@@ -155,15 +155,15 @@ struct CallerEntry {
     rendered_generation: u64,
     /// The camera and extent of the last rendered frame, which its frame
     /// results report.
-    rendered_view: Option<MlnMapView>,
-    waiting: Vec<MlnFrameDemand>,
+    rendered_view: Option<mln_map_view>,
+    waiting: Vec<mln_frame_demand>,
 }
 
 thread_local! {
     static ENTRIES: RefCell<HashMap<u64, Rc<RefCell<CallerEntry>>>> = RefCell::new(HashMap::new());
 }
 
-fn physical(size: MlnLogicalSize, scale_factor: f64) -> Size {
+fn physical(size: mln_logical_size, scale_factor: f64) -> Size {
     Size::new(
         (f64::from(size.width) * scale_factor).round().max(1.0) as u32,
         (f64::from(size.height) * scale_factor).round().max(1.0) as u32,
@@ -171,11 +171,11 @@ fn physical(size: MlnLogicalSize, scale_factor: f64) -> Size {
 }
 
 /// Creates the session's renderer on this thread over the host's objects.
-fn create_entry(session: u64, shared: &Arc<SessionShared>) -> Result<CallerEntry, String> {
+fn create_entry(shared: &Arc<SessionShared>) -> Result<CallerEntry, String> {
     let caller = shared.caller.as_ref().expect("a surface session");
     let extent = shared.state.lock().unwrap().extent;
     let scale_factor = shared.map.scale_factor;
-    let size = physical(MlnLogicalSize { width: extent.width, height: extent.height }, scale_factor);
+    let size = physical(mln_logical_size { width: extent.width, height: extent.height }, scale_factor);
     let instance = NonNull::new(caller.instance as *mut std::ffi::c_void).ok_or("no instance")?;
     let device = NonNull::new(caller.device as *mut std::ffi::c_void).ok_or("no device")?;
     let surface = NonNull::new(caller.surface as *mut std::ffi::c_void).ok_or("no surface")?;
@@ -205,7 +205,6 @@ fn create_entry(session: u64, shared: &Arc<SessionShared>) -> Result<CallerEntry
     let observer = Rc::new(RemoteObserver { map: shared.map.clone() });
     let weak_observer: Weak<dyn RendererObserver> = Rc::downgrade(&observer) as Weak<dyn RendererObserver>;
     renderer.set_observer(Some(weak_observer));
-    let _ = session;
     Ok(CallerEntry {
         shared: shared.clone(),
         run_loop,
@@ -220,8 +219,8 @@ fn create_entry(session: u64, shared: &Arc<SessionShared>) -> Result<CallerEntry
     })
 }
 
-fn frame_result(entry: &CallerEntry, disposition: u32, token: u64) -> MlnRenderFrameResult {
-    MlnRenderFrameResult {
+fn frame_result(entry: &CallerEntry, disposition: u32, token: u64) -> mln_render_frame_result {
+    mln_render_frame_result {
         disposition,
         token,
         map_update_generation: entry.update_generation,
@@ -244,7 +243,7 @@ fn render(entry: &mut CallerEntry) -> bool {
         // update arrived.
         let size = parameters.transform_state.get_size();
         entry.backend.set_framebuffer_size(physical(
-            MlnLogicalSize { width: size.width, height: size.height },
+            mln_logical_size { width: size.width, height: size.height },
             entry.shared.map.scale_factor,
         ));
         if !entry.backend.acquire_next_texture() {
@@ -264,7 +263,7 @@ fn render(entry: &mut CallerEntry) -> bool {
             view.camera = map::camera_of(&parameters.transform_state.get_camera_options(None));
             let size = parameters.transform_state.get_size();
             view.extent =
-                MlnLogicalExtent { width: size.width, height: size.height, scale_factor: entry.shared.map.scale_factor };
+                mln_logical_extent { width: size.width, height: size.height, scale_factor: entry.shared.map.scale_factor };
             entry.rendered_view = Some(view);
             entry.shared.frame_generation.fetch_add(1, Ordering::SeqCst);
             let handle = entry.shared.map.handle;
@@ -342,7 +341,7 @@ fn end(session: u64, shared: Arc<SessionShared>, state: u32, completions: Vec<Co
         shared.map.session.compare_exchange(session, 0, Ordering::SeqCst, Ordering::SeqCst).ok();
         let demands = std::mem::take(&mut *shared.demands.lock().unwrap());
         for demand in demands {
-            shared.push_result(MlnRenderFrameResult {
+            shared.push_result(mln_render_frame_result {
                 disposition: MLN_RENDER_RESULT_TARGET_NOT_READY,
                 token: demand.token,
                 view: shared.map.view(),
@@ -386,7 +385,7 @@ pub fn abandon(session: u64, shared: &Arc<SessionShared>) {
 }
 
 /// `mln_render_session_resize` of a surface session.
-pub fn resize(shared: &Arc<SessionShared>, logical_size: MlnLogicalSize, completion: Option<Completion>) {
+pub fn resize(shared: &Arc<SessionShared>, logical_size: mln_logical_size, completion: Option<Completion>) {
     {
         let mut public = shared.state.lock().unwrap();
         public.extent.width = logical_size.width;
@@ -416,12 +415,12 @@ pub fn barrier(shared: &Arc<SessionShared>, completion: Completion) {
 /// C API contract (surface.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(
-    map: u64,
-    descriptor: *const MlnWebGpuSurfaceDescriptor,
-    options: *const MlnRenderSessionAttachOptions,
-    out_session: *mut u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    descriptor: *const mln_web_gpu_surface_descriptor,
+    options: *const mln_render_session_attach_options,
+    out_session: *mut mln_render_session,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -466,7 +465,7 @@ pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(
             if !cfg!(target_os = "emscripten") {
                 return Err(Failure::new(MLN_STATUS_UNSUPPORTED, "WebGPU surfaces need the browser build"));
             }
-            let completion = Completion::from_c(completion, false)?;
+            let completion = Some(Completion::required(completion)?);
             let handle = handles::reserve(handles::Kind::RenderSession);
             if map_shared.session.compare_exchange(0, handle, Ordering::SeqCst, Ordering::SeqCst).is_err() {
                 return Err(Failure::invalid_state("the map already has a render session"));
@@ -475,7 +474,7 @@ pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(
                 map: map_shared.clone(),
                 state: Mutex::new(SessionPublic {
                     state: MLN_RENDER_SESSION_STATE_ATTACHING,
-                    extent: MlnLogicalExtent {
+                    extent: mln_logical_extent {
                         width: size.width,
                         height: size.height,
                         scale_factor: map_shared.scale_factor,
@@ -486,7 +485,7 @@ pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(
                 demands: Mutex::new(Vec::new()),
                 results: Mutex::new(Vec::new()),
                 frame_wake: Wake::from_c(&options.frame_wake),
-                frame_wake_armed: Mutex::new(true),
+                frame_wake_armed: AtomicBool::new(true),
                 frame_generation: AtomicU64::new(0),
                 driver: MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
                 caller: Some(CallerShared {
@@ -505,7 +504,7 @@ pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(
                 }),
             });
             handles::insert_at(handle, Object::Session(shared.clone()));
-            *out_session = handle;
+            *out_session = handle.into();
 
             map_shared.runtime.post(move || {
                 let Some(map) = map::entry(shared.map.handle) else {
@@ -530,12 +529,13 @@ pub unsafe extern "C" fn mln_map_attach_web_gpu_surface(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_service_driver_work(
-    session: u64,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
+            let session = session.0;
             let existing = ENTRIES.with(|entries| entries.borrow().get(&session).cloned());
             let shared = match (&existing, handles::session(session)) {
                 (_, Ok(shared)) => shared,
@@ -568,7 +568,7 @@ pub unsafe extern "C" fn mln_render_session_service_driver_work(
             let entry = match existing {
                 Some(entry) => entry,
                 None => {
-                    let created = catch_unwind(AssertUnwindSafe(|| create_entry(session, &shared)));
+                    let created = catch_unwind(AssertUnwindSafe(|| create_entry(&shared)));
                     let attach = caller.attach.lock().unwrap().take();
                     let result = match created {
                         Ok(result) => result,

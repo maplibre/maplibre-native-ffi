@@ -38,17 +38,17 @@ impl UserData {
 pub struct Wake {
     callback: Option<unsafe extern "C" fn(*mut c_void)>,
     user_data: UserData,
-    release_user_data: UserDataRelease,
+    release_user_data: mln_user_data_release,
     queue: u64,
 }
 
 impl Wake {
-    pub fn from_c(wake: &MlnWake) -> Option<Wake> {
+    pub fn from_c(wake: &mln_wake) -> Option<Wake> {
         wake.callback.map(|callback| Wake {
             callback: Some(callback),
             user_data: UserData(wake.user_data),
             release_user_data: wake.release_user_data,
-            queue: wake.queue,
+            queue: wake.queue.0,
         })
     }
 
@@ -112,9 +112,9 @@ pub fn deliver(queue: u64, call: Call) {
 /// A registered `mln_completion`, which runs once and then releases its
 /// user_data.
 pub struct Completion {
-    callback: MlnCompletionCallback,
+    callback: mln_completion_callback,
     user_data: UserData,
-    release_user_data: UserDataRelease,
+    release_user_data: mln_user_data_release,
     queue: u64,
 }
 
@@ -124,20 +124,30 @@ pub enum Value {
     /// An `mln_buffer_view` of these bytes.
     BufferView(Vec<u8>),
     /// An `mln_texture_readback_result` of these pixels.
-    Readback { pixels: Vec<u8>, info: MlnTextureImageInfo },
+    Readback { pixels: Vec<u8>, info: mln_texture_image_info },
     /// An `mln_camera_query_result`.
-    Camera(MlnCameraQueryResult),
+    Camera(mln_camera_query_result),
 }
 
 impl Completion {
+    /// Validates a caller's completion, which must not be null.
+    ///
+    /// # Safety
+    /// As for `optional`.
+    pub unsafe fn required(completion: *const mln_completion) -> Result<Completion, Failure> {
+        // SAFETY: the caller's contract.
+        unsafe { Completion::optional(completion) }?
+            .ok_or_else(|| Failure::invalid_argument("completion must not be null"))
+    }
+
     /// Validates a caller's completion. `Ok(None)` is a null completion,
     /// which only commands accept.
     ///
     /// # Safety
     /// `completion` is null or points at a readable `mln_completion`.
-    pub unsafe fn from_c(completion: *const MlnCompletion, optional: bool) -> Result<Option<Completion>, Failure> {
+    pub unsafe fn optional(completion: *const mln_completion) -> Result<Option<Completion>, Failure> {
         if completion.is_null() {
-            return if optional { Ok(None) } else { Err(Failure::invalid_argument("completion must not be null")) };
+            return Ok(None);
         }
         // SAFETY: the caller's contract.
         let Some(completion) = (unsafe { read_sized(completion) }) else {
@@ -146,14 +156,14 @@ impl Completion {
         if completion.callback.is_none() {
             return Err(Failure::invalid_argument("completion.callback must not be null"));
         }
-        if completion.queue != 0 {
+        if completion.queue.0 != 0 {
             handles::queue(completion.queue)?;
         }
         Ok(Some(Completion {
             callback: completion.callback,
             user_data: UserData(completion.user_data),
             release_user_data: completion.release_user_data,
-            queue: completion.queue,
+            queue: completion.queue.0,
         }))
     }
 
@@ -176,25 +186,23 @@ impl Completion {
     pub fn finish(self, status: i32, generation: u64, message: String, value: Value) {
         let Completion { callback, user_data, release_user_data, queue } = self;
         deliver(queue, Box::new(move || {
-            let mut buffer_view = MlnBufferView::EMPTY;
-            let mut text = LentText::new(Vec::new());
-            let mut readback = MlnTextureReadbackResult { data: MlnBufferView::EMPTY, info: MlnTextureImageInfo::default() };
-            let mut camera = MlnCameraQueryResult::default();
-            let (value_ptr, value_size, value_count): (*const c_void, usize, usize) = match &value {
+            // The value's C struct and what it points at, which live until
+            // the callback returns.
+            let text;
+            let buffer_view;
+            let readback;
+            let (value_ptr, value_size, value_count): (*const c_void, usize, usize) = match value {
                 Value::None => (std::ptr::null(), 0, 0),
                 Value::BufferView(bytes) => {
-                    text = LentText::new(bytes.clone());
-                    buffer_view = MlnBufferView::of_text(&text);
-                    ((&raw const buffer_view).cast(), size_of::<MlnBufferView>(), 1)
+                    text = LentText::new(bytes);
+                    buffer_view = mln_buffer_view::of_text(&text);
+                    ((&raw const buffer_view).cast(), size_of::<mln_buffer_view>(), 1)
                 }
-                Value::Readback { pixels, info } => {
-                    readback = MlnTextureReadbackResult { data: MlnBufferView::of(pixels), info: *info };
-                    ((&raw const readback).cast(), size_of::<MlnTextureReadbackResult>(), 1)
+                Value::Readback { ref pixels, info } => {
+                    readback = mln_texture_readback_result { data: mln_buffer_view::of(pixels), info };
+                    ((&raw const readback).cast(), size_of::<mln_texture_readback_result>(), 1)
                 }
-                Value::Camera(result) => {
-                    camera = *result;
-                    ((&raw const camera).cast(), size_of::<MlnCameraQueryResult>(), 1)
-                }
+                Value::Camera(ref camera) => ((&raw const *camera).cast(), size_of::<mln_camera_query_result>(), 1),
             };
             let disposition = if status == MLN_STATUS_OK {
                 MLN_COMMAND_DISPOSITION_COMMITTED
@@ -204,14 +212,14 @@ impl Completion {
                 MLN_COMMAND_DISPOSITION_FAILED
             };
             let diagnostic = LentText::new(message);
-            let result = MlnCompletionResult {
-                size: size_of::<MlnCompletionResult>() as u32,
+            let result = mln_completion_result {
+                size: size_of::<mln_completion_result>() as u32,
                 status,
                 disposition,
                 value_size: value_size as u32,
                 generation,
                 render_update_generation: 0,
-                diagnostic: MlnBufferView::of_text(&diagnostic),
+                diagnostic: mln_buffer_view::of_text(&diagnostic),
                 value: value_ptr,
                 value_count,
             };
@@ -220,7 +228,6 @@ impl Completion {
                 // `result` and what it points at live until it returns.
                 unsafe { callback(user_data.get(), &result) };
             }
-            let _ = (&buffer_view, &text, &readback, &camera);
             if let Some(release) = release_user_data {
                 // SAFETY: the registration's release, called once.
                 unsafe { release(user_data.get()) };
@@ -233,9 +240,9 @@ impl Completion {
 /// C API contract (delivery.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_delivery_queue_create(
-    options: *const MlnDeliveryQueueOptions,
-    out_queue: *mut u64,
-    out_diagnostic: *mut MlnDiagnostic,
+    options: *const mln_delivery_queue_options,
+    out_queue: *mut mln_delivery_queue,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -251,7 +258,7 @@ pub unsafe extern "C" fn mln_delivery_queue_create(
                 dispatching: Mutex::new(()),
                 wake: Wake::from_c(&options.wake),
             });
-            *out_queue = handles::insert(Object::Queue(queue));
+            *out_queue = handles::insert(Object::Queue(queue)).into();
             Ok(())
         })
     }
@@ -260,7 +267,7 @@ pub unsafe extern "C" fn mln_delivery_queue_create(
 /// # Safety
 /// C API contract (delivery.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_delivery_queue_release(queue: u64) {
+pub unsafe extern "C" fn mln_delivery_queue_release(queue: mln_delivery_queue) {
     if let Some(Object::Queue(queue)) = handles::remove(queue) {
         queue.calls.lock().unwrap().clear();
         if let Some(wake) = queue.wake {
@@ -275,7 +282,7 @@ pub unsafe extern "C" fn mln_delivery_queue_release(queue: u64) {
 /// # Safety
 /// C API contract (delivery.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_delivery_queue_dispatch(queue: u64, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_delivery_queue_dispatch(queue: mln_delivery_queue, out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {

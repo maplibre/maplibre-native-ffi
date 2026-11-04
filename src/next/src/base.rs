@@ -4,12 +4,9 @@
 use crate::diagnostics::{Failure, boundary};
 use crate::types::*;
 
-/// `MLN_C_VERSION` of the headers in include/.
-const C_VERSION: u32 = 0;
-
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_c_version() -> u32 {
-    C_VERSION
+    MLN_C_VERSION
 }
 
 /// The port renders through wgpu, i.e. the WebGPU API.
@@ -22,10 +19,10 @@ pub extern "C" fn mln_supported_render_backend_mask() -> u32 {
 /// C API contract (render_target.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_logical_extent_physical_size(
-    extent: MlnLogicalExtent,
+    extent: mln_logical_extent,
     out_width: *mut u32,
     out_height: *mut u32,
-    out_diagnostic: *mut MlnDiagnostic,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {

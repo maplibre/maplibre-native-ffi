@@ -36,9 +36,9 @@ thread_local! {
 
 /// A registered `mln_runtime_event_handler`.
 struct EventHandler {
-    callback: MlnRuntimeEventCallback,
+    callback: mln_runtime_event_callback,
     user_data: UserData,
-    release_user_data: UserDataRelease,
+    release_user_data: mln_user_data_release,
     queue: u64,
 }
 
@@ -54,6 +54,13 @@ impl EventHandler {
     }
 }
 
+/// The payloads of the events this crate raises.
+pub enum Payload {
+    None,
+    RenderFrame(mln_runtime_event_render_frame),
+    RenderMap(mln_runtime_event_render_map),
+}
+
 /// An event with the data it points at.
 pub struct OwnedEvent {
     pub type_: u32,
@@ -61,9 +68,8 @@ pub struct OwnedEvent {
     pub source: u64,
     pub generation: u64,
     pub code: u32,
-    pub payload_type: u32,
     pub message: String,
-    pub payload: MlnRuntimeEventPayload,
+    pub payload: Payload,
 }
 
 impl OwnedEvent {
@@ -74,9 +80,8 @@ impl OwnedEvent {
             source: map,
             generation,
             code: 0,
-            payload_type: MLN_RUNTIME_EVENT_PAYLOAD_NONE,
             message: String::new(),
-            payload: MlnRuntimeEventPayload { padding: [0; 9] },
+            payload: Payload::None,
         }
     }
 }
@@ -120,19 +125,31 @@ impl RuntimeShared {
         };
         deliver(handler.queue, Box::new(move || {
             let message = LentText::new(event.message);
-            let c_event = MlnRuntimeEvent {
+            let mut payload = mln_runtime_event_payload::default();
+            let payload_type = match event.payload {
+                Payload::None => MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+                Payload::RenderFrame(render_frame) => {
+                    payload.render_frame = render_frame;
+                    MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME
+                }
+                Payload::RenderMap(render_map) => {
+                    payload.render_map = render_map;
+                    MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
+                }
+            };
+            let c_event = mln_runtime_event {
                 type_: event.type_,
                 source_type: event.source_type,
                 source: event.source,
                 generation: event.generation,
                 code: event.code,
-                payload_type: event.payload_type,
-                message: MlnBufferView::of_text(&message),
-                payload: event.payload,
+                payload_type,
+                message: mln_buffer_view::of_text(&message),
+                payload,
             };
-            let batch = MlnEventBatchView {
-                size: size_of::<MlnEventBatchView>() as u32,
-                event_size: size_of::<MlnRuntimeEvent>() as u32,
+            let batch = mln_event_batch_view {
+                size: size_of::<mln_event_batch_view>() as u32,
+                event_size: size_of::<mln_runtime_event>() as u32,
                 events: &c_event,
                 event_count: 1,
             };
@@ -160,9 +177,9 @@ fn runtime_thread(ready: mpsc::Sender<RunLoopHandle>) {
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_runtime_create(
-    options: *const MlnRuntimeOptions,
-    out_runtime: *mut u64,
-    out_diagnostic: *mut MlnDiagnostic,
+    options: *const mln_runtime_options,
+    out_runtime: *mut mln_runtime,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -203,12 +220,12 @@ pub unsafe extern "C" fn mln_runtime_create(
                 thread: Mutex::new(Some(thread)),
                 maps: Mutex::new(HashSet::new()),
                 events: Mutex::new(None),
-                event_mask: AtomicU64::new(MLN_RUNTIME_EVENT_FLAGS_ALL),
+                event_mask: AtomicU64::new(MLN_RUNTIME_EVENT_FLAG_ALL),
                 released: AtomicBool::new(false),
                 resource_options,
             });
             handles::insert_at(handle, Object::Runtime(runtime));
-            *out_runtime = handle;
+            *out_runtime = handle.into();
             Ok(())
         })
     }
@@ -226,9 +243,9 @@ fn stop_runtime(runtime: &Arc<RuntimeShared>) {
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_runtime_release(
-    runtime: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    runtime: mln_runtime,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -237,7 +254,7 @@ pub unsafe extern "C" fn mln_runtime_release(
             if !shared.maps.lock().unwrap().is_empty() {
                 return Err(Failure::invalid_state("release the runtime's maps first"));
             }
-            let completion = Completion::from_c(completion, true)?;
+            let completion = Completion::optional(completion)?;
             stop_runtime(&shared);
             let thread = shared.thread.lock().unwrap().take();
             let loop_handle = shared.loop_handle.clone();
@@ -260,7 +277,7 @@ pub unsafe extern "C" fn mln_runtime_release(
 /// # Safety
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_dispose(runtime: u64, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_runtime_dispose(runtime: mln_runtime, out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
@@ -276,10 +293,10 @@ pub unsafe extern "C" fn mln_runtime_dispose(runtime: u64, out_diagnostic: *mut 
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_runtime_set_event_handler(
-    runtime: u64,
-    handler: *const MlnRuntimeEventHandler,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    runtime: mln_runtime,
+    handler: *const mln_runtime_event_handler,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -291,15 +308,15 @@ pub unsafe extern "C" fn mln_runtime_set_event_handler(
             if handler.callback.is_none() {
                 return Err(Failure::invalid_argument("handler.callback must not be null"));
             }
-            if handler.queue != 0 {
+            if handler.queue.0 != 0 {
                 handles::queue(handler.queue)?;
             }
-            let completion = Completion::from_c(completion, true)?;
+            let completion = Completion::optional(completion)?;
             let previous = shared.events.lock().unwrap().replace(Arc::new(EventHandler {
                 callback: handler.callback,
                 user_data: UserData(handler.user_data),
                 release_user_data: handler.release_user_data,
-                queue: handler.queue,
+                queue: handler.queue.0,
             }));
             if let Some(previous) = previous {
                 previous.release();
@@ -316,15 +333,15 @@ pub unsafe extern "C" fn mln_runtime_set_event_handler(
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_runtime_clear_event_handler(
-    runtime: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    runtime: mln_runtime,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
             let shared = handles::runtime(runtime)?;
-            let completion = Completion::from_c(completion, true)?;
+            let completion = Completion::optional(completion)?;
             if let Some(previous) = shared.events.lock().unwrap().take() {
                 previous.release();
             }
@@ -339,12 +356,12 @@ pub unsafe extern "C" fn mln_runtime_clear_event_handler(
 /// # Safety
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_event_mask(runtime: u64, mask: u64, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_runtime_set_event_mask(runtime: mln_runtime, mask: u64, out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
             let shared = handles::runtime(runtime)?;
-            if mask & !MLN_RUNTIME_EVENT_FLAGS_ALL != 0 {
+            if mask & !MLN_RUNTIME_EVENT_FLAG_ALL != 0 {
                 return Err(Failure::invalid_argument("mask has unknown event bits"));
             }
             shared.event_mask.store(mask, Ordering::SeqCst);
@@ -357,9 +374,9 @@ pub unsafe extern "C" fn mln_runtime_set_event_mask(runtime: u64, mask: u64, out
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_runtime_get_event_mask(
-    runtime: u64,
+    runtime: mln_runtime,
     out_mask: *mut u64,
-    out_diagnostic: *mut MlnDiagnostic,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -377,7 +394,7 @@ pub unsafe extern "C" fn mln_runtime_get_event_mask(
 /// # Safety
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_network_get_status(out_status: *mut u32, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_network_get_status(out_status: *mut u32, out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
@@ -396,7 +413,7 @@ pub unsafe extern "C" fn mln_network_get_status(out_status: *mut u32, out_diagno
 /// # Safety
 /// C API contract (runtime.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_network_set_status(status: u32, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_network_set_status(status: u32, out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {

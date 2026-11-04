@@ -3,925 +3,978 @@
 // The C API functions that this crate does not implement yet. Each one keeps
 // its C signature, writes a diagnostic and returns
 // MLN_STATUS_UNSUPPORTED (or does nothing, for functions without a
-// status), so callers of the whole API link.
+// status), so callers of the whole API link. At the end, a check that the
+// functions it does implement have the headers' signatures.
 
 #![allow(unused_variables, clippy::missing_safety_doc)]
 
 use crate::types::*;
-use std::ffi::c_void;
 
-/// `mln_android_init` (android.h): not implemented.
+/// `mln_acquired_frame_discard` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_android_init(jni_env: *mut c_void, context: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_android_init") }
+pub unsafe extern "C" fn mln_acquired_frame_discard(frame: mln_acquired_frame, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_discard") }
 }
 
-/// `mln_binding_owner_token_create` (binding_support.h): not implemented.
+/// `mln_acquired_frame_get_metal_texture` (texture.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_binding_owner_token_create(handle: u64) -> *mut c_void {
-    std::ptr::null_mut()
+pub unsafe extern "C" fn mln_acquired_frame_get_metal_texture(frame: mln_acquired_frame, out_frame: *mut mln_metal_texture_frame, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_metal_texture") }
 }
 
-/// `mln_binding_owner_token_destroy` (binding_support.h): not implemented.
+/// `mln_acquired_frame_get_open_gl_texture` (texture.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_binding_owner_token_destroy(token: *mut c_void) {
-}
-
-/// `mln_binding_owner_finalize` (binding_support.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_binding_owner_finalize(token: *mut c_void) {
-}
-
-/// `mln_binding_render_session_abandon_at_exit` (binding_support.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_binding_render_session_abandon_at_exit(session: u64, out_result: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_binding_render_session_abandon_at_exit") }
-}
-
-/// `mln_binding_dart_wake_create` (binding_support.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_binding_dart_wake_create(post_cobject: *mut c_void, port: i64, out_wake: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_binding_dart_wake_create") }
-}
-
-/// `mln_map_set_debug_flags` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_debug_flags(map: u64, flags: u32, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_debug_flags") }
-}
-
-/// `mln_map_set_rendering_stats_view_enabled` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_rendering_stats_view_enabled(map: u64, enabled: bool, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_rendering_stats_view_enabled") }
-}
-
-/// `mln_map_dump_debug_logs` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_dump_debug_logs(map: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_dump_debug_logs") }
-}
-
-/// `mln_map_set_viewport_options` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_viewport_options(map: u64, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_viewport_options") }
-}
-
-/// `mln_map_set_tile_options` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_tile_options(map: u64, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_tile_options") }
-}
-
-/// `mln_map_apply_camera_delta` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_apply_camera_delta(map: u64, delta: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_apply_camera_delta") }
-}
-
-/// `mln_map_cancel_camera_transitions` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_cancel_camera_transitions(map: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_cancel_camera_transitions") }
-}
-
-/// `mln_map_cancel_camera_transitions_with_id` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_cancel_camera_transitions_with_id(map: u64, transition_id: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_cancel_camera_transitions_with_id") }
-}
-
-/// `mln_map_camera_for_lat_lng_bounds` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_camera_for_lat_lng_bounds(map: u64, bounds: MlnLatLngBounds, fit_options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_camera_for_lat_lng_bounds") }
-}
-
-/// `mln_map_camera_for_lat_lngs` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_camera_for_lat_lngs(map: u64, coordinates: *const c_void, coordinate_count: usize, fit_options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_camera_for_lat_lngs") }
-}
-
-/// `mln_map_camera_for_geometry` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_camera_for_geometry(map: u64, geometry: MlnBufferView, fit_options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_camera_for_geometry") }
-}
-
-/// `mln_camera_for_tile` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_camera_for_tile(tile: MlnCanonicalTileId, logical_size: MlnLogicalSize, out_camera: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_camera_for_tile") }
-}
-
-/// `mln_map_fit_camera_to_lat_lng_bounds` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_fit_camera_to_lat_lng_bounds(map: u64, bounds: MlnLatLngBounds, update: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_fit_camera_to_lat_lng_bounds") }
-}
-
-/// `mln_map_fit_camera_to_lat_lngs` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_fit_camera_to_lat_lngs(map: u64, coordinates: *const c_void, coordinate_count: usize, update: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_fit_camera_to_lat_lngs") }
-}
-
-/// `mln_map_fit_camera_to_geometry` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_fit_camera_to_geometry(map: u64, geometry: MlnBufferView, update: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_fit_camera_to_geometry") }
-}
-
-/// `mln_map_lat_lng_bounds_for_camera` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_lat_lng_bounds_for_camera(map: u64, camera: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_lat_lng_bounds_for_camera") }
-}
-
-/// `mln_map_set_bounds` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_bounds(map: u64, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_bounds") }
-}
-
-/// `mln_map_set_free_camera_options` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_free_camera_options(map: u64, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_free_camera_options") }
-}
-
-/// `mln_map_set_projection_mode` (camera.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_projection_mode(map: u64, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_projection_mode") }
-}
-
-/// `mln_runtime_create_offline_region` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_create_offline_region(runtime: u64, definition: *const c_void, metadata: *const c_void, metadata_size: usize, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_create_offline_region") }
-}
-
-/// `mln_runtime_get_offline_region` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_get_offline_region(runtime: u64, region_id: i64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_get_offline_region") }
-}
-
-/// `mln_runtime_list_offline_regions` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_list_offline_regions(runtime: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_list_offline_regions") }
-}
-
-/// `mln_runtime_merge_offline_regions` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_merge_offline_regions(runtime: u64, side_database_path: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_merge_offline_regions") }
-}
-
-/// `mln_runtime_update_offline_region_metadata` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_update_offline_region_metadata(runtime: u64, region_id: i64, metadata: *const c_void, metadata_size: usize, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_update_offline_region_metadata") }
-}
-
-/// `mln_runtime_get_offline_region_status` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_get_offline_region_status(runtime: u64, region_id: i64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_get_offline_region_status") }
-}
-
-/// `mln_runtime_set_offline_region_observed` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_offline_region_observed(runtime: u64, region_id: i64, observed: bool, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_offline_region_observed") }
-}
-
-/// `mln_runtime_set_offline_region_download_state` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_offline_region_download_state(runtime: u64, region_id: i64, state: u32, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_offline_region_download_state") }
-}
-
-/// `mln_runtime_invalidate_offline_region` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_invalidate_offline_region(runtime: u64, region_id: i64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_invalidate_offline_region") }
-}
-
-/// `mln_runtime_delete_offline_region` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_delete_offline_region(runtime: u64, region_id: i64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_delete_offline_region") }
-}
-
-/// `mln_map_begin_command_group` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_begin_command_group(map: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_begin_command_group") }
-}
-
-/// `mln_map_end_command_group` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_end_command_group(map: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_end_command_group") }
-}
-
-/// `mln_map_set_feature_state` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_feature_state(map: u64, selector: *const c_void, state: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_feature_state") }
-}
-
-/// `mln_map_get_feature_state` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_feature_state(map: u64, selector: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_feature_state") }
-}
-
-/// `mln_map_remove_feature_state` (map.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_remove_feature_state(map: u64, selector: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_feature_state") }
-}
-
-/// `mln_plugin_get_register_function_v1` (plugin.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_plugin_get_register_function_v1() -> *const c_void {
-    std::ptr::null()
-}
-
-/// `mln_map_projection_create` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_create(view: *const c_void, out_projection: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_create") }
-}
-
-/// `mln_map_projection_release` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_release(projection: u64) {
-}
-
-/// `mln_map_projection_get_camera` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_get_camera(projection: u64, out_result: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_get_camera") }
-}
-
-/// `mln_map_projection_set_camera` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_set_camera(projection: u64, camera: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_set_camera") }
-}
-
-/// `mln_map_projection_pixel_for_lat_lng` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_pixel_for_lat_lng(projection: u64, coordinate: MlnLatLng, out_point: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_pixel_for_lat_lng") }
-}
-
-/// `mln_map_projection_lat_lng_for_pixel` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_lat_lng_for_pixel(projection: u64, point: MlnScreenPoint, out_coordinate: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_lat_lng_for_pixel") }
-}
-
-/// `mln_map_projection_lat_lng_for_pixel_unwrapped` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_lat_lng_for_pixel_unwrapped(projection: u64, point: MlnScreenPoint, out_coordinate: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_lat_lng_for_pixel_unwrapped") }
-}
-
-/// `mln_map_projection_pixels_for_lat_lngs` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_pixels_for_lat_lngs(projection: u64, coordinates: *const c_void, coordinate_count: usize, out_points: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_pixels_for_lat_lngs") }
-}
-
-/// `mln_map_projection_lat_lngs_for_pixels` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_lat_lngs_for_pixels(projection: u64, points: *const c_void, point_count: usize, out_coordinates: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_lat_lngs_for_pixels") }
-}
-
-/// `mln_map_projection_lat_lngs_for_pixels_unwrapped` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_lat_lngs_for_pixels_unwrapped(projection: u64, points: *const c_void, point_count: usize, out_coordinates: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_lat_lngs_for_pixels_unwrapped") }
-}
-
-/// `mln_map_projection_meters_per_pixel_at_latitude` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_projection_meters_per_pixel_at_latitude(projection: u64, latitude: f64, out_meters_per_pixel: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_meters_per_pixel_at_latitude") }
-}
-
-/// `mln_projected_meters_for_lat_lng` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_projected_meters_for_lat_lng(coordinate: MlnLatLng, out_meters: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_projected_meters_for_lat_lng") }
-}
-
-/// `mln_lat_lng_for_projected_meters` (projection.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_lat_lng_for_projected_meters(meters: MlnProjectedMeters, out_coordinate: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_lat_lng_for_projected_meters") }
-}
-
-/// `mln_render_session_query_rendered_features` (query.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_query_rendered_features(session: u64, geometry: *const c_void, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_rendered_features") }
-}
-
-/// `mln_render_session_query_source_features` (query.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_query_source_features(session: u64, source_id: MlnBufferView, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_source_features") }
-}
-
-/// `mln_render_session_query_feature_extensions` (query.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_query_feature_extensions(session: u64, source_id: MlnBufferView, feature: MlnBufferView, extension: MlnBufferView, extension_field: MlnBufferView, arguments: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_feature_extensions") }
-}
-
-/// `mln_render_session_acquire_frame` (render_session.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_acquire_frame(session: u64, out_frame: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_acquire_frame") }
-}
-
-/// `mln_acquired_frame_get_result` (render_session.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_get_result(frame: u64, out_result: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_result") }
+pub unsafe extern "C" fn mln_acquired_frame_get_open_gl_texture(frame: mln_acquired_frame, out_frame: *mut mln_open_gl_texture_frame, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_open_gl_texture") }
 }
 
 /// `mln_acquired_frame_get_producer_sync` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_get_producer_sync(frame: u64, out_sync: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_acquired_frame_get_producer_sync(frame: mln_acquired_frame, out_sync: *mut mln_gpu_sync, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_producer_sync") }
+}
+
+/// `mln_acquired_frame_get_result` (render_session.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_acquired_frame_get_result(frame: mln_acquired_frame, out_result: *mut mln_render_frame_result, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_result") }
+}
+
+/// `mln_acquired_frame_get_vulkan_texture` (texture.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_acquired_frame_get_vulkan_texture(frame: mln_acquired_frame, out_frame: *mut mln_vulkan_texture_frame, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_vulkan_texture") }
+}
+
+/// `mln_acquired_frame_get_web_gpu_texture` (texture.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_acquired_frame_get_web_gpu_texture(frame: mln_acquired_frame, out_frame: *mut mln_web_gpu_texture_frame, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_web_gpu_texture") }
 }
 
 /// `mln_acquired_frame_release` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_release(frame: u64, consumer_completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_acquired_frame_release(frame: mln_acquired_frame, consumer_completion: *const mln_gpu_sync, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_release") }
 }
 
 /// `mln_acquired_frame_view_begin` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_view_begin(frame: u64, out_scope: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_acquired_frame_view_begin(frame: mln_acquired_frame, out_scope: *mut *mut std::ffi::c_void, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_view_begin") }
 }
 
 /// `mln_acquired_frame_view_end` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_view_end(scope: *mut c_void) {
+pub unsafe extern "C" fn mln_acquired_frame_view_end(scope: *mut std::ffi::c_void) {
 }
 
-/// `mln_render_session_release_target` (render_session.h): not implemented.
+/// `mln_android_init` (android.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_release_target(session: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_release_target") }
+pub unsafe extern "C" fn mln_android_init(jni_env: *mut std::ffi::c_void, context: *mut std::ffi::c_void, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_android_init") }
 }
 
-/// `mln_render_session_reduce_memory_use` (render_session.h): not implemented.
+/// `mln_binding_dart_wake_create` (binding_support.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_reduce_memory_use(session: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_reduce_memory_use") }
+pub unsafe extern "C" fn mln_binding_dart_wake_create(post_cobject: *mut std::ffi::c_void, port: i64, out_wake: *mut mln_wake, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_binding_dart_wake_create") }
 }
 
-/// `mln_render_session_clear_data` (render_session.h): not implemented.
+/// `mln_binding_owner_finalize` (binding_support.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_clear_data(session: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_clear_data") }
+pub unsafe extern "C" fn mln_binding_owner_finalize(token: *mut std::ffi::c_void) {
 }
 
-/// `mln_render_session_dump_debug_logs` (render_session.h): not implemented.
+/// `mln_binding_owner_token_create` (binding_support.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_dump_debug_logs(session: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_dump_debug_logs") }
+pub unsafe extern "C" fn mln_binding_owner_token_create(handle: u64) -> *mut std::ffi::c_void {
+    std::ptr::null_mut()
 }
 
-/// `mln_acquired_frame_discard` (render_session.h): not implemented.
+/// `mln_binding_owner_token_destroy` (binding_support.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_discard(frame: u64, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_discard") }
+pub unsafe extern "C" fn mln_binding_owner_token_destroy(token: *mut std::ffi::c_void) {
 }
 
-/// `mln_open_gl_supported_context_provider_mask` (render_target.h): not implemented.
+/// `mln_binding_render_session_abandon_at_exit` (binding_support.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_open_gl_supported_context_provider_mask() -> u32 {
-    0
+pub unsafe extern "C" fn mln_binding_render_session_abandon_at_exit(session: mln_render_session, out_result: *mut mln_render_abandon_result, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_binding_render_session_abandon_at_exit") }
 }
 
-/// `mln_http_header_transform_response_set_header` (runtime.h): not implemented.
+/// `mln_camera_for_tile` (camera.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_http_header_transform_response_set_header(response: *mut c_void, name: MlnBufferView, value: MlnBufferView, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_http_header_transform_response_set_header") }
-}
-
-/// `mln_runtime_set_resource_provider` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_resource_provider(runtime: u64, provider: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_resource_provider") }
-}
-
-/// `mln_runtime_clear_resource_provider` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_clear_resource_provider(runtime: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_resource_provider") }
-}
-
-/// `mln_resource_request_complete` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_complete(handle: u64, response: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_complete") }
-}
-
-/// `mln_resource_request_pass_through` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_pass_through(handle: u64, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_pass_through") }
-}
-
-/// `mln_resource_request_is_cancelled` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_is_cancelled(handle: u64, out_cancelled: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_is_cancelled") }
-}
-
-/// `mln_resource_request_set_cancel_callback` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_set_cancel_callback(handle: u64, handler: *const c_void, out_cancelled: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_set_cancel_callback") }
-}
-
-/// `mln_resource_request_release` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_request_release(handle: u64) {
-}
-
-/// `mln_runtime_set_resource_transform` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_resource_transform(runtime: u64, transform: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_resource_transform") }
-}
-
-/// `mln_runtime_clear_resource_transform` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_clear_resource_transform(runtime: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_resource_transform") }
-}
-
-/// `mln_resource_transform_request_complete` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_transform_request_complete(request: u64, url: MlnBufferView, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_transform_request_complete") }
-}
-
-/// `mln_resource_transform_request_fail` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_transform_request_fail(request: u64, error: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_transform_request_fail") }
-}
-
-/// `mln_resource_transform_request_release` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_resource_transform_request_release(request: u64) {
-}
-
-/// `mln_runtime_set_http_header_transform` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_http_header_transform(runtime: u64, transform: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_http_header_transform") }
-}
-
-/// `mln_runtime_clear_http_header_transform` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_clear_http_header_transform(runtime: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_http_header_transform") }
-}
-
-/// `mln_runtime_run_ambient_cache_operation` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_run_ambient_cache_operation(runtime: u64, operation: u32, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_run_ambient_cache_operation") }
-}
-
-/// `mln_runtime_set_maximum_ambient_cache_size` (runtime.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_runtime_set_maximum_ambient_cache_size(runtime: u64, size: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_maximum_ambient_cache_size") }
-}
-
-/// `mln_map_set_global_state_property` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_global_state_property(map: u64, property_name: MlnBufferView, value: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_global_state_property") }
-}
-
-/// `mln_map_get_global_state` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_global_state(map: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_global_state") }
-}
-
-/// `mln_map_add_style_source_json` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_style_source_json(map: u64, source_id: MlnBufferView, source_json: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_style_source_json") }
-}
-
-/// `mln_map_remove_style_source` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_remove_style_source(map: u64, source_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_style_source") }
-}
-
-/// `mln_map_get_style_source` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_source(map: u64, source_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_source") }
-}
-
-/// `mln_map_set_style_source_volatile` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_style_source_volatile(map: u64, source_id: MlnBufferView, is_volatile: bool, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_source_volatile") }
-}
-
-/// `mln_map_list_style_sources` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_list_style_sources(map: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_list_style_sources") }
-}
-
-/// `mln_map_add_geo_json_source_url` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_geo_json_source_url(map: u64, source_id: MlnBufferView, url: MlnBufferView, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_geo_json_source_url") }
+pub unsafe extern "C" fn mln_camera_for_tile(tile: mln_canonical_tile_id, logical_size: mln_logical_size, out_camera: *mut mln_camera_options, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_camera_for_tile") }
 }
 
 /// `mln_geo_json_source_data_create` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_geo_json_source_data_create(data: MlnBufferView, options: *const c_void, out_data: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_geo_json_source_data_create(data: mln_buffer_view, options: *const mln_geo_json_source_options, out_data: *mut mln_geo_json_source_data, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_geo_json_source_data_create") }
 }
 
 /// `mln_geo_json_source_data_release` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_geo_json_source_data_release(data: u64) {
+pub unsafe extern "C" fn mln_geo_json_source_data_release(data: mln_geo_json_source_data) {
 }
 
-/// `mln_map_add_geo_json_source_data` (style.h): not implemented.
+/// `mln_http_header_transform_response_set_header` (runtime.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_geo_json_source_data(map: u64, source_id: MlnBufferView, data: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_geo_json_source_data") }
+pub unsafe extern "C" fn mln_http_header_transform_response_set_header(response: *mut mln_http_header_transform_response, name: mln_buffer_view, value: mln_buffer_view, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_http_header_transform_response_set_header") }
 }
 
-/// `mln_map_set_geo_json_source_url` (style.h): not implemented.
+/// `mln_lat_lng_for_projected_meters` (projection.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_geo_json_source_url(map: u64, source_id: MlnBufferView, url: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_url") }
-}
-
-/// `mln_map_set_geo_json_source_data` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_geo_json_source_data(map: u64, source_id: MlnBufferView, data: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_data") }
-}
-
-/// `mln_map_set_geo_json_source_synchronous_tiling` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_geo_json_source_synchronous_tiling(map: u64, source_id: MlnBufferView, enabled: bool, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_synchronous_tiling") }
+pub unsafe extern "C" fn mln_lat_lng_for_projected_meters(meters: mln_projected_meters, out_coordinate: *mut mln_lat_lng, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_lat_lng_for_projected_meters") }
 }
 
 /// `mln_map_add_custom_geometry_source` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_custom_geometry_source(map: u64, source_id: MlnBufferView, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_add_custom_geometry_source(map: mln_map, source_id: mln_buffer_view, options: *const mln_custom_geometry_source_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_custom_geometry_source") }
+}
+
+/// `mln_map_add_custom_vector_source` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_add_custom_vector_source(map: mln_map, source_id: mln_buffer_view, options: *const mln_custom_vector_source_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_custom_vector_source") }
+}
+
+/// `mln_map_add_geo_json_source_data` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_add_geo_json_source_data(map: mln_map, source_id: mln_buffer_view, data: mln_geo_json_source_data, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_geo_json_source_data") }
+}
+
+/// `mln_map_add_geo_json_source_url` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_add_geo_json_source_url(map: mln_map, source_id: mln_buffer_view, url: mln_buffer_view, options: *const mln_geo_json_source_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_geo_json_source_url") }
+}
+
+/// `mln_map_add_image_source_image` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_add_image_source_image(map: mln_map, source_id: mln_buffer_view, coordinates: *const mln_lat_lng, coordinate_count: usize, image: *const mln_premultiplied_rgba8_image, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_image_source_image") }
+}
+
+/// `mln_map_add_image_source_url` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_add_image_source_url(map: mln_map, source_id: mln_buffer_view, coordinates: *const mln_lat_lng, coordinate_count: usize, url: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_image_source_url") }
+}
+
+/// `mln_map_add_style_layer_json` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_add_style_layer_json(map: mln_map, layer_json: mln_buffer_view, before_layer_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_style_layer_json") }
+}
+
+/// `mln_map_add_style_source_json` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_add_style_source_json(map: mln_map, source_id: mln_buffer_view, source_json: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_style_source_json") }
+}
+
+/// `mln_map_apply_camera_delta` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_apply_camera_delta(map: mln_map, delta: *const mln_camera_delta, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_apply_camera_delta") }
+}
+
+/// `mln_map_attach_metal_borrowed_texture` (texture.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_attach_metal_borrowed_texture(map: mln_map, descriptor: *const mln_metal_borrowed_texture_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_metal_borrowed_texture") }
+}
+
+/// `mln_map_attach_metal_surface` (surface.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_attach_metal_surface(map: mln_map, descriptor: *const mln_metal_surface_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_metal_surface") }
+}
+
+/// `mln_map_attach_open_gl_borrowed_texture` (texture.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_attach_open_gl_borrowed_texture(map: mln_map, descriptor: *const mln_open_gl_borrowed_texture_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_open_gl_borrowed_texture") }
+}
+
+/// `mln_map_attach_open_gl_surface` (surface.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_attach_open_gl_surface(map: mln_map, descriptor: *const mln_open_gl_surface_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_open_gl_surface") }
+}
+
+/// `mln_map_attach_vulkan_borrowed_texture` (texture.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_attach_vulkan_borrowed_texture(map: mln_map, descriptor: *const mln_vulkan_borrowed_texture_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_vulkan_borrowed_texture") }
+}
+
+/// `mln_map_attach_vulkan_surface` (surface.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_attach_vulkan_surface(map: mln_map, descriptor: *const mln_vulkan_surface_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_vulkan_surface") }
+}
+
+/// `mln_map_attach_web_gpu_borrowed_texture` (texture.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_attach_web_gpu_borrowed_texture(map: mln_map, descriptor: *const mln_web_gpu_borrowed_texture_descriptor, options: *const mln_render_session_attach_options, out_session: *mut mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_web_gpu_borrowed_texture") }
+}
+
+/// `mln_map_begin_command_group` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_begin_command_group(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_begin_command_group") }
+}
+
+/// `mln_map_camera_for_geometry` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_camera_for_geometry(map: mln_map, geometry: mln_buffer_view, fit_options: *const mln_camera_fit_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_camera_for_geometry") }
+}
+
+/// `mln_map_camera_for_lat_lng_bounds` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_camera_for_lat_lng_bounds(map: mln_map, bounds: mln_lat_lng_bounds, fit_options: *const mln_camera_fit_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_camera_for_lat_lng_bounds") }
+}
+
+/// `mln_map_camera_for_lat_lngs` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_camera_for_lat_lngs(map: mln_map, coordinates: *const mln_lat_lng, coordinate_count: usize, fit_options: *const mln_camera_fit_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_camera_for_lat_lngs") }
+}
+
+/// `mln_map_cancel_camera_transitions` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_cancel_camera_transitions(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_cancel_camera_transitions") }
+}
+
+/// `mln_map_cancel_camera_transitions_with_id` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_cancel_camera_transitions_with_id(map: mln_map, transition_id: u64, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_cancel_camera_transitions_with_id") }
+}
+
+/// `mln_map_dump_debug_logs` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_dump_debug_logs(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_dump_debug_logs") }
+}
+
+/// `mln_map_end_command_group` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_end_command_group(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_end_command_group") }
+}
+
+/// `mln_map_fit_camera_to_geometry` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_fit_camera_to_geometry(map: mln_map, geometry: mln_buffer_view, update: *const mln_camera_fit_update, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_fit_camera_to_geometry") }
+}
+
+/// `mln_map_fit_camera_to_lat_lng_bounds` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_fit_camera_to_lat_lng_bounds(map: mln_map, bounds: mln_lat_lng_bounds, update: *const mln_camera_fit_update, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_fit_camera_to_lat_lng_bounds") }
+}
+
+/// `mln_map_fit_camera_to_lat_lngs` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_fit_camera_to_lat_lngs(map: mln_map, coordinates: *const mln_lat_lng, coordinate_count: usize, update: *const mln_camera_fit_update, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_fit_camera_to_lat_lngs") }
+}
+
+/// `mln_map_get_feature_state` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_feature_state(map: mln_map, selector: *const mln_feature_state_selector, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_feature_state") }
+}
+
+/// `mln_map_get_global_state` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_global_state(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_global_state") }
+}
+
+/// `mln_map_get_image_source_coordinates` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_image_source_coordinates(map: mln_map, source_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_image_source_coordinates") }
+}
+
+/// `mln_map_get_style_image` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_style_image(map: mln_map, image_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_image") }
+}
+
+/// `mln_map_get_style_layer` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_style_layer(map: mln_map, layer_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_layer") }
+}
+
+/// `mln_map_get_style_layer_json` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_style_layer_json(map: mln_map, layer_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_layer_json") }
+}
+
+/// `mln_map_get_style_layer_property` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_style_layer_property(map: mln_map, layer_id: mln_buffer_view, property_name: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_layer_property") }
+}
+
+/// `mln_map_get_style_light_property` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_style_light_property(map: mln_map, property_name: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_light_property") }
+}
+
+/// `mln_map_get_style_source` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_style_source(map: mln_map, source_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_source") }
+}
+
+/// `mln_map_get_style_transition_options` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_get_style_transition_options(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_transition_options") }
+}
+
+/// `mln_map_invalidate_custom_geometry_source_region` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_invalidate_custom_geometry_source_region(map: mln_map, source_id: mln_buffer_view, bounds: mln_lat_lng_bounds, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_geometry_source_region") }
+}
+
+/// `mln_map_invalidate_custom_geometry_source_tile` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_invalidate_custom_geometry_source_tile(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_geometry_source_tile") }
+}
+
+/// `mln_map_invalidate_custom_vector_source_tile` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_invalidate_custom_vector_source_tile(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_vector_source_tile") }
+}
+
+/// `mln_map_lat_lng_bounds_for_camera` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_lat_lng_bounds_for_camera(map: mln_map, camera: *const mln_camera_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_lat_lng_bounds_for_camera") }
+}
+
+/// `mln_map_list_style_layers` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_list_style_layers(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_list_style_layers") }
+}
+
+/// `mln_map_list_style_sources` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_list_style_sources(map: mln_map, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_list_style_sources") }
+}
+
+/// `mln_map_move_style_layer` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_move_style_layer(map: mln_map, layer_id: mln_buffer_view, before_layer_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_move_style_layer") }
+}
+
+/// `mln_map_projection_create` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_create(view: *const mln_map_view, out_projection: *mut mln_map_projection, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_create") }
+}
+
+/// `mln_map_projection_get_camera` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_get_camera(projection: mln_map_projection, out_result: *mut mln_map_projection_camera_result, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_get_camera") }
+}
+
+/// `mln_map_projection_lat_lng_for_pixel` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_lat_lng_for_pixel(projection: mln_map_projection, point: mln_screen_point, out_coordinate: *mut mln_lat_lng, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_lat_lng_for_pixel") }
+}
+
+/// `mln_map_projection_lat_lng_for_pixel_unwrapped` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_lat_lng_for_pixel_unwrapped(projection: mln_map_projection, point: mln_screen_point, out_coordinate: *mut mln_lat_lng, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_lat_lng_for_pixel_unwrapped") }
+}
+
+/// `mln_map_projection_lat_lngs_for_pixels` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_lat_lngs_for_pixels(projection: mln_map_projection, points: *const mln_screen_point, point_count: usize, out_coordinates: *mut mln_lat_lng, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_lat_lngs_for_pixels") }
+}
+
+/// `mln_map_projection_lat_lngs_for_pixels_unwrapped` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_lat_lngs_for_pixels_unwrapped(projection: mln_map_projection, points: *const mln_screen_point, point_count: usize, out_coordinates: *mut mln_lat_lng, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_lat_lngs_for_pixels_unwrapped") }
+}
+
+/// `mln_map_projection_meters_per_pixel_at_latitude` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_meters_per_pixel_at_latitude(projection: mln_map_projection, latitude: f64, out_meters_per_pixel: *mut f64, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_meters_per_pixel_at_latitude") }
+}
+
+/// `mln_map_projection_pixel_for_lat_lng` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_pixel_for_lat_lng(projection: mln_map_projection, coordinate: mln_lat_lng, out_point: *mut mln_screen_point, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_pixel_for_lat_lng") }
+}
+
+/// `mln_map_projection_pixels_for_lat_lngs` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_pixels_for_lat_lngs(projection: mln_map_projection, coordinates: *const mln_lat_lng, coordinate_count: usize, out_points: *mut mln_screen_point, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_pixels_for_lat_lngs") }
+}
+
+/// `mln_map_projection_release` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_release(projection: mln_map_projection) {
+}
+
+/// `mln_map_projection_set_camera` (projection.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_projection_set_camera(projection: mln_map_projection, camera: *const mln_camera_options, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_projection_set_camera") }
+}
+
+/// `mln_map_remove_feature_state` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_remove_feature_state(map: mln_map, selector: *const mln_feature_state_selector, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_feature_state") }
+}
+
+/// `mln_map_remove_style_image` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_remove_style_image(map: mln_map, image_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_style_image") }
+}
+
+/// `mln_map_remove_style_layer` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_remove_style_layer(map: mln_map, layer_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_style_layer") }
+}
+
+/// `mln_map_remove_style_source` (style.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_remove_style_source(map: mln_map, source_id: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_style_source") }
+}
+
+/// `mln_map_set_bounds` (camera.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_map_set_bounds(map: mln_map, options: *const mln_bound_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_bounds") }
 }
 
 /// `mln_map_set_custom_geometry_source_tile_data` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_custom_geometry_source_tile_data(map: u64, source_id: MlnBufferView, tile_id: MlnCanonicalTileId, data: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_set_custom_geometry_source_tile_data(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, data: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_custom_geometry_source_tile_data") }
 }
 
 /// `mln_map_set_custom_geometry_source_tile_error` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_custom_geometry_source_tile_error(map: u64, source_id: MlnBufferView, tile_id: MlnCanonicalTileId, message: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_set_custom_geometry_source_tile_error(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, message: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_custom_geometry_source_tile_error") }
-}
-
-/// `mln_map_invalidate_custom_geometry_source_tile` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_invalidate_custom_geometry_source_tile(map: u64, source_id: MlnBufferView, tile_id: MlnCanonicalTileId, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_geometry_source_tile") }
-}
-
-/// `mln_map_invalidate_custom_geometry_source_region` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_invalidate_custom_geometry_source_region(map: u64, source_id: MlnBufferView, bounds: MlnLatLngBounds, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_geometry_source_region") }
-}
-
-/// `mln_map_add_custom_vector_source` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_custom_vector_source(map: u64, source_id: MlnBufferView, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_custom_vector_source") }
 }
 
 /// `mln_map_set_custom_vector_source_tile_data` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_custom_vector_source_tile_data(map: u64, source_id: MlnBufferView, tile_id: MlnCanonicalTileId, encoding: u32, data: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_set_custom_vector_source_tile_data(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, encoding: mln_style_vector_tile_encoding, data: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_custom_vector_source_tile_data") }
 }
 
 /// `mln_map_set_custom_vector_source_tile_error` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_custom_vector_source_tile_error(map: u64, source_id: MlnBufferView, tile_id: MlnCanonicalTileId, message: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_set_custom_vector_source_tile_error(map: mln_map, source_id: mln_buffer_view, tile_id: mln_canonical_tile_id, message: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_custom_vector_source_tile_error") }
 }
 
-/// `mln_map_invalidate_custom_vector_source_tile` (style.h): not implemented.
+/// `mln_map_set_debug_flags` (camera.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_invalidate_custom_vector_source_tile(map: u64, source_id: MlnBufferView, tile_id: MlnCanonicalTileId, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_invalidate_custom_vector_source_tile") }
+pub unsafe extern "C" fn mln_map_set_debug_flags(map: mln_map, flags: mln_map_debug_flags, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_debug_flags") }
 }
 
-/// `mln_map_set_style_image` (style.h): not implemented.
+/// `mln_map_set_feature_state` (map.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_style_image(map: u64, image_id: MlnBufferView, image: *const c_void, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_image") }
+pub unsafe extern "C" fn mln_map_set_feature_state(map: mln_map, selector: *const mln_feature_state_selector, state: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_feature_state") }
 }
 
-/// `mln_map_remove_style_image` (style.h): not implemented.
+/// `mln_map_set_free_camera_options` (camera.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_remove_style_image(map: u64, image_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_style_image") }
+pub unsafe extern "C" fn mln_map_set_free_camera_options(map: mln_map, options: *const mln_free_camera_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_free_camera_options") }
 }
 
-/// `mln_map_get_style_image` (style.h): not implemented.
+/// `mln_map_set_geo_json_source_data` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_image(map: u64, image_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_image") }
+pub unsafe extern "C" fn mln_map_set_geo_json_source_data(map: mln_map, source_id: mln_buffer_view, data: mln_geo_json_source_data, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_data") }
 }
 
-/// `mln_map_add_image_source_url` (style.h): not implemented.
+/// `mln_map_set_geo_json_source_synchronous_tiling` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_image_source_url(map: u64, source_id: MlnBufferView, coordinates: *const c_void, coordinate_count: usize, url: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_image_source_url") }
+pub unsafe extern "C" fn mln_map_set_geo_json_source_synchronous_tiling(map: mln_map, source_id: mln_buffer_view, enabled: bool, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_synchronous_tiling") }
 }
 
-/// `mln_map_add_image_source_image` (style.h): not implemented.
+/// `mln_map_set_geo_json_source_url` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_image_source_image(map: u64, source_id: MlnBufferView, coordinates: *const c_void, coordinate_count: usize, image: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_image_source_image") }
+pub unsafe extern "C" fn mln_map_set_geo_json_source_url(map: mln_map, source_id: mln_buffer_view, url: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_geo_json_source_url") }
 }
 
-/// `mln_map_set_image_source_url` (style.h): not implemented.
+/// `mln_map_set_global_state_property` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_image_source_url(map: u64, source_id: MlnBufferView, url: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_image_source_url") }
-}
-
-/// `mln_map_set_image_source_image` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_image_source_image(map: u64, source_id: MlnBufferView, image: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_image_source_image") }
+pub unsafe extern "C" fn mln_map_set_global_state_property(map: mln_map, property_name: mln_buffer_view, value: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_global_state_property") }
 }
 
 /// `mln_map_set_image_source_coordinates` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_image_source_coordinates(map: u64, source_id: MlnBufferView, coordinates: *const c_void, coordinate_count: usize, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_set_image_source_coordinates(map: mln_map, source_id: mln_buffer_view, coordinates: *const mln_lat_lng, coordinate_count: usize, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_image_source_coordinates") }
 }
 
-/// `mln_map_get_image_source_coordinates` (style.h): not implemented.
+/// `mln_map_set_image_source_image` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_image_source_coordinates(map: u64, source_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_image_source_coordinates") }
+pub unsafe extern "C" fn mln_map_set_image_source_image(map: mln_map, source_id: mln_buffer_view, image: *const mln_premultiplied_rgba8_image, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_image_source_image") }
 }
 
-/// `mln_map_add_style_layer_json` (style.h): not implemented.
+/// `mln_map_set_image_source_url` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_add_style_layer_json(map: u64, layer_json: MlnBufferView, before_layer_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_add_style_layer_json") }
+pub unsafe extern "C" fn mln_map_set_image_source_url(map: mln_map, source_id: mln_buffer_view, url: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_image_source_url") }
 }
 
-/// `mln_map_remove_style_layer` (style.h): not implemented.
+/// `mln_map_set_projection_mode` (camera.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_remove_style_layer(map: u64, layer_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_remove_style_layer") }
+pub unsafe extern "C" fn mln_map_set_projection_mode(map: mln_map, options: *const mln_projection_mode_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_projection_mode") }
 }
 
-/// `mln_map_get_style_layer` (style.h): not implemented.
+/// `mln_map_set_rendering_stats_view_enabled` (camera.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_layer(map: u64, layer_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_layer") }
+pub unsafe extern "C" fn mln_map_set_rendering_stats_view_enabled(map: mln_map, enabled: bool, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_rendering_stats_view_enabled") }
 }
 
-/// `mln_map_list_style_layers` (style.h): not implemented.
+/// `mln_map_set_style_image` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_list_style_layers(map: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_list_style_layers") }
+pub unsafe extern "C" fn mln_map_set_style_image(map: mln_map, image_id: mln_buffer_view, image: *const mln_premultiplied_rgba8_image, options: *const mln_style_image_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_image") }
 }
 
-/// `mln_map_move_style_layer` (style.h): not implemented.
+/// `mln_map_set_style_layer_property` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_move_style_layer(map: u64, layer_id: MlnBufferView, before_layer_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_move_style_layer") }
-}
-
-/// `mln_map_get_style_layer_json` (style.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_layer_json(map: u64, layer_id: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_layer_json") }
+pub unsafe extern "C" fn mln_map_set_style_layer_property(map: mln_map, layer_id: mln_buffer_view, property_name: mln_buffer_view, value: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_layer_property") }
 }
 
 /// `mln_map_set_style_light_json` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_style_light_json(map: u64, light_json: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_set_style_light_json(map: mln_map, light_json: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_light_json") }
 }
 
 /// `mln_map_set_style_light_property` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_style_light_property(map: u64, property_name: MlnBufferView, value: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_set_style_light_property(map: mln_map, property_name: mln_buffer_view, value: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_light_property") }
 }
 
-/// `mln_map_get_style_light_property` (style.h): not implemented.
+/// `mln_map_set_style_source_volatile` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_light_property(map: u64, property_name: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_light_property") }
+pub unsafe extern "C" fn mln_map_set_style_source_volatile(map: mln_map, source_id: mln_buffer_view, is_volatile: bool, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_source_volatile") }
 }
 
 /// `mln_map_set_style_transition_options` (style.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_style_transition_options(map: u64, options: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_set_style_transition_options(map: mln_map, options: *const mln_style_transition_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_transition_options") }
 }
 
-/// `mln_map_get_style_transition_options` (style.h): not implemented.
+/// `mln_map_set_tile_options` (camera.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_transition_options(map: u64, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_transition_options") }
+pub unsafe extern "C" fn mln_map_set_tile_options(map: mln_map, options: *const mln_map_tile_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_tile_options") }
 }
 
-/// `mln_map_set_style_layer_property` (style.h): not implemented.
+/// `mln_map_set_viewport_options` (camera.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_set_style_layer_property(map: u64, layer_id: MlnBufferView, property_name: MlnBufferView, value: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_style_layer_property") }
+pub unsafe extern "C" fn mln_map_set_viewport_options(map: mln_map, options: *const mln_map_viewport_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_set_viewport_options") }
 }
 
-/// `mln_map_get_style_layer_property` (style.h): not implemented.
+/// `mln_open_gl_supported_context_provider_mask` (render_target.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_get_style_layer_property(map: u64, layer_id: MlnBufferView, property_name: MlnBufferView, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_get_style_layer_property") }
+pub unsafe extern "C" fn mln_open_gl_supported_context_provider_mask() -> mln_open_gl_context_provider_flags {
+    Default::default()
 }
 
-/// `mln_style_expression_create` (style_expression.h): not implemented.
+/// `mln_plugin_get_register_function_v1` (plugin.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_style_expression_create(expression: MlnBufferView, options: *const c_void, out_expression: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_style_expression_create") }
+pub unsafe extern "C" fn mln_plugin_get_register_function_v1() -> mln_plugin_register_function_v1 {
+    Default::default()
 }
 
-/// `mln_style_expression_release` (style_expression.h): not implemented.
+/// `mln_projected_meters_for_lat_lng` (projection.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_style_expression_release(expression: u64) {
+pub unsafe extern "C" fn mln_projected_meters_for_lat_lng(coordinate: mln_lat_lng, out_meters: *mut mln_projected_meters, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_projected_meters_for_lat_lng") }
 }
 
-/// `mln_style_expression_get_info` (style_expression.h): not implemented.
+/// `mln_render_session_acquire_frame` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_style_expression_get_info(expression: u64, out_info: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_style_expression_get_info") }
+pub unsafe extern "C" fn mln_render_session_acquire_frame(session: mln_render_session, out_frame: *mut mln_acquired_frame, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_acquire_frame") }
 }
 
-/// `mln_style_expression_evaluate` (style_expression.h): not implemented.
+/// `mln_render_session_clear_data` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_style_expression_evaluate(expression: u64, inputs: *const c_void, out_json: *mut c_void, json_capacity: usize, out_json_length: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_style_expression_evaluate") }
+pub unsafe extern "C" fn mln_render_session_clear_data(session: mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_clear_data") }
 }
 
-/// `mln_map_attach_metal_surface` (surface.h): not implemented.
+/// `mln_render_session_dump_debug_logs` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_metal_surface(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_metal_surface") }
+pub unsafe extern "C" fn mln_render_session_dump_debug_logs(session: mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_dump_debug_logs") }
 }
 
-/// `mln_map_attach_vulkan_surface` (surface.h): not implemented.
+/// `mln_render_session_query_feature_extensions` (query.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_vulkan_surface(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_vulkan_surface") }
+pub unsafe extern "C" fn mln_render_session_query_feature_extensions(session: mln_render_session, source_id: mln_buffer_view, feature: mln_buffer_view, extension: mln_buffer_view, extension_field: mln_buffer_view, arguments: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_feature_extensions") }
 }
 
-/// `mln_map_attach_open_gl_surface` (surface.h): not implemented.
+/// `mln_render_session_query_rendered_features` (query.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_open_gl_surface(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_open_gl_surface") }
+pub unsafe extern "C" fn mln_render_session_query_rendered_features(session: mln_render_session, geometry: *const mln_rendered_query_geometry, options: *const mln_rendered_feature_query_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_rendered_features") }
 }
 
-/// `mln_render_session_set_metal_surface_target` (surface.h): not implemented.
+/// `mln_render_session_query_source_features` (query.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_metal_surface_target(session: u64, replacement: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_metal_surface_target") }
+pub unsafe extern "C" fn mln_render_session_query_source_features(session: mln_render_session, source_id: mln_buffer_view, options: *const mln_source_feature_query_options, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_query_source_features") }
 }
 
-/// `mln_render_session_set_vulkan_surface_target` (surface.h): not implemented.
+/// `mln_render_session_reduce_memory_use` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_vulkan_surface_target(session: u64, replacement: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_vulkan_surface_target") }
+pub unsafe extern "C" fn mln_render_session_reduce_memory_use(session: mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_reduce_memory_use") }
 }
 
-/// `mln_render_session_set_open_gl_surface_target` (surface.h): not implemented.
+/// `mln_render_session_release_target` (render_session.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_open_gl_surface_target(session: u64, replacement: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_open_gl_surface_target") }
-}
-
-/// `mln_render_session_set_web_gpu_surface_target` (surface.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_web_gpu_surface_target(session: u64, replacement: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_web_gpu_surface_target") }
-}
-
-/// `mln_map_attach_metal_borrowed_texture` (texture.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_metal_borrowed_texture(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_metal_borrowed_texture") }
-}
-
-/// `mln_map_attach_vulkan_borrowed_texture` (texture.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_vulkan_borrowed_texture(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_vulkan_borrowed_texture") }
-}
-
-/// `mln_map_attach_open_gl_borrowed_texture` (texture.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_open_gl_borrowed_texture(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_open_gl_borrowed_texture") }
-}
-
-/// `mln_map_attach_web_gpu_borrowed_texture` (texture.h): not implemented.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_attach_web_gpu_borrowed_texture(map: u64, descriptor: *const c_void, options: *const c_void, out_session: *mut c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_map_attach_web_gpu_borrowed_texture") }
+pub unsafe extern "C" fn mln_render_session_release_target(session: mln_render_session, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_release_target") }
 }
 
 /// `mln_render_session_set_metal_borrowed_texture_target` (texture.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_metal_borrowed_texture_target(session: u64, replacement: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_render_session_set_metal_borrowed_texture_target(session: mln_render_session, replacement: *const mln_metal_borrowed_texture_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_metal_borrowed_texture_target") }
 }
 
-/// `mln_render_session_set_vulkan_borrowed_texture_target` (texture.h): not implemented.
+/// `mln_render_session_set_metal_surface_target` (surface.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_vulkan_borrowed_texture_target(session: u64, replacement: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_vulkan_borrowed_texture_target") }
+pub unsafe extern "C" fn mln_render_session_set_metal_surface_target(session: mln_render_session, replacement: *const mln_metal_surface_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_metal_surface_target") }
 }
 
 /// `mln_render_session_set_open_gl_borrowed_texture_target` (texture.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_open_gl_borrowed_texture_target(session: u64, replacement: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_render_session_set_open_gl_borrowed_texture_target(session: mln_render_session, replacement: *const mln_open_gl_borrowed_texture_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_open_gl_borrowed_texture_target") }
+}
+
+/// `mln_render_session_set_open_gl_surface_target` (surface.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_render_session_set_open_gl_surface_target(session: mln_render_session, replacement: *const mln_open_gl_surface_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_open_gl_surface_target") }
+}
+
+/// `mln_render_session_set_vulkan_borrowed_texture_target` (texture.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_render_session_set_vulkan_borrowed_texture_target(session: mln_render_session, replacement: *const mln_vulkan_borrowed_texture_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_vulkan_borrowed_texture_target") }
+}
+
+/// `mln_render_session_set_vulkan_surface_target` (surface.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_render_session_set_vulkan_surface_target(session: mln_render_session, replacement: *const mln_vulkan_surface_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_vulkan_surface_target") }
 }
 
 /// `mln_render_session_set_web_gpu_borrowed_texture_target` (texture.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_session_set_web_gpu_borrowed_texture_target(session: u64, replacement: *const c_void, completion: *const c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_render_session_set_web_gpu_borrowed_texture_target(session: mln_render_session, replacement: *const mln_web_gpu_borrowed_texture_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
     unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_web_gpu_borrowed_texture_target") }
 }
 
-/// `mln_acquired_frame_get_metal_texture` (texture.h): not implemented.
+/// `mln_render_session_set_web_gpu_surface_target` (surface.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_get_metal_texture(frame: u64, out_frame: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_metal_texture") }
+pub unsafe extern "C" fn mln_render_session_set_web_gpu_surface_target(session: mln_render_session, replacement: *const mln_web_gpu_surface_replacement, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_render_session_set_web_gpu_surface_target") }
 }
 
-/// `mln_acquired_frame_get_vulkan_texture` (texture.h): not implemented.
+/// `mln_resource_request_complete` (runtime.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_get_vulkan_texture(frame: u64, out_frame: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_vulkan_texture") }
+pub unsafe extern "C" fn mln_resource_request_complete(handle: mln_resource_request, response: *const mln_resource_response, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_complete") }
 }
 
-/// `mln_acquired_frame_get_open_gl_texture` (texture.h): not implemented.
+/// `mln_resource_request_is_cancelled` (runtime.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_get_open_gl_texture(frame: u64, out_frame: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_open_gl_texture") }
+pub unsafe extern "C" fn mln_resource_request_is_cancelled(handle: mln_resource_request, out_cancelled: *mut bool, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_is_cancelled") }
 }
 
-/// `mln_acquired_frame_get_web_gpu_texture` (texture.h): not implemented.
+/// `mln_resource_request_pass_through` (runtime.h): not implemented.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_acquired_frame_get_web_gpu_texture(frame: u64, out_frame: *mut c_void, out_diagnostic: *mut MlnDiagnostic) -> i32 {
-    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_acquired_frame_get_web_gpu_texture") }
+pub unsafe extern "C" fn mln_resource_request_pass_through(handle: mln_resource_request, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_pass_through") }
 }
+
+/// `mln_resource_request_release` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_resource_request_release(handle: mln_resource_request) {
+}
+
+/// `mln_resource_request_set_cancel_callback` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_resource_request_set_cancel_callback(handle: mln_resource_request, handler: *const mln_resource_request_cancel_handler, out_cancelled: *mut bool, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_request_set_cancel_callback") }
+}
+
+/// `mln_resource_transform_request_complete` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_resource_transform_request_complete(request: mln_resource_transform_request, url: mln_buffer_view, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_transform_request_complete") }
+}
+
+/// `mln_resource_transform_request_fail` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_resource_transform_request_fail(request: mln_resource_transform_request, error: *const mln_resource_transform_error, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_resource_transform_request_fail") }
+}
+
+/// `mln_resource_transform_request_release` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_resource_transform_request_release(request: mln_resource_transform_request) {
+}
+
+/// `mln_runtime_clear_http_header_transform` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_clear_http_header_transform(runtime: mln_runtime, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_http_header_transform") }
+}
+
+/// `mln_runtime_clear_resource_provider` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_clear_resource_provider(runtime: mln_runtime, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_resource_provider") }
+}
+
+/// `mln_runtime_clear_resource_transform` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_clear_resource_transform(runtime: mln_runtime, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_clear_resource_transform") }
+}
+
+/// `mln_runtime_create_offline_region` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_create_offline_region(runtime: mln_runtime, definition: *const mln_offline_region_definition, metadata: *const u8, metadata_size: usize, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_create_offline_region") }
+}
+
+/// `mln_runtime_delete_offline_region` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_delete_offline_region(runtime: mln_runtime, region_id: mln_offline_region_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_delete_offline_region") }
+}
+
+/// `mln_runtime_get_offline_region` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_get_offline_region(runtime: mln_runtime, region_id: mln_offline_region_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_get_offline_region") }
+}
+
+/// `mln_runtime_get_offline_region_status` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_get_offline_region_status(runtime: mln_runtime, region_id: mln_offline_region_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_get_offline_region_status") }
+}
+
+/// `mln_runtime_invalidate_offline_region` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_invalidate_offline_region(runtime: mln_runtime, region_id: mln_offline_region_id, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_invalidate_offline_region") }
+}
+
+/// `mln_runtime_list_offline_regions` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_list_offline_regions(runtime: mln_runtime, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_list_offline_regions") }
+}
+
+/// `mln_runtime_merge_offline_regions` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_merge_offline_regions(runtime: mln_runtime, side_database_path: mln_buffer_view, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_merge_offline_regions") }
+}
+
+/// `mln_runtime_run_ambient_cache_operation` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_run_ambient_cache_operation(runtime: mln_runtime, operation: mln_ambient_cache_operation, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_run_ambient_cache_operation") }
+}
+
+/// `mln_runtime_set_http_header_transform` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_set_http_header_transform(runtime: mln_runtime, transform: *const mln_http_header_transform, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_http_header_transform") }
+}
+
+/// `mln_runtime_set_maximum_ambient_cache_size` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_set_maximum_ambient_cache_size(runtime: mln_runtime, size: u64, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_maximum_ambient_cache_size") }
+}
+
+/// `mln_runtime_set_offline_region_download_state` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_set_offline_region_download_state(runtime: mln_runtime, region_id: mln_offline_region_id, state: mln_offline_region_download_state, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_offline_region_download_state") }
+}
+
+/// `mln_runtime_set_offline_region_observed` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_set_offline_region_observed(runtime: mln_runtime, region_id: mln_offline_region_id, observed: bool, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_offline_region_observed") }
+}
+
+/// `mln_runtime_set_resource_provider` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_set_resource_provider(runtime: mln_runtime, provider: *const mln_resource_provider, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_resource_provider") }
+}
+
+/// `mln_runtime_set_resource_transform` (runtime.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_set_resource_transform(runtime: mln_runtime, transform: *const mln_resource_transform, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_set_resource_transform") }
+}
+
+/// `mln_runtime_update_offline_region_metadata` (map.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_runtime_update_offline_region_metadata(runtime: mln_runtime, region_id: mln_offline_region_id, metadata: *const u8, metadata_size: usize, completion: *const mln_completion, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_runtime_update_offline_region_metadata") }
+}
+
+/// `mln_style_expression_create` (style_expression.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_style_expression_create(expression: mln_buffer_view, options: *const mln_style_expression_options, out_expression: *mut mln_style_expression, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_style_expression_create") }
+}
+
+/// `mln_style_expression_evaluate` (style_expression.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_style_expression_evaluate(expression: mln_style_expression, inputs: *const mln_style_expression_inputs, out_json: *mut std::ffi::c_char, json_capacity: usize, out_json_length: *mut usize, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_style_expression_evaluate") }
+}
+
+/// `mln_style_expression_get_info` (style_expression.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_style_expression_get_info(expression: mln_style_expression, out_info: *mut mln_style_expression_info, out_diagnostic: *mut mln_diagnostic) -> mln_status {
+    unsafe { crate::diagnostics::unsupported(out_diagnostic, "mln_style_expression_get_info") }
+}
+
+/// `mln_style_expression_release` (style_expression.h): not implemented.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mln_style_expression_release(expression: mln_style_expression) {
+}
+
+// The hand-written exports have the headers' signatures.
+const _: () = {
+    let _ = [crate::types::mln_c_version, crate::base::mln_c_version];
+    let _ = [crate::types::mln_delivery_queue_create, crate::delivery::mln_delivery_queue_create];
+    let _ = [crate::types::mln_delivery_queue_dispatch, crate::delivery::mln_delivery_queue_dispatch];
+    let _ = [crate::types::mln_delivery_queue_release, crate::delivery::mln_delivery_queue_release];
+    let _ = [crate::types::mln_log_clear_callback, crate::logging::mln_log_clear_callback];
+    let _ = [crate::types::mln_log_set_async_severity_mask, crate::logging::mln_log_set_async_severity_mask];
+    let _ = [crate::types::mln_log_set_callback, crate::logging::mln_log_set_callback];
+    let _ = [crate::types::mln_logical_extent_physical_size, crate::base::mln_logical_extent_physical_size];
+    let _ = [crate::types::mln_map_attach_offscreen, crate::session::mln_map_attach_offscreen];
+    let _ = [crate::types::mln_map_attach_web_gpu_surface, crate::surface_session::mln_map_attach_web_gpu_surface];
+    let _ = [crate::types::mln_map_dispose, crate::map::mln_map_dispose];
+    let _ = [crate::types::mln_map_get_camera, crate::map::mln_map_get_camera];
+    let _ = [crate::types::mln_map_get_loaded_style_json, crate::map::mln_map_get_loaded_style_json];
+    let _ = [crate::types::mln_map_get_snapshot, crate::map::mln_map_get_snapshot];
+    let _ = [crate::types::mln_map_get_style_url, crate::map::mln_map_get_style_url];
+    let _ = [crate::types::mln_map_release, crate::map::mln_map_release];
+    let _ = [crate::types::mln_map_request_repaint, crate::map::mln_map_request_repaint];
+    let _ = [crate::types::mln_map_request_still_image, crate::session::mln_map_request_still_image];
+    let _ = [crate::types::mln_map_resize, crate::map::mln_map_resize];
+    let _ = [crate::types::mln_map_set_event_mask, crate::map::mln_map_set_event_mask];
+    let _ = [crate::types::mln_map_set_style_json, crate::map::mln_map_set_style_json];
+    let _ = [crate::types::mln_map_set_style_url, crate::map::mln_map_set_style_url];
+    let _ = [crate::types::mln_map_update_camera, crate::map::mln_map_update_camera];
+    let _ = [crate::types::mln_network_get_status, crate::runtime::mln_network_get_status];
+    let _ = [crate::types::mln_network_set_status, crate::runtime::mln_network_set_status];
+    let _ = [crate::types::mln_offscreen_device_create, crate::session::mln_offscreen_device_create];
+    let _ = [crate::types::mln_offscreen_device_release, crate::session::mln_offscreen_device_release];
+    let _ = [crate::types::mln_render_frame_batch_release, crate::session::mln_render_frame_batch_release];
+    let _ = [crate::types::mln_render_session_abandon, crate::session::mln_render_session_abandon];
+    let _ = [crate::types::mln_render_session_barrier, crate::session::mln_render_session_barrier];
+    let _ = [crate::types::mln_render_session_demand_frame, crate::session::mln_render_session_demand_frame];
+    let _ = [crate::types::mln_render_session_detach, crate::session::mln_render_session_detach];
+    let _ = [crate::types::mln_render_session_dispose, crate::session::mln_render_session_dispose];
+    let _ = [crate::types::mln_render_session_drain_frame_results, crate::session::mln_render_session_drain_frame_results];
+    let _ = [crate::types::mln_render_session_get_capabilities, crate::session::mln_render_session_get_capabilities];
+    let _ = [crate::types::mln_render_session_get_failure, crate::session::mln_render_session_get_failure];
+    let _ = [crate::types::mln_render_session_get_snapshot, crate::session::mln_render_session_get_snapshot];
+    let _ = [crate::types::mln_render_session_read_texture, crate::session::mln_render_session_read_texture];
+    let _ = [crate::types::mln_render_session_resize, crate::session::mln_render_session_resize];
+    let _ = [crate::types::mln_render_session_service_driver_work, crate::surface_session::mln_render_session_service_driver_work];
+    let _ = [crate::types::mln_runtime_clear_event_handler, crate::runtime::mln_runtime_clear_event_handler];
+    let _ = [crate::types::mln_runtime_create, crate::runtime::mln_runtime_create];
+    let _ = [crate::types::mln_runtime_create_map, crate::map::mln_runtime_create_map];
+    let _ = [crate::types::mln_runtime_dispose, crate::runtime::mln_runtime_dispose];
+    let _ = [crate::types::mln_runtime_get_event_mask, crate::runtime::mln_runtime_get_event_mask];
+    let _ = [crate::types::mln_runtime_release, crate::runtime::mln_runtime_release];
+    let _ = [crate::types::mln_runtime_set_event_handler, crate::runtime::mln_runtime_set_event_handler];
+    let _ = [crate::types::mln_runtime_set_event_mask, crate::runtime::mln_runtime_set_event_mask];
+    let _ = [crate::types::mln_supported_render_backend_mask, crate::base::mln_supported_render_backend_mask];
+};

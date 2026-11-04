@@ -9,7 +9,7 @@
 use crate::delivery::{Completion, Value};
 use crate::diagnostics::{CallResult, Failure, boundary};
 use crate::handles::{self, Object};
-use crate::runtime::{OwnedEvent, RuntimeShared, STATE};
+use crate::runtime::{OwnedEvent, Payload, RuntimeShared, STATE};
 use crate::session::ProxyFrontend;
 use crate::types::*;
 use maplibre_native_next::mln_map::{
@@ -30,15 +30,14 @@ pub struct MapShared {
     pub scale_factor: f64,
     pub generation: AtomicU64,
     pub created: AtomicBool,
-    pub released: AtomicBool,
     pub event_mask: AtomicU64,
     pub session: AtomicU64,
-    snapshot: Mutex<MlnMapSnapshot>,
+    snapshot: Mutex<mln_map_snapshot>,
 }
 
 impl MapShared {
     /// The view of the last published snapshot, from any thread.
-    pub fn view(&self) -> MlnMapView {
+    pub fn view(&self) -> mln_map_view {
         self.snapshot.lock().unwrap().view
     }
 
@@ -75,18 +74,18 @@ impl MapEntry {
         let camera = camera_of(&map.get_camera_options(None));
         let size = map.get_map_options().size();
         let mut snapshot = self.shared.snapshot.lock().unwrap();
-        snapshot.size = size_of::<MlnMapSnapshot>() as u32;
+        snapshot.size = size_of::<mln_map_snapshot>() as u32;
         snapshot.generation = self.shared.generation.load(Ordering::SeqCst);
         snapshot.fully_loaded = map.is_fully_loaded();
         snapshot.event_mask = self.shared.event_mask.load(Ordering::SeqCst);
-        snapshot.view.size = size_of::<MlnMapView>() as u32;
+        snapshot.view.size = size_of::<mln_map_view>() as u32;
         snapshot.view.camera = camera;
         snapshot.view.extent =
-            MlnLogicalExtent { width: size.width, height: size.height, scale_factor: self.shared.scale_factor };
+            mln_logical_extent { width: size.width, height: size.height, scale_factor: self.shared.scale_factor };
         snapshot.latest_render_update_generation = self.frontend.update_generation();
     }
 
-    pub fn view(&self) -> MlnMapView {
+    pub fn view(&self) -> mln_map_view {
         self.shared.snapshot.lock().unwrap().view
     }
 }
@@ -99,13 +98,13 @@ fn mode_of(mode: u32) -> MapMode {
     }
 }
 
-pub fn camera_of(options: &CameraOptions) -> MlnCamera {
+pub fn camera_of(options: &CameraOptions) -> mln_camera {
     let center = options.center.unwrap_or_default();
     let padding = options.padding.unwrap_or_default();
-    MlnCamera {
-        center: MlnLatLng { latitude: center.latitude(), longitude: center.longitude() },
+    mln_camera {
+        center: mln_lat_lng { latitude: center.latitude(), longitude: center.longitude() },
         center_altitude: options.center_altitude.unwrap_or(0.0),
-        padding: MlnEdgeInsets {
+        padding: mln_edge_insets {
             top: padding.top(),
             left: padding.left(),
             bottom: padding.bottom(),
@@ -121,7 +120,7 @@ pub fn camera_of(options: &CameraOptions) -> MlnCamera {
 
 /// `mln_camera_options` -> `CameraOptions`, with the C++ validation messages
 /// for out-of-range values.
-fn camera_options_of(c: &MlnCameraOptions) -> Result<CameraOptions, Failure> {
+fn camera_options_of(c: &mln_camera_options) -> Result<CameraOptions, Failure> {
     if c.fields & !MLN_CAMERA_OPTION_ALL != 0 {
         return Err(Failure::invalid_argument("camera.fields has unknown bits"));
     }
@@ -166,7 +165,7 @@ fn camera_options_of(c: &MlnCameraOptions) -> Result<CameraOptions, Failure> {
     Ok(options)
 }
 
-fn animation_options_of(a: &MlnAnimationOptions) -> Result<AnimationOptions, Failure> {
+fn animation_options_of(a: &mln_animation_options) -> Result<AnimationOptions, Failure> {
     let mut options = AnimationOptions::default();
     if a.fields & MLN_ANIMATION_OPTION_DURATION != 0 {
         if !(a.duration_ms.is_finite() && a.duration_ms >= 0.0) {
@@ -245,14 +244,13 @@ impl MapObserver for FfiMapObserver {
     fn on_did_finish_rendering_frame(&self, status: &RenderFrameStatus) {
         if self.continuous() {
             self.shared.emit(MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED, |e| {
-                e.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME;
-                e.payload.render_frame = MlnRuntimeEventRenderFrame {
+                e.payload = Payload::RenderFrame(mln_runtime_event_render_frame {
                     mode: render_mode_code(status.mode),
                     needs_repaint: status.needs_repaint,
                     placement_changed: status.placement_changed,
                     // TODO(port): gfx::RenderingStats.
-                    stats: MlnRenderingStats::default(),
-                };
+                    stats: mln_rendering_stats::default(),
+                });
             });
         }
     }
@@ -264,8 +262,7 @@ impl MapObserver for FfiMapObserver {
     fn on_did_finish_rendering_map(&self, mode: RenderMode) {
         if self.continuous() {
             self.shared.emit(MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED, |e| {
-                e.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP;
-                e.payload.render_map = MlnRuntimeEventRenderMap { mode: render_mode_code(mode) };
+                e.payload = Payload::RenderMap(mln_runtime_event_render_map { mode: render_mode_code(mode) });
             });
         }
     }
@@ -293,16 +290,20 @@ pub fn entry(handle: u64) -> Option<Rc<MapEntry>> {
 /// generation.
 ///
 /// # Safety
-/// `completion` as for `Completion::from_c`.
+/// `completion` as for `Completion::optional`.
 pub unsafe fn command(
-    map: u64,
-    completion: *const MlnCompletion,
+    map: mln_map,
+    completion: *const mln_completion,
     optional_completion: bool,
     body: impl FnOnce(&Rc<MapEntry>) -> Result<Value, Failure> + Send + 'static,
 ) -> CallResult {
     let shared = handles::map(map)?;
     // SAFETY: the caller's contract.
-    let completion = unsafe { Completion::from_c(completion, optional_completion) }?;
+    let completion = if optional_completion {
+        unsafe { Completion::optional(completion) }?
+    } else {
+        Some(unsafe { Completion::required(completion) }?)
+    };
     let generation = shared.next_generation();
     let runtime = shared.runtime.clone();
     runtime.post(move || {
@@ -328,11 +329,11 @@ pub unsafe fn command(
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_runtime_create_map(
-    runtime: u64,
-    options: *const MlnMapOptions,
-    out_map: *mut u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    runtime: mln_runtime,
+    options: *const mln_map_options,
+    out_map: *mut mln_map,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -358,14 +359,14 @@ pub unsafe extern "C" fn mln_runtime_create_map(
                 return Err(Failure::invalid_argument("options.fields has unknown bits"));
             }
             let event_mask = if options.fields & MLN_MAP_OPTION_EVENT_MASK != 0 {
-                if options.event_mask & !MLN_RUNTIME_EVENT_FLAGS_MAP != 0 {
+                if options.event_mask & !MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS != 0 {
                     return Err(Failure::invalid_argument("event_mask has bits that aren't map events"));
                 }
                 options.event_mask
             } else {
-                MLN_RUNTIME_EVENT_FLAGS_MAP
+                MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS
             };
-            let completion = Completion::from_c(completion, false)?;
+            let completion = Some(Completion::required(completion)?);
 
             let handle = handles::reserve(handles::Kind::Map);
             let shared = Arc::new(MapShared {
@@ -375,20 +376,19 @@ pub unsafe extern "C" fn mln_runtime_create_map(
                 scale_factor: extent.scale_factor,
                 generation: AtomicU64::new(0),
                 created: AtomicBool::new(false),
-                released: AtomicBool::new(false),
                 event_mask: AtomicU64::new(event_mask),
                 session: AtomicU64::new(0),
-                snapshot: Mutex::new(MlnMapSnapshot::default()),
+                snapshot: Mutex::new(mln_map_snapshot::default()),
             });
             handles::insert_at(handle, Object::Map(shared.clone()));
             runtime.maps.lock().unwrap().insert(handle);
-            *out_map = handle;
+            *out_map = handle.into();
 
             let fast_pfor = options.fast_pfor_enabled;
             runtime.clone().post(move || {
                 let observer = Rc::new(FfiMapObserver { shared: shared.clone(), load_error: RefCell::new(None) });
                 let size = Size::new(extent.width, extent.height);
-                let frontend = ProxyFrontend::new(handle, mode_of(shared.mode), extent.scale_factor as f32);
+                let frontend = ProxyFrontend::new(mode_of(shared.mode), extent.scale_factor as f32);
                 let map = Map::with_resource_options(
                     &frontend,
                     observer.clone(),
@@ -414,7 +414,6 @@ pub unsafe extern "C" fn mln_runtime_create_map(
 }
 
 fn release_map(shared: &Arc<MapShared>, completion: Option<Completion>) {
-    shared.released.store(true, Ordering::SeqCst);
     handles::remove(shared.handle);
     shared.runtime.maps.lock().unwrap().remove(&shared.handle);
     let handle = shared.handle;
@@ -431,9 +430,9 @@ fn release_map(shared: &Arc<MapShared>, completion: Option<Completion>) {
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_release(
-    map: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -442,7 +441,7 @@ pub unsafe extern "C" fn mln_map_release(
             if shared.session.load(Ordering::SeqCst) != 0 {
                 return Err(Failure::invalid_state("detach the map's render session first"));
             }
-            let completion = Completion::from_c(completion, true)?;
+            let completion = Completion::optional(completion)?;
             release_map(&shared, completion);
             Ok(())
         })
@@ -452,7 +451,7 @@ pub unsafe extern "C" fn mln_map_release(
 /// # Safety
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_map_dispose(map: u64, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_map_dispose(map: mln_map, out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
@@ -471,9 +470,9 @@ pub unsafe extern "C" fn mln_map_dispose(map: u64, out_diagnostic: *mut MlnDiagn
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_get_snapshot(
-    map: u64,
-    out_snapshot: *mut MlnMapSnapshot,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    out_snapshot: *mut mln_map_snapshot,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -491,7 +490,7 @@ pub unsafe extern "C" fn mln_map_get_snapshot(
     }
 }
 
-fn utf8_view(view: MlnBufferView, name: &str) -> Result<String, Failure> {
+fn utf8_view(view: mln_buffer_view, name: &str) -> Result<String, Failure> {
     // SAFETY: C API contract for buffer views.
     let Some(bytes) = (unsafe { view.bytes() }) else {
         return Err(Failure::invalid_argument(format!("{name} must be a valid buffer view")));
@@ -503,10 +502,10 @@ fn utf8_view(view: MlnBufferView, name: &str) -> Result<String, Failure> {
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_set_style_json(
-    map: u64,
-    json: MlnBufferView,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    json: mln_buffer_view,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -528,10 +527,10 @@ pub unsafe extern "C" fn mln_map_set_style_json(
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_set_style_url(
-    map: u64,
-    url: MlnBufferView,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    url: mln_buffer_view,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -552,9 +551,9 @@ pub unsafe extern "C" fn mln_map_set_style_url(
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_get_style_url(
-    map: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -570,9 +569,9 @@ pub unsafe extern "C" fn mln_map_get_style_url(
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_get_loaded_style_json(
-    map: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -588,10 +587,10 @@ pub unsafe extern "C" fn mln_map_get_loaded_style_json(
 /// C API contract (camera.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_update_camera(
-    map: u64,
-    update: *const MlnCameraUpdate,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    update: *const mln_camera_update,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -634,16 +633,16 @@ pub unsafe extern "C" fn mln_map_update_camera(
 /// C API contract (camera.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_get_camera(
-    map: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
             command(map, completion, false, |entry| {
                 let camera = camera_of(&entry.map.borrow().get_camera_options(None));
-                Ok(Value::Camera(MlnCameraQueryResult {
+                Ok(Value::Camera(mln_camera_query_result {
                     generation: entry.shared.generation.load(Ordering::SeqCst),
                     camera,
                 }))
@@ -656,9 +655,9 @@ pub unsafe extern "C" fn mln_map_get_camera(
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_request_repaint(
-    map: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -675,10 +674,10 @@ pub unsafe extern "C" fn mln_map_request_repaint(
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_resize(
-    map: u64,
-    logical_size: MlnLogicalSize,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    logical_size: mln_logical_size,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -706,15 +705,15 @@ pub unsafe extern "C" fn mln_map_resize(
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_set_event_mask(
-    map: u64,
+    map: mln_map,
     mask: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
-            if mask & !MLN_RUNTIME_EVENT_FLAGS_MAP != 0 {
+            if mask & !MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS != 0 {
                 return Err(Failure::invalid_argument("mask has bits that aren't map events"));
             }
             command(map, completion, true, move |entry| {

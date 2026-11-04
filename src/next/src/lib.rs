@@ -14,7 +14,6 @@ mod base;
 mod delivery;
 mod diagnostics;
 mod handles;
-mod layout;
 mod logging;
 mod map;
 mod runtime;

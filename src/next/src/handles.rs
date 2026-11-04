@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
 /// C++ `HandleKind`.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Kind {
     Runtime = 1,
@@ -109,13 +109,14 @@ struct KindTable {
     free: Vec<usize>,
 }
 
-static TABLE: LazyLock<Mutex<HashMap<Kind, KindTable>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+/// Each kind's table, by its `Kind` byte.
+static TABLE: LazyLock<Mutex<HashMap<u8, KindTable>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// A handle of `kind` whose object comes later through `insert_at`, for an
 /// object that holds its own handle. It names nothing until then.
 pub fn reserve(kind: Kind) -> u64 {
     let mut table = TABLE.lock().unwrap();
-    let table = table.entry(kind).or_default();
+    let table = table.entry(kind as u8).or_default();
     let index = match table.free.pop() {
         Some(index) => index,
         None => {
@@ -134,29 +135,28 @@ pub fn insert(object: Object) -> u64 {
 
 pub fn insert_at(handle: u64, object: Object) {
     let mut table = TABLE.lock().unwrap();
-    if let Some(slot) = table.get_mut(&object.kind()).and_then(|t| t.slots.get_mut(index_of(handle))) {
+    if let Some(slot) = table.get_mut(&(object.kind() as u8)).and_then(|t| t.slots.get_mut(index_of(handle))) {
         slot.object = Some(object);
     }
 }
 
-fn live(table: &HashMap<Kind, KindTable>, handle: u64) -> Option<(Kind, &Slot)> {
-    table.iter().find(|(kind, _)| **kind as u8 == kind_of(handle)).and_then(|(kind, t)| {
-        let slot = t.slots.get(index_of(handle))?;
-        (slot.object.is_some() && slot.generation == generation_of(handle)).then_some((*kind, slot))
-    })
+fn live(table: &HashMap<u8, KindTable>, handle: u64) -> Option<&Slot> {
+    let slot = table.get(&kind_of(handle))?.slots.get(index_of(handle))?;
+    (slot.object.is_some() && slot.generation == generation_of(handle)).then_some(slot)
 }
 
-pub fn get(handle: u64) -> Option<Object> {
+pub fn get(handle: impl Into<u64>) -> Option<Object> {
     let table = TABLE.lock().unwrap();
-    live(&table, handle).and_then(|(_, slot)| slot.object.clone())
+    live(&table, handle.into()).and_then(|slot| slot.object.clone())
 }
 
 /// Retires `handle` and returns what it named. Every copy of the handle is
 /// stale from here on.
-pub fn remove(handle: u64) -> Option<Object> {
+pub fn remove(handle: impl Into<u64>) -> Option<Object> {
+    let handle = handle.into();
     let mut table = TABLE.lock().unwrap();
-    let kind = live(&table, handle)?.0;
-    let table = table.get_mut(&kind)?;
+    live(&table, handle)?;
+    let table = table.get_mut(&kind_of(handle))?;
     let index = index_of(handle);
     let slot = &mut table.slots[index];
     let object = slot.object.take();
@@ -188,7 +188,7 @@ fn fault(expected: Kind, handle: u64) -> Failure {
         let table = TABLE.lock().unwrap();
         let generation = generation_of(handle);
         table
-            .get(&expected)
+            .get(&(expected as u8))
             .and_then(|t| t.slots.get(index_of(handle)))
             .is_some_and(|slot| generation != 0 && generation < slot.generation)
     };
@@ -206,35 +206,36 @@ fn fault(expected: Kind, handle: u64) -> Failure {
 }
 
 /// The live object of kind `expected` that `handle` names, or the C++ fault.
-pub fn resolve(expected: Kind, handle: u64) -> Result<Object, Failure> {
+pub fn resolve(expected: Kind, handle: impl Into<u64>) -> Result<Object, Failure> {
+    let handle = handle.into();
     match get(handle) {
         Some(object) if object.kind() == expected => Ok(object),
         _ => Err(fault(expected, handle)),
     }
 }
 
-pub fn runtime(handle: u64) -> Result<Arc<RuntimeShared>, Failure> {
+pub fn runtime(handle: impl Into<u64>) -> Result<Arc<RuntimeShared>, Failure> {
     match resolve(Kind::Runtime, handle)? {
         Object::Runtime(runtime) => Ok(runtime),
         _ => unreachable!(),
     }
 }
 
-pub fn map(handle: u64) -> Result<Arc<MapShared>, Failure> {
+pub fn map(handle: impl Into<u64>) -> Result<Arc<MapShared>, Failure> {
     match resolve(Kind::Map, handle)? {
         Object::Map(map) => Ok(map),
         _ => unreachable!(),
     }
 }
 
-pub fn session(handle: u64) -> Result<Arc<SessionShared>, Failure> {
+pub fn session(handle: impl Into<u64>) -> Result<Arc<SessionShared>, Failure> {
     match resolve(Kind::RenderSession, handle)? {
         Object::Session(session) => Ok(session),
         _ => unreachable!(),
     }
 }
 
-pub fn queue(handle: u64) -> Result<Arc<DeliveryQueue>, Failure> {
+pub fn queue(handle: impl Into<u64>) -> Result<Arc<DeliveryQueue>, Failure> {
     match resolve(Kind::DeliveryQueue, handle)? {
         Object::Queue(queue) => Ok(queue),
         _ => unreachable!(),

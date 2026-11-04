@@ -46,11 +46,11 @@ fn truncated(message: &str, capacity: usize) -> &str {
 /// # Safety
 /// `diagnostic` is null or points at a writable `mln_diagnostic` whose
 /// `size` says how many of its bytes are writable.
-pub unsafe fn write(diagnostic: *mut MlnDiagnostic, message: &str) {
+pub unsafe fn write(diagnostic: *mut mln_diagnostic, message: &str) {
     if diagnostic.is_null() {
         return;
     }
-    let message_offset = std::mem::offset_of!(MlnDiagnostic, message);
+    let message_offset = std::mem::offset_of!(mln_diagnostic, message);
     // SAFETY: the caller's contract.
     let size = unsafe { (*diagnostic).size } as usize;
     if size <= message_offset {
@@ -71,7 +71,7 @@ pub unsafe fn write(diagnostic: *mut MlnDiagnostic, message: &str) {
 ///
 /// # Safety
 /// As for `write`.
-pub unsafe fn boundary(diagnostic: *mut MlnDiagnostic, body: impl FnOnce() -> CallResult) -> i32 {
+pub unsafe fn boundary(diagnostic: *mut mln_diagnostic, body: impl FnOnce() -> CallResult) -> i32 {
     let outcome = match catch_unwind(AssertUnwindSafe(body)) {
         Ok(result) => result,
         Err(panic) => Err(Failure::new(MLN_STATUS_NATIVE_ERROR, panic_message(&panic))),
@@ -104,13 +104,8 @@ pub fn panic_message(panic: &Box<dyn std::any::Any + Send>) -> String {
 ///
 /// # Safety
 /// As for `write`.
-pub unsafe fn unsupported(diagnostic: *mut MlnDiagnostic, name: &str) -> i32 {
+pub unsafe fn unsupported(diagnostic: *mut mln_diagnostic, name: &str) -> i32 {
     // SAFETY: the caller's contract.
     unsafe { write(diagnostic, &format!("{name} is not implemented by maplibre-native-next yet")) };
-    MLN_STATUS_UNSUPPORTED
-}
-
-#[allow(dead_code)] // stubs.rs uses it when a stub without a diagnostic returns a status.
-pub fn unsupported_status(_name: &str) -> i32 {
     MLN_STATUS_UNSUPPORTED
 }

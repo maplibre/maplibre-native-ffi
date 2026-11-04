@@ -1,6 +1,5 @@
 // Drives the maplibre-native-next build of maplibre_native_c through the header:
-// the struct layouts of the Rust mirrors, then the flows of the ffi's
-// "Render images" guide (tests/native/docsnippets/images.c) and of its
+// the flows of the ffi's "Render images" guide (tests/native/docsnippets/images.c) and of its
 // offscreen ABI tests (tests/native/abi/render/offscreen.c), rendered on the
 // Rust port and read back.
 
@@ -31,7 +30,7 @@ static int failures = 0;
 #define CHECK_STATUS(expected, call)                                         \
   do {                                                                       \
     mln_diagnostic diagnostic_ = {.size = sizeof(mln_diagnostic)};           \
-    const mln_status status_ = (call_with_diagnostic(call, &diagnostic_));   \
+    const mln_status status_ = (call);                                       \
     if (status_ != (expected)) {                                             \
       fprintf(stderr, "%s:%d: %s returned %d, expected %d: %s\n", __FILE__,  \
               __LINE__, #call, (int)status_, (int)(expected),                \
@@ -40,153 +39,8 @@ static int failures = 0;
     }                                                                        \
   } while (0)
 
-// Lets CHECK_STATUS pass its diagnostic as the call's last argument.
-#define call_with_diagnostic(call, diagnostic) call
+// The diagnostic of the call that CHECK_STATUS checks, as its last argument.
 #define DIAG (&diagnostic_)
-
-// MARK: - Layouts
-
-extern bool mln_next_ffi_layout(
-  const char* name, size_t* out_size, size_t* out_align
-);
-
-static void check_layout(const char* name, size_t size, size_t align) {
-  size_t rust_size = 0;
-  size_t rust_align = 0;
-  if (!mln_next_ffi_layout(name, &rust_size, &rust_align)) {
-    fprintf(stderr, "layout: Rust doesn't mirror %s\n", name);
-    failures += 1;
-    return;
-  }
-  if (rust_size != size || rust_align != align) {
-    fprintf(stderr, "layout: %s is %zu/%zu in C, %zu/%zu in Rust\n", name, size,
-            align, rust_size, rust_align);
-    failures += 1;
-  }
-}
-
-#define TYPE(t) check_layout(#t, sizeof(t), _Alignof(t))
-#define FIELD(t, f) check_layout(#t "." #f, offsetof(t, f), 0)
-
-static void test_layouts(void) {
-  TYPE(mln_diagnostic);
-  FIELD(mln_diagnostic, message);
-  TYPE(mln_buffer_view);
-  FIELD(mln_buffer_view, size);
-  TYPE(mln_logical_extent);
-  FIELD(mln_logical_extent, scale_factor);
-  TYPE(mln_completion_result);
-  FIELD(mln_completion_result, generation);
-  FIELD(mln_completion_result, diagnostic);
-  FIELD(mln_completion_result, value);
-  FIELD(mln_completion_result, value_count);
-  TYPE(mln_completion);
-  FIELD(mln_completion, callback);
-  FIELD(mln_completion, queue);
-  TYPE(mln_wake);
-  FIELD(mln_wake, queue);
-  TYPE(mln_delivery_queue_options);
-  FIELD(mln_delivery_queue_options, wake);
-  FIELD(mln_delivery_queue_options, release_abandoned_user_data);
-  TYPE(mln_runtime_options);
-  FIELD(mln_runtime_options, asset_path);
-  FIELD(mln_runtime_options, cache_path);
-  TYPE(mln_runtime_event);
-  FIELD(mln_runtime_event, generation);
-  FIELD(mln_runtime_event, code);
-  FIELD(mln_runtime_event, payload_type);
-  FIELD(mln_runtime_event, message);
-  FIELD(mln_runtime_event, payload);
-  TYPE(mln_runtime_event_payload);
-  TYPE(mln_runtime_event_render_frame);
-  FIELD(mln_runtime_event_render_frame, stats);
-  TYPE(mln_event_batch_view);
-  FIELD(mln_event_batch_view, events);
-  FIELD(mln_event_batch_view, event_count);
-  TYPE(mln_runtime_event_handler);
-  FIELD(mln_runtime_event_handler, callback);
-  FIELD(mln_runtime_event_handler, queue);
-  TYPE(mln_map_options);
-  FIELD(mln_map_options, initial_extent);
-  FIELD(mln_map_options, map_mode);
-  FIELD(mln_map_options, fast_pfor_enabled);
-  FIELD(mln_map_options, event_mask);
-  FIELD(mln_map_options, tile_cache_enabled);
-  TYPE(mln_camera_options);
-  FIELD(mln_camera_options, center);
-  FIELD(mln_camera_options, center_altitude);
-  FIELD(mln_camera_options, padding);
-  FIELD(mln_camera_options, anchor);
-  FIELD(mln_camera_options, zoom);
-  FIELD(mln_camera_options, field_of_view);
-  TYPE(mln_camera);
-  FIELD(mln_camera, zoom);
-  FIELD(mln_camera, field_of_view);
-  TYPE(mln_animation_options);
-  FIELD(mln_animation_options, duration_ms);
-  FIELD(mln_animation_options, easing);
-  FIELD(mln_animation_options, transition_id);
-  FIELD(mln_animation_options, end_handler);
-  TYPE(mln_camera_update);
-  FIELD(mln_camera_update, camera);
-  FIELD(mln_camera_update, animation);
-  FIELD(mln_camera_update, gesture_phase);
-  TYPE(mln_map_view);
-  FIELD(mln_map_view, camera);
-  FIELD(mln_map_view, extent);
-  FIELD(mln_map_view, projection_mode);
-  FIELD(mln_map_view, viewport);
-  TYPE(mln_map_snapshot);
-  FIELD(mln_map_snapshot, generation);
-  FIELD(mln_map_snapshot, event_mask);
-  FIELD(mln_map_snapshot, latest_render_update_generation);
-  FIELD(mln_map_snapshot, tile);
-  FIELD(mln_map_snapshot, bounds);
-  FIELD(mln_map_snapshot, free_camera);
-  FIELD(mln_map_snapshot, view);
-  TYPE(mln_camera_query_result);
-  FIELD(mln_camera_query_result, camera);
-  TYPE(mln_render_session_attach_options);
-  FIELD(mln_render_session_attach_options, frame_wake);
-  FIELD(mln_render_session_attach_options, driver_work_wake);
-  FIELD(mln_render_session_attach_options, queue_lock);
-  TYPE(mln_render_session_capabilities);
-  FIELD(mln_render_session_capabilities, consumer_sync_kinds);
-  TYPE(mln_offscreen_descriptor);
-  FIELD(mln_offscreen_descriptor, logical_size);
-  TYPE(mln_web_gpu_context_descriptor);
-  FIELD(mln_web_gpu_context_descriptor, device);
-  FIELD(mln_web_gpu_context_descriptor, queue);
-  TYPE(mln_web_gpu_surface_descriptor);
-  FIELD(mln_web_gpu_surface_descriptor, logical_size);
-  FIELD(mln_web_gpu_surface_descriptor, context);
-  FIELD(mln_web_gpu_surface_descriptor, surface);
-  FIELD(mln_web_gpu_surface_descriptor, format);
-  TYPE(mln_offscreen_device_options);
-  FIELD(mln_offscreen_device_options, client_api);
-  TYPE(mln_texture_readback_result);
-  FIELD(mln_texture_readback_result, info);
-  TYPE(mln_texture_image_info);
-  FIELD(mln_texture_image_info, byte_length);
-  TYPE(mln_frame_demand);
-  FIELD(mln_frame_demand, token);
-  TYPE(mln_render_frame_result);
-  FIELD(mln_render_frame_result, token);
-  FIELD(mln_render_frame_result, frame_generation);
-  FIELD(mln_render_frame_result, needs_repaint);
-  FIELD(mln_render_frame_result, view);
-  FIELD(mln_render_frame_result, mode);
-  TYPE(mln_render_frame_batch_view);
-  FIELD(mln_render_frame_batch_view, results);
-  FIELD(mln_render_frame_batch_view, result_count);
-  TYPE(mln_render_session_snapshot);
-  FIELD(mln_render_session_snapshot, extent);
-  FIELD(mln_render_session_snapshot, generation);
-  FIELD(mln_render_session_snapshot, failure_status);
-  FIELD(mln_render_session_snapshot, has_target);
-  TYPE(mln_render_abandon_result);
-  FIELD(mln_render_abandon_result, reserved);
-}
 
 // MARK: - Waiting
 
@@ -659,7 +513,6 @@ static void test_continuous_frames(void) {
 }
 
 int main(void) {
-  test_layouts();
   test_base();
   test_static_still_image();
   test_continuous_frames();

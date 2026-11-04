@@ -145,8 +145,8 @@ function(mln_ffi_add_maplibre_native_next_library target)
   mln_ffi_configure_vulkan_test_loader(mln_ffi_render_dependencies)
 endfunction()
 
-# The crate's own test, which the ABI suite can't replace: its Rust mirrors of
-# the header's types against the C compiler's layouts.
+# The crate's own tests: the images guide's and the offscreen ABI tests' flows,
+# rendered on the port and read back.
 function(mln_ffi_add_maplibre_native_next_tests out_tests)
   find_package(Threads REQUIRED)
   add_executable(mln_next_c_api_test
@@ -156,8 +156,7 @@ function(mln_ffi_add_maplibre_native_next_tests out_tests)
   target_link_libraries(mln_next_c_api_test PRIVATE maplibre_native_c
                                                     Threads::Threads)
   if(EMSCRIPTEN)
-    # A page in headless Chromium, like the browser ABI shards. The layouts it
-    # checks are wasm32's.
+    # A page in headless Chromium, like the browser ABI shards.
     mln_native_configure_browser_page(mln_next_c_api_test)
     mln_native_add_browser_test(next/c_api/browser mln_next_c_api_test)
     # A WebGPU surface session on a canvas of the test's thread, resized while

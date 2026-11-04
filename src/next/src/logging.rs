@@ -11,30 +11,13 @@ use crate::diagnostics::{Failure, boundary};
 use crate::handles;
 use crate::types::*;
 use maplibre_native_next::mln_util::logging::{Event, EventSeverity, Log, Observer};
-use std::ffi::c_void;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Once};
 
-pub const MLN_LOG_SEVERITY_FLAG_DEFAULT: u32 = (1 << 1) | (1 << 2);
-pub const MLN_LOG_SEVERITY_FLAG_ALL: u32 = (1 << 1) | (1 << 2) | (1 << 3);
-
-type LogCallback = Option<unsafe extern "C" fn(*mut c_void, u32, u32, i64, MlnBufferView) -> bool>;
-
-/// `mln_log_handler`.
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct MlnLogHandler {
-    pub size: u32,
-    pub callback: LogCallback,
-    pub user_data: *mut c_void,
-    pub release_user_data: UserDataRelease,
-    pub queue: u64,
-}
-
 struct Handler {
-    callback: LogCallback,
+    callback: mln_log_callback,
     user_data: UserData,
-    release_user_data: UserDataRelease,
+    release_user_data: mln_user_data_release,
     queue: u64,
 }
 
@@ -77,12 +60,12 @@ impl Observer for FfiObserver {
         if handler.queue == 0 {
             // SAFETY: the caller registered this callback and user_data; the
             // message lives until it returns.
-            return unsafe { callback(handler.user_data.get(), severity, event, code, MlnBufferView::of_text(&message)) };
+            return unsafe { callback(handler.user_data.get(), severity, event, code, mln_buffer_view::of_text(&message)) };
         }
         let user_data = handler.user_data;
         deliver(handler.queue, Box::new(move || {
             // SAFETY: as above, on the dispatching thread.
-            unsafe { callback(user_data.get(), severity, event, code, MlnBufferView::of_text(&message)) };
+            unsafe { callback(user_data.get(), severity, event, code, mln_buffer_view::of_text(&message)) };
         }));
         true
     }
@@ -91,7 +74,7 @@ impl Observer for FfiObserver {
 /// # Safety
 /// C API contract (logging.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_log_set_callback(handler: *const MlnLogHandler, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_log_set_callback(handler: *const mln_log_handler, out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
@@ -101,7 +84,7 @@ pub unsafe extern "C" fn mln_log_set_callback(handler: *const MlnLogHandler, out
             if handler.callback.is_none() {
                 return Err(Failure::invalid_argument("handler.callback must not be null"));
             }
-            if handler.queue != 0 {
+            if handler.queue.0 != 0 {
                 handles::queue(handler.queue)?;
             }
             INSTALL.call_once(|| Log::set_observer(Box::new(FfiObserver)));
@@ -109,7 +92,7 @@ pub unsafe extern "C" fn mln_log_set_callback(handler: *const MlnLogHandler, out
                 callback: handler.callback,
                 user_data: UserData(handler.user_data),
                 release_user_data: handler.release_user_data,
-                queue: handler.queue,
+                queue: handler.queue.0,
             }));
             if let Some(previous) = previous {
                 previous.release();
@@ -122,7 +105,7 @@ pub unsafe extern "C" fn mln_log_set_callback(handler: *const MlnLogHandler, out
 /// # Safety
 /// C API contract (logging.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_log_clear_callback(out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_log_clear_callback(out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
@@ -138,7 +121,7 @@ pub unsafe extern "C" fn mln_log_clear_callback(out_diagnostic: *mut MlnDiagnost
 /// # Safety
 /// C API contract (logging.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_log_set_async_severity_mask(mask: u32, out_diagnostic: *mut MlnDiagnostic) -> i32 {
+pub unsafe extern "C" fn mln_log_set_async_severity_mask(mask: u32, out_diagnostic: *mut mln_diagnostic) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {

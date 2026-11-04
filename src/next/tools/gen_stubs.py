@@ -2,132 +2,64 @@
 """Generates src/next/src/stubs.rs from the C headers in include/.
 
 Every C API function that no hand-written module of src/next exports gets a
-stub with the C signature that returns MLN_STATUS_UNSUPPORTED (or does
-nothing), so the static library links against any caller of the full API,
-such as maplibre-native-ffi's native test suites.
+stub that returns MLN_STATUS_UNSUPPORTED (or does nothing), so the static
+library links against any caller of the full API, such as
+maplibre-native-ffi's native test suites. tools/bindgen reads the headers and
+spells each stub's signature as it does for the -sys crate's declarations,
+which types.rs includes.
 
 Usage (from the repository root):
 
-    python3 -I src/next/tools/gen_stubs.py
+    uv run --no-sync python -I src/next/tools/gen_stubs.py
 
 Rerun it after implementing a function (its `extern "C" fn` in src/next/src
-removes it from the stubs) or after changing include/.
+removes it from the stubs, and adds it to the check of the hand-written
+functions' signatures against the headers') or after changing include/.
 """
 
-import glob
-import os
 import re
 import sys
+from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INCLUDE = os.path.join(ROOT, "..", "..", "include", "maplibre_native_c")
-SRC = os.path.join(ROOT, "src")
-OUT = os.path.join(SRC, "stubs.rs")
+ROOT = Path(__file__).resolve().parents[3]
+SRC = ROOT / "src" / "next" / "src"
+OUT = SRC / "stubs.rs"
+sys.path.insert(0, str(ROOT))
 
-HANDLE_TYPES = {
-    "mln_runtime", "mln_map", "mln_geo_json_source_data", "mln_style_expression",
-    "mln_offscreen_device", "mln_map_projection", "mln_resource_request",
-    "mln_resource_transform_request", "mln_render_session", "mln_acquired_frame",
-    "mln_render_frame_batch", "mln_delivery_queue",
-}
-U64_TYPES = HANDLE_TYPES | {"uint64_t", "mln_runtime_event_flags"}
-I64_TYPES = {"int64_t", "mln_offline_region_id"}
-U32_TYPES = {
-    "uint32_t", "mln_ambient_cache_operation", "mln_network_status",
-    "mln_offline_region_download_state", "mln_log_severity_flags",
-    "mln_map_debug_flags", "mln_render_backend_flags",
-    "mln_open_gl_context_provider_flags", "mln_style_vector_tile_encoding",
-}
-BY_VALUE = {
-    "mln_buffer_view": "MlnBufferView",
-    "mln_logical_size": "MlnLogicalSize",
-    "mln_logical_extent": "MlnLogicalExtent",
-    "mln_canonical_tile_id": "MlnCanonicalTileId",
-    "mln_lat_lng": "MlnLatLng",
-    "mln_lat_lng_bounds": "MlnLatLngBounds",
-    "mln_projected_meters": "MlnProjectedMeters",
-    "mln_screen_point": "MlnScreenPoint",
-}
-
-
-def strip_binding(text):
-    out, i = [], 0
-    while i < len(text):
-        if text.startswith("MLN_BINDING(", i):
-            depth, j = 0, i + len("MLN_BINDING")
-            while j < len(text):
-                c = text[j]
-                if c == "(":
-                    depth += 1
-                elif c == ")":
-                    depth -= 1
-                    if depth == 0:
-                        break
-                elif c == '"':
-                    j += 1
-                    while text[j] != '"':
-                        j += 1
-                j += 1
-            i = j + 1
-        else:
-            out.append(text[i])
-            i += 1
-    return "".join(out)
-
-
-def parse():
-    funcs = []
-    for path in sorted(glob.glob(os.path.join(INCLUDE, "*.h"))):
-        text = open(path, encoding="utf-8").read()
-        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-        text = re.sub(r"//[^\n]*", "", text)
-        text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("#"))
-        for m in re.finditer(r"MLN_API\s+(.*?)\)\s*MLN_NOEXCEPT\s*;", text, flags=re.S):
-            decl = " ".join((strip_binding(m.group(1)) + ")").split())
-            fm = re.match(r"(.*?)\b(mln_[a-z0-9_]+)\s*\((.*)\)$", decl)
-            ret, name, params = fm.group(1).strip(), fm.group(2), fm.group(3).strip()
-            plist = [] if params in ("void", "") else [p.strip() for p in params.split(",")]
-            ps = []
-            for p in plist:
-                pm = re.match(r"(.*?)([A-Za-z_][A-Za-z0-9_]*)$", p)
-                ps.append((" ".join(pm.group(1).split()), pm.group(2)))
-            funcs.append((os.path.basename(path), ret, name, ps))
-    return funcs
-
-
-def rust_type(c_type):
-    if c_type == "mln_diagnostic*":
-        return "*mut MlnDiagnostic"
-    if "*" in c_type:
-        return "*const c_void" if c_type.startswith("const ") else "*mut c_void"
-    if c_type in U64_TYPES:
-        return "u64"
-    if c_type in I64_TYPES:
-        return "i64"
-    if c_type in U32_TYPES:
-        return "u32"
-    if c_type == "size_t":
-        return "usize"
-    if c_type == "double":
-        return "f64"
-    if c_type == "bool":
-        return "bool"
-    if c_type in BY_VALUE:
-        return BY_VALUE[c_type]
-    raise SystemExit(f"gen_stubs.py: no Rust type for C type {c_type!r}")
+from tools.bindgen.emitters import rust_sys  # noqa: E402
+from tools.bindgen.frontend import parse_headers  # noqa: E402
 
 
 def implemented():
-    names = set()
-    for path in glob.glob(os.path.join(SRC, "**", "*.rs"), recursive=True):
-        if os.path.abspath(path) == OUT:
-            continue
-        names.update(re.findall(r'extern "C" fn (mln_[a-z0-9_]+)\s*\(', open(path, encoding="utf-8").read()))
+    """The module that exports each hand-written function."""
+    names = {}
+    for path in sorted(SRC.glob("*.rs")):
+        if path != OUT:
+            for name in re.findall(r'extern "C" fn (mln_\w+)\s*\(', path.read_text()):
+                names[name] = path.stem
     return names
 
 
+def body(function, returns):
+    if function.diagnostic:
+        return f'unsafe {{ crate::diagnostics::unsupported(out_diagnostic, "{function.name}") }}'
+    if not returns:
+        return ""
+    if returns == "mln_status":
+        return "MLN_STATUS_UNSUPPORTED"
+    if returns.startswith("*mut "):
+        return "std::ptr::null_mut()"
+    if returns.startswith("*const "):
+        return "std::ptr::null()"
+    return "Default::default()"
+
+
 def main():
-    funcs = parse()
+    api = parse_headers(
+        ROOT / "include",
+        clang_args=(f"-I{ROOT / 'third_party/maplibre-native/include'}",),
+    )
+    declarations = rust_sys.declarations(api)
     done = implemented()
     lines = [
         "// @generated by src/next/tools/gen_stubs.py from include/; do not edit.",
@@ -135,48 +67,43 @@ def main():
         "// The C API functions that this crate does not implement yet. Each one keeps",
         "// its C signature, writes a diagnostic and returns",
         "// MLN_STATUS_UNSUPPORTED (or does nothing, for functions without a",
-        "// status), so callers of the whole API link.",
+        "// status), so callers of the whole API link. At the end, a check that the",
+        "// functions it does implement have the headers' signatures.",
         "",
         "#![allow(unused_variables, clippy::missing_safety_doc)]",
         "",
         "use crate::types::*;",
-        "use std::ffi::c_void;",
         "",
     ]
-    stubbed = 0
-    for header, ret, name, params in funcs:
-        if name in done:
-            continue
-        stubbed += 1
-        args = ", ".join(f"{n}: {rust_type(t)}" for t, n in params)
-        diag = next((n for t, n in params if t == "mln_diagnostic*"), None)
-        lines.append(f"/// `{name}` ({header}): not implemented.")
+    stubbed = [function for function in api.functions if function.name not in done]
+    for function in stubbed:
+        # `pub fn name(parameters) -> result;`, as the -sys crate declares it.
+        signature = declarations.extern(function).strip().removeprefix("pub fn ").removesuffix(";")
+        result = function.return_type
+        returns = "" if result.kind == "void" else declarations.type(result)
+        header = Path(function.location.path).name
+        lines.append(f"/// `{function.name}` ({header}): not implemented.")
         lines.append("#[unsafe(no_mangle)]")
-        if ret == "mln_status":
-            lines.append(f'pub unsafe extern "C" fn {name}({args}) -> i32 {{')
-            if diag:
-                lines.append(f'    unsafe {{ crate::diagnostics::unsupported({diag}, "{name}") }}')
-            else:
-                lines.append(f'    crate::diagnostics::unsupported_status("{name}")')
-        elif ret == "void":
-            lines.append(f'pub unsafe extern "C" fn {name}({args}) {{')
-        elif ret == "mln_plugin_register_function_v1":
-            lines.append(f'pub unsafe extern "C" fn {name}({args}) -> *const c_void {{')
-            lines.append("    std::ptr::null()")
-        else:
-            rt = rust_type(ret)
-            lines.append(f'pub unsafe extern "C" fn {name}({args}) -> {rt} {{')
-            if rt.startswith("*mut"):
-                lines.append("    std::ptr::null_mut()")
-            elif rt.startswith("*const"):
-                lines.append("    std::ptr::null()")
-            else:
-                lines.append("    0")
+        lines.append(f'pub unsafe extern "C" fn {signature} {{')
+        if code := body(function, returns):
+            lines.append(f"    {code}")
         lines.append("}")
         lines.append("")
-    with open(OUT, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
-    print(f"{len(funcs)} functions: {len(funcs) - stubbed} implemented, {stubbed} stubbed")
+    # A function item coerces to the pointer type that it shares with another
+    # only if their signatures are the same, so this fails to compile where a
+    # hand-written export differs from the header's declaration.
+    lines.append("// The hand-written exports have the headers' signatures.")
+    lines.append("const _: () = {")
+    for function in api.functions:
+        if module := done.get(function.name):
+            lines.append(f"    let _ = [crate::types::{function.name}, crate::{module}::{function.name}];")
+    lines.append("};")
+    lines.append("")
+    OUT.write_text("\n".join(lines))
+    print(
+        f"{len(api.functions)} functions: "
+        f"{len(api.functions) - len(stubbed)} implemented, {len(stubbed)} stubbed"
+    )
 
 
 if __name__ == "__main__":

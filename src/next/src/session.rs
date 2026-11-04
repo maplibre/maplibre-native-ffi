@@ -27,7 +27,7 @@ use maplibre_native_next::mln_util::size::Size;
 use std::cell::{Cell, RefCell};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::rc::{Rc, Weak};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 // MARK: - ProxyFrontend
@@ -51,7 +51,7 @@ pub struct ProxyFrontend {
 }
 
 impl ProxyFrontend {
-    pub fn new(_map: u64, mode: MapMode, pixel_ratio: f32) -> ProxyFrontend {
+    pub fn new(mode: MapMode, pixel_ratio: f32) -> ProxyFrontend {
         ProxyFrontend {
             inner: Rc::new(ProxyInner {
                 mode,
@@ -170,10 +170,10 @@ impl RendererFrontend for ProxyFrontend {
 pub struct SessionShared {
     pub map: Arc<MapShared>,
     pub(crate) state: Mutex<SessionPublic>,
-    pub(crate) demands: Mutex<Vec<MlnFrameDemand>>,
-    pub(crate) results: Mutex<Vec<MlnRenderFrameResult>>,
+    pub(crate) demands: Mutex<Vec<mln_frame_demand>>,
+    pub(crate) results: Mutex<Vec<mln_render_frame_result>>,
     pub(crate) frame_wake: Option<Wake>,
-    pub(crate) frame_wake_armed: Mutex<bool>,
+    pub(crate) frame_wake_armed: AtomicBool,
     pub(crate) frame_generation: AtomicU64,
     /// The thread that renders: MLN_RENDER_DRIVER_CORE_WORKER (offscreen)
     /// or MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD (a WebGPU surface).
@@ -183,7 +183,7 @@ pub struct SessionShared {
 
 pub(crate) struct SessionPublic {
     pub(crate) state: u32,
-    pub(crate) extent: MlnLogicalExtent,
+    pub(crate) extent: mln_logical_extent,
     pub(crate) failure_status: i32,
     pub(crate) failure: String,
 }
@@ -209,15 +209,11 @@ impl SessionShared {
     }
 
     /// Queues a frame result and wakes the caller, once per drain.
-    pub(crate) fn push_result(&self, mut result: MlnRenderFrameResult) {
-        result.size = size_of::<MlnRenderFrameResult>() as u32;
+    pub(crate) fn push_result(&self, mut result: mln_render_frame_result) {
+        result.size = size_of::<mln_render_frame_result>() as u32;
         result.generation = self.map.generation.load(Ordering::SeqCst);
         self.results.lock().unwrap().push(result);
-        let signal = {
-            let mut armed = self.frame_wake_armed.lock().unwrap();
-            std::mem::replace(&mut *armed, false)
-        };
-        if signal {
+        if self.frame_wake_armed.swap(false, Ordering::SeqCst) {
             if let Some(wake) = &self.frame_wake {
                 wake.signal();
             }
@@ -240,19 +236,19 @@ pub struct SessionEntry {
     pub frontend: HeadlessFrontend,
     rendered_update_generation: Cell<u64>,
     frames_rendered: Cell<u64>,
-    waiting: RefCell<Vec<MlnFrameDemand>>,
+    waiting: RefCell<Vec<mln_frame_demand>>,
 }
 
 pub struct FrameBatch {
-    results: Vec<MlnRenderFrameResult>,
+    results: Vec<mln_render_frame_result>,
 }
 
 fn session_entry(handle: u64) -> Option<Rc<SessionEntry>> {
     STATE.with(|state| state.borrow().sessions.get(&handle).cloned())
 }
 
-fn frame_result(entry: &SessionEntry, map: Option<&MapEntry>, disposition: u32, token: u64) -> MlnRenderFrameResult {
-    MlnRenderFrameResult {
+fn frame_result(entry: &SessionEntry, map: Option<&MapEntry>, disposition: u32, token: u64) -> mln_render_frame_result {
+    mln_render_frame_result {
         disposition,
         token,
         map_update_generation: map.map(|m| m.frontend.update_generation()).unwrap_or(0),
@@ -372,9 +368,9 @@ pub fn abandon(session: u64) {
 /// C API contract (offscreen.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_offscreen_device_create(
-    options: *const MlnOffscreenDeviceOptions,
-    out_device: *mut u64,
-    out_diagnostic: *mut MlnDiagnostic,
+    options: *const mln_offscreen_device_options,
+    out_device: *mut mln_offscreen_device,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -396,13 +392,13 @@ pub unsafe extern "C" fn mln_offscreen_device_create(
                     return Err(Failure::new(MLN_STATUS_UNSUPPORTED, "a WebGPU device renders with no OpenGL API"));
                 }
             }
-            if out_device.is_null() || *out_device != 0 {
+            if out_device.is_null() || (*out_device).0 != 0 {
                 return Err(Failure::invalid_argument("out_device must point at MLN_HANDLE_NULL"));
             }
             // TODO(ffi): share one wgpu device among the device's sessions
             // (needs a HeadlessBackend constructor that takes a device); each
             // session creates its own for now.
-            *out_device = handles::insert(Object::OffscreenDevice);
+            *out_device = handles::insert(Object::OffscreenDevice).into();
             Ok(())
         })
     }
@@ -411,7 +407,7 @@ pub unsafe extern "C" fn mln_offscreen_device_create(
 /// # Safety
 /// C API contract (offscreen.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_offscreen_device_release(device: u64) {
+pub unsafe extern "C" fn mln_offscreen_device_release(device: mln_offscreen_device) {
     if let Some(Object::OffscreenDevice) = handles::get(device) {
         handles::remove(device);
     }
@@ -421,13 +417,13 @@ pub unsafe extern "C" fn mln_offscreen_device_release(device: u64) {
 /// C API contract (offscreen.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_attach_offscreen(
-    map: u64,
-    descriptor: *const MlnOffscreenDescriptor,
-    options: *const MlnRenderSessionAttachOptions,
-    device: u64,
-    out_session: *mut u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    descriptor: *const mln_offscreen_descriptor,
+    options: *const mln_render_session_attach_options,
+    device: mln_offscreen_device,
+    out_session: *mut mln_render_session,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -449,10 +445,10 @@ pub unsafe extern "C" fn mln_map_attach_offscreen(
             if options.driver != MLN_RENDER_DRIVER_CORE_WORKER {
                 return Err(Failure::new(MLN_STATUS_UNSUPPORTED, "an offscreen session renders on a core worker"));
             }
-            if device != 0 {
+            if device.0 != 0 {
                 handles::resolve(handles::Kind::OffscreenDevice, device)?;
             }
-            let completion = Completion::from_c(completion, false)?;
+            let completion = Some(Completion::required(completion)?);
             let handle = handles::reserve(handles::Kind::RenderSession);
             if map_shared.session.compare_exchange(0, handle, Ordering::SeqCst, Ordering::SeqCst).is_err() {
                 return Err(Failure::invalid_state("the map already has a render session"));
@@ -461,7 +457,7 @@ pub unsafe extern "C" fn mln_map_attach_offscreen(
                 map: map_shared.clone(),
                 state: Mutex::new(SessionPublic {
                     state: MLN_RENDER_SESSION_STATE_ATTACHING,
-                    extent: MlnLogicalExtent {
+                    extent: mln_logical_extent {
                         width: size.width,
                         height: size.height,
                         scale_factor: map_shared.scale_factor,
@@ -472,13 +468,13 @@ pub unsafe extern "C" fn mln_map_attach_offscreen(
                 demands: Mutex::new(Vec::new()),
                 results: Mutex::new(Vec::new()),
                 frame_wake: Wake::from_c(&options.frame_wake),
-                frame_wake_armed: Mutex::new(true),
+                frame_wake_armed: AtomicBool::new(true),
                 frame_generation: AtomicU64::new(0),
                 driver: MLN_RENDER_DRIVER_CORE_WORKER,
                 caller: None,
             });
             handles::insert_at(handle, Object::Session(shared.clone()));
-            *out_session = handle;
+            *out_session = handle.into();
 
             map_shared.runtime.post(move || {
                 let Some(map) = map::entry(shared.map.handle) else {
@@ -531,15 +527,15 @@ pub unsafe extern "C" fn mln_map_attach_offscreen(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_get_capabilities(
-    session: u64,
-    out_capabilities: *mut MlnRenderSessionCapabilities,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    out_capabilities: *mut mln_render_session_capabilities,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
             let shared = handles::session(session)?;
-            let capabilities = MlnRenderSessionCapabilities {
+            let capabilities = mln_render_session_capabilities {
                 size: 0,
                 driver: shared.driver,
                 texture_ring_depth: 0,
@@ -559,9 +555,9 @@ pub unsafe extern "C" fn mln_render_session_get_capabilities(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_get_snapshot(
-    session: u64,
-    out_snapshot: *mut MlnRenderSessionSnapshot,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    out_snapshot: *mut mln_render_session_snapshot,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -569,7 +565,7 @@ pub unsafe extern "C" fn mln_render_session_get_snapshot(
             let shared = handles::session(session)?;
             let snapshot = {
                 let public = shared.state.lock().unwrap();
-                MlnRenderSessionSnapshot {
+                mln_render_session_snapshot {
                     size: 0,
                     state: public.state,
                     extent: public.extent,
@@ -592,11 +588,11 @@ pub unsafe extern "C" fn mln_render_session_get_snapshot(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_get_failure(
-    session: u64,
+    session: mln_render_session,
     out_message: *mut std::ffi::c_char,
     message_capacity: usize,
     out_message_length: *mut usize,
-    out_diagnostic: *mut MlnDiagnostic,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -620,9 +616,9 @@ pub unsafe extern "C" fn mln_render_session_get_failure(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_demand_frame(
-    session: u64,
-    demand: *const MlnFrameDemand,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    demand: *const mln_frame_demand,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -645,7 +641,7 @@ pub unsafe extern "C" fn mln_render_session_demand_frame(
             if shared.is_caller() {
                 crate::surface_session::wake_driver(&shared);
             } else {
-                shared.map.runtime.post(move || process_demands(session));
+                shared.map.runtime.post(move || process_demands(session.0));
             }
             Ok(())
         })
@@ -656,10 +652,10 @@ pub unsafe extern "C" fn mln_render_session_demand_frame(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_drain_frame_results(
-    session: u64,
-    out_batch: *mut u64,
-    out_view: *mut MlnRenderFrameBatchView,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    out_batch: *mut mln_render_frame_batch,
+    out_view: *mut mln_render_frame_batch_view,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -668,33 +664,33 @@ pub unsafe extern "C" fn mln_render_session_drain_frame_results(
             if out_batch.is_null() || out_view.is_null() {
                 return Err(Failure::invalid_argument("out_batch and out_view must not be null"));
             }
-            if ((*out_view).size as usize) < size_of::<MlnRenderFrameBatchView>() {
+            if ((*out_view).size as usize) < size_of::<mln_render_frame_batch_view>() {
                 return Err(Failure::invalid_argument("out_view must be an mln_render_frame_batch_view"));
             }
             let results = {
                 let mut results = shared.results.lock().unwrap();
-                *shared.frame_wake_armed.lock().unwrap() = true;
+                shared.frame_wake_armed.store(true, Ordering::SeqCst);
                 std::mem::take(&mut *results)
             };
             let view_size = (*out_view).size;
             if results.is_empty() {
-                *out_batch = 0;
-                *out_view = MlnRenderFrameBatchView {
+                *out_batch = mln_render_frame_batch(0);
+                *out_view = mln_render_frame_batch_view {
                     size: view_size,
-                    result_size: size_of::<MlnRenderFrameResult>() as u32,
+                    result_size: size_of::<mln_render_frame_result>() as u32,
                     results: std::ptr::null(),
                     result_count: 0,
                 };
                 return Ok(());
             }
             let batch = Arc::new(FrameBatch { results });
-            *out_view = MlnRenderFrameBatchView {
+            *out_view = mln_render_frame_batch_view {
                 size: view_size,
-                result_size: size_of::<MlnRenderFrameResult>() as u32,
+                result_size: size_of::<mln_render_frame_result>() as u32,
                 results: batch.results.as_ptr(),
                 result_count: batch.results.len(),
             };
-            *out_batch = handles::insert(Object::FrameBatch(batch));
+            *out_batch = handles::insert(Object::FrameBatch(batch)).into();
             Ok(())
         })
     }
@@ -703,7 +699,7 @@ pub unsafe extern "C" fn mln_render_session_drain_frame_results(
 /// # Safety
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_render_frame_batch_release(batch: u64) {
+pub unsafe extern "C" fn mln_render_frame_batch_release(batch: mln_render_frame_batch) {
     if let Some(Object::FrameBatch(_)) = handles::get(batch) {
         handles::remove(batch);
     }
@@ -713,9 +709,9 @@ pub unsafe extern "C" fn mln_render_frame_batch_release(batch: u64) {
 /// C API contract (texture.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_read_texture(
-    session: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -728,11 +724,9 @@ pub unsafe extern "C" fn mln_render_session_read_texture(
                     "a WebGPU surface session presents its frames to the surface",
                 ));
             }
-            let Some(completion) = Completion::from_c(completion, false)? else {
-                return Err(Failure::invalid_argument("completion must not be null"));
-            };
+            let completion = Completion::required(completion)?;
             shared.map.runtime.clone().post(move || {
-                let Some(entry) = session_entry(session) else {
+                let Some(entry) = session_entry(session.0) else {
                     completion.fail(MLN_STATUS_TARGET_LOST, "the session is detached");
                     return;
                 };
@@ -741,7 +735,7 @@ pub unsafe extern "C" fn mln_render_session_read_texture(
                     return;
                 }
                 let image = entry.frontend.read_still_image();
-                let info = MlnTextureImageInfo {
+                let info = mln_texture_image_info {
                     width: image.size.width,
                     height: image.size.height,
                     stride: image.size.width * 4,
@@ -758,9 +752,9 @@ pub unsafe extern "C" fn mln_render_session_read_texture(
 /// C API contract (map.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_map_request_still_image(
-    map: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    map: mln_map,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -769,11 +763,9 @@ pub unsafe extern "C" fn mln_map_request_still_image(
             if shared.mode == MLN_MAP_MODE_CONTINUOUS {
                 return Err(Failure::invalid_state("only a static or tile map renders still images"));
             }
-            let Some(completion) = Completion::from_c(completion, false)? else {
-                return Err(Failure::invalid_argument("completion must not be null"));
-            };
+            let completion = Completion::required(completion)?;
             shared.runtime.clone().post(move || {
-                let Some(entry) = map::entry(map) else {
+                let Some(entry) = map::entry(map.0) else {
                     completion.fail(MLN_STATUS_CANCELLED, "the map was released");
                     return;
                 };
@@ -824,10 +816,10 @@ fn still_image_done(session: u64, error: Option<String>, completion: Completion)
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_resize(
-    session: u64,
-    logical_size: MlnLogicalSize,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    logical_size: mln_logical_size,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -837,13 +829,13 @@ pub unsafe extern "C" fn mln_render_session_resize(
                 return Err(Failure::invalid_argument("logical_size must not be empty"));
             }
             shared.check_live()?;
-            let completion = Completion::from_c(completion, true)?;
+            let completion = Completion::optional(completion)?;
             if shared.is_caller() {
                 crate::surface_session::resize(&shared, logical_size, completion);
                 return Ok(());
             }
             shared.map.runtime.clone().post(move || {
-                let (Some(entry), Some(map)) = (session_entry(session), map::entry(shared.map.handle)) else {
+                let (Some(entry), Some(map)) = (session_entry(session.0), map::entry(shared.map.handle)) else {
                     if let Some(completion) = completion {
                         completion.fail(MLN_STATUS_TARGET_LOST, "the session is detached");
                     }
@@ -854,8 +846,11 @@ pub unsafe extern "C" fn mln_render_session_resize(
                 frontend.set_size(size);
                 let _ = map.map.borrow_mut().set_size(size);
                 entry.frames_rendered.set(0);
-                shared.state.lock().unwrap().extent.width = logical_size.width;
-                shared.state.lock().unwrap().extent.height = logical_size.height;
+                {
+                    let extent = &mut shared.state.lock().unwrap().extent;
+                    extent.width = logical_size.width;
+                    extent.height = logical_size.height;
+                }
                 map.publish_snapshot();
                 if let Some(completion) = completion {
                     completion.ok();
@@ -870,24 +865,22 @@ pub unsafe extern "C" fn mln_render_session_resize(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_barrier(
-    session: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
             let shared = handles::session(session)?;
             shared.check_live()?;
-            let Some(completion) = Completion::from_c(completion, false)? else {
-                return Err(Failure::invalid_argument("completion must not be null"));
-            };
+            let completion = Completion::required(completion)?;
             if shared.is_caller() {
                 crate::surface_session::barrier(&shared, completion);
                 return Ok(());
             }
             shared.map.runtime.clone().post(move || {
-                if let Some(entry) = session_entry(session) {
+                if let Some(entry) = session_entry(session.0) {
                     let map = map::entry(entry.shared.map.handle);
                     for demand in entry.waiting.borrow_mut().drain(..) {
                         entry.shared.push_result(frame_result(
@@ -909,9 +902,9 @@ pub unsafe extern "C" fn mln_render_session_barrier(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_detach(
-    session: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
@@ -921,14 +914,14 @@ pub unsafe extern "C" fn mln_render_session_detach(
                 MLN_RENDER_SESSION_STATE_ATTACHING | MLN_RENDER_SESSION_STATE_ATTACHED => {}
                 _ => return Err(Failure::invalid_state("the session is not attached")),
             }
-            let completion = Completion::from_c(completion, true)?;
+            let completion = Completion::optional(completion)?;
             if shared.is_caller() {
-                crate::surface_session::detach(session, &shared, completion);
+                crate::surface_session::detach(session.0, &shared, completion);
                 return Ok(());
             }
             shared.set_state(MLN_RENDER_SESSION_STATE_DETACHING);
             shared.map.runtime.post(move || {
-                end_session(session, MLN_RENDER_SESSION_STATE_DETACHED);
+                end_session(session.0, MLN_RENDER_SESSION_STATE_DETACHED);
                 if let Some(completion) = completion {
                     completion.ok();
                 }
@@ -942,15 +935,15 @@ pub unsafe extern "C" fn mln_render_session_detach(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_dispose(
-    session: u64,
-    completion: *const MlnCompletion,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    completion: *const mln_completion,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
             let shared = handles::session(session)?;
-            let completion = Completion::from_c(completion, true)?;
+            let completion = Completion::optional(completion)?;
             handles::remove(session);
             let attached =
                 matches!(shared.state(), MLN_RENDER_SESSION_STATE_ATTACHING | MLN_RENDER_SESSION_STATE_ATTACHED);
@@ -958,7 +951,7 @@ pub unsafe extern "C" fn mln_render_session_dispose(
                 // The next service frees the graphics objects, then this
                 // completes.
                 if attached {
-                    crate::surface_session::detach(session, &shared, completion);
+                    crate::surface_session::detach(session.0, &shared, completion);
                 } else if let Some(completion) = completion {
                     completion.ok();
                 }
@@ -973,7 +966,7 @@ pub unsafe extern "C" fn mln_render_session_dispose(
             }
             runtime.post(move || {
                 if attached {
-                    end_session(session, MLN_RENDER_SESSION_STATE_DETACHED);
+                    end_session(session.0, MLN_RENDER_SESSION_STATE_DETACHED);
                 }
                 if let Some(completion) = completion {
                     completion.ok();
@@ -988,16 +981,16 @@ pub unsafe extern "C" fn mln_render_session_dispose(
 /// C API contract (render_session.h).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_render_session_abandon(
-    session: u64,
-    out_result: *mut MlnRenderAbandonResult,
-    out_diagnostic: *mut MlnDiagnostic,
+    session: mln_render_session,
+    out_result: *mut mln_render_abandon_result,
+    out_diagnostic: *mut mln_diagnostic,
 ) -> i32 {
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
             handles::session(session)?;
-            abandon(session);
-            let result = MlnRenderAbandonResult::default();
+            abandon(session.0);
+            let result = mln_render_abandon_result::default();
             if !out_result.is_null() && !write_sized(out_result, result) {
                 return Err(Failure::invalid_argument("out_result must be an mln_render_abandon_result"));
             }
