@@ -2596,6 +2596,19 @@ external int mln_android_init(
 
 @Native<
   Int32 Function(
+    Pointer<mln_frame_pacer_options>,
+    Pointer<mln_frame_pacer>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_apple_frame_pacer_create(
+  Pointer<mln_frame_pacer_options> options,
+  Pointer<mln_frame_pacer> out_pacer,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
     Pointer<Void>,
     Int64,
     Pointer<mln_wake>,

@@ -116,6 +116,7 @@ export interface NativeOperations {
     options: FramePacerOptions | undefined,
   ): bigint;
   mln_android_init(jniEnv: bigint, context: bigint): void;
+  mln_apple_frame_pacer_create(options: FramePacerOptions | undefined): bigint;
   mln_c_version(): number;
   mln_camera_for_tile(
     tile: CanonicalTileId,

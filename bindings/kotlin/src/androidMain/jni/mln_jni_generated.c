@@ -128,6 +128,16 @@ static jint mln_android_init_jni(
   );
 }
 
+static jint mln_apple_frame_pacer_create_jni(
+  JNIEnv* env, jclass type, jlong options, jlong out_pacer, jlong out_diagnostic
+) {
+  return (jint)mln_apple_frame_pacer_create(
+    MLN_JNI_POINTER(const mln_frame_pacer_options*, options),
+    MLN_JNI_POINTER(mln_frame_pacer*, out_pacer),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_c_version_jni(JNIEnv* env, jclass type) {
   return (jint)mln_c_version();
 }
@@ -2292,6 +2302,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_android_frame_pacer_create", "(JJJ)I",
    (void*)mln_android_frame_pacer_create_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
+  {"mln_apple_frame_pacer_create", "(JJJ)I",
+   (void*)mln_apple_frame_pacer_create_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
   {"mln_camera_for_tile", "(JJJJ)I", (void*)mln_camera_for_tile_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
@@ -2671,6 +2683,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_android_frame_pacer_create", "(JJJ)I",
    (void*)mln_android_frame_pacer_create_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
+  {"mln_apple_frame_pacer_create", "(JJJ)I",
+   (void*)mln_apple_frame_pacer_create_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
   {"mln_camera_for_tile", "(JJJJ)I", (void*)mln_camera_for_tile_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},

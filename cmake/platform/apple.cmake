@@ -67,8 +67,13 @@ function(mln_ffi_configure_platform_dependencies target)
       "-framework CoreText"
       "-framework Foundation"
       "-framework ImageIO"
+      "-framework QuartzCore"
       z
       c++)
+  # The frame pacer takes its macOS display link from an NSScreen.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(${target} INTERFACE "-framework AppKit")
+  endif()
   set_target_properties(
     ${target}
     PROPERTIES
@@ -131,6 +136,8 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/timer.cpp)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_APPLE_SOURCES})
+  mln_ffi_target_project_sources(
+    ${target} ${PROJECT_SOURCE_DIR}/src/platform/apple/frame_pacer.mm)
 
   target_include_directories(
     ${target}

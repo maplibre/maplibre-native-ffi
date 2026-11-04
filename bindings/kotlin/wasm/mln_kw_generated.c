@@ -119,6 +119,15 @@ int32_t mln_kw_mln_android_init(
   );
 }
 
+int32_t mln_kw_mln_apple_frame_pacer_create(
+  uintptr_t options, uintptr_t out_pacer, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_apple_frame_pacer_create(
+    (const mln_frame_pacer_options*)options, (mln_frame_pacer*)out_pacer,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_c_version(void) { return (int32_t)mln_c_version(); }
 
 int32_t mln_kw_mln_camera_for_tile(

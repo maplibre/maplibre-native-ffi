@@ -86,6 +86,13 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
 
+  @JvmStatic
+  actual external fun mln_apple_frame_pacer_create(
+    options: Long,
+    outPacer: Long,
+    outDiagnostic: Long,
+  ): Int
+
   @JvmStatic actual external fun mln_c_version(): Int
 
   @JvmStatic

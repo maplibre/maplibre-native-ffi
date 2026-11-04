@@ -3,6 +3,7 @@
 #define MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H
 
 #include "maplibre_native_c/android.h"
+#include "maplibre_native_c/apple.h"
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/camera.h"
 #include "maplibre_native_c/logging.h"

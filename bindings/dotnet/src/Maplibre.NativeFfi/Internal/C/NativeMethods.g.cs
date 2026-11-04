@@ -87,6 +87,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_apple_frame_pacer_create(
+        mln_frame_pacer_options* options,
+        MlnFramePacer* out_pacer,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial uint mln_c_version();
 
     [LibraryImport(LibraryName)]

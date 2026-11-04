@@ -9,6 +9,7 @@
 #define MAPLIBRE_NATIVE_C_H
 
 #include "maplibre_native_c/android.h"           // IWYU pragma: export
+#include "maplibre_native_c/apple.h"             // IWYU pragma: export
 #include "maplibre_native_c/base.h"              // IWYU pragma: export
 #include "maplibre_native_c/camera.h"            // IWYU pragma: export
 #include "maplibre_native_c/completion.h"        // IWYU pragma: export
