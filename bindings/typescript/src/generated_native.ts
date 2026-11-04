@@ -17,6 +17,8 @@ import type {
   CustomVectorSourceOptions,
   DmaBufFrame,
   DmaBufRingDescriptor,
+  DxgiSharedTextureFrame,
+  DxgiSharedTextureRingDescriptor,
   FeatureStateSelector,
   FrameDemand,
   FramePacerOptions,
@@ -108,6 +110,9 @@ export interface NativeOperations {
     frame: bigint,
   ): AndroidHardwareBufferFrame;
   mln_acquired_frame_get_dma_buf(frame: bigint): DmaBufFrame;
+  mln_acquired_frame_get_dxgi_shared_texture(
+    frame: bigint,
+  ): DxgiSharedTextureFrame;
   mln_acquired_frame_get_metal_texture(frame: bigint): MetalTextureFrame;
   mln_acquired_frame_get_open_gl_texture(frame: bigint): OpenGlTextureFrame;
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
@@ -205,6 +210,13 @@ export interface NativeOperations {
   mln_map_attach_dma_buf_ring(
     map: bigint,
     descriptor: DmaBufRingDescriptor,
+    device: bigint | undefined,
+    options: RenderSessionAttachOptions,
+    completion: NativeCompletion,
+  ): bigint;
+  mln_map_attach_dxgi_shared_texture_ring(
+    map: bigint,
+    descriptor: DxgiSharedTextureRingDescriptor,
     device: bigint | undefined,
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,

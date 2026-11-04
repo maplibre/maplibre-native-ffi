@@ -37,6 +37,16 @@
 #include "render/dma_buf_session.hpp"
 #endif
 
+#if defined(_WIN32)
+#include <algorithm>
+#include <array>
+#include <span>
+#include <stdexcept>
+
+#include "render/dxgi_shared_texture_session.hpp"
+#include "render/vulkan/vulkan_dxgi_texture.hpp"
+#endif
+
 #if defined(__ANDROID__)
 #include <bit>
 #include <stdexcept>
@@ -997,6 +1007,200 @@ auto configure_dma_buf_session(
       live.texture.backend = std::move(backend);
       return MLN_STATUS_OK;
     };
+  return MLN_STATUS_OK;
+}
+#endif
+
+#if defined(_WIN32)
+namespace {
+
+constexpr auto dxgi_usage =
+  vk::ImageUsageFlags{vk::ImageUsageFlagBits::eColorAttachment} |
+  vk::ImageUsageFlagBits::eSampled;
+
+// Whether the device imports a D3D11 texture as an image that it renders.
+auto imports_d3d11_textures(
+  vk::PhysicalDevice physical_device,
+  const mln::vulkan::DispatchLoaderDynamic& dispatcher
+) -> bool {
+  const auto external_info =
+    vk::PhysicalDeviceExternalImageFormatInfo().setHandleType(
+      vk::ExternalMemoryHandleTypeFlagBits::eD3D11Texture
+    );
+  const auto info = vk::PhysicalDeviceImageFormatInfo2()
+                      .setPNext(&external_info)
+                      .setFormat(vk::Format::eB8G8R8A8Unorm)
+                      .setType(vk::ImageType::e2D)
+                      .setTiling(vk::ImageTiling::eOptimal)
+                      .setUsage(dxgi_usage);
+  auto external = vk::ExternalImageFormatProperties{};
+  auto properties = vk::ImageFormatProperties2{};
+  properties.pNext = &external;
+  return physical_device.getImageFormatProperties2(
+           &info, &properties, dispatcher
+         ) == vk::Result::eSuccess &&
+         (external.externalMemoryProperties.externalMemoryFeatures &
+          vk::ExternalMemoryFeatureFlagBits::eImportable);
+}
+
+// A slot's image over the memory of a D3D11 texture that the ring allocated.
+class DxgiTextureImage final : public VulkanSlotImage {
+ public:
+  DxgiTextureImage(
+    const vk::UniqueDevice& device,
+    const mln::vulkan::DispatchLoaderDynamic& dispatcher, vk::Extent2D extent,
+    std::shared_ptr<const DxgiTextureDevice> d3d11,
+    const VkPhysicalDeviceMemoryProperties& memory
+  )
+      : texture_(std::move(d3d11), extent.width, extent.height) {
+    const auto external = vk::ExternalMemoryImageCreateInfo().setHandleTypes(
+      vk::ExternalMemoryHandleTypeFlagBits::eD3D11Texture
+    );
+    image_ = device->createImageUnique(
+      vk::ImageCreateInfo()
+        .setPNext(&external)
+        .setImageType(vk::ImageType::e2D)
+        .setFormat(vk::Format::eB8G8R8A8Unorm)
+        .setExtent({extent.width, extent.height, 1})
+        .setMipLevels(1)
+        .setArrayLayers(1)
+        .setSamples(vk::SampleCountFlagBits::e1)
+        .setTiling(vk::ImageTiling::eOptimal)
+        .setUsage(dxgi_usage)
+        .setSharingMode(vk::SharingMode::eExclusive)
+        .setInitialLayout(vk::ImageLayout::eUndefined),
+      nullptr, dispatcher
+    );
+    texture_.bind(
+      device.get(), dispatcher.vkGetDeviceProcAddr, memory, *image_
+    );
+    view_ = device->createImageViewUnique(
+      vk::ImageViewCreateInfo()
+        .setImage(*image_)
+        .setViewType(vk::ImageViewType::e2D)
+        .setFormat(vk::Format::eB8G8R8A8Unorm)
+        .setComponents(vk::ComponentMapping())
+        .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}),
+      nullptr, dispatcher
+    );
+  }
+
+  [[nodiscard]] auto image() const -> vk::Image override { return *image_; }
+  [[nodiscard]] auto view() const -> vk::ImageView override { return *view_; }
+  [[nodiscard]] auto frame_metadata(const RenderFrameMetadata& frame) const
+    -> std::any override {
+    return mln_dxgi_shared_texture_frame{
+      .size = sizeof(mln_dxgi_shared_texture_frame),
+      .width = frame.physical_width,
+      .height = frame.physical_height,
+      .scale_factor = frame.scale_factor,
+      .slot = frame.slot,
+      .format = dxgi_format_b8g8r8a8_unorm,
+      .handle = texture_.handle(),
+    };
+  }
+
+ private:
+  // Declared in reverse of the order they must be destroyed in.
+  DxgiSharedTexture texture_;
+  vk::UniqueImage image_;
+  vk::UniqueImageView view_;
+};
+
+}  // namespace
+
+auto configure_dxgi_shared_texture_session(
+  const DxgiSharedTextureRing& ring, mln_vulkan_device device,
+  mln_render_session_object& session
+) -> mln_status {
+  auto context = std::shared_ptr<const mln_vulkan_context_descriptor>{};
+  const auto device_status = texture_ring_device(device, context);
+  if (device_status != MLN_STATUS_OK) return device_status;
+  if (context == nullptr) {
+    const auto shared_status = shared_rendering_device(context);
+    if (shared_status != MLN_STATUS_OK) return shared_status;
+  }
+  auto dispatcher = vulkan_dispatch_loader(*context);
+  vulkan_init_instance_dispatch(dispatcher, *context);
+  vulkan_init_device_dispatch(
+    dispatcher, static_cast<VkDevice>(context->device), *context
+  );
+  const auto physical_device =
+    vk::PhysicalDevice(static_cast<VkPhysicalDevice>(context->physical_device));
+  // A device resolves an extension's commands only once it enables it.
+  if (
+    dispatcher.vkGetPhysicalDeviceProperties2 == nullptr ||
+    dispatcher.vkGetPhysicalDeviceImageFormatProperties2 == nullptr ||
+    dispatcher.vkGetDeviceProcAddr(
+      static_cast<VkDevice>(context->device),
+      "vkGetMemoryWin32HandlePropertiesKHR"
+    ) == nullptr
+  ) {
+    set_thread_error(
+      "the Vulkan device can't import D3D11 textures, because it lacks "
+      "VK_KHR_external_memory_win32"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  if (!imports_d3d11_textures(physical_device, dispatcher)) {
+    set_thread_error("the Vulkan device can't import D3D11 textures");
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  const auto properties = physical_device.getProperties2<
+    vk::PhysicalDeviceProperties2, vk::PhysicalDeviceIDProperties>(dispatcher);
+  const auto& ids = properties.get<vk::PhysicalDeviceIDProperties>();
+  if (ids.deviceLUIDValid != VK_TRUE) {
+    set_thread_error(
+      "the Vulkan device's GPU has no LUID, so D3D11 can't share its textures"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  auto luid = std::array<uint8_t, VK_LUID_SIZE>{};
+  std::ranges::copy(std::span{ids.deviceLUID}, luid.begin());
+  auto d3d11 = std::shared_ptr<const DxgiTextureDevice>{};
+  const auto d3d11_status = create_dxgi_texture_device(luid, d3d11);
+  if (d3d11_status != MLN_STATUS_OK) return d3d11_status;
+  const auto memory = static_cast<VkPhysicalDeviceMemoryProperties>(
+    physical_device.getMemoryProperties(dispatcher)
+  );
+  session.accepts_queue_lock = true;
+  // The textures' readers work outside this device, so a frame hands over as
+  // a D3D12 fence or as completed work.
+  session.probe_sync_kinds = [context] {
+    auto support = vulkan_sync_support(*context);
+    support.producer &= MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE;
+    support.consumer &= MLN_GPU_SYNC_KIND_FLAG_D3D12_FENCE;
+    return support;
+  };
+  session.initialize_backend = [context, depth = ring.texture_count,
+                                d3d11 = std::move(d3d11),
+                                memory](mln_render_session_object& live) {
+    // Each frame leaves its image to D3D, for which the external queue family
+    // stands.
+    auto exported = VulkanExportedRing{
+      .depth = depth,
+      .format = VK_FORMAT_B8G8R8A8_UNORM,
+      .final_layout = VK_IMAGE_LAYOUT_GENERAL,
+      .owner = MLN_VULKAN_IMAGE_OWNER_EXTERNAL,
+      .allocate = [d3d11, memory](
+                    const vk::UniqueDevice& device,
+                    const mln::vulkan::DispatchLoaderDynamic& dispatcher,
+                    vk::Extent2D extent
+                  ) -> std::unique_ptr<VulkanSlotImage> {
+        return std::make_unique<DxgiTextureImage>(
+          device, dispatcher, extent, d3d11, memory
+        );
+      },
+    };
+    auto backend = std::make_unique<VulkanTextureSessionBackend>(
+      *context, std::move(exported),
+      mln::Size{live.physical_width, live.physical_height}, live.queue_lock
+    );
+    backend->set_producer_sync_kind(live.producer_sync_kind);
+    backend->retain(context);
+    live.texture.backend = std::move(backend);
+    return MLN_STATUS_OK;
+  };
   return MLN_STATUS_OK;
 }
 #endif

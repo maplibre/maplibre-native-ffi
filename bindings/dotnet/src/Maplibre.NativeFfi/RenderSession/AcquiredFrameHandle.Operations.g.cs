@@ -163,6 +163,59 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
+    /// Gets the DXGI shared texture of an acquired frame.
+    /// </summary>
+    /// <remarks>
+    /// <para>Wait for <c>AcquiredFrameHandle.WithProducerSync()</c> before you
+    /// read the texture. Once you release or discard the frame, the session may
+    /// render into the texture again. Open the handle with
+    /// <c>ID3D11Device1::OpenSharedResource1</c> or
+    /// <c>ID3D12Device::OpenSharedHandle</c>. A texture that you open keeps its
+    /// memory, but not its contents.</para>
+    /// <para>The session owns the handle, so don't close it. To keep the handle
+    /// after you release the frame, duplicate it with
+    /// <c>DuplicateHandle</c>.</para>
+    /// <para>See <c>mln_acquired_frame_get_dxgi_shared_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.TargetLost</c> when the session failed, or
+    /// you detached, abandoned, or disposed it.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public void WithDxgiSharedTexture(Action<DxgiSharedTextureFrameView> callback)
+    {
+        using var call = Enter(this);
+        var outFrame = new mln_dxgi_shared_texture_frame
+        {
+            size = (uint)sizeof(mln_dxgi_shared_texture_frame),
+        };
+        ArgumentNullException.ThrowIfNull(callback);
+        var viewScope = new NativeViewScope();
+        void* token = null;
+        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        try
+        {
+            Check(
+                NativeMethods.mln_acquired_frame_get_dxgi_shared_texture(
+                    Handle,
+                    &outFrame,
+                    Diagnostic
+                )
+            );
+            callback(
+                new DxgiSharedTextureFrameView(CopyDxgiSharedTextureFrame(outFrame), viewScope)
+            );
+        }
+        finally
+        {
+            viewScope.Expire();
+            NativeMethods.mln_acquired_frame_view_end(token);
+        }
+    }
+
+    /// <summary>
     /// Gets the Metal texture of an acquired frame.
     /// </summary>
     /// <remarks>

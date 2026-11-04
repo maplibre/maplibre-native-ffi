@@ -31,8 +31,9 @@ auto shared_presentation_device(
   std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
 ) -> mln_status;
 
-// The device without presentation that the library's dmabuf rings share when
-// the host passes none. It lasts while one of them holds it.
+// The device without presentation that the library's dmabuf and DXGI shared
+// texture rings share when the host passes none. It lasts while one of them
+// holds it.
 auto shared_rendering_device(
   std::shared_ptr<const mln_vulkan_context_descriptor>& out_context
 ) -> mln_status;

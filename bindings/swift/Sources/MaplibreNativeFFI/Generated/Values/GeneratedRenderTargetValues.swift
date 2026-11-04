@@ -391,7 +391,8 @@ public struct RenderSessionAttachOptions: Sendable {
   ///   WGL context, an existing WebGL context, or a browser's WebGPU device.
   /// - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an
   ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-  ///   Android hardware buffers or dmabufs, or an offscreen session.
+  ///   Android hardware buffers, dmabufs, or DXGI shared textures, or an
+  ///   offscreen session.
   /// - Either one for a Metal or Vulkan target.
   ///
   /// An attach with another driver fails with `Status.unsupported`.

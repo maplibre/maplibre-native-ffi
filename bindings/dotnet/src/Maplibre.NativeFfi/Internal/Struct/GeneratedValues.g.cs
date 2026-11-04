@@ -540,6 +540,29 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static DxgiSharedTextureFrame CopyDxgiSharedTextureFrame(
+        mln_dxgi_shared_texture_frame value
+    ) =>
+        new(
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.slot,
+            value.format,
+            NativePointer.FromNativeAddress((nint)value.handle)
+        );
+
+    internal static mln_dxgi_shared_texture_ring_descriptor NativeDxgiSharedTextureRingDescriptor(
+        DxgiSharedTextureRingDescriptor value
+    )
+    {
+        var native = new mln_dxgi_shared_texture_ring_descriptor();
+        native.size = (uint)sizeof(mln_dxgi_shared_texture_ring_descriptor);
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.texture_count = value.TextureCount;
+        return native;
+    }
+
     internal static EdgeInsets CopyEdgeInsets(mln_edge_insets value) =>
         new(value.top, value.left, value.bottom, value.right);
 

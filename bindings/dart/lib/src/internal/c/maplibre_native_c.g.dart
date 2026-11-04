@@ -456,6 +456,30 @@ final class mln_dma_buf_ring_descriptor extends Struct {
   external int format_count;
 }
 
+final class mln_dxgi_shared_texture_frame extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int width;
+  @Uint32()
+  external int height;
+  @Double()
+  external double scale_factor;
+  @Uint32()
+  external int slot;
+  @Uint32()
+  external int format;
+  external Pointer<Void> handle;
+}
+
+final class mln_dxgi_shared_texture_ring_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_size logical_size;
+  @Uint32()
+  external int texture_count;
+}
+
 final class mln_edge_insets extends Struct {
   @Double()
   external double top;
@@ -2566,6 +2590,19 @@ external int mln_acquired_frame_get_dma_buf(
 @Native<
   Int32 Function(
     mln_acquired_frame,
+    Pointer<mln_dxgi_shared_texture_frame>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_acquired_frame_get_dxgi_shared_texture(
+  int frame,
+  Pointer<mln_dxgi_shared_texture_frame> out_frame,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_acquired_frame,
     Pointer<mln_metal_texture_frame>,
     Pointer<mln_diagnostic>,
   )
@@ -3023,6 +3060,27 @@ external int mln_map_attach_android_surface(
 external int mln_map_attach_dma_buf_ring(
   int map,
   Pointer<mln_dma_buf_ring_descriptor> descriptor,
+  int device,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_dxgi_shared_texture_ring_descriptor>,
+    mln_vulkan_device,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_dxgi_shared_texture_ring(
+  int map,
+  Pointer<mln_dxgi_shared_texture_ring_descriptor> descriptor,
   int device,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,

@@ -854,6 +854,41 @@ napi_value mln_ts_read_dma_buf_frame(
   return result;
 }
 
+napi_value mln_ts_read_dxgi_shared_texture_frame(
+  napi_env env, const mln_dxgi_shared_texture_frame* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "width", mln_ts_number(env, (double)(source->width))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "height", mln_ts_number(env, (double)(source->height))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "scaleFactor",
+        mln_ts_number(env, (double)(source->scale_factor))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "slot", mln_ts_number(env, (double)(source->slot))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "format", mln_ts_number(env, (double)(source->format))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "handle",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->handle))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_edge_insets(
   napi_env env, const mln_edge_insets* source, size_t size
 ) {
@@ -3918,6 +3953,30 @@ bool mln_ts_write_dma_buf_ring_descriptor(
       return false;
     out->formats = items;
     out->format_count = (size_t)count;
+  }
+  return true;
+}
+
+bool mln_ts_write_dxgi_shared_texture_ring_descriptor(
+  mln_ts_call* call, napi_value value,
+  mln_dxgi_shared_texture_ring_descriptor* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "textureCount", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "textureCount");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->texture_count = (uint32_t)number;
   }
   return true;
 }

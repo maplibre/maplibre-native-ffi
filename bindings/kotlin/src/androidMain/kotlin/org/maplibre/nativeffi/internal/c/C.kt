@@ -26,6 +26,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_acquired_frame_get_dxgi_shared_texture(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_acquired_frame_get_metal_texture(
     frame: Long,
     outFrame: Long,
@@ -251,6 +258,17 @@ internal actual object C {
 
   @JvmStatic
   actual external fun mln_map_attach_dma_buf_ring(
+    map: Long,
+    descriptor: Long,
+    device: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_attach_dxgi_shared_texture_ring(
     map: Long,
     descriptor: Long,
     device: Long,

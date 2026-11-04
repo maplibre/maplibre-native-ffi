@@ -5,6 +5,71 @@ import Foundation
 
 public extension MapHandle {
   #if os(Windows)
+    /// Creates a session that renders the map into a ring of DXGI shared
+    /// textures
+    /// that the library allocates.
+    ///
+    /// Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get
+    /// its
+    /// texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+    /// `RenderSessionHandle.resize()` gives the ring new textures of the new
+    /// size.
+    ///
+    /// The session renders with the Vulkan device `device`, or, when `device`
+    /// is
+    /// null, with one that the library creates. The textures belong to the
+    /// device's GPU, so open them on a D3D11 or D3D12 device of the same
+    /// adapter.
+    /// To pick the GPU, create `device` with `VulkanDeviceOptions.deviceLuid`
+    /// set
+    /// to your adapter's LUID. Attach with `RenderDriverKind.coreWorker`.
+    ///
+    /// For a reader that waits on no fence, such as Flutter's texture
+    /// registrar,
+    /// attach without `GpuSyncKindFlag.d3d12Fence` in
+    /// `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+    /// finishes before you acquire it. Release a frame with
+    /// `GpuSyncKind.cpuComplete` only once the reader has finished with its
+    /// texture.
+    ///
+    /// See `mln_map_attach_dxgi_shared_texture_ring` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.unsupported` in an OpenGL build, or when the GPU can't share
+    /// the
+    ///   textures: D3D11 has no adapter with the Vulkan device's LUID or can't
+    ///   share textures through NT handles, or the device lacks
+    ///   VK_KHR_external_memory_win32 or can't import D3D11 textures.
+    /// - `Status.nativeError` when the library can't create its Vulkan device
+    /// or
+    ///   a D3D11 device on the adapter.
+    func attachDxgiSharedTextureRing(
+      descriptor bindingArg0: DxgiSharedTextureRingDescriptor,
+      device bindingArg1: VulkanDeviceHandle? = nil,
+      options bindingArg2: RenderSessionAttachOptions
+    ) throws -> RenderSessionHandle {
+      var value0: mln_render_session = 0
+      return try nativeAttach { raw, arena, completion, diagnostic in
+        try mln_map_attach_dxgi_shared_texture_ring(
+          raw,
+          arena.store(bindingArg0.nativeValue()),
+          bindingArg1.map { arena.use($0.handle) } ?? 0,
+          arena.store(bindingArg2.nativeValue(arena: arena)),
+          &value0,
+          completion,
+          diagnostic
+        )
+      } adopt: { ready in try RenderSessionHandle(
+        adopting: value0,
+        parent: self,
+        ready: ready
+      ) }
+    }
+  #endif
+
+  #if os(Windows)
     /// Creates a session that presents the map to a Win32 window, with a
     /// graphics
     /// context that the library creates.

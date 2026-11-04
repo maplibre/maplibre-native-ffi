@@ -314,6 +314,24 @@ internal unsafe struct mln_dma_buf_ring_descriptor
     public nuint format_count;
 }
 
+internal unsafe struct mln_dxgi_shared_texture_frame
+{
+    public uint size;
+    public uint width;
+    public uint height;
+    public double scale_factor;
+    public uint slot;
+    public uint format;
+    public void* handle;
+}
+
+internal unsafe struct mln_dxgi_shared_texture_ring_descriptor
+{
+    public uint size;
+    public mln_logical_size logical_size;
+    public uint texture_count;
+}
+
 internal unsafe struct mln_edge_insets
 {
     public double top;

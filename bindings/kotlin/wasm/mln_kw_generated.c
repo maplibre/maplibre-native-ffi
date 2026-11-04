@@ -35,6 +35,15 @@ int32_t mln_kw_mln_acquired_frame_get_dma_buf(
   );
 }
 
+int32_t mln_kw_mln_acquired_frame_get_dxgi_shared_texture(
+  int64_t frame, uintptr_t out_frame, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_acquired_frame_get_dxgi_shared_texture(
+    (mln_acquired_frame)frame, (mln_dxgi_shared_texture_frame*)out_frame,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_acquired_frame_get_metal_texture(
   int64_t frame, uintptr_t out_frame, uintptr_t out_diagnostic
 ) {
@@ -349,6 +358,19 @@ int32_t mln_kw_mln_map_attach_dma_buf_ring(
 ) {
   return (int32_t)mln_map_attach_dma_buf_ring(
     (mln_map)map, (const mln_dma_buf_ring_descriptor*)descriptor,
+    (mln_vulkan_device)device,
+    (const mln_render_session_attach_options*)options,
+    (mln_render_session*)out_session, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_attach_dxgi_shared_texture_ring(
+  int64_t map, uintptr_t descriptor, int64_t device, uintptr_t options,
+  uintptr_t out_session, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_attach_dxgi_shared_texture_ring(
+    (mln_map)map, (const mln_dxgi_shared_texture_ring_descriptor*)descriptor,
     (mln_vulkan_device)device,
     (const mln_render_session_attach_options*)options,
     (mln_render_session*)out_session, (const mln_completion*)completion,

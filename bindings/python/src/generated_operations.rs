@@ -286,6 +286,20 @@ fn generated_copy_mln_dma_buf_frame(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_dxgi_shared_texture_frame(
+    py: Python<'_>,
+    value: &sys::mln_dxgi_shared_texture_frame,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("width", generated_value(py, value.width)?)?;
+    dict.set_item("height", generated_value(py, value.height)?)?;
+    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
+    dict.set_item("slot", generated_value(py, value.slot)?)?;
+    dict.set_item("format", generated_value(py, value.format)?)?;
+    dict.set_item("handle", generated_value(py, value.handle as usize)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_edge_insets(
     py: Python<'_>,
     value: &sys::mln_edge_insets,
@@ -2039,6 +2053,17 @@ fn generated_input_mln_dma_buf_ring_descriptor<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_dxgi_shared_texture_ring_descriptor<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_dxgi_shared_texture_ring_descriptor> {
+    let mut raw: sys::mln_dxgi_shared_texture_ring_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_dxgi_shared_texture_ring_descriptor>() as _;
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.texture_count = value.getattr("texture_count")?.extract::<u32>()?;
+    Ok(raw)
+}
+
 fn generated_input_mln_edge_insets<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3680,6 +3705,19 @@ impl AcquiredFrameHandle {
         generated_copy_mln_dma_buf_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
+    fn dxgi_shared_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_frame: sys::mln_dxgi_shared_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_dxgi_shared_texture_frame>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_acquired_frame_get_dxgi_shared_texture(handle, &mut out_frame, diagnostic)
+            })
+        }?;
+        generated_copy_mln_dxgi_shared_texture_frame(py, &out_frame)
+    }
+    #[pyo3(signature = ())]
     fn metal_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -4315,6 +4353,51 @@ impl MapHandle {
             call.complete(
                 |completion, diagnostic| {
                     sys::mln_map_attach_dma_buf_ring(
+                        handle,
+                        &descriptor_value,
+                        device_handle,
+                        &options_value,
+                        &mut out_session,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }?;
+        let callback_roots = call.accept_callbacks();
+        let mut out_session_owner =
+            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
+        let out_session_python = unsafe {
+            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
+        }?;
+        let result = PyDict::new(py);
+        result.set_item("session", out_session_python)?;
+        result.set_item("ready", future)?;
+        Ok(result.into_any().unbind())
+    }
+    #[pyo3(signature = (descriptor, device, options))]
+    fn attach_dxgi_shared_texture_ring(
+        &self,
+        py: Python<'_>,
+        descriptor: &Bound<'_, PyAny>,
+        device: Option<&VulkanDeviceHandle>,
+        options: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let descriptor_value =
+            generated_input_mln_dxgi_shared_texture_ring_descriptor(&descriptor.clone(), storage)?;
+        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
+        let options_value =
+            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
+        let handle = self.input();
+        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
+        let convert = py_none;
+        let future = unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_map_attach_dxgi_shared_texture_ring(
                         handle,
                         &descriptor_value,
                         device_handle,

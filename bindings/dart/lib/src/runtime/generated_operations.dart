@@ -23,6 +23,17 @@ DmaBufFrame _readDmaBufFrame(raw.mln_dma_buf_frame source) => DmaBufFrame(
   stride: source.stride,
 );
 
+DxgiSharedTextureFrame _readDxgiSharedTextureFrame(
+  raw.mln_dxgi_shared_texture_frame source,
+) => DxgiSharedTextureFrame(
+  width: source.width,
+  height: source.height,
+  scaleFactor: source.scale_factor,
+  slot: source.slot,
+  format: source.format,
+  handle: NativePointer(source.handle.address),
+);
+
 MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
     MetalTextureFrame(
       width: source.width,
@@ -973,6 +984,19 @@ Pointer<raw.mln_dma_buf_ring_descriptor> _writeDmaBufRingDescriptor(
       into: result.ref.formats + index,
     );
   }
+  return result;
+}
+
+Pointer<raw.mln_dxgi_shared_texture_ring_descriptor>
+_writeDxgiSharedTextureRingDescriptor(
+  DxgiSharedTextureRingDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_dxgi_shared_texture_ring_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_dxgi_shared_texture_ring_descriptor>();
+  result.ref.size = sizeOf<raw.mln_dxgi_shared_texture_ring_descriptor>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.texture_count = _nativeInteger(value.textureCount, 0, 4294967295);
   return result;
 }
 
@@ -3618,6 +3642,49 @@ final class AcquiredFrameHandle implements Finalizable {
     return _readDmaBufFrame(outFrame.ref);
   });
 
+  /// Gets the DXGI shared texture of an acquired frame.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// texture. Once you release or discard the frame, the session may render
+  /// into the texture again. Open the handle with
+  /// `ID3D11Device1::OpenSharedResource1` or `ID3D12Device::OpenSharedHandle`.
+  /// A texture that you open keeps its memory, but not its contents.
+  ///
+  /// The session owns the handle, so don't close it. To keep the handle after
+  /// you release the frame, duplicate it with `DuplicateHandle`.
+  ///
+  /// See `mln_acquired_frame_get_dxgi_shared_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+  T withDxgiSharedTexture<T>(
+    T Function(ScopedDxgiSharedTextureFrame view) use,
+  ) =>
+      _NativeViewScope(
+        _state,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
+      ).use(
+        (scope) =>
+            use(ScopedDxgiSharedTextureFrame._(scope, _getDxgiSharedTexture())),
+      );
+
+  DxgiSharedTextureFrame _getDxgiSharedTexture() => withNativeArena((arena) {
+    final outFrame = arena<raw.mln_dxgi_shared_texture_frame>();
+    outFrame.ref.size = sizeOf<raw.mln_dxgi_shared_texture_frame>();
+    _check(
+      raw.mln_acquired_frame_get_dxgi_shared_texture(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
+    return _readDxgiSharedTextureFrame(outFrame.ref);
+  });
+
   /// Gets the Metal texture of an acquired frame.
   ///
   /// See `mln_acquired_frame_get_metal_texture` in the
@@ -4892,6 +4959,68 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         () => raw.mln_map_attach_dma_buf_ring(
           _handle.raw,
           _writeDmaBufRingDescriptor(descriptor, arena),
+          (device?._handle.raw ?? 0),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle, ready) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, _NativeRenderSession(handle), ready)
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+    );
+  }
+
+  /// Creates a session that renders the map into a ring of DXGI shared textures
+  /// that the library allocates.
+  ///
+  /// Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
+  /// texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+  /// `RenderSessionHandle.resize()` gives the ring new textures of the new
+  /// size.
+  ///
+  /// The session renders with the Vulkan device `device`, or, when `device` is
+  /// null, with one that the library creates. The textures belong to the
+  /// device's GPU, so open them on a D3D11 or D3D12 device of the same adapter.
+  /// To pick the GPU, create `device` with `VulkanDeviceOptions.deviceLuid` set
+  /// to your adapter's LUID. Attach with `RenderDriverKind.coreWorker`.
+  ///
+  /// For a reader that waits on no fence, such as Flutter's texture registrar,
+  /// attach without `GpuSyncKindFlag.d3d12Fence` in
+  /// `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+  /// finishes before you acquire it. Release a frame with
+  /// `GpuSyncKind.cpuComplete` only once the reader has finished with its
+  /// texture.
+  ///
+  /// See `mln_map_attach_dxgi_shared_texture_ring` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` in an OpenGL build, or when the GPU can't share the
+  ///   textures: D3D11 has no adapter with the Vulkan device's LUID or can't
+  ///   share textures through NT handles, or the device lacks
+  ///   VK_KHR_external_memory_win32 or can't import D3D11 textures.
+  /// - `Status.nativeError` when the library can't create its Vulkan device or
+  ///   a D3D11 device on the adapter.
+  RenderSessionHandle attachDxgiSharedTextureRing(
+    DxgiSharedTextureRingDescriptor descriptor,
+    RenderSessionAttachOptions options, {
+    VulkanDeviceHandle? device,
+  }) {
+    final registrations = _NativeRegistrations(_CallbackRoots());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_dxgi_shared_texture_ring(
+          _handle.raw,
+          _writeDxgiSharedTextureRingDescriptor(descriptor, arena),
           (device?._handle.raw ?? 0),
           _writeRenderSessionAttachOptions(options, arena, registrations),
           outSession,
@@ -7647,7 +7776,7 @@ final class RenderSessionHandle implements Finalizable {
   /// Errors:
   ///
   /// - `Status.unsupported` when the session renders offscreen or into Android
-  ///   hardware buffers or dmabufs that it allocates.
+  ///   hardware buffers, dmabufs, or DXGI shared textures that it allocates.
   /// - `Status.unsupported` when the target is a WebGL canvas.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
@@ -8959,6 +9088,25 @@ final class ScopedDmaBufFrame {
   int get fd => _scope.active(_value).fd;
   int get offset => _value.offset;
   int get stride => _value.stride;
+}
+
+/// A `DxgiSharedTextureFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withDxgiSharedTexture` runs. Its
+/// other members stay readable after the callback returns.
+final class ScopedDxgiSharedTextureFrame {
+  ScopedDxgiSharedTextureFrame._(this._scope, this._value);
+  final DxgiSharedTextureFrame _value;
+  final _NativeViewScope _scope;
+  int get width => _value.width;
+  int get height => _value.height;
+  double get scaleFactor => _value.scaleFactor;
+  int get slot => _value.slot;
+  int get format => _value.format;
+  ScopedNativePointer get handle => ScopedNativePointer(
+    _value.handle.address,
+    checkValid: _scope.checkActive,
+    debugName: 'DxgiSharedTextureFrame.handle',
+  );
 }
 
 /// A `MetalTextureFrame` whose native objects are readable only while the
