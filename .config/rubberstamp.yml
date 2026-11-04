@@ -618,6 +618,21 @@ ci:
         it: the package manifests, the facade bundle, the React Native package's
         files, and the packing script. Ordinary TypeScript binding changes and
         one platform's addon don't.
+    react-native:
+      covers: >-
+        Builds the React Native example for Android x64 and the iOS simulator as
+        release builds, which also bundle its JavaScript, against the archives
+        that those targets built, so it runs those targets. It runs no app.
+        Catches what breaks the React Native package's native build, the
+        example's native projects, or its JavaScript bundle: changes to the
+        package or the example, and to the Hermes adapter they compile.
+      rules:
+        - if:
+            files:
+              - examples/react-native/**
+              - bindings/typescript/react-native/**
+              - bindings/typescript/native/hermes/**
+          then: apply
     ohpm:
       covers: >-
         Packs the ArkTS OHPM packages from the addons that the OpenHarmony

@@ -23,6 +23,7 @@
     "@react-native/gradle-plugin": "0.88.1",
     "@react-native/metro-config": "0.88.1",
     "@react-native/typescript-config": "0.88.1",
-    "@types/react": "^19.2.0"
+    "@types/react": "^19.2.0",
+    "hermes-compiler": "260318099.0.5"
   }
 }

@@ -121,6 +121,15 @@ JOBS = {
         ),
     ),
     "arkts-ohpm": ("ohpm", lambda target: addon(target) == "arkts"),
+    # The React Native example builds against one archive per platform.
+    "react-native-android": (
+        "react-native",
+        lambda target: target.preset == "android-x64-egl",
+    ),
+    "react-native-ios": (
+        "react-native",
+        lambda target: target.preset == "ios-simulator-arm64-metal",
+    ),
     "swift-package": (
         "swiftpm",
         lambda target: (
