@@ -5,7 +5,7 @@
 // image sources. Custom sources are in custom_sources.rs.
 
 use crate::custom_sources;
-use crate::delivery::{Lent, Value};
+use crate::delivery::{LentValue, Value};
 use crate::diagnostics::{Failure, boundary};
 use crate::geojson_data::{self, GeoJsonOptions};
 use crate::map::{MapEntry, command};
@@ -23,6 +23,41 @@ use maplibre_native_next::mln_util::geo::LatLng;
 use maplibre_native_next::mln_util::image::PremultipliedImage;
 use maplibre_native_next::mln_util::size::Size;
 use maplibre_native_next::mln_util::tileset::{RasterEncoding, Scheme, VectorEncoding};
+
+// MARK: - Completion values
+
+/// C structs that a completion lends, with the storage their views point
+/// into (C++ `deliver_style_result`).
+pub struct LentStructs {
+    ptr: *const std::ffi::c_void,
+    size: usize,
+    count: usize,
+    _storage: Box<dyn std::any::Any>,
+}
+
+// SAFETY: `ptr` and the views in the structs point into `_storage`, which
+// moves with them and which nothing else references.
+unsafe impl Send for LentStructs {}
+
+impl LentStructs {
+    /// The completion value that lends `structs`, keeping `storage` alive
+    /// with them.
+    ///
+    /// # Safety
+    /// Every pointer in `structs` points at static data or into heap memory
+    /// that `storage` owns, which moving `storage` doesn't relocate.
+    pub unsafe fn value<T: 'static, S: 'static>(structs: Vec<T>, storage: S) -> Value {
+        let ptr = structs.as_ptr().cast();
+        let count = structs.len();
+        Value::Lent(Box::new(LentStructs { ptr, size: size_of::<T>(), count, _storage: Box::new((structs, storage)) }))
+    }
+}
+
+impl LentValue for LentStructs {
+    fn view(&self) -> (*const std::ffi::c_void, usize, usize) {
+        (self.ptr, self.size, self.count)
+    }
+}
 
 // MARK: - Input validation (C++ c_api/style.cpp, map/style.cpp)
 
@@ -304,7 +339,7 @@ fn source_record(source: &dyn Source) -> SourceRecord {
 fn lend_sources(records: Vec<SourceRecord>) -> Value {
     let infos: Vec<mln_style_source_info> = records.iter().map(|record| record.info).collect();
     // SAFETY: each info's views point into its record's heap buffers.
-    Value::Lent(unsafe { Lent::new(infos, records) })
+    unsafe { LentStructs::value(infos, records) }
 }
 
 // MARK: - Style sources
@@ -755,7 +790,7 @@ pub unsafe extern "C" fn mln_map_get_image_source_coordinates(
                 };
                 let corners: Vec<mln_lat_lng> = image_source.get_coordinates().iter().map(c_lat_lng).collect();
                 // SAFETY: plain values without views.
-                Ok(Value::Lent(Lent::new(corners, ())))
+                Ok(LentStructs::value(corners, ()))
             })
         })
     }

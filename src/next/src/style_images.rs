@@ -7,10 +7,10 @@
 // `kept_style_images` (map.rs), which a style load clears and which
 // `on_can_remove_unused_style_image` reads (C++ `kept_style_images`).
 
-use crate::delivery::{Lent, Value};
+use crate::delivery::Value;
 use crate::diagnostics::{Failure, boundary};
 use crate::map::command;
-use crate::style_sources::{non_empty_text, premultiplied_image, with_style};
+use crate::style_sources::{LentStructs, non_empty_text, premultiplied_image, with_style};
 use crate::types::*;
 use maplibre_native_next::mln_style::image::{ImageContent, ImageStretches, Impl, TextFit};
 use std::sync::Arc;
@@ -285,7 +285,7 @@ pub unsafe extern "C" fn mln_map_get_style_image(
                 // SAFETY: the views point into the shared image's pixels and
                 // into the stretch vectors' heap buffers, which the storage
                 // owns.
-                Ok(Value::Lent(Lent::new(vec![info], (image, stretch_x, stretch_y))))
+                Ok(LentStructs::value(vec![info], (image, stretch_x, stretch_y)))
             })
         })
     }

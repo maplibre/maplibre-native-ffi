@@ -15,8 +15,8 @@ crate-type = ["staticlib"]
 
 [dependencies]
 maplibre-native-next = "0.0.6"
-# The JSON front end of maplibre-native-next's style conversions.
-serde_json = "1"
+# The JSON values that the core's Convertible reads; the core's own features.
+serde_json = { version = "1.0.154", features = ["float_roundtrip", "preserve_order"] }
 
 # A workspace of its own: the repository's workspace builds without the port.
 [workspace]
