@@ -522,8 +522,15 @@ pub unsafe extern "C" fn mln_map_set_style_json(
     // SAFETY: C API contract.
     unsafe {
         boundary(out_diagnostic, || {
+            if json.size == 0 {
+                return Err(Failure::invalid_argument("style JSON must not be empty"));
+            }
             let json = utf8_view(json, "json")?;
             command(map, completion, true, move |entry| {
+                // C++ `validate_bytes(json, "style JSON")`.
+                if json.contains('\0') {
+                    return Err(Failure::invalid_argument("style JSON must not contain embedded NUL"));
+                }
                 *entry.observer.load_error.borrow_mut() = None;
                 entry.map.borrow_mut().get_style_mut().load_json(&json);
                 match entry.observer.load_error.borrow_mut().take() {
