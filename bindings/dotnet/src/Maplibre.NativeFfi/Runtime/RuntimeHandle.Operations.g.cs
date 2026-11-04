@@ -296,6 +296,10 @@ public sealed unsafe partial class RuntimeHandle
     /// Reads the download progress of the offline region <c>regionId</c>.
     /// </summary>
     /// <remarks>
+    /// <para>While the download is active, the counts cover what it has
+    /// visited. Once it's inactive, they cover every resource the region holds,
+    /// including those that only earlier versions of its style listed, so the
+    /// completed counts can exceed the required counts.</para>
     /// <para>See <c>mln_runtime_get_offline_region_status</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -330,24 +334,12 @@ public sealed unsafe partial class RuntimeHandle
     /// with the server before they use it.
     /// </summary>
     /// <remarks>
-    /// <para>The region keeps its resources. To refresh them for offline use,
-    /// start the region's download with
-    /// <c>RuntimeHandle.SetOfflineRegionDownloadStateAsync()</c>. Only a change
-    /// from inactive to active starts a download, so set an active download
-    /// inactive first. The download fetches each resource that the region's
-    /// current style and TileJSON documents list and that no map has checked
-    /// with the server since the invalidation, and keeps the stored copy when
-    /// the server reports that it hasn't changed. When the style or a TileJSON
-    /// document is missing or invalid, the download reports an offline region
-    /// response error event and goes on from the stored copy.</para>
-    /// <para>Resources that only earlier versions of the style or TileJSON
-    /// documents listed stay in the region until it's deleted, so delete the
-    /// region and create it again to drop them. While the download is active,
-    /// its status events and <c>RuntimeHandle.GetOfflineRegionStatusAsync()</c>
-    /// count only the resources it has visited. Once it's inactive,
-    /// <c>RuntimeHandle.GetOfflineRegionStatusAsync()</c> counts every resource
-    /// the region holds, including those from earlier versions, so the
-    /// completed counts can exceed the required counts.</para>
+    /// <para>The region keeps its resources. Starting its download again
+    /// fetches the invalidated resources for offline use. If the style or a
+    /// TileJSON document is then missing or invalid, the download reports an
+    /// offline region response error and goes on from the stored copy.
+    /// Resources that the current style no longer lists stay in the region
+    /// until it's deleted.</para>
     /// <para>See <c>mln_runtime_invalidate_offline_region</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -564,7 +556,8 @@ public sealed unsafe partial class RuntimeHandle
     /// Starts or pauses the download of the offline region <c>regionId</c>.
     /// </summary>
     /// <remarks>
-    /// <para>A download stops when the runtime closes.</para>
+    /// <para>Setting the state that the download already has does nothing. A
+    /// download stops when the runtime closes.</para>
     /// <para>See <c>mln_runtime_set_offline_region_download_state</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>

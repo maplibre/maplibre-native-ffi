@@ -236,33 +236,24 @@ internal constructor(
   /**
    * Reads the children of a cluster in a clustered GeoJSON source.
    *
-   * `clusterId` is the value of the "cluster_id" property of a cluster feature that a query found.
-   * The children are the clusters and points that the cluster splits into one zoom level closer.
-   * The result is a GeoJSON feature collection.
+   * `clusterId` is the "cluster_id" property of a cluster feature. The result is a GeoJSON feature
+   * collection of the clusters and points that the cluster splits into at the next zoom level.
    *
-   * The query reads the clustered index of the source's data in the session's most recent render
-   * attempt. Data that changes after that attempt shows from the next one, and before the first
-   * attempt there is no source.
+   * The query reads the source's data from the session's most recent render attempt, so a change to
+   * the data shows once the session tries to render again.
    *
-   * A feature query, such as `RenderSessionHandle.querySourceFeatures()`, returns what the source's
-   * loaded tiles hold. After the source's data, URL, or options change, or the style changes, those
-   * tiles can hold the older data until they reload. Until then, a cluster ID that a feature query
-   * found can name a cluster of the older data. Cluster IDs repeat across versions of the data, so
-   * this query can then complete with `Status.NOT_FOUND` or read the newer data's cluster with that
-   * ID. Treat `Status.NOT_FOUND` as a cluster that is gone, and query the features again.
-   *
-   * When a source's data fails to load, its earlier tiles can stay until new data loads, so feature
-   * queries can keep finding the earlier clusters while this query completes with
-   * `Status.NOT_FOUND`.
+   * A cluster ID belongs to one version of the source's data. After the data changes, feature
+   * queries can return IDs from the earlier version until the source's tiles reload, and such an ID
+   * completes with `Status.NOT_FOUND` or names a different cluster. Query the features again for
+   * current IDs.
    *
    * See `mln_render_session_get_cluster_children` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` when you detached, abandoned, released, or disposed the session.
-   * - `Status.NOT_FOUND` when that data has no source named `sourceId`, or the source has no
-   *   cluster `clusterId`.
+   * - `Status.NOT_FOUND` when the session's most recent render attempt had no source named
+   *   `sourceId`, or the source has no cluster `clusterId`.
    * - `Status.INVALID_ARGUMENT` when the source isn't a GeoJSON source with clustering turned on.
    */
   public fun getClusterChildren(sourceId: String, clusterId: UInt): Deferred<String> =
@@ -281,21 +272,18 @@ internal constructor(
   /**
    * Reads the zoom level at which a cluster of a clustered GeoJSON source splits.
    *
-   * `clusterId` is the value of the "cluster_id" property of a cluster feature that a query found.
-   * At the result's zoom level, the cluster's points no longer form this cluster, but two or more
-   * clusters or points.
+   * `clusterId` is the "cluster_id" property of a cluster feature. At the result's zoom level, the
+   * cluster's points no longer form this cluster, but two or more clusters or points.
    *
-   * The query reads its data as `RenderSessionHandle.getClusterChildren()` describes, including
-   * when a cluster ID that a feature query found names a cluster of older data.
+   * A cluster ID can go out of date as `RenderSessionHandle.getClusterChildren()` describes.
    *
    * See `mln_render_session_get_cluster_expansion_zoom` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` when you detached, abandoned, released, or disposed the session.
-   * - `Status.NOT_FOUND` when that data has no source named `sourceId`, or the source has no
-   *   cluster `clusterId`.
+   * - `Status.NOT_FOUND` when the session's most recent render attempt had no source named
+   *   `sourceId`, or the source has no cluster `clusterId`.
    * - `Status.INVALID_ARGUMENT` when the source isn't a GeoJSON source with clustering turned on.
    */
   public fun getClusterExpansionZoom(sourceId: String, clusterId: UInt): Deferred<UInt> =
@@ -314,22 +302,19 @@ internal constructor(
   /**
    * Reads the points in a cluster of a clustered GeoJSON source.
    *
-   * `clusterId` is the value of the "cluster_id" property of a cluster feature that a query found.
-   * The result is a GeoJSON feature collection of the original point features. It skips the first
-   * `offset` points and then holds up to `limit` of them, so a `limit` of 0 gives an empty
-   * collection.
+   * `clusterId` is the "cluster_id" property of a cluster feature. The result is a GeoJSON feature
+   * collection of the original point features. It skips the first `offset` points and then holds up
+   * to `limit` of them, so a `limit` of 0 gives an empty collection.
    *
-   * The query reads its data as `RenderSessionHandle.getClusterChildren()` describes, including
-   * when a cluster ID that a feature query found names a cluster of older data.
+   * A cluster ID can go out of date as `RenderSessionHandle.getClusterChildren()` describes.
    *
    * See `mln_render_session_get_cluster_leaves` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` when you detached, abandoned, released, or disposed the session.
-   * - `Status.NOT_FOUND` when that data has no source named `sourceId`, or the source has no
-   *   cluster `clusterId`.
+   * - `Status.NOT_FOUND` when the session's most recent render attempt had no source named
+   *   `sourceId`, or the source has no cluster `clusterId`.
    * - `Status.INVALID_ARGUMENT` when the source isn't a GeoJSON source with clustering turned on.
    */
   public fun getClusterLeaves(

@@ -8556,36 +8556,25 @@ func (receiver *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, 
 // GetClusterChildren reads the children of a cluster in a clustered GeoJSON
 // source.
 //
-// clusterID is the value of the "cluster_id" property of a cluster feature that
-// a query found. The children are the clusters and points that the cluster
-// splits into one zoom level closer. The result is a GeoJSON feature
-// collection.
+// clusterID is the "cluster_id" property of a cluster feature. The result is a
+// GeoJSON feature collection of the clusters and points that the cluster splits
+// into at the next zoom level.
 //
-// The query reads the clustered index of the source's data in the session's
-// most recent render attempt. Data that changes after that attempt shows from
-// the next one, and before the first attempt there is no source.
+// The query reads the source's data from the session's most recent render
+// attempt, so a change to the data shows once the session tries to render
+// again.
 //
-// A feature query, such as RenderSessionHandle.QuerySourceFeatures(), returns
-// what the source's loaded tiles hold. After the source's data, URL, or options
-// change, or the style changes, those tiles can hold the older data until they
-// reload. Until then, a cluster ID that a feature query found can name a
-// cluster of the older data. Cluster IDs repeat across versions of the data, so
-// this query can then complete with StatusNotFound or read the newer data's
-// cluster with that ID. Treat StatusNotFound as a cluster that is gone, and
-// query the features again.
-//
-// When a source's data fails to load, its earlier tiles can stay until new data
-// loads, so feature queries can keep finding the earlier clusters while this
-// query completes with StatusNotFound.
+// A cluster ID belongs to one version of the source's data. After the data
+// changes, feature queries can return IDs from the earlier version until the
+// source's tiles reload, and such an ID completes with StatusNotFound or names
+// a different cluster. Query the features again for current IDs.
 //
 // See mln_render_session_get_cluster_children in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 //
 // Errors:
-//   - StatusInvalidState when you detached, abandoned, released, or disposed
-//     the session.
-//   - StatusNotFound when that data has no source named sourceID, or the source
-//     has no cluster clusterID.
+//   - StatusNotFound when the session's most recent render attempt had no
+//     source named sourceID, or the source has no cluster clusterID.
 //   - StatusInvalidArgument when the source isn't a GeoJSON source with
 //     clustering turned on.
 func (receiver *RenderSessionHandle) GetClusterChildren(sourceID string, clusterID uint32) (*Future[string], error) {
@@ -8597,22 +8586,19 @@ func (receiver *RenderSessionHandle) GetClusterChildren(sourceID string, cluster
 // GetClusterExpansionZoom reads the zoom level at which a cluster of a
 // clustered GeoJSON source splits.
 //
-// clusterID is the value of the "cluster_id" property of a cluster feature that
-// a query found. At the result's zoom level, the cluster's points no longer
-// form this cluster, but two or more clusters or points.
+// clusterID is the "cluster_id" property of a cluster feature. At the result's
+// zoom level, the cluster's points no longer form this cluster, but two or more
+// clusters or points.
 //
-// The query reads its data as RenderSessionHandle.GetClusterChildren()
-// describes, including when a cluster ID that a feature query found names a
-// cluster of older data.
+// A cluster ID can go out of date as RenderSessionHandle.GetClusterChildren()
+// describes.
 //
 // See mln_render_session_get_cluster_expansion_zoom in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 //
 // Errors:
-//   - StatusInvalidState when you detached, abandoned, released, or disposed
-//     the session.
-//   - StatusNotFound when that data has no source named sourceID, or the source
-//     has no cluster clusterID.
+//   - StatusNotFound when the session's most recent render attempt had no
+//     source named sourceID, or the source has no cluster clusterID.
 //   - StatusInvalidArgument when the source isn't a GeoJSON source with
 //     clustering turned on.
 func (receiver *RenderSessionHandle) GetClusterExpansionZoom(sourceID string, clusterID uint32) (*Future[uint32], error) {
@@ -8623,23 +8609,20 @@ func (receiver *RenderSessionHandle) GetClusterExpansionZoom(sourceID string, cl
 
 // GetClusterLeaves reads the points in a cluster of a clustered GeoJSON source.
 //
-// clusterID is the value of the "cluster_id" property of a cluster feature that
-// a query found. The result is a GeoJSON feature collection of the original
-// point features. It skips the first offset points and then holds up to limit
-// of them, so a limit of 0 gives an empty collection.
+// clusterID is the "cluster_id" property of a cluster feature. The result is a
+// GeoJSON feature collection of the original point features. It skips the first
+// offset points and then holds up to limit of them, so a limit of 0 gives an
+// empty collection.
 //
-// The query reads its data as RenderSessionHandle.GetClusterChildren()
-// describes, including when a cluster ID that a feature query found names a
-// cluster of older data.
+// A cluster ID can go out of date as RenderSessionHandle.GetClusterChildren()
+// describes.
 //
 // See mln_render_session_get_cluster_leaves in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
 //
 // Errors:
-//   - StatusInvalidState when you detached, abandoned, released, or disposed
-//     the session.
-//   - StatusNotFound when that data has no source named sourceID, or the source
-//     has no cluster clusterID.
+//   - StatusNotFound when the session's most recent render attempt had no
+//     source named sourceID, or the source has no cluster clusterID.
 //   - StatusInvalidArgument when the source isn't a GeoJSON source with
 //     clustering turned on.
 func (receiver *RenderSessionHandle) GetClusterLeaves(sourceID string, clusterID uint32, limit uint32, offset uint32) (*Future[string], error) {
@@ -9165,6 +9148,11 @@ func (receiver *RuntimeHandle) GetOfflineRegion(regionID int64) (*Future[*Offlin
 // GetOfflineRegionStatus reads the download progress of the offline region
 // regionID.
 //
+// While the download is active, the counts cover what it has visited. Once it's
+// inactive, they cover every resource the region holds, including those that
+// only earlier versions of its style listed, so the completed counts can exceed
+// the required counts.
+//
 // See mln_runtime_get_offline_region_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 //
@@ -9179,23 +9167,11 @@ func (receiver *RuntimeHandle) GetOfflineRegionStatus(regionID int64) (*Future[O
 // InvalidateOfflineRegion makes maps check each resource of the offline region
 // regionID with the server before they use it.
 //
-// The region keeps its resources. To refresh them for offline use, start the
-// region's download with RuntimeHandle.SetOfflineRegionDownloadState(). Only a
-// change from inactive to active starts a download, so set an active download
-// inactive first. The download fetches each resource that the region's current
-// style and TileJSON documents list and that no map has checked with the server
-// since the invalidation, and keeps the stored copy when the server reports
-// that it hasn't changed. When the style or a TileJSON document is missing or
-// invalid, the download reports an offline region response error event and goes
-// on from the stored copy.
-//
-// Resources that only earlier versions of the style or TileJSON documents
-// listed stay in the region until it's deleted, so delete the region and create
-// it again to drop them. While the download is active, its status events and
-// RuntimeHandle.GetOfflineRegionStatus() count only the resources it has
-// visited. Once it's inactive, RuntimeHandle.GetOfflineRegionStatus() counts
-// every resource the region holds, including those from earlier versions, so
-// the completed counts can exceed the required counts.
+// The region keeps its resources. Starting its download again fetches the
+// invalidated resources for offline use. If the style or a TileJSON document is
+// then missing or invalid, the download reports an offline region response
+// error and goes on from the stored copy. Resources that the current style no
+// longer lists stay in the region until it's deleted.
 //
 // See mln_runtime_invalidate_offline_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -9308,7 +9284,8 @@ func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[
 // SetOfflineRegionDownloadState starts or pauses the download of the offline
 // region regionID.
 //
-// A download stops when the runtime closes.
+// Setting the state that the download already has does nothing. A download
+// stops when the runtime closes.
 //
 // See mln_runtime_set_offline_region_download_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
