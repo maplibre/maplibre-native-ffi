@@ -418,6 +418,7 @@ class UnpresentedRender {
 void reset_pushed_feature_state(mln_render_session_object& session) {
   session.rendered_source_ids.clear();
   session.rendered_sources.reset();
+  session.renderer_sources.reset();
   session.applied_feature_state = {};
   session.pushed_feature_state.reset();
 }
@@ -612,52 +613,6 @@ auto create_source_feature_result(
   }
   out_result = std::move(list);
   return MLN_STATUS_OK;
-}
-
-auto validate_non_empty_string(mln_buffer_view string, const char* name)
-  -> bool {
-  if (!validate_string_view(string)) {
-    return false;
-  }
-  if (string.size == 0) {
-    auto message = std::string{name} + " must not be empty";
-    mln::core::set_thread_error(message.c_str());
-    return false;
-  }
-  return true;
-}
-
-auto to_feature_extension_arguments(mln_buffer_view arguments)
-  -> std::optional<std::optional<std::map<std::string, mln::Value>>> {
-  if (arguments.size == 0) {
-    return std::optional<std::map<std::string, mln::Value>>{std::nullopt};
-  }
-  auto converted = mln::core::to_native_json_value(arguments);
-  if (!converted) {
-    return std::nullopt;
-  }
-  const auto* object = converted->getObject();
-  if (object == nullptr) {
-    mln::core::set_thread_error(
-      "feature extension arguments must be a JSON object"
-    );
-    return std::nullopt;
-  }
-  auto result = std::map<std::string, mln::Value>{};
-  for (const auto& [key, value] : *object) {
-    result.emplace(key, value);
-  }
-  return std::optional<std::map<std::string, mln::Value>>{std::move(result)};
-}
-
-auto serialize_feature_extension_result(const mln::FeatureExtensionValue& value)
-  -> std::string {
-  if (value.is<mln::Value>()) {
-    return mln::core::serialize_json_value(value.get<mln::Value>());
-  }
-  return mln::core::serialize_feature_collection(
-    value.get<mln::FeatureCollection>()
-  );
 }
 
 }  // namespace
@@ -2448,6 +2403,7 @@ auto render_session_render_update_on_driver(
   const auto render_once = [&]() -> std::optional<mln_status> {
     try {
       live->frame_observer.begin_render();
+      live->renderer_sources = rendered_update->sources;
       live->renderer->render(rendered_update);
 #if defined(MLN_RENDER_BACKEND_VULKAN)
     } catch (const mln::vulkan::SurfaceNotReady&) {
@@ -2789,66 +2745,6 @@ auto render_session_query_source_features(
   const auto features =
     live->renderer->querySourceFeatures(native_source_id, *native_options);
   return create_source_feature_result(features, out_result);
-}
-
-auto validate_feature_extension_query(
-  mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, mln_buffer_view arguments
-) -> mln_status {
-  if (
-    !validate_non_empty_string(source_id, "source_id") ||
-    !validate_non_empty_string(extension, "extension") ||
-    !validate_non_empty_string(extension_field, "extension_field") ||
-    !to_native_feature(feature) || !to_feature_extension_arguments(arguments)
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto render_session_query_feature_extensions(
-  mln_render_session session, mln_buffer_view source_id,
-  mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, mln_buffer_view arguments,
-  std::string& out_result
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_live_attached_render_session(session, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    !validate_non_empty_string(source_id, "source_id") ||
-    !validate_non_empty_string(extension, "extension") ||
-    !validate_non_empty_string(extension_field, "extension_field")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto native_feature = to_native_feature(feature);
-  if (!native_feature) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto native_arguments = to_feature_extension_arguments(arguments);
-  if (!native_arguments) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  mln::gfx::RendererBackend* backend = nullptr;
-  if (
-    const auto backend_status = validate_renderer_backend(live, backend);
-    backend_status != MLN_STATUS_OK
-  ) {
-    return backend_status;
-  }
-
-  auto query_feature = mln::Feature{std::move(*native_feature)};
-  auto current = ScopedCurrentScheduler{live->scheduler};
-  auto guard = mln::gfx::BackendScope{*backend};
-  const auto result = live->renderer->queryFeatureExtensions(
-    string_from_view(source_id), query_feature, string_from_view(extension),
-    string_from_view(extension_field), std::move(*native_arguments)
-  );
-  out_result = serialize_feature_extension_result(result);
-  return MLN_STATUS_OK;
 }
 
 namespace {

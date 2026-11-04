@@ -1784,6 +1784,7 @@ class GeoJsonSourceOptions:
     tolerance: float | None = None
 
     cluster_max_zoom: float | None = None
+    """The last zoom level that has clusters, at most 30."""
 
     cluster_properties: Any = None
     """The `clusterProperties` object, or empty for none."""

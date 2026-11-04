@@ -125,7 +125,7 @@ class SwiftEmitterTests(unittest.TestCase):
         self.assertTrue(swift.repeats("setGlobalStateProperty", "propertyName"))
         self.assertFalse(swift.repeats("createMap", "options"))
         self.assertFalse(swift.repeats("setHeader", "name"))
-        self.assertFalse(swift.repeats("queryFeatureExtensions", "sourceId"))
+        self.assertFalse(swift.repeats("getClusterChildren", "sourceId"))
 
     def test_a_required_member_has_no_default_and_others_default_to_zero(self):
         outputs = emitted(swift, real_api())

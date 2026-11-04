@@ -4234,6 +4234,61 @@ external int mln_render_session_get_capabilities(
 @Native<
   Int32 Function(
     mln_render_session,
+    mln_buffer_view,
+    Uint32,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_get_cluster_children(
+  int session,
+  mln_buffer_view source_id,
+  int cluster_id,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    mln_buffer_view,
+    Uint32,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_get_cluster_expansion_zoom(
+  int session,
+  mln_buffer_view source_id,
+  int cluster_id,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    mln_buffer_view,
+    Uint32,
+    Uint32,
+    Uint32,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_get_cluster_leaves(
+  int session,
+  mln_buffer_view source_id,
+  int cluster_id,
+  int limit,
+  int offset,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
     Pointer<Char>,
     Size,
     Pointer<Size>,
@@ -4258,29 +4313,6 @@ external int mln_render_session_get_failure(
 external int mln_render_session_get_snapshot(
   int session,
   Pointer<mln_render_session_snapshot> out_snapshot,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    mln_buffer_view,
-    mln_buffer_view,
-    mln_buffer_view,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_query_feature_extensions(
-  int session,
-  mln_buffer_view source_id,
-  mln_buffer_view feature,
-  mln_buffer_view extension,
-  mln_buffer_view extension_field,
-  mln_buffer_view arguments,
-  Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

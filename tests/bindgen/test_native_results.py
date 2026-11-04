@@ -20,6 +20,7 @@ class NativeResultTests(unittest.TestCase):
                     "mln_map_list_names", "mln_buffer_view", True, False
                 ),
                 CompletionResultPlan("mln_map_reload"),
+                CompletionResultPlan("mln_map_tile_count", "uint32_t", False, False),
                 CompletionResultPlan(
                     "mln_map_visible_tiles", "mln_tile_id", True, True
                 ),

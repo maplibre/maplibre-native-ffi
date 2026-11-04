@@ -636,17 +636,28 @@ export interface NativeOperations {
   mln_render_session_get_capabilities(
     session: bigint,
   ): RenderSessionCapabilities;
-  mln_render_session_get_failure(session: bigint): string;
-  mln_render_session_get_snapshot(session: bigint): RenderSessionSnapshot;
-  mln_render_session_query_feature_extensions(
+  mln_render_session_get_cluster_children(
     session: bigint,
     sourceId: string,
-    feature: unknown,
-    extension: string,
-    extensionField: string,
-    argumentsValue: unknown,
+    clusterId: number,
     completion: NativeCompletion,
   ): void;
+  mln_render_session_get_cluster_expansion_zoom(
+    session: bigint,
+    sourceId: string,
+    clusterId: number,
+    completion: NativeCompletion,
+  ): void;
+  mln_render_session_get_cluster_leaves(
+    session: bigint,
+    sourceId: string,
+    clusterId: number,
+    limit: number,
+    offset: number,
+    completion: NativeCompletion,
+  ): void;
+  mln_render_session_get_failure(session: bigint): string;
+  mln_render_session_get_snapshot(session: bigint): RenderSessionSnapshot;
   mln_render_session_query_rendered_features(
     session: bigint,
     geometry: RenderedQueryGeometry,

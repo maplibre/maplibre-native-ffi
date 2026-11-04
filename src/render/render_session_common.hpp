@@ -1009,6 +1009,13 @@ struct mln_render_session_object
   std::unordered_set<std::string> rendered_source_ids;
   std::optional<std::remove_const_t<decltype(mln::UpdateParameters::sources)>>
     rendered_sources;
+  // The sources of the update the renderer last started rendering, which
+  // cluster queries read. The renderer switches to an update's sources as it
+  // starts the update's render tree, before anything can end the attempt, so
+  // this matches the sources its own feature queries read. rendered_sources
+  // lags it when a feature state warmup ends an attempt early.
+  std::optional<std::remove_const_t<decltype(mln::UpdateParameters::sources)>>
+    renderer_sources;
   mln::core::FeatureStateSnapshot applied_feature_state;
   std::shared_ptr<const mln::core::FeatureStateSnapshot> pushed_feature_state;
   mln::core::RenderSurfaceState surface;
@@ -1287,16 +1294,6 @@ auto render_session_query_source_features(
   const mln_source_feature_query_options* options,
   std::shared_ptr<const SourceFeatureList>& out_result
 ) -> mln_status;
-auto render_session_query_feature_extensions(
-  mln_render_session session, mln_buffer_view source_id,
-  mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, mln_buffer_view arguments,
-  std::string& out_result
-) -> mln_status;
-auto validate_feature_extension_query(
-  mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, mln_buffer_view arguments
-) -> mln_status;
 
 auto render_session_query_rendered_features_start(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
@@ -1308,11 +1305,18 @@ auto render_session_query_source_features_start(
   const mln_source_feature_query_options* options,
   const mln_completion* completion
 ) -> mln_status;
-auto render_session_query_feature_extensions_start(
+auto render_session_get_cluster_children_start(
   mln_render_session session, mln_buffer_view source_id,
-  mln_buffer_view feature, mln_buffer_view extension,
-  mln_buffer_view extension_field, mln_buffer_view arguments,
+  std::uint32_t cluster_id, const mln_completion* completion
+) -> mln_status;
+auto render_session_get_cluster_leaves_start(
+  mln_render_session session, mln_buffer_view source_id,
+  std::uint32_t cluster_id, std::uint32_t limit, std::uint32_t offset,
   const mln_completion* completion
+) -> mln_status;
+auto render_session_get_cluster_expansion_zoom_start(
+  mln_render_session session, mln_buffer_view source_id,
+  std::uint32_t cluster_id, const mln_completion* completion
 ) -> mln_status;
 
 auto render_session_get_capabilities(

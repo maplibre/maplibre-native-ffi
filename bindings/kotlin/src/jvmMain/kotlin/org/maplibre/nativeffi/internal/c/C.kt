@@ -884,6 +884,38 @@ internal actual object C {
     Ffm.downcall("mln_render_session_dump_debug_logs", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_get_capabilities =
     Ffm.downcall("mln_render_session_get_capabilities", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_render_session_get_cluster_children =
+    Ffm.downcall(
+      "mln_render_session_get_cluster_children",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_render_session_get_cluster_expansion_zoom =
+    Ffm.downcall(
+      "mln_render_session_get_cluster_expansion_zoom",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_render_session_get_cluster_leaves =
+    Ffm.downcall(
+      "mln_render_session_get_cluster_leaves",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
+      JAVA_INT,
+      JAVA_INT,
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_render_session_get_failure =
     Ffm.downcall(
       "mln_render_session_get_failure",
@@ -896,19 +928,6 @@ internal actual object C {
     )
   private val mln_render_session_get_snapshot =
     Ffm.downcall("mln_render_session_get_snapshot", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_render_session_query_feature_extensions =
-    Ffm.downcall(
-      "mln_render_session_query_feature_extensions",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      mln_buffer_view,
-      mln_buffer_view,
-      mln_buffer_view,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_render_session_query_rendered_features =
     Ffm.downcall(
       "mln_render_session_query_rendered_features",
@@ -2604,6 +2623,55 @@ internal actual object C {
   ): Int =
     mln_render_session_get_capabilities.invokeExact(session, outCapabilities, outDiagnostic) as Int
 
+  actual fun mln_render_session_get_cluster_children(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_render_session_get_cluster_children.invokeExact(
+      session,
+      Ffm.value(sourceId, mln_buffer_view),
+      clusterId,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_render_session_get_cluster_expansion_zoom(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_render_session_get_cluster_expansion_zoom.invokeExact(
+      session,
+      Ffm.value(sourceId, mln_buffer_view),
+      clusterId,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_render_session_get_cluster_leaves(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    limit: Int,
+    offset: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_render_session_get_cluster_leaves.invokeExact(
+      session,
+      Ffm.value(sourceId, mln_buffer_view),
+      clusterId,
+      limit,
+      offset,
+      completion,
+      outDiagnostic,
+    ) as Int
+
   actual fun mln_render_session_get_failure(
     session: Long,
     outMessage: Long,
@@ -2624,27 +2692,6 @@ internal actual object C {
     outSnapshot: Long,
     outDiagnostic: Long,
   ): Int = mln_render_session_get_snapshot.invokeExact(session, outSnapshot, outDiagnostic) as Int
-
-  actual fun mln_render_session_query_feature_extensions(
-    session: Long,
-    sourceId: Long,
-    feature: Long,
-    extension: Long,
-    extensionField: Long,
-    arguments: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_query_feature_extensions.invokeExact(
-      session,
-      Ffm.value(sourceId, mln_buffer_view),
-      Ffm.value(feature, mln_buffer_view),
-      Ffm.value(extension, mln_buffer_view),
-      Ffm.value(extensionField, mln_buffer_view),
-      Ffm.value(arguments, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
 
   actual fun mln_render_session_query_rendered_features(
     session: Long,

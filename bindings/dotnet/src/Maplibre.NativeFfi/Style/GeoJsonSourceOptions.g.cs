@@ -16,6 +16,10 @@ public sealed record GeoJsonSourceOptions
     public double? MinZoom { get; init; }
     public double? MaxZoom { get; init; }
     public double? Tolerance { get; init; }
+
+    /// <summary>
+    /// The last zoom level that has clusters, at most 30.
+    /// </summary>
     public double? ClusterMaxZoom { get; init; }
 
     /// <summary>

@@ -5,6 +5,8 @@
 
 #include <math.h>
 
+#include "support/map.h"
+#include "support/resources.h"
 #include "support/style.h"
 #include "support/test_support.h"
 
@@ -536,45 +538,33 @@ static void source_queries_read_the_named_source_layers(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Three weighted points close enough to cluster at zoom 0, drawn only as
-// their cluster.
+// Three points close enough to form one cluster at every zoom level up to the
+// cluster max zoom, 5, drawn only as their cluster. "empty" clusters no
+// points, "plain" doesn't cluster, and "tiles" isn't a GeoJSON source; no
+// layer draws them.
+#define CLUSTERED_SOURCE_JSON                                               \
+  "{\"type\":\"geojson\",\"cluster\":true,\"clusterRadius\":50,"            \
+  "\"clusterMaxZoom\":5,\"data\":{\"type\":\"FeatureCollection\","          \
+  "\"features\":["                                                          \
+  "{\"type\":\"Feature\",\"properties\":{\"name\":\"one\"},\"geometry\":"   \
+  "{\"type\":\"Point\",\"coordinates\":[0,0]}},"                            \
+  "{\"type\":\"Feature\",\"properties\":{\"name\":\"two\"},\"geometry\":"   \
+  "{\"type\":\"Point\",\"coordinates\":[0.001,0.001]}},"                    \
+  "{\"type\":\"Feature\",\"properties\":{\"name\":\"three\"},\"geometry\":" \
+  "{\"type\":\"Point\",\"coordinates\":[0.002,0.002]}}]}}"
+#define CLUSTER_LAYER_JSON                                             \
+  "{\"id\":\"clusters\",\"type\":\"circle\",\"source\":\"clustered\"," \
+  "\"filter\":[\"has\",\"point_count\"],\"paint\":{\"circle-radius\":8}}"
 static const char cluster_style_json[] =
-  "{\"version\":8,\"sources\":{\"clustered\":{\"type\":\"geojson\","
-  "\"cluster\":true,\"clusterRadius\":50,\"data\":{\"type\":"
-  "\"FeatureCollection\",\"features\":["
-  "{\"type\":\"Feature\",\"properties\":{\"name\":\"one\"},\"geometry\":"
-  "{\"type\":\"Point\",\"coordinates\":[0,0]}},"
-  "{\"type\":\"Feature\",\"properties\":{\"name\":\"two\"},\"geometry\":"
-  "{\"type\":\"Point\",\"coordinates\":[0.001,0.001]}},"
-  "{\"type\":\"Feature\",\"properties\":{\"name\":\"three\"},\"geometry\":"
-  "{\"type\":\"Point\",\"coordinates\":[0.002,0.002]}}]}}},"
-  "\"layers\":[{\"id\":\"clusters\",\"type\":\"circle\",\"source\":"
-  "\"clustered\",\"filter\":[\"has\",\"point_count\"],\"paint\":"
-  "{\"circle-radius\":8}}]}";
-
-// Runs one supercluster query and copies its JSON into `out`.
-static mln_status query_extension(
-  const mln_test_render_fixture* fixture, const char* feature,
-  const char* field, const char* arguments, char* out, size_t capacity
-) {
-  // Null arguments pass an empty view, which is none.
-  const mln_buffer_view argument_view =
-    arguments == NULL ? (mln_buffer_view){0}
-                      : mln_buffer_view_from_cstr(arguments);
-  mln_test_completion completion = mln_test_completion_buffer_view();
-  MLN_TEST_OK(mln_render_session_query_feature_extensions(
-    fixture->session, MLN_BUFFER_LITERAL("clustered"),
-    mln_buffer_view_from_cstr(feature), MLN_BUFFER_LITERAL("supercluster"),
-    mln_buffer_view_from_cstr(field), argument_view, &completion.descriptor,
-    MLN_TEST_DIAGNOSTIC
-  ));
-  (void)mln_test_render_fixture_finish_operation(fixture, &completion);
-  bool found = false;
-  const mln_status status =
-    mln_test_style_finish_text(&completion, out, capacity, &found);
-  TEST_ASSERT_TRUE(status != MLN_STATUS_OK || found);
-  return status;
-}
+  "{\"version\":8,\"sources\":{\"clustered\":" CLUSTERED_SOURCE_JSON
+  ","
+  "\"empty\":{\"type\":\"geojson\",\"cluster\":true,\"data\":"
+  "{\"type\":\"FeatureCollection\",\"features\":[]}},"
+  "\"plain\":{\"type\":\"geojson\",\"data\":"
+  "{\"type\":\"FeatureCollection\",\"features\":[]}},"
+  "\"tiles\":{\"type\":\"vector\","
+  "\"tiles\":[\"fixture://tiles/{z}/{x}/{y}.mvt\"]}},"
+  "\"layers\":[" CLUSTER_LAYER_JSON "]}";
 
 static size_t count_features(const char* collection) {
   size_t count = 0;
@@ -585,28 +575,113 @@ static size_t count_features(const char* collection) {
   return count;
 }
 
-// Parses the cluster_id property of a queried cluster, which MapLibre writes
-// as an unsigned integer.
-static unsigned long long cluster_id_of(const char* feature) {
+// Parses the cluster_id property of a queried cluster.
+static uint32_t cluster_id_of(const char* feature) {
   const char* property = strstr(feature, "\"cluster_id\":");
   TEST_ASSERT_NOT_NULL_MESSAGE(property, feature);
   const char* digits = property + strlen("\"cluster_id\":");
-  TEST_ASSERT_TRUE_MESSAGE(*digits >= '0' && *digits <= '9', feature);
   char* end = NULL;
   const unsigned long long id = strtoull(digits, &end, 10);
-  TEST_ASSERT_TRUE_MESSAGE(*end == ',' || *end == '}', feature);
-  return id;
+  TEST_ASSERT_TRUE_MESSAGE(
+    end != digits && (*end == ',' || *end == '}'), feature
+  );
+  TEST_ASSERT_TRUE_MESSAGE(id <= UINT32_MAX, feature);
+  return (uint32_t)id;
 }
 
-typedef struct extension_row {
-  const char* label;
-  const char* field;
-  const char* arguments;
-  // The features the result holds, or SIZE_MAX for a scalar result.
-  size_t features;
-} extension_row;
+// Services a cluster query's completion and copies its feature collection
+// into `out`.
+static mln_status finish_cluster_collection(
+  const mln_test_render_fixture* fixture, mln_test_completion* completion,
+  char* out, size_t capacity
+) {
+  (void)mln_test_render_fixture_finish_operation(fixture, completion);
+  bool found = false;
+  const mln_status status =
+    mln_test_style_finish_text(completion, out, capacity, &found);
+  TEST_ASSERT_TRUE(status != MLN_STATUS_OK || found);
+  if (status == MLN_STATUS_OK) {
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(out, "\"FeatureCollection\""), out);
+  }
+  return status;
+}
 
-static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
+static mln_status cluster_children(
+  const mln_test_render_fixture* fixture, const char* source_id,
+  uint32_t cluster_id, char* out, size_t capacity
+) {
+  mln_test_completion completion = mln_test_completion_buffer_view();
+  MLN_TEST_OK(mln_render_session_get_cluster_children(
+    fixture->session, mln_buffer_view_from_cstr(source_id), cluster_id,
+    &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  ));
+  return finish_cluster_collection(fixture, &completion, out, capacity);
+}
+
+static mln_status cluster_leaves(
+  const mln_test_render_fixture* fixture, const char* source_id,
+  uint32_t cluster_id, uint32_t limit, uint32_t offset, char* out,
+  size_t capacity
+) {
+  mln_test_completion completion = mln_test_completion_buffer_view();
+  MLN_TEST_OK(mln_render_session_get_cluster_leaves(
+    fixture->session, mln_buffer_view_from_cstr(source_id), cluster_id, limit,
+    offset, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  ));
+  return finish_cluster_collection(fixture, &completion, out, capacity);
+}
+
+static mln_status cluster_expansion_zoom(
+  const mln_test_render_fixture* fixture, const char* source_id,
+  uint32_t cluster_id, uint32_t* out_zoom
+) {
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(uint32_t));
+  MLN_TEST_OK(mln_render_session_get_cluster_expansion_zoom(
+    fixture->session, mln_buffer_view_from_cstr(source_id), cluster_id,
+    &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  ));
+  const mln_status status =
+    mln_test_render_fixture_finish_operation(fixture, &completion);
+  if (status == MLN_STATUS_OK) {
+    TEST_ASSERT_TRUE(
+      mln_test_completion_copy_value(&completion, out_zoom, sizeof(*out_zoom))
+    );
+  }
+  mln_test_completion_destroy(&completion);
+  return status;
+}
+
+// Names the original points a collection holds, in the order one, two, three,
+// as a bit mask.
+enum { ONE = 1U << 0U, TWO = 1U << 1U, THREE = 1U << 2U };
+
+static unsigned int leaf_names(const char* collection) {
+  static const char* const names[] = {
+    "\"name\":\"one\"", "\"name\":\"two\"", "\"name\":\"three\""
+  };
+  unsigned int found = 0;
+  for (size_t index = 0; index < 3; index += 1) {
+    if (strstr(collection, names[index]) != NULL) found |= 1U << index;
+  }
+  return found;
+}
+
+typedef struct leaves_row {
+  const char* label;
+  uint32_t limit;
+  uint32_t offset;
+  size_t features;
+} leaves_row;
+
+typedef struct cluster_failure_row {
+  const char* label;
+  const char* source_id;
+  uint32_t cluster_id;
+  mln_status expected;
+} cluster_failure_row;
+
+static void cluster_queries_read_a_clustered_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
@@ -618,59 +693,96 @@ static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
   TEST_ASSERT_EQUAL_size_t(1, clusters.count);
   const char* cluster = clusters.features[0].feature;
   TEST_ASSERT_NOT_NULL_MESSAGE(strstr(cluster, "\"point_count\":3"), cluster);
+  const uint32_t id = cluster_id_of(cluster);
 
+  // One zoom level closer, the three points still form one cluster.
   static char result[4096];
-  const extension_row rows[] = {
-    {"leaves default to every leaf", "leaves", NULL, 3},
-    {"empty arguments are none", "leaves", "", 3},
-    {"a leaf limit bounds the leaves", "leaves", "{\"limit\":2}", 2},
-    {"the expansion zoom is a number", "expansion-zoom", NULL, SIZE_MAX},
+  MLN_TEST_OK(
+    cluster_children(&fixture, "clustered", id, result, sizeof(result))
+  );
+  TEST_ASSERT_EQUAL_size_t_MESSAGE(1, count_features(result), result);
+  TEST_ASSERT_NOT_NULL_MESSAGE(strstr(result, "\"point_count\":3"), result);
+
+  const leaves_row leaves[] = {
+    {"every leaf", 10, 0, 3},
+    {"a limit bounds the leaves", 2, 0, 2},
+    {"an offset skips leaves", 2, 2, 1},
+    {"a limit of 0 gives no leaves", 0, 0, 0},
   };
-  for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
-    const extension_row* row = &rows[index];
+  for (size_t index = 0; index < sizeof(leaves) / sizeof(leaves[0]);
+       index += 1) {
+    const leaves_row* row = &leaves[index];
     MLN_TEST_OK_MESSAGE(
-      query_extension(
-        &fixture, cluster, row->field, row->arguments, result, sizeof(result)
+      cluster_leaves(
+        &fixture, "clustered", id, row->limit, row->offset, result,
+        sizeof(result)
       ),
       row->label
     );
-    if (row->features == SIZE_MAX) {
-      char* end = NULL;
-      const unsigned long zoom = strtoul(result, &end, 10);
-      TEST_ASSERT_TRUE_MESSAGE(end != result && *end == '\0', result);
-      TEST_ASSERT_GREATER_THAN_UINT32_MESSAGE(0, zoom, row->label);
-    } else {
-      TEST_ASSERT_EQUAL_size_t_MESSAGE(
-        row->features, count_features(result), row->label
-      );
-    }
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(
+      row->features, count_features(result), row->label
+    );
   }
 
-  // The feature's JSON reaches the source with its number types intact, so
-  // only an unsigned cluster_id names a cluster: the same number written as a
-  // signed or fractional value finds nothing.
-  const unsigned long long id = cluster_id_of(cluster);
-  char feature[256];
-  static const char* const written_ids[] = {"%llu", "-%llu", "%llu.5"};
-  static const char* const expected[] = {NULL, "null", "null"};
-  for (size_t index = 0; index < 3; index += 1) {
-    char written[32];
-    (void)snprintf(written, sizeof(written), written_ids[index], id);
-    (void)snprintf(
-      feature, sizeof(feature),
-      "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-      "\"coordinates\":[0,0]},\"properties\":{\"cluster\":true,"
-      "\"cluster_id\":%s}}",
-      written
+  // The leaves are the original points, and two pages cover each one once.
+  MLN_TEST_OK(
+    cluster_leaves(&fixture, "clustered", id, 10, 0, result, sizeof(result))
+  );
+  TEST_ASSERT_EQUAL_UINT(ONE | TWO | THREE, leaf_names(result));
+  TEST_ASSERT_NULL_MESSAGE(strstr(result, "point_count"), result);
+  MLN_TEST_OK(
+    cluster_leaves(&fixture, "clustered", id, 2, 0, result, sizeof(result))
+  );
+  const unsigned int first_page = leaf_names(result);
+  MLN_TEST_OK(
+    cluster_leaves(&fixture, "clustered", id, 2, 2, result, sizeof(result))
+  );
+  const unsigned int second_page = leaf_names(result);
+  TEST_ASSERT_EQUAL_UINT(0, first_page & second_page);
+  TEST_ASSERT_EQUAL_UINT(ONE | TWO | THREE, first_page | second_page);
+
+  // The points stay one cluster through the cluster max zoom, 5, and show
+  // apart one level closer.
+  uint32_t zoom = 0;
+  MLN_TEST_OK(cluster_expansion_zoom(&fixture, "clustered", id, &zoom));
+  TEST_ASSERT_EQUAL_UINT32(6, zoom);
+
+  // A cluster ID's low five bits hold its zoom level plus one, so 0 and an ID
+  // whose zoom lies beyond the source's cluster max zoom name no cluster.
+  const cluster_failure_row failures[] = {
+    {"a missing source", "missing", id, MLN_STATUS_NOT_FOUND},
+    {"a GeoJSON source that doesn't cluster", "plain", id,
+     MLN_STATUS_INVALID_ARGUMENT},
+    {"a source that isn't GeoJSON", "tiles", id, MLN_STATUS_INVALID_ARGUMENT},
+    {"a clustered source with no points", "empty", id, MLN_STATUS_NOT_FOUND},
+    {"cluster ID 0", "clustered", 0, MLN_STATUS_NOT_FOUND},
+    {"an ID past the source's clusters", "clustered",
+     (id & UINT32_C(0x1F)) | (UINT32_C(0x7FFFFFF) << 5), MLN_STATUS_NOT_FOUND},
+    {"an ID beyond the cluster max zoom", "clustered",
+     (id & ~UINT32_C(0x1F)) | UINT32_C(0x1F), MLN_STATUS_NOT_FOUND},
+  };
+  for (size_t index = 0; index < sizeof(failures) / sizeof(failures[0]);
+       index += 1) {
+    const cluster_failure_row* row = &failures[index];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      row->expected,
+      cluster_children(
+        &fixture, row->source_id, row->cluster_id, result, sizeof(result)
+      ),
+      row->label
     );
-    MLN_TEST_OK(
-      query_extension(&fixture, feature, "leaves", NULL, result, sizeof(result))
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      row->expected,
+      cluster_leaves(
+        &fixture, row->source_id, row->cluster_id, 10, 0, result, sizeof(result)
+      ),
+      row->label
     );
-    if (expected[index] == NULL) {
-      TEST_ASSERT_EQUAL_size_t_MESSAGE(3, count_features(result), written);
-    } else {
-      TEST_ASSERT_EQUAL_STRING_MESSAGE(expected[index], result, written);
-    }
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      row->expected,
+      cluster_expansion_zoom(&fixture, row->source_id, row->cluster_id, &zoom),
+      row->label
+    );
   }
 
   mln_test_render_fixture_destroy(&fixture);
@@ -678,42 +790,206 @@ static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct extension_call {
+// The vector tile that a static map's still image waits on, which the
+// provider holds.
+static const char held_tile_url[] = "custom://held/0/0/0.pbf";
+static const mln_test_provided_resource held_tile[] = {
+  {.url = held_tile_url, .held = true},
+};
+
+// Two of the three points, which form one cluster as the three do.
+static const char two_point_source_json[] =
+  "{\"type\":\"geojson\",\"cluster\":true,\"clusterRadius\":50,"
+  "\"clusterMaxZoom\":5,\"data\":{\"type\":\"FeatureCollection\","
+  "\"features\":["
+  "{\"type\":\"Feature\",\"properties\":{\"name\":\"one\"},\"geometry\":"
+  "{\"type\":\"Point\",\"coordinates\":[0,0]}},"
+  "{\"type\":\"Feature\",\"properties\":{\"name\":\"two\"},\"geometry\":"
+  "{\"type\":\"Point\",\"coordinates\":[0.001,0.001]}}]}}";
+
+typedef struct two_point_cluster {
+  const mln_test_render_fixture* fixture;
+  mln_test_provider* provider;
+  char feature[512];
+} two_point_cluster;
+
+// Whether the renderer has asked for the held tile, so it has started
+// rendering the new style, and a source query finds the two-point cluster.
+static bool two_point_cluster_found(void* context) {
+  two_point_cluster* wait = context;
+  if (mln_test_provider_requests(wait->provider, held_tile_url) < 1) {
+    return false;
+  }
+  const mln_test_feature_list list =
+    mln_test_style_query_source(wait->fixture, "clustered", NULL);
+  for (size_t index = 0; index < list.count; index += 1) {
+    const char* feature = list.features[index].feature;
+    if (strstr(feature, "\"point_count\":2") != NULL) {
+      (void)snprintf(wait->feature, sizeof(wait->feature), "%s", feature);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Cluster queries read the source of the session's most recent render
+// attempt, not the last frame it completed. A static map renders only once
+// everything it loads has arrived, so while a tile is held, an attempt holds a
+// source that no frame has drawn. The test replaces the source rather than
+// its data, so the new source's tiles hold only the new data.
+static void cluster_queries_read_the_most_recent_render_attempt(void) {
+  mln_test_provider* provider = mln_test_provider_create(held_tile, 1);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  mln_map_options options = mln_test_map_options();
+  options.initial_extent =
+    (mln_logical_extent){.width = 64, .height = 64, .scale_factor = 1.0};
+  options.map_mode = MLN_MAP_MODE_STATIC;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  mln_test_load_style_and_wait(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{\"clustered\":" CLUSTERED_SOURCE_JSON
+           "},\"layers\":[" CLUSTER_LAYER_JSON "]}"
+         )
+  );
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  static char result[4096];
+  // A static map renders nothing until a still image asks for it.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND,
+    cluster_leaves(&fixture, "clustered", 1, 10, 0, result, sizeof(result))
+  );
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
+
+  // Replace the three points with two, and add a source whose tile is held,
+  // so the next still image's render attempts never complete a frame.
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_layer(
+    map, MLN_BUFFER_LITERAL("clusters"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
+    map, MLN_BUFFER_LITERAL("clustered"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("clustered"),
+    MLN_BUFFER_LITERAL(two_point_source_json), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map, MLN_BUFFER_LITERAL(CLUSTER_LAYER_JSON), (mln_buffer_view){0},
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("held"),
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"vector\",\"tiles\":[\"custom://held/{z}/{x}/{y}.pbf\"],"
+      "\"minzoom\":0,\"maxzoom\":0}"
+    ),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map,
+    MLN_BUFFER_LITERAL(
+      "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"held\","
+      "\"source-layer\":\"any\"}"
+    ),
+    (mln_buffer_view){0}, &completion.descriptor, NULL
+  ));
+  mln_test_completion still = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, NULL));
+  two_point_cluster wait = {.fixture = &fixture, .provider = provider};
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture, two_point_cluster_found, &wait, mln_test_deadline_default(),
+    "a source query's two-point cluster"
+  ));
+  TEST_ASSERT_FALSE(mln_test_completion_poll(&still));
+
+  // The cluster that the new source's tiles hold traverses to its own two
+  // points.
+  const uint32_t id = cluster_id_of(wait.feature);
+  MLN_TEST_OK(
+    cluster_leaves(&fixture, "clustered", id, 10, 0, result, sizeof(result))
+  );
+  TEST_ASSERT_EQUAL_size_t_MESSAGE(2, count_features(result), result);
+  TEST_ASSERT_EQUAL_UINT(ONE | TWO, leaf_names(result));
+  MLN_TEST_OK(
+    cluster_children(&fixture, "clustered", id, result, sizeof(result))
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(strstr(result, "\"point_count\":2"), result);
+
+  const mln_test_provider_request* request =
+    mln_test_provider_request_at(provider, held_tile_url, 0);
+  TEST_ASSERT_NOT_NULL(request);
+  const mln_resource_response empty = {
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+  };
+  mln_test_request_answer(request->handle, &empty);
+  MLN_TEST_OK(mln_test_render_pending_still_image(&fixture, &still));
+  mln_test_completion_destroy(&still);
+
+  // A detached session has no renderer to read.
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  mln_completion discarded = mln_test_discard_completion();
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_get_cluster_leaves(
+      fixture.session, MLN_BUFFER_LITERAL("clustered"), id, 10, 0, &discarded,
+      MLN_TEST_DIAGNOSTIC
+    )
+  );
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "not attached"));
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
+typedef enum cluster_query {
+  CLUSTER_CHILDREN,
+  CLUSTER_LEAVES,
+  CLUSTER_EXPANSION_ZOOM,
+} cluster_query;
+
+typedef struct cluster_call {
+  cluster_query query;
   mln_buffer_view source_id;
-  mln_buffer_view feature;
-  mln_buffer_view extension;
-  mln_buffer_view field;
-  mln_buffer_view arguments;
-} extension_call;
+} cluster_call;
 
-static void empty_extension_source(void* call) {
-  ((extension_call*)call)->source_id = (mln_buffer_view){.data = "", .size = 0};
+static void empty_children_source(void* call) {
+  ((cluster_call*)call)->query = CLUSTER_CHILDREN;
 }
-static void empty_extension(void* call) {
-  ((extension_call*)call)->extension = (mln_buffer_view){.data = "", .size = 0};
+static void empty_leaves_source(void* call) {
+  ((cluster_call*)call)->query = CLUSTER_LEAVES;
 }
-static void empty_extension_field(void* call) {
-  ((extension_call*)call)->field = (mln_buffer_view){.data = "", .size = 0};
-}
-static void geometry_instead_of_feature(void* call) {
-  ((extension_call*)call)->feature =
-    MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}");
-}
-static void array_arguments(void* call) {
-  extension_call* extension = call;
-  extension->arguments = MLN_BUFFER_LITERAL("[1]");
+static void empty_expansion_zoom_source(void* call) {
+  ((cluster_call*)call)->query = CLUSTER_EXPANSION_ZOOM;
 }
 
-static mln_status submit_extension(
+static mln_status submit_cluster_query(
   void* context, const void* descriptor, mln_diagnostic* diagnostic
 ) {
   const mln_render_session session = *(const mln_render_session*)context;
-  const extension_call* call = descriptor;
+  const cluster_call* call = descriptor;
   mln_completion completion = mln_test_discard_completion();
-  return mln_render_session_query_feature_extensions(
-    session, call->source_id, call->feature, call->extension, call->field,
-    call->arguments, &completion, diagnostic
-  );
+  switch (call->query) {
+    case CLUSTER_CHILDREN:
+      return mln_render_session_get_cluster_children(
+        session, call->source_id, 1, &completion, diagnostic
+      );
+    case CLUSTER_LEAVES:
+      return mln_render_session_get_cluster_leaves(
+        session, call->source_id, 1, 10, 0, &completion, diagnostic
+      );
+    case CLUSTER_EXPANSION_ZOOM:
+      return mln_render_session_get_cluster_expansion_zoom(
+        session, call->source_id, 1, &completion, diagnostic
+      );
+  }
+  return MLN_STATUS_NATIVE_ERROR;
 }
 
 // A frame of an empty style renders no feature, so a well-formed rendered
@@ -777,29 +1053,20 @@ static void malformed_queries_are_rejected_at_submission(void) {
     submit_query, &fixture.session
   );
 
-  static const mln_test_validation_case extension_cases[] = {
-    {"empty source ID", empty_extension_source, MLN_STATUS_INVALID_ARGUMENT,
-     "source_id must not be empty"},
-    {"empty extension", empty_extension, MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"empty extension field", empty_extension_field,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"a geometry instead of a feature", geometry_instead_of_feature,
-     MLN_STATUS_INVALID_ARGUMENT, "one GeoJSON Feature"},
-    {"arguments that are not an object", array_arguments,
-     MLN_STATUS_INVALID_ARGUMENT, "must be a JSON object"},
+  static const mln_test_validation_case cluster_cases[] = {
+    {"children of an empty source ID", empty_children_source,
+     MLN_STATUS_INVALID_ARGUMENT, "source_id must not be empty"},
+    {"leaves of an empty source ID", empty_leaves_source,
+     MLN_STATUS_INVALID_ARGUMENT, "source_id must not be empty"},
+    {"expansion zoom of an empty source ID", empty_expansion_zoom_source,
+     MLN_STATUS_INVALID_ARGUMENT, "source_id must not be empty"},
   };
-  const extension_call extension_defaults = {
-    .source_id = MLN_BUFFER_LITERAL("clustered"),
-    .feature = MLN_BUFFER_LITERAL(
-      "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-      "\"coordinates\":[0,0]},\"properties\":{\"cluster_id\":1}}"
-    ),
-    .extension = MLN_BUFFER_LITERAL("supercluster"),
-    .field = MLN_BUFFER_LITERAL("children"),
+  const cluster_call cluster_defaults = {
+    .source_id = (mln_buffer_view){.data = "", .size = 0},
   };
   mln_test_run_validation_table(
-    extension_cases, sizeof(extension_cases) / sizeof(extension_cases[0]),
-    &extension_defaults, sizeof(extension_defaults), submit_extension,
+    cluster_cases, sizeof(cluster_cases) / sizeof(cluster_cases[0]),
+    &cluster_defaults, sizeof(cluster_defaults), submit_cluster_query,
     &fixture.session
   );
 
@@ -818,6 +1085,7 @@ MLN_TEST_GROUP {
   RUN_TEST(rendered_queries_select_by_geometry_layer_and_filter);
   RUN_TEST(source_queries_read_the_named_source_layers);
   RUN_TEST(location_indicator_hits_name_only_their_layer);
-  RUN_TEST(cluster_extensions_resolve_an_unsigned_cluster_id);
+  RUN_TEST(cluster_queries_read_a_clustered_source);
+  RUN_TEST(cluster_queries_read_the_most_recent_render_attempt);
   RUN_TEST(malformed_queries_are_rejected_at_submission);
 }

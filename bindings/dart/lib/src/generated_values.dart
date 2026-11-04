@@ -2206,6 +2206,8 @@ final class GeoJsonSourceOptions extends _Value {
   final double? minZoom;
   final double? maxZoom;
   final double? tolerance;
+
+  /// The last zoom level that has clusters, at most 30.
   final double? clusterMaxZoom;
 
   /// The `clusterProperties` object, or empty for none.

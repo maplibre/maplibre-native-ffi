@@ -420,6 +420,8 @@ mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction
         api = self.parse("""
 BIND("execution=query;result=double")
 mln_status mln_map_scalar(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+BIND("execution=query;result=uint32_t")
+mln_status mln_map_count(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=command")
 mln_status mln_map_span(mln_map map, const double *values, unsigned count, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 void mln_global_hook(void (*callback)(void *), void *context);
@@ -433,6 +435,7 @@ void mln_global_hook(void (*callback)(void *), void *context);
                 self.assertFalse(generated & unsupported)
                 self.assertEqual(generated | unsupported, names)
                 self.assertIn("mln_map_scalar", generated)
+                self.assertIn("mln_map_count", generated)
                 self.assertIn("values", coverage.unsupported["mln_map_span"])
                 self.assertTrue(all(coverage.unsupported.values()))
 

@@ -2803,6 +2803,29 @@ unsafe extern "C" {
         out_capabilities: *mut mln_render_session_capabilities,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_render_session_get_cluster_children(
+        session: mln_render_session,
+        source_id: mln_buffer_view,
+        cluster_id: u32,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_get_cluster_expansion_zoom(
+        session: mln_render_session,
+        source_id: mln_buffer_view,
+        cluster_id: u32,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_get_cluster_leaves(
+        session: mln_render_session,
+        source_id: mln_buffer_view,
+        cluster_id: u32,
+        limit: u32,
+        offset: u32,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_render_session_get_failure(
         session: mln_render_session,
         out_message: *mut std::ffi::c_char,
@@ -2813,16 +2836,6 @@ unsafe extern "C" {
     pub fn mln_render_session_get_snapshot(
         session: mln_render_session,
         out_snapshot: *mut mln_render_session_snapshot,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_query_feature_extensions(
-        session: mln_render_session,
-        source_id: mln_buffer_view,
-        feature: mln_buffer_view,
-        extension: mln_buffer_view,
-        extension_field: mln_buffer_view,
-        arguments: mln_buffer_view,
-        completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_query_rendered_features(

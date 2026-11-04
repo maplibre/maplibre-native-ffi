@@ -1331,6 +1331,39 @@ int32_t mln_kw_mln_render_session_get_capabilities(
   );
 }
 
+int32_t mln_kw_mln_render_session_get_cluster_children(
+  int64_t session, uintptr_t source_id, int32_t cluster_id,
+  uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_get_cluster_children(
+    (mln_render_session)session, *(const mln_buffer_view*)(uintptr_t)source_id,
+    (uint32_t)cluster_id, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_render_session_get_cluster_expansion_zoom(
+  int64_t session, uintptr_t source_id, int32_t cluster_id,
+  uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_get_cluster_expansion_zoom(
+    (mln_render_session)session, *(const mln_buffer_view*)(uintptr_t)source_id,
+    (uint32_t)cluster_id, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_render_session_get_cluster_leaves(
+  int64_t session, uintptr_t source_id, int32_t cluster_id, int32_t limit,
+  int32_t offset, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_render_session_get_cluster_leaves(
+    (mln_render_session)session, *(const mln_buffer_view*)(uintptr_t)source_id,
+    (uint32_t)cluster_id, (uint32_t)limit, (uint32_t)offset,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_render_session_get_failure(
   int64_t session, uintptr_t out_message, uint32_t message_capacity,
   uintptr_t out_message_length, uintptr_t out_diagnostic
@@ -1347,21 +1380,6 @@ int32_t mln_kw_mln_render_session_get_snapshot(
   return (int32_t)mln_render_session_get_snapshot(
     (mln_render_session)session, (mln_render_session_snapshot*)out_snapshot,
     (mln_diagnostic*)out_diagnostic
-  );
-}
-
-int32_t mln_kw_mln_render_session_query_feature_extensions(
-  int64_t session, uintptr_t source_id, uintptr_t feature, uintptr_t extension,
-  uintptr_t extension_field, uintptr_t arguments, uintptr_t completion,
-  uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_render_session_query_feature_extensions(
-    (mln_render_session)session, *(const mln_buffer_view*)(uintptr_t)source_id,
-    *(const mln_buffer_view*)(uintptr_t)feature,
-    *(const mln_buffer_view*)(uintptr_t)extension,
-    *(const mln_buffer_view*)(uintptr_t)extension_field,
-    *(const mln_buffer_view*)(uintptr_t)arguments,
-    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 

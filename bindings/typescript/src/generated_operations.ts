@@ -4117,6 +4117,134 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
+   * Reads the children of a cluster in a clustered GeoJSON source.
+   *
+   * `clusterId` is the value of the "cluster_id" property of a cluster feature
+   * that a query found. The children are the clusters and points that the
+   * cluster splits into one zoom level closer. The result is a GeoJSON feature
+   * collection.
+   *
+   * The query reads the clustered index of the source's data in the session's
+   * most recent render attempt. Data that changes after that attempt shows from
+   * the next one, and before the first attempt there is no source.
+   *
+   * A feature query, such as `RenderSessionHandle.querySourceFeatures()`,
+   * returns what the source's loaded tiles hold. After the source's data, URL,
+   * or options change, or the style changes, those tiles can hold the older
+   * data until they reload. Until then, a cluster ID that a feature query found
+   * can name a cluster of the older data. Cluster IDs repeat across versions of
+   * the data, so this query can then complete with `Status.notFound` or read
+   * the newer data's cluster with that ID. Treat `Status.notFound` as a cluster
+   * that is gone, and query the features again.
+   *
+   * When a source's data fails to load, its earlier tiles can stay until new
+   * data loads, so feature queries can keep finding the earlier clusters while
+   * this query completes with `Status.notFound`.
+   *
+   * See `mln_render_session_get_cluster_children` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when you detached, abandoned, released, or disposed
+   *   the session.
+   * - `Status.notFound` when that data has no source named `sourceId`, or the
+   *   source has no cluster `clusterId`.
+   * - `Status.invalidArgument` when the source isn't a GeoJSON source with
+   *   clustering turned on.
+   */
+  getClusterChildren(sourceId: string, clusterId: number): Promise<unknown> {
+    return query<unknown>((completion) =>
+      native.mln_render_session_get_cluster_children(
+        this.id,
+        sourceId,
+        clusterId,
+        completion,
+      ),
+    );
+  }
+
+  /**
+   * Reads the zoom level at which a cluster of a clustered GeoJSON source
+   * splits.
+   *
+   * `clusterId` is the value of the "cluster_id" property of a cluster feature
+   * that a query found. At the result's zoom level, the cluster's points no
+   * longer form this cluster, but two or more clusters or points.
+   *
+   * The query reads its data as `RenderSessionHandle.getClusterChildren()`
+   * describes, including when a cluster ID that a feature query found names a
+   * cluster of older data.
+   *
+   * See `mln_render_session_get_cluster_expansion_zoom` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when you detached, abandoned, released, or disposed
+   *   the session.
+   * - `Status.notFound` when that data has no source named `sourceId`, or the
+   *   source has no cluster `clusterId`.
+   * - `Status.invalidArgument` when the source isn't a GeoJSON source with
+   *   clustering turned on.
+   */
+  getClusterExpansionZoom(
+    sourceId: string,
+    clusterId: number,
+  ): Promise<number> {
+    return query<number>((completion) =>
+      native.mln_render_session_get_cluster_expansion_zoom(
+        this.id,
+        sourceId,
+        clusterId,
+        completion,
+      ),
+    );
+  }
+
+  /**
+   * Reads the points in a cluster of a clustered GeoJSON source.
+   *
+   * `clusterId` is the value of the "cluster_id" property of a cluster feature
+   * that a query found. The result is a GeoJSON feature collection of the
+   * original point features. It skips the first `offset` points and then holds
+   * up to `limit` of them, so a `limit` of 0 gives an empty collection.
+   *
+   * The query reads its data as `RenderSessionHandle.getClusterChildren()`
+   * describes, including when a cluster ID that a feature query found names a
+   * cluster of older data.
+   *
+   * See `mln_render_session_get_cluster_leaves` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when you detached, abandoned, released, or disposed
+   *   the session.
+   * - `Status.notFound` when that data has no source named `sourceId`, or the
+   *   source has no cluster `clusterId`.
+   * - `Status.invalidArgument` when the source isn't a GeoJSON source with
+   *   clustering turned on.
+   */
+  getClusterLeaves(
+    sourceId: string,
+    clusterId: number,
+    limit: number,
+    offset: number,
+  ): Promise<unknown> {
+    return query<unknown>((completion) =>
+      native.mln_render_session_get_cluster_leaves(
+        this.id,
+        sourceId,
+        clusterId,
+        limit,
+        offset,
+        completion,
+      ),
+    );
+  }
+
+  /**
    * Reads the message of the error that made the session fail.
    *
    * `RenderSessionSnapshot.failureStatus` reports the error's status. The
@@ -4138,40 +4266,6 @@ export class RenderSessionHandle extends Owner {
    */
   getSnapshot(): RenderSessionSnapshot {
     return native.mln_render_session_get_snapshot(this.id);
-  }
-
-  /**
-   * Reads a value that a source computes for one of its features.
-   *
-   * A clustered GeoJSON source answers the `supercluster` extension for a
-   * cluster feature. Its `extensionField` is `children` for the cluster's child
-   * features, `leaves` for the points in the cluster, or `expansion-zoom` for
-   * the zoom level where the cluster splits. For `leaves`, `argumentsValue` can
-   * set `limit` and `offset`. Without `limit`, the result has up to 10 points
-   * and ignores `offset`. The result is JSON: a GeoJSON feature collection, a
-   * number, or null when the source has no answer.
-   *
-   * See `mln_render_session_query_feature_extensions` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-   */
-  queryFeatureExtensions(
-    sourceId: string,
-    feature: unknown,
-    extension: string,
-    extensionField: string,
-    argumentsValue: unknown,
-  ): Promise<unknown> {
-    return query<unknown>((completion) =>
-      native.mln_render_session_query_feature_extensions(
-        this.id,
-        sourceId,
-        feature,
-        extension,
-        extensionField,
-        argumentsValue,
-        completion,
-      ),
-    );
   }
 
   /**

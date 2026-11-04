@@ -193,7 +193,21 @@ struct CompletionResult<&mln_render_session_dump_debug_logs> {
   static constexpr bool has_value = false;
 };
 template <>
-struct CompletionResult<&mln_render_session_query_feature_extensions> {
+struct CompletionResult<&mln_render_session_get_cluster_children> {
+  static constexpr bool has_value = true;
+  using type = mln_buffer_view;
+  static constexpr bool array = false;
+  static constexpr bool nullable = false;
+};
+template <>
+struct CompletionResult<&mln_render_session_get_cluster_expansion_zoom> {
+  static constexpr bool has_value = true;
+  using type = uint32_t;
+  static constexpr bool array = false;
+  static constexpr bool nullable = false;
+};
+template <>
+struct CompletionResult<&mln_render_session_get_cluster_leaves> {
   static constexpr bool has_value = true;
   using type = mln_buffer_view;
   static constexpr bool array = false;

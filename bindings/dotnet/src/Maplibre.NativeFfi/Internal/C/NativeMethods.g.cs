@@ -1036,6 +1036,35 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_get_cluster_children(
+        MlnRenderSession session,
+        mln_buffer_view source_id,
+        uint cluster_id,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_get_cluster_expansion_zoom(
+        MlnRenderSession session,
+        mln_buffer_view source_id,
+        uint cluster_id,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_get_cluster_leaves(
+        MlnRenderSession session,
+        mln_buffer_view source_id,
+        uint cluster_id,
+        uint limit,
+        uint offset,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_get_failure(
         MlnRenderSession session,
         sbyte* out_message,
@@ -1048,18 +1077,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_render_session_get_snapshot(
         MlnRenderSession session,
         mln_render_session_snapshot* out_snapshot,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_query_feature_extensions(
-        MlnRenderSession session,
-        mln_buffer_view source_id,
-        mln_buffer_view feature,
-        mln_buffer_view extension,
-        mln_buffer_view extension_field,
-        mln_buffer_view arguments,
-        mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
 

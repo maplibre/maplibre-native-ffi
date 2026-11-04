@@ -1634,6 +1634,55 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_render_session_get_cluster_children(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_get_cluster_children(
+      session.toULong(),
+      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      clusterId.toUInt(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_render_session_get_cluster_expansion_zoom(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_get_cluster_expansion_zoom(
+      session.toULong(),
+      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      clusterId.toUInt(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_render_session_get_cluster_leaves(
+    session: Long,
+    sourceId: Long,
+    clusterId: Int,
+    limit: Int,
+    offset: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_get_cluster_leaves(
+      session.toULong(),
+      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      clusterId.toUInt(),
+      limit.toUInt(),
+      offset.toUInt(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_render_session_get_failure(
     session: Long,
     outMessage: Long,
@@ -1657,27 +1706,6 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_get_snapshot(
       session.toULong(),
       outSnapshot.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_query_feature_extensions(
-    session: Long,
-    sourceId: Long,
-    feature: Long,
-    extension: Long,
-    extensionField: Long,
-    arguments: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_query_feature_extensions(
-      session.toULong(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      feature.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      extension.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      extensionField.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      arguments.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
