@@ -20,7 +20,12 @@ cc -std=c11 -Wall -Wextra -Werror "$sources/suite/main.c" \
 "$scratch/suite"
 
 case "$(uname -s)" in
-  Darwin) export DYLD_LIBRARY_PATH="$install_dir/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" ;;
+  # Homebrew's GJS typelib names libgjs by its leaf name, which the rpath of
+  # Homebrew's gjs doesn't reach, so its Gio overrides fail to load.
+  Darwin)
+    gjs_lib="$(dirname "$(realpath "$(command -v gjs)")")/../lib"
+    export DYLD_LIBRARY_PATH="$install_dir/lib:$gjs_lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+    ;;
   *) export LD_LIBRARY_PATH="$install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
 esac
 GI_TYPELIB_PATH="$install_dir/lib/girepository-1.0" gjs -m "$sources/smoke/main.js"
