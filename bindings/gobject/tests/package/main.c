@@ -64,13 +64,13 @@ static void released(
 
 int main(void) {
   State state = {.loop = g_main_loop_new(NULL, FALSE), .status = EXIT_SUCCESS};
-  MaplibreNativeFfiRuntimeOptions* options =
-    maplibre_native_ffi_runtime_options_new();
-  maplibre_native_ffi_runtime_options_set_asset_path(options, ".");
+  MaplibreNativeFfiRuntimeOptions* options = g_object_new(
+    MAPLIBRE_NATIVE_FFI_TYPE_RUNTIME_OPTIONS, "asset-path", ".", NULL
+  );
   GError* error = NULL;
   MaplibreNativeFfiRuntime* runtime =
     maplibre_native_ffi_runtime_create(options, &error);
-  maplibre_native_ffi_runtime_options_free(options);
+  g_object_unref(options);
   if (runtime == NULL) {
     fprintf(stderr, "create failed: %s\n", error->message);
     return EXIT_FAILURE;

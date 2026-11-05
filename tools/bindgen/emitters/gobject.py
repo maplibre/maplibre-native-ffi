@@ -546,8 +546,6 @@ class Emitter:
         count = parameter_name(length.name)
         count_type = values.gtype(length.value)
         if element.kind == "record":
-            if self.values.is_object(element):
-                raise Unsupported(f"an array of {element.native}")
             type_ = type_name(element.native)
             prefix = symbol_name(element.native)
             # A plain record's array is flat, as C's is.
@@ -653,12 +651,10 @@ class Emitter:
                 call.uses_call = True
                 call.arguments[output.name] = local
                 if element.kind == "record":
-                    if self.values.is_object(element):
-                        raise Unsupported(f"an array of {element.native}")
                     prefix = symbol_name(element.native)
                     expression = f"{output.name}_items_"
                     convert = (
-                        f"  GPtrArray* {expression} = g_ptr_array_new_full((guint){count_local}, (GDestroyNotify){prefix}_free);\n"
+                        f"  GPtrArray* {expression} = g_ptr_array_new_full((guint){count_local}, (GDestroyNotify){self.values.destroy(element)});\n"
                         f"  for (gsize index = 0; index < {count_local}; index++) {{\n"
                         f"    g_ptr_array_add({expression}, {prefix}_from_native(&{local}[index]));\n  }}\n"
                     )
@@ -1147,12 +1143,10 @@ class Emitter:
             element = result.element
             assert element is not None
             if element.kind == "record":
-                if self.values.is_object(element):
-                    raise Unsupported(f"an array of {element.native}")
                 prefix = symbol_name(element.native)
                 values.use(element)
                 item = f"{prefix}_from_native((const {element.native}*)(const void*)((const char*)result->value + index * result->value_size))"
-                free = f"(GDestroyNotify){prefix}_free"
+                free = f"(GDestroyNotify){self.values.destroy(element)}"
             elif values.text(element) and element.buffer_form == "view":
                 item = "maplibre_native_ffi_text_new(*(const mln_buffer_view*)(const void*)((const char*)result->value + index * result->value_size))"
                 free = "g_free"
@@ -1386,7 +1380,7 @@ class Emitter:
             + "  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};\n"
             f"  mln_status status_ = {call.native_call({drain.batch.name: '&batch_', drain.view.name: '&view_'})};\n"
             "  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;\n"
-            f"  GPtrArray* items_ = g_ptr_array_new_with_free_func((GDestroyNotify){prefix}_free);\n"
+            f"  GPtrArray* items_ = g_ptr_array_new_with_free_func((GDestroyNotify){self.values.destroy(element)});\n"
             "  if (batch_ != MLN_HANDLE_NULL) {\n"
             f"    for (size_t index = 0; index < view_.{slice_.value.length}; index++) {{\n"
             f"      g_ptr_array_add(items_, {prefix}_from_native({item}));\n    }}\n"

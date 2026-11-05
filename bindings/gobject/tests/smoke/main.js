@@ -96,9 +96,7 @@ async function run() {
     center: new LatLng({ latitude: 10, longitude: 20 }),
   });
   camera.zoom = 4;
-  const update = new CameraUpdate();
-  update.set_mode(CameraUpdateMode.JUMP);
-  update.set_camera(camera);
+  const update = new CameraUpdate({ mode: CameraUpdateMode.JUMP, camera });
   const completion = await map.update_camera_async(update);
   check(typeof completion.generation === "number", "a command's generation");
   const found = await map.get_camera_async();

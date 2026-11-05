@@ -57,9 +57,10 @@ namespace CameraSnippets {
 			center = { latitude: 48.8566, longitude: 2.3522 },
 			zoom = 12,
 		};
-		var jump = new CameraUpdate ();
-		jump.set_mode (CameraUpdateMode.JUMP);
-		jump.set_camera (paris);
+		var jump = new CameraUpdate () {
+			mode = CameraUpdateMode.JUMP,
+			camera = paris,
+		};
 		map.update_camera_async.begin (jump);
 		// #endregion jump
 
@@ -81,10 +82,11 @@ namespace CameraSnippets {
 			center = { latitude: 40.7128, longitude: -74.006 },
 			zoom = 10,
 		};
-		var fly = new CameraUpdate ();
-		fly.set_mode (CameraUpdateMode.FLY);
-		fly.set_camera (new_york);
-		fly.set_animation (animation);
+		var fly = new CameraUpdate () {
+			mode = CameraUpdateMode.FLY,
+			camera = new_york,
+			animation = animation,
+		};
 		map.update_camera_async.begin (fly);
 		// #endregion animate
 
@@ -94,9 +96,10 @@ namespace CameraSnippets {
 			{ latitude: 47.8, longitude: 10.5 },
 		};
 		var ease = new AnimationOptions () { duration_ms = 500 };
-		var fit = new CameraFitUpdate ();
-		fit.set_mode (CameraUpdateMode.EASE);
-		fit.set_animation (ease);
+		var fit = new CameraFitUpdate () {
+			mode = CameraUpdateMode.EASE,
+			animation = ease,
+		};
 		map.fit_camera_to_lat_lng_bounds_async.begin (bounds, fit);
 		// #endregion fit
 

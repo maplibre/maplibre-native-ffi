@@ -74,9 +74,8 @@ GType maplibre_native_ffi_error_get_type(void) G_GNUC_CONST;
  * A maintenance action on a runtime's cache database.
  *
  * The cache database is the file that
- * `maplibre_native_ffi_runtime_options_set_cache_path` names. It holds the
- * ambient cache, meaning the resources that maps loaded, and the offline
- * regions.
+ * `MaplibreNativeFfiRuntimeOptions:cache-path` names. It holds the ambient
+ * cache, meaning the resources that maps loaded, and the offline regions.
  *
  * See `mln_cache_database_operation` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).

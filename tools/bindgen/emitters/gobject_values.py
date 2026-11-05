@@ -104,6 +104,10 @@ SAME_MEMBER_DEFINITION = (
     "    sizeof(((type*)0)->member) == sizeof(((record*)0)->member) \\\n"
     "  )\n\n"
 )
+ZEROLESS = (
+    "Until it is set, it holds 0, which names no value and which native code"
+    " rejects, whatever the property's default says."
+)
 UNSET = (
     "A member that a `has_` method reports on is unset until its property or"
     " setter sets it."
@@ -371,29 +375,40 @@ class Values:
         return native in self.bound.inputs
 
     def is_object(self, value: ValuePlan) -> bool:
-        """Whether a record is an option bag that native code takes as input,
-        which is a final GObject class with a property for each member that a
-        property represents."""
+        """Whether a record is an input record, which is a final GObject class
+        with a property for each member that a property represents.
+
+        That is each record that native code takes as input, but a plain
+        struct, which is a value, a record that presents its tagged union,
+        and a registration whose every member is a callback or an array,
+        which has no setting to hold as a property."""
         if value.kind != "record" or value.native not in self.bound.values:
             return False
         record = self.record(value.native)
-        return (
-            not record.union_member
-            and not self.transparent(record)
-            and bool(self.masks(record))
-            and self.is_input(record.native)
+        if (
+            record.union_member
+            or self.transparent(record)
+            or not self.is_input(record.native)
+        ):
+            return False
+        if record.registration:
+            return any(self.has_property(record, m) for m in self.members(record))
+        return True
+
+    def has_property(self, record: ValuePlan, member: FieldPlan) -> bool:
+        """Whether a property represents a member: any member but a callback,
+        or an array of records with its count."""
+        if member.name in {f.name for f in self.hosted(record)}:
+            return False
+        value = member.value
+        return not (
+            value.kind == "array" and value.element and value.element.kind == "record"
         )
 
     def property_name(self, record: ValuePlan, member: FieldPlan) -> str | None:
-        """The property of an option bag's member, or None for a member that a
-        property represents badly: a callback, or an array of records with its
-        count."""
-        if not self.is_object(record):
-            return None
-        if member.name in {f.name for f in self.hosted(record)}:
-            return None
-        value = member.value
-        if value.kind == "array" and value.element and value.element.kind == "record":
+        """The property of an input record's member, or None for a member
+        without one."""
+        if not self.is_object(record) or not self.has_property(record, member):
             return None
         return accessor(record, member.name).replace("_", "-")
 
@@ -615,8 +630,6 @@ class Values:
             element = value.element
             assert element is not None
             if element.kind == "record":
-                if self.is_object(element):
-                    raise Unsupported(f"GObject: an array of {element.native}")
                 return "GPtrArray*"
             if self.text(element) and element.buffer_form == "view":
                 return "char**"
@@ -638,7 +651,7 @@ class Values:
             element = value.element
             assert element is not None
             if element.kind == "record":
-                return f"  {place} = g_ptr_array_new_with_free_func((GDestroyNotify){symbol_name(element.native)}_free);\n"
+                return f"  {place} = g_ptr_array_new_with_free_func((GDestroyNotify){self.destroy(element)});\n"
             return f"  {place} = g_new0(char*, 1);\n"
         if (
             value.kind == "record"
@@ -662,7 +675,7 @@ class Values:
                 return (
                     f"  {place} = {source} != NULL ? g_ptr_array_copy({source}, "
                     f"{prefix}_copy_func, NULL) : NULL;\n"
-                    f"  if ({place} != NULL) g_ptr_array_set_free_func({place}, (GDestroyNotify){prefix}_free);\n"
+                    f"  if ({place} != NULL) g_ptr_array_set_free_func({place}, (GDestroyNotify){self.destroy(element)});\n"
                 )
             return f"  {place} = g_strdupv({source});\n"
         if value.kind in {"record", "union"} and not self.transparent(value):
@@ -761,9 +774,15 @@ class Values:
                 # A plain record's array is flat, as C's is.
                 flat = self.transparent(element)
                 item = f"&{name}[index]" if flat else f"{name}[index]"
-                body = (
+                body = ""
+                if self.is_object(element):
+                    body = (
+                        f"  for (gsize index = 0; index < {count}; index++) {{\n"
+                        f"    g_return_if_fail({self.record_check(element, item)});\n  }}\n"
+                    )
+                body += (
                     f"  GPtrArray* previous = {place};\n"
-                    f"  {place} = g_ptr_array_new_full((guint){count}, (GDestroyNotify){prefix}_free);\n"
+                    f"  {place} = g_ptr_array_new_full((guint){count}, (GDestroyNotify){self.destroy(element)});\n"
                     f"  for (gsize index = 0; index < {count}; index++) {{\n"
                     f"    g_ptr_array_add({place}, {prefix}_copy({item}));\n  }}\n"
                     "  if (previous != NULL) g_ptr_array_unref(previous);\n"
@@ -920,7 +939,7 @@ class Values:
                     item = f"(const {native}*)(const void*)((const char*){origin} + index * {source}->{value.stride})"
                 return (
                     release
-                    + f"  {place} = g_ptr_array_new_full((guint){count}, (GDestroyNotify){prefix}_free);\n"
+                    + f"  {place} = g_ptr_array_new_full((guint){count}, (GDestroyNotify){self.destroy(element)});\n"
                     f"  for (size_t index = 0; index < {count}; index++) {{\n"
                     f"    g_ptr_array_add({place}, {prefix}_from_native({item}));\n  }}\n"
                 )
@@ -1298,14 +1317,25 @@ class Values:
                 if not all(0 <= n <= 0xFFFFFFFF for n in numbers):
                     raise Unsupported(f"GObject: a property of {value.native}")
                 return "flags"
-            if not all(-(2**31) <= n < 2**31 for n in numbers) or 0 not in numbers:
+            if not all(-(2**31) <= n < 2**31 for n in numbers):
                 raise Unsupported(f"GObject: a property of {value.native}")
             return "enum"
+        if kind == "native_pointer":
+            return "pointer"
         if self.text(value):
             return "string"
         if self.is_object(value):
             return "object"
         return "boxed"
+
+    def zeroless(self, value: ValuePlan) -> bool:
+        """Whether an enum names no zero, which a `GEnum` property can't take
+        as its default."""
+        return (
+            value.kind == "enum"
+            and value.enum_kind != "bitmask"
+            and all(number != 0 for _, number in value.enum_values)
+        )
 
     def param_spec(self, member: FieldPlan, name: str) -> str:
         value = member.value
@@ -1313,8 +1343,13 @@ class Values:
         head = f'"{name}", NULL, NULL'
         if kind == "boolean":
             return f"g_param_spec_boolean({head}, FALSE, {PROPERTY_FLAGS})"
+        if kind == "pointer":
+            return f"g_param_spec_pointer({head}, {PROPERTY_FLAGS})"
         if kind in {"enum", "flags"}:
-            return f"g_param_spec_{kind}({head}, {type_macro(value.native)}, 0, {PROPERTY_FLAGS})"
+            default = "0"
+            if self.zeroless(value):
+                default = constant_name(value, value.enum_values[0][0])
+            return f"g_param_spec_{kind}({head}, {type_macro(value.native)}, {default}, {PROPERTY_FLAGS})"
         if kind == "string":
             default = "NULL" if value.nullable else '""'
             return f"g_param_spec_string({head}, {default}, {PROPERTY_FLAGS})"
@@ -1413,6 +1448,11 @@ class Values:
         property_doc: list[str] = []
         if prop is not None:
             named = f"`{name}:{prop}`"
+            if self.zeroless(member.value):
+                # The member keeps the zero that the C record starts with, so
+                # a record that leaves it unset still reaches native code as
+                # one that doesn't name it.
+                doc = self.doc_lines(documented, (ZEROLESS,)) or doc
             property_doc = [
                 f"{name}:{prop}: (setter set_{stem}) (getter get_{stem})",
                 "",
@@ -1464,9 +1504,9 @@ class Values:
         return property_doc, functions
 
     def render_object(self, value: ValuePlan) -> tuple[str, str, str]:
-        """An option bag that native code takes as input: a final GObject
-        class, whose properties set its members, and which copies the members
-        that it holds."""
+        """A record that native code takes as input: a final GObject class,
+        whose properties set its members, and which copies the members that
+        it holds."""
         name, prefix, native = (
             type_name(value.native),
             symbol_name(value.native),
@@ -1494,10 +1534,11 @@ class Values:
         struct += "".join(f"  MaplibreNativeFfiClosure* {m.name};\n" for m in callbacks)
         struct += "};\n\n"
         ids = "".join(f"  {ident},\n" for _, _, ident in properties)
-        struct += (
-            f"enum {{\n  {upper}_PROP_0,\n{ids}  {upper}_N_PROPERTIES\n}};\n\n"
-            f"static GParamSpec* {table}[{upper}_N_PROPERTIES];\n\n"
-        )
+        if properties:
+            struct += (
+                f"enum {{\n  {upper}_PROP_0,\n{ids}  {upper}_N_PROPERTIES\n}};\n\n"
+                f"static GParamSpec* {table}[{upper}_N_PROPERTIES];\n\n"
+            )
 
         functions = [
             Function(
@@ -1505,15 +1546,16 @@ class Values:
                 f"{name}*",
                 [],
                 f"  return g_object_new({type_macro(native)}, NULL);\n",
-                doc=[f"Creates a `{name}` whose members are zero, empty, or unset."],
+                doc=[
+                    f"Creates a `{name}` whose members are zero, empty, or unset."
+                    if masks
+                    else f"Creates a `{name}` whose members are zero or empty."
+                ],
                 identifier_annotation="(constructor)",
                 returns_doc="(transfer full): the new value",
             )
         ]
-        header = self.type_comment(
-            value,
-            extra=(UNSET,),
-        )
+        header = self.type_comment(value, extra=(UNSET,) if masks else ())
         header += functions[0].declaration()
         for member in data:
             property_doc, accessors = self.object_accessors(
@@ -1557,7 +1599,7 @@ class Values:
                 + finalize
                 + f"  G_OBJECT_CLASS({prefix}_parent_class)->finalize(object);\n}}\n\n"
             )
-        source += (
+        accessors = (
             f"static void {prefix}_get_property(\n"
             "  GObject* object, guint id, GValue* value, GParamSpec* pspec\n) {\n"
             f"  {name}* self = {cast}(object);\n"
@@ -1566,13 +1608,25 @@ class Values:
             "  GObject* object, guint id, const GValue* value, GParamSpec* pspec\n) {\n"
             f"  {name}* self = {cast}(object);\n"
             f"  switch (id) {{\n{sets}{invalid}}}\n\n"
-            f"static void {prefix}_class_init({name}Class* klass) {{\n"
-            "  GObjectClass* object_class = G_OBJECT_CLASS(klass);\n"
-            + (f"  object_class->finalize = {prefix}_finalize;\n" if finalize else "")
-            + f"  object_class->get_property = {prefix}_get_property;\n"
+        )
+        class_init = (
+            f"  object_class->get_property = {prefix}_get_property;\n"
             f"  object_class->set_property = {prefix}_set_property;\n"
             + installs
-            + f"  g_object_class_install_properties(object_class, {upper}_N_PROPERTIES, {table});\n}}\n\n"
+            + f"  g_object_class_install_properties(object_class, {upper}_N_PROPERTIES, {table});\n"
+        )
+        if not properties:
+            accessors, class_init = "", ""
+        source += accessors + (
+            f"static void {prefix}_class_init({name}Class* klass) {{\n"
+            + (
+                "  GObjectClass* object_class = G_OBJECT_CLASS(klass);\n"
+                if finalize or properties
+                else "  (void)klass;\n"
+            )
+            + (f"  object_class->finalize = {prefix}_finalize;\n" if finalize else "")
+            + class_init
+            + "}\n\n"
             f"static void {prefix}_init({name}* self) {{\n"
             + (
                 "".join(self.default(m, f"self->{m.name}") for m in data)
@@ -1596,9 +1650,10 @@ class Values:
         )
         copy += "  return copy;\n}\n\n"
         private = self.private_prototypes(value)
-        if native in self.held:
+        if native in self.held or self.arrayed(value):
             source += copy
             private += f"G_GNUC_INTERNAL {name}* {prefix}_copy(const {name}* self);\n"
+        source += self.copy_func(value)
         if self.writes(value):
             source += "".join(
                 self.trampoline(value, member, index)
@@ -1931,11 +1986,14 @@ class Values:
                 parameters, annotations, body = self.setter(
                     variant.value, place, "value"
                 )
-                check = "  g_return_if_fail(value != NULL);\n"
+                # The setter's checks, which a constructor makes first.
                 precondition = ""
-                if check in body:
-                    body = body.replace(check, "")
-                    precondition = "  g_return_val_if_fail(value != NULL, NULL);\n"
+                while body.startswith("  g_return_if_fail("):
+                    line, body = body.split("\n", 1)
+                    condition = line.removeprefix("  g_return_if_fail(").removesuffix(
+                        ");"
+                    )
+                    precondition += f"  g_return_val_if_fail({condition}, NULL);\n"
                 functions.append(
                     Function(
                         f"{prefix}_new_{variant.name}",
@@ -2180,7 +2238,7 @@ class Values:
                 if slice_.value.stride:
                     item = f"(const {element.native}*)(const void*)((const char*){access}{slice_.name} + index * {access}{slice_.value.stride})"
                 setup += (
-                    f"  GPtrArray* {local} = g_ptr_array_new_full((guint){count}, (GDestroyNotify){prefix}_free);\n"
+                    f"  GPtrArray* {local} = g_ptr_array_new_full((guint){count}, (GDestroyNotify){self.destroy(element)});\n"
                     f"  for (size_t index = 0; index < {count}; index++) {{\n"
                     f"    g_ptr_array_add({local}, {prefix}_from_native({item}));\n  }}\n"
                 )

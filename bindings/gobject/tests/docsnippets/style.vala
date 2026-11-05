@@ -5,12 +5,12 @@ using MaplibreNativeFfi;
 
 namespace Style {
 	PremultipliedRgba8Image draw_image (string image_id) {
-		var image = new PremultipliedRgba8Image ();
-		image.set_width (1);
-		image.set_height (1);
-		image.set_stride (4);
-		image.set_pixels (new GLib.Bytes ({ 255, 0, 0, 255 }));
-		return image;
+		return new PremultipliedRgba8Image () {
+			width = 1,
+			height = 1,
+			stride = 4,
+			pixels = new GLib.Bytes ({ 255, 0, 0, 255 }),
+		};
 	}
 
 	// pixels holds 16 x 16 premultiplied RGBA pixels.
@@ -68,11 +68,12 @@ namespace Style {
 		// #endregion set-property
 
 		// #region image
-		var marker = new PremultipliedRgba8Image ();
-		marker.set_width (16);
-		marker.set_height (16);
-		marker.set_stride (16 * 4);
-		marker.set_pixels (pixels);
+		var marker = new PremultipliedRgba8Image () {
+			width = 16,
+			height = 16,
+			stride = 16 * 4,
+			pixels = pixels,
+		};
 		map.set_style_image_async.begin ("marker", marker, null);
 
 		// An empty layer ID draws the layer on top.

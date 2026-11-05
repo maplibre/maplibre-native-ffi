@@ -13,8 +13,7 @@ Gio._promisify(
 );
 
 async function run() {
-  const options = new MaplibreNativeFfi.RuntimeOptions();
-  options.set_asset_path(".");
+  const options = new MaplibreNativeFfi.RuntimeOptions({ asset_path: "." });
   const runtime = MaplibreNativeFfi.Runtime.create(options);
   await runtime.release_async();
   try {

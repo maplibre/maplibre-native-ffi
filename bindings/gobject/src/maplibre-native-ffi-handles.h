@@ -526,8 +526,8 @@ maplibre_native_ffi_map_add_geo_json_source_data_finish(
 void maplibre_native_ffi_map_add_image_source_image_async(
   MaplibreNativeFfiMap* self, const char* source_id,
   const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
-  const MaplibreNativeFfiPremultipliedRgba8Image* image,
-  GAsyncReadyCallback callback, gpointer user_data
+  MaplibreNativeFfiPremultipliedRgba8Image* image, GAsyncReadyCallback callback,
+  gpointer user_data
 );
 
 /**
@@ -688,10 +688,10 @@ maplibre_native_ffi_map_apply_camera_delta_finish(
  * For a reader that waits on no sync file, such as a Wayland compositor without
  * explicit synchronization, attach without
  * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_KIND_FLAG_SYNC_FD` in
- * `maplibre_native_ffi_render_session_attach_options_set_producer_sync_kinds`,
- * so that each frame finishes before you acquire it. Keep each frame acquired
- * until its reader is done with the buffer. Give the ring 3 buffers, so the
- * session can render while you hold two frames.
+ * `MaplibreNativeFfiRenderSessionAttachOptions:producer-sync-kinds`, so that
+ * each frame finishes before you acquire it. Keep each frame acquired until its
+ * reader is done with the buffer. Give the ring 3 buffers, so the session can
+ * render while you hold two frames.
  *
  * The object is ready once `maplibre_native_ffi_render_session_ready_async`
  * finishes, which fails with the errors that the completion reports.
@@ -709,10 +709,9 @@ maplibre_native_ffi_map_apply_camera_delta_finish(
  * Returns: (transfer full): the new object, or %NULL with `error` set
  */
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_dma_buf_ring(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiDmaBufRingDescriptor* descriptor,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiDmaBufRingDescriptor* descriptor,
   MaplibreNativeFfiVulkanDevice* device,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 #endif
 
@@ -733,8 +732,8 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_dma_buf_ring(
  * To hand frames to a reader that can't wait on an event, such as Flutter's
  * `copyPixelBuffer`, attach without
  * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT` in
- * `maplibre_native_ffi_render_session_attach_options_set_producer_sync_kinds`,
- * so that each frame finishes before you acquire it. Release a frame with
+ * `MaplibreNativeFfiRenderSessionAttachOptions:producer-sync-kinds`, so that
+ * each frame finishes before you acquire it. Release a frame with
  * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE` only once the reader has finished
  * with its surface.
  *
@@ -756,8 +755,8 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_dma_buf_ring(
  */
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_io_surface_ring(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiIoSurfaceRingDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiIoSurfaceRingDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 #endif
 
@@ -785,8 +784,8 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_io_surface_ring(
 MaplibreNativeFfiRenderSession*
 maplibre_native_ffi_map_attach_metal_borrowed_texture(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiMetalBorrowedTextureDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiMetalBorrowedTextureDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 #endif
 
@@ -812,8 +811,8 @@ maplibre_native_ffi_map_attach_metal_borrowed_texture(
  */
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_metal_surface(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiMetalSurfaceDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiMetalSurfaceDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 #endif
 
@@ -847,7 +846,7 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_metal_surface(
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_offscreen(
   MaplibreNativeFfiMap* self,
   const MaplibreNativeFfiOffscreenDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options,
+  MaplibreNativeFfiRenderSessionAttachOptions* options,
   MaplibreNativeFfiOffscreenDevice* device, GError** error
 );
 
@@ -874,8 +873,8 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_offscreen(
 MaplibreNativeFfiRenderSession*
 maplibre_native_ffi_map_attach_open_gl_borrowed_texture(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 
 /**
@@ -899,8 +898,8 @@ maplibre_native_ffi_map_attach_open_gl_borrowed_texture(
  */
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_open_gl_surface(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiOpenGlSurfaceDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiOpenGlSurfaceDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 
 /**
@@ -926,8 +925,8 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_open_gl_surface(
 MaplibreNativeFfiRenderSession*
 maplibre_native_ffi_map_attach_vulkan_borrowed_texture(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiVulkanBorrowedTextureDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 
 /**
@@ -951,8 +950,8 @@ maplibre_native_ffi_map_attach_vulkan_borrowed_texture(
  */
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_vulkan_surface(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiVulkanSurfaceDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiVulkanSurfaceDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 
 #if defined(__linux__)
@@ -995,9 +994,9 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_vulkan_surface(
  */
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_wayland_surface(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiWaylandSurfaceDescriptor* descriptor,
+  MaplibreNativeFfiWaylandSurfaceDescriptor* descriptor,
   MaplibreNativeFfiVulkanDevice* device,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
 #endif
 
@@ -1320,7 +1319,7 @@ maplibre_native_ffi_map_end_command_group_finish(
  */
 void maplibre_native_ffi_map_fit_camera_to_geometry_async(
   MaplibreNativeFfiMap* self, const char* geometry,
-  const MaplibreNativeFfiCameraFitUpdate* update, GAsyncReadyCallback callback,
+  MaplibreNativeFfiCameraFitUpdate* update, GAsyncReadyCallback callback,
   gpointer user_data
 );
 
@@ -1362,7 +1361,7 @@ maplibre_native_ffi_map_fit_camera_to_geometry_finish(
  */
 void maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLngBounds* bounds,
-  const MaplibreNativeFfiCameraFitUpdate* update, GAsyncReadyCallback callback,
+  MaplibreNativeFfiCameraFitUpdate* update, GAsyncReadyCallback callback,
   gpointer user_data
 );
 
@@ -1405,7 +1404,7 @@ maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_finish(
  */
 void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLng* coordinates,
-  gsize coordinate_count, const MaplibreNativeFfiCameraFitUpdate* update,
+  gsize coordinate_count, MaplibreNativeFfiCameraFitUpdate* update,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -2954,8 +2953,8 @@ maplibre_native_ffi_map_set_image_source_coordinates_finish(
  */
 void maplibre_native_ffi_map_set_image_source_image_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  const MaplibreNativeFfiPremultipliedRgba8Image* image,
-  GAsyncReadyCallback callback, gpointer user_data
+  MaplibreNativeFfiPremultipliedRgba8Image* image, GAsyncReadyCallback callback,
+  gpointer user_data
 );
 
 /**
@@ -3096,7 +3095,7 @@ maplibre_native_ffi_map_set_rendering_stats_view_enabled_finish(
  */
 void maplibre_native_ffi_map_set_style_image_async(
   MaplibreNativeFfiMap* self, const char* image_id,
-  const MaplibreNativeFfiPremultipliedRgba8Image* image,
+  MaplibreNativeFfiPremultipliedRgba8Image* image,
   MaplibreNativeFfiStyleImageOptions* options, GAsyncReadyCallback callback,
   gpointer user_data
 );
@@ -3479,7 +3478,7 @@ maplibre_native_ffi_map_set_viewport_options_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_update_camera_async(
-  MaplibreNativeFfiMap* self, const MaplibreNativeFfiCameraUpdate* update,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiCameraUpdate* update,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -4568,9 +4567,9 @@ maplibre_native_ffi_render_session_resize_finish(
  *
  * Use it with `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`, and
  * call it from the same thread every time. Call it each time
- * `maplibre_native_ffi_render_session_attach_options_set_driver_work_wake` is
- * called, even while you demand no frames, until a detach, release, or disposal
- * of the session finishes. It returns once no work is ready.
+ * `MaplibreNativeFfiRenderSessionAttachOptions:driver-work-wake` is called,
+ * even while you demand no frames, until a detach, release, or disposal of the
+ * session finishes. It returns once no work is ready.
  *
  * It accepts a released or disposed session until that release or disposal
  * finishes.
@@ -4638,7 +4637,7 @@ gboolean maplibre_native_ffi_render_session_set_frame_pacer(
  */
 void maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiMetalBorrowedTextureReplacement* replacement,
+  MaplibreNativeFfiMetalBorrowedTextureReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 );
 #endif
@@ -4676,7 +4675,7 @@ maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_finish(
  */
 void maplibre_native_ffi_render_session_set_metal_surface_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiMetalSurfaceReplacement* replacement,
+  MaplibreNativeFfiMetalSurfaceReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 );
 #endif
@@ -4712,7 +4711,7 @@ gboolean maplibre_native_ffi_render_session_set_metal_surface_target_finish(
  */
 void maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiOpenGlBorrowedTextureReplacement* replacement,
+  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -4746,7 +4745,7 @@ maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_finish(
  */
 void maplibre_native_ffi_render_session_set_open_gl_surface_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiOpenGlSurfaceReplacement* replacement,
+  MaplibreNativeFfiOpenGlSurfaceReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -4779,7 +4778,7 @@ gboolean maplibre_native_ffi_render_session_set_open_gl_surface_target_finish(
  */
 void maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiVulkanBorrowedTextureReplacement* replacement,
+  MaplibreNativeFfiVulkanBorrowedTextureReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -4861,7 +4860,7 @@ gboolean maplibre_native_ffi_render_session_set_vulkan_surface_target_finish(
  */
 void maplibre_native_ffi_render_session_set_wayland_surface_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiWaylandSurfaceReplacement* replacement,
+  MaplibreNativeFfiWaylandSurfaceReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 );
 #endif
@@ -5278,7 +5277,7 @@ maplibre_native_ffi_runtime_clear_resource_transform_finish(
  * Returns: (transfer full): the object
  */
 MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(
-  const MaplibreNativeFfiRuntimeOptions* options, GError** error
+  MaplibreNativeFfiRuntimeOptions* options, GError** error
 );
 
 /**
@@ -6078,8 +6077,7 @@ MaplibreNativeFfiVulkanDevice* maplibre_native_ffi_vulkan_device_create(
  * Pass it as the context of `maplibre_native_ffi_map_attach_vulkan_surface()`
  * or `maplibre_native_ffi_map_attach_vulkan_borrowed_texture()`. The sessions
  * on the device share its graphics queue. To submit to the queue yourself, set
- * `maplibre_native_ffi_render_session_attach_options_set_queue_lock` on each
- * session.
+ * `MaplibreNativeFfiRenderSessionAttachOptions:queue-lock` on each session.
  *
  * See `mln_vulkan_device_get_context` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
@@ -6241,7 +6239,7 @@ gboolean maplibre_native_ffi_set_log_async_severity_mask(
  * Returns: %TRUE on success, or %FALSE with `error` set
  */
 gboolean maplibre_native_ffi_set_log_callback(
-  const MaplibreNativeFfiLogHandler* handler, GError** error
+  MaplibreNativeFfiLogHandler* handler, GError** error
 );
 
 /**

@@ -20,12 +20,14 @@ namespace Network {
 		// #region headers
 		// This library takes rules only, because it can't answer
 		// on a library thread.
-		var header = new HttpHeader ();
-		header.set_name ("Authorization");
-		header.set_value ("Bearer my-token");
-		var header_rule = new HttpHeaderRule ();
-		header_rule.set_flags (UrlMatchFlag.GLOB);
-		header_rule.set_url ("https://tiles.example.com/**");
+		var header = new HttpHeader () {
+			name = "Authorization",
+			value = "Bearer my-token",
+		};
+		var header_rule = new HttpHeaderRule () {
+			flags = UrlMatchFlag.GLOB,
+			url = "https://tiles.example.com/**",
+		};
 		header_rule.set_headers ({ header });
 		var headers = new HttpHeaderTransform ();
 		headers.set_rules ({ header_rule });
@@ -33,12 +35,14 @@ namespace Network {
 		// #endregion headers
 
 		// #region query-rules
-		var parameter = new UrlQueryParameter ();
-		parameter.set_name ("key");
-		parameter.set_value ("my-api-key");
-		var query_rule = new ResourceTransformRule ();
-		query_rule.set_flags (UrlMatchFlag.GLOB);
-		query_rule.set_url ("https://tiles.example.com/**");
+		var parameter = new UrlQueryParameter () {
+			name = "key",
+			value = "my-api-key",
+		};
+		var query_rule = new ResourceTransformRule () {
+			flags = UrlMatchFlag.GLOB,
+			url = "https://tiles.example.com/**",
+		};
 		query_rule.set_parameters ({ parameter });
 		var query = new ResourceTransform ();
 		query.set_rules ({ query_rule });
@@ -58,10 +62,11 @@ namespace Network {
 		// #endregion rewrite
 
 		// #region provider
-		var route = new ResourceRoute ();
-		route.set_kinds (ResourceKindFlag.TILE);
-		route.set_flags (UrlMatchFlag.GLOB);
-		route.set_url ("app://tiles/**");
+		var route = new ResourceRoute () {
+			kinds = ResourceKindFlag.TILE,
+			flags = UrlMatchFlag.GLOB,
+			url = "app://tiles/**",
+		};
 		var provider = new ResourceProvider ();
 		provider.set_routes ({ route });
 		provider.set_callback ((request, handle) => {

@@ -24,9 +24,10 @@ namespace Images {
 		// #endregion style
 
 		// #region attach
-		var attach = new RenderSessionAttachOptions ();
-		// The library renders on its own thread.
-		attach.set_driver (RenderDriverKind.CORE_WORKER);
+		var attach = new RenderSessionAttachOptions () {
+			// The library renders on its own thread.
+			driver = RenderDriverKind.CORE_WORKER,
+		};
 		var session = map.attach_offscreen (
 			{ logical_size: { width: 800, height: 600 } }, attach, null
 		);
@@ -38,9 +39,10 @@ namespace Images {
 			center = { latitude: 48.8566, longitude: 2.3522 },
 			zoom = 4,
 		};
-		var update = new CameraUpdate ();
-		update.set_mode (CameraUpdateMode.JUMP);
-		update.set_camera (camera);
+		var update = new CameraUpdate () {
+			mode = CameraUpdateMode.JUMP,
+			camera = camera,
+		};
 		map.update_camera_async.begin (update);
 
 		yield map.request_still_image_async ();
@@ -66,11 +68,10 @@ namespace Images {
 		var map = runtime.create_map (options);
 		yield map.ready_async ();
 
-		var update = new CameraUpdate ();
-		update.set_mode (CameraUpdateMode.JUMP);
-		update.set_camera (
-			Camera.for_tile ({ z, x, y }, { width: 512, height: 512 })
-		);
+		var update = new CameraUpdate () {
+			mode = CameraUpdateMode.JUMP,
+			camera = Camera.for_tile ({ z, x, y }, { width: 512, height: 512 }),
+		};
 		map.update_camera_async.begin (update);
 		// #endregion tile
 

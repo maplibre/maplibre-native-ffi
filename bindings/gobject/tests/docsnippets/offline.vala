@@ -17,8 +17,9 @@ namespace Offline {
 
 	public async void offline () throws GLib.Error {
 		// #region cache-file
-		var options = new RuntimeOptions ();
-		options.set_cache_path ("maplibre-cache.db");
+		var options = new RuntimeOptions () {
+			cache_path = "maplibre-cache.db",
+		};
 		var runtime = new Runtime.create (options);
 		// #endregion cache-file
 
@@ -56,17 +57,16 @@ namespace Offline {
 		// #endregion ambient
 
 		// #region download
-		var pyramid = new OfflineTilePyramidRegionDefinition ();
-		pyramid.set_style_url (
-			"https://demotiles.maplibre.org/style.json"
-		);
-		pyramid.set_bounds ({
-			{ latitude: 47.5, longitude: -122.5 },
-			{ latitude: 47.8, longitude: -122.2 },
-		});
-		pyramid.set_min_zoom (0);
-		pyramid.set_max_zoom (6);
-		pyramid.set_pixel_ratio (1);
+		var pyramid = new OfflineTilePyramidRegionDefinition () {
+			style_url = "https://demotiles.maplibre.org/style.json",
+			bounds = {
+				{ latitude: 47.5, longitude: -122.5 },
+				{ latitude: 47.8, longitude: -122.2 },
+			},
+			min_zoom = 0,
+			max_zoom = 6,
+			pixel_ratio = 1,
+		};
 		var region = yield runtime.create_offline_region_async (
 			new OfflineRegionDefinition.tile_pyramid (pyramid),
 			new GLib.Bytes ("Seattle".data)

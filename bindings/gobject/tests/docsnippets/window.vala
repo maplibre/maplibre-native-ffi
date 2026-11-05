@@ -110,20 +110,22 @@ namespace Window {
 		Map map, VulkanContextDescriptor vulkan, uint64 window_surface
 	) throws GLib.Error {
 		// #region attach
-		var descriptor = new VulkanSurfaceDescriptor ();
-		// The window's size in logical pixels. The map's scale
-		// factor turns it into pixels.
-		descriptor.set_logical_size ({ width: 800, height: 600 });
-		// Your VkInstance, VkPhysicalDevice, VkDevice, and graphics
-		// VkQueue.
-		descriptor.set_context (vulkan);
-		// Your VkSurfaceKHR.
-		descriptor.set_surface (window_surface);
+		var descriptor = new VulkanSurfaceDescriptor () {
+			// The window's size in logical pixels. The map's scale
+			// factor turns it into pixels.
+			logical_size = { width: 800, height: 600 },
+			// Your VkInstance, VkPhysicalDevice, VkDevice, and graphics
+			// VkQueue.
+			context = vulkan,
+			// Your VkSurfaceKHR.
+			surface = window_surface,
+		};
 
-		var options = new RenderSessionAttachOptions ();
-		options.set_driver (RenderDriverKind.CORE_WORKER);
-		options.set_redraw_wake (wake (on_redraw_wake));
-		options.set_frame_wake (wake (on_frame_wake));
+		var options = new RenderSessionAttachOptions () {
+			driver = RenderDriverKind.CORE_WORKER,
+			redraw_wake = wake (on_redraw_wake),
+			frame_wake = wake (on_frame_wake),
+		};
 
 		session = map.attach_vulkan_surface (descriptor, options);
 		yield session.ready_async ();
@@ -132,16 +134,14 @@ namespace Window {
 		on_window_resized (1024, 768);
 
 		// #region service
-		var graphics_thread_options = new RenderSessionAttachOptions ();
-		graphics_thread_options.set_driver (
-			RenderDriverKind.CALLER_GRAPHICS_THREAD
-		);
-		graphics_thread_options.set_redraw_wake (wake (on_redraw_wake));
-		graphics_thread_options.set_frame_wake (wake (on_frame_wake));
-		graphics_thread_options.set_driver_work_wake (
-			wake (on_driver_work_wake)
-		);
+		var graphics_thread_options = new RenderSessionAttachOptions () {
+			driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+			redraw_wake = wake (on_redraw_wake),
+			frame_wake = wake (on_frame_wake),
+			driver_work_wake = wake (on_driver_work_wake),
+		};
 		// #endregion service
+		assert (graphics_thread_options != null);
 
 		yield session.release_async ();
 		destroy_surface (); // For example, with vkDestroySurfaceKHR.

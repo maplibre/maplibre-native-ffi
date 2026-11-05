@@ -34,9 +34,10 @@ namespace CreateAMap {
 		// #endregion style
 
 		var camera = new CameraOptions () { zoom = 3 };
-		var update = new CameraUpdate ();
-		update.set_mode (CameraUpdateMode.JUMP);
-		update.set_camera (camera);
+		var update = new CameraUpdate () {
+			mode = CameraUpdateMode.JUMP,
+			camera = camera,
+		};
 
 		// #region wait
 		yield map.update_camera_async (update);

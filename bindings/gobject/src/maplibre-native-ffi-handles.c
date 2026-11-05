@@ -1048,11 +1048,11 @@ maplibre_native_ffi_map_add_geo_json_source_data_finish(
 void maplibre_native_ffi_map_add_image_source_image_async(
   MaplibreNativeFfiMap* self, const char* source_id,
   const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
-  const MaplibreNativeFfiPremultipliedRgba8Image* image,
-  GAsyncReadyCallback callback, gpointer user_data
+  MaplibreNativeFfiPremultipliedRgba8Image* image, GAsyncReadyCallback callback,
+  gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  g_return_if_fail(image != NULL);
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_PREMULTIPLIED_RGBA8_IMAGE(image));
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self, maplibre_native_ffi_map_add_image_source_image_async,
@@ -1181,14 +1181,17 @@ maplibre_native_ffi_map_apply_camera_delta_finish(
 
 #if defined(__linux__)
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_dma_buf_ring(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiDmaBufRingDescriptor* descriptor,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiDmaBufRingDescriptor* descriptor,
   MaplibreNativeFfiVulkanDevice* device,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_DMA_BUF_RING_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1232,12 +1235,16 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_dma_buf_ring(
 #if defined(__APPLE__)
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_io_surface_ring(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiIoSurfaceRingDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiIoSurfaceRingDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_IO_SURFACE_RING_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1281,12 +1288,16 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_io_surface_ring(
 MaplibreNativeFfiRenderSession*
 maplibre_native_ffi_map_attach_metal_borrowed_texture(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiMetalBorrowedTextureDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiMetalBorrowedTextureDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_METAL_BORROWED_TEXTURE_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1329,12 +1340,16 @@ maplibre_native_ffi_map_attach_metal_borrowed_texture(
 #if defined(__APPLE__)
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_metal_surface(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiMetalSurfaceDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiMetalSurfaceDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_METAL_SURFACE_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1377,12 +1392,14 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_metal_surface(
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_offscreen(
   MaplibreNativeFfiMap* self,
   const MaplibreNativeFfiOffscreenDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options,
+  MaplibreNativeFfiRenderSessionAttachOptions* options,
   MaplibreNativeFfiOffscreenDevice* device, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
   g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1425,12 +1442,16 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_offscreen(
 MaplibreNativeFfiRenderSession*
 maplibre_native_ffi_map_attach_open_gl_borrowed_texture(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_OPEN_GL_BORROWED_TEXTURE_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1471,12 +1492,16 @@ maplibre_native_ffi_map_attach_open_gl_borrowed_texture(
 
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_open_gl_surface(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiOpenGlSurfaceDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiOpenGlSurfaceDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_OPEN_GL_SURFACE_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1518,12 +1543,16 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_open_gl_surface(
 MaplibreNativeFfiRenderSession*
 maplibre_native_ffi_map_attach_vulkan_borrowed_texture(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiVulkanBorrowedTextureDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_VULKAN_BORROWED_TEXTURE_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1564,12 +1593,16 @@ maplibre_native_ffi_map_attach_vulkan_borrowed_texture(
 
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_vulkan_surface(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiVulkanSurfaceDescriptor* descriptor,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiVulkanSurfaceDescriptor* descriptor,
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_VULKAN_SURFACE_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1611,13 +1644,17 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_vulkan_surface(
 #if defined(__linux__)
 MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_wayland_surface(
   MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiWaylandSurfaceDescriptor* descriptor,
+  MaplibreNativeFfiWaylandSurfaceDescriptor* descriptor,
   MaplibreNativeFfiVulkanDevice* device,
-  const MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
+  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
-  g_return_val_if_fail(descriptor != NULL, NULL);
-  g_return_val_if_fail(options != NULL, NULL);
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_WAYLAND_SURFACE_DESCRIPTOR(descriptor), NULL
+  );
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION_ATTACH_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
@@ -1942,11 +1979,11 @@ maplibre_native_ffi_map_end_command_group_finish(
 
 void maplibre_native_ffi_map_fit_camera_to_geometry_async(
   MaplibreNativeFfiMap* self, const char* geometry,
-  const MaplibreNativeFfiCameraFitUpdate* update, GAsyncReadyCallback callback,
+  MaplibreNativeFfiCameraFitUpdate* update, GAsyncReadyCallback callback,
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  g_return_if_fail(update != NULL);
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_FIT_UPDATE(update));
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self, maplibre_native_ffi_map_fit_camera_to_geometry_async,
@@ -1978,12 +2015,12 @@ maplibre_native_ffi_map_fit_camera_to_geometry_finish(
 
 void maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLngBounds* bounds,
-  const MaplibreNativeFfiCameraFitUpdate* update, GAsyncReadyCallback callback,
+  MaplibreNativeFfiCameraFitUpdate* update, GAsyncReadyCallback callback,
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(bounds != NULL);
-  g_return_if_fail(update != NULL);
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_FIT_UPDATE(update));
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self, maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_async,
@@ -2019,11 +2056,11 @@ maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_finish(
 
 void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLng* coordinates,
-  gsize coordinate_count, const MaplibreNativeFfiCameraFitUpdate* update,
+  gsize coordinate_count, MaplibreNativeFfiCameraFitUpdate* update,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  g_return_if_fail(update != NULL);
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_FIT_UPDATE(update));
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self, maplibre_native_ffi_map_fit_camera_to_lat_lngs_async,
@@ -3430,11 +3467,11 @@ maplibre_native_ffi_map_set_image_source_coordinates_finish(
 
 void maplibre_native_ffi_map_set_image_source_image_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  const MaplibreNativeFfiPremultipliedRgba8Image* image,
-  GAsyncReadyCallback callback, gpointer user_data
+  MaplibreNativeFfiPremultipliedRgba8Image* image, GAsyncReadyCallback callback,
+  gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  g_return_if_fail(image != NULL);
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_PREMULTIPLIED_RGBA8_IMAGE(image));
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self, maplibre_native_ffi_map_set_image_source_image_async,
@@ -3563,12 +3600,12 @@ maplibre_native_ffi_map_set_rendering_stats_view_enabled_finish(
 
 void maplibre_native_ffi_map_set_style_image_async(
   MaplibreNativeFfiMap* self, const char* image_id,
-  const MaplibreNativeFfiPremultipliedRgba8Image* image,
+  MaplibreNativeFfiPremultipliedRgba8Image* image,
   MaplibreNativeFfiStyleImageOptions* options, GAsyncReadyCallback callback,
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  g_return_if_fail(image != NULL);
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_PREMULTIPLIED_RGBA8_IMAGE(image));
   g_return_if_fail(
     options == NULL || MAPLIBRE_NATIVE_FFI_IS_STYLE_IMAGE_OPTIONS(options)
   );
@@ -3896,11 +3933,11 @@ maplibre_native_ffi_map_set_viewport_options_finish(
 }
 
 void maplibre_native_ffi_map_update_camera_async(
-  MaplibreNativeFfiMap* self, const MaplibreNativeFfiCameraUpdate* update,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiCameraUpdate* update,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  g_return_if_fail(update != NULL);
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_UPDATE(update));
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self, maplibre_native_ffi_map_update_camera_async, callback,
@@ -5041,11 +5078,13 @@ gboolean maplibre_native_ffi_render_session_set_frame_pacer(
 #if defined(__APPLE__)
 void maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiMetalBorrowedTextureReplacement* replacement,
+  MaplibreNativeFfiMetalBorrowedTextureReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  g_return_if_fail(replacement != NULL);
+  g_return_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_METAL_BORROWED_TEXTURE_REPLACEMENT(replacement)
+  );
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self,
@@ -5078,11 +5117,13 @@ maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_finish(
 #if defined(__APPLE__)
 void maplibre_native_ffi_render_session_set_metal_surface_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiMetalSurfaceReplacement* replacement,
+  MaplibreNativeFfiMetalSurfaceReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  g_return_if_fail(replacement != NULL);
+  g_return_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_METAL_SURFACE_REPLACEMENT(replacement)
+  );
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self,
@@ -5113,11 +5154,13 @@ gboolean maplibre_native_ffi_render_session_set_metal_surface_target_finish(
 
 void maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiOpenGlBorrowedTextureReplacement* replacement,
+  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  g_return_if_fail(replacement != NULL);
+  g_return_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_OPEN_GL_BORROWED_TEXTURE_REPLACEMENT(replacement)
+  );
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self,
@@ -5146,11 +5189,13 @@ maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_finish(
 
 void maplibre_native_ffi_render_session_set_open_gl_surface_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiOpenGlSurfaceReplacement* replacement,
+  MaplibreNativeFfiOpenGlSurfaceReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  g_return_if_fail(replacement != NULL);
+  g_return_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_OPEN_GL_SURFACE_REPLACEMENT(replacement)
+  );
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self,
@@ -5178,11 +5223,13 @@ gboolean maplibre_native_ffi_render_session_set_open_gl_surface_target_finish(
 
 void maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiVulkanBorrowedTextureReplacement* replacement,
+  MaplibreNativeFfiVulkanBorrowedTextureReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  g_return_if_fail(replacement != NULL);
+  g_return_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_VULKAN_BORROWED_TEXTURE_REPLACEMENT(replacement)
+  );
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self,
@@ -5244,11 +5291,13 @@ gboolean maplibre_native_ffi_render_session_set_vulkan_surface_target_finish(
 #if defined(__linux__)
 void maplibre_native_ffi_render_session_set_wayland_surface_target_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiWaylandSurfaceReplacement* replacement,
+  MaplibreNativeFfiWaylandSurfaceReplacement* replacement,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  g_return_if_fail(replacement != NULL);
+  g_return_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_WAYLAND_SURFACE_REPLACEMENT(replacement)
+  );
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self,
@@ -5743,8 +5792,11 @@ maplibre_native_ffi_runtime_clear_resource_transform_finish(
 }
 
 MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(
-  const MaplibreNativeFfiRuntimeOptions* options, GError** error
+  MaplibreNativeFfiRuntimeOptions* options, GError** error
 ) {
+  g_return_val_if_fail(
+    options == NULL || MAPLIBRE_NATIVE_FFI_IS_RUNTIME_OPTIONS(options), NULL
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   mln_runtime_options options_native_;
   if (options != NULL)
@@ -6700,9 +6752,9 @@ gboolean maplibre_native_ffi_set_log_async_severity_mask(
 }
 
 gboolean maplibre_native_ffi_set_log_callback(
-  const MaplibreNativeFfiLogHandler* handler, GError** error
+  MaplibreNativeFfiLogHandler* handler, GError** error
 ) {
-  g_return_val_if_fail(handler != NULL, FALSE);
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_LOG_HANDLER(handler), FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);

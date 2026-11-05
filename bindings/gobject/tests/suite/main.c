@@ -256,12 +256,10 @@ static void a_holder_copies_its_members(void) {
 static void jump(
   MaplibreNativeFfiMap* map, MaplibreNativeFfiCameraOptions* camera
 ) {
-  g_autoptr(MaplibreNativeFfiCameraUpdate) update =
-    maplibre_native_ffi_camera_update_new();
-  maplibre_native_ffi_camera_update_set_mode(
-    update, MAPLIBRE_NATIVE_FFI_CAMERA_UPDATE_MODE_JUMP
+  g_autoptr(MaplibreNativeFfiCameraUpdate) update = g_object_new(
+    MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_UPDATE, "mode",
+    MAPLIBRE_NATIVE_FFI_CAMERA_UPDATE_MODE_JUMP, "camera", camera, NULL
   );
-  maplibre_native_ffi_camera_update_set_camera(update, camera);
   maplibre_native_ffi_map_update_camera_async(map, update, NULL, NULL);
 }
 
@@ -480,20 +478,17 @@ static void a_dma_buf_ring_converts_its_formats(void) {
   const MaplibreNativeFfiDmaBufFormat format = {
     .fourcc = 0x3231564e, .modifier = 0
   };
-  g_autoptr(MaplibreNativeFfiDmaBufRingDescriptor) descriptor =
-    maplibre_native_ffi_dma_buf_ring_descriptor_new();
   const MaplibreNativeFfiLogicalSize size = {.width = 64, .height = 48};
-  maplibre_native_ffi_dma_buf_ring_descriptor_set_logical_size(
-    descriptor, &size
+  g_autoptr(MaplibreNativeFfiDmaBufRingDescriptor) descriptor = g_object_new(
+    MAPLIBRE_NATIVE_FFI_TYPE_DMA_BUF_RING_DESCRIPTOR, "logical-size", &size,
+    "buffer-count", 3, NULL
   );
-  maplibre_native_ffi_dma_buf_ring_descriptor_set_buffer_count(descriptor, 3);
   maplibre_native_ffi_dma_buf_ring_descriptor_set_formats(
     descriptor, &format, 1
   );
-  g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
-    maplibre_native_ffi_render_session_attach_options_new();
-  maplibre_native_ffi_render_session_attach_options_set_driver(
-    options, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER
+  g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options = g_object_new(
+    MAPLIBRE_NATIVE_FFI_TYPE_RENDER_SESSION_ATTACH_OPTIONS, "driver",
+    MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER, NULL
   );
   g_autoptr(GError) error = NULL;
   g_autoptr(MaplibreNativeFfiRenderSession) session =
@@ -544,20 +539,17 @@ static void on_driver_work(gpointer user_data) {
 static MaplibreNativeFfiRenderSessionAttachOptions* attach_options(
   Target* target, MaplibreNativeFfiRenderDriverKind driver
 ) {
-  MaplibreNativeFfiRenderSessionAttachOptions* options =
-    maplibre_native_ffi_render_session_attach_options_new();
-  maplibre_native_ffi_render_session_attach_options_set_driver(options, driver);
   g_autoptr(MaplibreNativeFfiWake) frame = maplibre_native_ffi_wake_new();
   maplibre_native_ffi_wake_set_callback(frame, on_frame, target, NULL);
-  maplibre_native_ffi_render_session_attach_options_set_frame_wake(
-    options, frame
+  // Construction properties reach native code: the attach takes the driver.
+  MaplibreNativeFfiRenderSessionAttachOptions* options = g_object_new(
+    MAPLIBRE_NATIVE_FFI_TYPE_RENDER_SESSION_ATTACH_OPTIONS, "driver", driver,
+    "frame-wake", frame, NULL
   );
   if (driver == MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     g_autoptr(MaplibreNativeFfiWake) work = maplibre_native_ffi_wake_new();
     maplibre_native_ffi_wake_set_callback(work, on_driver_work, target, NULL);
-    maplibre_native_ffi_render_session_attach_options_set_driver_work_wake(
-      options, work
-    );
+    g_object_set(options, "driver-work-wake", work, NULL);
   }
   return options;
 }
@@ -786,54 +778,27 @@ static void attach_borrowed(Target* target, uint32_t backend) {
   if (backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN) {
     g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
       attach_options(target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER);
-    g_autoptr(MaplibreNativeFfiVulkanContextDescriptor) vulkan =
-      maplibre_native_ffi_vulkan_context_descriptor_new();
-    maplibre_native_ffi_vulkan_context_descriptor_set_instance(
-      vulkan, context.vulkan_instance
-    );
-    maplibre_native_ffi_vulkan_context_descriptor_set_physical_device(
-      vulkan, context.vulkan_physical_device
-    );
-    maplibre_native_ffi_vulkan_context_descriptor_set_device(
-      vulkan, context.vulkan_device
-    );
-    maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue(
-      vulkan, context.vulkan_queue
-    );
-    maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue_family_index(
-      vulkan, context.vulkan_queue_family_index
-    );
-    maplibre_native_ffi_vulkan_context_descriptor_set_get_instance_proc_addr(
-      vulkan, context.vulkan_get_instance_proc_addr
-    );
-    maplibre_native_ffi_vulkan_context_descriptor_set_get_device_proc_addr(
-      vulkan, context.vulkan_get_device_proc_addr
+    g_autoptr(MaplibreNativeFfiVulkanContextDescriptor) vulkan = g_object_new(
+      MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_CONTEXT_DESCRIPTOR, "instance",
+      context.vulkan_instance, "physical-device",
+      context.vulkan_physical_device, "device", context.vulkan_device,
+      "graphics-queue", context.vulkan_queue, "graphics-queue-family-index",
+      context.vulkan_queue_family_index, "get-instance-proc-addr",
+      context.vulkan_get_instance_proc_addr, "get-device-proc-addr",
+      context.vulkan_get_device_proc_addr, NULL
     );
     MaplibreNativeFfiVulkanBorrowedTexture texture = {
       .image = info.vulkan_image, .image_view = info.vulkan_image_view
     };
     g_autoptr(MaplibreNativeFfiVulkanBorrowedTextureDescriptor) descriptor =
-      maplibre_native_ffi_vulkan_borrowed_texture_descriptor_new();
-    maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_logical_size(
-      descriptor, &size
-    );
-    maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_width(
-      descriptor, info.width
-    );
-    maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_height(
-      descriptor, info.height
-    );
-    maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_context(
-      descriptor, vulkan
-    );
+      g_object_new(
+        MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURE_DESCRIPTOR,
+        "logical-size", &size, "physical-width", info.width, "physical-height",
+        info.height, "context", vulkan, "format", info.format, "final-layout",
+        info.vulkan_final_layout, NULL
+      );
     maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures(
       descriptor, &texture, 1
-    );
-    maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_format(
-      descriptor, info.format
-    );
-    maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_final_layout(
-      descriptor, info.vulkan_final_layout
     );
     target->session = maplibre_native_ffi_map_attach_vulkan_borrowed_texture(
       target->map, descriptor, options, &error
@@ -843,53 +808,31 @@ static void attach_borrowed(Target* target, uint32_t backend) {
       attach_options(
         target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
       );
-    g_autoptr(MaplibreNativeFfiEglContextDescriptor) egl =
-      maplibre_native_ffi_egl_context_descriptor_new();
-    maplibre_native_ffi_egl_context_descriptor_set_display(
-      egl, context.egl_display
-    );
-    maplibre_native_ffi_egl_context_descriptor_set_config(
-      egl, context.egl_config
-    );
-    maplibre_native_ffi_egl_context_descriptor_set_share_context(
-      egl, context.egl_context
-    );
-    maplibre_native_ffi_egl_context_descriptor_set_client_api(
-      egl, MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES
-    );
-    maplibre_native_ffi_egl_context_descriptor_set_get_proc_address(
-      egl, context.get_proc_address
+    g_autoptr(MaplibreNativeFfiEglContextDescriptor) egl = g_object_new(
+      MAPLIBRE_NATIVE_FFI_TYPE_EGL_CONTEXT_DESCRIPTOR, "display",
+      context.egl_display, "config", context.egl_config, "share-context",
+      context.egl_context, "client-api",
+      MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES, "get-proc-address",
+      context.get_proc_address, NULL
     );
     g_autoptr(MaplibreNativeFfiOpenGlContextDescriptorData) platform =
       maplibre_native_ffi_open_gl_context_descriptor_data_new_egl(egl);
-    g_autoptr(MaplibreNativeFfiOpenGlContextDescriptor) opengl =
-      maplibre_native_ffi_open_gl_context_descriptor_new();
-    maplibre_native_ffi_open_gl_context_descriptor_set_ownership(
-      opengl, MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_SHARED
+    g_autoptr(MaplibreNativeFfiOpenGlContextDescriptor) opengl = g_object_new(
+      MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_CONTEXT_DESCRIPTOR, "ownership",
+      MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_SHARED, "data", platform,
+      NULL
     );
-    maplibre_native_ffi_open_gl_context_descriptor_set_data(opengl, platform);
     MaplibreNativeFfiOpenGlBorrowedTexture texture = {
       .texture = info.opengl_texture
     };
     g_autoptr(MaplibreNativeFfiOpenGlBorrowedTextureDescriptor) descriptor =
-      maplibre_native_ffi_open_gl_borrowed_texture_descriptor_new();
-    maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_logical_size(
-      descriptor, &size
-    );
-    maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_width(
-      descriptor, info.width
-    );
-    maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_height(
-      descriptor, info.height
-    );
-    maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_context(
-      descriptor, opengl
-    );
+      g_object_new(
+        MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURE_DESCRIPTOR,
+        "logical-size", &size, "physical-width", info.width, "physical-height",
+        info.height, "context", opengl, "target", info.opengl_target, NULL
+      );
     maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures(
       descriptor, &texture, 1
-    );
-    maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_target(
-      descriptor, info.opengl_target
     );
     target->session = maplibre_native_ffi_map_attach_open_gl_borrowed_texture(
       target->map, descriptor, options, &error
