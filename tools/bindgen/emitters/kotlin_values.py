@@ -357,6 +357,74 @@ class Values:
             )
         return None
 
+    def enum_class(self, value):
+        """An open enum or flag set: a final class that holds its raw value.
+
+        A plain class rather than a value class, so that Java can name its constants and call each
+        member that takes or returns one. `of` hands back the shared constant of a known value.
+        """
+        public = name(value.native)
+        scalar = self.scalar(value)[0]
+        bitmask = value.enum_kind == "bitmask"
+        constants = [
+            (enum_member(value, native), native, number)
+            for native, number in value.enum_values
+        ]
+        if bitmask and not any(n == 0 for _, n in value.enum_values):
+            constants.insert(0, ("NONE", None, 0))
+        known = {}
+        for member, _, number in constants:
+            known.setdefault(number, member)
+        members = []
+        for member, native, number in constants:
+            members.append(
+                (
+                    f"{doc(self.bound, native, '    ')}"
+                    if native
+                    else "    /** No flags. */\n"
+                )
+                + f"    @JvmField public val {member}: {public} = {public}({member}_VALUE)"
+            )
+            members.append(
+                f"    /** The `rawValue` of [{member}]. */\n"
+                f"    public const val {member}_VALUE: {scalar} = {literal(number, scalar)}"
+            )
+        branches = "; ".join(f"{member}_VALUE -> {member}" for member in known.values())
+        unknown = (
+            "a new flag set that holds its bits"
+            if bitmask
+            else "a new value that keeps it"
+        )
+        members.append(
+            f"    /** Returns the constant whose `rawValue` is [rawValue], or {unknown}. */\n"
+            "    @JvmStatic\n"
+            + ('    @JvmName("of")\n' if scalar.startswith("U") else "")
+            + f"    public fun of(rawValue: {scalar}): {public} ="
+            + f" when (rawValue) {{ {branches}; else -> {public}(rawValue) }}"
+        )
+        getter = '@get:JvmName("getRawValue") ' if scalar.startswith("U") else ""
+        return "\n".join(
+            [
+                f"{enum_doc(self.bound, value)}public class {public}({getter}public val rawValue: {scalar}) {{",
+                *(
+                    [
+                        f"  public infix fun or(other: {public}): {public} = of(rawValue or other.rawValue)",
+                        f"  public infix fun and(other: {public}): {public} = of(rawValue and other.rawValue)",
+                        f"  public operator fun contains(other: {public}): Boolean = (rawValue and other.rawValue) == other.rawValue",
+                        flag_label(value, scalar),
+                    ]
+                    if bitmask
+                    else [enum_label(public, value, scalar)]
+                ),
+                f"  override fun equals(other: Any?): Boolean = other is {public} && other.rawValue == rawValue",
+                "  override fun hashCode(): Int = rawValue.hashCode()",
+                "  public companion object {",
+                *members,
+                "  }",
+                "}",
+            ]
+        )
+
     def common(self):
         from . import kotlin_callbacks
 
@@ -369,7 +437,9 @@ class Values:
                 if self.views
                 else []
             ),
-            "import kotlin.jvm.JvmInline",
+            "import kotlin.jvm.JvmField",
+            "import kotlin.jvm.JvmName",
+            "import kotlin.jvm.JvmStatic",
             "import org.maplibre.nativeffi.internal.JvmSynthetic",
             "import org.maplibre.nativeffi.internal.callback.NativeRegistration",
             "import org.maplibre.nativeffi.internal.values.flagLabel",
@@ -380,36 +450,7 @@ class Values:
                 continue
             public = name(value.native)
             if value.kind == "enum":
-                scalar = self.scalar(value)[0]
-                bitmask = value.enum_kind == "bitmask"
-                constants = [
-                    f"{doc(self.bound, native, '    ')}    public val {enum_member(value, native)}: {public} = {public}({literal(number, scalar)})"
-                    for native, number in value.enum_values
-                ]
-                if bitmask and not any(n == 0 for _, n in value.enum_values):
-                    constants.insert(
-                        0,
-                        f"    /** No flags. */\n    public val NONE: {public} = {public}({literal(0, scalar)})",
-                    )
-                result.extend(
-                    [
-                        f"{enum_doc(self.bound, value)}@JvmInline\npublic value class {public}(public val rawValue: {scalar}) {{",
-                        *(
-                            [
-                                f"  public infix fun or(other: {public}): {public} = {public}(rawValue or other.rawValue)",
-                                f"  public infix fun and(other: {public}): {public} = {public}(rawValue and other.rawValue)",
-                                f"  public operator fun contains(other: {public}): Boolean = (rawValue and other.rawValue) == other.rawValue",
-                                flag_label(value, scalar),
-                            ]
-                            if bitmask
-                            else [enum_label(public, value, scalar)]
-                        ),
-                        "  public companion object {",
-                        *constants,
-                        "  }",
-                        "}",
-                    ]
-                )
+                result.append(self.enum_class(value))
                 continue
             if value.union_member:
                 # The record is presented as its union, under the record's name.
@@ -826,7 +867,7 @@ class Values:
             return pointer
         if value.kind == "enum":
             suffix, _typ = self.accessor(value)
-            return f"{name(value.native)}(read{suffix}({address}))"
+            return f"{name(value.native)}.of(read{suffix}({address}))"
         if value.kind == "scalar":
             suffix, _typ = self.accessor(value)
             return f"read{suffix}({address})"

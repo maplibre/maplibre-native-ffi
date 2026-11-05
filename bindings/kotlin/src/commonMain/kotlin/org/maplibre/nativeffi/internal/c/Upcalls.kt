@@ -33,8 +33,8 @@ internal object Upcalls {
   ): Unit = run {
     upcall<LogHandler, Boolean>("mln_log_callback", userData, false) { value ->
       value.callback(
-        LogSeverity(severity.toUInt()),
-        LogEvent(event.toUInt()),
+        LogSeverity.of(severity.toUInt()),
+        LogEvent.of(event.toUInt()),
         code,
         readViewString(message),
       )
@@ -169,7 +169,7 @@ internal object Upcalls {
       !upcall<ResourceTransform, Boolean>("mln_resource_transform_callback", userData, false) {
         value ->
         val invoke = value.callback ?: return@upcall false
-        invoke(ResourceKind(kind.toUInt()), readViewString(url), requestOwner)
+        invoke(ResourceKind.of(kind.toUInt()), readViewString(url), requestOwner)
         true
       }
     ) {

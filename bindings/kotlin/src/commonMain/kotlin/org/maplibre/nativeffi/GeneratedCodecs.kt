@@ -1543,7 +1543,7 @@ internal fun readOpenGlTextureFrame(source: Long, scope: ViewScope? = null): Ope
 @JvmSynthetic
 internal fun readGpuSync(source: Long, scope: ViewScope? = null): GpuSync =
   GpuSync(
-      kind = GpuSyncKind(readU32(source + 4)),
+      kind = GpuSyncKind.of(readU32(source + 4)),
       handle = readU64(source + 8),
       value = readU64(source + 16),
     )
@@ -1552,14 +1552,14 @@ internal fun readGpuSync(source: Long, scope: ViewScope? = null): GpuSync =
 @JvmSynthetic
 internal fun readRenderFrameResult(source: Long): RenderFrameResult =
   RenderFrameResult(
-    disposition = RenderResult(readU32(source + 4)),
+    disposition = RenderResult.of(readU32(source + 4)),
     token = readU64(source + 8),
     mapUpdateGeneration = readU64(source + 16),
     generation = readU64(source + 24),
     frameGeneration = readU64(source + 32),
     needsRepaint = readBool(source + 40),
     view = readMapView(source + w(48, 48, 44)),
-    mode = RenderMode(readU32(source + w(240, 240, 224))),
+    mode = RenderMode.of(readU32(source + w(240, 240, 224))),
   )
 
 @JvmSynthetic
@@ -1634,13 +1634,13 @@ internal fun readCameraQueryResult(source: Long): CameraQueryResult =
 @JvmSynthetic
 internal fun readMapSnapshot(source: Long): MapSnapshot =
   MapSnapshot(
-    debugFlags = MapDebugFlag(readU32(source + 4)),
+    debugFlags = MapDebugFlag.of(readU32(source + 4)),
     generation = readU64(source + 8),
     fullyLoaded = readBool(source + 16),
     renderingStatsViewEnabled = readBool(source + 17),
     gestureInProgress = readBool(source + 18),
     transitionInProgress = readBool(source + 19),
-    eventMask = RuntimeEventFlag(readU64(source + w(24, 24, 20))),
+    eventMask = RuntimeEventFlag.of(readU64(source + w(24, 24, 20))),
     latestRenderUpdateGeneration = readU64(source + w(32, 32, 28)),
     tile = readMapTileSettings(source + w(40, 40, 36)),
     bounds = readCameraBounds(source + w(88, 88, 76)),
@@ -1665,9 +1665,9 @@ internal fun readStyleImageInfo(source: Long): StyleImageInfo {
       },
     content = if ((fields and 1u) != 0u) readImageContent(source + w(36, 64)) else null,
     textFitWidth =
-      if ((fields and 2u) != 0u) StyleImageTextFit(readU32(source + w(52, 80))) else null,
+      if ((fields and 2u) != 0u) StyleImageTextFit.of(readU32(source + w(52, 80))) else null,
     textFitHeight =
-      if ((fields and 4u) != 0u) StyleImageTextFit(readU32(source + w(56, 84))) else null,
+      if ((fields and 4u) != 0u) StyleImageTextFit.of(readU32(source + w(56, 84))) else null,
     pixelRatio = readF32(source + w(60, 88)),
     sdf = readBool(source + w(64, 92)),
     keepUnused = readBool(source + w(65, 93)),
@@ -1683,7 +1683,7 @@ internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
     sourceLayer = readViewString(source + w(24, 48)),
     minZoom = readF64(source + w(32, 64)),
     maxZoom = readF64(source + w(40, 72)),
-    visibility = StyleLayerVisibility(readU32(source + w(48, 80))),
+    visibility = StyleLayerVisibility.of(readU32(source + w(48, 80))),
   )
 
 @JvmSynthetic
@@ -1691,7 +1691,7 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo {
   val fields = readU32(source + w(12, 20))
   return StyleSourceInfo(
     id = readViewString(source),
-    type = StyleSourceType(readU32(source + w(8, 16))),
+    type = StyleSourceType.of(readU32(source + w(8, 16))),
     isVolatile = readBool(source + w(16, 24)),
     attribution = readViewString(source + w(20, 32)),
     url = readViewString(source + w(28, 48)),
@@ -1699,10 +1699,10 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo {
     bounds = if ((fields and 2u) != 0u) readLatLngBounds(source + w(72, 104, 64)) else null,
     tileSize = if ((fields and 4u) != 0u) readU32(source + w(104, 136, 96)) else null,
     vectorEncoding =
-      if ((fields and 8u) != 0u) StyleVectorTileEncoding(readU32(source + w(108, 140, 100)))
+      if ((fields and 8u) != 0u) StyleVectorTileEncoding.of(readU32(source + w(108, 140, 100)))
       else null,
     rasterEncoding =
-      if ((fields and 16u) != 0u) StyleRasterDemEncoding(readU32(source + w(112, 144, 104)))
+      if ((fields and 16u) != 0u) StyleRasterDemEncoding.of(readU32(source + w(112, 144, 104)))
       else null,
     geoJson =
       if ((fields and 32u) != 0u) readGeoJsonSourceOptions(source + w(120, 152, 108)) else null,
@@ -1734,7 +1734,7 @@ internal fun readScreenPoint(source: Long): ScreenPoint =
 @JvmSynthetic
 internal fun readRenderAbandonResult(source: Long): RenderAbandonResult =
   RenderAbandonResult(
-    disposition = RenderAbandonDisposition(readU32(source + 4)),
+    disposition = RenderAbandonDisposition.of(readU32(source + 4)),
     quarantinedResourceCount = readU32(source + 8),
   )
 
@@ -1752,22 +1752,22 @@ internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> =
 @JvmSynthetic
 internal fun readRenderSessionCapabilities(source: Long): RenderSessionCapabilities =
   RenderSessionCapabilities(
-    driver = RenderDriverKind(readU32(source + 4)),
+    driver = RenderDriverKind.of(readU32(source + 4)),
     textureRingDepth = readU32(source + 8),
-    flags = RenderSessionCapabilityFlag(readU32(source + 12)),
-    producerSyncKind = GpuSyncKind(readU32(source + 16)),
-    consumerSyncKinds = GpuSyncKindFlag(readU32(source + 20)),
+    flags = RenderSessionCapabilityFlag.of(readU32(source + 12)),
+    producerSyncKind = GpuSyncKind.of(readU32(source + 16)),
+    consumerSyncKinds = GpuSyncKindFlag.of(readU32(source + 20)),
   )
 
 @JvmSynthetic
 internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
   RenderSessionSnapshot(
-    state = RenderSessionState(readU32(source + 4)),
+    state = RenderSessionState.of(readU32(source + 4)),
     extent = readLogicalExtent(source + 8),
     generation = readU64(source + 24),
     frameGeneration = readU64(source + 32),
     acquiredFrameCount = readU32(source + 40),
-    failureStatus = Status(readI32(source + 44)),
+    failureStatus = Status.of(readI32(source + 44)),
     hasTarget = readBool(source + 48),
   )
 
@@ -1800,7 +1800,7 @@ internal fun readOfflineRegionInfo(source: Long): OfflineRegionInfo =
 @JvmSynthetic
 internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
   OfflineRegionStatus(
-    downloadState = OfflineRegionDownloadState(readU32(source)),
+    downloadState = OfflineRegionDownloadState.of(readU32(source)),
     completedResourceCount = readU64(source + w(8, 8, 4)),
     completedResourceSize = readU64(source + w(16, 16, 12)),
     completedTileCount = readU64(source + w(24, 24, 20)),
@@ -2251,11 +2251,11 @@ internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
   return ResourceRequestInfo(
     requestedUrl = readViewString(source + 8),
     resolvedUrl = readViewString(source + w(16, 24)),
-    kind = ResourceKind(readU32(source + w(24, 40))),
-    loadingMethod = ResourceLoadingMethod(readU32(source + w(28, 44))),
-    priority = ResourcePriority(readU32(source + w(32, 48))),
-    usage = ResourceUsage(readU32(source + w(36, 52))),
-    storagePolicy = ResourceStoragePolicy(readU32(source + w(40, 56))),
+    kind = ResourceKind.of(readU32(source + w(24, 40))),
+    loadingMethod = ResourceLoadingMethod.of(readU32(source + w(28, 44))),
+    priority = ResourcePriority.of(readU32(source + w(32, 48))),
+    usage = ResourceUsage.of(readU32(source + w(36, 52))),
+    storagePolicy = ResourceStoragePolicy.of(readU32(source + w(40, 56))),
     range = if ((fields and 1u) != 0u) readResourceRange(source + w(48, 64, 44)) else null,
     priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(64, 80, 60)) else null,
     priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(72, 88, 68)) else null,
@@ -2307,7 +2307,7 @@ internal fun readMapTileSettings(source: Long): MapTileSettings =
     lodScale = readF64(source + w(16, 16, 12)),
     lodPitchThreshold = readF64(source + w(24, 24, 20)),
     lodZoomShift = readF64(source + w(32, 32, 28)),
-    lodMode = TileLodMode(readU32(source + w(40, 40, 36))),
+    lodMode = TileLodMode.of(readU32(source + w(40, 40, 36))),
   )
 
 @JvmSynthetic
@@ -2351,7 +2351,7 @@ internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
       },
     minZoom = readF64(source + w(8, 16)),
     maxZoom = readF64(source + w(16, 24)),
-    scheme = StyleTileScheme(readU32(source + w(24, 32))),
+    scheme = StyleTileScheme.of(readU32(source + w(24, 32))),
   )
 
 @JvmSynthetic
@@ -2483,8 +2483,8 @@ internal fun NativeArena.writeUrlQueryParameter(value: UrlQueryParameter): Long 
 @JvmSynthetic
 internal fun readRuntimeEvent(source: Long): RuntimeEvent =
   RuntimeEvent(
-    type = RuntimeEventType(readU32(source)),
-    sourceType = RuntimeEventSourceType(readU32(source + 4)),
+    type = RuntimeEventType.of(readU32(source)),
+    sourceType = RuntimeEventSourceType.of(readU32(source + 4)),
     source = readU64(source + 8),
     generation = readU64(source + 16),
     message = readViewString(source + w(28, 32)),
@@ -2539,9 +2539,9 @@ internal fun readProjectionMode(source: Long): ProjectionMode =
 @JvmSynthetic
 internal fun readMapViewport(source: Long): MapViewport =
   MapViewport(
-    northOrientation = NorthOrientation(readU32(source)),
-    constrainMode = ConstrainMode(readU32(source + 4)),
-    viewportMode = ViewportMode(readU32(source + 8)),
+    northOrientation = NorthOrientation.of(readU32(source)),
+    constrainMode = ConstrainMode.of(readU32(source + 4)),
+    viewportMode = ViewportMode.of(readU32(source + 8)),
     frustumOffset = readEdgeInsets(source + w(16, 16, 12)),
   )
 
@@ -2585,22 +2585,22 @@ internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryR
 @JvmSynthetic
 internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =
   CameraTransitionEnd(
-    outcome = CameraTransitionOutcome(readU32(source + 4)),
+    outcome = CameraTransitionOutcome.of(readU32(source + 4)),
     generation = readU64(source + 8),
   )
 
 @JvmSynthetic
 internal fun readRuntimeEventCameraChange(source: Long): RuntimeEventCameraChange =
-  RuntimeEventCameraChange(mode = CameraChangeMode(readU32(source)))
+  RuntimeEventCameraChange(mode = CameraChangeMode.of(readU32(source)))
 
 @JvmSynthetic
 internal fun readRuntimeEventLoadingFailed(source: Long): RuntimeEventLoadingFailed =
-  RuntimeEventLoadingFailed(error = MapLoadError(readU32(source)))
+  RuntimeEventLoadingFailed(error = MapLoadError.of(readU32(source)))
 
 @JvmSynthetic
 internal fun readRuntimeEventRenderFrame(source: Long): RuntimeEventRenderFrame =
   RuntimeEventRenderFrame(
-    mode = RenderMode(readU32(source)),
+    mode = RenderMode.of(readU32(source)),
     needsRepaint = readBool(source + 4),
     placementChanged = readBool(source + 5),
     stats = readRenderingStats(source + 8),
@@ -2614,7 +2614,7 @@ internal fun readRuntimeEventStyleImage(source: Long): RuntimeEventStyleImage =
 internal fun readRuntimeEventTileAction(source: Long): RuntimeEventTileAction =
   RuntimeEventTileAction(
     sourceId = readViewString(source),
-    operation = TileOperation(readU32(source + w(8, 16))),
+    operation = TileOperation.of(readU32(source + w(8, 16))),
     tileId = readTileId(source + w(12, 20)),
   )
 
@@ -2635,7 +2635,7 @@ internal fun readRuntimeEventOfflineRegionResponseError(
 ): RuntimeEventOfflineRegionResponseError =
   RuntimeEventOfflineRegionResponseError(
     regionId = readI64(source),
-    reason = ResourceErrorReason(readU32(source + 8)),
+    reason = ResourceErrorReason.of(readU32(source + 8)),
   )
 
 @JvmSynthetic

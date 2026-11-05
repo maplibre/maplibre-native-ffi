@@ -4,8 +4,10 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraUpdate
+import org.maplibre.nativeffi.CameraUpdateMode
 import org.maplibre.nativeffi.FeatureId
 import org.maplibre.nativeffi.FeatureStateSelector
 import org.maplibre.nativeffi.FrameDemandFlag
@@ -199,5 +201,16 @@ class GeneratedShapesTest {
     )
     assertEquals("INFO | WARNING | ERROR", LogSeverityFlag.ALL.toString())
     assertEquals("GLOB | 0x10", UrlMatchFlag(0x11u).toString())
+  }
+
+  @Test
+  fun ofSharesKnownConstantsAndKeepsUnknownValues() {
+    assertSame(CameraUpdateMode.FLY, CameraUpdateMode.of(CameraUpdateMode.FLY_VALUE))
+    assertSame(FrameDemandFlag.FORCE, FrameDemandFlag.of(FrameDemandFlag.FORCE_VALUE))
+    val unknown = CameraUpdateMode.of(99u)
+    assertEquals(99u, unknown.rawValue)
+    assertEquals(CameraUpdateMode(99u), unknown)
+    assertEquals(CameraUpdateMode(99u).hashCode(), unknown.hashCode())
+    assertEquals("CameraUpdateMode(99)", unknown.toString())
   }
 }

@@ -322,7 +322,7 @@ def result_value(value, values):
         return "NativePointer.ofAddress({raw})"
     if value.kind == "enum":
         _suffix, typ = values.accessor(value)
-        return name(value.native) + "({raw}" + PUBLIC_FROM_CARRIER[typ] + ")"
+        return name(value.native) + ".of({raw}" + PUBLIC_FROM_CARRIER[typ] + ")"
     if value.kind == "scalar":
         typ = values.scalar(value)[0]
         return "{raw}" + PUBLIC_FROM_CARRIER[typ]
