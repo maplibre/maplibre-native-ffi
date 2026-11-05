@@ -1217,7 +1217,7 @@ typedef struct {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef void (*MaplibreNativeFfiCameraTransitionEndCallback)(
-  const MaplibreNativeFfiCameraTransitionEnd* end, gpointer user_data
+  MaplibreNativeFfiCameraTransitionEnd* end, gpointer user_data
 );
 
 /**
@@ -1236,7 +1236,7 @@ typedef void (*MaplibreNativeFfiCameraTransitionEndCallback)(
  */
 typedef void (*MaplibreNativeFfiCustomSourceCancelTileCallback)(
   MaplibreNativeFfiMap* map, const char* source_id,
-  const MaplibreNativeFfiCanonicalTileId* tile_id, gpointer user_data
+  MaplibreNativeFfiCanonicalTileId* tile_id, gpointer user_data
 );
 
 /**
@@ -1261,7 +1261,7 @@ typedef void (*MaplibreNativeFfiCustomSourceCancelTileCallback)(
  */
 typedef void (*MaplibreNativeFfiCustomSourceFetchTileCallback)(
   MaplibreNativeFfiMap* map, const char* source_id,
-  const MaplibreNativeFfiCanonicalTileId* tile_id, gpointer user_data
+  MaplibreNativeFfiCanonicalTileId* tile_id, gpointer user_data
 );
 
 /**
@@ -1314,7 +1314,7 @@ typedef void (*MaplibreNativeFfiQueueLockCallback)(gpointer user_data);
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef void (*MaplibreNativeFfiResourceProviderCallback)(
-  const MaplibreNativeFfiResourceRequestInfo* request,
+  MaplibreNativeFfiResourceRequestInfo* request,
   MaplibreNativeFfiResourceRequest* handle, gpointer user_data
 );
 
@@ -1390,15 +1390,6 @@ typedef void (*MaplibreNativeFfiWakeCallback)(gpointer user_data);
 GType maplibre_native_ffi_unit_bezier_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_UNIT_BEZIER \
   (maplibre_native_ffi_unit_bezier_get_type())
-
-/**
- * maplibre_native_ffi_unit_bezier_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiUnitBezier` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiUnitBezier* maplibre_native_ffi_unit_bezier_new(void);
 
 /**
  * maplibre_native_ffi_unit_bezier_copy:
@@ -1639,8 +1630,7 @@ void maplibre_native_ffi_animation_options_set_min_zoom(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiUnitBezier*
-maplibre_native_ffi_animation_options_get_easing(
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_animation_options_get_easing(
   const MaplibreNativeFfiAnimationOptions* self
 );
 
@@ -1733,15 +1723,6 @@ GType maplibre_native_ffi_lat_lng_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_lat_lng_get_type())
 
 /**
- * maplibre_native_ffi_lat_lng_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiLatLng` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiLatLng* maplibre_native_ffi_lat_lng_new(void);
-
-/**
  * maplibre_native_ffi_lat_lng_copy:
  *
  * Copies the value.
@@ -1767,15 +1748,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_lat_lng_bounds_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_LAT_LNG_BOUNDS \
   (maplibre_native_ffi_lat_lng_bounds_get_type())
-
-/**
- * maplibre_native_ffi_lat_lng_bounds_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiLatLngBounds` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiLatLngBounds* maplibre_native_ffi_lat_lng_bounds_new(void);
 
 /**
  * maplibre_native_ffi_lat_lng_bounds_copy:
@@ -1851,8 +1823,7 @@ void maplibre_native_ffi_bound_options_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLatLngBounds*
-maplibre_native_ffi_bound_options_get_bounds(
+MaplibreNativeFfiLatLngBounds* maplibre_native_ffi_bound_options_get_bounds(
   const MaplibreNativeFfiBoundOptions* self
 );
 
@@ -2011,15 +1982,6 @@ GType maplibre_native_ffi_edge_insets_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_edge_insets_get_type())
 
 /**
- * maplibre_native_ffi_edge_insets_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiEdgeInsets` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiEdgeInsets* maplibre_native_ffi_edge_insets_new(void);
-
-/**
  * maplibre_native_ffi_edge_insets_copy:
  *
  * Copies the value.
@@ -2044,15 +2006,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 
 GType maplibre_native_ffi_camera_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA (maplibre_native_ffi_camera_get_type())
-
-/**
- * maplibre_native_ffi_camera_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiCamera` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiCamera* maplibre_native_ffi_camera_new(void);
 
 /**
  * maplibre_native_ffi_camera_copy:
@@ -2094,15 +2047,6 @@ GType maplibre_native_ffi_camera_bounds_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_camera_bounds_get_type())
 
 /**
- * maplibre_native_ffi_camera_bounds_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiCameraBounds` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiCameraBounds* maplibre_native_ffi_camera_bounds_new(void);
-
-/**
  * maplibre_native_ffi_camera_bounds_copy:
  *
  * Copies the value.
@@ -2130,15 +2074,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_screen_point_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_SCREEN_POINT \
   (maplibre_native_ffi_screen_point_get_type())
-
-/**
- * maplibre_native_ffi_screen_point_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiScreenPoint` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiScreenPoint* maplibre_native_ffi_screen_point_new(void);
 
 /**
  * maplibre_native_ffi_screen_point_copy:
@@ -2210,7 +2145,7 @@ void maplibre_native_ffi_camera_delta_free(MaplibreNativeFfiCameraDelta* self);
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiScreenPoint* maplibre_native_ffi_camera_delta_get_offset(
+MaplibreNativeFfiScreenPoint* maplibre_native_ffi_camera_delta_get_offset(
   const MaplibreNativeFfiCameraDelta* self
 );
 
@@ -2337,7 +2272,7 @@ void maplibre_native_ffi_camera_delta_set_pitch(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiScreenPoint* maplibre_native_ffi_camera_delta_get_anchor(
+MaplibreNativeFfiScreenPoint* maplibre_native_ffi_camera_delta_get_anchor(
   const MaplibreNativeFfiCameraDelta* self
 );
 
@@ -2465,8 +2400,7 @@ void maplibre_native_ffi_camera_fit_options_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiEdgeInsets*
-maplibre_native_ffi_camera_fit_options_get_padding(
+MaplibreNativeFfiEdgeInsets* maplibre_native_ffi_camera_fit_options_get_padding(
   const MaplibreNativeFfiCameraFitOptions* self
 );
 
@@ -2730,7 +2664,7 @@ void maplibre_native_ffi_camera_options_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLatLng* maplibre_native_ffi_camera_options_get_center(
+MaplibreNativeFfiLatLng* maplibre_native_ffi_camera_options_get_center(
   const MaplibreNativeFfiCameraOptions* self
 );
 
@@ -2793,8 +2727,7 @@ void maplibre_native_ffi_camera_options_set_center_altitude(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiEdgeInsets*
-maplibre_native_ffi_camera_options_get_padding(
+MaplibreNativeFfiEdgeInsets* maplibre_native_ffi_camera_options_get_padding(
   const MaplibreNativeFfiCameraOptions* self
 );
 
@@ -2827,8 +2760,7 @@ void maplibre_native_ffi_camera_options_set_padding(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiScreenPoint*
-maplibre_native_ffi_camera_options_get_anchor(
+MaplibreNativeFfiScreenPoint* maplibre_native_ffi_camera_options_get_anchor(
   const MaplibreNativeFfiCameraOptions* self
 );
 
@@ -3019,17 +2951,6 @@ GType maplibre_native_ffi_camera_query_result_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_camera_query_result_get_type())
 
 /**
- * maplibre_native_ffi_camera_query_result_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiCameraQueryResult` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiCameraQueryResult* maplibre_native_ffi_camera_query_result_new(
-  void
-);
-
-/**
  * maplibre_native_ffi_camera_query_result_copy:
  *
  * Copies the value.
@@ -3059,16 +2980,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_camera_transition_end_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_TRANSITION_END \
   (maplibre_native_ffi_camera_transition_end_get_type())
-
-/**
- * maplibre_native_ffi_camera_transition_end_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiCameraTransitionEnd` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiCameraTransitionEnd*
-maplibre_native_ffi_camera_transition_end_new(void);
 
 /**
  * maplibre_native_ffi_camera_transition_end_copy:
@@ -3235,17 +3146,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_canonical_tile_id_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_CANONICAL_TILE_ID \
   (maplibre_native_ffi_canonical_tile_id_get_type())
-
-/**
- * maplibre_native_ffi_canonical_tile_id_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiCanonicalTileId` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiCanonicalTileId* maplibre_native_ffi_canonical_tile_id_new(
-  void
-);
 
 /**
  * maplibre_native_ffi_canonical_tile_id_copy:
@@ -3752,15 +3652,6 @@ GType maplibre_native_ffi_dma_buf_format_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_dma_buf_format_get_type())
 
 /**
- * maplibre_native_ffi_dma_buf_format_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiDmaBufFormat` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiDmaBufFormat* maplibre_native_ffi_dma_buf_format_new(void);
-
-/**
  * maplibre_native_ffi_dma_buf_format_copy:
  *
  * Copies the value.
@@ -3788,15 +3679,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_dma_buf_plane_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_DMA_BUF_PLANE \
   (maplibre_native_ffi_dma_buf_plane_get_type())
-
-/**
- * maplibre_native_ffi_dma_buf_plane_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiDmaBufPlane` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiDmaBufPlane* maplibre_native_ffi_dma_buf_plane_new(void);
 
 /**
  * maplibre_native_ffi_dma_buf_plane_copy:
@@ -3949,15 +3831,6 @@ GType maplibre_native_ffi_logical_size_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_logical_size_get_type())
 
 /**
- * maplibre_native_ffi_logical_size_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiLogicalSize` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiLogicalSize* maplibre_native_ffi_logical_size_new(void);
-
-/**
  * maplibre_native_ffi_logical_size_copy:
  *
  * Copies the value.
@@ -4038,7 +3911,7 @@ void maplibre_native_ffi_dma_buf_ring_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_dma_buf_ring_descriptor_get_logical_size(
   const MaplibreNativeFfiDmaBufRingDescriptor* self
 );
@@ -4095,7 +3968,7 @@ GPtrArray* maplibre_native_ffi_dma_buf_ring_descriptor_get_formats(
  */
 void maplibre_native_ffi_dma_buf_ring_descriptor_set_formats(
   MaplibreNativeFfiDmaBufRingDescriptor* self,
-  MaplibreNativeFfiDmaBufFormat* const* value, gsize value_count
+  const MaplibreNativeFfiDmaBufFormat* value, gsize value_count
 );
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
@@ -4582,15 +4455,6 @@ GType maplibre_native_ffi_frame_demand_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_frame_demand_get_type())
 
 /**
- * maplibre_native_ffi_frame_demand_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiFrameDemand` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiFrameDemand* maplibre_native_ffi_frame_demand_new(void);
-
-/**
  * maplibre_native_ffi_frame_demand_copy:
  *
  * Copies the value.
@@ -4702,15 +4566,6 @@ GType maplibre_native_ffi_vec3_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_VEC3 (maplibre_native_ffi_vec3_get_type())
 
 /**
- * maplibre_native_ffi_vec3_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiVec3` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiVec3* maplibre_native_ffi_vec3_new(void);
-
-/**
  * maplibre_native_ffi_vec3_copy:
  *
  * Copies the value.
@@ -4738,15 +4593,6 @@ GType maplibre_native_ffi_quaternion_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_quaternion_get_type())
 
 /**
- * maplibre_native_ffi_quaternion_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiQuaternion` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiQuaternion* maplibre_native_ffi_quaternion_new(void);
-
-/**
  * maplibre_native_ffi_quaternion_copy:
  *
  * Copies the value.
@@ -4772,15 +4618,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_free_camera_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_FREE_CAMERA \
   (maplibre_native_ffi_free_camera_get_type())
-
-/**
- * maplibre_native_ffi_free_camera_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiFreeCamera` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiFreeCamera* maplibre_native_ffi_free_camera_new(void);
 
 /**
  * maplibre_native_ffi_free_camera_copy:
@@ -4859,8 +4696,7 @@ void maplibre_native_ffi_free_camera_options_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiVec3*
-maplibre_native_ffi_free_camera_options_get_position(
+MaplibreNativeFfiVec3* maplibre_native_ffi_free_camera_options_get_position(
   const MaplibreNativeFfiFreeCameraOptions* self
 );
 
@@ -4895,7 +4731,7 @@ void maplibre_native_ffi_free_camera_options_set_position(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiQuaternion*
+MaplibreNativeFfiQuaternion*
 maplibre_native_ffi_free_camera_options_get_orientation(
   const MaplibreNativeFfiFreeCameraOptions* self
 );
@@ -5285,15 +5121,6 @@ GType maplibre_native_ffi_gpu_sync_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_gpu_sync_get_type())
 
 /**
- * maplibre_native_ffi_gpu_sync_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiGpuSync` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiGpuSync* maplibre_native_ffi_gpu_sync_new(void);
-
-/**
  * maplibre_native_ffi_gpu_sync_copy:
  *
  * Copies the value.
@@ -5611,15 +5438,6 @@ GType maplibre_native_ffi_image_content_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_image_content_get_type())
 
 /**
- * maplibre_native_ffi_image_content_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiImageContent` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiImageContent* maplibre_native_ffi_image_content_new(void);
-
-/**
  * maplibre_native_ffi_image_content_copy:
  *
  * Copies the value.
@@ -5647,15 +5465,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_image_stretch_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_IMAGE_STRETCH \
   (maplibre_native_ffi_image_stretch_get_type())
-
-/**
- * maplibre_native_ffi_image_stretch_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiImageStretch` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiImageStretch* maplibre_native_ffi_image_stretch_new(void);
 
 /**
  * maplibre_native_ffi_image_stretch_copy:
@@ -5910,7 +5719,7 @@ void maplibre_native_ffi_io_surface_ring_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_io_surface_ring_descriptor_get_logical_size(
   const MaplibreNativeFfiIoSurfaceRingDescriptor* self
 );
@@ -6068,15 +5877,6 @@ GType maplibre_native_ffi_logical_extent_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_logical_extent_get_type())
 
 /**
- * maplibre_native_ffi_logical_extent_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiLogicalExtent` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiLogicalExtent* maplibre_native_ffi_logical_extent_new(void);
-
-/**
  * maplibre_native_ffi_logical_extent_copy:
  *
  * Copies the value.
@@ -6149,7 +5949,7 @@ void maplibre_native_ffi_map_options_free(MaplibreNativeFfiMapOptions* self);
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalExtent*
+MaplibreNativeFfiLogicalExtent*
 maplibre_native_ffi_map_options_get_initial_extent(
   const MaplibreNativeFfiMapOptions* self
 );
@@ -6283,16 +6083,6 @@ GType maplibre_native_ffi_map_projection_camera_result_get_type(
   (maplibre_native_ffi_map_projection_camera_result_get_type())
 
 /**
- * maplibre_native_ffi_map_projection_camera_result_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiMapProjectionCameraResult` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiMapProjectionCameraResult*
-maplibre_native_ffi_map_projection_camera_result_new(void);
-
-/**
  * maplibre_native_ffi_map_projection_camera_result_copy:
  *
  * Copies the value.
@@ -6324,17 +6114,6 @@ GType maplibre_native_ffi_map_tile_settings_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_map_tile_settings_get_type())
 
 /**
- * maplibre_native_ffi_map_tile_settings_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiMapTileSettings` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiMapTileSettings* maplibre_native_ffi_map_tile_settings_new(
-  void
-);
-
-/**
  * maplibre_native_ffi_map_tile_settings_copy:
  *
  * Copies the value.
@@ -6362,15 +6141,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_projection_mode_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_MODE \
   (maplibre_native_ffi_projection_mode_get_type())
-
-/**
- * maplibre_native_ffi_projection_mode_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiProjectionMode` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiProjectionMode* maplibre_native_ffi_projection_mode_new(void);
 
 /**
  * maplibre_native_ffi_projection_mode_copy:
@@ -6402,15 +6172,6 @@ GType maplibre_native_ffi_map_viewport_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_map_viewport_get_type())
 
 /**
- * maplibre_native_ffi_map_viewport_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiMapViewport` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiMapViewport* maplibre_native_ffi_map_viewport_new(void);
-
-/**
  * maplibre_native_ffi_map_viewport_copy:
  *
  * Copies the value.
@@ -6438,15 +6199,6 @@ GType maplibre_native_ffi_map_view_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_map_view_get_type())
 
 /**
- * maplibre_native_ffi_map_view_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiMapView` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiMapView* maplibre_native_ffi_map_view_new(void);
-
-/**
  * maplibre_native_ffi_map_view_copy:
  *
  * Copies the value.
@@ -6472,15 +6224,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_map_snapshot_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_MAP_SNAPSHOT \
   (maplibre_native_ffi_map_snapshot_get_type())
-
-/**
- * maplibre_native_ffi_map_snapshot_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiMapSnapshot` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiMapSnapshot* maplibre_native_ffi_map_snapshot_new(void);
 
 /**
  * maplibre_native_ffi_map_snapshot_copy:
@@ -6891,7 +6634,7 @@ void maplibre_native_ffi_map_viewport_options_set_viewport_mode(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiEdgeInsets*
+MaplibreNativeFfiEdgeInsets*
 maplibre_native_ffi_map_viewport_options_get_frustum_offset(
   const MaplibreNativeFfiMapViewportOptions* self
 );
@@ -7056,7 +6799,7 @@ void maplibre_native_ffi_metal_borrowed_texture_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_metal_borrowed_texture_descriptor_get_logical_size(
   const MaplibreNativeFfiMetalBorrowedTextureDescriptor* self
 );
@@ -7225,7 +6968,7 @@ void maplibre_native_ffi_metal_borrowed_texture_replacement_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_metal_borrowed_texture_replacement_get_logical_size(
   const MaplibreNativeFfiMetalBorrowedTextureReplacement* self
 );
@@ -7366,7 +7109,7 @@ void maplibre_native_ffi_metal_surface_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_metal_surface_descriptor_get_logical_size(
   const MaplibreNativeFfiMetalSurfaceDescriptor* self
 );
@@ -7486,7 +7229,7 @@ void maplibre_native_ffi_metal_surface_replacement_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_metal_surface_replacement_get_logical_size(
   const MaplibreNativeFfiMetalSurfaceReplacement* self
 );
@@ -7909,7 +7652,7 @@ void maplibre_native_ffi_offline_tile_pyramid_region_definition_set_style_url(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLatLngBounds*
+MaplibreNativeFfiLatLngBounds*
 maplibre_native_ffi_offline_tile_pyramid_region_definition_get_bounds(
   const MaplibreNativeFfiOfflineTilePyramidRegionDefinition* self
 );
@@ -8212,16 +7955,6 @@ GType maplibre_native_ffi_offline_region_status_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_offline_region_status_get_type())
 
 /**
- * maplibre_native_ffi_offline_region_status_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiOfflineRegionStatus` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiOfflineRegionStatus*
-maplibre_native_ffi_offline_region_status_new(void);
-
-/**
  * maplibre_native_ffi_offline_region_status_copy:
  *
  * Copies the value.
@@ -8251,16 +7984,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_offscreen_descriptor_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_OFFSCREEN_DESCRIPTOR \
   (maplibre_native_ffi_offscreen_descriptor_get_type())
-
-/**
- * maplibre_native_ffi_offscreen_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiOffscreenDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiOffscreenDescriptor*
-maplibre_native_ffi_offscreen_descriptor_new(void);
 
 /**
  * maplibre_native_ffi_offscreen_descriptor_copy:
@@ -8448,16 +8171,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_open_gl_borrowed_texture_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURE \
   (maplibre_native_ffi_open_gl_borrowed_texture_get_type())
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiOpenGlBorrowedTexture` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiOpenGlBorrowedTexture*
-maplibre_native_ffi_open_gl_borrowed_texture_new(void);
 
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_copy:
@@ -9020,7 +8733,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_logical_size(
   const MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self
 );
@@ -9120,7 +8833,7 @@ GPtrArray* maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_textures(
  */
 void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures(
   MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self,
-  MaplibreNativeFfiOpenGlBorrowedTexture* const* value, gsize value_count
+  const MaplibreNativeFfiOpenGlBorrowedTexture* value, gsize value_count
 );
 
 /**
@@ -9207,7 +8920,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_replacement_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_logical_size(
   const MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self
 );
@@ -9285,7 +8998,7 @@ maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_textures(
  */
 void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_textures(
   MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self,
-  MaplibreNativeFfiOpenGlBorrowedTexture* const* value, gsize value_count
+  const MaplibreNativeFfiOpenGlBorrowedTexture* value, gsize value_count
 );
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
@@ -9351,7 +9064,7 @@ void maplibre_native_ffi_open_gl_surface_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_open_gl_surface_descriptor_get_logical_size(
   const MaplibreNativeFfiOpenGlSurfaceDescriptor* self
 );
@@ -9473,7 +9186,7 @@ void maplibre_native_ffi_open_gl_surface_replacement_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_open_gl_surface_replacement_get_logical_size(
   const MaplibreNativeFfiOpenGlSurfaceReplacement* self
 );
@@ -9519,16 +9232,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_open_gl_texture_frame_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_TEXTURE_FRAME \
   (maplibre_native_ffi_open_gl_texture_frame_get_type())
-
-/**
- * maplibre_native_ffi_open_gl_texture_frame_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiOpenGlTextureFrame` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiOpenGlTextureFrame*
-maplibre_native_ffi_open_gl_texture_frame_new(void);
 
 /**
  * maplibre_native_ffi_open_gl_texture_frame_copy:
@@ -9692,17 +9395,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_projected_meters_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTED_METERS \
   (maplibre_native_ffi_projected_meters_get_type())
-
-/**
- * maplibre_native_ffi_projected_meters_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiProjectedMeters` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiProjectedMeters* maplibre_native_ffi_projected_meters_new(
-  void
-);
 
 /**
  * maplibre_native_ffi_projected_meters_copy:
@@ -9962,16 +9654,6 @@ GType maplibre_native_ffi_render_abandon_result_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_render_abandon_result_get_type())
 
 /**
- * maplibre_native_ffi_render_abandon_result_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRenderAbandonResult` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRenderAbandonResult*
-maplibre_native_ffi_render_abandon_result_new(void);
-
-/**
  * maplibre_native_ffi_render_abandon_result_copy:
  *
  * Copies the value.
@@ -10001,17 +9683,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_render_frame_result_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_FRAME_RESULT \
   (maplibre_native_ffi_render_frame_result_get_type())
-
-/**
- * maplibre_native_ffi_render_frame_result_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRenderFrameResult` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRenderFrameResult* maplibre_native_ffi_render_frame_result_new(
-  void
-);
 
 /**
  * maplibre_native_ffi_render_frame_result_copy:
@@ -10336,16 +10007,6 @@ GType maplibre_native_ffi_render_session_capabilities_get_type(
   (maplibre_native_ffi_render_session_capabilities_get_type())
 
 /**
- * maplibre_native_ffi_render_session_capabilities_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRenderSessionCapabilities` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRenderSessionCapabilities*
-maplibre_native_ffi_render_session_capabilities_new(void);
-
-/**
  * maplibre_native_ffi_render_session_capabilities_copy:
  *
  * Copies the value.
@@ -10375,16 +10036,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_render_session_snapshot_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_SESSION_SNAPSHOT \
   (maplibre_native_ffi_render_session_snapshot_get_type())
-
-/**
- * maplibre_native_ffi_render_session_snapshot_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRenderSessionSnapshot` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRenderSessionSnapshot*
-maplibre_native_ffi_render_session_snapshot_new(void);
 
 /**
  * maplibre_native_ffi_render_session_snapshot_copy:
@@ -10628,15 +10279,6 @@ GType maplibre_native_ffi_screen_box_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_screen_box_get_type())
 
 /**
- * maplibre_native_ffi_screen_box_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiScreenBox` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiScreenBox* maplibre_native_ffi_screen_box_new(void);
-
-/**
  * maplibre_native_ffi_screen_box_copy:
  *
  * Copies the value.
@@ -10722,7 +10364,7 @@ GPtrArray* maplibre_native_ffi_screen_line_string_get_points(
  */
 void maplibre_native_ffi_screen_line_string_set_points(
   MaplibreNativeFfiScreenLineString* self,
-  MaplibreNativeFfiScreenPoint* const* value, gsize value_count
+  const MaplibreNativeFfiScreenPoint* value, gsize value_count
 );
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
@@ -10794,7 +10436,7 @@ gboolean maplibre_native_ffi_rendered_query_geometry_is_point(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiScreenPoint*
+MaplibreNativeFfiScreenPoint*
 maplibre_native_ffi_rendered_query_geometry_get_point(
   const MaplibreNativeFfiRenderedQueryGeometry* self
 );
@@ -10830,8 +10472,7 @@ gboolean maplibre_native_ffi_rendered_query_geometry_is_box(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiScreenBox*
-maplibre_native_ffi_rendered_query_geometry_get_box(
+MaplibreNativeFfiScreenBox* maplibre_native_ffi_rendered_query_geometry_get_box(
   const MaplibreNativeFfiRenderedQueryGeometry* self
 );
 
@@ -10879,15 +10520,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_rendering_stats_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RENDERING_STATS \
   (maplibre_native_ffi_rendering_stats_get_type())
-
-/**
- * maplibre_native_ffi_rendering_stats_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRenderingStats` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRenderingStats* maplibre_native_ffi_rendering_stats_new(void);
 
 /**
  * maplibre_native_ffi_rendering_stats_copy:
@@ -11119,15 +10751,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_resource_range_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RESOURCE_RANGE \
   (maplibre_native_ffi_resource_range_get_type())
-
-/**
- * maplibre_native_ffi_resource_range_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiResourceRange` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiResourceRange* maplibre_native_ffi_resource_range_new(void);
 
 /**
  * maplibre_native_ffi_resource_range_copy:
@@ -11363,7 +10986,7 @@ maplibre_native_ffi_resource_request_info_get_storage_policy(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiResourceRange*
+MaplibreNativeFfiResourceRange*
 maplibre_native_ffi_resource_request_info_get_range(
   const MaplibreNativeFfiResourceRequestInfo* self
 );
@@ -12189,16 +11812,6 @@ GType maplibre_native_ffi_runtime_event_camera_change_get_type(
   (maplibre_native_ffi_runtime_event_camera_change_get_type())
 
 /**
- * maplibre_native_ffi_runtime_event_camera_change_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRuntimeEventCameraChange` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRuntimeEventCameraChange*
-maplibre_native_ffi_runtime_event_camera_change_new(void);
-
-/**
  * maplibre_native_ffi_runtime_event_camera_change_copy:
  *
  * Copies the value.
@@ -12232,16 +11845,6 @@ GType maplibre_native_ffi_runtime_event_loading_failed_get_type(
   (maplibre_native_ffi_runtime_event_loading_failed_get_type())
 
 /**
- * maplibre_native_ffi_runtime_event_loading_failed_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRuntimeEventLoadingFailed` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRuntimeEventLoadingFailed*
-maplibre_native_ffi_runtime_event_loading_failed_new(void);
-
-/**
  * maplibre_native_ffi_runtime_event_loading_failed_copy:
  *
  * Copies the value.
@@ -12273,16 +11876,6 @@ GType maplibre_native_ffi_runtime_event_render_frame_get_type(
 ) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RUNTIME_EVENT_RENDER_FRAME \
   (maplibre_native_ffi_runtime_event_render_frame_get_type())
-
-/**
- * maplibre_native_ffi_runtime_event_render_frame_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRuntimeEventRenderFrame` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRuntimeEventRenderFrame*
-maplibre_native_ffi_runtime_event_render_frame_new(void);
 
 /**
  * maplibre_native_ffi_runtime_event_render_frame_copy:
@@ -12374,15 +11967,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_tile_id_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_TILE_ID \
   (maplibre_native_ffi_tile_id_get_type())
-
-/**
- * maplibre_native_ffi_tile_id_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiTileId` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiTileId* maplibre_native_ffi_tile_id_new(void);
 
 /**
  * maplibre_native_ffi_tile_id_copy:
@@ -12481,7 +12065,7 @@ maplibre_native_ffi_runtime_event_tile_action_get_operation(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiTileId*
+MaplibreNativeFfiTileId*
 maplibre_native_ffi_runtime_event_tile_action_get_tile_id(
   const MaplibreNativeFfiRuntimeEventTileAction* self
 );
@@ -12560,16 +12144,6 @@ GType maplibre_native_ffi_runtime_event_offline_region_status_get_type(
   (maplibre_native_ffi_runtime_event_offline_region_status_get_type())
 
 /**
- * maplibre_native_ffi_runtime_event_offline_region_status_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRuntimeEventOfflineRegionStatus` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRuntimeEventOfflineRegionStatus*
-maplibre_native_ffi_runtime_event_offline_region_status_new(void);
-
-/**
  * maplibre_native_ffi_runtime_event_offline_region_status_copy:
  *
  * Copies the value.
@@ -12603,16 +12177,6 @@ GType maplibre_native_ffi_runtime_event_offline_region_response_error_get_type(
   (maplibre_native_ffi_runtime_event_offline_region_response_error_get_type())
 
 /**
- * maplibre_native_ffi_runtime_event_offline_region_response_error_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRuntimeEventOfflineRegionResponseError` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRuntimeEventOfflineRegionResponseError*
-maplibre_native_ffi_runtime_event_offline_region_response_error_new(void);
-
-/**
  * maplibre_native_ffi_runtime_event_offline_region_response_error_copy:
  *
  * Copies the value.
@@ -12644,16 +12208,6 @@ GType maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_get_type
 ) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT \
   (maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_get_type())
-
-/**
- * maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit*
-maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_new(void);
 
 /**
  * maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_copy:
@@ -12902,7 +12456,7 @@ gboolean maplibre_native_ffi_runtime_event_payload_is_camera_change(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiRuntimeEventCameraChange*
+MaplibreNativeFfiRuntimeEventCameraChange*
 maplibre_native_ffi_runtime_event_payload_get_camera_change(
   const MaplibreNativeFfiRuntimeEventPayload* self
 );
@@ -12925,7 +12479,7 @@ gboolean maplibre_native_ffi_runtime_event_payload_is_loading_failed(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiRuntimeEventLoadingFailed*
+MaplibreNativeFfiRuntimeEventLoadingFailed*
 maplibre_native_ffi_runtime_event_payload_get_loading_failed(
   const MaplibreNativeFfiRuntimeEventPayload* self
 );
@@ -12948,7 +12502,7 @@ gboolean maplibre_native_ffi_runtime_event_payload_is_render_frame(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiRuntimeEventRenderFrame*
+MaplibreNativeFfiRuntimeEventRenderFrame*
 maplibre_native_ffi_runtime_event_payload_get_render_frame(
   const MaplibreNativeFfiRuntimeEventPayload* self
 );
@@ -13040,7 +12594,7 @@ gboolean maplibre_native_ffi_runtime_event_payload_is_offline_region_status(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiRuntimeEventOfflineRegionStatus*
+MaplibreNativeFfiRuntimeEventOfflineRegionStatus*
 maplibre_native_ffi_runtime_event_payload_get_offline_region_status(
   const MaplibreNativeFfiRuntimeEventPayload* self
 );
@@ -13064,7 +12618,7 @@ maplibre_native_ffi_runtime_event_payload_is_offline_region_response_error(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiRuntimeEventOfflineRegionResponseError*
+MaplibreNativeFfiRuntimeEventOfflineRegionResponseError*
 maplibre_native_ffi_runtime_event_payload_get_offline_region_response_error(
   const MaplibreNativeFfiRuntimeEventPayload* self
 );
@@ -13088,7 +12642,7 @@ maplibre_native_ffi_runtime_event_payload_is_offline_region_tile_count_limit(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit*
+MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit*
 maplibre_native_ffi_runtime_event_payload_get_offline_region_tile_count_limit(
   const MaplibreNativeFfiRuntimeEventPayload* self
 );
@@ -13612,16 +13166,6 @@ GType maplibre_native_ffi_style_expression_info_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_style_expression_info_get_type())
 
 /**
- * maplibre_native_ffi_style_expression_info_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiStyleExpressionInfo` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiStyleExpressionInfo*
-maplibre_native_ffi_style_expression_info_new(void);
-
-/**
  * maplibre_native_ffi_style_expression_info_copy:
  *
  * Copies the value.
@@ -13825,7 +13369,7 @@ void maplibre_native_ffi_style_expression_inputs_set_global_state(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiCanonicalTileId*
+MaplibreNativeFfiCanonicalTileId*
 maplibre_native_ffi_style_expression_inputs_get_canonical_tile_id(
   const MaplibreNativeFfiStyleExpressionInputs* self
 );
@@ -13883,16 +13427,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_style_expression_type_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_EXPRESSION_TYPE \
   (maplibre_native_ffi_style_expression_type_get_type())
-
-/**
- * maplibre_native_ffi_style_expression_type_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiStyleExpressionType` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiStyleExpressionType*
-maplibre_native_ffi_style_expression_type_new(void);
 
 /**
  * maplibre_native_ffi_style_expression_type_copy:
@@ -13972,7 +13506,7 @@ void maplibre_native_ffi_style_expression_options_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiStyleExpressionType*
+MaplibreNativeFfiStyleExpressionType*
 maplibre_native_ffi_style_expression_options_get_expected_type(
   const MaplibreNativeFfiStyleExpressionOptions* self
 );
@@ -14109,8 +13643,7 @@ GPtrArray* maplibre_native_ffi_style_image_info_get_stretch_y(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiImageContent*
-maplibre_native_ffi_style_image_info_get_content(
+MaplibreNativeFfiImageContent* maplibre_native_ffi_style_image_info_get_content(
   const MaplibreNativeFfiStyleImageInfo* self
 );
 
@@ -14285,7 +13818,7 @@ gboolean maplibre_native_ffi_style_image_options_has_stretch_x(
  */
 void maplibre_native_ffi_style_image_options_set_stretch_x(
   MaplibreNativeFfiStyleImageOptions* self,
-  MaplibreNativeFfiImageStretch* const* value, gsize value_count
+  const MaplibreNativeFfiImageStretch* value, gsize value_count
 );
 
 /**
@@ -14318,7 +13851,7 @@ gboolean maplibre_native_ffi_style_image_options_has_stretch_y(
  */
 void maplibre_native_ffi_style_image_options_set_stretch_y(
   MaplibreNativeFfiStyleImageOptions* self,
-  MaplibreNativeFfiImageStretch* const* value, gsize value_count
+  const MaplibreNativeFfiImageStretch* value, gsize value_count
 );
 
 /**
@@ -14328,7 +13861,7 @@ void maplibre_native_ffi_style_image_options_set_stretch_y(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiImageContent*
+MaplibreNativeFfiImageContent*
 maplibre_native_ffi_style_image_options_get_content(
   const MaplibreNativeFfiStyleImageOptions* self
 );
@@ -14874,8 +14407,7 @@ gboolean maplibre_native_ffi_style_source_info_has_tile_json(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLatLngBounds*
-maplibre_native_ffi_style_source_info_get_bounds(
+MaplibreNativeFfiLatLngBounds* maplibre_native_ffi_style_source_info_get_bounds(
   const MaplibreNativeFfiStyleSourceInfo* self
 );
 
@@ -15137,17 +14669,6 @@ GType maplibre_native_ffi_texture_image_info_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_texture_image_info_get_type())
 
 /**
- * maplibre_native_ffi_texture_image_info_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiTextureImageInfo` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiTextureImageInfo* maplibre_native_ffi_texture_image_info_new(
-  void
-);
-
-/**
  * maplibre_native_ffi_texture_image_info_copy:
  *
  * Copies the value.
@@ -15236,7 +14757,7 @@ GBytes* maplibre_native_ffi_texture_readback_result_get_data(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiTextureImageInfo*
+MaplibreNativeFfiTextureImageInfo*
 maplibre_native_ffi_texture_readback_result_get_info(
   const MaplibreNativeFfiTextureReadbackResult* self
 );
@@ -15249,16 +14770,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 GType maplibre_native_ffi_vulkan_borrowed_texture_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURE \
   (maplibre_native_ffi_vulkan_borrowed_texture_get_type())
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiVulkanBorrowedTexture` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiVulkanBorrowedTexture*
-maplibre_native_ffi_vulkan_borrowed_texture_new(void);
 
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_copy:
@@ -15550,7 +15061,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_logical_size(
   const MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
 );
@@ -15650,7 +15161,7 @@ GPtrArray* maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_textures(
  */
 void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures(
   MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self,
-  MaplibreNativeFfiVulkanBorrowedTexture* const* value, gsize value_count
+  const MaplibreNativeFfiVulkanBorrowedTexture* value, gsize value_count
 );
 
 /**
@@ -15779,7 +15290,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_replacement_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_logical_size(
   const MaplibreNativeFfiVulkanBorrowedTextureReplacement* self
 );
@@ -15856,7 +15367,7 @@ GPtrArray* maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_textures(
  */
 void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_textures(
   MaplibreNativeFfiVulkanBorrowedTextureReplacement* self,
-  MaplibreNativeFfiVulkanBorrowedTexture* const* value, gsize value_count
+  const MaplibreNativeFfiVulkanBorrowedTexture* value, gsize value_count
 );
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
@@ -16138,7 +15649,7 @@ void maplibre_native_ffi_vulkan_surface_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_vulkan_surface_descriptor_get_logical_size(
   const MaplibreNativeFfiVulkanSurfaceDescriptor* self
 );
@@ -16207,16 +15718,6 @@ GType maplibre_native_ffi_vulkan_surface_replacement_get_type(
 ) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_SURFACE_REPLACEMENT \
   (maplibre_native_ffi_vulkan_surface_replacement_get_type())
-
-/**
- * maplibre_native_ffi_vulkan_surface_replacement_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiVulkanSurfaceReplacement` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiVulkanSurfaceReplacement*
-maplibre_native_ffi_vulkan_surface_replacement_new(void);
 
 /**
  * maplibre_native_ffi_vulkan_surface_replacement_copy:
@@ -16447,7 +15948,7 @@ void maplibre_native_ffi_wayland_surface_descriptor_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_wayland_surface_descriptor_get_logical_size(
   const MaplibreNativeFfiWaylandSurfaceDescriptor* self
 );
@@ -16562,7 +16063,7 @@ void maplibre_native_ffi_wayland_surface_replacement_free(
  *
  * Returns: (transfer none): the value
  */
-const MaplibreNativeFfiLogicalSize*
+MaplibreNativeFfiLogicalSize*
 maplibre_native_ffi_wayland_surface_replacement_get_logical_size(
   const MaplibreNativeFfiWaylandSurfaceReplacement* self
 );

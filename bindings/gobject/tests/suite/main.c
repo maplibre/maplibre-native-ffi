@@ -432,8 +432,9 @@ static void a_dma_buf_ring_converts_its_formats(void) {
   MaplibreNativeFfiRuntime* runtime = create_runtime();
   MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 48);
   // NV12, which the library never renders, with a linear modifier.
-  MaplibreNativeFfiDmaBufFormat format = {.fourcc = 0x3231564e, .modifier = 0};
-  MaplibreNativeFfiDmaBufFormat* formats[] = {&format};
+  const MaplibreNativeFfiDmaBufFormat format = {
+    .fourcc = 0x3231564e, .modifier = 0
+  };
   g_autoptr(MaplibreNativeFfiDmaBufRingDescriptor) descriptor =
     maplibre_native_ffi_dma_buf_ring_descriptor_new();
   const MaplibreNativeFfiLogicalSize size = {.width = 64, .height = 48};
@@ -442,7 +443,7 @@ static void a_dma_buf_ring_converts_its_formats(void) {
   );
   maplibre_native_ffi_dma_buf_ring_descriptor_set_buffer_count(descriptor, 3);
   maplibre_native_ffi_dma_buf_ring_descriptor_set_formats(
-    descriptor, formats, 1
+    descriptor, &format, 1
   );
   g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
     maplibre_native_ffi_render_session_attach_options_new();
@@ -661,7 +662,7 @@ static void tile_answered(
 
 static void fetch_tile(
   MaplibreNativeFfiMap* map, const char* source_id,
-  const MaplibreNativeFfiCanonicalTileId* tile_id, gpointer user_data
+  MaplibreNativeFfiCanonicalTileId* tile_id, gpointer user_data
 ) {
   SourceCase* state = user_data;
   g_assert_cmpstr(source_id, ==, "custom");
@@ -763,7 +764,6 @@ static void attach_borrowed(Target* target, uint32_t backend) {
     MaplibreNativeFfiVulkanBorrowedTexture texture = {
       .image = info.vulkan_image, .image_view = info.vulkan_image_view
     };
-    MaplibreNativeFfiVulkanBorrowedTexture* textures[] = {&texture};
     g_autoptr(MaplibreNativeFfiVulkanBorrowedTextureDescriptor) descriptor =
       maplibre_native_ffi_vulkan_borrowed_texture_descriptor_new();
     maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_logical_size(
@@ -779,7 +779,7 @@ static void attach_borrowed(Target* target, uint32_t backend) {
       descriptor, vulkan
     );
     maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures(
-      descriptor, textures, 1
+      descriptor, &texture, 1
     );
     maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_format(
       descriptor, info.format
@@ -823,7 +823,6 @@ static void attach_borrowed(Target* target, uint32_t backend) {
     MaplibreNativeFfiOpenGlBorrowedTexture texture = {
       .texture = info.opengl_texture
     };
-    MaplibreNativeFfiOpenGlBorrowedTexture* textures[] = {&texture};
     g_autoptr(MaplibreNativeFfiOpenGlBorrowedTextureDescriptor) descriptor =
       maplibre_native_ffi_open_gl_borrowed_texture_descriptor_new();
     maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_logical_size(
@@ -839,7 +838,7 @@ static void attach_borrowed(Target* target, uint32_t backend) {
       descriptor, opengl
     );
     maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures(
-      descriptor, textures, 1
+      descriptor, &texture, 1
     );
     maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_target(
       descriptor, info.opengl_target

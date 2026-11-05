@@ -55,6 +55,7 @@ from .gobject_values import (
     CALL,
     HEADER,
     MACRO,
+    NAMESPACE,
     SOURCE,
     SYMBOL,
     THREADS,
@@ -533,13 +534,18 @@ class Emitter:
         if element.kind == "record":
             type_ = type_name(element.native)
             prefix = symbol_name(element.native)
-            call.parameters.append((f"{type_}* const*", name))
+            # A plain record's array is flat, as C's is.
+            flat = values.transparent(element)
+            item = f"&{name}[index]" if flat else f"{name}[index]"
+            call.parameters.append(
+                (f"const {type_}*" if flat else f"{type_}* const*", name)
+            )
             call.parameters.append((count_type, count))
             call.annotations[name] = f"(array length={count}){nullable}: the items"
             call.setup += (
                 f"  {element.native}* {local} = maplibre_native_ffi_call_alloc(&{CALL}, {count}, sizeof *{local});\n"
                 f"  for (gsize index = 0; index < (gsize){count}; index++) {{\n"
-                f"    {prefix}_to_native({name}[index], &{local}[index], &{CALL});\n  }}\n"
+                f"    {prefix}_to_native({item}, &{local}[index], &{CALL});\n  }}\n"
             )
         elif element.kind in {"scalar", "enum"}:
             call.parameters.append((f"const {values.gtype(element)}*", name))
@@ -1631,7 +1637,16 @@ def render(emitter: Emitter) -> dict[str, str]:
     constants_header, constants_source = emitter.constants()
     module_header, module_source = emitter.module_functions()
     guard_ = f"{MACRO}_VALUES_H"
+    # vapigen makes a boxed record a compact class unless its metadata names
+    # it a struct, which Vala copies by value as C does.
+    structs = sorted(
+        type_name(v.native).removeprefix(NAMESPACE)
+        for v in emitter.values.presented()
+        if emitter.values.transparent(v)
+    )
     files = {
+        f"{DIRECTORY}/vapi/{NAMESPACE}-0.metadata": "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+        + "".join(f"{name} struct\n" for name in [*structs, "CommandCompletion"]),
         f"{SOURCE}/maplibre-native-ffi-values.h": HEADER
         + f"#ifndef {guard_}\n#define {guard_}\n\n"
         + "#include <glib-object.h>\n\n"

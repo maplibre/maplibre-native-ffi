@@ -517,7 +517,9 @@ class Values:
             )
         name = type_name(value.native)
         if kind == "record" and self.transparent(value):
-            return f"const {name}*", f"&{place}", "(transfer none): the value"
+            # The member lives in the value, which a getter takes as const,
+            # and a binding copies it out.
+            return f"{name}*", f"({name}*)&{place}", "(transfer none): the value"
         nullable = " (nullable)" if kind == "union" or value.union_member else ""
         return f"{name}*", place, f"(transfer none){nullable}: the value"
 
@@ -558,11 +560,14 @@ class Values:
             if element.kind == "record":
                 prefix = symbol_name(element.native)
                 count = f"{name}_count"
+                # A plain record's array is flat, as C's is.
+                flat = self.transparent(element)
+                item = f"&{name}[index]" if flat else f"{name}[index]"
                 body = (
                     f"  GPtrArray* previous = {place};\n"
                     f"  {place} = g_ptr_array_new_full((guint){count}, (GDestroyNotify){prefix}_free);\n"
                     f"  for (gsize index = 0; index < {count}; index++) {{\n"
-                    f"    g_ptr_array_add({place}, {prefix}_copy({name}[index]));\n  }}\n"
+                    f"    g_ptr_array_add({place}, {prefix}_copy({item}));\n  }}\n"
                     "  if (previous != NULL) g_ptr_array_unref(previous);\n"
                 )
                 if value.nullable:
@@ -571,8 +576,13 @@ class Values:
                         f"    g_clear_pointer(&{place}, g_ptr_array_unref);\n"
                         "    return;\n  }\n" + body
                     )
+                array_type = (
+                    f"const {type_name(element.native)}*"
+                    if flat
+                    else f"{type_name(element.native)}* const*"
+                )
                 return (
-                    [(f"{type_name(element.native)}* const*", name), ("gsize", count)],
+                    [(array_type, name), ("gsize", count)],
                     {name: f"(array length={count}){nullable}: the items"},
                     body,
                 )
@@ -829,8 +839,9 @@ class Values:
     def lifecycle(
         self, value: ValuePlan, new_body: str, copy_body: str, free_body: str
     ) -> list[Function]:
+        """A value's constructor, without `new_body`, and its copy and free."""
         name, prefix = type_name(value.native), symbol_name(value.native)
-        return [
+        functions = [
             Function(
                 f"{prefix}_new",
                 f"{name}*",
@@ -857,6 +868,7 @@ class Values:
                 annotations={"self": "(transfer full) (nullable): the value"},
             ),
         ]
+        return functions if new_body else functions[1:]
 
     def private_prototypes(self, value: ValuePlan) -> str:
         name, prefix, native = (
@@ -916,9 +928,11 @@ class Values:
         )
         members = [f for f in value.fields if f.public]
         header = ""
+        # A host creates a plain struct as it would any struct, so it has no
+        # constructor, which would make Vala treat it as a class.
         functions = self.lifecycle(
             value,
-            f"  return g_new0({name}, 1);\n",
+            "",
             "  g_return_val_if_fail(self != NULL, NULL);\n  return g_memdup2(self, sizeof *self);\n",
             "  g_free(self);\n",
         )
@@ -1490,9 +1504,11 @@ class Values:
                     )
                 )
             elif kind in {"record", "union"}:
+                # A callback's record is the callback's own copy, and Vala
+                # writes a delegate's parameters without const.
                 out.append(
                     (
-                        f"const {type_name(unwrapped.native)}*",
+                        f"{type_name(unwrapped.native)}*",
                         parameter.name,
                         "(transfer none): the value",
                     )

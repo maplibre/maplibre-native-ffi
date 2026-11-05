@@ -1118,7 +1118,7 @@ maplibre_native_ffi_map_add_geo_json_source_data_finish(
 
 void maplibre_native_ffi_map_add_image_source_image_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  MaplibreNativeFfiLatLng* const* coordinates, gsize coordinate_count,
+  const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
   const MaplibreNativeFfiPremultipliedRgba8Image* image,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
@@ -1138,7 +1138,7 @@ void maplibre_native_ffi_map_add_image_source_image_async(
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &call_
     );
   }
   mln_premultiplied_rgba8_image image_native_;
@@ -2052,7 +2052,7 @@ maplibre_native_ffi_map_camera_for_lat_lng_bounds_finish(
 }
 
 void maplibre_native_ffi_map_camera_for_lat_lngs_async(
-  MaplibreNativeFfiMap* self, MaplibreNativeFfiLatLng* const* coordinates,
+  MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLng* coordinates,
   gsize coordinate_count, const MaplibreNativeFfiCameraFitOptions* fit_options,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
@@ -2068,7 +2068,7 @@ void maplibre_native_ffi_map_camera_for_lat_lngs_async(
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &call_
     );
   }
   mln_camera_fit_options fit_options_native_;
@@ -2505,7 +2505,7 @@ maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_finish(
 }
 
 void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
-  MaplibreNativeFfiMap* self, MaplibreNativeFfiLatLng* const* coordinates,
+  MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLng* coordinates,
   gsize coordinate_count, const MaplibreNativeFfiCameraFitUpdate* update,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
@@ -2525,7 +2525,7 @@ void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &call_
     );
   }
   mln_camera_fit_update update_native_;
@@ -5129,7 +5129,7 @@ maplibre_native_ffi_map_set_global_state_property_finish(
 
 void maplibre_native_ffi_map_set_image_source_coordinates_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  MaplibreNativeFfiLatLng* const* coordinates, gsize coordinate_count,
+  const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
@@ -5147,7 +5147,7 @@ void maplibre_native_ffi_map_set_image_source_coordinates_async(
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &call_
     );
   }
   GError* error_ = NULL;
@@ -6320,7 +6320,7 @@ maplibre_native_ffi_map_projection_lat_lng_for_pixel_unwrapped(
 
 GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
   MaplibreNativeFfiMapProjection* self,
-  MaplibreNativeFfiScreenPoint* const* points, gsize point_count, GError** error
+  const MaplibreNativeFfiScreenPoint* points, gsize point_count, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
@@ -6330,7 +6330,7 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
     maplibre_native_ffi_call_alloc(&call_, point_count, sizeof *points_native_);
   for (gsize index = 0; index < (gsize)point_count; index++) {
     maplibre_native_ffi_screen_point_to_native(
-      points[index], &points_native_[index], &call_
+      &points[index], &points_native_[index], &call_
     );
   }
   gsize out_coordinates_count_ = (gsize)((size_t)(point_count));
@@ -6360,7 +6360,7 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
 
 GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels_unwrapped(
   MaplibreNativeFfiMapProjection* self,
-  MaplibreNativeFfiScreenPoint* const* points, gsize point_count, GError** error
+  const MaplibreNativeFfiScreenPoint* points, gsize point_count, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
@@ -6370,7 +6370,7 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels_unwrapped(
     maplibre_native_ffi_call_alloc(&call_, point_count, sizeof *points_native_);
   for (gsize index = 0; index < (gsize)point_count; index++) {
     maplibre_native_ffi_screen_point_to_native(
-      points[index], &points_native_[index], &call_
+      &points[index], &points_native_[index], &call_
     );
   }
   gsize out_coordinates_count_ = (gsize)((size_t)(point_count));
@@ -6444,7 +6444,7 @@ maplibre_native_ffi_map_projection_pixel_for_lat_lng(
 
 GPtrArray* maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
   MaplibreNativeFfiMapProjection* self,
-  MaplibreNativeFfiLatLng* const* coordinates, gsize coordinate_count,
+  const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
   GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), NULL);
@@ -6456,7 +6456,7 @@ GPtrArray* maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &call_
     );
   }
   gsize out_points_count_ = (gsize)((size_t)(coordinate_count));

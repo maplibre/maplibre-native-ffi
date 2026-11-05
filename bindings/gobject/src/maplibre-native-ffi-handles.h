@@ -509,7 +509,7 @@ maplibre_native_ffi_map_add_geo_json_source_data_finish(
  */
 void maplibre_native_ffi_map_add_image_source_image_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  MaplibreNativeFfiLatLng* const* coordinates, gsize coordinate_count,
+  const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
   const MaplibreNativeFfiPremultipliedRgba8Image* image,
   GAsyncReadyCallback callback, gpointer user_data
 );
@@ -1122,7 +1122,7 @@ maplibre_native_ffi_map_camera_for_lat_lng_bounds_finish(
  *   `fit_options` leaves no room for the area.
  */
 void maplibre_native_ffi_map_camera_for_lat_lngs_async(
-  MaplibreNativeFfiMap* self, MaplibreNativeFfiLatLng* const* coordinates,
+  MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLng* coordinates,
   gsize coordinate_count, const MaplibreNativeFfiCameraFitOptions* fit_options,
   GAsyncReadyCallback callback, gpointer user_data
 );
@@ -1399,7 +1399,7 @@ maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_finish(
  *   whether it succeeds.
  */
 void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
-  MaplibreNativeFfiMap* self, MaplibreNativeFfiLatLng* const* coordinates,
+  MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLng* coordinates,
   gsize coordinate_count, const MaplibreNativeFfiCameraFitUpdate* update,
   GAsyncReadyCallback callback, gpointer user_data
 );
@@ -2936,7 +2936,7 @@ maplibre_native_ffi_map_set_global_state_property_finish(
  */
 void maplibre_native_ffi_map_set_image_source_coordinates_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  MaplibreNativeFfiLatLng* const* coordinates, gsize coordinate_count,
+  const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -3687,7 +3687,7 @@ maplibre_native_ffi_map_projection_lat_lng_for_pixel_unwrapped(
  */
 GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
   MaplibreNativeFfiMapProjection* self,
-  MaplibreNativeFfiScreenPoint* const* points, gsize point_count, GError** error
+  const MaplibreNativeFfiScreenPoint* points, gsize point_count, GError** error
 );
 
 /**
@@ -3704,7 +3704,7 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
  */
 GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels_unwrapped(
   MaplibreNativeFfiMapProjection* self,
-  MaplibreNativeFfiScreenPoint* const* points, gsize point_count, GError** error
+  const MaplibreNativeFfiScreenPoint* points, gsize point_count, GError** error
 );
 
 /**
@@ -3756,7 +3756,7 @@ maplibre_native_ffi_map_projection_pixel_for_lat_lng(
  */
 GPtrArray* maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
   MaplibreNativeFfiMapProjection* self,
-  MaplibreNativeFfiLatLng* const* coordinates, gsize coordinate_count,
+  const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
   GError** error
 );
 

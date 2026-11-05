@@ -272,6 +272,7 @@
     "bindings/gobject/src/maplibre-native-ffi-values-private.h",
     "bindings/gobject/src/maplibre-native-ffi-values.c",
     "bindings/gobject/src/maplibre-native-ffi-values.h",
+    "bindings/gobject/vapi/MaplibreNativeFfi-0.metadata",
     "bindings/kotlin/src/androidMain/jni/mln_jni_generated.c",
     "bindings/kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/GeneratedAndroidOperations.kt",
     "bindings/kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt",

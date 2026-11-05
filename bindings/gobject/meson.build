@@ -88,5 +88,6 @@ gnome.generate_vapi(
   package,
   sources: gir[0],
   packages: ['gio-2.0'],
+  metadata_dirs: [meson.current_source_dir() / 'vapi'],
   install: true,
 )
