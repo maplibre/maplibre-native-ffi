@@ -34,6 +34,7 @@ add_project_arguments(
 )
 
 headers = files(
+  'src/maplibre-native-ffi-command-completion.h',
   'src/maplibre-native-ffi-enums.h',
   'src/maplibre-native-ffi-handles.h',
   'src/maplibre-native-ffi-values.h',

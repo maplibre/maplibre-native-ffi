@@ -266,6 +266,7 @@
     "bindings/go/maplibre/generated_callbacks.h",
     "bindings/gobject/src/maplibre-native-ffi-enums.c",
     "bindings/gobject/src/maplibre-native-ffi-enums.h",
+    "bindings/gobject/src/maplibre-native-ffi-handles-private.h",
     "bindings/gobject/src/maplibre-native-ffi-handles.c",
     "bindings/gobject/src/maplibre-native-ffi-handles.h",
     "bindings/gobject/src/maplibre-native-ffi-values-private.h",

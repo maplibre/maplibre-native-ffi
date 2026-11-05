@@ -9,6 +9,7 @@ from tools.bindgen.emitters import (
     dart,
     dotnet,
     go,
+    gobject,
     kotlin,
     python,
     rust,
@@ -163,6 +164,21 @@ mln_status mln_windows_start(mln_diagnostic *out_diagnostic);
         self.assertIn("//go:build windows\n", generated["generated_api_windows.go"])
         self.assertIn("func WindowsStart(", generated["generated_api_windows.go"])
         self.assertNotIn("WindowsStart", generated["generated_api.go"])
+
+    def test_gobject_compiles_a_function_only_for_the_platforms_it_serves(self):
+        generated = emitted(gobject, api())
+        header = generated["src/maplibre-native-ffi-handles.h"]
+        self.assertIn(
+            "#if defined(__APPLE__)\n/**\n * maplibre_native_ffi_map_use_metal:", header
+        )
+        self.assertIn(
+            "#if defined(__APPLE__)\ngboolean maplibre_native_ffi_map_use_metal(",
+            generated["src/maplibre-native-ffi-handles.c"],
+        )
+        self.assertIn("gboolean maplibre_native_ffi_map_redraw(", header)
+        # The library serves neither Android nor the browser.
+        self.assertNotIn("android_start", header)
+        self.assertNotIn("attach_canvas", header)
 
     def test_dotnet_marks_the_platforms_that_a_function_serves(self):
         generated = "\n".join(emitted(dotnet, api()).values())

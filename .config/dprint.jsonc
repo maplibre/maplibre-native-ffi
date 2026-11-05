@@ -90,7 +90,11 @@
     "UseTab": "Never",
     "AlignAfterOpenBracket": "BlockIndent",
     "IncludeBlocks": "Regroup",
-    "overrides": [{ "files": "**/docsnippets/**", "ColumnLimit": 70 }],
+    "overrides": [
+      { "files": "**/docsnippets/**", "ColumnLimit": 70 },
+      // g-ir-scanner reads a gtk-doc annotation only from a single line.
+      { "files": "**/gobject/src/**", "ReflowComments": false },
+    ],
     "IncludeCategories": [
       { "Regex": "^<[a-zA-Z0-9_]+>$", "Priority": -100 },
       { "Regex": "^<mln/.*>$", "Priority": -60 },

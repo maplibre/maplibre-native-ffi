@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#MISE description="Build and run the GObject library's GTest suite and GJS smoke test against the installed library."
+#MISE extends="ffi:preset"
+#MISE depends=[{ task = ":build", args = ["{{usage.preset}}"] }]
+#MISE shell="bash"
+set -euo pipefail
+
+install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sources="$PWD/tests"
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
+export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
+package=maplibre-native-ffi-gobject-0
+
+# The suite renders with the graphics objects of the C suite's fixtures.
+# shellcheck disable=SC2046 # pkg-config prints one flag per word.
+cc -std=c11 -Wall -Wextra -Werror "$sources/suite/main.c" \
+  $(pkg-config --cflags --libs "$package" mln-test-graphics) -o "$scratch/suite"
+"$scratch/suite"
+
+case "$(uname -s)" in
+  Darwin) export DYLD_LIBRARY_PATH="$install_dir/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" ;;
+  *) export LD_LIBRARY_PATH="$install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+esac
+GI_TYPELIB_PATH="$install_dir/lib/girepository-1.0" gjs -m "$sources/smoke/main.js"

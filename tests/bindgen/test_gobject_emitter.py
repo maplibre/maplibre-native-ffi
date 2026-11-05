@@ -5,7 +5,6 @@ import unittest
 from support import emitted, parse, real_api
 
 from tools.bindgen.emitters import gobject
-from tools.bindgen.model import Unsupported
 from tools.bindgen.schema import validate
 
 ENUMS = "src/maplibre-native-ffi-enums.h"
@@ -37,8 +36,17 @@ mln_status mln_widen(mln_wide_flags flags, mln_diagnostic *out_diagnostic);
             defines=("MLN_PROTOCOL_STANDARD_TYPES",),
         )
         validate(api)
-        with self.assertRaisesRegex(Unsupported, "MLN_WIDE_FLAG_HIGH"):
-            gobject.lower(api)
+        lowered = emitted(gobject, api)
+        # A wider bitmask is an integer type with a constant for each bit.
+        self.assertIn("typedef guint64 MaplibreNativeFfiWideFlag;\n", lowered[ENUMS])
+        self.assertIn(
+            "#define MAPLIBRE_NATIVE_FFI_WIDE_FLAG_HIGH"
+            " ((MaplibreNativeFfiWideFlag)G_GUINT64_CONSTANT(1099511627776))\n",
+            lowered[ENUMS],
+        )
+        self.assertNotIn(
+            "G_DEFINE_FLAGS_TYPE", lowered["src/maplibre-native-ffi-enums.c"]
+        )
 
 
 if __name__ == "__main__":
