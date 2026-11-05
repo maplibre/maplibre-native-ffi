@@ -9,7 +9,10 @@ set -euo pipefail
 # does: the C program through the installed header and pkg-config file, the
 # Vala program through the installed VAPI, and the GJS program through the
 # installed typelib.
-install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+#
+# Where a target builds the library itself, MLN_FFI_GOBJECT_PREFIX names the
+# prefix it installed into, beside a copy of the native install.
+install_dir=${MLN_FFI_GOBJECT_PREFIX:-"$MISE_MONOREPO_ROOT/build/$usage_preset/install"}
 sources="$PWD/tests/package"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT

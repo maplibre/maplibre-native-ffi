@@ -167,14 +167,14 @@ link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
 [[entry]]
 bindings = ["gobject"]
-platforms = ["linux-musl", "freebsd", "windows", "windows-mingw"]
+platforms = ["freebsd", "windows", "windows-mingw"]
 status = "path-known"
-reason = "The library builds against the system's GLib, gobject-introspection, Vala, and GJS, which CI installs only on Linux (GNU) and macOS. Alpine, FreeBSD, and MSYS2 package them."
+reason = "The library builds against the system's GLib, gobject-introspection, Vala, and GJS, which CI installs only on Linux and macOS. FreeBSD and MSYS2 package them."
 link = "https://github.com/maplibre/maplibre-native-ffi/issues/119"
 
 [[entry]]
 bindings = ["gobject"]
-platforms = ["linux-gnu"]
+platforms = ["linux-gnu", "linux-musl"]
 archs = ["riscv64", "loongarch64"]
 status = "path-known"
 reason = "These targets cross-compile on an x64 runner and run under QEMU, without the target architecture's GLib and GJS to build and run against."
