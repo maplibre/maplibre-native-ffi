@@ -325,10 +325,10 @@ namespace Example {
 			maplibre_map = runtime.create_map (options);
 			map_scale_factor = scale;
 			yield maplibre_map.ready_async ();
-			var update = new CameraUpdate ();
-			update.set_mode (CameraUpdateMode.JUMP);
-			update.set_camera (camera);
-			maplibre_map.update_camera_async.begin (update);
+			maplibre_map.update_camera_async.begin (new CameraUpdate () {
+				mode = CameraUpdateMode.JUMP,
+				camera = camera,
+			});
 			maplibre_map.set_style_url_async.begin (STYLE_URL);
 			show_status ("Loading the style…");
 			// The next pass attaches a session at the size GTK reports then.
@@ -376,21 +376,24 @@ namespace Example {
 		// Attaches a session that renders into a ring of dmabufs in formats
 		// that this display imports.
 		private async void attach (LogicalSize size) throws GLib.Error {
-			var descriptor = new DmaBufRingDescriptor ();
-			descriptor.set_logical_size (size);
-			// The session renders into one buffer while GTK holds two: the
-			// frame it shows, and the one the compositor hasn't let go of yet.
-			descriptor.set_buffer_count (3);
+			var descriptor = new DmaBufRingDescriptor () {
+				logical_size = size,
+				// The session renders into one buffer while GTK holds two:
+				// the frame it shows, and the one the compositor hasn't let
+				// go of yet.
+				buffer_count = 3,
+			};
 			descriptor.set_formats (dma_buf_formats (display));
 
 			var number = ++session_number;
-			var options = new RenderSessionAttachOptions ();
-			options.set_driver (RenderDriverKind.CORE_WORKER);
-			// GdkDmabufTextureBuilder takes no sync file, so each frame
-			// finishes rendering before the session hands it over.
-			options.set_producer_sync_kinds (GpuSyncKindFlag.CPU_COMPLETE);
-			options.set_redraw_wake (session_wake (this, number, false));
-			options.set_frame_wake (session_wake (this, number, true));
+			var options = new RenderSessionAttachOptions () {
+				driver = RenderDriverKind.CORE_WORKER,
+				// GdkDmabufTextureBuilder takes no sync file, so each frame
+				// finishes rendering before the session hands it over.
+				producer_sync_kinds = GpuSyncKindFlag.CPU_COMPLETE,
+				redraw_wake = session_wake (this, number, false),
+				frame_wake = session_wake (this, number, true),
+			};
 
 			session = maplibre_map.attach_dma_buf_ring (descriptor, null, options);
 			session_size = size;
