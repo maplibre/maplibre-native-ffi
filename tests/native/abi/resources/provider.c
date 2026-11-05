@@ -940,7 +940,7 @@ static void a_not_modified_answer_delivers_the_cached_style(void) {
      }},
   };
   mln_test_provider* provider = mln_test_provider_create(resources, 1);
-  mln_runtime runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_caching_runtime();
   mln_test_provider_install(runtime, provider);
   mln_map first = load_style(runtime, cached_style_url);
   const mln_test_provider_request* initial =
@@ -969,7 +969,7 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
      .later_held = true},
   };
   mln_test_provider* provider = mln_test_provider_create(resources, 1);
-  mln_runtime runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_caching_runtime();
   mln_test_provider_install(runtime, provider);
   mln_map first = load_style(runtime, cached_style_url);
 

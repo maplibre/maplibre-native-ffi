@@ -109,24 +109,25 @@ static void apply_change(mln_runtime runtime, const cache_case* row) {
   }
 }
 
+static const mln_test_provided_resource fresh_style[] = {
+  {.url = cached_style_url,
+   .response = {
+     .fields = MLN_RESOURCE_RESPONSE_EXPIRES,
+     .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+     .bytes = (const uint8_t*)cached_style_json,
+     .byte_count = sizeof(cached_style_json) - 1,
+     .etag = MLN_BUFFER_LITERAL("\"ambient\""),
+     // Fresh until 2100, so only a cache change makes it stale.
+     .expires_unix_ms = 4102444800000,
+   }},
+};
+
 static void ambient_cache_changes_reach_the_next_request(void) {
-  static const mln_test_provided_resource resources[] = {
-    {.url = cached_style_url,
-     .response = {
-       .fields = MLN_RESOURCE_RESPONSE_EXPIRES,
-       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-       .bytes = (const uint8_t*)cached_style_json,
-       .byte_count = sizeof(cached_style_json) - 1,
-       .etag = MLN_BUFFER_LITERAL("\"ambient\""),
-       // Fresh until 2100, so only a cache change makes it stale.
-       .expires_unix_ms = 4102444800000,
-     }},
-  };
   for (size_t index = 0; index < sizeof(cache_cases) / sizeof(cache_cases[0]);
        index += 1) {
     const cache_case* row = &cache_cases[index];
-    mln_test_provider* provider = mln_test_provider_create(resources, 1);
-    mln_runtime runtime = mln_test_create_runtime();
+    mln_test_provider* provider = mln_test_provider_create(fresh_style, 1);
+    mln_runtime runtime = mln_test_create_caching_runtime();
     mln_test_provider_install(runtime, provider);
     mln_map first = load_style(runtime);
     apply_change(runtime, row);
@@ -180,7 +181,7 @@ static void revalidation_keeps_omitted_cache_validators(void) {
      }},
   };
   mln_test_provider* provider = mln_test_provider_create(resources, 1);
-  mln_runtime runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_caching_runtime();
   mln_test_provider_install(runtime, provider);
   mln_map first = load_style(runtime);
   const cache_case invalidate = {
@@ -213,6 +214,31 @@ static void revalidation_keeps_omitted_cache_validators(void) {
   TEST_ASSERT_TRUE_MESSAGE(
     kept_modified, "304 keeps the cached modification time"
   );
+}
+
+// The browser's HTTP cache already holds what an in-memory ambient cache would.
+static void only_the_browser_starts_without_an_ambient_cache(void) {
+#if defined(__EMSCRIPTEN__)
+  const bool cached = false;
+#else
+  const bool cached = true;
+#endif
+  mln_test_provider* provider = mln_test_provider_create(fresh_style, 1);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  mln_map first = load_style(runtime);
+  mln_map second = load_style(runtime);
+  TEST_ASSERT_TRUE(
+    mln_test_provider_wait_for_requests(provider, cached_style_url, 2)
+  );
+  const mln_test_provider_request* next =
+    mln_test_provider_request_at(provider, cached_style_url, 1);
+  TEST_ASSERT_NOT_NULL(next);
+  TEST_ASSERT_EQUAL(cached, next->has_prior_etag);
+  mln_test_destroy_map(second);
+  mln_test_destroy_map(first);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
 }
 
 typedef struct shared_cache_probe {
@@ -297,5 +323,6 @@ MLN_TEST_GROUP {
   RUN_TEST(ambient_cache_calls_validate_their_arguments);
   RUN_TEST(ambient_cache_changes_reach_the_next_request);
   RUN_TEST(revalidation_keeps_omitted_cache_validators);
+  RUN_TEST(only_the_browser_starts_without_an_ambient_cache);
   RUN_TEST(two_runtimes_can_use_the_same_cache_database);
 }

@@ -31,6 +31,10 @@ mln_status mln_test_set_http_header_transform(
 );
 mln_status mln_test_clear_http_header_transform(mln_runtime runtime);
 
+// A runtime whose ambient cache keeps what maps load. A browser runtime without
+// a cache file starts with no ambient cache, so this one gives it a budget.
+mln_runtime mln_test_create_caching_runtime(void);
+
 bool mln_test_await_loading_failure(
   mln_runtime runtime, mln_map map, char* out_message, size_t capacity
 );
