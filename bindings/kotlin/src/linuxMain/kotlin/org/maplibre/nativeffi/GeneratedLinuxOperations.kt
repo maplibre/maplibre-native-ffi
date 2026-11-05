@@ -90,7 +90,7 @@ public fun VulkanDeviceHandle.Companion.create(
         diagnostic,
       ),
     )
-    adopt(out, GeneratedOwnerDisposal::vulkanDevice) { VulkanDeviceHandle(it) }
+    adopt(out, GeneratedOwnerDisposal::vulkanDevice) { VulkanDeviceHandle.wrap(it) }
   }
 
 /**
@@ -138,7 +138,7 @@ public fun MapHandle.attachDmaBufRing(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachDmaBufRing, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachDmaBufRing, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -172,7 +172,9 @@ public fun MapHandle.attachVulkanBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachVulkanBorrowedTexture, ready) },
+      { created, ready ->
+        RenderSessionHandle.wrap(created, this@attachVulkanBorrowedTexture, ready)
+      },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -205,7 +207,7 @@ public fun MapHandle.attachVulkanSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachVulkanSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachVulkanSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -255,7 +257,7 @@ public fun MapHandle.attachWaylandSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachWaylandSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachWaylandSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )

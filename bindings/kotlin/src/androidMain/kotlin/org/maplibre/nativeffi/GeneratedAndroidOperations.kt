@@ -58,7 +58,7 @@ public fun androidFramePacerCreate(options: FramePacerOptions? = null): FramePac
         diagnostic,
       ),
     )
-    adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle(it) }
+    adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle.wrap(it) }
   }
 
 /**
@@ -111,7 +111,7 @@ public fun MapHandle.attachAndroidHardwareBufferRing(
       },
       GeneratedOwnerDisposal::renderSession,
       { created, ready ->
-        RenderSessionHandle(created, this@attachAndroidHardwareBufferRing, ready)
+        RenderSessionHandle.wrap(created, this@attachAndroidHardwareBufferRing, ready)
       },
       { it.bindingCallbacks },
       { it.dispose() },
@@ -164,7 +164,7 @@ public fun MapHandle.attachAndroidSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachAndroidSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachAndroidSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )

@@ -261,7 +261,7 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 'return &MapHandle{bindingBorrow(raw, "MapHandle")}',
             ),
             kotlin: (
-                "value.callback(MapHandle(map, borrowed = true), ",
+                "value.callback(MapHandle.wrap(map, borrowed = true), ",
                 'HandleState("MapHandle", handle, GeneratedOwnerDisposal::map, borrowed)',
             ),
             python: (

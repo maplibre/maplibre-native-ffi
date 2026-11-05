@@ -55,7 +55,7 @@ internal object Upcalls {
       false,
     ) { value ->
       value.fetchTile(
-        MapHandle(map, null, borrowed = true),
+        MapHandle.wrap(map, null, borrowed = true),
         readViewString(sourceId),
         readCanonicalTileId(tileId),
       )
@@ -77,7 +77,7 @@ internal object Upcalls {
     ) { value ->
       val invoke = value.cancelTile ?: return@upcall false
       invoke(
-        MapHandle(map, null, borrowed = true),
+        MapHandle.wrap(map, null, borrowed = true),
         readViewString(sourceId),
         readCanonicalTileId(tileId),
       )
@@ -98,7 +98,7 @@ internal object Upcalls {
       false,
     ) { value ->
       value.fetchTile(
-        MapHandle(map, null, borrowed = true),
+        MapHandle.wrap(map, null, borrowed = true),
         readViewString(sourceId),
         readCanonicalTileId(tileId),
       )
@@ -120,7 +120,7 @@ internal object Upcalls {
     ) { value ->
       val invoke = value.cancelTile ?: return@upcall false
       invoke(
-        MapHandle(map, null, borrowed = true),
+        MapHandle.wrap(map, null, borrowed = true),
         readViewString(sourceId),
         readCanonicalTileId(tileId),
       )
@@ -150,7 +150,7 @@ internal object Upcalls {
 
   @JvmStatic
   fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Unit = run {
-    val handleOwner = ResourceRequestHandle(handle)
+    val handleOwner = ResourceRequestHandle.wrap(handle)
     if (
       !upcall<ResourceProvider, Boolean>("mln_resource_provider_callback", userData, false) { value
         ->
@@ -164,7 +164,7 @@ internal object Upcalls {
 
   @JvmStatic
   fun resourceTransformCallback(userData: Long, kind: Int, url: Long, request: Long): Unit = run {
-    val requestOwner = ResourceTransformRequestHandle(request)
+    val requestOwner = ResourceTransformRequestHandle.wrap(request)
     if (
       !upcall<ResourceTransform, Boolean>("mln_resource_transform_callback", userData, false) {
         value ->

@@ -20,7 +20,7 @@ internal object ThreadedUpcalls {
         invoke(
           ResourceKind(kind.toUInt()),
           readViewString(url),
-          HttpHeaderTransformResponse(outResponse, scope),
+          HttpHeaderTransformResponse.wrap(outResponse, scope),
         )
       }
       0

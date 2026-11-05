@@ -16,7 +16,7 @@ case "$usage_preset" in
     ./gradlew :bindings:kotlin:jvmDeviceTestClasspath
     install="$PWD/build/$usage_preset/install"
     suite="$PWD/bindings/kotlin/build/jvm-device-test"
-    classpath="$suite/classes:$suite/lib/*"
+    classpath="$suite/classes:$suite/main:$suite/lib/*"
     export MLN_FFI_DEVICE_INSTALL="$install" MLN_FFI_DEVICE_TIMEOUT=900
     export MLN_FFI_MUSL_TEST_IMAGE=eclipse-temurin:25-jre-alpine
     if [[ "$usage_preset" == freebsd-* ]]; then

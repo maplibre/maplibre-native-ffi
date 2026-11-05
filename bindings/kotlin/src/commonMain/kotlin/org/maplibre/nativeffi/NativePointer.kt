@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 
 /** Opaque borrowed native address value used for backend interop handles. */
@@ -55,6 +56,7 @@ private constructor(private val addressValue: Long, private val scope: ViewScope
     public fun ofAddress(address: Long): NativePointer =
       if (address == 0L) NULL_POINTER else NativePointer(address, null)
 
+    @JvmSynthetic
     internal fun scoped(address: Long, scope: ViewScope): NativePointer =
       if (address == 0L) NULL_POINTER else NativePointer(address, scope)
   }

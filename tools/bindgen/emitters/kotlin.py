@@ -133,6 +133,9 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 """
 
+# An optional expectation, which only the shared source sets can name.
+SYNTHETIC_IMPORT = "import org.maplibre.nativeffi.internal.JvmSynthetic\n"
+
 # What a call that waits for a thread to start does on each target, which the C
 # reference cannot say.
 THREAD_START_NOTE = (
@@ -479,7 +482,8 @@ def lower(api: Api | BoundApi) -> Lowered:
                 else "CallbackOwner()"
             )
             body.insert(
-                0, f"  internal val bindingCallbacks: CallbackOwner = {callbacks}\n"
+                0,
+                f"  @get:JvmSynthetic internal val bindingCallbacks: CallbackOwner = {callbacks}\n",
             )
         trailer = ""
         commands = [p for p in common if p.completion and p.completion.discardable]
@@ -502,9 +506,9 @@ def lower(api: Api | BoundApi) -> Lowered:
             trailer = (
                 f"\n/** The commands of a [{class_name}] that drop their completions. */\n"
                 f"@JvmInline\npublic value class {view} internal constructor(internal val owner: {class_name}) {{\n"
-                f"  internal val binding get() = owner.binding\n"
+                f"  @get:JvmSynthetic internal val binding get() = owner.binding\n"
                 + (
-                    "  internal val bindingCallbacks get() = owner.bindingCallbacks\n"
+                    "  @get:JvmSynthetic internal val bindingCallbacks get() = owner.bindingCallbacks\n"
                     if any(p.registrations for p in commands) or split_commands
                     else ""
                 )
@@ -568,6 +572,7 @@ def lower(api: Api | BoundApi) -> Lowered:
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
             "package org.maplibre.nativeffi\n\n"
             + OPERATION_IMPORTS
+            + ("" if lowering == kotlin_callbacks.ASYNC else SYNTHETIC_IMPORT)
             + "import org.maplibre.nativeffi.internal.delivery.HostDelivery\n\n"
             + "\n\n".join([*declarations, *codecs])
             + "\n\n"
@@ -584,13 +589,14 @@ def lower(api: Api | BoundApi) -> Lowered:
             [bound.operations_by_name[f.name] for f in functions],
             factories,
             members,
-            OPERATION_IMPORTS,
+            OPERATION_IMPORTS + SYNTHETIC_IMPORT,
         )
     )
     outputs[f"{COMMON}/GeneratedOwnerDisposal.kt"] = (
         "// Generated from handle disposal relationships by tools/bindgen. Do not edit.\n"
         "package org.maplibre.nativeffi\n\n"
-        "import org.maplibre.nativeffi.internal.c.C\n"
+        + SYNTHETIC_IMPORT
+        + "import org.maplibre.nativeffi.internal.c.C\n"
         "import org.maplibre.nativeffi.internal.status.NativeDiagnostics\n\n"
         + owner_disposal(bound, native)
     )

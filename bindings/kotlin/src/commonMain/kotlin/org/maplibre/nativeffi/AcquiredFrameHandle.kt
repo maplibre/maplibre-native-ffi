@@ -1,6 +1,7 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -13,10 +14,11 @@ import org.maplibre.nativeffi.internal.memory.*
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class AcquiredFrameHandle
-internal constructor(
+private constructor(
   handle: Long,
   @Suppress("unused") private val parent: RenderSessionHandle,
 ) {
+  @get:JvmSynthetic
   internal val binding =
     HandleState("AcquiredFrameHandle", handle, GeneratedOwnerDisposal::acquiredFrame)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
@@ -122,4 +124,11 @@ internal constructor(
 
   override fun toString(): String =
     "AcquiredFrameHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
+
+  internal companion object {
+    /** Creates the owner of `handle`. */
+    @JvmSynthetic
+    internal fun wrap(handle: Long, parent: RenderSessionHandle): AcquiredFrameHandle =
+      AcquiredFrameHandle(handle, parent)
+  }
 }

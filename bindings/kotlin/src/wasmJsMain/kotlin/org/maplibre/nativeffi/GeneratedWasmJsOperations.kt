@@ -57,7 +57,9 @@ public fun MapHandle.attachWebGpuBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachWebGpuBorrowedTexture, ready) },
+      { created, ready ->
+        RenderSessionHandle.wrap(created, this@attachWebGpuBorrowedTexture, ready)
+      },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -90,7 +92,7 @@ public fun MapHandle.attachWebGpuSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachWebGpuSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachWebGpuSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )

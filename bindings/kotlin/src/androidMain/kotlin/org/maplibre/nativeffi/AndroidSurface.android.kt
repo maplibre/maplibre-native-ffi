@@ -46,7 +46,7 @@ public fun MapHandle.attachAndroidSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachAndroidSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachAndroidSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )

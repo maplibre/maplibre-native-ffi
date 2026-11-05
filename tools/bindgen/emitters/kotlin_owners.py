@@ -74,6 +74,12 @@ def releases(bound, native, plans):
     return result
 
 
+def indent(source, prefix):
+    return "".join(
+        prefix + line if line.strip() else line for line in source.splitlines(True)
+    )
+
+
 def generate_owners(bound, plans, factories, members, imports):
     """Every handle's owner, which declares its handle's operations. The owner
     of a handle with factories has a companion object, which declares the
@@ -105,26 +111,39 @@ def owner(bound, native, plans, factories, members, imports):
     # nothing disposes its handle.
     borrowable = native in bound.borrowed_handles
     parameters = ["handle: Long"]
+    # The factory's parameters, which the private constructor mirrors.
+    factory = ["handle: Long"]
     if handle.parent:
         # The owner, not its state, keeps the parent reachable, so leak cleanup
         # and exit abandonment never hold a parent.
-        parameters.append(
-            f'@Suppress("unused") private val parent: {owner_name(bound.handles[handle.parent])}'
-            + ("?" if borrowable else "")
-        )
+        parent = owner_name(bound.handles[handle.parent]) + ("?" if borrowable else "")
+        parameters.append(f'@Suppress("unused") private val parent: {parent}')
+        factory.append(f"parent: {parent}")
     readied = bound.readied_handles.get(native)
     if readied:
         # A handle that no attach created, such as a borrowed one, is ready.
         parameters.append(
             f"/** Completes once the {readied} is ready, and fails with a [MaplibreException] "
             f"when it fails to become ready. The {readied} takes calls before then. */\n"
-            "  public val ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit)"
+            "  public val ready: Deferred<Unit>"
+        )
+        factory.append(
+            "ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit)"
         )
     if borrowable:
-        parameters.append("borrowed: Boolean = false")
+        parameters.append("borrowed: Boolean")
+        factory.append("borrowed: Boolean = false")
+    arguments = ", ".join(p.split(":")[0] for p in factory)
+    # Java sees an internal constructor as public, and a handle that Java forged
+    # would dispose the real one, so only this factory creates an owner.
+    wrap = (
+        "/** Creates the owner of `handle`. */\n"
+        f"@JvmSynthetic internal fun wrap({', '.join(factory)}): {owner_class} =\n"
+        f"  {owner_class}({arguments})\n"
+    )
     dispose = family[0].lower() + family[1:]
     body = [
-        f'  internal val binding = {state_type(native, plans)}("{owner_class}", handle, GeneratedOwnerDisposal::{dispose}'
+        f'  @get:JvmSynthetic internal val binding = {state_type(native, plans)}("{owner_class}", handle, GeneratedOwnerDisposal::{dispose}'
         + (", borrowed)" if borrowable else ")"),
         (
             '  @Suppress("unused") private val cleanup = if (borrowed) null else disposeWhenUnreachable(this, binding)'
@@ -167,22 +186,23 @@ def owner(bound, native, plans, factories, members, imports):
     body.append(
         f'  override fun toString(): String = "{owner_class}(id=0x${{binding.handle.toString(16)}}, closed=$isClosed)"'
     )
-    if any(plan.factory == native for plan in plans):
-        body.append(
-            "  public companion object {\n"
-            + "\n".join(
-                "".join("  " + line if line else line for line in f.splitlines(True))
-                for f in factories
-            )
-            + "  }"
-        )
+    # A handle without public factories hides its companion from Kotlin. Java
+    # can still read it, but can't call its members.
+    companion = (
+        "public" if any(plan.factory == native for plan in plans) else "internal"
+    )
+    body.append(
+        f"  {companion} companion object {{\n"
+        + "\n".join(indent(f, "  ") for f in [*factories, indent(wrap, "  ")])
+        + "  }"
+    )
     return (
         "// Generated from handle ownership plans by tools/bindgen. Do not edit.\n"
         "package org.maplibre.nativeffi\n\n"
         + imports
         + "\n"
         + doc(bound, native)
-        + f"public class {owner_class} internal constructor(\n  "
+        + f"public class {owner_class} private constructor(\n  "
         + ",\n  ".join(parameters)
         + ",\n)"
         + (f" : {', '.join(supertypes)}" if supertypes else "")

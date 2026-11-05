@@ -2,6 +2,7 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmInline
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.callback.NativeRegistration
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.values.flagLabel
@@ -1828,7 +1829,7 @@ public class AndroidHardwareBufferFrame(
   /** The `AHardwareBuffer*`. */
   buffer: NativePointer,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedBuffer: NativePointer = buffer
   public val buffer: NativePointer
     get() {
@@ -1875,7 +1876,7 @@ public class DmaBufFrame(
    */
   planes: List<DmaBufPlane>,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedPlanes: List<DmaBufPlane> = planes
   public val planes: List<DmaBufPlane>
     get() {
@@ -1901,7 +1902,7 @@ public class DxgiSharedTextureFrame(
   /** The texture's shared NT `HANDLE`. */
   handle: NativePointer,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedHandle: NativePointer = handle
   public val handle: NativePointer
     get() {
@@ -1925,7 +1926,7 @@ public class IoSurfaceFrame(
   /** The `IOSurfaceRef`. */
   surface: NativePointer,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedSurface: NativePointer = surface
   public val surface: NativePointer
     get() {
@@ -1953,7 +1954,7 @@ public class MetalTextureFrame(
   /** The texture's MTLPixelFormat. */
   public val pixelFormat: ULong,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: NativePointer = texture
   public val texture: NativePointer
     get() {
@@ -1984,7 +1985,7 @@ public class OpenGlTextureFrame(
   texture: UInt,
   public val target: UInt,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: UInt = texture
   public val texture: UInt
     get() {
@@ -2005,7 +2006,7 @@ public class GpuSync(
   handle: ULong = 0uL,
   public val value: ULong = 0uL,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedHandle: ULong = handle
   public val handle: ULong
     get() {
@@ -2212,7 +2213,7 @@ public class VulkanTextureFrame(
   /** The VkImageLayout that the frame left the image in. */
   public val layout: UInt,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedImage: ULong = image
   public val image: ULong
     get() {
@@ -2256,7 +2257,7 @@ public class WebGpuTextureFrame(
   /** The texture's WGPUTextureFormat. */
   public val format: UInt,
 ) {
-  internal var bindingScope: ViewScope? = null
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: NativePointer = texture
   public val texture: NativePointer
     get() {
@@ -4732,15 +4733,22 @@ public fun interface CameraTransitionEndCallback {
  */
 @ConsistentCopyVisibility
 public data class Wake
-internal constructor(
+private constructor(
   /** Null to turn the wake off. */
   public val callback: WakeCallback?,
-  internal val bindingNative: NativeRegistration?,
+  private val nativeRegistration: NativeRegistration?,
 ) {
   /** A registration of Kotlin callbacks. */
   public constructor(callback: WakeCallback? = null) : this(callback, null)
 
-  public companion object
+  @get:JvmSynthetic
+  internal val bindingNative: NativeRegistration?
+    get() = nativeRegistration
+
+  public companion object {
+    /** A registration of native functions, which only `native` creates. */
+    @JvmSynthetic internal fun wrap(native: NativeRegistration): Wake = Wake(null, native)
+  }
 }
 
 /**
@@ -4776,10 +4784,10 @@ public fun interface WakeCallback {
  */
 @ConsistentCopyVisibility
 public data class QueueLock
-internal constructor(
+private constructor(
   public val lock: QueueLockCallback?,
   public val unlock: QueueLockCallback?,
-  internal val bindingNative: NativeRegistration?,
+  private val nativeRegistration: NativeRegistration?,
 ) {
   /** A registration of Kotlin callbacks. */
   public constructor(
@@ -4787,7 +4795,15 @@ internal constructor(
     unlock: QueueLockCallback? = null,
   ) : this(lock, unlock, null)
 
-  public companion object
+  @get:JvmSynthetic
+  internal val bindingNative: NativeRegistration?
+    get() = nativeRegistration
+
+  public companion object {
+    /** A registration of native functions, which only `native` creates. */
+    @JvmSynthetic
+    internal fun wrap(native: NativeRegistration): QueueLock = QueueLock(null, null, native)
+  }
 }
 
 /**

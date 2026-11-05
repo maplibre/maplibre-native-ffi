@@ -12,7 +12,7 @@ internal expect fun platformReportUncaught(failure: Throwable)
 
 /** Reports [error], which the upcall of the C [callback] type contained. Never throws. */
 internal fun reportCallbackFailure(callback: String, error: Throwable) {
-  reportUncaught(CallbackException(callback, error))
+  reportUncaught(CallbackException.create(callback, error))
 }
 
 /** Reports [failure] through [platformReportUncaught]. Never throws. */
