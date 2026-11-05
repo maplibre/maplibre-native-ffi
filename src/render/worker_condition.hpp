@@ -21,16 +21,6 @@ class WorkerCondition {
     condition_.wait(lock, std::move(predicate));
   }
 
-  // Waits as wait() does, on the core worker. In a browser WebGPU build the
-  // worker returns to its event loop while it waits, because the browser
-  // delivers the results of the WebGPU work it submitted only there.
-  template <typename Predicate>
-  void wait_on_core_worker(
-    std::unique_lock<std::mutex>& lock, Predicate predicate
-  ) {
-    while (!predicate()) wait_on_core_worker_once(lock);
-  }
-
 #if defined(__EMSCRIPTEN__)
   // The notifications so far. Read it under the session's control mutex,
   // after finding nothing to do, and pass it to resume_after_notification().
@@ -46,8 +36,6 @@ class WorkerCondition {
 #endif
 
  private:
-  void wait_on_core_worker_once(std::unique_lock<std::mutex>& lock);
-
   std::condition_variable condition_;
   // Counts notifications, for a waiter on the event loop, which cannot block
   // on condition_.

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <string>
 
 #include <mln/util/size.hpp>
 
@@ -41,13 +43,22 @@ struct HandleTraits<OffscreenDeviceObject> {
   static constexpr auto leasable = true;
 };
 
-// Each backend defines this, and gets validated options. It runs on any
-// thread, except in a browser WebGPU build: there only a session's core worker
-// calls it, and the device it makes serves that worker alone.
+#if defined(MLN_RENDER_BACKEND_WEBGPU)
+// Requests a device for the calling core worker and returns without waiting.
+// The browser answers on this thread's event loop, which then calls `done`
+// once, with the device, or with null and the reason. The device serves this
+// worker alone. It must not throw.
+auto request_backend_offscreen_device(
+  std::function<void(std::shared_ptr<OffscreenDevice>, std::string)> done
+) noexcept -> void;
+#else
+// Each other backend defines this, and gets validated options. It runs on any
+// thread.
 auto create_backend_offscreen_device(
   const mln_offscreen_device_options& options,
   std::shared_ptr<OffscreenDevice>& out_device
 ) -> mln_status;
+#endif
 
 auto offscreen_device_create(
   const mln_offscreen_device_options* options, mln_offscreen_device* out_device

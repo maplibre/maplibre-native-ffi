@@ -38,6 +38,12 @@ harness_flags=(
   "-Wl,--wrap=main"
   "$proxy_main_object"
 )
+# The WebGPU fixtures wait in place for their device and its results, which a
+# browser delivers on the waiting thread's event loop, so they suspend through
+# JSPI. The core never does, and its link options leave it out.
+if [[ "$preset" == *-webgpu ]]; then
+  harness_flags+=(-sJSPI)
+fi
 
 # Build and link options must reach every crate in the graph.
 unit_separator=$'\x1f'

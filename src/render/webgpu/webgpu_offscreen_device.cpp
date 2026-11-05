@@ -1,28 +1,35 @@
 // clang-format off
-#include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 
 // emdawnwebgpu's header comes first, as in webgpu_texture_session.cpp.
 #include <webgpu/webgpu.h>
 
 #include <emscripten/em_js.h>
-#include <emscripten/eventloop.h>
 
 #include <mln/util/logging.hpp>
 
-#include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
 #include "render/offscreen_device.hpp"
 #include "render/render_session_common.hpp"
 #include "render/webgpu/webgpu_texture_session.hpp"
 // clang-format on
 
-// Suspends the calling thread through JSPI until its event loop has run one
-// task.
+// Keeps the calling thread alive until the browser reports that `device` is
+// lost. emdawnwebgpu calls into the module from that report on the thread that
+// requested the device, but unlike its other requests holds no runtime
+// keepalive for it. Without one, the thread can exit first, and the report
+// then runs on whatever pthread the Web Worker hosts by then, or on the freed
+// stack of none. emdawnwebgpu subscribed to the report when it made the
+// device, so its handler runs before this one releases the keepalive. Call it
+// before releasing the device, while its handle still names the object.
 // clang-format off
-EM_ASYNC_JS(void, mln_yield_to_event_loop, (), {
-  await new Promise((resolve) => setTimeout(resolve, 0));
+EM_JS_DEPS(mln_webgpu_device_loss, "$WebGPU,$callUserCallback,$runtimeKeepalivePush,$runtimeKeepalivePop");
+EM_JS(void, mln_keep_thread_until_device_lost, (WGPUDevice device), {
+  runtimeKeepalivePush();
+  WebGPU.getJsObject(device).lost.then(() => callUserCallback(runtimeKeepalivePop));
 });
 // clang-format on
 
@@ -33,54 +40,6 @@ auto text(WGPUStringView view) -> std::string {
   if (view.data == nullptr) return {};
   return view.length == WGPU_STRLEN ? std::string{view.data}
                                     : std::string{view.data, view.length};
-}
-
-template <typename Object>
-struct Requested {
-  Object object = nullptr;
-  std::string message;
-};
-
-void on_adapter(
-  WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message,
-  void* user_data, void* /*unused*/
-) noexcept {
-  auto& requested = *static_cast<Requested<WGPUAdapter>*>(user_data);
-  if (status == WGPURequestAdapterStatus_Success) {
-    requested.object = adapter;
-  } else {
-    requested.message = text(message);
-  }
-}
-
-void on_device(
-  WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message,
-  void* user_data, void* /*unused*/
-) noexcept {
-  auto& requested = *static_cast<Requested<WGPUDevice>*>(user_data);
-  if (status == WGPURequestDeviceStatus_Success) {
-    requested.object = device;
-  } else {
-    requested.message = text(message);
-  }
-}
-
-// Suspends the calling thread until `future` completes, and runs its
-// callback. Only a thread that started inside the library can suspend.
-auto wait_for(WGPUInstance instance, WGPUFuture future) -> bool {
-  auto wait = WGPUFutureWaitInfo{.future = future, .completed = false};
-  return future.id != 0 &&
-         wgpuInstanceWaitAny(instance, 1, &wait, UINT64_MAX) ==
-           WGPUWaitStatus_Success &&
-         wait.completed;
-}
-
-auto fail(const char* summary, const std::string& message) -> mln_status {
-  const auto diagnostic = message.empty()
-                            ? std::string{summary}
-                            : std::string{summary} + ": " + message;
-  set_thread_error(diagnostic.c_str());
-  return MLN_STATUS_NATIVE_ERROR;
 }
 
 // A device that the session's core worker requested, which only that thread
@@ -95,26 +54,17 @@ class WebGPUOffscreenDevice final : public OffscreenDevice {
     -> WebGPUOffscreenDevice& = delete;
   WebGPUOffscreenDevice(WebGPUOffscreenDevice&&) = delete;
   auto operator=(WebGPUOffscreenDevice&&) -> WebGPUOffscreenDevice& = delete;
+  // Runs on the core worker. Abandon keeps a backend that only its driver
+  // may destroy, so a session that never detaches never gets here, and its
+  // device never reports a loss that would need the thread.
   ~WebGPUOffscreenDevice() override {
     // Destroyed rather than left to the garbage collector, so its GPU memory
-    // returns as soon as its session ends.
-    const auto lost = wgpuDeviceGetLostFuture(device_);
+    // returns as soon as its session ends. The browser reports the loss
+    // later, on this thread's event loop, which the worker returns to.
+    mln_keep_thread_until_device_lost(device_);
     wgpuDeviceDestroy(device_);
-    // The browser reports the loss later, on this thread's event loop, and
-    // emdawnwebgpu then calls into the module on whatever pthread that Web
-    // Worker hosts by then, or on the freed stack of none. Unlike its other
-    // requests, the report holds no runtime keepalive, so the worker waits
-    // for it here.
-    auto wait = WGPUFutureWaitInfo{.future = lost, .completed = false};
-    static_cast<void>(wgpuInstanceWaitAny(instance_, 1, &wait, UINT64_MAX));
     wgpuDeviceRelease(device_);
     wgpuInstanceRelease(instance_);
-    // emdawnwebgpu holds a runtime keepalive for each request still pending,
-    // such as a readback's buffer map, until this thread's event loop
-    // settles it. A pthread that returns while one is held exits only later,
-    // from inside that callback, after which the page's next runtime was seen
-    // to hang. So the worker settles them here, before it can return.
-    while (emscripten_runtime_keepalive_check()) mln_yield_to_event_loop();
   }
 
   auto create_texture_backend(
@@ -131,67 +81,118 @@ class WebGPUOffscreenDevice final : public OffscreenDevice {
   WGPUDevice device_;
 };
 
-}  // namespace
+using DeviceDone =
+  std::function<void(std::shared_ptr<OffscreenDevice>, std::string)>;
 
-// Runs only on a session's core worker, during its attach; see
-// offscreen_device_create(). The browser answers both requests
-// asynchronously, so the worker suspends until it does.
-auto create_backend_offscreen_device(
-  const mln_offscreen_device_options& options,
-  std::shared_ptr<OffscreenDevice>& out_device
-) -> mln_status {
-  (void)options;
-  // Without this feature, emdawnwebgpu rejects every wait that may block.
-  const auto timed_wait_any = WGPUInstanceFeatureName_TimedWaitAny;
-  const auto instance_descriptor = WGPUInstanceDescriptor{
-    .nextInChain = nullptr,
-    .requiredFeatureCount = 1,
-    .requiredFeatures = &timed_wait_any,
-    .requiredLimits = nullptr,
-  };
-  auto* const instance = wgpuCreateInstance(&instance_descriptor);
-  if (instance == nullptr) {
-    return fail("creating a WebGPU instance failed", {});
+// One request, from the instance to the device. The browser answers each step
+// from this thread's event loop, and each callback owns the request until it
+// hands it to the next step or finishes.
+struct DeviceRequest {
+  WGPUInstance instance = nullptr;
+  WGPUAdapter adapter = nullptr;
+  DeviceDone done;
+
+  ~DeviceRequest() {
+    if (adapter != nullptr) wgpuAdapterRelease(adapter);
+    if (instance != nullptr) wgpuInstanceRelease(instance);
   }
 
-  auto adapter = Requested<WGPUAdapter>{};
-  const auto adapter_callback = WGPURequestAdapterCallbackInfo{
+  void fail(const char* summary, WGPUStringView message = {}) noexcept {
+    auto reason = std::string{};
+    try {
+      reason = summary;
+      if (const auto detail = text(message); !detail.empty())
+        reason += ": " + detail;
+    } catch (...) {
+      // The attach then reports a failure without its reason.
+    }
+    done(nullptr, std::move(reason));
+  }
+};
+
+void on_device(
+  WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message,
+  void* user_data, void* /*unused*/
+) noexcept {
+  auto request =
+    std::unique_ptr<DeviceRequest>{static_cast<DeviceRequest*>(user_data)};
+  if (status != WGPURequestDeviceStatus_Success || device == nullptr) {
+    request->fail("requesting a WebGPU device failed", message);
+    return;
+  }
+  auto offscreen = std::shared_ptr<OffscreenDevice>{};
+  try {
+    offscreen =
+      std::make_shared<WebGPUOffscreenDevice>(request->instance, device);
+    request->instance = nullptr;
+  } catch (...) {
+    mln_keep_thread_until_device_lost(device);
+    wgpuDeviceDestroy(device);
+    wgpuDeviceRelease(device);
+    request->fail("allocating the WebGPU offscreen device failed");
+    return;
+  }
+  mln::Log::Info(mln::Event::Render, "offscreen device uses browser WebGPU");
+  request->done(std::move(offscreen), {});
+}
+
+void on_adapter(
+  WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message,
+  void* user_data, void* /*unused*/
+) noexcept {
+  auto request =
+    std::unique_ptr<DeviceRequest>{static_cast<DeviceRequest*>(user_data)};
+  if (status != WGPURequestAdapterStatus_Success || adapter == nullptr) {
+    request->fail("the browser offered no WebGPU adapter", message);
+    return;
+  }
+  request->adapter = adapter;
+  const auto callback = WGPURequestDeviceCallbackInfo{
     .nextInChain = nullptr,
-    .mode = WGPUCallbackMode_WaitAnyOnly,
+    .mode = WGPUCallbackMode_AllowSpontaneous,
+    .callback = on_device,
+    .userdata1 = request.get(),
+    .userdata2 = nullptr,
+  };
+  if (wgpuAdapterRequestDevice(adapter, nullptr, callback).id == 0) {
+    request->fail("the browser refused the WebGPU device request");
+    return;
+  }
+  static_cast<void>(request.release());
+}
+
+}  // namespace
+
+// Runs only on a session's core worker, before it takes the attach; see
+// offscreen_attach_start().
+auto request_backend_offscreen_device(DeviceDone done) noexcept -> void {
+  auto request = std::unique_ptr<DeviceRequest>{};
+  try {
+    request = std::make_unique<DeviceRequest>();
+  } catch (...) {
+    done(nullptr, {});
+    return;
+  }
+  request->done = std::move(done);
+  request->instance = wgpuCreateInstance(nullptr);
+  if (request->instance == nullptr) {
+    request->fail("creating a WebGPU instance failed");
+    return;
+  }
+  const auto callback = WGPURequestAdapterCallbackInfo{
+    .nextInChain = nullptr,
+    .mode = WGPUCallbackMode_AllowSpontaneous,
     .callback = on_adapter,
-    .userdata1 = &adapter,
+    .userdata1 = request.get(),
     .userdata2 = nullptr,
   };
   if (
-    !wait_for(
-      instance, wgpuInstanceRequestAdapter(instance, nullptr, adapter_callback)
-    ) ||
-    adapter.object == nullptr
+    wgpuInstanceRequestAdapter(request->instance, nullptr, callback).id == 0
   ) {
-    wgpuInstanceRelease(instance);
-    return fail("the browser offered no WebGPU adapter", adapter.message);
+    request->fail("the browser refused the WebGPU adapter request");
+    return;
   }
-
-  auto device = Requested<WGPUDevice>{};
-  const auto device_callback = WGPURequestDeviceCallbackInfo{
-    .nextInChain = nullptr,
-    .mode = WGPUCallbackMode_WaitAnyOnly,
-    .callback = on_device,
-    .userdata1 = &device,
-    .userdata2 = nullptr,
-  };
-  const auto device_ready = wait_for(
-    instance, wgpuAdapterRequestDevice(adapter.object, nullptr, device_callback)
-  );
-  wgpuAdapterRelease(adapter.object);
-  if (!device_ready || device.object == nullptr) {
-    wgpuInstanceRelease(instance);
-    return fail("requesting a WebGPU device failed", device.message);
-  }
-
-  mln::Log::Info(mln::Event::Render, "offscreen device uses browser WebGPU");
-  out_device = std::make_shared<WebGPUOffscreenDevice>(instance, device.object);
-  return MLN_STATUS_OK;
+  static_cast<void>(request.release());
 }
 
 }  // namespace mln::core

@@ -1,4 +1,6 @@
+#include <functional>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "render/offscreen_device.hpp"
@@ -91,16 +93,70 @@ auto validate_offscreen_descriptor(const mln_offscreen_descriptor* descriptor)
   return MLN_STATUS_OK;
 }
 
-}  // namespace
+// Makes the session's backend on `device`, which the backend then shares in
+// owning.
+auto initialize_offscreen_backend(
+  mln_render_session_object& target,
+  const std::shared_ptr<OffscreenDevice>& device
+) -> mln_status {
+  auto backend = std::unique_ptr<TextureSessionBackend>{};
+  const auto status = device->create_texture_backend(
+    mln::Size{target.physical_width, target.physical_height}, backend
+  );
+  if (backend != nullptr) {
+    backend->retain(device);
+    target.texture.backend = std::move(backend);
+  }
+  return status;
+}
 
 #if defined(MLN_RENDER_BACKEND_WEBGPU)
 // A browser's WebGPU device belongs to the worker that requested it, and the
-// browser answers the request asynchronously. So only a session's core worker
-// creates one, during the attach, and no caller can create one to share.
-constexpr auto backend_shares_devices = false;
-#else
-constexpr auto backend_shares_devices = true;
+// browser answers the request on that worker's event loop. So the session's
+// core worker runs from its event loop and requests its device before it takes
+// any work, and no caller can create one to share.
+auto configure_webgpu_offscreen_worker(mln_render_session_object& session)
+  -> void {
+  struct Requested {
+    std::shared_ptr<OffscreenDevice> device;
+    std::string failure = "requesting a WebGPU device failed";
+  };
+  // Only the core worker touches it, first in the request and then in the
+  // attach.
+  auto requested = std::make_shared<Requested>();
+  session.core_worker_yields_to_event_loop = true;
+  session.prepare_core_worker = [requested](std::function<void()> start) {
+    auto done =
+      std::function<void(std::shared_ptr<OffscreenDevice>, std::string)>{};
+    try {
+      done = [requested, start](
+               std::shared_ptr<OffscreenDevice> device, std::string failure
+             ) {
+        requested->device = std::move(device);
+        if (!failure.empty()) requested->failure = std::move(failure);
+        start();
+      };
+    } catch (...) {
+      // The attach then reports the default failure.
+      start();
+      return;
+    }
+    request_backend_offscreen_device(std::move(done));
+  };
+  session.initialize_backend = [requested](mln_render_session_object& target) {
+    // Taken, so the backend is its only owner: the worker exits only after
+    // the backend destroys it, and the session outlives the worker.
+    const auto device = std::exchange(requested->device, nullptr);
+    if (device == nullptr) {
+      set_thread_error(requested->failure.c_str());
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+    return initialize_offscreen_backend(target, device);
+  };
+}
 #endif
+
+}  // namespace
 
 auto offscreen_device_create(
   const mln_offscreen_device_options* options, mln_offscreen_device* out_device
@@ -115,13 +171,13 @@ auto offscreen_device_create(
     set_thread_error("out_device must point to a null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!backend_shares_devices) {
-    set_thread_error(
-      "this build cannot create an offscreen device; attach without one, "
-      "and the session creates its own"
-    );
-    return MLN_STATUS_UNSUPPORTED;
-  }
+#if defined(MLN_RENDER_BACKEND_WEBGPU)
+  set_thread_error(
+    "this build cannot create an offscreen device; attach without one, "
+    "and the session creates its own"
+  );
+  return MLN_STATUS_UNSUPPORTED;
+#else
   auto device = std::shared_ptr<OffscreenDevice>{};
   const auto create_status = create_backend_offscreen_device(effective, device);
   if (create_status != MLN_STATUS_OK) {
@@ -133,6 +189,7 @@ auto offscreen_device_create(
     )
   );
   return MLN_STATUS_OK;
+#endif
 }
 
 auto offscreen_device_release(mln_offscreen_device device) -> void {
@@ -182,6 +239,10 @@ auto offscreen_attach_start(
     return driver_status;
   }
   session->texture.mode = TextureSessionMode::Offscreen;
+#if defined(MLN_RENDER_BACKEND_WEBGPU)
+  // No device handle exists to share; see offscreen_device_create().
+  configure_webgpu_offscreen_worker(*session);
+#else
   session->initialize_backend =
     [shared =
        object != nullptr ? object->device : std::shared_ptr<OffscreenDevice>{}](
@@ -198,16 +259,9 @@ auto offscreen_attach_start(
           return create_status;
         }
       }
-      auto backend = std::unique_ptr<TextureSessionBackend>{};
-      const auto status = device->create_texture_backend(
-        mln::Size{target.physical_width, target.physical_height}, backend
-      );
-      if (backend != nullptr) {
-        backend->retain(device);
-        target.texture.backend = std::move(backend);
-      }
-      return status;
+      return initialize_offscreen_backend(target, device);
     };
+#endif
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
     .driver = {},
