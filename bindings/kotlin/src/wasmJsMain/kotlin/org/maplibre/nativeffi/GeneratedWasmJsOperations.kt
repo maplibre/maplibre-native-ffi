@@ -1,7 +1,6 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -110,7 +109,7 @@ public fun MapHandle.attachWebGpuSurface(
  */
 public fun RenderSessionHandle.setWebGpuBorrowedTextureTarget(
   replacement: WebGpuBorrowedTextureReplacement,
-): Deferred<Unit> =
+): Completion<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_web_gpu_borrowed_texture_target(
@@ -134,7 +133,7 @@ public fun RenderSessionHandle.setWebGpuBorrowedTextureTarget(
  */
 public fun RenderSessionHandle.setWebGpuSurfaceTarget(
   replacement: WebGpuSurfaceReplacement,
-): Deferred<Unit> =
+): Completion<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_web_gpu_surface_target(

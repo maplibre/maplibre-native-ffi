@@ -397,7 +397,7 @@ def operation(plan, values, native, *, discard=False):
     arguments = call_arguments(plan, values) + ["completion"]
     body = encodings(plan) + native.checked(plan.function, arguments)
     types = [typ for _, typ in params]
-    # Java can't read an unsigned value that a Deferred boxes, so it calls a
+    # Java can't read an unsigned value that a Completion boxes, so it calls a
     # twin that decodes the signed value instead.
     twin = (
         not discard
@@ -406,7 +406,7 @@ def operation(plan, values, native, *, discard=False):
         and java.unsigned(result_type)
     )
     annotation = "@JvmSynthetic " if twin else values.jvm_name(method, types)
-    head = f"  {annotation}public fun {method}({declaration(params)}): Deferred<{result_type}> ="
+    head = f"  {annotation}public fun {method}({declaration(params)}): Completion<{result_type}> ="
     owners = "owner, binding" if discard else receiver_arguments(plan)
     callbacks = ", bindingCallbacks" if plan.registrations else ""
     if discard:
@@ -439,7 +439,7 @@ def operation(plan, values, native, *, discard=False):
         signed = [(local, java.signed(typ)) for local, typ in params]
         source += (
             f'  @PublishedApi @JvmName("{method}") internal fun {method}ForJava({declaration(signed)}): '
-            f"Deferred<{java.signed(result_type)}> = "
+            f"Completion<{java.signed(result_type)}> = "
             f"nativeSubmit({owners}, {decode}{callbacks}) {{ {body} }}\n"
         )
     return source
@@ -625,7 +625,7 @@ def owned(plan, values, native):
             f"{{ created, ready -> {owner_name(handle)}.wrap(created{parent}, ready) }}"
         )
     else:
-        returns = f"Deferred<{result_type}>" if plan.completion else result_type
+        returns = f"Completion<{result_type}>" if plan.completion else result_type
     annotation = values.jvm_name(method, [typ for _, typ in params])
     head = f"  {annotation}public fun {method}({declaration(params)}): {returns} ="
     arguments = call_arguments(plan, values)
@@ -664,12 +664,12 @@ def owned(plan, values, native):
 
 
 def thread_start(plan, values, native, head, arguments, create, handle):
-    """A call that waits for a thread to start, as a suspend function.
+    """A call that waits for a thread to start, whose owner a Completion
+    delivers.
 
     A thread that a browser page starts runs only after the page yields, so
-    the call suspends where the page cannot wait. The call writes its own
-    diagnostic, because other calls run while it waits. A caller cancelled
-    meanwhile drops the owner that the call created.
+    the result arrives once the call returns where the page cannot wait. The
+    call writes its own diagnostic, because other calls run while it waits.
     """
     if (
         plan.receiver
@@ -684,10 +684,10 @@ def thread_start(plan, values, native, head, arguments, create, handle):
     )
     call = native.call(plan.function, [*arguments, "diagnostic"])
     adopted = f"adopt(out, {disposal(handle)}) {create}"
-    body = f"val out = {values.storage(slot)}; threadStart {{ diagnostic -> {call} }}; {adopted}"
-    head = head.replace("public fun ", "public suspend fun ", 1)
-    drop = f"{{ it.{disposal_method(handle)}() }}"
-    return f"{head} nativeThreadStart({drop}) {{ {encodings(plan)}{body} }}\n"
+    body = f"val out = {values.storage(slot)}; threadStart({{ diagnostic -> {call} }}) {{ {adopted} }}"
+    signature, returns = head.rsplit(": ", 1)
+    head = f"{signature}: Completion<{returns.removesuffix(' =')}> ="
+    return f"{head} nativeThreadStart {{ {encodings(plan)}{body} }}\n"
 
 
 def lifecycle(plan, values, native):
@@ -716,7 +716,7 @@ def lifecycle(plan, values, native):
         consume = "nativeClose" if plan.release else "nativeAnswer"
         return f"  {annotation}public fun {method}({parameters}): Unit = {consume}(this, binding) {{ {body()} }}\n"
     return (
-        f"  {annotation}public fun {method}({parameters}): Deferred<Unit> = "
+        f"  {annotation}public fun {method}({parameters}): Completion<Unit> = "
         f"nativeRetire(this, binding) {{ {body('completion')} }}\n"
     )
 

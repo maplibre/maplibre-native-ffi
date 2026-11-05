@@ -106,6 +106,13 @@ ALLOWED_ABOVE_FLOOR = frozenset(
         # Only AcquiredFrameHandle.getHardwareBuffer() names it, for a frame of
         # a hardware buffer ring, which the C library attaches only on API 26+.
         "android/hardware/HardwareBuffer",
+        # Completion forwards these to its superclass only for a stage derived
+        # from it, which CompletableFuture creates through newIncompleteFuture()
+        # only on API 31+. A Completion that the library completes throws first.
+        "java/util/concurrent/CompletableFuture#completeAsync(Ljava/util/function/Supplier;)Ljava/util/concurrent/CompletableFuture;",
+        "java/util/concurrent/CompletableFuture#completeAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;",
+        "java/util/concurrent/CompletableFuture#completeOnTimeout(Ljava/lang/Object;JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/CompletableFuture;",
+        "java/util/concurrent/CompletableFuture#orTimeout(JLjava/util/concurrent/TimeUnit;)Ljava/util/concurrent/CompletableFuture;",
     }
 )
 

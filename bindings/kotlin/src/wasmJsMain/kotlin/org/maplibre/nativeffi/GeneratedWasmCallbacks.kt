@@ -1,7 +1,6 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -53,7 +52,7 @@ internal fun NativeCall.writeHttpHeaderTransformRules(value: HttpHeaderTransform
  */
 public fun RuntimeHandle.setHttpHeaderTransform(
   transform: HttpHeaderTransformRules,
-): Deferred<CommandCompletion> =
+): Completion<CommandCompletion> =
   nativeCommand(this, binding, bindingCallbacks) {
     check(
       C.mln_runtime_set_http_header_transform(

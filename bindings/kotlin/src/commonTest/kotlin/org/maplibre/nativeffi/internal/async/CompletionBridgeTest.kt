@@ -3,8 +3,8 @@ package org.maplibre.nativeffi.internal.async
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.CommandCompletion
+import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.assertFailsWithStatus
@@ -27,7 +27,7 @@ import org.maplibre.nativeffi.runSuspendTest
  * hand through the function pointers of the descriptor the bridge built, as native would.
  */
 internal class HandDeliveredCompletion<T>(
-  val deferred: Deferred<T>,
+  val completion: Completion<T>,
   private val callback: Long,
   private val userData: Long,
   private val releaseUserData: Long,
@@ -56,9 +56,9 @@ internal expect fun callCompletion(callback: Long, userData: Long, result: Long)
 internal expect fun callCompletionRelease(release: Long, userData: Long)
 
 /** Submits through [submit] and keeps the descriptor's fields for hand delivery. */
-private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredCompletion<T> {
+private fun <T> capture(submit: ((Long) -> Unit) -> Completion<T>): HandDeliveredCompletion<T> {
   var fields: Triple<Long, Long, Long>? = null
-  val deferred = submit { descriptor ->
+  val completion = submit { descriptor ->
     fields =
       Triple(
         readAddress(descriptor + CompletionLayout.CALLBACK),
@@ -67,7 +67,7 @@ private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredC
       )
   }
   val (callback, userData, release) = requireNotNull(fields)
-  return HandDeliveredCompletion(deferred, callback, userData, release)
+  return HandDeliveredCompletion(completion, callback, userData, release)
 }
 
 private fun handDeliveredCommand(): HandDeliveredCompletion<CommandCompletion> = capture { call ->
@@ -111,7 +111,7 @@ class CompletionBridgeTest {
   }
 
   @Test
-  fun aCompletionConvertsOnceAndAConversionFailureFailsItsDeferred() = runSuspendTest {
+  fun aCompletionConvertsOnceAndAConversionFailureFailsIt() = runSuspendTest {
     val failure = IllegalStateException("conversion")
     var conversions = 0
     val completion = capture { call ->
@@ -130,7 +130,7 @@ class CompletionBridgeTest {
     completion.release()
     assertEquals(
       failure.message,
-      assertFailsWith<IllegalStateException> { completion.deferred.await() }.message,
+      assertFailsWith<IllegalStateException> { completion.completion.await() }.message,
     )
     assertEquals(1, conversions)
   }
@@ -140,20 +140,20 @@ class CompletionBridgeTest {
     val failed = handDeliveredCommand()
     failed.deliver(Status.NOT_FOUND.rawValue, 9u, "the source does not exist")
     failed.release()
-    val failure = assertFailsWithStatus(Status.NOT_FOUND) { failed.deferred.await() }
+    val failure = assertFailsWithStatus(Status.NOT_FOUND) { failed.completion.await() }
     assertEquals("the source does not exist", failure.diagnostic)
     assertEquals(9uL, failure.generation)
 
     val cancelled = handDeliveredCommand()
     cancelled.deliver(Status.CANCELLED.rawValue, 0u, "asynchronous work was abandoned")
     cancelled.release()
-    val cancellation = assertFailsWithStatus(Status.CANCELLED) { cancelled.deferred.await() }
+    val cancellation = assertFailsWithStatus(Status.CANCELLED) { cancelled.completion.await() }
     assertEquals("asynchronous work was abandoned", cancellation.diagnostic)
     assertEquals(0uL, cancellation.generation)
 
     val committed = handDeliveredCommand()
     committed.deliver(Status.OK.rawValue, 4u)
     committed.release()
-    assertEquals(CommandCompletion(4u, 0u), committed.deferred.await())
+    assertEquals(CommandCompletion(4u, 0u), committed.completion.await())
   }
 }

@@ -125,11 +125,9 @@ def owner(bound, native, plans, factories, members, imports):
         parameters.append(
             f"/** Completes once the {readied} is ready, and fails with a [MaplibreException] "
             f"when it fails to become ready. The {readied} takes calls before then. */\n"
-            "  public val ready: Deferred<Unit>"
+            "  public val ready: Completion<Unit>"
         )
-        factory.append(
-            "ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit)"
-        )
+        factory.append("ready: Completion<Unit> = Completion.completed(Unit)")
     if borrowable:
         parameters.append("borrowed: Boolean")
         factory.append("borrowed: Boolean = false")
@@ -180,7 +178,7 @@ def owner(bound, native, plans, factories, members, imports):
             )
             + f"   */\n  public override fun close() {{ {release.method}() }}"
             if release.member == "close"
-            else f"  public override fun release(): Deferred<Unit> = {release.method}()"
+            else f"  public override fun release(): Completion<Unit> = {release.method}()"
         )
     body.extend(operations)
     body.append(

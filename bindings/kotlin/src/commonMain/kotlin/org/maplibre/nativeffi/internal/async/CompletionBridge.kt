@@ -1,8 +1,7 @@
 package org.maplibre.nativeffi.internal.async
 
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.CommandCompletion
+import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.MaplibreException
 import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.c.CompletionLayout
@@ -22,26 +21,26 @@ import org.maplibre.nativeffi.internal.memory.writeI64
 import org.maplibre.nativeffi.internal.memory.writeU32
 
 /**
- * Bridges one native completion into an eager Kotlin [Deferred].
+ * Bridges one native completion into a [Completion].
  *
  * Each submission builds an `mln_completion` whose `user_data` roots its state until native
  * releases it. On a target with a [HostDelivery] queue, the page runs both calls as it dispatches
  * the queue. A conversion reads the `mln_completion_result` at the address it receives, which stays
  * valid only while the conversion runs. Each submission call throws the mapped status error when
  * native rejects it synchronously. A result with a status other than OK, including a failed or
- * cancelled command, completes the [Deferred] exceptionally with [MaplibreException].
+ * cancelled command, completes the [Completion] exceptionally with [MaplibreException].
  */
 internal object CompletionBridge {
   private class State<T>(private val convert: (Long) -> T) {
-    val deferred = CompletableDeferred<T>()
+    val completion = Completion.pending<T>()
 
     fun complete(result: Long) {
       try {
         val status = readI32(result + CompletionResultLayout.STATUS)
         if (status == Status.OK.rawValue) {
-          deferred.complete(convert(result))
+          completion.succeed(convert(result))
         } else {
-          deferred.completeExceptionally(
+          completion.fail(
             MaplibreException(
               Status.of(status),
               diagnostic(result),
@@ -50,12 +49,12 @@ internal object CompletionBridge {
           )
         }
       } catch (failure: Throwable) {
-        deferred.completeExceptionally(failure)
+        completion.fail(failure)
       }
     }
   }
 
-  fun <T> submit(arena: NativeArena, convert: (Long) -> T, call: (Long) -> Unit): Deferred<T> {
+  fun <T> submit(arena: NativeArena, convert: (Long) -> T, call: (Long) -> Unit): Completion<T> {
     val state = State(convert)
     val token = NativeRoots.retain(state)
     try {
@@ -72,12 +71,12 @@ internal object CompletionBridge {
       release(token)
       throw failure
     }
-    return state.deferred
+    return state.completion
   }
 
-  fun unit(arena: NativeArena, call: (Long) -> Unit): Deferred<Unit> = submit(arena, {}, call)
+  fun unit(arena: NativeArena, call: (Long) -> Unit): Completion<Unit> = submit(arena, {}, call)
 
-  fun command(arena: NativeArena, call: (Long) -> Unit): Deferred<CommandCompletion> =
+  fun command(arena: NativeArena, call: (Long) -> Unit): Completion<CommandCompletion> =
     submit(arena, ::commandCompletion, call)
 
   /** Delivers the result that native passes to the `mln_completion_callback`. */

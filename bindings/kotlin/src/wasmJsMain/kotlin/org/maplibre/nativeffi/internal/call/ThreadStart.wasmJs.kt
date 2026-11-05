@@ -2,9 +2,6 @@
 
 package org.maplibre.nativeffi.internal.call
 
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.internal.status.checkStatus
@@ -14,13 +11,10 @@ import org.maplibre.nativeffi.internal.status.checkStatus
  * start: a thread starts only after the page yields.
  *
  * [run] stages a thread start that the generated wrapper copies the call's arguments into, and
- * suspends until the page shim posts the call's status. The wait does not cancel, because the call
- * writes to memory that the caller's arena holds until the call returns.
+ * passes on the call's status once the page shim posts it.
  */
 internal actual object ThreadStart {
-  private class Waiting {
-    var caller: Continuation<Int>? = null
-  }
+  private class Waiting(val done: (Int) -> Unit)
 
   private var staged = 0
 
@@ -30,8 +24,8 @@ internal actual object ThreadStart {
     return staged
   }
 
-  actual suspend fun run(call: () -> Int): Int {
-    val waiting = Waiting()
+  actual fun run(call: () -> Int, done: (Int) -> Unit) {
+    val waiting = Waiting(done)
     val token = NativeRoots.retain(waiting)
     val start = mln_kw_thread_start_create(token.toInt())
     if (start == 0) {
@@ -52,12 +46,10 @@ internal actual object ThreadStart {
       discard(token, start)
       checkStatus(started) { "could not start a thread for the call" }
     }
-    // The page delivers the status from a later task, after this suspends.
-    return suspendCoroutine { waiting.caller = it }
   }
 
   fun deliver(token: Long, status: Int) {
-    (NativeRoots.release(token) as? Waiting)?.caller?.resume(status)
+    (NativeRoots.release(token) as? Waiting)?.done?.invoke(status)
   }
 
   private fun discard(token: Long, start: Int) {

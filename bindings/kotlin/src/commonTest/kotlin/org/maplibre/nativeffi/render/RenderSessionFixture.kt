@@ -9,6 +9,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
 import org.maplibre.nativeffi.GpuSync
@@ -48,10 +49,14 @@ internal class RenderSessionFixture(
   private val acquiresFrames =
     RenderSessionCapabilityFlag.FRAME_ACQUISITION in session.getCapabilities().flags
 
-  /** Services the session's driver work on the graphics thread until [deferred] completes. */
-  suspend fun <T> complete(deferred: Deferred<T>, what: String = "a driver-serviced operation"): T {
+  /** Services the session's driver work on the graphics thread until [completion] completes. */
+  suspend fun <T> complete(
+    completion: Completion<T>,
+    what: String = "a driver-serviced operation",
+  ): T {
+    val deferred = completion.asDeferred()
     serviceUntil(what, deferred) { deferred.isCompleted }
-    return deferred.await()
+    return completion.await()
   }
 
   /**
@@ -103,7 +108,8 @@ internal class RenderSessionFixture(
    * only one in flight, since [renderUntil] returns with none of its own. Where the session hands
    * out frames, each rendered frame is acquired and released so the texture ring never fills.
    */
-  suspend fun renderStill(still: Deferred<Unit> = mapFixture.map.requestStillImage()) {
+  suspend fun renderStill(request: Completion<Unit> = mapFixture.map.requestStillImage()) {
+    val still = request.asDeferred()
     var rendered = false
     serviceUntil("a still image", still) {
       if (drainResults().isNotEmpty()) rendered = true

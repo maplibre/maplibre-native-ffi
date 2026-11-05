@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi
 
 import android.view.Surface
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.c.Jni
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -65,7 +64,7 @@ public fun MapHandle.attachAndroidSurface(
 public fun RenderSessionHandle.setAndroidSurfaceTarget(
   surface: Surface,
   logicalSize: LogicalSize,
-): Deferred<Unit> =
+): Completion<Unit> =
   nativeUnit(this, binding) {
     check(
       Jni.renderSessionSetAndroidSurfaceTarget(
