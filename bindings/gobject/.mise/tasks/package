@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#MISE description="Build a C, a Vala, and a GJS program against only the installed GObject library, and run them."
+#MISE extends="ffi:preset"
+#MISE depends=[{ task = ":build", args = ["{{usage.preset}}"] }]
+#MISE shell="bash"
+set -euo pipefail
+
+# Each program reaches the library the way an app outside this repository
+# does: the C program through the installed header and pkg-config file, the
+# Vala program through the installed VAPI, and the GJS program through the
+# installed typelib.
+install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sources="$PWD/tests/package"
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
+export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
+package=maplibre-native-ffi-gobject-0
+
+# shellcheck disable=SC2046 # pkg-config prints one flag per word.
+cc -std=c11 -Wall -Wextra -Werror "$sources/main.c" \
+  $(pkg-config --cflags --libs "$package") -o "$scratch/c-consumer"
+"$scratch/c-consumer"
+
+valac --vapidir="$install_dir/share/vala/vapi" --pkg "$package" \
+  --directory="$scratch" --output=vala-consumer "$sources/main.vala"
+"$scratch/vala-consumer"
+
+# A typelib names its library, which the dynamic loader finds on the library
+# path like any other.
+case "$(uname -s)" in
+  Darwin) export DYLD_LIBRARY_PATH="$install_dir/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" ;;
+  *) export LD_LIBRARY_PATH="$install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+esac
+GI_TYPELIB_PATH="$install_dir/lib/girepository-1.0" gjs -m "$sources/main.js"

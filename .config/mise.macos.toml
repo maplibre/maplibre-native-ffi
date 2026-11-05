@@ -1,12 +1,17 @@
 [vars]
 host_native_preset = "macos-arm64-metal"
 
+# GLib, gobject-introspection, Vala, and GJS build and test the GObject library.
 [bootstrap.packages]
 "brew:docker-buildx" = "latest"
+"brew:gjs" = "latest"
+"brew:glib" = "latest"
 "brew:glslang" = "latest"
+"brew:gobject-introspection" = "latest"
 "brew:molten-vk" = "latest"
 "brew:pkgconf" = "latest"
 "brew:qemu" = "latest"
+"brew:vala" = "latest"
 "brew:vulkan-loader" = "latest"
 
 [env]

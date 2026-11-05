@@ -1,0 +1,37 @@
+# meson and gi-docgen come from the root uv project. GLib,
+# gobject-introspection, Vala, and GJS are system packages; see
+# .config/mise.linux.toml and .config/mise.macos.toml.
+
+[tasks.build]
+description = "Build the GObject library and install it into a native preset's install."
+extends = "ffi:preset"
+run = '''
+install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/gobject"
+meson=(uv run --project "$MISE_MONOREPO_ROOT" --no-sync meson)
+setup=(setup "$build_dir" . --prefix="$install_dir" --libdir=lib --buildtype=release)
+if [[ -f "$build_dir/build.ninja" ]]; then
+  setup+=(--reconfigure)
+fi
+export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
+"${meson[@]}" "${setup[@]}"
+"${meson[@]}" install -C "$build_dir" --quiet
+'''
+
+[tasks.test]
+description = "Test the GObject library against a native preset's install."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = [{ task = ":package", args = ["{{usage.preset}}"] }]
+
+[tasks.api]
+description = "Generate the gi-docgen HTML API reference for the GObject library."
+extends = "ffi:preset"
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+rm -rf build/gi-docgen
+uv run --project "$MISE_MONOREPO_ROOT" --no-sync gi-docgen generate \
+  --quiet --fatal-warnings \
+  --config docs/maplibre-native-ffi.toml \
+  --output-dir build/gi-docgen \
+  "$MISE_MONOREPO_ROOT/build/$usage_preset/install/share/gir-1.0/MaplibreNativeFfi-0.gir"
+'''
