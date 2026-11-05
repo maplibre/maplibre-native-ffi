@@ -223,6 +223,15 @@ namespace Example {
 		// shows, and demands no frames.
 		public override void map () {
 			base.map ();
+			// A frame that the session rendered while the widget was hidden
+			// is waiting.
+			if (session != null && !resizing) {
+				try {
+					show_newest_frame ();
+				} catch (GLib.Error error) {
+					fail (error.message);
+				}
+			}
 			if (redraw_pending) {
 				schedule_tick ();
 			}

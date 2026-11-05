@@ -78,9 +78,10 @@ namespace Example {
 
 			rotate = new Gtk.GestureRotate ();
 			rotate.begin.connect (() => previous_angle = 0);
-			rotate.angle_changed.connect ((angle) => {
-				var turn = (angle - previous_angle) * 180 / Math.PI;
-				previous_angle = angle;
+			// The delta is the turn since the gesture began.
+			rotate.angle_changed.connect ((angle, angle_delta) => {
+				var turn = (angle_delta - previous_angle) * 180 / Math.PI;
+				previous_angle = angle_delta;
 				var delta = phase (GesturePhase.UPDATE);
 				delta.set_bearing (-wrap_degrees (turn));
 				delta.set_anchor (center (rotate));
