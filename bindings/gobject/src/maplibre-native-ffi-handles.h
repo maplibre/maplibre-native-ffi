@@ -1535,7 +1535,7 @@ void maplibre_native_ffi_map_get_image_source_coordinates_async(
  *
  * Finishes a call that `maplibre_native_ffi_map_get_image_source_coordinates_async` started.
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiLatLng): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiLatLng): the items
  */
 GPtrArray* maplibre_native_ffi_map_get_image_source_coordinates_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
@@ -2040,7 +2040,7 @@ void maplibre_native_ffi_map_list_style_layers_async(
  *
  * Finishes a call that `maplibre_native_ffi_map_list_style_layers_async` started.
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiStyleLayerInfo): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiStyleLayerInfo): the items
  */
 GPtrArray* maplibre_native_ffi_map_list_style_layers_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
@@ -2066,7 +2066,7 @@ void maplibre_native_ffi_map_list_style_sources_async(
  *
  * Finishes a call that `maplibre_native_ffi_map_list_style_sources_async` started.
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiStyleSourceInfo): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiStyleSourceInfo): the items
  */
 GPtrArray* maplibre_native_ffi_map_list_style_sources_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
@@ -3648,7 +3648,7 @@ maplibre_native_ffi_map_projection_lat_lng_for_pixel_unwrapped(
  * See `mln_map_projection_lat_lngs_for_pixels` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiLatLng): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiLatLng): the items
  */
 GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
   MaplibreNativeFfiMapProjection* self,
@@ -3665,7 +3665,7 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
  * See `mln_map_projection_lat_lngs_for_pixels_unwrapped` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiLatLng): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiLatLng): the items
  */
 GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels_unwrapped(
   MaplibreNativeFfiMapProjection* self,
@@ -3717,7 +3717,7 @@ maplibre_native_ffi_map_projection_pixel_for_lat_lng(
  * See `mln_map_projection_pixels_for_lat_lngs` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiScreenPoint): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiScreenPoint): the items
  */
 GPtrArray* maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
   MaplibreNativeFfiMapProjection* self,
@@ -4082,7 +4082,7 @@ void maplibre_native_ffi_render_session_dispose(
  * See `mln_render_session_drain_frame_results` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiRenderFrameResult): the items, or %NULL with `error` set
+ * Returns: (transfer container) (element-type MaplibreNativeFfiRenderFrameResult): the items, or %NULL with `error` set
  */
 GPtrArray* maplibre_native_ffi_render_session_drain_frame_results(
   MaplibreNativeFfiRenderSession* self, GError** error
@@ -4332,7 +4332,7 @@ void maplibre_native_ffi_render_session_query_rendered_features_async(
  *
  * Finishes a call that `maplibre_native_ffi_render_session_query_rendered_features_async` started.
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiRenderedFeature): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiRenderedFeature): the items
  */
 GPtrArray* maplibre_native_ffi_render_session_query_rendered_features_finish(
   MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
@@ -4365,7 +4365,7 @@ void maplibre_native_ffi_render_session_query_source_features_async(
  *
  * Finishes a call that `maplibre_native_ffi_render_session_query_source_features_async` started.
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiSourceFeature): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiSourceFeature): the items
  */
 GPtrArray* maplibre_native_ffi_render_session_query_source_features_finish(
   MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
@@ -5515,7 +5515,7 @@ void maplibre_native_ffi_runtime_list_offline_regions_async(
  *
  * Finishes a call that `maplibre_native_ffi_runtime_list_offline_regions_async` started.
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiOfflineRegionInfo): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiOfflineRegionInfo): the items
  */
 GPtrArray* maplibre_native_ffi_runtime_list_offline_regions_finish(
   MaplibreNativeFfiRuntime* self, GAsyncResult* result, GError** error
@@ -5557,7 +5557,7 @@ void maplibre_native_ffi_runtime_merge_offline_regions_async(
  *
  * Finishes a call that `maplibre_native_ffi_runtime_merge_offline_regions_async` started.
  *
- * Returns: (transfer full) (element-type MaplibreNativeFfiOfflineRegionInfo): the items
+ * Returns: (transfer container) (element-type MaplibreNativeFfiOfflineRegionInfo): the items
  */
 GPtrArray* maplibre_native_ffi_runtime_merge_offline_regions_finish(
   MaplibreNativeFfiRuntime* self, GAsyncResult* result, GError** error

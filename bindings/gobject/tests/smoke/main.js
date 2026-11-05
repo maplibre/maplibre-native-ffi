@@ -1,5 +1,5 @@
 // Calls through the introspected API as a GJS program does: handle objects,
-// boxed values, an event handler, a command, a query, readiness, and errors.
+// boxed values, an event handler, a command, queries, readiness, and errors.
 
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
@@ -24,7 +24,17 @@ const {
 
 for (const [type, methods] of [
   [Runtime, ["release", "set_event_handler", "clear_event_handler"]],
-  [Map, ["ready", "release", "set_style_json", "update_camera", "get_camera"]],
+  [
+    Map,
+    [
+      "ready",
+      "release",
+      "set_style_json",
+      "update_camera",
+      "get_camera",
+      "list_style_layers",
+    ],
+  ],
 ]) {
   for (const method of methods) {
     Gio._promisify(type.prototype, `${method}_async`, `${method}_finish`);
@@ -62,8 +72,17 @@ async function run() {
     });
     runtime.set_event_handler_async(handler);
   });
-  await map.set_style_json_async('{"version":8,"sources":{},"layers":[]}');
+  await map.set_style_json_async(
+    '{"version":8,"sources":{},"layers":[{"id":"land","type":"background"}]}',
+  );
   await loaded;
+
+  // GJS frees the array that a query returns, which owns its items.
+  const layers = await map.list_style_layers_async();
+  check(
+    layers.length === 1 && layers[0].get_id() === "land",
+    "the style's layers",
+  );
 
   const camera = new CameraOptions();
   camera.set_zoom(4);

@@ -82,6 +82,11 @@ DIRECTORY = gobject_values.DIRECTORY
 TARGETS = frozenset({"linux", "macos"})
 PLATFORM_CONDITIONS = {"linux": "defined(__linux__)", "macos": "defined(__APPLE__)"}
 GINT_MIN, GINT_MAX, GUINT_MAX = -(2**31), 2**31 - 1, 2**32 - 1
+# A returned GPtrArray frees its items when its last reference goes. GJS and
+# PyGObject free each item of a `(transfer full)` array before they free the
+# array, which would free the items twice, so the caller receives the array as
+# a container whose items it owns through the array.
+ARRAY_TRANSFER = "(transfer container)"
 # The names that a generated function's own parameters take, which a C
 # parameter of the same name gives up.
 RESERVED = frozenset({"self", "callback", "user_data", "error", "result"})
@@ -640,7 +645,7 @@ class Emitter:
                         (
                             "GPtrArray*",
                             expression,
-                            f"(transfer full) (element-type {type_name(element.native)}): the items",
+                            f"{ARRAY_TRANSFER} (element-type {type_name(element.native)}): the items",
                             convert,
                         )
                     )
@@ -1147,7 +1152,7 @@ class Emitter:
                 "(GDestroyNotify)g_ptr_array_unref",
                 "GPtrArray*",
                 "  return g_task_propagate_pointer(G_TASK(result), error);\n",
-                f"(transfer full) (element-type {element_type}){nullable}: the items",
+                f"{ARRAY_TRANSFER} (element-type {element_type}){nullable}: the items",
             )
         raise Unsupported(f"a {result.kind} result")
 
@@ -1384,7 +1389,7 @@ class Emitter:
             body,
             doc=self.doc_lines(plan.name),
             annotations=call.annotations,
-            returns_doc=f"(transfer full) (element-type {type_name(element.native)}): the items, or %NULL with `error` set",
+            returns_doc=f"{ARRAY_TRANSFER} (element-type {type_name(element.native)}): the items, or %NULL with `error` set",
         )
 
     # Handles.
