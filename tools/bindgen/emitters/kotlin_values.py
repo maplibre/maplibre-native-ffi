@@ -533,9 +533,7 @@ class Values:
                     for member, typ, field in members
                     if field.scoped
                 ]
-                if any(default == "null" for _, _, default in defaults):
-                    raise ValueError(f"{public}: a view has no copy for Java's options")
-                twins, companion = java.record(public, defaults, copyable=False)
+                twins, companion = java.record(public, defaults, view=True)
                 result.append(
                     f"{doc(self.bound, value.native)}public class {public}(\n"
                     + ",\n".join(args)

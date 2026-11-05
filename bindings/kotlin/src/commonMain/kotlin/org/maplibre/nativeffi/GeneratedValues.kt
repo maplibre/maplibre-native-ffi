@@ -3707,7 +3707,29 @@ public class GpuSync(
       return storedHandle
     }
 
+  @PublishedApi
+  internal fun withKind(kind: GpuSyncKind): GpuSync =
+    GpuSync(kind = kind, handle = handle, value = value).also { it.bindingScope = bindingScope }
+
+  @PublishedApi
+  internal fun withHandle(handle: Long): GpuSync =
+    GpuSync(kind = kind, handle = handle.toULong(), value = value).also {
+      it.bindingScope = bindingScope
+    }
+
+  @PublishedApi
+  internal fun withValue(value: Long): GpuSync =
+    GpuSync(kind = kind, handle = handle, value = value.toULong()).also {
+      it.bindingScope = bindingScope
+    }
+
   public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GpuSync = GpuSync()
+
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
     @PublishedApi

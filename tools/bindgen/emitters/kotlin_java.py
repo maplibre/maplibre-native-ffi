@@ -14,7 +14,8 @@ a u64, with the same bits.
 - A record with a member that has a default gets a static `of` factory with the
   members that have none, and a `withX` copy for each member that has one, so
   Java never restates a default or passes null for an unset option, and a
-  member that C appends to a record doesn't break Java's calls. Another record
+  member that C appends to a record doesn't break Java's calls. A view's copy
+  keeps the view's scope. Another record
   whose constructor takes an unsigned member gets an `of` factory that takes
   every member. Both are hidden from Kotlin, which uses the constructor's named
   and default arguments.
@@ -114,16 +115,16 @@ def function_annotation(method: str, types: list[str]) -> str:
     return ""
 
 
-def record(
-    public: str, members: list[tuple[str, str, str | None]], copyable: bool = True
-):
-    """The Java members of a data class with [members]: (name, type, default).
+def record(public: str, members: list[tuple[str, str, str | None]], view: bool = False):
+    """The Java members of a record with [members]: (name, type, default).
 
     Returns the lines of the class body and those of its companion. The `of`
-    factory of a [copyable] record with a member that has a default takes the
-    members without one, and Java sets each other one with a `withX` copy. A
-    record whose constructor Java can't call, and that has no option that
-    defaults to null, also gets an `of` factory that takes every member.
+    factory of a record with a member that has a default takes the members
+    without one, and Java sets each other one with a `withX` copy. A record
+    whose constructor Java can't call, and that has no option that defaults to
+    null, also gets an `of` factory that takes every member. A [view] is a
+    class rather than a data class, so its copy calls the constructor and keeps
+    the view's `bindingScope`.
     """
     body = [line for member, typ, _ in members for line in property_twin(member, typ)]
     factories = []
@@ -131,14 +132,25 @@ def record(
         "Creates a value from the members without defaults, for Java, which sets "
         "the others with the `withX` methods."
     )
-    if copyable and any(default is not None for _, _, default in members):
+    if any(default is not None for _, _, default in members):
         for member, typ, default in members:
             if default is None:
                 continue
             value = typ.removesuffix("?")
+            update = f"{member} = {to_kotlin(member, value)}"
+            if view:
+                arguments = ", ".join(
+                    update if other == member else f"{other} = {other}"
+                    for other, _, _ in members
+                )
+                copy = (
+                    f"{public}({arguments}).also {{ it.bindingScope = bindingScope }}"
+                )
+            else:
+                copy = f"copy({update})"
             body.append(
                 f"  @PublishedApi internal fun with{pascal(bare(member))}({member}: {signed(value)}): "
-                f"{public} = copy({member} = {to_kotlin(member, value)})"
+                f"{public} = {copy}"
             )
         factories.append(
             (
