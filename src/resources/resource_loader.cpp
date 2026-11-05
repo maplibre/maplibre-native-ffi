@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -516,6 +517,14 @@ auto make_database_file_source(
     auto source = std::make_unique<mln::DatabaseFileSource>(
       resource_options, client_options
     );
+#if defined(__EMSCRIPTEN__)
+    // The browser's HTTP cache already holds what an in-memory ambient cache
+    // would, so a browser runtime without a cache file starts with no ambient
+    // cache.
+    if (resource_options.cachePath() == ":memory:") {
+      source->setMaximumAmbientCacheSize(0, [](std::exception_ptr) -> void {});
+    }
+#endif
     return source;
   } catch (const std::exception& exception) {
     set_thread_error(exception);

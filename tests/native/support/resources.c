@@ -43,6 +43,18 @@ mln_status mln_test_clear_resource_provider(mln_runtime runtime) {
   );
 }
 
+mln_runtime mln_test_create_caching_runtime(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_completion completion = mln_test_completion_default(0);
+  MLN_TEST_OK(commit(
+    mln_runtime_set_maximum_ambient_cache_size(
+      runtime, 64 * 1024 * 1024, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    ),
+    &completion
+  ));
+  return runtime;
+}
+
 mln_status mln_test_set_resource_transform(
   mln_runtime runtime, const mln_resource_transform* transform
 ) {

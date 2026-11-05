@@ -1157,7 +1157,9 @@ MLN_API mln_status mln_runtime_run_cache_database_operation(
 /**
  * Limits the size of the runtime's ambient cache.
  *
- * `size` is in bytes. Offline regions don't count toward it.
+ * `size` is in bytes. Offline regions don't count toward it. The limit
+ * defaults to 50 MB. In the browser, a runtime without a cache file defaults
+ * to 0, because the browser's HTTP cache already holds what maps load.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
