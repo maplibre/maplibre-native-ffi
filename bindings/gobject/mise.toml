@@ -1,6 +1,7 @@
 # meson and gi-docgen come from the root uv project. GLib,
 # gobject-introspection, Vala, and GJS are system packages; see
-# .config/mise.linux.toml and .config/mise.macos.toml.
+# .config/mise.linux.toml and .config/mise.macos.toml. Targets whose tests run
+# in another system install their own; see scripts/test-from-source.sh.
 
 [tasks.build]
 description = "Build the GObject library and install it into a native preset's install."
@@ -21,6 +22,16 @@ export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
 [tasks.test]
 description = "Test the GObject library against a native preset's install."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = '''
+case "$usage_preset" in
+  linux-musl-*) exec mise run :_test-device "$usage_preset" ;;
+  *) exec mise run :_test-host "$usage_preset" ;;
+esac
+'''
+
+[tasks._test-host]
+hide = true
+usage = 'arg "<preset>"'
 run = [
   { task = ":package", args = [
     "{{usage.preset}}",
@@ -29,6 +40,16 @@ run = [
     "{{usage.preset}}",
   ] },
 ]
+
+# Alpine builds the library against its own GLib and runs the programs there.
+[tasks._test-device]
+hide = true
+extends = "ffi:preset"
+run = '''
+install="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+MLN_FFI_DEVICE_INSTALL="$install" MLN_FFI_DEVICE_TIMEOUT=600 exec "$MISE_MONOREPO_ROOT/tools/devices/run" \
+  sh "$PWD/scripts/test-from-source.sh" "$install"
+'''
 
 [tasks.api]
 description = "Generate the gi-docgen HTML API reference for the GObject library."

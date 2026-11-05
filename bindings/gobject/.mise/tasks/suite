@@ -5,7 +5,9 @@
 #MISE shell="bash"
 set -euo pipefail
 
-install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+# Where a target builds the library itself, MLN_FFI_GOBJECT_PREFIX names the
+# prefix it installed into, beside a copy of the native install.
+install_dir=${MLN_FFI_GOBJECT_PREFIX:-"$MISE_MONOREPO_ROOT/build/$usage_preset/install"}
 sources="$PWD/tests"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
