@@ -167,9 +167,9 @@ link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
 [[entry]]
 bindings = ["gobject"]
-platforms = ["freebsd", "windows", "windows-mingw"]
+platforms = ["windows", "windows-mingw"]
 status = "path-known"
-reason = "The library builds against the system's GLib, gobject-introspection, Vala, and GJS, which CI installs only on Linux and macOS. FreeBSD and MSYS2 package them."
+reason = "The library builds against the system's GLib, gobject-introspection, Vala, and GJS, which CI installs only on Linux, macOS, and FreeBSD. MSYS2 packages them."
 link = "https://github.com/maplibre/maplibre-native-ffi/issues/119"
 
 [[entry]]
