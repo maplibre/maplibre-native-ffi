@@ -41,14 +41,11 @@ namespace EventsAndLogs {
 		// #endregion handler
 
 		// #region mask
-		var options = new MapOptions ();
-		options.set_initial_extent (
-			{ width: 512, height: 512, scale_factor: 1.0 }
-		);
-		options.set_event_mask (
-			RuntimeEventFlag.MAP_STYLE_LOADED
-			| RuntimeEventFlag.MAP_LOADING_FAILED
-		);
+		var options = new MapOptions () {
+			initial_extent = { width: 512, height: 512, scale_factor: 1.0 },
+			event_mask = RuntimeEventFlag.MAP_STYLE_LOADED
+				| RuntimeEventFlag.MAP_LOADING_FAILED,
+		};
 		map = runtime.create_map (options);
 		// #endregion mask
 		yield map.ready_async ();

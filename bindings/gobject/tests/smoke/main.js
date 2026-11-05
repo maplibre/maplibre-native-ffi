@@ -1,5 +1,5 @@
 // Calls through the introspected API as a GJS program does: handle objects,
-// boxed values, an event handler, a command, queries, readiness, and errors.
+// option objects that properties build, boxed values, an event handler, a command, queries, readiness, and errors.
 
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
@@ -47,12 +47,20 @@ function check(condition, message) {
 
 async function run() {
   const runtime = Runtime.create(null);
-  const options = new MapOptions();
-  options.set_initial_extent(
-    new LogicalExtent({ width: 64, height: 64, scale_factor: 1 }),
+  // An option object takes its members as construction properties.
+  const options = new MapOptions({
+    initial_extent: new LogicalExtent({
+      width: 64,
+      height: 64,
+      scale_factor: 1,
+    }),
+    map_mode: MapMode.CONTINUOUS,
+    event_mask: RuntimeEventFlag.MAP_STYLE_LOADED,
+  });
+  check(
+    options.has_event_mask() && !options.has_tile_cache_enabled(),
+    "the members that construction sets",
   );
-  options.set_map_mode(MapMode.CONTINUOUS);
-  options.set_event_mask(RuntimeEventFlag.MAP_STYLE_LOADED);
   const map = runtime.create_map(options);
   await map.ready_async();
 
@@ -84,9 +92,10 @@ async function run() {
     "the style's layers",
   );
 
-  const camera = new CameraOptions();
-  camera.set_zoom(4);
-  camera.set_center(new LatLng({ latitude: 10, longitude: 20 }));
+  const camera = new CameraOptions({
+    center: new LatLng({ latitude: 10, longitude: 20 }),
+  });
+  camera.zoom = 4;
   const update = new CameraUpdate();
   update.set_mode(CameraUpdateMode.JUMP);
   update.set_camera(camera);

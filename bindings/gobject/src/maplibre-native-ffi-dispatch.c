@@ -140,6 +140,16 @@ mln_buffer_view maplibre_native_ffi_bytes_view(GBytes* bytes) {
   return (mln_buffer_view){.data = data, .size = size};
 }
 
+gboolean maplibre_native_ffi_bytes_equal(GBytes* a, GBytes* b) {
+  if (a == NULL || b == NULL) return a == b;
+  return g_bytes_equal(a, b);
+}
+
+gboolean maplibre_native_ffi_strv_equal(char** a, char** b) {
+  if (a == NULL || b == NULL) return a == b;
+  return g_strv_equal((const char* const*)a, (const char* const*)b);
+}
+
 /** Takes the dispatcher out of service, when nothing names its queue. */
 static void dispatcher_retire(Dispatcher* dispatcher) {
   g_source_destroy(&dispatcher->source);

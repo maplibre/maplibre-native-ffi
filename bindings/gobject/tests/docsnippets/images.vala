@@ -9,11 +9,10 @@ namespace Images {
 
 	public async void images (Runtime runtime) throws GLib.Error {
 		// #region map
-		var options = new MapOptions ();
-		options.set_initial_extent (
-			{ width: 800, height: 600, scale_factor: 2.0 }
-		);
-		options.set_map_mode (MapMode.STATIC);
+		var options = new MapOptions () {
+			initial_extent = { width: 800, height: 600, scale_factor: 2.0 },
+			map_mode = MapMode.STATIC,
+		};
 		var map = runtime.create_map (options);
 		yield map.ready_async ();
 		// #endregion map
@@ -35,9 +34,10 @@ namespace Images {
 		// #endregion attach
 
 		// #region image
-		var camera = new CameraOptions ();
-		camera.set_center ({ latitude: 48.8566, longitude: 2.3522 });
-		camera.set_zoom (4);
+		var camera = new CameraOptions () {
+			center = { latitude: 48.8566, longitude: 2.3522 },
+			zoom = 4,
+		};
 		var update = new CameraUpdate ();
 		update.set_mode (CameraUpdateMode.JUMP);
 		update.set_camera (camera);
@@ -59,11 +59,10 @@ namespace Images {
 		Runtime runtime, uint8 z, uint32 x, uint32 y
 	) throws GLib.Error {
 		// #region tile
-		var options = new MapOptions ();
-		options.set_initial_extent (
-			{ width: 512, height: 512, scale_factor: 1.0 }
-		);
-		options.set_map_mode (MapMode.TILE);
+		var options = new MapOptions () {
+			initial_extent = { width: 512, height: 512, scale_factor: 1.0 },
+			map_mode = MapMode.TILE,
+		};
 		var map = runtime.create_map (options);
 		yield map.ready_async ();
 

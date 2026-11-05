@@ -46,6 +46,12 @@ G_GNUC_INTERNAL GBytes* maplibre_native_ffi_bytes_new(
 /** The view of `bytes`, which is empty when `bytes` is null. */
 G_GNUC_INTERNAL mln_buffer_view maplibre_native_ffi_bytes_view(GBytes* bytes);
 
+/** Whether two byte sequences, either of which may be null, are equal. */
+G_GNUC_INTERNAL gboolean maplibre_native_ffi_bytes_equal(GBytes* a, GBytes* b);
+
+/** Whether two text arrays, either of which may be null, are equal. */
+G_GNUC_INTERNAL gboolean maplibre_native_ffi_strv_equal(char** a, char** b);
+
 /**
  * A host callback with its data and the function that frees the data, which
  * runs once the last reference goes. A registration's copies and the native

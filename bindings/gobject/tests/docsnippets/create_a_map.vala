@@ -18,11 +18,10 @@ namespace CreateAMap {
 		// #endregion runtime
 
 		// #region map
-		var options = new MapOptions ();
-		options.set_initial_extent (
-			{ width: 800, height: 600, scale_factor: 2.0 }
-		);
-		options.set_map_mode (MapMode.CONTINUOUS);
+		var options = new MapOptions () {
+			initial_extent = { width: 800, height: 600, scale_factor: 2.0 },
+			map_mode = MapMode.CONTINUOUS,
+		};
 
 		var map = runtime.create_map (options);
 		yield map.ready_async ();
@@ -34,8 +33,7 @@ namespace CreateAMap {
 		);
 		// #endregion style
 
-		var camera = new CameraOptions ();
-		camera.set_zoom (3);
+		var camera = new CameraOptions () { zoom = 3 };
 		var update = new CameraUpdate ();
 		update.set_mode (CameraUpdateMode.JUMP);
 		update.set_camera (camera);

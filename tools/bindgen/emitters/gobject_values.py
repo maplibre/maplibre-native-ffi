@@ -2,12 +2,14 @@
 the callbacks that registrations carry.
 
 A record of plain values, which zeroed storage represents, is a transparent
-boxed struct whose members a host reads and writes. Every other record, such
-as an option bag with a presence mask, a record that holds text, arrays, or
-bytes, a registration, or a tagged union, is an opaque boxed type with
-accessors, since introspection can represent neither its presence nor its
-ownership. A record that holds only a tagged union and its tag is that union,
-under the record's name.
+boxed struct whose members a host reads and writes. An option bag with a
+presence mask that native code takes as input is a final GObject class with a
+property for each member, so every introspected language builds one with
+properties, and a member is unset until its property or setter sets it. Every
+other record, such as one that holds text, arrays, or bytes, a registration,
+or a tagged union, is an opaque boxed type with accessors, since introspection
+can represent neither its presence nor its ownership. A record that holds only
+a tagged union and its tag is that union, under the record's name.
 
 Each type converts to its C record within the scope of one call, which owns
 the storage that the C record borrows and the native registrations that it
@@ -73,6 +75,36 @@ GLIB_SCALARS = {
     "uintptr_t": "guintptr",
 }
 BOOLEANS = frozenset({"bool", "_Bool"})
+# The property of a GLib scalar: its spec's and GValue's kind, and its range.
+# Native code validates its own ranges, so a property takes any value.
+SCALAR_PROPERTIES = {
+    "gdouble": ("double", "-INFINITY", "INFINITY"),
+    "gfloat": ("float", "-INFINITY", "INFINITY"),
+    "gint8": ("int", "G_MININT8", "G_MAXINT8"),
+    "guint8": ("uint", "0", "G_MAXUINT8"),
+    "gshort": ("int", "G_MINSHORT", "G_MAXSHORT"),
+    "gushort": ("uint", "0", "G_MAXUSHORT"),
+    "gint16": ("int", "G_MININT16", "G_MAXINT16"),
+    "guint16": ("uint", "0", "G_MAXUINT16"),
+    "gint": ("int", "G_MININT", "G_MAXINT"),
+    "guint": ("uint", "0", "G_MAXUINT"),
+    "gint32": ("int", "G_MININT32", "G_MAXINT32"),
+    "guint32": ("uint", "0", "G_MAXUINT32"),
+    "gint64": ("int64", "G_MININT64", "G_MAXINT64"),
+    "guint64": ("uint64", "0", "G_MAXUINT64"),
+}
+UNSET = (
+    "A member that a `has_` method reports on is unset until its property or"
+    " setter sets it."
+)
+# The flags of each option bag's property, which the source defines.
+PROPERTY_FLAGS = "PROPERTY_FLAGS"
+PROPERTY_FLAGS_DEFINITION = (
+    "// An option bag's members start unset, so no property is\n"
+    "// G_PARAM_CONSTRUCT, and each notifies only when its setter changes it.\n"
+    "#define PROPERTY_FLAGS \\\n"
+    "  (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS)\n\n"
+)
 # Each record's own functions, which a member's accessor must not take.
 RECORD_FUNCTIONS = frozenset({"new", "copy", "free", "get_type", "to_options"})
 
@@ -327,6 +359,51 @@ class Values:
     def is_input(self, native: str) -> bool:
         return native in self.bound.inputs
 
+    def is_object(self, value: ValuePlan) -> bool:
+        """Whether a record is an option bag that native code takes as input,
+        which is a final GObject class with a property for each member that a
+        property represents."""
+        if value.kind != "record" or value.native not in self.bound.values:
+            return False
+        record = self.record(value.native)
+        return (
+            not record.union_member
+            and not self.transparent(record)
+            and bool(self.masks(record))
+            and self.is_input(record.native)
+        )
+
+    def property_name(self, record: ValuePlan, member: FieldPlan) -> str | None:
+        """The property of an option bag's member, or None for a member that a
+        property represents badly: a callback, or an array of records with its
+        count."""
+        if not self.is_object(record):
+            return None
+        if member.name in {f.name for f in self.hosted(record)}:
+            return None
+        value = member.value
+        if value.kind == "array" and value.element and value.element.kind == "record":
+            return None
+        return accessor(record, member.name).replace("_", "-")
+
+    def destroy(self, value: ValuePlan) -> str:
+        """The function that frees a record or union."""
+        if self.is_object(value):
+            return "g_object_unref"
+        return f"{symbol_name(value.native)}_free"
+
+    def record_check(self, value: ValuePlan, name: str) -> str:
+        """The condition that a record argument holds a value."""
+        if self.is_object(value):
+            return f"{check_macro(value.native)}({name})"
+        return f"{name} != NULL"
+
+    def record_parameter(self, value: ValuePlan) -> str:
+        """The C type of a record parameter, which an object's is not const."""
+        if self.is_object(value):
+            return f"{type_name(value.native)}*"
+        return f"const {type_name(value.native)}*"
+
     # Use.
 
     def use(self, value: ValuePlan | None) -> None:
@@ -429,6 +506,8 @@ class Values:
             element = value.element
             assert element is not None
             if element.kind == "record":
+                if self.is_object(element):
+                    raise Unsupported(f"GObject: an array of {element.native}")
                 return "GPtrArray*"
             if self.text(element) and element.buffer_form == "view":
                 return "char**"
@@ -493,6 +572,8 @@ class Values:
             if element.kind == "record":
                 return f"  g_clear_pointer(&{place}, g_ptr_array_unref);\n"
             return f"  g_strfreev({place});\n"
+        if self.is_object(value):
+            return f"  g_clear_object(&{place});\n"
         if value.kind in {"record", "union"} and not self.transparent(value):
             return f"  g_clear_pointer(&{place}, {symbol_name(value.native)}_free);\n"
         return ""
@@ -613,14 +694,16 @@ class Values:
                 {name: "the value"},
                 f"  g_return_if_fail({name} != NULL);\n  {place} = *{name};\n",
             )
+        # The holder copies an option bag, as it does every other member, so
+        # a later change to the caller's object doesn't reach it.
         return (
-            [(f"const {type_}*", name)],
+            [(self.record_parameter(value), name)],
             {name: "the value"},
             (
-                f"  g_return_if_fail({name} != NULL);\n"
+                f"  g_return_if_fail({self.record_check(value, name)});\n"
                 f"  {type_}* previous = {place};\n"
                 f"  {place} = {prefix}_copy({name});\n"
-                f"  if (previous != NULL) {prefix}_free(previous);\n"
+                f"  if (previous != NULL) {self.destroy(value)}(previous);\n"
             ),
         )
 
@@ -819,6 +902,13 @@ class Values:
         name = type_name(value.native)
         if self.transparent(value):
             return ""
+        if self.is_object(value):
+            prefix = symbol_name(value.native)
+            upper = prefix.removeprefix(SYMBOL + "_").upper()
+            return (
+                f"#define {type_macro(value.native)} ({prefix}_get_type())\n"
+                f"G_DECLARE_FINAL_TYPE({name}, {prefix}, {MACRO}, {upper}, GObject)\n"
+            )
         return f"typedef struct _{name} {name};\n"
 
     def render_value(self, value: ValuePlan) -> tuple[str, str, str]:
@@ -828,13 +918,18 @@ class Values:
             return self.render_union(value, value.union_member.value)
         if self.transparent(value):
             return self.render_transparent(value)
+        if self.is_object(value):
+            return self.render_object(value)
         return self.render_opaque(value)
 
     def type_comment(
-        self, value: ValuePlan, members: tuple[str, ...] | list[str] = ()
+        self,
+        value: ValuePlan,
+        members: tuple[str, ...] | list[str] = (),
+        extra: tuple[str, ...] = (),
     ) -> str:
         name = type_name(value.native)
-        return comment([f"{name}:", *members, "", *self.doc_lines(value.native)])
+        return comment([f"{name}:", *members, "", *self.doc_lines(value.native, extra)])
 
     def boxed_header(self, value: ValuePlan, functions: list[Function]) -> str:
         prefix = symbol_name(value.native)
@@ -1043,7 +1138,350 @@ class Values:
             for index, member in enumerate(callbacks)
         )
         source += self.opaque_to_native(value, data, callbacks)
-        source += f"{name}* {prefix}_from_native(const {native}* in) {{\n"
+        source += self.from_native(value, data)
+        return header, source, self.private_prototypes(value)
+
+    # Option bags.
+
+    def property_kind(self, value: ValuePlan) -> str:
+        """The kind of a member's property, which names its `g_param_spec_`
+        and its `GValue` accessors."""
+        kind = value.kind
+        if kind == "scalar":
+            if self.boolean(value):
+                return "boolean"
+            found = SCALAR_PROPERTIES.get(self.gtype(value))
+            if found is None:
+                raise Unsupported(f"GObject: a {self.gtype(value)} property")
+            return found[0]
+        if kind == "enum":
+            numbers = [number for _, number in value.enum_values]
+            if value.enum_kind == "bitmask":
+                if not all(0 <= n <= 0xFFFFFFFF for n in numbers):
+                    raise Unsupported(f"GObject: a property of {value.native}")
+                return "flags"
+            if not all(-(2**31) <= n < 2**31 for n in numbers) or 0 not in numbers:
+                raise Unsupported(f"GObject: a property of {value.native}")
+            return "enum"
+        if self.text(value):
+            return "string"
+        if self.is_object(value):
+            return "object"
+        return "boxed"
+
+    def param_spec(self, member: FieldPlan, name: str) -> str:
+        value = member.value
+        kind = self.property_kind(value)
+        head = f'"{name}", NULL, NULL'
+        if kind == "boolean":
+            return f"g_param_spec_boolean({head}, FALSE, {PROPERTY_FLAGS})"
+        if kind in {"enum", "flags"}:
+            return f"g_param_spec_{kind}({head}, {type_macro(value.native)}, 0, {PROPERTY_FLAGS})"
+        if kind == "string":
+            default = "NULL" if value.nullable else '""'
+            return f"g_param_spec_string({head}, {default}, {PROPERTY_FLAGS})"
+        if kind == "object":
+            return f"g_param_spec_object({head}, {type_macro(value.native)}, {PROPERTY_FLAGS})"
+        if kind == "boxed":
+            if self.bytes_(value):
+                gtype = "G_TYPE_BYTES"
+            elif value.kind == "array":
+                gtype = "G_TYPE_STRV"
+            else:
+                gtype = type_macro(value.native)
+            return f"g_param_spec_boxed({head}, {gtype}, {PROPERTY_FLAGS})"
+        _, low, high = SCALAR_PROPERTIES[self.gtype(value)]
+        return f"g_param_spec_{kind}({head}, {low}, {high}, 0, {PROPERTY_FLAGS})"
+
+    def property_get(self, member: FieldPlan, place: str) -> str:
+        """The statement that `get_property` stores a member's value with."""
+        value = member.value
+        kind = self.property_kind(value)
+        if value.kind == "record" and self.transparent(value):
+            place = f"&{place}"
+        return f"g_value_set_{kind}(value, {place});"
+
+    def object_setter(
+        self, member: FieldPlan, notify: str | None
+    ) -> tuple[list[tuple[str, str]], dict[str, str], str]:
+        """An option bag's member setter, which sets the member's bit of the
+        mask, and notifies the property `notify` when it changes the member or
+        sets it for the first time. A copy of a record always changes it."""
+        value = member.value
+        place = f"self->{member.name}"
+        parameters, annotations, body = self.setter(value, place, "value")
+        kind = value.kind
+        # Each comparison runs before the setter frees the previous value.
+        compare, before = "", ""
+        if kind in {"scalar", "enum", "native_pointer"}:
+            body = f"  gboolean changed = {place} != value;\n" + body
+        elif self.text(value):
+            compare, before = (
+                f"g_strcmp0(previous, {place}) != 0",
+                "  g_free(previous);\n",
+            )
+        elif self.bytes_(value):
+            compare = f"!maplibre_native_ffi_bytes_equal(previous, {place})"
+            before = "  if (previous != NULL) g_bytes_unref(previous);\n"
+        elif kind == "array" and notify is not None:
+            compare = f"!maplibre_native_ffi_strv_equal(previous, {place})"
+            before = "  g_strfreev(previous);\n"
+        elif kind == "record" and self.transparent(value):
+            compare = f"memcmp(&{place}, value, sizeof {place}) != 0"
+            before = f"  {place} = *value;\n"
+        if compare:
+            assert before in body
+            body = body.replace(before, f"  gboolean changed = {compare};\n" + before)
+        compares = "gboolean changed" in body
+        presence = member.presence
+        if presence is not None and presence.mask and presence.bit:
+            bit = f"self->{presence.mask} & {presence.bit}"
+            if notify is not None and compares:
+                # After the setter's own checks.
+                checks = ""
+                while body.startswith("  g_return_if_fail("):
+                    line, body = body.split("\n", 1)
+                    checks += line + "\n"
+                body = checks + f"  gboolean was_set = ({bit}) != 0;\n" + body
+            body += f"  self->{presence.mask} |= {presence.bit};\n"
+            masked = True
+        else:
+            masked = False
+        if notify is not None:
+            emit = f"g_object_notify_by_pspec(G_OBJECT(self), {notify});\n"
+            if compares:
+                condition = "changed || !was_set" if masked else "changed"
+                body += f"  if ({condition}) {emit}"
+            else:
+                body += f"  {emit}"
+        return parameters, annotations, body
+
+    def object_accessors(
+        self, value: ValuePlan, member: FieldPlan, notify: str | None
+    ) -> tuple[list[str], list[Function]]:
+        """An option bag's member: its property's documentation, and its
+        getter, its predicate, and its setter, which document only the
+        property."""
+        name, prefix = type_name(value.native), symbol_name(value.native)
+        stem = accessor(value, member.name)
+        documented = f"{value.native}.{member.name}"
+        doc = self.doc_lines(documented) or [f"The `{member.name}` member."]
+        prop = self.property_name(value, member)
+        place = f"self->{member.name}"
+        returns, expression, annotation = self.getter(member.value, place)
+        default = fail_value(returns) or "0"
+        check = check_macro(value.native)
+        setter_name = f"{prefix}_set_{stem}"
+        property_doc: list[str] = []
+        if prop is not None:
+            named = f"`{name}:{prop}`"
+            property_doc = [
+                f"{name}:{prop}: (setter set_{stem}) (getter get_{stem})",
+                "",
+                *doc,
+            ]
+            get_doc, set_doc = [f"Gets {named}."], [f"Sets {named}."]
+            has_doc = [f"Whether {named} is set."]
+        else:
+            get_doc = [f"Gets the value that `{setter_name}` sets."]
+            set_doc = doc
+            has_doc = [f"Whether the value sets `{setter_name}`."]
+        functions = [
+            Function(
+                f"{prefix}_get_{stem}",
+                returns,
+                [(f"{name}*", "self")],
+                f"  g_return_val_if_fail({check}(self), {default});\n"
+                f"  return {expression};\n",
+                doc=get_doc,
+                returns_doc=annotation,
+                identifier_annotation=f"(get-property {prop})" if prop else "",
+            )
+        ]
+        presence = member.presence
+        if presence and presence.mask and presence.bit:
+            functions.append(
+                Function(
+                    f"{prefix}_has_{stem}",
+                    "gboolean",
+                    [(f"{name}*", "self")],
+                    f"  g_return_val_if_fail({check}(self), FALSE);\n"
+                    f"  return (self->{presence.mask} & {presence.bit}) != 0;\n",
+                    doc=has_doc,
+                    returns_doc="whether the member is set",
+                )
+            )
+        parameters, annotations, body = self.object_setter(member, notify)
+        functions.append(
+            Function(
+                setter_name,
+                "void",
+                [(f"{name}*", "self"), *parameters],
+                f"  g_return_if_fail({check}(self));\n" + body,
+                doc=set_doc,
+                annotations=annotations,
+                identifier_annotation=f"(set-property {prop})" if prop else "",
+            )
+        )
+        return property_doc, functions
+
+    def render_object(self, value: ValuePlan) -> tuple[str, str, str]:
+        """An option bag that native code takes as input: a final GObject
+        class, whose properties set its members, and which copies the members
+        that it holds."""
+        name, prefix, native = (
+            type_name(value.native),
+            symbol_name(value.native),
+            value.native,
+        )
+        stem = public_stem(native)
+        upper = stem.upper()
+        cast = cast_macro(native)
+        members = self.members(value)
+        hosted = {f.name for f in self.hosted(value)}
+        data = [m for m in members if m.name not in hosted]
+        callbacks = [m for m in members if m.name in hosted]
+        masks = self.masks(value)
+        properties = [
+            (m, prop, f"{upper}_PROP_{prop.replace('-', '_').upper()}")
+            for m in data
+            if (prop := self.property_name(value, m)) is not None
+        ]
+        table = f"{stem}_properties"
+        notify = {m.name: f"{table}[{ident}]" for m, _, ident in properties}
+
+        struct = f"struct _{name} {{\n  GObject parent_instance;\n"
+        struct += "".join(f"  guint64 {mask};\n" for mask in masks)
+        struct += "".join(f"  {self.storage(m.value)} {m.name};\n" for m in data)
+        struct += "".join(f"  MaplibreNativeFfiClosure* {m.name};\n" for m in callbacks)
+        struct += "};\n\n"
+        ids = "".join(f"  {ident},\n" for _, _, ident in properties)
+        struct += (
+            f"enum {{\n  {upper}_PROP_0,\n{ids}  {upper}_N_PROPERTIES\n}};\n\n"
+            f"static GParamSpec* {table}[{upper}_N_PROPERTIES];\n\n"
+        )
+
+        functions = [
+            Function(
+                f"{prefix}_new",
+                f"{name}*",
+                [],
+                f"  return g_object_new({type_macro(native)}, NULL);\n",
+                doc=[f"Creates a `{name}` whose members are zero, empty, or unset."],
+                identifier_annotation="(constructor)",
+                returns_doc="(transfer full): the new value",
+            )
+        ]
+        header = self.type_comment(
+            value,
+            extra=(UNSET,),
+        )
+        header += functions[0].declaration()
+        for member in data:
+            property_doc, accessors = self.object_accessors(
+                value, member, notify.get(member.name)
+            )
+            if property_doc:
+                header += comment(property_doc)
+            header += "".join(f.declaration() for f in accessors)
+            functions += accessors
+        for member in callbacks:
+            setter = self.callback_setter(value, member)
+            header += setter.declaration()
+            functions.append(setter)
+        header += "\n"
+
+        finalize = "".join(self.free(m.value, f"self->{m.name}") for m in data)
+        finalize += "".join(
+            f"  maplibre_native_ffi_closure_unref(self->{m.name});\n" for m in callbacks
+        )
+        gets = "".join(
+            f"  case {ident}:\n    {self.property_get(m, f'self->{m.name}')}\n    break;\n"
+            for m, _, ident in properties
+        )
+        sets = "".join(
+            f"  case {ident}:\n"
+            f"    {prefix}_set_{accessor(value, m.name)}(self, g_value_get_{self.property_kind(m.value)}(value));\n"
+            "    break;\n"
+            for m, _, ident in properties
+        )
+        invalid = "  default:\n    G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);\n  }\n"
+        installs = "".join(
+            f"  {table}[{ident}] = {self.param_spec(m, prop)};\n"
+            for m, prop, ident in properties
+        )
+        source = struct
+        source += f"G_DEFINE_FINAL_TYPE({name}, {prefix}, G_TYPE_OBJECT)\n\n"
+        if finalize:
+            source += (
+                f"static void {prefix}_finalize(GObject* object) {{\n"
+                f"  {name}* self = {cast}(object);\n"
+                + finalize
+                + f"  G_OBJECT_CLASS({prefix}_parent_class)->finalize(object);\n}}\n\n"
+            )
+        source += (
+            f"static void {prefix}_get_property(\n"
+            "  GObject* object, guint id, GValue* value, GParamSpec* pspec\n) {\n"
+            f"  {name}* self = {cast}(object);\n"
+            f"  switch (id) {{\n{gets}{invalid}}}\n\n"
+            f"static void {prefix}_set_property(\n"
+            "  GObject* object, guint id, const GValue* value, GParamSpec* pspec\n) {\n"
+            f"  {name}* self = {cast}(object);\n"
+            f"  switch (id) {{\n{sets}{invalid}}}\n\n"
+            f"static void {prefix}_class_init({name}Class* klass) {{\n"
+            "  GObjectClass* object_class = G_OBJECT_CLASS(klass);\n"
+            + (f"  object_class->finalize = {prefix}_finalize;\n" if finalize else "")
+            + f"  object_class->get_property = {prefix}_get_property;\n"
+            f"  object_class->set_property = {prefix}_set_property;\n"
+            + installs
+            + f"  g_object_class_install_properties(object_class, {upper}_N_PROPERTIES, {table});\n}}\n\n"
+            f"static void {prefix}_init({name}* self) {{\n"
+            + (
+                "".join(self.default(m, f"self->{m.name}") for m in data)
+                or "  (void)self;\n"
+            )
+            + "}\n\n"
+        )
+        source += "".join(f.definition() for f in functions)
+        # A holder's copy of the option bag.
+        copy = f"{name}* {prefix}_copy(const {name}* self) {{\n"
+        copy += f"  {name}* copy = {prefix}_new();\n"
+        copy += "".join(f"  copy->{mask} = self->{mask};\n" for mask in masks)
+        for member in data:
+            place, origin = f"copy->{member.name}", f"self->{member.name}"
+            if self.default(member, place):
+                copy += self.free(member.value, place)
+            copy += self.copy(member.value, place, origin) or f"  {place} = {origin};\n"
+        copy += "".join(
+            f"  copy->{m.name} = maplibre_native_ffi_closure_ref(self->{m.name});\n"
+            for m in callbacks
+        )
+        copy += "  return copy;\n}\n\n"
+        source += copy
+        source += "".join(
+            self.trampoline(value, member, index)
+            for index, member in enumerate(callbacks)
+        )
+        source += self.opaque_to_native(value, data, callbacks)
+        source += self.from_native(value, data)
+        private = (
+            f"G_GNUC_INTERNAL void {prefix}_to_native(\n"
+            f"  const {name}* self, {native}* out, MaplibreNativeFfiCall* call\n);\n"
+            f"G_GNUC_INTERNAL {name}* {prefix}_from_native(const {native}* in);\n"
+            f"G_GNUC_INTERNAL {name}* {prefix}_copy(const {name}* self);\n"
+        )
+        return header, source, private
+
+    def from_native(self, value: ValuePlan, data: list[FieldPlan]) -> str:
+        """A copy of a C record that native code lends, which holds a member
+        only when the record's mask sets it."""
+        name, prefix, native = (
+            type_name(value.native),
+            symbol_name(value.native),
+            value.native,
+        )
+        masks = self.masks(value)
+        source = f"{name}* {prefix}_from_native(const {native}* in) {{\n"
         source += f"  {name}* self = {prefix}_new();\n"
         if not (masks or data):
             source += "  (void)in;\n"
@@ -1055,7 +1493,7 @@ class Values:
                 read = f"  if ((in->{member.presence.mask} & {bit}) != 0) {{\n{textwrap.indent(read, '  ')}  }}\n"
             source += read
         source += "  return self;\n}\n\n"
-        return header, source, self.private_prototypes(value)
+        return source
 
     def accessors(
         self, value: ValuePlan, member: FieldPlan, input_: bool
@@ -1078,7 +1516,10 @@ class Values:
                 returns,
                 [(f"const {name}*", "self")],
                 guard + f"  return {expression};\n",
-                doc=doc,
+                # A member that a setter writes is documented there.
+                doc=[f"Gets the value that `{prefix}_set_{stem}` sets."]
+                if input_
+                else doc,
                 returns_doc=annotation,
             )
         ]
@@ -1639,7 +2080,7 @@ class Values:
                 prefix = symbol_name(unwrapped.native)
                 source = name if pointer else f"&{name}"
                 setup += f"  {type_name(unwrapped.native)}* {local} = {prefix}_from_native({source});\n"
-                cleanup += f"  {prefix}_free({local});\n"
+                cleanup += f"  {self.destroy(unwrapped)}({local});\n"
                 arguments.append(local)
             else:
                 raise Unsupported(

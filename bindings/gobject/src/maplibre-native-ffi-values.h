@@ -70,34 +70,85 @@ typedef struct _MaplibreNativeFfiStyleExpression
 typedef struct _MaplibreNativeFfiVulkanDevice MaplibreNativeFfiVulkanDevice;
 typedef struct _MaplibreNativeFfiCameraTransitionHandler
   MaplibreNativeFfiCameraTransitionHandler;
-typedef struct _MaplibreNativeFfiAnimationOptions
-  MaplibreNativeFfiAnimationOptions;
-typedef struct _MaplibreNativeFfiBoundOptions MaplibreNativeFfiBoundOptions;
-typedef struct _MaplibreNativeFfiCameraDelta MaplibreNativeFfiCameraDelta;
-typedef struct _MaplibreNativeFfiCameraFitOptions
-  MaplibreNativeFfiCameraFitOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_ANIMATION_OPTIONS \
+  (maplibre_native_ffi_animation_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiAnimationOptions, maplibre_native_ffi_animation_options,
+  MAPLIBRE_NATIVE_FFI, ANIMATION_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_BOUND_OPTIONS \
+  (maplibre_native_ffi_bound_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiBoundOptions, maplibre_native_ffi_bound_options,
+  MAPLIBRE_NATIVE_FFI, BOUND_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_DELTA \
+  (maplibre_native_ffi_camera_delta_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiCameraDelta, maplibre_native_ffi_camera_delta,
+  MAPLIBRE_NATIVE_FFI, CAMERA_DELTA, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_FIT_OPTIONS \
+  (maplibre_native_ffi_camera_fit_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiCameraFitOptions, maplibre_native_ffi_camera_fit_options,
+  MAPLIBRE_NATIVE_FFI, CAMERA_FIT_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiCameraFitUpdate
   MaplibreNativeFfiCameraFitUpdate;
-typedef struct _MaplibreNativeFfiCameraOptions MaplibreNativeFfiCameraOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_OPTIONS \
+  (maplibre_native_ffi_camera_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiCameraOptions, maplibre_native_ffi_camera_options,
+  MAPLIBRE_NATIVE_FFI, CAMERA_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiCameraUpdate MaplibreNativeFfiCameraUpdate;
-typedef struct _MaplibreNativeFfiCustomGeometrySourceOptions
-  MaplibreNativeFfiCustomGeometrySourceOptions;
-typedef struct _MaplibreNativeFfiCustomVectorSourceOptions
-  MaplibreNativeFfiCustomVectorSourceOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_GEOMETRY_SOURCE_OPTIONS \
+  (maplibre_native_ffi_custom_geometry_source_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiCustomGeometrySourceOptions,
+  maplibre_native_ffi_custom_geometry_source_options, MAPLIBRE_NATIVE_FFI,
+  CUSTOM_GEOMETRY_SOURCE_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_VECTOR_SOURCE_OPTIONS \
+  (maplibre_native_ffi_custom_vector_source_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiCustomVectorSourceOptions,
+  maplibre_native_ffi_custom_vector_source_options, MAPLIBRE_NATIVE_FFI,
+  CUSTOM_VECTOR_SOURCE_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiDmaBufFrame MaplibreNativeFfiDmaBufFrame;
 typedef struct _MaplibreNativeFfiDmaBufRingDescriptor
   MaplibreNativeFfiDmaBufRingDescriptor;
 typedef struct _MaplibreNativeFfiEglContextDescriptor
   MaplibreNativeFfiEglContextDescriptor;
 typedef struct _MaplibreNativeFfiFeatureId MaplibreNativeFfiFeatureId;
-typedef struct _MaplibreNativeFfiFeatureStateSelector
-  MaplibreNativeFfiFeatureStateSelector;
-typedef struct _MaplibreNativeFfiFramePacerOptions
-  MaplibreNativeFfiFramePacerOptions;
-typedef struct _MaplibreNativeFfiFreeCameraOptions
-  MaplibreNativeFfiFreeCameraOptions;
-typedef struct _MaplibreNativeFfiGeoJsonSourceOptions
-  MaplibreNativeFfiGeoJsonSourceOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_FEATURE_STATE_SELECTOR \
+  (maplibre_native_ffi_feature_state_selector_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiFeatureStateSelector,
+  maplibre_native_ffi_feature_state_selector, MAPLIBRE_NATIVE_FFI,
+  FEATURE_STATE_SELECTOR, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_FRAME_PACER_OPTIONS \
+  (maplibre_native_ffi_frame_pacer_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiFramePacerOptions, maplibre_native_ffi_frame_pacer_options,
+  MAPLIBRE_NATIVE_FFI, FRAME_PACER_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_FREE_CAMERA_OPTIONS \
+  (maplibre_native_ffi_free_camera_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiFreeCameraOptions, maplibre_native_ffi_free_camera_options,
+  MAPLIBRE_NATIVE_FFI, FREE_CAMERA_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_GEO_JSON_SOURCE_OPTIONS \
+  (maplibre_native_ffi_geo_json_source_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiGeoJsonSourceOptions,
+  maplibre_native_ffi_geo_json_source_options, MAPLIBRE_NATIVE_FFI,
+  GEO_JSON_SOURCE_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiHttpHeader MaplibreNativeFfiHttpHeader;
 typedef struct _MaplibreNativeFfiHttpHeaderRule MaplibreNativeFfiHttpHeaderRule;
 typedef struct _MaplibreNativeFfiHttpHeaderTransform
@@ -108,10 +159,24 @@ typedef struct _MaplibreNativeFfiMetalContextDescriptor
 typedef struct _MaplibreNativeFfiIoSurfaceRingDescriptor
   MaplibreNativeFfiIoSurfaceRingDescriptor;
 typedef struct _MaplibreNativeFfiLogHandler MaplibreNativeFfiLogHandler;
-typedef struct _MaplibreNativeFfiMapOptions MaplibreNativeFfiMapOptions;
-typedef struct _MaplibreNativeFfiMapTileOptions MaplibreNativeFfiMapTileOptions;
-typedef struct _MaplibreNativeFfiMapViewportOptions
-  MaplibreNativeFfiMapViewportOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_OPTIONS \
+  (maplibre_native_ffi_map_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiMapOptions, maplibre_native_ffi_map_options,
+  MAPLIBRE_NATIVE_FFI, MAP_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_TILE_OPTIONS \
+  (maplibre_native_ffi_map_tile_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiMapTileOptions, maplibre_native_ffi_map_tile_options,
+  MAPLIBRE_NATIVE_FFI, MAP_TILE_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_VIEWPORT_OPTIONS \
+  (maplibre_native_ffi_map_viewport_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiMapViewportOptions, maplibre_native_ffi_map_viewport_options,
+  MAPLIBRE_NATIVE_FFI, MAP_VIEWPORT_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiMetalBorrowedTexture
   MaplibreNativeFfiMetalBorrowedTexture;
 typedef struct _MaplibreNativeFfiMetalBorrowedTextureDescriptor
@@ -132,8 +197,13 @@ typedef struct _MaplibreNativeFfiOfflineRegionDefinition
   MaplibreNativeFfiOfflineRegionDefinition;
 typedef struct _MaplibreNativeFfiOfflineRegionInfo
   MaplibreNativeFfiOfflineRegionInfo;
-typedef struct _MaplibreNativeFfiOffscreenDeviceOptions
-  MaplibreNativeFfiOffscreenDeviceOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_OFFSCREEN_DEVICE_OPTIONS \
+  (maplibre_native_ffi_offscreen_device_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiOffscreenDeviceOptions,
+  maplibre_native_ffi_offscreen_device_options, MAPLIBRE_NATIVE_FFI,
+  OFFSCREEN_DEVICE_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiWglContextDescriptor
   MaplibreNativeFfiWglContextDescriptor;
 typedef struct _MaplibreNativeFfiWebGlContextDescriptor
@@ -152,16 +222,26 @@ typedef struct _MaplibreNativeFfiOpenGlSurfaceReplacement
   MaplibreNativeFfiOpenGlSurfaceReplacement;
 typedef struct _MaplibreNativeFfiPremultipliedRgba8Image
   MaplibreNativeFfiPremultipliedRgba8Image;
-typedef struct _MaplibreNativeFfiProjectionModeOptions
-  MaplibreNativeFfiProjectionModeOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_MODE_OPTIONS \
+  (maplibre_native_ffi_projection_mode_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiProjectionModeOptions,
+  maplibre_native_ffi_projection_mode_options, MAPLIBRE_NATIVE_FFI,
+  PROJECTION_MODE_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiQueueLock MaplibreNativeFfiQueueLock;
 typedef struct _MaplibreNativeFfiWake MaplibreNativeFfiWake;
 typedef struct _MaplibreNativeFfiRenderSessionAttachOptions
   MaplibreNativeFfiRenderSessionAttachOptions;
 typedef struct _MaplibreNativeFfiRenderedFeature
   MaplibreNativeFfiRenderedFeature;
-typedef struct _MaplibreNativeFfiRenderedFeatureQueryOptions
-  MaplibreNativeFfiRenderedFeatureQueryOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_RENDERED_FEATURE_QUERY_OPTIONS \
+  (maplibre_native_ffi_rendered_feature_query_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiRenderedFeatureQueryOptions,
+  maplibre_native_ffi_rendered_feature_query_options, MAPLIBRE_NATIVE_FFI,
+  RENDERED_FEATURE_QUERY_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiScreenLineString
   MaplibreNativeFfiScreenLineString;
 typedef struct _MaplibreNativeFfiRenderedQueryGeometry
@@ -173,16 +253,25 @@ typedef struct _MaplibreNativeFfiResourceRequestCancelHandler
   MaplibreNativeFfiResourceRequestCancelHandler;
 typedef struct _MaplibreNativeFfiResourceRequestInfo
   MaplibreNativeFfiResourceRequestInfo;
-typedef struct _MaplibreNativeFfiResourceResponse
-  MaplibreNativeFfiResourceResponse;
+#define MAPLIBRE_NATIVE_FFI_TYPE_RESOURCE_RESPONSE \
+  (maplibre_native_ffi_resource_response_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiResourceResponse, maplibre_native_ffi_resource_response,
+  MAPLIBRE_NATIVE_FFI, RESOURCE_RESPONSE, GObject
+)
 typedef struct _MaplibreNativeFfiUrlQueryParameter
   MaplibreNativeFfiUrlQueryParameter;
 typedef struct _MaplibreNativeFfiResourceTransformRule
   MaplibreNativeFfiResourceTransformRule;
 typedef struct _MaplibreNativeFfiResourceTransform
   MaplibreNativeFfiResourceTransform;
-typedef struct _MaplibreNativeFfiResourceTransformError
-  MaplibreNativeFfiResourceTransformError;
+#define MAPLIBRE_NATIVE_FFI_TYPE_RESOURCE_TRANSFORM_ERROR \
+  (maplibre_native_ffi_resource_transform_error_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiResourceTransformError,
+  maplibre_native_ffi_resource_transform_error, MAPLIBRE_NATIVE_FFI,
+  RESOURCE_TRANSFORM_ERROR, GObject
+)
 typedef struct _MaplibreNativeFfiRuntimeEventStyleImage
   MaplibreNativeFfiRuntimeEventStyleImage;
 typedef struct _MaplibreNativeFfiRuntimeEventTileAction
@@ -200,22 +289,46 @@ typedef struct _MaplibreNativeFfiRuntimeEventHandler
   MaplibreNativeFfiRuntimeEventHandler;
 typedef struct _MaplibreNativeFfiRuntimeOptions MaplibreNativeFfiRuntimeOptions;
 typedef struct _MaplibreNativeFfiSourceFeature MaplibreNativeFfiSourceFeature;
-typedef struct _MaplibreNativeFfiSourceFeatureQueryOptions
-  MaplibreNativeFfiSourceFeatureQueryOptions;
-typedef struct _MaplibreNativeFfiStyleExpressionInputs
-  MaplibreNativeFfiStyleExpressionInputs;
-typedef struct _MaplibreNativeFfiStyleExpressionOptions
-  MaplibreNativeFfiStyleExpressionOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_SOURCE_FEATURE_QUERY_OPTIONS \
+  (maplibre_native_ffi_source_feature_query_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiSourceFeatureQueryOptions,
+  maplibre_native_ffi_source_feature_query_options, MAPLIBRE_NATIVE_FFI,
+  SOURCE_FEATURE_QUERY_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_EXPRESSION_INPUTS \
+  (maplibre_native_ffi_style_expression_inputs_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiStyleExpressionInputs,
+  maplibre_native_ffi_style_expression_inputs, MAPLIBRE_NATIVE_FFI,
+  STYLE_EXPRESSION_INPUTS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_EXPRESSION_OPTIONS \
+  (maplibre_native_ffi_style_expression_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiStyleExpressionOptions,
+  maplibre_native_ffi_style_expression_options, MAPLIBRE_NATIVE_FFI,
+  STYLE_EXPRESSION_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiStyleImageInfo MaplibreNativeFfiStyleImageInfo;
-typedef struct _MaplibreNativeFfiStyleImageOptions
-  MaplibreNativeFfiStyleImageOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_IMAGE_OPTIONS \
+  (maplibre_native_ffi_style_image_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiStyleImageOptions, maplibre_native_ffi_style_image_options,
+  MAPLIBRE_NATIVE_FFI, STYLE_IMAGE_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiStyleLayerInfo MaplibreNativeFfiStyleLayerInfo;
 typedef struct _MaplibreNativeFfiStyleSourceTileInfo
   MaplibreNativeFfiStyleSourceTileInfo;
 typedef struct _MaplibreNativeFfiStyleSourceInfo
   MaplibreNativeFfiStyleSourceInfo;
-typedef struct _MaplibreNativeFfiStyleTransitionOptions
-  MaplibreNativeFfiStyleTransitionOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_TRANSITION_OPTIONS \
+  (maplibre_native_ffi_style_transition_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiStyleTransitionOptions,
+  maplibre_native_ffi_style_transition_options, MAPLIBRE_NATIVE_FFI,
+  STYLE_TRANSITION_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiTextureReadbackResult
   MaplibreNativeFfiTextureReadbackResult;
 typedef struct _MaplibreNativeFfiVulkanContextDescriptor
@@ -226,8 +339,13 @@ typedef struct _MaplibreNativeFfiVulkanBorrowedTextureReplacement
   MaplibreNativeFfiVulkanBorrowedTextureReplacement;
 typedef struct _MaplibreNativeFfiVulkanDeviceContextResult
   MaplibreNativeFfiVulkanDeviceContextResult;
-typedef struct _MaplibreNativeFfiVulkanDeviceOptions
-  MaplibreNativeFfiVulkanDeviceOptions;
+#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_DEVICE_OPTIONS \
+  (maplibre_native_ffi_vulkan_device_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiVulkanDeviceOptions,
+  maplibre_native_ffi_vulkan_device_options, MAPLIBRE_NATIVE_FFI,
+  VULKAN_DEVICE_OPTIONS, GObject
+)
 typedef struct _MaplibreNativeFfiVulkanSurfaceDescriptor
   MaplibreNativeFfiVulkanSurfaceDescriptor;
 typedef struct _MaplibreNativeFfiVulkanTextureFrame
@@ -1489,17 +1607,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * How a camera change animates.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_animation_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_animation_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_ANIMATION_OPTIONS \
-  (maplibre_native_ffi_animation_options_get_type())
-
 /**
  * maplibre_native_ffi_animation_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiAnimationOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiAnimationOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -1508,148 +1625,146 @@ MaplibreNativeFfiAnimationOptions* maplibre_native_ffi_animation_options_new(
 );
 
 /**
- * maplibre_native_ffi_animation_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiAnimationOptions* maplibre_native_ffi_animation_options_copy(
-  const MaplibreNativeFfiAnimationOptions* self
-);
-
-/**
- * maplibre_native_ffi_animation_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_animation_options_free(
-  MaplibreNativeFfiAnimationOptions* self
-);
-
-/**
- * maplibre_native_ffi_animation_options_get_duration_ms:
+ * MaplibreNativeFfiAnimationOptions:duration-ms: (setter set_duration_ms) (getter get_duration_ms)
  *
  * The `duration_ms` member.
+ */
+/**
+ * maplibre_native_ffi_animation_options_get_duration_ms: (get-property duration-ms)
+ *
+ * Gets `MaplibreNativeFfiAnimationOptions:duration-ms`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_animation_options_get_duration_ms(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
  * maplibre_native_ffi_animation_options_has_duration_ms:
  *
- * Whether the value sets `maplibre_native_ffi_animation_options_set_duration_ms`.
+ * Whether `MaplibreNativeFfiAnimationOptions:duration-ms` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_animation_options_has_duration_ms(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
- * maplibre_native_ffi_animation_options_set_duration_ms:
+ * maplibre_native_ffi_animation_options_set_duration_ms: (set-property duration-ms)
  *
- * The `duration_ms` member.
+ * Sets `MaplibreNativeFfiAnimationOptions:duration-ms`.
  */
 void maplibre_native_ffi_animation_options_set_duration_ms(
   MaplibreNativeFfiAnimationOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_animation_options_get_velocity:
+ * MaplibreNativeFfiAnimationOptions:velocity: (setter set_velocity) (getter get_velocity)
  *
  * The average speed of a fly animation, in screens per second. `duration_ms`
  * overrides it.
+ */
+/**
+ * maplibre_native_ffi_animation_options_get_velocity: (get-property velocity)
+ *
+ * Gets `MaplibreNativeFfiAnimationOptions:velocity`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_animation_options_get_velocity(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
  * maplibre_native_ffi_animation_options_has_velocity:
  *
- * Whether the value sets `maplibre_native_ffi_animation_options_set_velocity`.
+ * Whether `MaplibreNativeFfiAnimationOptions:velocity` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_animation_options_has_velocity(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
- * maplibre_native_ffi_animation_options_set_velocity:
+ * maplibre_native_ffi_animation_options_set_velocity: (set-property velocity)
  *
- * The average speed of a fly animation, in screens per second. `duration_ms`
- * overrides it.
+ * Sets `MaplibreNativeFfiAnimationOptions:velocity`.
  */
 void maplibre_native_ffi_animation_options_set_velocity(
   MaplibreNativeFfiAnimationOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_animation_options_get_min_zoom:
+ * MaplibreNativeFfiAnimationOptions:min-zoom: (setter set_min_zoom) (getter get_min_zoom)
  *
  * The zoom level at the peak of a fly animation.
+ */
+/**
+ * maplibre_native_ffi_animation_options_get_min_zoom: (get-property min-zoom)
+ *
+ * Gets `MaplibreNativeFfiAnimationOptions:min-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_animation_options_get_min_zoom(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
  * maplibre_native_ffi_animation_options_has_min_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_animation_options_set_min_zoom`.
+ * Whether `MaplibreNativeFfiAnimationOptions:min-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_animation_options_has_min_zoom(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
- * maplibre_native_ffi_animation_options_set_min_zoom:
+ * maplibre_native_ffi_animation_options_set_min_zoom: (set-property min-zoom)
  *
- * The zoom level at the peak of a fly animation.
+ * Sets `MaplibreNativeFfiAnimationOptions:min-zoom`.
  */
 void maplibre_native_ffi_animation_options_set_min_zoom(
   MaplibreNativeFfiAnimationOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_animation_options_get_easing:
+ * MaplibreNativeFfiAnimationOptions:easing: (setter set_easing) (getter get_easing)
  *
  * The `easing` member.
+ */
+/**
+ * maplibre_native_ffi_animation_options_get_easing: (get-property easing)
+ *
+ * Gets `MaplibreNativeFfiAnimationOptions:easing`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiUnitBezier* maplibre_native_ffi_animation_options_get_easing(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
  * maplibre_native_ffi_animation_options_has_easing:
  *
- * Whether the value sets `maplibre_native_ffi_animation_options_set_easing`.
+ * Whether `MaplibreNativeFfiAnimationOptions:easing` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_animation_options_has_easing(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
- * maplibre_native_ffi_animation_options_set_easing:
+ * maplibre_native_ffi_animation_options_set_easing: (set-property easing)
  * @value: the value
  *
- * The `easing` member.
+ * Sets `MaplibreNativeFfiAnimationOptions:easing`.
  */
 void maplibre_native_ffi_animation_options_set_easing(
   MaplibreNativeFfiAnimationOptions* self,
@@ -1657,66 +1772,70 @@ void maplibre_native_ffi_animation_options_set_easing(
 );
 
 /**
- * maplibre_native_ffi_animation_options_get_transition_id:
+ * MaplibreNativeFfiAnimationOptions:transition-id: (setter set_transition_id) (getter get_transition_id)
  *
  * An ID that
  * `maplibre_native_ffi_map_cancel_camera_transitions_with_id_async()` cancels
  * the change by. Several changes can share one.
+ */
+/**
+ * maplibre_native_ffi_animation_options_get_transition_id: (get-property transition-id)
+ *
+ * Gets `MaplibreNativeFfiAnimationOptions:transition-id`.
  *
  * Returns: the value
  */
 guint64 maplibre_native_ffi_animation_options_get_transition_id(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
  * maplibre_native_ffi_animation_options_has_transition_id:
  *
- * Whether the value sets `maplibre_native_ffi_animation_options_set_transition_id`.
+ * Whether `MaplibreNativeFfiAnimationOptions:transition-id` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_animation_options_has_transition_id(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
- * maplibre_native_ffi_animation_options_set_transition_id:
+ * maplibre_native_ffi_animation_options_set_transition_id: (set-property transition-id)
  *
- * An ID that
- * `maplibre_native_ffi_map_cancel_camera_transitions_with_id_async()` cancels
- * the change by. Several changes can share one.
+ * Sets `MaplibreNativeFfiAnimationOptions:transition-id`.
  */
 void maplibre_native_ffi_animation_options_set_transition_id(
   MaplibreNativeFfiAnimationOptions* self, guint64 value
 );
 
 /**
- * maplibre_native_ffi_animation_options_get_end_handler:
+ * MaplibreNativeFfiAnimationOptions:end-handler: (setter set_end_handler) (getter get_end_handler)
  *
  * The `end_handler` member.
+ */
+/**
+ * maplibre_native_ffi_animation_options_get_end_handler: (get-property end-handler)
+ *
+ * Gets `MaplibreNativeFfiAnimationOptions:end-handler`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiCameraTransitionHandler*
 maplibre_native_ffi_animation_options_get_end_handler(
-  const MaplibreNativeFfiAnimationOptions* self
+  MaplibreNativeFfiAnimationOptions* self
 );
 
 /**
- * maplibre_native_ffi_animation_options_set_end_handler:
+ * maplibre_native_ffi_animation_options_set_end_handler: (set-property end-handler)
  * @value: the value
  *
- * The `end_handler` member.
+ * Sets `MaplibreNativeFfiAnimationOptions:end-handler`.
  */
 void maplibre_native_ffi_animation_options_set_end_handler(
   MaplibreNativeFfiAnimationOptions* self,
   const MaplibreNativeFfiCameraTransitionHandler* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiAnimationOptions, maplibre_native_ffi_animation_options_free
-)
 
 GType maplibre_native_ffi_lat_lng_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_LAT_LNG \
@@ -1779,70 +1898,53 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Limits on the camera, for `maplibre_native_ffi_map_set_bounds_async()`.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_bound_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_bound_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_BOUND_OPTIONS \
-  (maplibre_native_ffi_bound_options_get_type())
-
 /**
  * maplibre_native_ffi_bound_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiBoundOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiBoundOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
 MaplibreNativeFfiBoundOptions* maplibre_native_ffi_bound_options_new(void);
 
 /**
- * maplibre_native_ffi_bound_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiBoundOptions* maplibre_native_ffi_bound_options_copy(
-  const MaplibreNativeFfiBoundOptions* self
-);
-
-/**
- * maplibre_native_ffi_bound_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_bound_options_free(
-  MaplibreNativeFfiBoundOptions* self
-);
-
-/**
- * maplibre_native_ffi_bound_options_get_bounds:
+ * MaplibreNativeFfiBoundOptions:bounds: (setter set_bounds) (getter get_bounds)
  *
  * The area that the camera's center stays within.
+ */
+/**
+ * maplibre_native_ffi_bound_options_get_bounds: (get-property bounds)
+ *
+ * Gets `MaplibreNativeFfiBoundOptions:bounds`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiLatLngBounds* maplibre_native_ffi_bound_options_get_bounds(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
  * maplibre_native_ffi_bound_options_has_bounds:
  *
- * Whether the value sets `maplibre_native_ffi_bound_options_set_bounds`.
+ * Whether `MaplibreNativeFfiBoundOptions:bounds` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_bound_options_has_bounds(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
- * maplibre_native_ffi_bound_options_set_bounds:
+ * maplibre_native_ffi_bound_options_set_bounds: (set-property bounds)
  * @value: the value
  *
- * The area that the camera's center stays within.
+ * Sets `MaplibreNativeFfiBoundOptions:bounds`.
  */
 void maplibre_native_ffi_bound_options_set_bounds(
   MaplibreNativeFfiBoundOptions* self,
@@ -1850,132 +1952,148 @@ void maplibre_native_ffi_bound_options_set_bounds(
 );
 
 /**
- * maplibre_native_ffi_bound_options_get_min_zoom:
+ * MaplibreNativeFfiBoundOptions:min-zoom: (setter set_min_zoom) (getter get_min_zoom)
  *
  * The `min_zoom` member.
+ */
+/**
+ * maplibre_native_ffi_bound_options_get_min_zoom: (get-property min-zoom)
+ *
+ * Gets `MaplibreNativeFfiBoundOptions:min-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_bound_options_get_min_zoom(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
  * maplibre_native_ffi_bound_options_has_min_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_bound_options_set_min_zoom`.
+ * Whether `MaplibreNativeFfiBoundOptions:min-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_bound_options_has_min_zoom(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
- * maplibre_native_ffi_bound_options_set_min_zoom:
+ * maplibre_native_ffi_bound_options_set_min_zoom: (set-property min-zoom)
  *
- * The `min_zoom` member.
+ * Sets `MaplibreNativeFfiBoundOptions:min-zoom`.
  */
 void maplibre_native_ffi_bound_options_set_min_zoom(
   MaplibreNativeFfiBoundOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_bound_options_get_max_zoom:
+ * MaplibreNativeFfiBoundOptions:max-zoom: (setter set_max_zoom) (getter get_max_zoom)
  *
  * The `max_zoom` member.
+ */
+/**
+ * maplibre_native_ffi_bound_options_get_max_zoom: (get-property max-zoom)
+ *
+ * Gets `MaplibreNativeFfiBoundOptions:max-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_bound_options_get_max_zoom(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
  * maplibre_native_ffi_bound_options_has_max_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_bound_options_set_max_zoom`.
+ * Whether `MaplibreNativeFfiBoundOptions:max-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_bound_options_has_max_zoom(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
- * maplibre_native_ffi_bound_options_set_max_zoom:
+ * maplibre_native_ffi_bound_options_set_max_zoom: (set-property max-zoom)
  *
- * The `max_zoom` member.
+ * Sets `MaplibreNativeFfiBoundOptions:max-zoom`.
  */
 void maplibre_native_ffi_bound_options_set_max_zoom(
   MaplibreNativeFfiBoundOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_bound_options_get_min_pitch:
+ * MaplibreNativeFfiBoundOptions:min-pitch: (setter set_min_pitch) (getter get_min_pitch)
  *
  * The lowest pitch, in degrees.
+ */
+/**
+ * maplibre_native_ffi_bound_options_get_min_pitch: (get-property min-pitch)
+ *
+ * Gets `MaplibreNativeFfiBoundOptions:min-pitch`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_bound_options_get_min_pitch(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
  * maplibre_native_ffi_bound_options_has_min_pitch:
  *
- * Whether the value sets `maplibre_native_ffi_bound_options_set_min_pitch`.
+ * Whether `MaplibreNativeFfiBoundOptions:min-pitch` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_bound_options_has_min_pitch(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
- * maplibre_native_ffi_bound_options_set_min_pitch:
+ * maplibre_native_ffi_bound_options_set_min_pitch: (set-property min-pitch)
  *
- * The lowest pitch, in degrees.
+ * Sets `MaplibreNativeFfiBoundOptions:min-pitch`.
  */
 void maplibre_native_ffi_bound_options_set_min_pitch(
   MaplibreNativeFfiBoundOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_bound_options_get_max_pitch:
+ * MaplibreNativeFfiBoundOptions:max-pitch: (setter set_max_pitch) (getter get_max_pitch)
  *
  * The highest pitch, in degrees.
+ */
+/**
+ * maplibre_native_ffi_bound_options_get_max_pitch: (get-property max-pitch)
+ *
+ * Gets `MaplibreNativeFfiBoundOptions:max-pitch`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_bound_options_get_max_pitch(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
  * maplibre_native_ffi_bound_options_has_max_pitch:
  *
- * Whether the value sets `maplibre_native_ffi_bound_options_set_max_pitch`.
+ * Whether `MaplibreNativeFfiBoundOptions:max-pitch` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_bound_options_has_max_pitch(
-  const MaplibreNativeFfiBoundOptions* self
+  MaplibreNativeFfiBoundOptions* self
 );
 
 /**
- * maplibre_native_ffi_bound_options_set_max_pitch:
+ * maplibre_native_ffi_bound_options_set_max_pitch: (set-property max-pitch)
  *
- * The highest pitch, in degrees.
+ * Sets `MaplibreNativeFfiBoundOptions:max-pitch`.
  */
 void maplibre_native_ffi_bound_options_set_max_pitch(
   MaplibreNativeFfiBoundOptions* self, gdouble value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiBoundOptions, maplibre_native_ffi_bound_options_free
-)
 
 GType maplibre_native_ffi_edge_insets_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_EDGE_INSETS \
@@ -2103,266 +2221,273 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * A change to the camera from where it is now, for gestures.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_camera_delta_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_DELTA \
-  (maplibre_native_ffi_camera_delta_get_type())
-
 /**
  * maplibre_native_ffi_camera_delta_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiCameraDelta` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiCameraDelta` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
 MaplibreNativeFfiCameraDelta* maplibre_native_ffi_camera_delta_new(void);
 
 /**
- * maplibre_native_ffi_camera_delta_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiCameraDelta* maplibre_native_ffi_camera_delta_copy(
-  const MaplibreNativeFfiCameraDelta* self
-);
-
-/**
- * maplibre_native_ffi_camera_delta_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_camera_delta_free(MaplibreNativeFfiCameraDelta* self);
-
-/**
- * maplibre_native_ffi_camera_delta_get_offset:
+ * MaplibreNativeFfiCameraDelta:offset: (setter set_offset) (getter get_offset)
  *
  * Moves the map's content this far on the screen, as a drag does.
+ */
+/**
+ * maplibre_native_ffi_camera_delta_get_offset: (get-property offset)
+ *
+ * Gets `MaplibreNativeFfiCameraDelta:offset`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiScreenPoint* maplibre_native_ffi_camera_delta_get_offset(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
  * maplibre_native_ffi_camera_delta_has_offset:
  *
- * Whether the value sets `maplibre_native_ffi_camera_delta_set_offset`.
+ * Whether `MaplibreNativeFfiCameraDelta:offset` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_delta_has_offset(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
- * maplibre_native_ffi_camera_delta_set_offset:
+ * maplibre_native_ffi_camera_delta_set_offset: (set-property offset)
  * @value: the value
  *
- * Moves the map's content this far on the screen, as a drag does.
+ * Sets `MaplibreNativeFfiCameraDelta:offset`.
  */
 void maplibre_native_ffi_camera_delta_set_offset(
   MaplibreNativeFfiCameraDelta* self, const MaplibreNativeFfiScreenPoint* value
 );
 
 /**
- * maplibre_native_ffi_camera_delta_get_scale:
+ * MaplibreNativeFfiCameraDelta:scale: (setter set_scale) (getter get_scale)
  *
  * Multiplies the map's scale. 2 zooms in by one level.
+ */
+/**
+ * maplibre_native_ffi_camera_delta_get_scale: (get-property scale)
+ *
+ * Gets `MaplibreNativeFfiCameraDelta:scale`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_delta_get_scale(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
  * maplibre_native_ffi_camera_delta_has_scale:
  *
- * Whether the value sets `maplibre_native_ffi_camera_delta_set_scale`.
+ * Whether `MaplibreNativeFfiCameraDelta:scale` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_delta_has_scale(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
- * maplibre_native_ffi_camera_delta_set_scale:
+ * maplibre_native_ffi_camera_delta_set_scale: (set-property scale)
  *
- * Multiplies the map's scale. 2 zooms in by one level.
+ * Sets `MaplibreNativeFfiCameraDelta:scale`.
  */
 void maplibre_native_ffi_camera_delta_set_scale(
   MaplibreNativeFfiCameraDelta* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_delta_get_bearing:
+ * MaplibreNativeFfiCameraDelta:bearing: (setter set_bearing) (getter get_bearing)
  *
  * Degrees to add to the bearing.
+ */
+/**
+ * maplibre_native_ffi_camera_delta_get_bearing: (get-property bearing)
+ *
+ * Gets `MaplibreNativeFfiCameraDelta:bearing`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_delta_get_bearing(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
  * maplibre_native_ffi_camera_delta_has_bearing:
  *
- * Whether the value sets `maplibre_native_ffi_camera_delta_set_bearing`.
+ * Whether `MaplibreNativeFfiCameraDelta:bearing` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_delta_has_bearing(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
- * maplibre_native_ffi_camera_delta_set_bearing:
+ * maplibre_native_ffi_camera_delta_set_bearing: (set-property bearing)
  *
- * Degrees to add to the bearing.
+ * Sets `MaplibreNativeFfiCameraDelta:bearing`.
  */
 void maplibre_native_ffi_camera_delta_set_bearing(
   MaplibreNativeFfiCameraDelta* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_delta_get_pitch:
+ * MaplibreNativeFfiCameraDelta:pitch: (setter set_pitch) (getter get_pitch)
  *
  * Degrees to add to the pitch.
+ */
+/**
+ * maplibre_native_ffi_camera_delta_get_pitch: (get-property pitch)
+ *
+ * Gets `MaplibreNativeFfiCameraDelta:pitch`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_delta_get_pitch(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
  * maplibre_native_ffi_camera_delta_has_pitch:
  *
- * Whether the value sets `maplibre_native_ffi_camera_delta_set_pitch`.
+ * Whether `MaplibreNativeFfiCameraDelta:pitch` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_delta_has_pitch(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
- * maplibre_native_ffi_camera_delta_set_pitch:
+ * maplibre_native_ffi_camera_delta_set_pitch: (set-property pitch)
  *
- * Degrees to add to the pitch.
+ * Sets `MaplibreNativeFfiCameraDelta:pitch`.
  */
 void maplibre_native_ffi_camera_delta_set_pitch(
   MaplibreNativeFfiCameraDelta* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_delta_get_anchor:
+ * MaplibreNativeFfiCameraDelta:anchor: (setter set_anchor) (getter get_anchor)
  *
  * The screen point that `scale`, `bearing`, and `pitch` keep in place. It needs
  * one of them, and it combines with `offset` only in a delta without a
  * duration.
+ */
+/**
+ * maplibre_native_ffi_camera_delta_get_anchor: (get-property anchor)
+ *
+ * Gets `MaplibreNativeFfiCameraDelta:anchor`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiScreenPoint* maplibre_native_ffi_camera_delta_get_anchor(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
  * maplibre_native_ffi_camera_delta_has_anchor:
  *
- * Whether the value sets `maplibre_native_ffi_camera_delta_set_anchor`.
+ * Whether `MaplibreNativeFfiCameraDelta:anchor` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_delta_has_anchor(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
- * maplibre_native_ffi_camera_delta_set_anchor:
+ * maplibre_native_ffi_camera_delta_set_anchor: (set-property anchor)
  * @value: the value
  *
- * The screen point that `scale`, `bearing`, and `pitch` keep in place. It needs
- * one of them, and it combines with `offset` only in a delta without a
- * duration.
+ * Sets `MaplibreNativeFfiCameraDelta:anchor`.
  */
 void maplibre_native_ffi_camera_delta_set_anchor(
   MaplibreNativeFfiCameraDelta* self, const MaplibreNativeFfiScreenPoint* value
 );
 
 /**
- * maplibre_native_ffi_camera_delta_get_animation:
+ * MaplibreNativeFfiCameraDelta:animation: (setter set_animation) (getter get_animation)
  *
  * The `animation` member.
+ */
+/**
+ * maplibre_native_ffi_camera_delta_get_animation: (get-property animation)
+ *
+ * Gets `MaplibreNativeFfiCameraDelta:animation`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiAnimationOptions*
 maplibre_native_ffi_camera_delta_get_animation(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
- * maplibre_native_ffi_camera_delta_set_animation:
+ * maplibre_native_ffi_camera_delta_set_animation: (set-property animation)
  * @value: the value
  *
- * The `animation` member.
+ * Sets `MaplibreNativeFfiCameraDelta:animation`.
  */
 void maplibre_native_ffi_camera_delta_set_animation(
-  MaplibreNativeFfiCameraDelta* self,
-  const MaplibreNativeFfiAnimationOptions* value
+  MaplibreNativeFfiCameraDelta* self, MaplibreNativeFfiAnimationOptions* value
 );
 
 /**
- * maplibre_native_ffi_camera_delta_get_gesture_phase:
+ * MaplibreNativeFfiCameraDelta:gesture-phase: (setter set_gesture_phase) (getter get_gesture_phase)
  *
  * The `gesture_phase` member.
+ */
+/**
+ * maplibre_native_ffi_camera_delta_get_gesture_phase: (get-property gesture-phase)
+ *
+ * Gets `MaplibreNativeFfiCameraDelta:gesture-phase`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiGesturePhase
 maplibre_native_ffi_camera_delta_get_gesture_phase(
-  const MaplibreNativeFfiCameraDelta* self
+  MaplibreNativeFfiCameraDelta* self
 );
 
 /**
- * maplibre_native_ffi_camera_delta_set_gesture_phase:
+ * maplibre_native_ffi_camera_delta_set_gesture_phase: (set-property gesture-phase)
  *
- * The `gesture_phase` member.
+ * Sets `MaplibreNativeFfiCameraDelta:gesture-phase`.
  */
 void maplibre_native_ffi_camera_delta_set_gesture_phase(
   MaplibreNativeFfiCameraDelta* self, MaplibreNativeFfiGesturePhase value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiCameraDelta, maplibre_native_ffi_camera_delta_free
-)
 
 /**
  * MaplibreNativeFfiCameraFitOptions:
  *
  * Options for finding the camera that fits an area.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_camera_fit_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_camera_fit_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_FIT_OPTIONS \
-  (maplibre_native_ffi_camera_fit_options_get_type())
-
 /**
  * maplibre_native_ffi_camera_fit_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiCameraFitOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiCameraFitOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -2371,57 +2496,39 @@ MaplibreNativeFfiCameraFitOptions* maplibre_native_ffi_camera_fit_options_new(
 );
 
 /**
- * maplibre_native_ffi_camera_fit_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiCameraFitOptions* maplibre_native_ffi_camera_fit_options_copy(
-  const MaplibreNativeFfiCameraFitOptions* self
-);
-
-/**
- * maplibre_native_ffi_camera_fit_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_camera_fit_options_free(
-  MaplibreNativeFfiCameraFitOptions* self
-);
-
-/**
- * maplibre_native_ffi_camera_fit_options_get_padding:
+ * MaplibreNativeFfiCameraFitOptions:padding: (setter set_padding) (getter get_padding)
  *
  * Space to leave between the area and each edge of the map. The left and right
  * insets must add up to less than the map's width, and the top and bottom to
  * less than its height.
+ */
+/**
+ * maplibre_native_ffi_camera_fit_options_get_padding: (get-property padding)
+ *
+ * Gets `MaplibreNativeFfiCameraFitOptions:padding`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiEdgeInsets* maplibre_native_ffi_camera_fit_options_get_padding(
-  const MaplibreNativeFfiCameraFitOptions* self
+  MaplibreNativeFfiCameraFitOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_fit_options_has_padding:
  *
- * Whether the value sets `maplibre_native_ffi_camera_fit_options_set_padding`.
+ * Whether `MaplibreNativeFfiCameraFitOptions:padding` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_fit_options_has_padding(
-  const MaplibreNativeFfiCameraFitOptions* self
+  MaplibreNativeFfiCameraFitOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_fit_options_set_padding:
+ * maplibre_native_ffi_camera_fit_options_set_padding: (set-property padding)
  * @value: the value
  *
- * Space to leave between the area and each edge of the map. The left and right
- * insets must add up to less than the map's width, and the top and bottom to
- * less than its height.
+ * Sets `MaplibreNativeFfiCameraFitOptions:padding`.
  */
 void maplibre_native_ffi_camera_fit_options_set_padding(
   MaplibreNativeFfiCameraFitOptions* self,
@@ -2429,70 +2536,76 @@ void maplibre_native_ffi_camera_fit_options_set_padding(
 );
 
 /**
- * maplibre_native_ffi_camera_fit_options_get_bearing:
+ * MaplibreNativeFfiCameraFitOptions:bearing: (setter set_bearing) (getter get_bearing)
  *
  * The rotation from north, in degrees.
+ */
+/**
+ * maplibre_native_ffi_camera_fit_options_get_bearing: (get-property bearing)
+ *
+ * Gets `MaplibreNativeFfiCameraFitOptions:bearing`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_fit_options_get_bearing(
-  const MaplibreNativeFfiCameraFitOptions* self
+  MaplibreNativeFfiCameraFitOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_fit_options_has_bearing:
  *
- * Whether the value sets `maplibre_native_ffi_camera_fit_options_set_bearing`.
+ * Whether `MaplibreNativeFfiCameraFitOptions:bearing` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_fit_options_has_bearing(
-  const MaplibreNativeFfiCameraFitOptions* self
+  MaplibreNativeFfiCameraFitOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_fit_options_set_bearing:
+ * maplibre_native_ffi_camera_fit_options_set_bearing: (set-property bearing)
  *
- * The rotation from north, in degrees.
+ * Sets `MaplibreNativeFfiCameraFitOptions:bearing`.
  */
 void maplibre_native_ffi_camera_fit_options_set_bearing(
   MaplibreNativeFfiCameraFitOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_fit_options_get_pitch:
+ * MaplibreNativeFfiCameraFitOptions:pitch: (setter set_pitch) (getter get_pitch)
  *
  * The tilt toward the horizon, in degrees.
+ */
+/**
+ * maplibre_native_ffi_camera_fit_options_get_pitch: (get-property pitch)
+ *
+ * Gets `MaplibreNativeFfiCameraFitOptions:pitch`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_fit_options_get_pitch(
-  const MaplibreNativeFfiCameraFitOptions* self
+  MaplibreNativeFfiCameraFitOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_fit_options_has_pitch:
  *
- * Whether the value sets `maplibre_native_ffi_camera_fit_options_set_pitch`.
+ * Whether `MaplibreNativeFfiCameraFitOptions:pitch` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_fit_options_has_pitch(
-  const MaplibreNativeFfiCameraFitOptions* self
+  MaplibreNativeFfiCameraFitOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_fit_options_set_pitch:
+ * maplibre_native_ffi_camera_fit_options_set_pitch: (set-property pitch)
  *
- * The tilt toward the horizon, in degrees.
+ * Sets `MaplibreNativeFfiCameraFitOptions:pitch`.
  */
 void maplibre_native_ffi_camera_fit_options_set_pitch(
   MaplibreNativeFfiCameraFitOptions* self, gdouble value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiCameraFitOptions, maplibre_native_ffi_camera_fit_options_free
-)
 
 /**
  * MaplibreNativeFfiCameraFitUpdate:
@@ -2546,7 +2659,7 @@ void maplibre_native_ffi_camera_fit_update_free(
 /**
  * maplibre_native_ffi_camera_fit_update_get_mode:
  *
- * The `mode` member.
+ * Gets the value that `maplibre_native_ffi_camera_fit_update_set_mode` sets.
  *
  * Returns: the value
  */
@@ -2568,7 +2681,7 @@ void maplibre_native_ffi_camera_fit_update_set_mode(
 /**
  * maplibre_native_ffi_camera_fit_update_get_fit:
  *
- * The `fit` member.
+ * Gets the value that `maplibre_native_ffi_camera_fit_update_set_fit` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -2585,13 +2698,13 @@ maplibre_native_ffi_camera_fit_update_get_fit(
  */
 void maplibre_native_ffi_camera_fit_update_set_fit(
   MaplibreNativeFfiCameraFitUpdate* self,
-  const MaplibreNativeFfiCameraFitOptions* value
+  MaplibreNativeFfiCameraFitOptions* value
 );
 
 /**
  * maplibre_native_ffi_camera_fit_update_get_animation:
  *
- * The `animation` member.
+ * Gets the value that `maplibre_native_ffi_camera_fit_update_set_animation` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -2608,7 +2721,7 @@ maplibre_native_ffi_camera_fit_update_get_animation(
  */
 void maplibre_native_ffi_camera_fit_update_set_animation(
   MaplibreNativeFfiCameraFitUpdate* self,
-  const MaplibreNativeFfiAnimationOptions* value
+  MaplibreNativeFfiAnimationOptions* value
 );
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
@@ -2620,167 +2733,164 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * A camera, with only the members that `fields` selects.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_camera_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_camera_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_OPTIONS \
-  (maplibre_native_ffi_camera_options_get_type())
-
 /**
  * maplibre_native_ffi_camera_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiCameraOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiCameraOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
 MaplibreNativeFfiCameraOptions* maplibre_native_ffi_camera_options_new(void);
 
 /**
- * maplibre_native_ffi_camera_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiCameraOptions* maplibre_native_ffi_camera_options_copy(
-  const MaplibreNativeFfiCameraOptions* self
-);
-
-/**
- * maplibre_native_ffi_camera_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_camera_options_free(
-  MaplibreNativeFfiCameraOptions* self
-);
-
-/**
- * maplibre_native_ffi_camera_options_get_center:
+ * MaplibreNativeFfiCameraOptions:center: (setter set_center) (getter get_center)
  *
  * The `center` member.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_center: (get-property center)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:center`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiLatLng* maplibre_native_ffi_camera_options_get_center(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_center:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_center`.
+ * Whether `MaplibreNativeFfiCameraOptions:center` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_center(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_center:
+ * maplibre_native_ffi_camera_options_set_center: (set-property center)
  * @value: the value
  *
- * The `center` member.
+ * Sets `MaplibreNativeFfiCameraOptions:center`.
  */
 void maplibre_native_ffi_camera_options_set_center(
   MaplibreNativeFfiCameraOptions* self, const MaplibreNativeFfiLatLng* value
 );
 
 /**
- * maplibre_native_ffi_camera_options_get_center_altitude:
+ * MaplibreNativeFfiCameraOptions:center-altitude: (setter set_center_altitude) (getter get_center_altitude)
  *
  * The altitude of the center, in meters above sea level.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_center_altitude: (get-property center-altitude)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:center-altitude`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_options_get_center_altitude(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_center_altitude:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_center_altitude`.
+ * Whether `MaplibreNativeFfiCameraOptions:center-altitude` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_center_altitude(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_center_altitude:
+ * maplibre_native_ffi_camera_options_set_center_altitude: (set-property center-altitude)
  *
- * The altitude of the center, in meters above sea level.
+ * Sets `MaplibreNativeFfiCameraOptions:center-altitude`.
  */
 void maplibre_native_ffi_camera_options_set_center_altitude(
   MaplibreNativeFfiCameraOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_options_get_padding:
+ * MaplibreNativeFfiCameraOptions:padding: (setter set_padding) (getter get_padding)
  *
  * Insets from the map's edges. The camera centers within the rest.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_padding: (get-property padding)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:padding`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiEdgeInsets* maplibre_native_ffi_camera_options_get_padding(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_padding:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_padding`.
+ * Whether `MaplibreNativeFfiCameraOptions:padding` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_padding(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_padding:
+ * maplibre_native_ffi_camera_options_set_padding: (set-property padding)
  * @value: the value
  *
- * Insets from the map's edges. The camera centers within the rest.
+ * Sets `MaplibreNativeFfiCameraOptions:padding`.
  */
 void maplibre_native_ffi_camera_options_set_padding(
   MaplibreNativeFfiCameraOptions* self, const MaplibreNativeFfiEdgeInsets* value
 );
 
 /**
- * maplibre_native_ffi_camera_options_get_anchor:
+ * MaplibreNativeFfiCameraOptions:anchor: (setter set_anchor) (getter get_anchor)
  *
  * The screen point that a change to the zoom, bearing, or pitch keeps in place.
  * A `center` overrides it.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_anchor: (get-property anchor)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:anchor`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiScreenPoint* maplibre_native_ffi_camera_options_get_anchor(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_anchor:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_anchor`.
+ * Whether `MaplibreNativeFfiCameraOptions:anchor` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_anchor(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_anchor:
+ * maplibre_native_ffi_camera_options_set_anchor: (set-property anchor)
  * @value: the value
  *
- * The screen point that a change to the zoom, bearing, or pitch keeps in place.
- * A `center` overrides it.
+ * Sets `MaplibreNativeFfiCameraOptions:anchor`.
  */
 void maplibre_native_ffi_camera_options_set_anchor(
   MaplibreNativeFfiCameraOptions* self,
@@ -2788,163 +2898,184 @@ void maplibre_native_ffi_camera_options_set_anchor(
 );
 
 /**
- * maplibre_native_ffi_camera_options_get_zoom:
+ * MaplibreNativeFfiCameraOptions:zoom: (setter set_zoom) (getter get_zoom)
  *
  * The `zoom` member.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_zoom: (get-property zoom)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_options_get_zoom(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_zoom`.
+ * Whether `MaplibreNativeFfiCameraOptions:zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_zoom(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_zoom:
+ * maplibre_native_ffi_camera_options_set_zoom: (set-property zoom)
  *
- * The `zoom` member.
+ * Sets `MaplibreNativeFfiCameraOptions:zoom`.
  */
 void maplibre_native_ffi_camera_options_set_zoom(
   MaplibreNativeFfiCameraOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_options_get_bearing:
+ * MaplibreNativeFfiCameraOptions:bearing: (setter set_bearing) (getter get_bearing)
  *
  * The rotation from north, in degrees.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_bearing: (get-property bearing)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:bearing`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_options_get_bearing(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_bearing:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_bearing`.
+ * Whether `MaplibreNativeFfiCameraOptions:bearing` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_bearing(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_bearing:
+ * maplibre_native_ffi_camera_options_set_bearing: (set-property bearing)
  *
- * The rotation from north, in degrees.
+ * Sets `MaplibreNativeFfiCameraOptions:bearing`.
  */
 void maplibre_native_ffi_camera_options_set_bearing(
   MaplibreNativeFfiCameraOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_options_get_pitch:
+ * MaplibreNativeFfiCameraOptions:pitch: (setter set_pitch) (getter get_pitch)
  *
  * The tilt toward the horizon, in degrees. 0 looks straight down.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_pitch: (get-property pitch)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:pitch`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_options_get_pitch(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_pitch:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_pitch`.
+ * Whether `MaplibreNativeFfiCameraOptions:pitch` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_pitch(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_pitch:
+ * maplibre_native_ffi_camera_options_set_pitch: (set-property pitch)
  *
- * The tilt toward the horizon, in degrees. 0 looks straight down.
+ * Sets `MaplibreNativeFfiCameraOptions:pitch`.
  */
 void maplibre_native_ffi_camera_options_set_pitch(
   MaplibreNativeFfiCameraOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_options_get_roll:
+ * MaplibreNativeFfiCameraOptions:roll: (setter set_roll) (getter get_roll)
  *
  * The roll, in degrees.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_roll: (get-property roll)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:roll`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_options_get_roll(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_roll:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_roll`.
+ * Whether `MaplibreNativeFfiCameraOptions:roll` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_roll(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_roll:
+ * maplibre_native_ffi_camera_options_set_roll: (set-property roll)
  *
- * The roll, in degrees.
+ * Sets `MaplibreNativeFfiCameraOptions:roll`.
  */
 void maplibre_native_ffi_camera_options_set_roll(
   MaplibreNativeFfiCameraOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_camera_options_get_field_of_view:
+ * MaplibreNativeFfiCameraOptions:field-of-view: (setter set_field_of_view) (getter get_field_of_view)
  *
  * The vertical field of view, in degrees.
+ */
+/**
+ * maplibre_native_ffi_camera_options_get_field_of_view: (get-property field-of-view)
+ *
+ * Gets `MaplibreNativeFfiCameraOptions:field-of-view`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_camera_options_get_field_of_view(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_camera_options_has_field_of_view:
  *
- * Whether the value sets `maplibre_native_ffi_camera_options_set_field_of_view`.
+ * Whether `MaplibreNativeFfiCameraOptions:field-of-view` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_camera_options_has_field_of_view(
-  const MaplibreNativeFfiCameraOptions* self
+  MaplibreNativeFfiCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_camera_options_set_field_of_view:
+ * maplibre_native_ffi_camera_options_set_field_of_view: (set-property field-of-view)
  *
- * The vertical field of view, in degrees.
+ * Sets `MaplibreNativeFfiCameraOptions:field-of-view`.
  */
 void maplibre_native_ffi_camera_options_set_field_of_view(
   MaplibreNativeFfiCameraOptions* self, gdouble value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiCameraOptions, maplibre_native_ffi_camera_options_free
-)
 
 GType maplibre_native_ffi_camera_query_result_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_QUERY_RESULT \
@@ -3056,7 +3187,7 @@ void maplibre_native_ffi_camera_update_free(
 /**
  * maplibre_native_ffi_camera_update_get_mode:
  *
- * The `mode` member.
+ * Gets the value that `maplibre_native_ffi_camera_update_set_mode` sets.
  *
  * Returns: the value
  */
@@ -3076,7 +3207,7 @@ void maplibre_native_ffi_camera_update_set_mode(
 /**
  * maplibre_native_ffi_camera_update_get_camera:
  *
- * The `camera` member.
+ * Gets the value that `maplibre_native_ffi_camera_update_set_camera` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -3091,14 +3222,13 @@ MaplibreNativeFfiCameraOptions* maplibre_native_ffi_camera_update_get_camera(
  * The `camera` member.
  */
 void maplibre_native_ffi_camera_update_set_camera(
-  MaplibreNativeFfiCameraUpdate* self,
-  const MaplibreNativeFfiCameraOptions* value
+  MaplibreNativeFfiCameraUpdate* self, MaplibreNativeFfiCameraOptions* value
 );
 
 /**
  * maplibre_native_ffi_camera_update_get_animation:
  *
- * The `animation` member.
+ * Gets the value that `maplibre_native_ffi_camera_update_set_animation` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -3114,14 +3244,13 @@ maplibre_native_ffi_camera_update_get_animation(
  * The `animation` member.
  */
 void maplibre_native_ffi_camera_update_set_animation(
-  MaplibreNativeFfiCameraUpdate* self,
-  const MaplibreNativeFfiAnimationOptions* value
+  MaplibreNativeFfiCameraUpdate* self, MaplibreNativeFfiAnimationOptions* value
 );
 
 /**
  * maplibre_native_ffi_camera_update_get_gesture_phase:
  *
- * The `gesture_phase` member.
+ * Gets the value that `maplibre_native_ffi_camera_update_set_gesture_phase` sets.
  *
  * Returns: the value
  */
@@ -3179,19 +3308,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Zoom levels are whole numbers from 0 to 32.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_custom_geometry_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-GType maplibre_native_ffi_custom_geometry_source_options_get_type(
-  void
-) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_GEOMETRY_SOURCE_OPTIONS \
-  (maplibre_native_ffi_custom_geometry_source_options_get_type())
-
 /**
  * maplibre_native_ffi_custom_geometry_source_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiCustomGeometrySourceOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiCustomGeometrySourceOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -3199,241 +3325,253 @@ MaplibreNativeFfiCustomGeometrySourceOptions*
 maplibre_native_ffi_custom_geometry_source_options_new(void);
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiCustomGeometrySourceOptions*
-maplibre_native_ffi_custom_geometry_source_options_copy(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
-);
-
-/**
- * maplibre_native_ffi_custom_geometry_source_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_custom_geometry_source_options_free(
-  MaplibreNativeFfiCustomGeometrySourceOptions* self
-);
-
-/**
- * maplibre_native_ffi_custom_geometry_source_options_get_min_zoom:
+ * MaplibreNativeFfiCustomGeometrySourceOptions:min-zoom: (setter set_min_zoom) (getter get_min_zoom)
  *
  * The `min_zoom` member.
+ */
+/**
+ * maplibre_native_ffi_custom_geometry_source_options_get_min_zoom: (get-property min-zoom)
+ *
+ * Gets `MaplibreNativeFfiCustomGeometrySourceOptions:min-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_custom_geometry_source_options_get_min_zoom(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_geometry_source_options_has_min_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_custom_geometry_source_options_set_min_zoom`.
+ * Whether `MaplibreNativeFfiCustomGeometrySourceOptions:min-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_has_min_zoom(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_set_min_zoom:
+ * maplibre_native_ffi_custom_geometry_source_options_set_min_zoom: (set-property min-zoom)
  *
- * The `min_zoom` member.
+ * Sets `MaplibreNativeFfiCustomGeometrySourceOptions:min-zoom`.
  */
 void maplibre_native_ffi_custom_geometry_source_options_set_min_zoom(
   MaplibreNativeFfiCustomGeometrySourceOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_get_max_zoom:
+ * MaplibreNativeFfiCustomGeometrySourceOptions:max-zoom: (setter set_max_zoom) (getter get_max_zoom)
  *
  * The `max_zoom` member.
+ */
+/**
+ * maplibre_native_ffi_custom_geometry_source_options_get_max_zoom: (get-property max-zoom)
+ *
+ * Gets `MaplibreNativeFfiCustomGeometrySourceOptions:max-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_custom_geometry_source_options_get_max_zoom(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_geometry_source_options_has_max_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_custom_geometry_source_options_set_max_zoom`.
+ * Whether `MaplibreNativeFfiCustomGeometrySourceOptions:max-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_has_max_zoom(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_set_max_zoom:
+ * maplibre_native_ffi_custom_geometry_source_options_set_max_zoom: (set-property max-zoom)
  *
- * The `max_zoom` member.
+ * Sets `MaplibreNativeFfiCustomGeometrySourceOptions:max-zoom`.
  */
 void maplibre_native_ffi_custom_geometry_source_options_set_max_zoom(
   MaplibreNativeFfiCustomGeometrySourceOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_get_tolerance:
+ * MaplibreNativeFfiCustomGeometrySourceOptions:tolerance: (setter set_tolerance) (getter get_tolerance)
  *
  * How far, in pixels, simplified geometry can stray from the original.
+ */
+/**
+ * maplibre_native_ffi_custom_geometry_source_options_get_tolerance: (get-property tolerance)
+ *
+ * Gets `MaplibreNativeFfiCustomGeometrySourceOptions:tolerance`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_custom_geometry_source_options_get_tolerance(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_geometry_source_options_has_tolerance:
  *
- * Whether the value sets `maplibre_native_ffi_custom_geometry_source_options_set_tolerance`.
+ * Whether `MaplibreNativeFfiCustomGeometrySourceOptions:tolerance` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_has_tolerance(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_set_tolerance:
+ * maplibre_native_ffi_custom_geometry_source_options_set_tolerance: (set-property tolerance)
  *
- * How far, in pixels, simplified geometry can stray from the original.
+ * Sets `MaplibreNativeFfiCustomGeometrySourceOptions:tolerance`.
  */
 void maplibre_native_ffi_custom_geometry_source_options_set_tolerance(
   MaplibreNativeFfiCustomGeometrySourceOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_get_tile_size:
+ * MaplibreNativeFfiCustomGeometrySourceOptions:tile-size: (setter set_tile_size) (getter get_tile_size)
  *
  * The width of a tile in pixels, a power of two no larger than 8192.
+ */
+/**
+ * maplibre_native_ffi_custom_geometry_source_options_get_tile_size: (get-property tile-size)
+ *
+ * Gets `MaplibreNativeFfiCustomGeometrySourceOptions:tile-size`.
  *
  * Returns: the value
  */
 guint32 maplibre_native_ffi_custom_geometry_source_options_get_tile_size(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_geometry_source_options_has_tile_size:
  *
- * Whether the value sets `maplibre_native_ffi_custom_geometry_source_options_set_tile_size`.
+ * Whether `MaplibreNativeFfiCustomGeometrySourceOptions:tile-size` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_has_tile_size(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_set_tile_size:
+ * maplibre_native_ffi_custom_geometry_source_options_set_tile_size: (set-property tile-size)
  *
- * The width of a tile in pixels, a power of two no larger than 8192.
+ * Sets `MaplibreNativeFfiCustomGeometrySourceOptions:tile-size`.
  */
 void maplibre_native_ffi_custom_geometry_source_options_set_tile_size(
   MaplibreNativeFfiCustomGeometrySourceOptions* self, guint32 value
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_get_buffer:
+ * MaplibreNativeFfiCustomGeometrySourceOptions:buffer: (setter set_buffer) (getter get_buffer)
  *
  * The width in pixels of the margin around a tile that holds geometry from
  * beyond its edges. `buffer` times 8192 / `tile_size` must be at most 65535.
+ */
+/**
+ * maplibre_native_ffi_custom_geometry_source_options_get_buffer: (get-property buffer)
+ *
+ * Gets `MaplibreNativeFfiCustomGeometrySourceOptions:buffer`.
  *
  * Returns: the value
  */
 guint32 maplibre_native_ffi_custom_geometry_source_options_get_buffer(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_geometry_source_options_has_buffer:
  *
- * Whether the value sets `maplibre_native_ffi_custom_geometry_source_options_set_buffer`.
+ * Whether `MaplibreNativeFfiCustomGeometrySourceOptions:buffer` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_has_buffer(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_set_buffer:
+ * maplibre_native_ffi_custom_geometry_source_options_set_buffer: (set-property buffer)
  *
- * The width in pixels of the margin around a tile that holds geometry from
- * beyond its edges. `buffer` times 8192 / `tile_size` must be at most 65535.
+ * Sets `MaplibreNativeFfiCustomGeometrySourceOptions:buffer`.
  */
 void maplibre_native_ffi_custom_geometry_source_options_set_buffer(
   MaplibreNativeFfiCustomGeometrySourceOptions* self, guint32 value
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_get_clip:
+ * MaplibreNativeFfiCustomGeometrySourceOptions:clip: (setter set_clip) (getter get_clip)
  *
  * Whether to cut geometry at the outer edge of a tile's margin.
+ */
+/**
+ * maplibre_native_ffi_custom_geometry_source_options_get_clip: (get-property clip)
+ *
+ * Gets `MaplibreNativeFfiCustomGeometrySourceOptions:clip`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_get_clip(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_geometry_source_options_has_clip:
  *
- * Whether the value sets `maplibre_native_ffi_custom_geometry_source_options_set_clip`.
+ * Whether `MaplibreNativeFfiCustomGeometrySourceOptions:clip` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_has_clip(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_set_clip:
+ * maplibre_native_ffi_custom_geometry_source_options_set_clip: (set-property clip)
  *
- * Whether to cut geometry at the outer edge of a tile's margin.
+ * Sets `MaplibreNativeFfiCustomGeometrySourceOptions:clip`.
  */
 void maplibre_native_ffi_custom_geometry_source_options_set_clip(
   MaplibreNativeFfiCustomGeometrySourceOptions* self, gboolean value
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_get_wrap:
+ * MaplibreNativeFfiCustomGeometrySourceOptions:wrap: (setter set_wrap) (getter get_wrap)
  *
  * Whether to wrap geometry that crosses the antimeridian.
+ */
+/**
+ * maplibre_native_ffi_custom_geometry_source_options_get_wrap: (get-property wrap)
+ *
+ * Gets `MaplibreNativeFfiCustomGeometrySourceOptions:wrap`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_get_wrap(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_geometry_source_options_has_wrap:
  *
- * Whether the value sets `maplibre_native_ffi_custom_geometry_source_options_set_wrap`.
+ * Whether `MaplibreNativeFfiCustomGeometrySourceOptions:wrap` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_geometry_source_options_has_wrap(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
+  MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_geometry_source_options_set_wrap:
+ * maplibre_native_ffi_custom_geometry_source_options_set_wrap: (set-property wrap)
  *
- * Whether to wrap geometry that crosses the antimeridian.
+ * Sets `MaplibreNativeFfiCustomGeometrySourceOptions:wrap`.
  */
 void maplibre_native_ffi_custom_geometry_source_options_set_wrap(
   MaplibreNativeFfiCustomGeometrySourceOptions* self, gboolean value
@@ -3483,11 +3621,6 @@ void maplibre_native_ffi_custom_geometry_source_options_set_cancel_tile(
   GDestroyNotify notify
 );
 
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiCustomGeometrySourceOptions,
-  maplibre_native_ffi_custom_geometry_source_options_free
-)
-
 /**
  * MaplibreNativeFfiCustomVectorSourceOptions:
  *
@@ -3495,19 +3628,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Zoom levels are whole numbers from 0 to 32.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_custom_vector_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-GType maplibre_native_ffi_custom_vector_source_options_get_type(
-  void
-) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_VECTOR_SOURCE_OPTIONS \
-  (maplibre_native_ffi_custom_vector_source_options_get_type())
-
 /**
  * maplibre_native_ffi_custom_vector_source_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiCustomVectorSourceOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiCustomVectorSourceOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -3515,84 +3645,72 @@ MaplibreNativeFfiCustomVectorSourceOptions*
 maplibre_native_ffi_custom_vector_source_options_new(void);
 
 /**
- * maplibre_native_ffi_custom_vector_source_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiCustomVectorSourceOptions*
-maplibre_native_ffi_custom_vector_source_options_copy(
-  const MaplibreNativeFfiCustomVectorSourceOptions* self
-);
-
-/**
- * maplibre_native_ffi_custom_vector_source_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_custom_vector_source_options_free(
-  MaplibreNativeFfiCustomVectorSourceOptions* self
-);
-
-/**
- * maplibre_native_ffi_custom_vector_source_options_get_min_zoom:
+ * MaplibreNativeFfiCustomVectorSourceOptions:min-zoom: (setter set_min_zoom) (getter get_min_zoom)
  *
  * The `min_zoom` member.
+ */
+/**
+ * maplibre_native_ffi_custom_vector_source_options_get_min_zoom: (get-property min-zoom)
+ *
+ * Gets `MaplibreNativeFfiCustomVectorSourceOptions:min-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_custom_vector_source_options_get_min_zoom(
-  const MaplibreNativeFfiCustomVectorSourceOptions* self
+  MaplibreNativeFfiCustomVectorSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_vector_source_options_has_min_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_custom_vector_source_options_set_min_zoom`.
+ * Whether `MaplibreNativeFfiCustomVectorSourceOptions:min-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_vector_source_options_has_min_zoom(
-  const MaplibreNativeFfiCustomVectorSourceOptions* self
+  MaplibreNativeFfiCustomVectorSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_vector_source_options_set_min_zoom:
+ * maplibre_native_ffi_custom_vector_source_options_set_min_zoom: (set-property min-zoom)
  *
- * The `min_zoom` member.
+ * Sets `MaplibreNativeFfiCustomVectorSourceOptions:min-zoom`.
  */
 void maplibre_native_ffi_custom_vector_source_options_set_min_zoom(
   MaplibreNativeFfiCustomVectorSourceOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_custom_vector_source_options_get_max_zoom:
+ * MaplibreNativeFfiCustomVectorSourceOptions:max-zoom: (setter set_max_zoom) (getter get_max_zoom)
  *
  * The `max_zoom` member.
+ */
+/**
+ * maplibre_native_ffi_custom_vector_source_options_get_max_zoom: (get-property max-zoom)
+ *
+ * Gets `MaplibreNativeFfiCustomVectorSourceOptions:max-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_custom_vector_source_options_get_max_zoom(
-  const MaplibreNativeFfiCustomVectorSourceOptions* self
+  MaplibreNativeFfiCustomVectorSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_custom_vector_source_options_has_max_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_custom_vector_source_options_set_max_zoom`.
+ * Whether `MaplibreNativeFfiCustomVectorSourceOptions:max-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_custom_vector_source_options_has_max_zoom(
-  const MaplibreNativeFfiCustomVectorSourceOptions* self
+  MaplibreNativeFfiCustomVectorSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_custom_vector_source_options_set_max_zoom:
+ * maplibre_native_ffi_custom_vector_source_options_set_max_zoom: (set-property max-zoom)
  *
- * The `max_zoom` member.
+ * Sets `MaplibreNativeFfiCustomVectorSourceOptions:max-zoom`.
  */
 void maplibre_native_ffi_custom_vector_source_options_set_max_zoom(
   MaplibreNativeFfiCustomVectorSourceOptions* self, gdouble value
@@ -3641,11 +3759,6 @@ void maplibre_native_ffi_custom_vector_source_options_set_cancel_tile(
   MaplibreNativeFfiCustomSourceCancelTileCallback callback, gpointer user_data,
   GDestroyNotify notify
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiCustomVectorSourceOptions,
-  maplibre_native_ffi_custom_vector_source_options_free
-)
 
 GType maplibre_native_ffi_dma_buf_format_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_DMA_BUF_FORMAT \
@@ -3907,7 +4020,7 @@ void maplibre_native_ffi_dma_buf_ring_descriptor_free(
 /**
  * maplibre_native_ffi_dma_buf_ring_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_dma_buf_ring_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -3930,7 +4043,7 @@ void maplibre_native_ffi_dma_buf_ring_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_dma_buf_ring_descriptor_get_buffer_count:
  *
- * How many buffers the ring has, from 1 to 8.
+ * Gets the value that `maplibre_native_ffi_dma_buf_ring_descriptor_set_buffer_count` sets.
  *
  * Returns: the value
  */
@@ -3950,8 +4063,7 @@ void maplibre_native_ffi_dma_buf_ring_descriptor_set_buffer_count(
 /**
  * maplibre_native_ffi_dma_buf_ring_descriptor_get_formats:
  *
- * The formats and modifiers that your reader imports, most preferred first,
- * such as those that eglQueryDmaBufModifiersEXT() reports.
+ * Gets the value that `maplibre_native_ffi_dma_buf_ring_descriptor_set_formats` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiDmaBufFormat): the items
  */
@@ -4023,7 +4135,7 @@ void maplibre_native_ffi_egl_context_descriptor_free(
 /**
  * maplibre_native_ffi_egl_context_descriptor_get_display:
  *
- * An `EGLDisplay`.
+ * Gets the value that `maplibre_native_ffi_egl_context_descriptor_set_display` sets.
  *
  * Returns: the value
  */
@@ -4043,7 +4155,7 @@ void maplibre_native_ffi_egl_context_descriptor_set_display(
 /**
  * maplibre_native_ffi_egl_context_descriptor_get_config:
  *
- * An `EGLConfig`.
+ * Gets the value that `maplibre_native_ffi_egl_context_descriptor_set_config` sets.
  *
  * Returns: the value
  */
@@ -4063,7 +4175,7 @@ void maplibre_native_ffi_egl_context_descriptor_set_config(
 /**
  * maplibre_native_ffi_egl_context_descriptor_get_share_context:
  *
- * Your `EGLContext`, for a shared context.
+ * Gets the value that `maplibre_native_ffi_egl_context_descriptor_set_share_context` sets.
  *
  * Returns: the value
  */
@@ -4083,7 +4195,7 @@ void maplibre_native_ffi_egl_context_descriptor_set_share_context(
 /**
  * maplibre_native_ffi_egl_context_descriptor_get_client_api:
  *
- * The API of a dedicated context. A shared context uses the API of yours.
+ * Gets the value that `maplibre_native_ffi_egl_context_descriptor_set_client_api` sets.
  *
  * Returns: the value
  */
@@ -4105,7 +4217,7 @@ void maplibre_native_ffi_egl_context_descriptor_set_client_api(
 /**
  * maplibre_native_ffi_egl_context_descriptor_get_get_proc_address:
  *
- * Your `eglGetProcAddress`, or null to use the system's.
+ * Gets the value that `maplibre_native_ffi_egl_context_descriptor_set_get_proc_address` sets.
  *
  * Returns: the value
  */
@@ -4303,17 +4415,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * The features whose state to set, read, or remove.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_feature_state_selector` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_feature_state_selector_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_FEATURE_STATE_SELECTOR \
-  (maplibre_native_ffi_feature_state_selector_get_type())
-
 /**
  * maplibre_native_ffi_feature_state_selector_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiFeatureStateSelector` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiFeatureStateSelector` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -4321,101 +4432,92 @@ MaplibreNativeFfiFeatureStateSelector*
 maplibre_native_ffi_feature_state_selector_new(void);
 
 /**
- * maplibre_native_ffi_feature_state_selector_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiFeatureStateSelector*
-maplibre_native_ffi_feature_state_selector_copy(
-  const MaplibreNativeFfiFeatureStateSelector* self
-);
-
-/**
- * maplibre_native_ffi_feature_state_selector_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_feature_state_selector_free(
-  MaplibreNativeFfiFeatureStateSelector* self
-);
-
-/**
- * maplibre_native_ffi_feature_state_selector_get_source_id:
+ * MaplibreNativeFfiFeatureStateSelector:source-id: (setter set_source_id) (getter get_source_id)
  *
  * The `source_id` member.
+ */
+/**
+ * maplibre_native_ffi_feature_state_selector_get_source_id: (get-property source-id)
+ *
+ * Gets `MaplibreNativeFfiFeatureStateSelector:source-id`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_feature_state_selector_get_source_id(
-  const MaplibreNativeFfiFeatureStateSelector* self
+  MaplibreNativeFfiFeatureStateSelector* self
 );
 
 /**
- * maplibre_native_ffi_feature_state_selector_set_source_id:
+ * maplibre_native_ffi_feature_state_selector_set_source_id: (set-property source-id)
  * @value: the UTF-8 text
  *
- * The `source_id` member.
+ * Sets `MaplibreNativeFfiFeatureStateSelector:source-id`.
  */
 void maplibre_native_ffi_feature_state_selector_set_source_id(
   MaplibreNativeFfiFeatureStateSelector* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_feature_state_selector_get_source_layer_id:
+ * MaplibreNativeFfiFeatureStateSelector:source-layer-id: (setter set_source_layer_id) (getter get_source_layer_id)
  *
  * The source layer, for a vector source. Empty for other sources.
+ */
+/**
+ * maplibre_native_ffi_feature_state_selector_get_source_layer_id: (get-property source-layer-id)
+ *
+ * Gets `MaplibreNativeFfiFeatureStateSelector:source-layer-id`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_feature_state_selector_get_source_layer_id(
-  const MaplibreNativeFfiFeatureStateSelector* self
+  MaplibreNativeFfiFeatureStateSelector* self
 );
 
 /**
- * maplibre_native_ffi_feature_state_selector_set_source_layer_id:
+ * maplibre_native_ffi_feature_state_selector_set_source_layer_id: (set-property source-layer-id)
  * @value: the UTF-8 text
  *
- * The source layer, for a vector source. Empty for other sources.
+ * Sets `MaplibreNativeFfiFeatureStateSelector:source-layer-id`.
  */
 void maplibre_native_ffi_feature_state_selector_set_source_layer_id(
   MaplibreNativeFfiFeatureStateSelector* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_feature_state_selector_get_feature_id:
+ * MaplibreNativeFfiFeatureStateSelector:feature-id: (setter set_feature_id) (getter get_feature_id)
  *
  * The feature's ID. Setting or reading state needs it. Without it,
  * `maplibre_native_ffi_map_remove_feature_state_async()` removes the state of
  * every feature in the source layer.
+ */
+/**
+ * maplibre_native_ffi_feature_state_selector_get_feature_id: (get-property feature-id)
+ *
+ * Gets `MaplibreNativeFfiFeatureStateSelector:feature-id`.
  *
  * Returns: (transfer none) (nullable): the value
  */
 MaplibreNativeFfiFeatureId*
 maplibre_native_ffi_feature_state_selector_get_feature_id(
-  const MaplibreNativeFfiFeatureStateSelector* self
+  MaplibreNativeFfiFeatureStateSelector* self
 );
 
 /**
  * maplibre_native_ffi_feature_state_selector_has_feature_id:
  *
- * Whether the value sets `maplibre_native_ffi_feature_state_selector_set_feature_id`.
+ * Whether `MaplibreNativeFfiFeatureStateSelector:feature-id` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_feature_state_selector_has_feature_id(
-  const MaplibreNativeFfiFeatureStateSelector* self
+  MaplibreNativeFfiFeatureStateSelector* self
 );
 
 /**
- * maplibre_native_ffi_feature_state_selector_set_feature_id:
+ * maplibre_native_ffi_feature_state_selector_set_feature_id: (set-property feature-id)
  * @value: the value
  *
- * The feature's ID. Setting or reading state needs it. Without it,
- * `maplibre_native_ffi_map_remove_feature_state_async()` removes the state of
- * every feature in the source layer.
+ * Sets `MaplibreNativeFfiFeatureStateSelector:feature-id`.
  */
 void maplibre_native_ffi_feature_state_selector_set_feature_id(
   MaplibreNativeFfiFeatureStateSelector* self,
@@ -4423,32 +4525,31 @@ void maplibre_native_ffi_feature_state_selector_set_feature_id(
 );
 
 /**
- * maplibre_native_ffi_feature_state_selector_get_state_key:
+ * MaplibreNativeFfiFeatureStateSelector:state-key: (setter set_state_key) (getter get_state_key)
  *
  * The one key that `maplibre_native_ffi_map_remove_feature_state_async()`
  * removes. It needs `feature_id`. Empty removes every key.
+ */
+/**
+ * maplibre_native_ffi_feature_state_selector_get_state_key: (get-property state-key)
+ *
+ * Gets `MaplibreNativeFfiFeatureStateSelector:state-key`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_feature_state_selector_get_state_key(
-  const MaplibreNativeFfiFeatureStateSelector* self
+  MaplibreNativeFfiFeatureStateSelector* self
 );
 
 /**
- * maplibre_native_ffi_feature_state_selector_set_state_key:
+ * maplibre_native_ffi_feature_state_selector_set_state_key: (set-property state-key)
  * @value: the UTF-8 text
  *
- * The one key that `maplibre_native_ffi_map_remove_feature_state_async()`
- * removes. It needs `feature_id`. Empty removes every key.
+ * Sets `MaplibreNativeFfiFeatureStateSelector:state-key`.
  */
 void maplibre_native_ffi_feature_state_selector_set_state_key(
   MaplibreNativeFfiFeatureStateSelector* self, const char* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiFeatureStateSelector,
-  maplibre_native_ffi_feature_state_selector_free
-)
 
 GType maplibre_native_ffi_frame_demand_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_FRAME_DEMAND \
@@ -4482,17 +4583,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Options for creating a frame pacer.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_frame_pacer_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
-GType maplibre_native_ffi_frame_pacer_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_FRAME_PACER_OPTIONS \
-  (maplibre_native_ffi_frame_pacer_options_get_type())
-
 /**
  * maplibre_native_ffi_frame_pacer_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiFramePacerOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiFramePacerOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -4501,66 +4601,42 @@ MaplibreNativeFfiFramePacerOptions* maplibre_native_ffi_frame_pacer_options_new(
 );
 
 /**
- * maplibre_native_ffi_frame_pacer_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiFramePacerOptions*
-maplibre_native_ffi_frame_pacer_options_copy(
-  const MaplibreNativeFfiFramePacerOptions* self
-);
-
-/**
- * maplibre_native_ffi_frame_pacer_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_frame_pacer_options_free(
-  MaplibreNativeFfiFramePacerOptions* self
-);
-
-/**
- * maplibre_native_ffi_frame_pacer_options_get_maximum_frames_per_second:
+ * MaplibreNativeFfiFramePacerOptions:maximum-frames-per-second: (setter set_maximum_frames_per_second) (getter get_maximum_frames_per_second)
  *
  * The most frames per second that the pacer demands, greater than zero. The
  * pacer skips display refreshes to stay within it. By default, it can demand
  * frames at every refresh.
+ */
+/**
+ * maplibre_native_ffi_frame_pacer_options_get_maximum_frames_per_second: (get-property maximum-frames-per-second)
+ *
+ * Gets `MaplibreNativeFfiFramePacerOptions:maximum-frames-per-second`.
  *
  * Returns: the value
  */
 guint32 maplibre_native_ffi_frame_pacer_options_get_maximum_frames_per_second(
-  const MaplibreNativeFfiFramePacerOptions* self
+  MaplibreNativeFfiFramePacerOptions* self
 );
 
 /**
  * maplibre_native_ffi_frame_pacer_options_has_maximum_frames_per_second:
  *
- * Whether the value sets `maplibre_native_ffi_frame_pacer_options_set_maximum_frames_per_second`.
+ * Whether `MaplibreNativeFfiFramePacerOptions:maximum-frames-per-second` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_frame_pacer_options_has_maximum_frames_per_second(
-  const MaplibreNativeFfiFramePacerOptions* self
+  MaplibreNativeFfiFramePacerOptions* self
 );
 
 /**
- * maplibre_native_ffi_frame_pacer_options_set_maximum_frames_per_second:
+ * maplibre_native_ffi_frame_pacer_options_set_maximum_frames_per_second: (set-property maximum-frames-per-second)
  *
- * The most frames per second that the pacer demands, greater than zero. The
- * pacer skips display refreshes to stay within it. By default, it can demand
- * frames at every refresh.
+ * Sets `MaplibreNativeFfiFramePacerOptions:maximum-frames-per-second`.
  */
 void maplibre_native_ffi_frame_pacer_options_set_maximum_frames_per_second(
   MaplibreNativeFfiFramePacerOptions* self, guint32 value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiFramePacerOptions,
-  maplibre_native_ffi_frame_pacer_options_free
-)
 
 GType maplibre_native_ffi_vec3_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_VEC3 (maplibre_native_ffi_vec3_get_type())
@@ -4647,17 +4723,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * The camera's position and orientation in three dimensions.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_free_camera_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_free_camera_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_FREE_CAMERA_OPTIONS \
-  (maplibre_native_ffi_free_camera_options_get_type())
-
 /**
  * maplibre_native_ffi_free_camera_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiFreeCameraOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiFreeCameraOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -4666,103 +4741,83 @@ MaplibreNativeFfiFreeCameraOptions* maplibre_native_ffi_free_camera_options_new(
 );
 
 /**
- * maplibre_native_ffi_free_camera_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiFreeCameraOptions*
-maplibre_native_ffi_free_camera_options_copy(
-  const MaplibreNativeFfiFreeCameraOptions* self
-);
-
-/**
- * maplibre_native_ffi_free_camera_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_free_camera_options_free(
-  MaplibreNativeFfiFreeCameraOptions* self
-);
-
-/**
- * maplibre_native_ffi_free_camera_options_get_position:
+ * MaplibreNativeFfiFreeCameraOptions:position: (setter set_position) (getter get_position)
  *
  * The camera's position in Web Mercator units, where the world is 1 wide, (0,
  * 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is the
  * altitude in the same units.
+ */
+/**
+ * maplibre_native_ffi_free_camera_options_get_position: (get-property position)
+ *
+ * Gets `MaplibreNativeFfiFreeCameraOptions:position`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiVec3* maplibre_native_ffi_free_camera_options_get_position(
-  const MaplibreNativeFfiFreeCameraOptions* self
+  MaplibreNativeFfiFreeCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_free_camera_options_has_position:
  *
- * Whether the value sets `maplibre_native_ffi_free_camera_options_set_position`.
+ * Whether `MaplibreNativeFfiFreeCameraOptions:position` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_free_camera_options_has_position(
-  const MaplibreNativeFfiFreeCameraOptions* self
+  MaplibreNativeFfiFreeCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_free_camera_options_set_position:
+ * maplibre_native_ffi_free_camera_options_set_position: (set-property position)
  * @value: the value
  *
- * The camera's position in Web Mercator units, where the world is 1 wide, (0,
- * 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is the
- * altitude in the same units.
+ * Sets `MaplibreNativeFfiFreeCameraOptions:position`.
  */
 void maplibre_native_ffi_free_camera_options_set_position(
   MaplibreNativeFfiFreeCameraOptions* self, const MaplibreNativeFfiVec3* value
 );
 
 /**
- * maplibre_native_ffi_free_camera_options_get_orientation:
+ * MaplibreNativeFfiFreeCameraOptions:orientation: (setter set_orientation) (getter get_orientation)
  *
  * The camera's rotation from looking straight down with north at the top of the
  * screen.
+ */
+/**
+ * maplibre_native_ffi_free_camera_options_get_orientation: (get-property orientation)
+ *
+ * Gets `MaplibreNativeFfiFreeCameraOptions:orientation`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiQuaternion*
 maplibre_native_ffi_free_camera_options_get_orientation(
-  const MaplibreNativeFfiFreeCameraOptions* self
+  MaplibreNativeFfiFreeCameraOptions* self
 );
 
 /**
  * maplibre_native_ffi_free_camera_options_has_orientation:
  *
- * Whether the value sets `maplibre_native_ffi_free_camera_options_set_orientation`.
+ * Whether `MaplibreNativeFfiFreeCameraOptions:orientation` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_free_camera_options_has_orientation(
-  const MaplibreNativeFfiFreeCameraOptions* self
+  MaplibreNativeFfiFreeCameraOptions* self
 );
 
 /**
- * maplibre_native_ffi_free_camera_options_set_orientation:
+ * maplibre_native_ffi_free_camera_options_set_orientation: (set-property orientation)
  * @value: the value
  *
- * The camera's rotation from looking straight down with north at the top of the
- * screen.
+ * Sets `MaplibreNativeFfiFreeCameraOptions:orientation`.
  */
 void maplibre_native_ffi_free_camera_options_set_orientation(
   MaplibreNativeFfiFreeCameraOptions* self,
   const MaplibreNativeFfiQuaternion* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiFreeCameraOptions,
-  maplibre_native_ffi_free_camera_options_free
-)
 
 /**
  * MaplibreNativeFfiGeoJsonSourceOptions:
@@ -4772,17 +4827,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Zoom levels are whole numbers.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_geo_json_source_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-GType maplibre_native_ffi_geo_json_source_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_GEO_JSON_SOURCE_OPTIONS \
-  (maplibre_native_ffi_geo_json_source_options_get_type())
-
 /**
  * maplibre_native_ffi_geo_json_source_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiGeoJsonSourceOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiGeoJsonSourceOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -4790,331 +4844,354 @@ MaplibreNativeFfiGeoJsonSourceOptions*
 maplibre_native_ffi_geo_json_source_options_new(void);
 
 /**
- * maplibre_native_ffi_geo_json_source_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiGeoJsonSourceOptions*
-maplibre_native_ffi_geo_json_source_options_copy(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
-);
-
-/**
- * maplibre_native_ffi_geo_json_source_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_geo_json_source_options_free(
-  MaplibreNativeFfiGeoJsonSourceOptions* self
-);
-
-/**
- * maplibre_native_ffi_geo_json_source_options_get_min_zoom:
+ * MaplibreNativeFfiGeoJsonSourceOptions:min-zoom: (setter set_min_zoom) (getter get_min_zoom)
  *
  * The `min_zoom` member.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_min_zoom: (get-property min-zoom)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:min-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_geo_json_source_options_get_min_zoom(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_min_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_min_zoom`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:min-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_min_zoom(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_min_zoom:
+ * maplibre_native_ffi_geo_json_source_options_set_min_zoom: (set-property min-zoom)
  *
- * The `min_zoom` member.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:min-zoom`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_min_zoom(
   MaplibreNativeFfiGeoJsonSourceOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_max_zoom:
+ * MaplibreNativeFfiGeoJsonSourceOptions:max-zoom: (setter set_max_zoom) (getter get_max_zoom)
  *
  * The `max_zoom` member.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_max_zoom: (get-property max-zoom)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:max-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_geo_json_source_options_get_max_zoom(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_max_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_max_zoom`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:max-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_max_zoom(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_max_zoom:
+ * maplibre_native_ffi_geo_json_source_options_set_max_zoom: (set-property max-zoom)
  *
- * The `max_zoom` member.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:max-zoom`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_max_zoom(
   MaplibreNativeFfiGeoJsonSourceOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_tolerance:
+ * MaplibreNativeFfiGeoJsonSourceOptions:tolerance: (setter set_tolerance) (getter get_tolerance)
  *
  * The `tolerance` member.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_tolerance: (get-property tolerance)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:tolerance`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_geo_json_source_options_get_tolerance(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_tolerance:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_tolerance`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:tolerance` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_tolerance(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_tolerance:
+ * maplibre_native_ffi_geo_json_source_options_set_tolerance: (set-property tolerance)
  *
- * The `tolerance` member.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:tolerance`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_tolerance(
   MaplibreNativeFfiGeoJsonSourceOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_cluster_max_zoom:
+ * MaplibreNativeFfiGeoJsonSourceOptions:cluster-max-zoom: (setter set_cluster_max_zoom) (getter get_cluster_max_zoom)
  *
  * The last zoom level that has clusters, at most 30.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_cluster_max_zoom: (get-property cluster-max-zoom)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:cluster-max-zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_geo_json_source_options_get_cluster_max_zoom(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_cluster_max_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_cluster_max_zoom`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:cluster-max-zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_cluster_max_zoom(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_cluster_max_zoom:
+ * maplibre_native_ffi_geo_json_source_options_set_cluster_max_zoom: (set-property cluster-max-zoom)
  *
- * The last zoom level that has clusters, at most 30.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:cluster-max-zoom`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_cluster_max_zoom(
   MaplibreNativeFfiGeoJsonSourceOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_cluster_properties:
+ * MaplibreNativeFfiGeoJsonSourceOptions:cluster-properties: (setter set_cluster_properties) (getter get_cluster_properties)
  *
  * The `clusterProperties` object, or empty for none.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_cluster_properties: (get-property cluster-properties)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:cluster-properties`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_geo_json_source_options_get_cluster_properties(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_cluster_properties:
+ * maplibre_native_ffi_geo_json_source_options_set_cluster_properties: (set-property cluster-properties)
  * @value: the UTF-8 text
  *
- * The `clusterProperties` object, or empty for none.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:cluster-properties`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_cluster_properties(
   MaplibreNativeFfiGeoJsonSourceOptions* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_buffer:
+ * MaplibreNativeFfiGeoJsonSourceOptions:buffer: (setter set_buffer) (getter get_buffer)
  *
  * The `buffer` member.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_buffer: (get-property buffer)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:buffer`.
  *
  * Returns: the value
  */
 guint32 maplibre_native_ffi_geo_json_source_options_get_buffer(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_buffer:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_buffer`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:buffer` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_buffer(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_buffer:
+ * maplibre_native_ffi_geo_json_source_options_set_buffer: (set-property buffer)
  *
- * The `buffer` member.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:buffer`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_buffer(
   MaplibreNativeFfiGeoJsonSourceOptions* self, guint32 value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_cluster_radius:
+ * MaplibreNativeFfiGeoJsonSourceOptions:cluster-radius: (setter set_cluster_radius) (getter get_cluster_radius)
  *
  * The `cluster_radius` member.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_cluster_radius: (get-property cluster-radius)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:cluster-radius`.
  *
  * Returns: the value
  */
 guint32 maplibre_native_ffi_geo_json_source_options_get_cluster_radius(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_cluster_radius:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_cluster_radius`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:cluster-radius` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_cluster_radius(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_cluster_radius:
+ * maplibre_native_ffi_geo_json_source_options_set_cluster_radius: (set-property cluster-radius)
  *
- * The `cluster_radius` member.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:cluster-radius`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_cluster_radius(
   MaplibreNativeFfiGeoJsonSourceOptions* self, guint32 value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_cluster_min_points:
+ * MaplibreNativeFfiGeoJsonSourceOptions:cluster-min-points: (setter set_cluster_min_points) (getter get_cluster_min_points)
  *
  * At most 4294967295 on a 32-bit target.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_cluster_min_points: (get-property cluster-min-points)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:cluster-min-points`.
  *
  * Returns: the value
  */
 guint64 maplibre_native_ffi_geo_json_source_options_get_cluster_min_points(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_cluster_min_points:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_cluster_min_points`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:cluster-min-points` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_cluster_min_points(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_cluster_min_points:
+ * maplibre_native_ffi_geo_json_source_options_set_cluster_min_points: (set-property cluster-min-points)
  *
- * At most 4294967295 on a 32-bit target.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:cluster-min-points`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_cluster_min_points(
   MaplibreNativeFfiGeoJsonSourceOptions* self, guint64 value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_line_metrics:
+ * MaplibreNativeFfiGeoJsonSourceOptions:line-metrics: (setter set_line_metrics) (getter get_line_metrics)
  *
  * The `line_metrics` member.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_line_metrics: (get-property line-metrics)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:line-metrics`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_geo_json_source_options_get_line_metrics(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_line_metrics:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_line_metrics`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:line-metrics` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_line_metrics(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_line_metrics:
+ * maplibre_native_ffi_geo_json_source_options_set_line_metrics: (set-property line-metrics)
  *
- * The `line_metrics` member.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:line-metrics`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_line_metrics(
   MaplibreNativeFfiGeoJsonSourceOptions* self, gboolean value
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_get_cluster:
+ * MaplibreNativeFfiGeoJsonSourceOptions:cluster: (setter set_cluster) (getter get_cluster)
  *
  * The `cluster` member.
+ */
+/**
+ * maplibre_native_ffi_geo_json_source_options_get_cluster: (get-property cluster)
+ *
+ * Gets `MaplibreNativeFfiGeoJsonSourceOptions:cluster`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_geo_json_source_options_get_cluster(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
  * maplibre_native_ffi_geo_json_source_options_has_cluster:
  *
- * Whether the value sets `maplibre_native_ffi_geo_json_source_options_set_cluster`.
+ * Whether `MaplibreNativeFfiGeoJsonSourceOptions:cluster` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_geo_json_source_options_has_cluster(
-  const MaplibreNativeFfiGeoJsonSourceOptions* self
+  MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 
 /**
- * maplibre_native_ffi_geo_json_source_options_set_cluster:
+ * maplibre_native_ffi_geo_json_source_options_set_cluster: (set-property cluster)
  *
- * The `cluster` member.
+ * Sets `MaplibreNativeFfiGeoJsonSourceOptions:cluster`.
  */
 void maplibre_native_ffi_geo_json_source_options_set_cluster(
   MaplibreNativeFfiGeoJsonSourceOptions* self, gboolean value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiGeoJsonSourceOptions,
-  maplibre_native_ffi_geo_json_source_options_free
-)
 
 GType maplibre_native_ffi_gpu_sync_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_GPU_SYNC \
@@ -5188,7 +5265,7 @@ void maplibre_native_ffi_http_header_free(MaplibreNativeFfiHttpHeader* self);
 /**
  * maplibre_native_ffi_http_header_get_name:
  *
- * The `name` member.
+ * Gets the value that `maplibre_native_ffi_http_header_set_name` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -5209,7 +5286,7 @@ void maplibre_native_ffi_http_header_set_name(
 /**
  * maplibre_native_ffi_http_header_get_value:
  *
- * The `value` member.
+ * Gets the value that `maplibre_native_ffi_http_header_set_value` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -5276,7 +5353,7 @@ void maplibre_native_ffi_http_header_rule_free(
 /**
  * maplibre_native_ffi_http_header_rule_get_kinds:
  *
- * The kinds of resource that the rule covers. Zero covers every kind.
+ * Gets the value that `maplibre_native_ffi_http_header_rule_set_kinds` sets.
  *
  * Returns: the value
  */
@@ -5297,7 +5374,7 @@ void maplibre_native_ffi_http_header_rule_set_kinds(
 /**
  * maplibre_native_ffi_http_header_rule_get_flags:
  *
- * The `flags` member.
+ * Gets the value that `maplibre_native_ffi_http_header_rule_set_flags` sets.
  *
  * Returns: the value
  */
@@ -5317,7 +5394,7 @@ void maplibre_native_ffi_http_header_rule_set_flags(
 /**
  * maplibre_native_ffi_http_header_rule_get_url:
  *
- * The `url` member.
+ * Gets the value that `maplibre_native_ffi_http_header_rule_set_url` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -5338,7 +5415,7 @@ void maplibre_native_ffi_http_header_rule_set_url(
 /**
  * maplibre_native_ffi_http_header_rule_get_headers:
  *
- * The `headers` member.
+ * Gets the value that `maplibre_native_ffi_http_header_rule_set_headers` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiHttpHeader): the items
  */
@@ -5409,7 +5486,7 @@ void maplibre_native_ffi_http_header_transform_free(
 /**
  * maplibre_native_ffi_http_header_transform_get_rules:
  *
- * The first rule that matches a request adds its headers, and no other.
+ * Gets the value that `maplibre_native_ffi_http_header_transform_set_rules` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiHttpHeaderRule): the items
  */
@@ -5639,7 +5716,7 @@ void maplibre_native_ffi_metal_context_descriptor_free(
 /**
  * maplibre_native_ffi_metal_context_descriptor_get_device:
  *
- * An `MTLDevice`.
+ * Gets the value that `maplibre_native_ffi_metal_context_descriptor_set_device` sets.
  *
  * Returns: the value
  */
@@ -5715,7 +5792,7 @@ void maplibre_native_ffi_io_surface_ring_descriptor_free(
 /**
  * maplibre_native_ffi_io_surface_ring_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_io_surface_ring_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -5738,7 +5815,7 @@ void maplibre_native_ffi_io_surface_ring_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_io_surface_ring_descriptor_get_buffer_count:
  *
- * How many surfaces the ring has, from 1 to 8.
+ * Gets the value that `maplibre_native_ffi_io_surface_ring_descriptor_set_buffer_count` sets.
  *
  * Returns: the value
  */
@@ -5758,7 +5835,7 @@ void maplibre_native_ffi_io_surface_ring_descriptor_set_buffer_count(
 /**
  * maplibre_native_ffi_io_surface_ring_descriptor_get_context:
  *
- * The MTLDevice to render with. A null device picks the system's default.
+ * Gets the value that `maplibre_native_ffi_io_surface_ring_descriptor_set_context` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -5828,9 +5905,7 @@ void maplibre_native_ffi_log_handler_free(MaplibreNativeFfiLogHandler* self);
 /**
  * maplibre_native_ffi_log_handler_get_platform_severities:
  *
- * The severities that also go to the platform's log, as they do without a
- * callback. 0 sends none. A message of these severities goes to the platform's
- * log even when the handler's queue can't accept it.
+ * Gets the value that `maplibre_native_ffi_log_handler_set_platform_severities` sets.
  *
  * Returns: the value
  */
@@ -5906,175 +5981,173 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Options for `maplibre_native_ffi_runtime_create_map()`.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_map_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_map_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_OPTIONS \
-  (maplibre_native_ffi_map_options_get_type())
-
 /**
  * maplibre_native_ffi_map_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiMapOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiMapOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
 MaplibreNativeFfiMapOptions* maplibre_native_ffi_map_options_new(void);
 
 /**
- * maplibre_native_ffi_map_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiMapOptions* maplibre_native_ffi_map_options_copy(
-  const MaplibreNativeFfiMapOptions* self
-);
-
-/**
- * maplibre_native_ffi_map_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_map_options_free(MaplibreNativeFfiMapOptions* self);
-
-/**
- * maplibre_native_ffi_map_options_get_initial_extent:
+ * MaplibreNativeFfiMapOptions:initial-extent: (setter set_initial_extent) (getter get_initial_extent)
  *
  * The map's first size, and its scale factor. The scale factor stays fixed for
  * the map's life, and every render session of the map renders at it.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_initial_extent: (get-property initial-extent)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:initial-extent`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiLogicalExtent*
 maplibre_native_ffi_map_options_get_initial_extent(
-  const MaplibreNativeFfiMapOptions* self
+  MaplibreNativeFfiMapOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_options_set_initial_extent:
+ * maplibre_native_ffi_map_options_set_initial_extent: (set-property initial-extent)
  * @value: the value
  *
- * The map's first size, and its scale factor. The scale factor stays fixed for
- * the map's life, and every render session of the map renders at it.
+ * Sets `MaplibreNativeFfiMapOptions:initial-extent`.
  */
 void maplibre_native_ffi_map_options_set_initial_extent(
   MaplibreNativeFfiMapOptions* self, const MaplibreNativeFfiLogicalExtent* value
 );
 
 /**
- * maplibre_native_ffi_map_options_get_map_mode:
+ * MaplibreNativeFfiMapOptions:map-mode: (setter set_map_mode) (getter get_map_mode)
  *
  * The `map_mode` member.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_map_mode: (get-property map-mode)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:map-mode`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiMapMode maplibre_native_ffi_map_options_get_map_mode(
-  const MaplibreNativeFfiMapOptions* self
+  MaplibreNativeFfiMapOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_options_set_map_mode:
+ * maplibre_native_ffi_map_options_set_map_mode: (set-property map-mode)
  *
- * The `map_mode` member.
+ * Sets `MaplibreNativeFfiMapOptions:map-mode`.
  */
 void maplibre_native_ffi_map_options_set_map_mode(
   MaplibreNativeFfiMapOptions* self, MaplibreNativeFfiMapMode value
 );
 
 /**
- * maplibre_native_ffi_map_options_get_fast_pfor_enabled:
+ * MaplibreNativeFfiMapOptions:fast-pfor-enabled: (setter set_fast_pfor_enabled) (getter get_fast_pfor_enabled)
  *
  * Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
  * encoding. Without it, such tiles fail to load.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_fast_pfor_enabled: (get-property fast-pfor-enabled)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:fast-pfor-enabled`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_map_options_get_fast_pfor_enabled(
-  const MaplibreNativeFfiMapOptions* self
+  MaplibreNativeFfiMapOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_options_set_fast_pfor_enabled:
+ * maplibre_native_ffi_map_options_set_fast_pfor_enabled: (set-property fast-pfor-enabled)
  *
- * Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
- * encoding. Without it, such tiles fail to load.
+ * Sets `MaplibreNativeFfiMapOptions:fast-pfor-enabled`.
  */
 void maplibre_native_ffi_map_options_set_fast_pfor_enabled(
   MaplibreNativeFfiMapOptions* self, gboolean value
 );
 
 /**
- * maplibre_native_ffi_map_options_get_event_mask:
+ * MaplibreNativeFfiMapOptions:event-mask: (setter set_event_mask) (getter get_event_mask)
  *
  * The events that the map reports. Without it, the map reports them all.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_event_mask: (get-property event-mask)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:event-mask`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiRuntimeEventFlag
 maplibre_native_ffi_map_options_get_event_mask(
-  const MaplibreNativeFfiMapOptions* self
+  MaplibreNativeFfiMapOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_options_has_event_mask:
  *
- * Whether the value sets `maplibre_native_ffi_map_options_set_event_mask`.
+ * Whether `MaplibreNativeFfiMapOptions:event-mask` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_options_has_event_mask(
-  const MaplibreNativeFfiMapOptions* self
+  MaplibreNativeFfiMapOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_options_set_event_mask:
+ * maplibre_native_ffi_map_options_set_event_mask: (set-property event-mask)
  *
- * The events that the map reports. Without it, the map reports them all.
+ * Sets `MaplibreNativeFfiMapOptions:event-mask`.
  */
 void maplibre_native_ffi_map_options_set_event_mask(
   MaplibreNativeFfiMapOptions* self, MaplibreNativeFfiRuntimeEventFlag value
 );
 
 /**
- * maplibre_native_ffi_map_options_get_tile_cache_enabled:
+ * MaplibreNativeFfiMapOptions:tile-cache-enabled: (setter set_tile_cache_enabled) (getter get_tile_cache_enabled)
  *
  * Whether the map keeps tiles in memory after they leave the view, so they show
  * again without loading. Without it, the map keeps them.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_tile_cache_enabled: (get-property tile-cache-enabled)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:tile-cache-enabled`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_map_options_get_tile_cache_enabled(
-  const MaplibreNativeFfiMapOptions* self
+  MaplibreNativeFfiMapOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_options_has_tile_cache_enabled:
  *
- * Whether the value sets `maplibre_native_ffi_map_options_set_tile_cache_enabled`.
+ * Whether `MaplibreNativeFfiMapOptions:tile-cache-enabled` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_options_has_tile_cache_enabled(
-  const MaplibreNativeFfiMapOptions* self
+  MaplibreNativeFfiMapOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_options_set_tile_cache_enabled:
+ * maplibre_native_ffi_map_options_set_tile_cache_enabled: (set-property tile-cache-enabled)
  *
- * Whether the map keeps tiles in memory after they leave the view, so they show
- * again without loading. Without it, the map keeps them.
+ * Sets `MaplibreNativeFfiMapOptions:tile-cache-enabled`.
  */
 void maplibre_native_ffi_map_options_set_tile_cache_enabled(
   MaplibreNativeFfiMapOptions* self, gboolean value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiMapOptions, maplibre_native_ffi_map_options_free
-)
 
 GType maplibre_native_ffi_map_projection_camera_result_get_type(
   void
@@ -6256,251 +6329,253 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  * The `lod_` members lower the level of detail away from the camera, so the map
  * loads fewer tiles when the pitch is high.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_map_tile_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_map_tile_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_TILE_OPTIONS \
-  (maplibre_native_ffi_map_tile_options_get_type())
-
 /**
  * maplibre_native_ffi_map_tile_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiMapTileOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiMapTileOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
 MaplibreNativeFfiMapTileOptions* maplibre_native_ffi_map_tile_options_new(void);
 
 /**
- * maplibre_native_ffi_map_tile_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiMapTileOptions* maplibre_native_ffi_map_tile_options_copy(
-  const MaplibreNativeFfiMapTileOptions* self
-);
-
-/**
- * maplibre_native_ffi_map_tile_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_map_tile_options_free(
-  MaplibreNativeFfiMapTileOptions* self
-);
-
-/**
- * maplibre_native_ffi_map_tile_options_get_prefetch_zoom_delta:
+ * MaplibreNativeFfiMapTileOptions:prefetch-zoom-delta: (setter set_prefetch_zoom_delta) (getter get_prefetch_zoom_delta)
  *
  * How many zoom levels lower the map also loads tiles for, so it can show a
  * coarse map while the current tiles load. 0 loads only the current tiles.
+ */
+/**
+ * maplibre_native_ffi_map_tile_options_get_prefetch_zoom_delta: (get-property prefetch-zoom-delta)
+ *
+ * Gets `MaplibreNativeFfiMapTileOptions:prefetch-zoom-delta`.
  *
  * Returns: the value
  */
 guint32 maplibre_native_ffi_map_tile_options_get_prefetch_zoom_delta(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_tile_options_has_prefetch_zoom_delta:
  *
- * Whether the value sets `maplibre_native_ffi_map_tile_options_set_prefetch_zoom_delta`.
+ * Whether `MaplibreNativeFfiMapTileOptions:prefetch-zoom-delta` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_tile_options_has_prefetch_zoom_delta(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_set_prefetch_zoom_delta:
+ * maplibre_native_ffi_map_tile_options_set_prefetch_zoom_delta: (set-property prefetch-zoom-delta)
  *
- * How many zoom levels lower the map also loads tiles for, so it can show a
- * coarse map while the current tiles load. 0 loads only the current tiles.
+ * Sets `MaplibreNativeFfiMapTileOptions:prefetch-zoom-delta`.
  */
 void maplibre_native_ffi_map_tile_options_set_prefetch_zoom_delta(
   MaplibreNativeFfiMapTileOptions* self, guint32 value
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_get_lod_min_radius:
+ * MaplibreNativeFfiMapTileOptions:lod-min-radius: (setter set_lod_min_radius) (getter get_lod_min_radius)
  *
  * The radius around the view point, in tiles, that keeps full detail.
+ */
+/**
+ * maplibre_native_ffi_map_tile_options_get_lod_min_radius: (get-property lod-min-radius)
+ *
+ * Gets `MaplibreNativeFfiMapTileOptions:lod-min-radius`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_map_tile_options_get_lod_min_radius(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_tile_options_has_lod_min_radius:
  *
- * Whether the value sets `maplibre_native_ffi_map_tile_options_set_lod_min_radius`.
+ * Whether `MaplibreNativeFfiMapTileOptions:lod-min-radius` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_tile_options_has_lod_min_radius(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_set_lod_min_radius:
+ * maplibre_native_ffi_map_tile_options_set_lod_min_radius: (set-property lod-min-radius)
  *
- * The radius around the view point, in tiles, that keeps full detail.
+ * Sets `MaplibreNativeFfiMapTileOptions:lod-min-radius`.
  */
 void maplibre_native_ffi_map_tile_options_set_lod_min_radius(
   MaplibreNativeFfiMapTileOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_get_lod_scale:
+ * MaplibreNativeFfiMapTileOptions:lod-scale: (setter set_lod_scale) (getter get_lod_scale)
  *
  * Scales the distance to the view point. Above 1 lowers the detail.
+ */
+/**
+ * maplibre_native_ffi_map_tile_options_get_lod_scale: (get-property lod-scale)
+ *
+ * Gets `MaplibreNativeFfiMapTileOptions:lod-scale`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_map_tile_options_get_lod_scale(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_tile_options_has_lod_scale:
  *
- * Whether the value sets `maplibre_native_ffi_map_tile_options_set_lod_scale`.
+ * Whether `MaplibreNativeFfiMapTileOptions:lod-scale` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_tile_options_has_lod_scale(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_set_lod_scale:
+ * maplibre_native_ffi_map_tile_options_set_lod_scale: (set-property lod-scale)
  *
- * Scales the distance to the view point. Above 1 lowers the detail.
+ * Sets `MaplibreNativeFfiMapTileOptions:lod-scale`.
  */
 void maplibre_native_ffi_map_tile_options_set_lod_scale(
   MaplibreNativeFfiMapTileOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_get_lod_pitch_threshold:
+ * MaplibreNativeFfiMapTileOptions:lod-pitch-threshold: (setter set_lod_pitch_threshold) (getter get_lod_pitch_threshold)
  *
  * The pitch, in degrees, above which the map lowers the detail.
+ */
+/**
+ * maplibre_native_ffi_map_tile_options_get_lod_pitch_threshold: (get-property lod-pitch-threshold)
+ *
+ * Gets `MaplibreNativeFfiMapTileOptions:lod-pitch-threshold`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_map_tile_options_get_lod_pitch_threshold(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_tile_options_has_lod_pitch_threshold:
  *
- * Whether the value sets `maplibre_native_ffi_map_tile_options_set_lod_pitch_threshold`.
+ * Whether `MaplibreNativeFfiMapTileOptions:lod-pitch-threshold` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_tile_options_has_lod_pitch_threshold(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_set_lod_pitch_threshold:
+ * maplibre_native_ffi_map_tile_options_set_lod_pitch_threshold: (set-property lod-pitch-threshold)
  *
- * The pitch, in degrees, above which the map lowers the detail.
+ * Sets `MaplibreNativeFfiMapTileOptions:lod-pitch-threshold`.
  */
 void maplibre_native_ffi_map_tile_options_set_lod_pitch_threshold(
   MaplibreNativeFfiMapTileOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_get_lod_zoom_shift:
+ * MaplibreNativeFfiMapTileOptions:lod-zoom-shift: (setter set_lod_zoom_shift) (getter get_lod_zoom_shift)
  *
  * Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
+ */
+/**
+ * maplibre_native_ffi_map_tile_options_get_lod_zoom_shift: (get-property lod-zoom-shift)
+ *
+ * Gets `MaplibreNativeFfiMapTileOptions:lod-zoom-shift`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_map_tile_options_get_lod_zoom_shift(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_tile_options_has_lod_zoom_shift:
  *
- * Whether the value sets `maplibre_native_ffi_map_tile_options_set_lod_zoom_shift`.
+ * Whether `MaplibreNativeFfiMapTileOptions:lod-zoom-shift` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_tile_options_has_lod_zoom_shift(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_set_lod_zoom_shift:
+ * maplibre_native_ffi_map_tile_options_set_lod_zoom_shift: (set-property lod-zoom-shift)
  *
- * Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
+ * Sets `MaplibreNativeFfiMapTileOptions:lod-zoom-shift`.
  */
 void maplibre_native_ffi_map_tile_options_set_lod_zoom_shift(
   MaplibreNativeFfiMapTileOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_get_lod_mode:
+ * MaplibreNativeFfiMapTileOptions:lod-mode: (setter set_lod_mode) (getter get_lod_mode)
  *
  * `MAPLIBRE_NATIVE_FFI_TILE_LOD_MODE_DISTANCE` ignores `lod_min_radius`.
+ */
+/**
+ * maplibre_native_ffi_map_tile_options_get_lod_mode: (get-property lod-mode)
+ *
+ * Gets `MaplibreNativeFfiMapTileOptions:lod-mode`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiTileLodMode maplibre_native_ffi_map_tile_options_get_lod_mode(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_tile_options_has_lod_mode:
  *
- * Whether the value sets `maplibre_native_ffi_map_tile_options_set_lod_mode`.
+ * Whether `MaplibreNativeFfiMapTileOptions:lod-mode` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_tile_options_has_lod_mode(
-  const MaplibreNativeFfiMapTileOptions* self
+  MaplibreNativeFfiMapTileOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_tile_options_set_lod_mode:
+ * maplibre_native_ffi_map_tile_options_set_lod_mode: (set-property lod-mode)
  *
- * `MAPLIBRE_NATIVE_FFI_TILE_LOD_MODE_DISTANCE` ignores `lod_min_radius`.
+ * Sets `MaplibreNativeFfiMapTileOptions:lod-mode`.
  */
 void maplibre_native_ffi_map_tile_options_set_lod_mode(
   MaplibreNativeFfiMapTileOptions* self, MaplibreNativeFfiTileLodMode value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiMapTileOptions, maplibre_native_ffi_map_tile_options_free
-)
 
 /**
  * MaplibreNativeFfiMapViewportOptions:
  *
  * How the map orients and constrains its view.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_map_viewport_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_map_viewport_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_VIEWPORT_OPTIONS \
-  (maplibre_native_ffi_map_viewport_options_get_type())
-
 /**
  * maplibre_native_ffi_map_viewport_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiMapViewportOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiMapViewportOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -6508,54 +6583,37 @@ MaplibreNativeFfiMapViewportOptions*
 maplibre_native_ffi_map_viewport_options_new(void);
 
 /**
- * maplibre_native_ffi_map_viewport_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiMapViewportOptions*
-maplibre_native_ffi_map_viewport_options_copy(
-  const MaplibreNativeFfiMapViewportOptions* self
-);
-
-/**
- * maplibre_native_ffi_map_viewport_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_map_viewport_options_free(
-  MaplibreNativeFfiMapViewportOptions* self
-);
-
-/**
- * maplibre_native_ffi_map_viewport_options_get_north_orientation:
+ * MaplibreNativeFfiMapViewportOptions:north-orientation: (setter set_north_orientation) (getter get_north_orientation)
  *
  * The `north_orientation` member.
+ */
+/**
+ * maplibre_native_ffi_map_viewport_options_get_north_orientation: (get-property north-orientation)
+ *
+ * Gets `MaplibreNativeFfiMapViewportOptions:north-orientation`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiNorthOrientation
 maplibre_native_ffi_map_viewport_options_get_north_orientation(
-  const MaplibreNativeFfiMapViewportOptions* self
+  MaplibreNativeFfiMapViewportOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_viewport_options_has_north_orientation:
  *
- * Whether the value sets `maplibre_native_ffi_map_viewport_options_set_north_orientation`.
+ * Whether `MaplibreNativeFfiMapViewportOptions:north-orientation` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_viewport_options_has_north_orientation(
-  const MaplibreNativeFfiMapViewportOptions* self
+  MaplibreNativeFfiMapViewportOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_viewport_options_set_north_orientation:
+ * maplibre_native_ffi_map_viewport_options_set_north_orientation: (set-property north-orientation)
  *
- * The `north_orientation` member.
+ * Sets `MaplibreNativeFfiMapViewportOptions:north-orientation`.
  */
 void maplibre_native_ffi_map_viewport_options_set_north_orientation(
   MaplibreNativeFfiMapViewportOptions* self,
@@ -6563,32 +6621,37 @@ void maplibre_native_ffi_map_viewport_options_set_north_orientation(
 );
 
 /**
- * maplibre_native_ffi_map_viewport_options_get_constrain_mode:
+ * MaplibreNativeFfiMapViewportOptions:constrain-mode: (setter set_constrain_mode) (getter get_constrain_mode)
  *
  * The `constrain_mode` member.
+ */
+/**
+ * maplibre_native_ffi_map_viewport_options_get_constrain_mode: (get-property constrain-mode)
+ *
+ * Gets `MaplibreNativeFfiMapViewportOptions:constrain-mode`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiConstrainMode
 maplibre_native_ffi_map_viewport_options_get_constrain_mode(
-  const MaplibreNativeFfiMapViewportOptions* self
+  MaplibreNativeFfiMapViewportOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_viewport_options_has_constrain_mode:
  *
- * Whether the value sets `maplibre_native_ffi_map_viewport_options_set_constrain_mode`.
+ * Whether `MaplibreNativeFfiMapViewportOptions:constrain-mode` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_viewport_options_has_constrain_mode(
-  const MaplibreNativeFfiMapViewportOptions* self
+  MaplibreNativeFfiMapViewportOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_viewport_options_set_constrain_mode:
+ * maplibre_native_ffi_map_viewport_options_set_constrain_mode: (set-property constrain-mode)
  *
- * The `constrain_mode` member.
+ * Sets `MaplibreNativeFfiMapViewportOptions:constrain-mode`.
  */
 void maplibre_native_ffi_map_viewport_options_set_constrain_mode(
   MaplibreNativeFfiMapViewportOptions* self,
@@ -6596,75 +6659,80 @@ void maplibre_native_ffi_map_viewport_options_set_constrain_mode(
 );
 
 /**
- * maplibre_native_ffi_map_viewport_options_get_viewport_mode:
+ * MaplibreNativeFfiMapViewportOptions:viewport-mode: (setter set_viewport_mode) (getter get_viewport_mode)
  *
  * The `viewport_mode` member.
+ */
+/**
+ * maplibre_native_ffi_map_viewport_options_get_viewport_mode: (get-property viewport-mode)
+ *
+ * Gets `MaplibreNativeFfiMapViewportOptions:viewport-mode`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiViewportMode
 maplibre_native_ffi_map_viewport_options_get_viewport_mode(
-  const MaplibreNativeFfiMapViewportOptions* self
+  MaplibreNativeFfiMapViewportOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_viewport_options_has_viewport_mode:
  *
- * Whether the value sets `maplibre_native_ffi_map_viewport_options_set_viewport_mode`.
+ * Whether `MaplibreNativeFfiMapViewportOptions:viewport-mode` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_viewport_options_has_viewport_mode(
-  const MaplibreNativeFfiMapViewportOptions* self
+  MaplibreNativeFfiMapViewportOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_viewport_options_set_viewport_mode:
+ * maplibre_native_ffi_map_viewport_options_set_viewport_mode: (set-property viewport-mode)
  *
- * The `viewport_mode` member.
+ * Sets `MaplibreNativeFfiMapViewportOptions:viewport-mode`.
  */
 void maplibre_native_ffi_map_viewport_options_set_viewport_mode(
   MaplibreNativeFfiMapViewportOptions* self, MaplibreNativeFfiViewportMode value
 );
 
 /**
- * maplibre_native_ffi_map_viewport_options_get_frustum_offset:
+ * MaplibreNativeFfiMapViewportOptions:frustum-offset: (setter set_frustum_offset) (getter get_frustum_offset)
  *
  * The `frustum_offset` member.
+ */
+/**
+ * maplibre_native_ffi_map_viewport_options_get_frustum_offset: (get-property frustum-offset)
+ *
+ * Gets `MaplibreNativeFfiMapViewportOptions:frustum-offset`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiEdgeInsets*
 maplibre_native_ffi_map_viewport_options_get_frustum_offset(
-  const MaplibreNativeFfiMapViewportOptions* self
+  MaplibreNativeFfiMapViewportOptions* self
 );
 
 /**
  * maplibre_native_ffi_map_viewport_options_has_frustum_offset:
  *
- * Whether the value sets `maplibre_native_ffi_map_viewport_options_set_frustum_offset`.
+ * Whether `MaplibreNativeFfiMapViewportOptions:frustum-offset` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_map_viewport_options_has_frustum_offset(
-  const MaplibreNativeFfiMapViewportOptions* self
+  MaplibreNativeFfiMapViewportOptions* self
 );
 
 /**
- * maplibre_native_ffi_map_viewport_options_set_frustum_offset:
+ * maplibre_native_ffi_map_viewport_options_set_frustum_offset: (set-property frustum-offset)
  * @value: the value
  *
- * The `frustum_offset` member.
+ * Sets `MaplibreNativeFfiMapViewportOptions:frustum-offset`.
  */
 void maplibre_native_ffi_map_viewport_options_set_frustum_offset(
   MaplibreNativeFfiMapViewportOptions* self,
   const MaplibreNativeFfiEdgeInsets* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiMapViewportOptions,
-  maplibre_native_ffi_map_viewport_options_free
-)
 
 /**
  * MaplibreNativeFfiMetalBorrowedTexture:
@@ -6713,7 +6781,7 @@ void maplibre_native_ffi_metal_borrowed_texture_free(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_get_texture:
  *
- * Your MTLTexture.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_set_texture` sets.
  *
  * Returns: the value
  */
@@ -6795,7 +6863,7 @@ void maplibre_native_ffi_metal_borrowed_texture_descriptor_free(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -6818,7 +6886,7 @@ void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_physical_width:
  *
- * The `physical_width` member.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_descriptor_set_physical_width` sets.
  *
  * Returns: the value
  */
@@ -6839,7 +6907,7 @@ void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_physical_width(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_physical_height:
  *
- * The `physical_height` member.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_descriptor_set_physical_height` sets.
  *
  * Returns: the value
  */
@@ -6860,7 +6928,7 @@ void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_physical_height(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_textures:
  *
- * The `textures` member.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_descriptor_set_textures` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiMetalBorrowedTexture): the items
  */
@@ -6882,9 +6950,7 @@ void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_textures(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_command_queue:
  *
- * Your MTLCommandQueue on the textures' device, or null for a queue of the
- * session's own. With your queue, frames can use
- * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_QUEUE_ORDER`.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_descriptor_set_command_queue` sets.
  *
  * Returns: the value
  */
@@ -6964,7 +7030,7 @@ void maplibre_native_ffi_metal_borrowed_texture_replacement_free(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_replacement_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_replacement_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -6987,7 +7053,7 @@ void maplibre_native_ffi_metal_borrowed_texture_replacement_set_logical_size(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_replacement_get_physical_width:
  *
- * The `physical_width` member.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_replacement_set_physical_width` sets.
  *
  * Returns: the value
  */
@@ -7008,7 +7074,7 @@ void maplibre_native_ffi_metal_borrowed_texture_replacement_set_physical_width(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_replacement_get_physical_height:
  *
- * The `physical_height` member.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_replacement_set_physical_height` sets.
  *
  * Returns: the value
  */
@@ -7029,7 +7095,7 @@ void maplibre_native_ffi_metal_borrowed_texture_replacement_set_physical_height(
 /**
  * maplibre_native_ffi_metal_borrowed_texture_replacement_get_textures:
  *
- * The `textures` member.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_replacement_set_textures` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiMetalBorrowedTexture): the items
  */
@@ -7105,7 +7171,7 @@ void maplibre_native_ffi_metal_surface_descriptor_free(
 /**
  * maplibre_native_ffi_metal_surface_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_metal_surface_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -7128,7 +7194,7 @@ void maplibre_native_ffi_metal_surface_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_metal_surface_descriptor_get_context:
  *
- * The MTLDevice to render with. A null device picks the system's default.
+ * Gets the value that `maplibre_native_ffi_metal_surface_descriptor_set_context` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -7151,7 +7217,7 @@ void maplibre_native_ffi_metal_surface_descriptor_set_context(
 /**
  * maplibre_native_ffi_metal_surface_descriptor_get_layer:
  *
- * Your CAMetalLayer.
+ * Gets the value that `maplibre_native_ffi_metal_surface_descriptor_set_layer` sets.
  *
  * Returns: the value
  */
@@ -7225,7 +7291,7 @@ void maplibre_native_ffi_metal_surface_replacement_free(
 /**
  * maplibre_native_ffi_metal_surface_replacement_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_metal_surface_replacement_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -7248,7 +7314,7 @@ void maplibre_native_ffi_metal_surface_replacement_set_logical_size(
 /**
  * maplibre_native_ffi_metal_surface_replacement_get_layer:
  *
- * Your CAMetalLayer.
+ * Gets the value that `maplibre_native_ffi_metal_surface_replacement_set_layer` sets.
  *
  * Returns: the value
  */
@@ -7449,7 +7515,7 @@ void maplibre_native_ffi_offline_geometry_region_definition_free(
 /**
  * maplibre_native_ffi_offline_geometry_region_definition_get_style_url:
  *
- * The `style_url` member.
+ * Gets the value that `maplibre_native_ffi_offline_geometry_region_definition_set_style_url` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -7471,7 +7537,7 @@ void maplibre_native_ffi_offline_geometry_region_definition_set_style_url(
 /**
  * maplibre_native_ffi_offline_geometry_region_definition_get_geometry:
  *
- * The `geometry` member.
+ * Gets the value that `maplibre_native_ffi_offline_geometry_region_definition_set_geometry` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -7492,7 +7558,7 @@ void maplibre_native_ffi_offline_geometry_region_definition_set_geometry(
 /**
  * maplibre_native_ffi_offline_geometry_region_definition_get_min_zoom:
  *
- * The `min_zoom` member.
+ * Gets the value that `maplibre_native_ffi_offline_geometry_region_definition_set_min_zoom` sets.
  *
  * Returns: the value
  */
@@ -7512,7 +7578,7 @@ void maplibre_native_ffi_offline_geometry_region_definition_set_min_zoom(
 /**
  * maplibre_native_ffi_offline_geometry_region_definition_get_max_zoom:
  *
- * The `max_zoom` member.
+ * Gets the value that `maplibre_native_ffi_offline_geometry_region_definition_set_max_zoom` sets.
  *
  * Returns: the value
  */
@@ -7532,7 +7598,7 @@ void maplibre_native_ffi_offline_geometry_region_definition_set_max_zoom(
 /**
  * maplibre_native_ffi_offline_geometry_region_definition_get_pixel_ratio:
  *
- * The `pixel_ratio` member.
+ * Gets the value that `maplibre_native_ffi_offline_geometry_region_definition_set_pixel_ratio` sets.
  *
  * Returns: the value
  */
@@ -7552,7 +7618,7 @@ void maplibre_native_ffi_offline_geometry_region_definition_set_pixel_ratio(
 /**
  * maplibre_native_ffi_offline_geometry_region_definition_get_include_ideographs:
  *
- * The `include_ideographs` member.
+ * Gets the value that `maplibre_native_ffi_offline_geometry_region_definition_set_include_ideographs` sets.
  *
  * Returns: the value
  */
@@ -7624,8 +7690,7 @@ void maplibre_native_ffi_offline_tile_pyramid_region_definition_free(
 /**
  * maplibre_native_ffi_offline_tile_pyramid_region_definition_get_style_url:
  *
- * The style whose resources the region holds. Maps use the region when they
- * load the same style URL.
+ * Gets the value that `maplibre_native_ffi_offline_tile_pyramid_region_definition_set_style_url` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -7648,7 +7713,7 @@ void maplibre_native_ffi_offline_tile_pyramid_region_definition_set_style_url(
 /**
  * maplibre_native_ffi_offline_tile_pyramid_region_definition_get_bounds:
  *
- * The `bounds` member.
+ * Gets the value that `maplibre_native_ffi_offline_tile_pyramid_region_definition_set_bounds` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -7671,7 +7736,7 @@ void maplibre_native_ffi_offline_tile_pyramid_region_definition_set_bounds(
 /**
  * maplibre_native_ffi_offline_tile_pyramid_region_definition_get_min_zoom:
  *
- * The `min_zoom` member.
+ * Gets the value that `maplibre_native_ffi_offline_tile_pyramid_region_definition_set_min_zoom` sets.
  *
  * Returns: the value
  */
@@ -7691,7 +7756,7 @@ void maplibre_native_ffi_offline_tile_pyramid_region_definition_set_min_zoom(
 /**
  * maplibre_native_ffi_offline_tile_pyramid_region_definition_get_max_zoom:
  *
- * INFINITY covers every zoom level that the style's sources have.
+ * Gets the value that `maplibre_native_ffi_offline_tile_pyramid_region_definition_set_max_zoom` sets.
  *
  * Returns: the value
  */
@@ -7711,7 +7776,7 @@ void maplibre_native_ffi_offline_tile_pyramid_region_definition_set_max_zoom(
 /**
  * maplibre_native_ffi_offline_tile_pyramid_region_definition_get_pixel_ratio:
  *
- * The pixel ratio of the images to download, such as 2 for dense screens.
+ * Gets the value that `maplibre_native_ffi_offline_tile_pyramid_region_definition_set_pixel_ratio` sets.
  *
  * Returns: the value
  */
@@ -7732,7 +7797,7 @@ void maplibre_native_ffi_offline_tile_pyramid_region_definition_set_pixel_ratio(
 /**
  * maplibre_native_ffi_offline_tile_pyramid_region_definition_get_include_ideographs:
  *
- * Whether the region holds the glyphs of CJK ideographs.
+ * Gets the value that `maplibre_native_ffi_offline_tile_pyramid_region_definition_set_include_ideographs` sets.
  *
  * Returns: the value
  */
@@ -8017,17 +8082,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Options for `maplibre_native_ffi_offscreen_device_create()`.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_offscreen_device_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
  */
-GType maplibre_native_ffi_offscreen_device_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_OFFSCREEN_DEVICE_OPTIONS \
-  (maplibre_native_ffi_offscreen_device_options_get_type())
-
 /**
  * maplibre_native_ffi_offscreen_device_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiOffscreenDeviceOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiOffscreenDeviceOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -8035,93 +8099,80 @@ MaplibreNativeFfiOffscreenDeviceOptions*
 maplibre_native_ffi_offscreen_device_options_new(void);
 
 /**
- * maplibre_native_ffi_offscreen_device_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiOffscreenDeviceOptions*
-maplibre_native_ffi_offscreen_device_options_copy(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_offscreen_device_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_offscreen_device_options_free(
-  MaplibreNativeFfiOffscreenDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_offscreen_device_options_get_adapter_index:
+ * MaplibreNativeFfiOffscreenDeviceOptions:adapter-index: (setter set_adapter_index) (getter get_adapter_index)
  *
  * The GPU to use, as an index into the platform's list of GPUs.
+ */
+/**
+ * maplibre_native_ffi_offscreen_device_options_get_adapter_index: (get-property adapter-index)
+ *
+ * Gets `MaplibreNativeFfiOffscreenDeviceOptions:adapter-index`.
  *
  * Returns: the value
  */
 guint32 maplibre_native_ffi_offscreen_device_options_get_adapter_index(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self
+  MaplibreNativeFfiOffscreenDeviceOptions* self
 );
 
 /**
  * maplibre_native_ffi_offscreen_device_options_has_adapter_index:
  *
- * Whether the value sets `maplibre_native_ffi_offscreen_device_options_set_adapter_index`.
+ * Whether `MaplibreNativeFfiOffscreenDeviceOptions:adapter-index` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_offscreen_device_options_has_adapter_index(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self
+  MaplibreNativeFfiOffscreenDeviceOptions* self
 );
 
 /**
- * maplibre_native_ffi_offscreen_device_options_set_adapter_index:
+ * maplibre_native_ffi_offscreen_device_options_set_adapter_index: (set-property adapter-index)
  *
- * The GPU to use, as an index into the platform's list of GPUs.
+ * Sets `MaplibreNativeFfiOffscreenDeviceOptions:adapter-index`.
  */
 void maplibre_native_ffi_offscreen_device_options_set_adapter_index(
   MaplibreNativeFfiOffscreenDeviceOptions* self, guint32 value
 );
 
 /**
- * maplibre_native_ffi_offscreen_device_options_get_single_context:
+ * MaplibreNativeFfiOffscreenDeviceOptions:single-context: (setter set_single_context) (getter get_single_context)
  *
  * Whether the device's sessions take turns in one OpenGL context instead of
  * having one each. Only an EGL device reads it.
+ */
+/**
+ * maplibre_native_ffi_offscreen_device_options_get_single_context: (get-property single-context)
+ *
+ * Gets `MaplibreNativeFfiOffscreenDeviceOptions:single-context`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_offscreen_device_options_get_single_context(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self
+  MaplibreNativeFfiOffscreenDeviceOptions* self
 );
 
 /**
  * maplibre_native_ffi_offscreen_device_options_has_single_context:
  *
- * Whether the value sets `maplibre_native_ffi_offscreen_device_options_set_single_context`.
+ * Whether `MaplibreNativeFfiOffscreenDeviceOptions:single-context` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_offscreen_device_options_has_single_context(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self
+  MaplibreNativeFfiOffscreenDeviceOptions* self
 );
 
 /**
- * maplibre_native_ffi_offscreen_device_options_set_single_context:
+ * maplibre_native_ffi_offscreen_device_options_set_single_context: (set-property single-context)
  *
- * Whether the device's sessions take turns in one OpenGL context instead of
- * having one each. Only an EGL device reads it.
+ * Sets `MaplibreNativeFfiOffscreenDeviceOptions:single-context`.
  */
 void maplibre_native_ffi_offscreen_device_options_set_single_context(
   MaplibreNativeFfiOffscreenDeviceOptions* self, gboolean value
 );
 
 /**
- * maplibre_native_ffi_offscreen_device_options_get_client_api:
+ * MaplibreNativeFfiOffscreenDeviceOptions:client-api: (setter set_client_api) (getter get_client_api)
  *
  * The OpenGL API that the device's sessions render with. An EGL device defaults
  * to `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES`, and takes
@@ -8129,44 +8180,39 @@ void maplibre_native_ffi_offscreen_device_options_set_single_context(
  * device takes only `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GL`, its default,
  * and a WebGL device only `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES`, its
  * default. Other devices take neither.
+ */
+/**
+ * maplibre_native_ffi_offscreen_device_options_get_client_api: (get-property client-api)
+ *
+ * Gets `MaplibreNativeFfiOffscreenDeviceOptions:client-api`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiOpenGlClientApi
 maplibre_native_ffi_offscreen_device_options_get_client_api(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self
+  MaplibreNativeFfiOffscreenDeviceOptions* self
 );
 
 /**
  * maplibre_native_ffi_offscreen_device_options_has_client_api:
  *
- * Whether the value sets `maplibre_native_ffi_offscreen_device_options_set_client_api`.
+ * Whether `MaplibreNativeFfiOffscreenDeviceOptions:client-api` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_offscreen_device_options_has_client_api(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self
+  MaplibreNativeFfiOffscreenDeviceOptions* self
 );
 
 /**
- * maplibre_native_ffi_offscreen_device_options_set_client_api:
+ * maplibre_native_ffi_offscreen_device_options_set_client_api: (set-property client-api)
  *
- * The OpenGL API that the device's sessions render with. An EGL device defaults
- * to `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES`, and takes
- * `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GL` too on Linux and FreeBSD. A WGL
- * device takes only `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GL`, its default,
- * and a WebGL device only `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES`, its
- * default. Other devices take neither.
+ * Sets `MaplibreNativeFfiOffscreenDeviceOptions:client-api`.
  */
 void maplibre_native_ffi_offscreen_device_options_set_client_api(
   MaplibreNativeFfiOffscreenDeviceOptions* self,
   MaplibreNativeFfiOpenGlClientApi value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiOffscreenDeviceOptions,
-  maplibre_native_ffi_offscreen_device_options_free
-)
 
 GType maplibre_native_ffi_open_gl_borrowed_texture_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURE \
@@ -8246,7 +8292,7 @@ void maplibre_native_ffi_wgl_context_descriptor_free(
 /**
  * maplibre_native_ffi_wgl_context_descriptor_get_device_context:
  *
- * An `HDC`.
+ * Gets the value that `maplibre_native_ffi_wgl_context_descriptor_set_device_context` sets.
  *
  * Returns: the value
  */
@@ -8266,7 +8312,7 @@ void maplibre_native_ffi_wgl_context_descriptor_set_device_context(
 /**
  * maplibre_native_ffi_wgl_context_descriptor_get_share_context:
  *
- * Your `HGLRC`, for a shared context.
+ * Gets the value that `maplibre_native_ffi_wgl_context_descriptor_set_share_context` sets.
  *
  * Returns: the value
  */
@@ -8286,7 +8332,7 @@ void maplibre_native_ffi_wgl_context_descriptor_set_share_context(
 /**
  * maplibre_native_ffi_wgl_context_descriptor_get_get_proc_address:
  *
- * Your `wglGetProcAddress`, or null to use the system's.
+ * Gets the value that `maplibre_native_ffi_wgl_context_descriptor_set_get_proc_address` sets.
  *
  * Returns: the value
  */
@@ -8355,7 +8401,7 @@ void maplibre_native_ffi_web_gl_context_descriptor_free(
 /**
  * maplibre_native_ffi_web_gl_context_descriptor_get_kind:
  *
- * The `kind` member.
+ * Gets the value that `maplibre_native_ffi_web_gl_context_descriptor_set_kind` sets.
  *
  * Returns: the value
  */
@@ -8377,7 +8423,7 @@ void maplibre_native_ffi_web_gl_context_descriptor_set_kind(
 /**
  * maplibre_native_ffi_web_gl_context_descriptor_get_context:
  *
- * Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
+ * Gets the value that `maplibre_native_ffi_web_gl_context_descriptor_set_context` sets.
  *
  * Returns: the value
  */
@@ -8397,7 +8443,7 @@ void maplibre_native_ffi_web_gl_context_descriptor_set_context(
 /**
  * maplibre_native_ffi_web_gl_context_descriptor_get_canvas_selector:
  *
- * The canvas's CSS selector, for a transferred canvas.
+ * Gets the value that `maplibre_native_ffi_web_gl_context_descriptor_set_canvas_selector` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -8621,7 +8667,7 @@ void maplibre_native_ffi_open_gl_context_descriptor_free(
 /**
  * maplibre_native_ffi_open_gl_context_descriptor_get_ownership:
  *
- * The `ownership` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_context_descriptor_set_ownership` sets.
  *
  * Returns: the value
  */
@@ -8643,7 +8689,7 @@ void maplibre_native_ffi_open_gl_context_descriptor_set_ownership(
 /**
  * maplibre_native_ffi_open_gl_context_descriptor_get_data:
  *
- * The `data` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_context_descriptor_set_data` sets.
  *
  * Returns: (transfer none) (nullable): the value
  */
@@ -8729,7 +8775,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_free(
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -8752,7 +8798,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_physical_width:
  *
- * The `physical_width` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_width` sets.
  *
  * Returns: the value
  */
@@ -8773,7 +8819,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_width(
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_physical_height:
  *
- * The `physical_height` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_height` sets.
  *
  * Returns: the value
  */
@@ -8794,7 +8840,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_height
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_context:
  *
- * The `context` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_context` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -8817,7 +8863,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_context(
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_textures:
  *
- * The `textures` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiOpenGlBorrowedTexture): the items
  */
@@ -8839,7 +8885,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures(
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_target:
  *
- * The textures' target. It must be GL_TEXTURE_2D.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_target` sets.
  *
  * Returns: the value
  */
@@ -8916,7 +8962,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_replacement_free(
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -8939,7 +8985,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_logical_size(
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_physical_width:
  *
- * The `physical_width` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_physical_width` sets.
  *
  * Returns: the value
  */
@@ -8960,7 +9006,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_physical_width
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_physical_height:
  *
- * The `physical_height` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_physical_height` sets.
  *
  * Returns: the value
  */
@@ -8981,7 +9027,7 @@ void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_physical_heigh
 /**
  * maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_textures:
  *
- * The `textures` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_textures` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiOpenGlBorrowedTexture): the items
  */
@@ -9060,7 +9106,7 @@ void maplibre_native_ffi_open_gl_surface_descriptor_free(
 /**
  * maplibre_native_ffi_open_gl_surface_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_surface_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -9083,7 +9129,7 @@ void maplibre_native_ffi_open_gl_surface_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_open_gl_surface_descriptor_get_context:
  *
- * The `context` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_surface_descriptor_set_context` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -9106,7 +9152,7 @@ void maplibre_native_ffi_open_gl_surface_descriptor_set_context(
 /**
  * maplibre_native_ffi_open_gl_surface_descriptor_get_surface:
  *
- * Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
+ * Gets the value that `maplibre_native_ffi_open_gl_surface_descriptor_set_surface` sets.
  *
  * Returns: the value
  */
@@ -9182,7 +9228,7 @@ void maplibre_native_ffi_open_gl_surface_replacement_free(
 /**
  * maplibre_native_ffi_open_gl_surface_replacement_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_open_gl_surface_replacement_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -9205,8 +9251,7 @@ void maplibre_native_ffi_open_gl_surface_replacement_set_logical_size(
 /**
  * maplibre_native_ffi_open_gl_surface_replacement_get_surface:
  *
- * Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
- * leave it null.
+ * Gets the value that `maplibre_native_ffi_open_gl_surface_replacement_set_surface` sets.
  *
  * Returns: the value
  */
@@ -9307,7 +9352,7 @@ void maplibre_native_ffi_premultiplied_rgba8_image_free(
 /**
  * maplibre_native_ffi_premultiplied_rgba8_image_get_width:
  *
- * The `width` member.
+ * Gets the value that `maplibre_native_ffi_premultiplied_rgba8_image_set_width` sets.
  *
  * Returns: the value
  */
@@ -9327,7 +9372,7 @@ void maplibre_native_ffi_premultiplied_rgba8_image_set_width(
 /**
  * maplibre_native_ffi_premultiplied_rgba8_image_get_height:
  *
- * The `height` member.
+ * Gets the value that `maplibre_native_ffi_premultiplied_rgba8_image_set_height` sets.
  *
  * Returns: the value
  */
@@ -9347,8 +9392,7 @@ void maplibre_native_ffi_premultiplied_rgba8_image_set_height(
 /**
  * maplibre_native_ffi_premultiplied_rgba8_image_get_stride:
  *
- * The number of bytes from the start of one row to the start of the next, at
- * least `width` \* 4.
+ * Gets the value that `maplibre_native_ffi_premultiplied_rgba8_image_set_stride` sets.
  *
  * Returns: the value
  */
@@ -9369,7 +9413,7 @@ void maplibre_native_ffi_premultiplied_rgba8_image_set_stride(
 /**
  * maplibre_native_ffi_premultiplied_rgba8_image_get_pixels:
  *
- * The rows of pixels, `stride` bytes apart, from the top row down.
+ * Gets the value that `maplibre_native_ffi_premultiplied_rgba8_image_set_pixels` sets.
  *
  * Returns: (transfer none) (nullable): the bytes
  */
@@ -9426,17 +9470,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Settings that skew the map or draw it without perspective.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_projection_mode_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-GType maplibre_native_ffi_projection_mode_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_MODE_OPTIONS \
-  (maplibre_native_ffi_projection_mode_options_get_type())
-
 /**
  * maplibre_native_ffi_projection_mode_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiProjectionModeOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiProjectionModeOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -9444,124 +9487,112 @@ MaplibreNativeFfiProjectionModeOptions*
 maplibre_native_ffi_projection_mode_options_new(void);
 
 /**
- * maplibre_native_ffi_projection_mode_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiProjectionModeOptions*
-maplibre_native_ffi_projection_mode_options_copy(
-  const MaplibreNativeFfiProjectionModeOptions* self
-);
-
-/**
- * maplibre_native_ffi_projection_mode_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_projection_mode_options_free(
-  MaplibreNativeFfiProjectionModeOptions* self
-);
-
-/**
- * maplibre_native_ffi_projection_mode_options_get_axonometric:
+ * MaplibreNativeFfiProjectionModeOptions:axonometric: (setter set_axonometric) (getter get_axonometric)
  *
  * Whether the map draws without perspective.
+ */
+/**
+ * maplibre_native_ffi_projection_mode_options_get_axonometric: (get-property axonometric)
+ *
+ * Gets `MaplibreNativeFfiProjectionModeOptions:axonometric`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_projection_mode_options_get_axonometric(
-  const MaplibreNativeFfiProjectionModeOptions* self
+  MaplibreNativeFfiProjectionModeOptions* self
 );
 
 /**
  * maplibre_native_ffi_projection_mode_options_has_axonometric:
  *
- * Whether the value sets `maplibre_native_ffi_projection_mode_options_set_axonometric`.
+ * Whether `MaplibreNativeFfiProjectionModeOptions:axonometric` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_projection_mode_options_has_axonometric(
-  const MaplibreNativeFfiProjectionModeOptions* self
+  MaplibreNativeFfiProjectionModeOptions* self
 );
 
 /**
- * maplibre_native_ffi_projection_mode_options_set_axonometric:
+ * maplibre_native_ffi_projection_mode_options_set_axonometric: (set-property axonometric)
  *
- * Whether the map draws without perspective.
+ * Sets `MaplibreNativeFfiProjectionModeOptions:axonometric`.
  */
 void maplibre_native_ffi_projection_mode_options_set_axonometric(
   MaplibreNativeFfiProjectionModeOptions* self, gboolean value
 );
 
 /**
- * maplibre_native_ffi_projection_mode_options_get_x_skew:
+ * MaplibreNativeFfiProjectionModeOptions:x-skew: (setter set_x_skew) (getter get_x_skew)
  *
  * The `x_skew` member.
+ */
+/**
+ * maplibre_native_ffi_projection_mode_options_get_x_skew: (get-property x-skew)
+ *
+ * Gets `MaplibreNativeFfiProjectionModeOptions:x-skew`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_projection_mode_options_get_x_skew(
-  const MaplibreNativeFfiProjectionModeOptions* self
+  MaplibreNativeFfiProjectionModeOptions* self
 );
 
 /**
  * maplibre_native_ffi_projection_mode_options_has_x_skew:
  *
- * Whether the value sets `maplibre_native_ffi_projection_mode_options_set_x_skew`.
+ * Whether `MaplibreNativeFfiProjectionModeOptions:x-skew` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_projection_mode_options_has_x_skew(
-  const MaplibreNativeFfiProjectionModeOptions* self
+  MaplibreNativeFfiProjectionModeOptions* self
 );
 
 /**
- * maplibre_native_ffi_projection_mode_options_set_x_skew:
+ * maplibre_native_ffi_projection_mode_options_set_x_skew: (set-property x-skew)
  *
- * The `x_skew` member.
+ * Sets `MaplibreNativeFfiProjectionModeOptions:x-skew`.
  */
 void maplibre_native_ffi_projection_mode_options_set_x_skew(
   MaplibreNativeFfiProjectionModeOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_projection_mode_options_get_y_skew:
+ * MaplibreNativeFfiProjectionModeOptions:y-skew: (setter set_y_skew) (getter get_y_skew)
  *
  * The `y_skew` member.
+ */
+/**
+ * maplibre_native_ffi_projection_mode_options_get_y_skew: (get-property y-skew)
+ *
+ * Gets `MaplibreNativeFfiProjectionModeOptions:y-skew`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_projection_mode_options_get_y_skew(
-  const MaplibreNativeFfiProjectionModeOptions* self
+  MaplibreNativeFfiProjectionModeOptions* self
 );
 
 /**
  * maplibre_native_ffi_projection_mode_options_has_y_skew:
  *
- * Whether the value sets `maplibre_native_ffi_projection_mode_options_set_y_skew`.
+ * Whether `MaplibreNativeFfiProjectionModeOptions:y-skew` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_projection_mode_options_has_y_skew(
-  const MaplibreNativeFfiProjectionModeOptions* self
+  MaplibreNativeFfiProjectionModeOptions* self
 );
 
 /**
- * maplibre_native_ffi_projection_mode_options_set_y_skew:
+ * maplibre_native_ffi_projection_mode_options_set_y_skew: (set-property y-skew)
  *
- * The `y_skew` member.
+ * Sets `MaplibreNativeFfiProjectionModeOptions:y-skew`.
  */
 void maplibre_native_ffi_projection_mode_options_set_y_skew(
   MaplibreNativeFfiProjectionModeOptions* self, gdouble value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiProjectionModeOptions,
-  maplibre_native_ffi_projection_mode_options_free
-)
 
 /**
  * MaplibreNativeFfiQueueLock:
@@ -9818,20 +9849,7 @@ void maplibre_native_ffi_render_session_attach_options_free(
 /**
  * maplibre_native_ffi_render_session_attach_options_get_driver:
  *
- * The thread that runs the session's graphics work, which depends on the
- * target:
- *
- * - `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD` for a shared or
- *   dedicated EGL or WGL context, an existing WebGL context, or a browser's
- *   WebGPU device.
- * - `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER` for a transferred WebGL
- *   canvas, an Android, OpenHarmony, or Win32 window, a Wayland surface, a ring
- *   of Android hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces,
- *   or an offscreen session.
- * - Either one for another Metal or Vulkan target.
- *
- * An attach with another driver fails with
- * `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED`.
+ * Gets the value that `maplibre_native_ffi_render_session_attach_options_set_driver` sets.
  *
  * Returns: the value
  */
@@ -9866,9 +9884,7 @@ void maplibre_native_ffi_render_session_attach_options_set_driver(
 /**
  * maplibre_native_ffi_render_session_attach_options_get_producer_sync_kinds:
  *
- * The kinds of `MaplibreNativeFfiGpuSync` that you can wait on before you read
- * an acquired frame. The session uses one of them that its target supports.
- * Zero lets the session pick a kind that names no object to wait on.
+ * Gets the value that `maplibre_native_ffi_render_session_attach_options_set_producer_sync_kinds` sets.
  *
  * Returns: the value
  */
@@ -9892,9 +9908,7 @@ void maplibre_native_ffi_render_session_attach_options_set_producer_sync_kinds(
 /**
  * maplibre_native_ffi_render_session_attach_options_get_frame_wake:
  *
- * Called when frame results are waiting for
- * `maplibre_native_ffi_render_session_drain_frame_results()`. It isn't called
- * again until a drain takes them.
+ * Gets the value that `maplibre_native_ffi_render_session_attach_options_set_frame_wake` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -9919,9 +9933,7 @@ void maplibre_native_ffi_render_session_attach_options_set_frame_wake(
 /**
  * maplibre_native_ffi_render_session_attach_options_get_redraw_wake:
  *
- * Called when the session has something new to draw. Demand a frame at your
- * next display refresh. It isn't called again until you demand a frame, or
- * while the session has no target.
+ * Gets the value that `maplibre_native_ffi_render_session_attach_options_set_redraw_wake` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -9946,10 +9958,7 @@ void maplibre_native_ffi_render_session_attach_options_set_redraw_wake(
 /**
  * maplibre_native_ffi_render_session_attach_options_get_driver_work_wake:
  *
- * Called when a session driven by
- * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD` has work for
- * `maplibre_native_ffi_render_session_service_driver_work()`. It isn't called
- * again until a service runs.
+ * Gets the value that `maplibre_native_ffi_render_session_attach_options_set_driver_work_wake` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -9975,7 +9984,7 @@ void maplibre_native_ffi_render_session_attach_options_set_driver_work_wake(
 /**
  * maplibre_native_ffi_render_session_attach_options_get_queue_lock:
  *
- * Your lock on the Vulkan queue, when you submit to it yourself.
+ * Gets the value that `maplibre_native_ffi_render_session_attach_options_set_queue_lock` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -10172,19 +10181,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Options for a rendered feature query.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_rendered_feature_query_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
-GType maplibre_native_ffi_rendered_feature_query_options_get_type(
-  void
-) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_RENDERED_FEATURE_QUERY_OPTIONS \
-  (maplibre_native_ffi_rendered_feature_query_options_get_type())
-
 /**
  * maplibre_native_ffi_rendered_feature_query_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiRenderedFeatureQueryOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiRenderedFeatureQueryOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -10192,87 +10198,69 @@ MaplibreNativeFfiRenderedFeatureQueryOptions*
 maplibre_native_ffi_rendered_feature_query_options_new(void);
 
 /**
- * maplibre_native_ffi_rendered_feature_query_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiRenderedFeatureQueryOptions*
-maplibre_native_ffi_rendered_feature_query_options_copy(
-  const MaplibreNativeFfiRenderedFeatureQueryOptions* self
-);
-
-/**
- * maplibre_native_ffi_rendered_feature_query_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_rendered_feature_query_options_free(
-  MaplibreNativeFfiRenderedFeatureQueryOptions* self
-);
-
-/**
- * maplibre_native_ffi_rendered_feature_query_options_get_layer_ids:
+ * MaplibreNativeFfiRenderedFeatureQueryOptions:layer-ids: (setter set_layer_ids) (getter get_layer_ids)
  *
  * The layers to query. Without them, the query covers every layer.
+ */
+/**
+ * maplibre_native_ffi_rendered_feature_query_options_get_layer_ids: (get-property layer-ids)
+ *
+ * Gets `MaplibreNativeFfiRenderedFeatureQueryOptions:layer-ids`.
  *
  * Returns: (transfer none) (array zero-terminated=1): the texts
  */
 const char* const*
 maplibre_native_ffi_rendered_feature_query_options_get_layer_ids(
-  const MaplibreNativeFfiRenderedFeatureQueryOptions* self
+  MaplibreNativeFfiRenderedFeatureQueryOptions* self
 );
 
 /**
  * maplibre_native_ffi_rendered_feature_query_options_has_layer_ids:
  *
- * Whether the value sets `maplibre_native_ffi_rendered_feature_query_options_set_layer_ids`.
+ * Whether `MaplibreNativeFfiRenderedFeatureQueryOptions:layer-ids` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_rendered_feature_query_options_has_layer_ids(
-  const MaplibreNativeFfiRenderedFeatureQueryOptions* self
+  MaplibreNativeFfiRenderedFeatureQueryOptions* self
 );
 
 /**
- * maplibre_native_ffi_rendered_feature_query_options_set_layer_ids:
+ * maplibre_native_ffi_rendered_feature_query_options_set_layer_ids: (set-property layer-ids)
  * @value: (array zero-terminated=1): the texts
  *
- * The layers to query. Without them, the query covers every layer.
+ * Sets `MaplibreNativeFfiRenderedFeatureQueryOptions:layer-ids`.
  */
 void maplibre_native_ffi_rendered_feature_query_options_set_layer_ids(
   MaplibreNativeFfiRenderedFeatureQueryOptions* self, const char* const* value
 );
 
 /**
- * maplibre_native_ffi_rendered_feature_query_options_get_filter:
+ * MaplibreNativeFfiRenderedFeatureQueryOptions:filter: (setter set_filter) (getter get_filter)
  *
  * A \[filter\](https://maplibre.org/maplibre-style-spec/expressions/) that each
  * feature must match. Empty matches every feature.
+ */
+/**
+ * maplibre_native_ffi_rendered_feature_query_options_get_filter: (get-property filter)
+ *
+ * Gets `MaplibreNativeFfiRenderedFeatureQueryOptions:filter`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_rendered_feature_query_options_get_filter(
-  const MaplibreNativeFfiRenderedFeatureQueryOptions* self
+  MaplibreNativeFfiRenderedFeatureQueryOptions* self
 );
 
 /**
- * maplibre_native_ffi_rendered_feature_query_options_set_filter:
+ * maplibre_native_ffi_rendered_feature_query_options_set_filter: (set-property filter)
  * @value: the UTF-8 text
  *
- * A \[filter\](https://maplibre.org/maplibre-style-spec/expressions/) that each
- * feature must match. Empty matches every feature.
+ * Sets `MaplibreNativeFfiRenderedFeatureQueryOptions:filter`.
  */
 void maplibre_native_ffi_rendered_feature_query_options_set_filter(
   MaplibreNativeFfiRenderedFeatureQueryOptions* self, const char* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiRenderedFeatureQueryOptions,
-  maplibre_native_ffi_rendered_feature_query_options_free
-)
 
 GType maplibre_native_ffi_screen_box_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_SCREEN_BOX \
@@ -10348,7 +10336,7 @@ void maplibre_native_ffi_screen_line_string_free(
 /**
  * maplibre_native_ffi_screen_line_string_get_points:
  *
- * The `points` member.
+ * Gets the value that `maplibre_native_ffi_screen_line_string_set_points` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiScreenPoint): the items
  */
@@ -10591,7 +10579,7 @@ void maplibre_native_ffi_resource_route_free(
 /**
  * maplibre_native_ffi_resource_route_get_kinds:
  *
- * The kinds of resource that the route covers. Zero covers every kind.
+ * Gets the value that `maplibre_native_ffi_resource_route_set_kinds` sets.
  *
  * Returns: the value
  */
@@ -10611,7 +10599,7 @@ void maplibre_native_ffi_resource_route_set_kinds(
 /**
  * maplibre_native_ffi_resource_route_get_flags:
  *
- * The `flags` member.
+ * Gets the value that `maplibre_native_ffi_resource_route_set_flags` sets.
  *
  * Returns: the value
  */
@@ -10631,7 +10619,7 @@ void maplibre_native_ffi_resource_route_set_flags(
 /**
  * maplibre_native_ffi_resource_route_get_url:
  *
- * The `url` member.
+ * Gets the value that `maplibre_native_ffi_resource_route_set_url` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -10701,8 +10689,7 @@ void maplibre_native_ffi_resource_provider_free(
 /**
  * maplibre_native_ffi_resource_provider_get_routes:
  *
- * The requests that the provider serves. Without routes, it serves every
- * network request.
+ * Gets the value that `maplibre_native_ffi_resource_provider_set_routes` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiResourceRoute): the items
  */
@@ -11078,17 +11065,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * The answer to a resource request.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_resource_response` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-GType maplibre_native_ffi_resource_response_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_RESOURCE_RESPONSE \
-  (maplibre_native_ffi_resource_response_get_type())
-
 /**
  * maplibre_native_ffi_resource_response_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiResourceResponse` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiResourceResponse` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -11097,42 +11083,26 @@ MaplibreNativeFfiResourceResponse* maplibre_native_ffi_resource_response_new(
 );
 
 /**
- * maplibre_native_ffi_resource_response_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiResourceResponse* maplibre_native_ffi_resource_response_copy(
-  const MaplibreNativeFfiResourceResponse* self
-);
-
-/**
- * maplibre_native_ffi_resource_response_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_resource_response_free(
-  MaplibreNativeFfiResourceResponse* self
-);
-
-/**
- * maplibre_native_ffi_resource_response_get_status:
+ * MaplibreNativeFfiResourceResponse:status: (setter set_status) (getter get_status)
  *
  * The `status` member.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_status: (get-property status)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:status`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiResourceResponseStatus
 maplibre_native_ffi_resource_response_get_status(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_status:
+ * maplibre_native_ffi_resource_response_set_status: (set-property status)
  *
- * The `status` member.
+ * Sets `MaplibreNativeFfiResourceResponse:status`.
  */
 void maplibre_native_ffi_resource_response_set_status(
   MaplibreNativeFfiResourceResponse* self,
@@ -11140,23 +11110,27 @@ void maplibre_native_ffi_resource_response_set_status(
 );
 
 /**
- * maplibre_native_ffi_resource_response_get_error_reason:
+ * MaplibreNativeFfiResourceResponse:error-reason: (setter set_error_reason) (getter get_error_reason)
  *
  * Why the request failed, for
  * `MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_ERROR`.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_error_reason: (get-property error-reason)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:error-reason`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiResourceErrorReason
 maplibre_native_ffi_resource_response_get_error_reason(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_error_reason:
+ * maplibre_native_ffi_resource_response_set_error_reason: (set-property error-reason)
  *
- * Why the request failed, for
- * `MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_ERROR`.
+ * Sets `MaplibreNativeFfiResourceResponse:error-reason`.
  */
 void maplibre_native_ffi_resource_response_set_error_reason(
   MaplibreNativeFfiResourceResponse* self,
@@ -11164,188 +11138,217 @@ void maplibre_native_ffi_resource_response_set_error_reason(
 );
 
 /**
- * maplibre_native_ffi_resource_response_get_bytes:
+ * MaplibreNativeFfiResourceResponse:bytes: (setter set_bytes) (getter get_bytes)
  *
  * The resource, for `MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_OK`.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_bytes: (get-property bytes)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:bytes`.
  *
  * Returns: (transfer none) (nullable): the bytes
  */
 GBytes* maplibre_native_ffi_resource_response_get_bytes(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_bytes:
+ * maplibre_native_ffi_resource_response_set_bytes: (set-property bytes)
  * @value: (nullable): the bytes
  *
- * The resource, for `MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_OK`.
+ * Sets `MaplibreNativeFfiResourceResponse:bytes`.
  */
 void maplibre_native_ffi_resource_response_set_bytes(
   MaplibreNativeFfiResourceResponse* self, GBytes* value
 );
 
 /**
- * maplibre_native_ffi_resource_response_get_error_message:
+ * MaplibreNativeFfiResourceResponse:error-message: (setter set_error_message) (getter get_error_message)
  *
  * A description of the error, for
  * `MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_ERROR`.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_error_message: (get-property error-message)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:error-message`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_resource_response_get_error_message(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_error_message:
+ * maplibre_native_ffi_resource_response_set_error_message: (set-property error-message)
  * @value: the UTF-8 text
  *
- * A description of the error, for
- * `MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_ERROR`.
+ * Sets `MaplibreNativeFfiResourceResponse:error-message`.
  */
 void maplibre_native_ffi_resource_response_set_error_message(
   MaplibreNativeFfiResourceResponse* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_resource_response_get_must_revalidate:
+ * MaplibreNativeFfiResourceResponse:must-revalidate: (setter set_must_revalidate) (getter get_must_revalidate)
  *
  * Whether the library must request the resource again before it reuses this
  * copy.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_must_revalidate: (get-property must-revalidate)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:must-revalidate`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_resource_response_get_must_revalidate(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_must_revalidate:
+ * maplibre_native_ffi_resource_response_set_must_revalidate: (set-property must-revalidate)
  *
- * Whether the library must request the resource again before it reuses this
- * copy.
+ * Sets `MaplibreNativeFfiResourceResponse:must-revalidate`.
  */
 void maplibre_native_ffi_resource_response_set_must_revalidate(
   MaplibreNativeFfiResourceResponse* self, gboolean value
 );
 
 /**
- * maplibre_native_ffi_resource_response_get_modified_unix_ms:
+ * MaplibreNativeFfiResourceResponse:modified-unix-ms: (setter set_modified_unix_ms) (getter get_modified_unix_ms)
  *
  * The `modified_unix_ms` member.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_modified_unix_ms: (get-property modified-unix-ms)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:modified-unix-ms`.
  *
  * Returns: the value
  */
 gint64 maplibre_native_ffi_resource_response_get_modified_unix_ms(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
  * maplibre_native_ffi_resource_response_has_modified_unix_ms:
  *
- * Whether the value sets `maplibre_native_ffi_resource_response_set_modified_unix_ms`.
+ * Whether `MaplibreNativeFfiResourceResponse:modified-unix-ms` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_resource_response_has_modified_unix_ms(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_modified_unix_ms:
+ * maplibre_native_ffi_resource_response_set_modified_unix_ms: (set-property modified-unix-ms)
  *
- * The `modified_unix_ms` member.
+ * Sets `MaplibreNativeFfiResourceResponse:modified-unix-ms`.
  */
 void maplibre_native_ffi_resource_response_set_modified_unix_ms(
   MaplibreNativeFfiResourceResponse* self, gint64 value
 );
 
 /**
- * maplibre_native_ffi_resource_response_get_expires_unix_ms:
+ * MaplibreNativeFfiResourceResponse:expires-unix-ms: (setter set_expires_unix_ms) (getter get_expires_unix_ms)
  *
  * The `expires_unix_ms` member.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_expires_unix_ms: (get-property expires-unix-ms)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:expires-unix-ms`.
  *
  * Returns: the value
  */
 gint64 maplibre_native_ffi_resource_response_get_expires_unix_ms(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
  * maplibre_native_ffi_resource_response_has_expires_unix_ms:
  *
- * Whether the value sets `maplibre_native_ffi_resource_response_set_expires_unix_ms`.
+ * Whether `MaplibreNativeFfiResourceResponse:expires-unix-ms` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_resource_response_has_expires_unix_ms(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_expires_unix_ms:
+ * maplibre_native_ffi_resource_response_set_expires_unix_ms: (set-property expires-unix-ms)
  *
- * The `expires_unix_ms` member.
+ * Sets `MaplibreNativeFfiResourceResponse:expires-unix-ms`.
  */
 void maplibre_native_ffi_resource_response_set_expires_unix_ms(
   MaplibreNativeFfiResourceResponse* self, gint64 value
 );
 
 /**
- * maplibre_native_ffi_resource_response_get_etag:
+ * MaplibreNativeFfiResourceResponse:etag: (setter set_etag) (getter get_etag)
  *
  * Empty when the resource has no ETag.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_etag: (get-property etag)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:etag`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_resource_response_get_etag(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_etag:
+ * maplibre_native_ffi_resource_response_set_etag: (set-property etag)
  * @value: the UTF-8 text
  *
- * Empty when the resource has no ETag.
+ * Sets `MaplibreNativeFfiResourceResponse:etag`.
  */
 void maplibre_native_ffi_resource_response_set_etag(
   MaplibreNativeFfiResourceResponse* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_resource_response_get_retry_after_unix_ms:
+ * MaplibreNativeFfiResourceResponse:retry-after-unix-ms: (setter set_retry_after_unix_ms) (getter get_retry_after_unix_ms)
  *
  * When to retry, for `MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_ERROR`.
+ */
+/**
+ * maplibre_native_ffi_resource_response_get_retry_after_unix_ms: (get-property retry-after-unix-ms)
+ *
+ * Gets `MaplibreNativeFfiResourceResponse:retry-after-unix-ms`.
  *
  * Returns: the value
  */
 gint64 maplibre_native_ffi_resource_response_get_retry_after_unix_ms(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
  * maplibre_native_ffi_resource_response_has_retry_after_unix_ms:
  *
- * Whether the value sets `maplibre_native_ffi_resource_response_set_retry_after_unix_ms`.
+ * Whether `MaplibreNativeFfiResourceResponse:retry-after-unix-ms` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_resource_response_has_retry_after_unix_ms(
-  const MaplibreNativeFfiResourceResponse* self
+  MaplibreNativeFfiResourceResponse* self
 );
 
 /**
- * maplibre_native_ffi_resource_response_set_retry_after_unix_ms:
+ * maplibre_native_ffi_resource_response_set_retry_after_unix_ms: (set-property retry-after-unix-ms)
  *
- * When to retry, for `MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_ERROR`.
+ * Sets `MaplibreNativeFfiResourceResponse:retry-after-unix-ms`.
  */
 void maplibre_native_ffi_resource_response_set_retry_after_unix_ms(
   MaplibreNativeFfiResourceResponse* self, gint64 value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiResourceResponse, maplibre_native_ffi_resource_response_free
-)
 
 /**
  * MaplibreNativeFfiUrlQueryParameter:
@@ -11399,7 +11402,7 @@ void maplibre_native_ffi_url_query_parameter_free(
 /**
  * maplibre_native_ffi_url_query_parameter_get_name:
  *
- * The `name` member.
+ * Gets the value that `maplibre_native_ffi_url_query_parameter_set_name` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -11420,7 +11423,7 @@ void maplibre_native_ffi_url_query_parameter_set_name(
 /**
  * maplibre_native_ffi_url_query_parameter_get_value:
  *
- * The `value` member.
+ * Gets the value that `maplibre_native_ffi_url_query_parameter_set_value` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -11494,7 +11497,7 @@ void maplibre_native_ffi_resource_transform_rule_free(
 /**
  * maplibre_native_ffi_resource_transform_rule_get_kinds:
  *
- * The kinds of resource that the rule covers. Zero covers every kind.
+ * Gets the value that `maplibre_native_ffi_resource_transform_rule_set_kinds` sets.
  *
  * Returns: the value
  */
@@ -11516,7 +11519,7 @@ void maplibre_native_ffi_resource_transform_rule_set_kinds(
 /**
  * maplibre_native_ffi_resource_transform_rule_get_flags:
  *
- * The `flags` member.
+ * Gets the value that `maplibre_native_ffi_resource_transform_rule_set_flags` sets.
  *
  * Returns: the value
  */
@@ -11538,7 +11541,7 @@ void maplibre_native_ffi_resource_transform_rule_set_flags(
 /**
  * maplibre_native_ffi_resource_transform_rule_get_url:
  *
- * The `url` member.
+ * Gets the value that `maplibre_native_ffi_resource_transform_rule_set_url` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -11559,7 +11562,7 @@ void maplibre_native_ffi_resource_transform_rule_set_url(
 /**
  * maplibre_native_ffi_resource_transform_rule_get_parameters:
  *
- * The `parameters` member.
+ * Gets the value that `maplibre_native_ffi_resource_transform_rule_set_parameters` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiUrlQueryParameter): the items
  */
@@ -11633,8 +11636,7 @@ void maplibre_native_ffi_resource_transform_free(
 /**
  * maplibre_native_ffi_resource_transform_get_rules:
  *
- * The first rule that matches a request adds its parameters, and no other. A
- * request that no rule matches keeps its URL.
+ * Gets the value that `maplibre_native_ffi_resource_transform_set_rules` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiResourceTransformRule): the items
  */
@@ -11687,17 +11689,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Why a resource transform fails a request.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_resource_transform_error` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-GType maplibre_native_ffi_resource_transform_error_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_RESOURCE_TRANSFORM_ERROR \
-  (maplibre_native_ffi_resource_transform_error_get_type())
-
 /**
  * maplibre_native_ffi_resource_transform_error_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiResourceTransformError` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiResourceTransformError` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -11705,43 +11706,26 @@ MaplibreNativeFfiResourceTransformError*
 maplibre_native_ffi_resource_transform_error_new(void);
 
 /**
- * maplibre_native_ffi_resource_transform_error_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiResourceTransformError*
-maplibre_native_ffi_resource_transform_error_copy(
-  const MaplibreNativeFfiResourceTransformError* self
-);
-
-/**
- * maplibre_native_ffi_resource_transform_error_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_resource_transform_error_free(
-  MaplibreNativeFfiResourceTransformError* self
-);
-
-/**
- * maplibre_native_ffi_resource_transform_error_get_reason:
+ * MaplibreNativeFfiResourceTransformError:reason: (setter set_reason) (getter get_reason)
  *
  * The `reason` member.
+ */
+/**
+ * maplibre_native_ffi_resource_transform_error_get_reason: (get-property reason)
+ *
+ * Gets `MaplibreNativeFfiResourceTransformError:reason`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiResourceErrorReason
 maplibre_native_ffi_resource_transform_error_get_reason(
-  const MaplibreNativeFfiResourceTransformError* self
+  MaplibreNativeFfiResourceTransformError* self
 );
 
 /**
- * maplibre_native_ffi_resource_transform_error_set_reason:
+ * maplibre_native_ffi_resource_transform_error_set_reason: (set-property reason)
  *
- * The `reason` member.
+ * Sets `MaplibreNativeFfiResourceTransformError:reason`.
  */
 void maplibre_native_ffi_resource_transform_error_set_reason(
   MaplibreNativeFfiResourceTransformError* self,
@@ -11749,61 +11733,66 @@ void maplibre_native_ffi_resource_transform_error_set_reason(
 );
 
 /**
- * maplibre_native_ffi_resource_transform_error_get_message:
+ * MaplibreNativeFfiResourceTransformError:message: (setter set_message) (getter get_message)
  *
  * The `message` member.
+ */
+/**
+ * maplibre_native_ffi_resource_transform_error_get_message: (get-property message)
+ *
+ * Gets `MaplibreNativeFfiResourceTransformError:message`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_resource_transform_error_get_message(
-  const MaplibreNativeFfiResourceTransformError* self
+  MaplibreNativeFfiResourceTransformError* self
 );
 
 /**
- * maplibre_native_ffi_resource_transform_error_set_message:
+ * maplibre_native_ffi_resource_transform_error_set_message: (set-property message)
  * @value: the UTF-8 text
  *
- * The `message` member.
+ * Sets `MaplibreNativeFfiResourceTransformError:message`.
  */
 void maplibre_native_ffi_resource_transform_error_set_message(
   MaplibreNativeFfiResourceTransformError* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_resource_transform_error_get_retry_after_unix_ms:
+ * MaplibreNativeFfiResourceTransformError:retry-after-unix-ms: (setter set_retry_after_unix_ms) (getter get_retry_after_unix_ms)
  *
  * When to retry, for `MAPLIBRE_NATIVE_FFI_RESOURCE_ERROR_REASON_RATE_LIMIT`.
+ */
+/**
+ * maplibre_native_ffi_resource_transform_error_get_retry_after_unix_ms: (get-property retry-after-unix-ms)
+ *
+ * Gets `MaplibreNativeFfiResourceTransformError:retry-after-unix-ms`.
  *
  * Returns: the value
  */
 gint64 maplibre_native_ffi_resource_transform_error_get_retry_after_unix_ms(
-  const MaplibreNativeFfiResourceTransformError* self
+  MaplibreNativeFfiResourceTransformError* self
 );
 
 /**
  * maplibre_native_ffi_resource_transform_error_has_retry_after_unix_ms:
  *
- * Whether the value sets `maplibre_native_ffi_resource_transform_error_set_retry_after_unix_ms`.
+ * Whether `MaplibreNativeFfiResourceTransformError:retry-after-unix-ms` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_resource_transform_error_has_retry_after_unix_ms(
-  const MaplibreNativeFfiResourceTransformError* self
+  MaplibreNativeFfiResourceTransformError* self
 );
 
 /**
- * maplibre_native_ffi_resource_transform_error_set_retry_after_unix_ms:
+ * maplibre_native_ffi_resource_transform_error_set_retry_after_unix_ms: (set-property retry-after-unix-ms)
  *
- * When to retry, for `MAPLIBRE_NATIVE_FFI_RESOURCE_ERROR_REASON_RATE_LIMIT`.
+ * Sets `MaplibreNativeFfiResourceTransformError:retry-after-unix-ms`.
  */
 void maplibre_native_ffi_resource_transform_error_set_retry_after_unix_ms(
   MaplibreNativeFfiResourceTransformError* self, gint64 value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiResourceTransformError,
-  maplibre_native_ffi_resource_transform_error_free
-)
 
 GType maplibre_native_ffi_runtime_event_camera_change_get_type(
   void
@@ -12937,8 +12926,7 @@ void maplibre_native_ffi_runtime_options_free(
 /**
  * maplibre_native_ffi_runtime_options_get_asset_path:
  *
- * The directory that `asset://` URLs load from. Empty uses the working
- * directory, or the app's assets on Android.
+ * Gets the value that `maplibre_native_ffi_runtime_options_set_asset_path` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -12960,8 +12948,7 @@ void maplibre_native_ffi_runtime_options_set_asset_path(
 /**
  * maplibre_native_ffi_runtime_options_get_cache_path:
  *
- * The cache database file, which holds the ambient cache and offline regions.
- * Empty keeps them in memory.
+ * Gets the value that `maplibre_native_ffi_runtime_options_set_cache_path` sets.
  *
  * Returns: (transfer none): the text
  */
@@ -13057,19 +13044,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Options for a source feature query.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_source_feature_query_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
-GType maplibre_native_ffi_source_feature_query_options_get_type(
-  void
-) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_SOURCE_FEATURE_QUERY_OPTIONS \
-  (maplibre_native_ffi_source_feature_query_options_get_type())
-
 /**
  * maplibre_native_ffi_source_feature_query_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiSourceFeatureQueryOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiSourceFeatureQueryOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -13077,89 +13061,70 @@ MaplibreNativeFfiSourceFeatureQueryOptions*
 maplibre_native_ffi_source_feature_query_options_new(void);
 
 /**
- * maplibre_native_ffi_source_feature_query_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiSourceFeatureQueryOptions*
-maplibre_native_ffi_source_feature_query_options_copy(
-  const MaplibreNativeFfiSourceFeatureQueryOptions* self
-);
-
-/**
- * maplibre_native_ffi_source_feature_query_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_source_feature_query_options_free(
-  MaplibreNativeFfiSourceFeatureQueryOptions* self
-);
-
-/**
- * maplibre_native_ffi_source_feature_query_options_get_source_layer_ids:
+ * MaplibreNativeFfiSourceFeatureQueryOptions:source-layer-ids: (setter set_source_layer_ids) (getter get_source_layer_ids)
  *
  * The source layers to query. A vector source finds features only in the source
  * layers named here.
+ */
+/**
+ * maplibre_native_ffi_source_feature_query_options_get_source_layer_ids: (get-property source-layer-ids)
+ *
+ * Gets `MaplibreNativeFfiSourceFeatureQueryOptions:source-layer-ids`.
  *
  * Returns: (transfer none) (array zero-terminated=1): the texts
  */
 const char* const*
 maplibre_native_ffi_source_feature_query_options_get_source_layer_ids(
-  const MaplibreNativeFfiSourceFeatureQueryOptions* self
+  MaplibreNativeFfiSourceFeatureQueryOptions* self
 );
 
 /**
  * maplibre_native_ffi_source_feature_query_options_has_source_layer_ids:
  *
- * Whether the value sets `maplibre_native_ffi_source_feature_query_options_set_source_layer_ids`.
+ * Whether `MaplibreNativeFfiSourceFeatureQueryOptions:source-layer-ids` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_source_feature_query_options_has_source_layer_ids(
-  const MaplibreNativeFfiSourceFeatureQueryOptions* self
+  MaplibreNativeFfiSourceFeatureQueryOptions* self
 );
 
 /**
- * maplibre_native_ffi_source_feature_query_options_set_source_layer_ids:
+ * maplibre_native_ffi_source_feature_query_options_set_source_layer_ids: (set-property source-layer-ids)
  * @value: (array zero-terminated=1): the texts
  *
- * The source layers to query. A vector source finds features only in the source
- * layers named here.
+ * Sets `MaplibreNativeFfiSourceFeatureQueryOptions:source-layer-ids`.
  */
 void maplibre_native_ffi_source_feature_query_options_set_source_layer_ids(
   MaplibreNativeFfiSourceFeatureQueryOptions* self, const char* const* value
 );
 
 /**
- * maplibre_native_ffi_source_feature_query_options_get_filter:
+ * MaplibreNativeFfiSourceFeatureQueryOptions:filter: (setter set_filter) (getter get_filter)
  *
  * A \[filter\](https://maplibre.org/maplibre-style-spec/expressions/) that each
  * feature must match. Empty matches every feature.
+ */
+/**
+ * maplibre_native_ffi_source_feature_query_options_get_filter: (get-property filter)
+ *
+ * Gets `MaplibreNativeFfiSourceFeatureQueryOptions:filter`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_source_feature_query_options_get_filter(
-  const MaplibreNativeFfiSourceFeatureQueryOptions* self
+  MaplibreNativeFfiSourceFeatureQueryOptions* self
 );
 
 /**
- * maplibre_native_ffi_source_feature_query_options_set_filter:
+ * maplibre_native_ffi_source_feature_query_options_set_filter: (set-property filter)
  * @value: the UTF-8 text
  *
- * A \[filter\](https://maplibre.org/maplibre-style-spec/expressions/) that each
- * feature must match. Empty matches every feature.
+ * Sets `MaplibreNativeFfiSourceFeatureQueryOptions:filter`.
  */
 void maplibre_native_ffi_source_feature_query_options_set_filter(
   MaplibreNativeFfiSourceFeatureQueryOptions* self, const char* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiSourceFeatureQueryOptions,
-  maplibre_native_ffi_source_feature_query_options_free
-)
 
 GType maplibre_native_ffi_style_expression_info_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_EXPRESSION_INFO \
@@ -13197,17 +13162,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * The inputs that a style expression reads while it evaluates.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_style_expression_inputs` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
-GType maplibre_native_ffi_style_expression_inputs_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_EXPRESSION_INPUTS \
-  (maplibre_native_ffi_style_expression_inputs_get_type())
-
 /**
  * maplibre_native_ffi_style_expression_inputs_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiStyleExpressionInputs` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiStyleExpressionInputs` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -13215,182 +13179,189 @@ MaplibreNativeFfiStyleExpressionInputs*
 maplibre_native_ffi_style_expression_inputs_new(void);
 
 /**
- * maplibre_native_ffi_style_expression_inputs_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiStyleExpressionInputs*
-maplibre_native_ffi_style_expression_inputs_copy(
-  const MaplibreNativeFfiStyleExpressionInputs* self
-);
-
-/**
- * maplibre_native_ffi_style_expression_inputs_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_style_expression_inputs_free(
-  MaplibreNativeFfiStyleExpressionInputs* self
-);
-
-/**
- * maplibre_native_ffi_style_expression_inputs_get_zoom:
+ * MaplibreNativeFfiStyleExpressionInputs:zoom: (setter set_zoom) (getter get_zoom)
  *
  * The `zoom` member.
+ */
+/**
+ * maplibre_native_ffi_style_expression_inputs_get_zoom: (get-property zoom)
+ *
+ * Gets `MaplibreNativeFfiStyleExpressionInputs:zoom`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_style_expression_inputs_get_zoom(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
  * maplibre_native_ffi_style_expression_inputs_has_zoom:
  *
- * Whether the value sets `maplibre_native_ffi_style_expression_inputs_set_zoom`.
+ * Whether `MaplibreNativeFfiStyleExpressionInputs:zoom` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_expression_inputs_has_zoom(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_set_zoom:
+ * maplibre_native_ffi_style_expression_inputs_set_zoom: (set-property zoom)
  *
- * The `zoom` member.
+ * Sets `MaplibreNativeFfiStyleExpressionInputs:zoom`.
  */
 void maplibre_native_ffi_style_expression_inputs_set_zoom(
   MaplibreNativeFfiStyleExpressionInputs* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_get_color_ramp_parameter:
+ * MaplibreNativeFfiStyleExpressionInputs:color-ramp-parameter: (setter set_color_ramp_parameter) (getter get_color_ramp_parameter)
  *
  * The value of `heatmap-density`, `line-progress`, and `elevation`.
+ */
+/**
+ * maplibre_native_ffi_style_expression_inputs_get_color_ramp_parameter: (get-property color-ramp-parameter)
+ *
+ * Gets `MaplibreNativeFfiStyleExpressionInputs:color-ramp-parameter`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_style_expression_inputs_get_color_ramp_parameter(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
  * maplibre_native_ffi_style_expression_inputs_has_color_ramp_parameter:
  *
- * Whether the value sets `maplibre_native_ffi_style_expression_inputs_set_color_ramp_parameter`.
+ * Whether `MaplibreNativeFfiStyleExpressionInputs:color-ramp-parameter` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_expression_inputs_has_color_ramp_parameter(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_set_color_ramp_parameter:
+ * maplibre_native_ffi_style_expression_inputs_set_color_ramp_parameter: (set-property color-ramp-parameter)
  *
- * The value of `heatmap-density`, `line-progress`, and `elevation`.
+ * Sets `MaplibreNativeFfiStyleExpressionInputs:color-ramp-parameter`.
  */
 void maplibre_native_ffi_style_expression_inputs_set_color_ramp_parameter(
   MaplibreNativeFfiStyleExpressionInputs* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_get_feature:
+ * MaplibreNativeFfiStyleExpressionInputs:feature: (setter set_feature) (getter get_feature)
  *
  * The feature to evaluate against, as a GeoJSON feature, or empty for none.
+ */
+/**
+ * maplibre_native_ffi_style_expression_inputs_get_feature: (get-property feature)
+ *
+ * Gets `MaplibreNativeFfiStyleExpressionInputs:feature`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_style_expression_inputs_get_feature(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_set_feature:
+ * maplibre_native_ffi_style_expression_inputs_set_feature: (set-property feature)
  * @value: the UTF-8 text
  *
- * The feature to evaluate against, as a GeoJSON feature, or empty for none.
+ * Sets `MaplibreNativeFfiStyleExpressionInputs:feature`.
  */
 void maplibre_native_ffi_style_expression_inputs_set_feature(
   MaplibreNativeFfiStyleExpressionInputs* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_get_feature_state:
+ * MaplibreNativeFfiStyleExpressionInputs:feature-state: (setter set_feature_state) (getter get_feature_state)
  *
  * The feature's state, as a JSON object, or empty for none.
+ */
+/**
+ * maplibre_native_ffi_style_expression_inputs_get_feature_state: (get-property feature-state)
+ *
+ * Gets `MaplibreNativeFfiStyleExpressionInputs:feature-state`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_style_expression_inputs_get_feature_state(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_set_feature_state:
+ * maplibre_native_ffi_style_expression_inputs_set_feature_state: (set-property feature-state)
  * @value: the UTF-8 text
  *
- * The feature's state, as a JSON object, or empty for none.
+ * Sets `MaplibreNativeFfiStyleExpressionInputs:feature-state`.
  */
 void maplibre_native_ffi_style_expression_inputs_set_feature_state(
   MaplibreNativeFfiStyleExpressionInputs* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_get_global_state:
+ * MaplibreNativeFfiStyleExpressionInputs:global-state: (setter set_global_state) (getter get_global_state)
  *
  * The values that `global-state` reads, as a JSON object, or empty for none.
+ */
+/**
+ * maplibre_native_ffi_style_expression_inputs_get_global_state: (get-property global-state)
+ *
+ * Gets `MaplibreNativeFfiStyleExpressionInputs:global-state`.
  *
  * Returns: (transfer none): the text
  */
 const char* maplibre_native_ffi_style_expression_inputs_get_global_state(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_set_global_state:
+ * maplibre_native_ffi_style_expression_inputs_set_global_state: (set-property global-state)
  * @value: the UTF-8 text
  *
- * The values that `global-state` reads, as a JSON object, or empty for none.
+ * Sets `MaplibreNativeFfiStyleExpressionInputs:global-state`.
  */
 void maplibre_native_ffi_style_expression_inputs_set_global_state(
   MaplibreNativeFfiStyleExpressionInputs* self, const char* value
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_get_canonical_tile_id:
+ * MaplibreNativeFfiStyleExpressionInputs:canonical-tile-id: (setter set_canonical_tile_id) (getter get_canonical_tile_id)
  *
  * The tile that holds the feature. `within` and `distance` need it to read the
  * feature's geometry.
+ */
+/**
+ * maplibre_native_ffi_style_expression_inputs_get_canonical_tile_id: (get-property canonical-tile-id)
+ *
+ * Gets `MaplibreNativeFfiStyleExpressionInputs:canonical-tile-id`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiCanonicalTileId*
 maplibre_native_ffi_style_expression_inputs_get_canonical_tile_id(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
  * maplibre_native_ffi_style_expression_inputs_has_canonical_tile_id:
  *
- * Whether the value sets `maplibre_native_ffi_style_expression_inputs_set_canonical_tile_id`.
+ * Whether `MaplibreNativeFfiStyleExpressionInputs:canonical-tile-id` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_expression_inputs_has_canonical_tile_id(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_set_canonical_tile_id:
+ * maplibre_native_ffi_style_expression_inputs_set_canonical_tile_id: (set-property canonical-tile-id)
  * @value: the value
  *
- * The tile that holds the feature. `within` and `distance` need it to read the
- * feature's geometry.
+ * Sets `MaplibreNativeFfiStyleExpressionInputs:canonical-tile-id`.
  */
 void maplibre_native_ffi_style_expression_inputs_set_canonical_tile_id(
   MaplibreNativeFfiStyleExpressionInputs* self,
@@ -13398,31 +13369,31 @@ void maplibre_native_ffi_style_expression_inputs_set_canonical_tile_id(
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_get_available_images:
+ * MaplibreNativeFfiStyleExpressionInputs:available-images: (setter set_available_images) (getter get_available_images)
  *
  * The IDs of the images that `image` treats as available.
+ */
+/**
+ * maplibre_native_ffi_style_expression_inputs_get_available_images: (get-property available-images)
+ *
+ * Gets `MaplibreNativeFfiStyleExpressionInputs:available-images`.
  *
  * Returns: (transfer none) (array zero-terminated=1): the texts
  */
 const char* const*
 maplibre_native_ffi_style_expression_inputs_get_available_images(
-  const MaplibreNativeFfiStyleExpressionInputs* self
+  MaplibreNativeFfiStyleExpressionInputs* self
 );
 
 /**
- * maplibre_native_ffi_style_expression_inputs_set_available_images:
+ * maplibre_native_ffi_style_expression_inputs_set_available_images: (set-property available-images)
  * @value: (array zero-terminated=1): the texts
  *
- * The IDs of the images that `image` treats as available.
+ * Sets `MaplibreNativeFfiStyleExpressionInputs:available-images`.
  */
 void maplibre_native_ffi_style_expression_inputs_set_available_images(
   MaplibreNativeFfiStyleExpressionInputs* self, const char* const* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiStyleExpressionInputs,
-  maplibre_native_ffi_style_expression_inputs_free
-)
 
 GType maplibre_native_ffi_style_expression_type_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_EXPRESSION_TYPE \
@@ -13460,17 +13431,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Options for parsing a style expression.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_style_expression_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
-GType maplibre_native_ffi_style_expression_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_EXPRESSION_OPTIONS \
-  (maplibre_native_ffi_style_expression_options_get_type())
-
 /**
  * maplibre_native_ffi_style_expression_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiStyleExpressionOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiStyleExpressionOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -13478,65 +13448,43 @@ MaplibreNativeFfiStyleExpressionOptions*
 maplibre_native_ffi_style_expression_options_new(void);
 
 /**
- * maplibre_native_ffi_style_expression_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiStyleExpressionOptions*
-maplibre_native_ffi_style_expression_options_copy(
-  const MaplibreNativeFfiStyleExpressionOptions* self
-);
-
-/**
- * maplibre_native_ffi_style_expression_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_style_expression_options_free(
-  MaplibreNativeFfiStyleExpressionOptions* self
-);
-
-/**
- * maplibre_native_ffi_style_expression_options_get_expected_type:
+ * MaplibreNativeFfiStyleExpressionOptions:expected-type: (setter set_expected_type) (getter get_expected_type)
  *
  * The type that the result must have.
+ */
+/**
+ * maplibre_native_ffi_style_expression_options_get_expected_type: (get-property expected-type)
+ *
+ * Gets `MaplibreNativeFfiStyleExpressionOptions:expected-type`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiStyleExpressionType*
 maplibre_native_ffi_style_expression_options_get_expected_type(
-  const MaplibreNativeFfiStyleExpressionOptions* self
+  MaplibreNativeFfiStyleExpressionOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_expression_options_has_expected_type:
  *
- * Whether the value sets `maplibre_native_ffi_style_expression_options_set_expected_type`.
+ * Whether `MaplibreNativeFfiStyleExpressionOptions:expected-type` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_expression_options_has_expected_type(
-  const MaplibreNativeFfiStyleExpressionOptions* self
+  MaplibreNativeFfiStyleExpressionOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_expression_options_set_expected_type:
+ * maplibre_native_ffi_style_expression_options_set_expected_type: (set-property expected-type)
  * @value: the value
  *
- * The type that the result must have.
+ * Sets `MaplibreNativeFfiStyleExpressionOptions:expected-type`.
  */
 void maplibre_native_ffi_style_expression_options_set_expected_type(
   MaplibreNativeFfiStyleExpressionOptions* self,
   const MaplibreNativeFfiStyleExpressionType* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiStyleExpressionOptions,
-  maplibre_native_ffi_style_expression_options_free
-)
 
 /**
  * MaplibreNativeFfiStyleImageInfo:
@@ -13748,17 +13696,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  * \[sprite\](https://maplibre.org/maplibre-style-spec/sprite/) spec describes
  * them.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_style_image_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-GType maplibre_native_ffi_style_image_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_IMAGE_OPTIONS \
-  (maplibre_native_ffi_style_image_options_get_type())
-
 /**
  * maplibre_native_ffi_style_image_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiStyleImageOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiStyleImageOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -13767,36 +13714,14 @@ MaplibreNativeFfiStyleImageOptions* maplibre_native_ffi_style_image_options_new(
 );
 
 /**
- * maplibre_native_ffi_style_image_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiStyleImageOptions*
-maplibre_native_ffi_style_image_options_copy(
-  const MaplibreNativeFfiStyleImageOptions* self
-);
-
-/**
- * maplibre_native_ffi_style_image_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_style_image_options_free(
-  MaplibreNativeFfiStyleImageOptions* self
-);
-
-/**
  * maplibre_native_ffi_style_image_options_get_stretch_x:
  *
- * The ranges of columns that stretch, in increasing order without overlap.
+ * Gets the value that `maplibre_native_ffi_style_image_options_set_stretch_x` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiImageStretch): the items
  */
 GPtrArray* maplibre_native_ffi_style_image_options_get_stretch_x(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
@@ -13807,7 +13732,7 @@ GPtrArray* maplibre_native_ffi_style_image_options_get_stretch_x(
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_image_options_has_stretch_x(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
@@ -13824,12 +13749,12 @@ void maplibre_native_ffi_style_image_options_set_stretch_x(
 /**
  * maplibre_native_ffi_style_image_options_get_stretch_y:
  *
- * The ranges of rows that stretch, in increasing order without overlap.
+ * Gets the value that `maplibre_native_ffi_style_image_options_set_stretch_y` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiImageStretch): the items
  */
 GPtrArray* maplibre_native_ffi_style_image_options_get_stretch_y(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
@@ -13840,7 +13765,7 @@ GPtrArray* maplibre_native_ffi_style_image_options_get_stretch_y(
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_image_options_has_stretch_y(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
@@ -13855,33 +13780,38 @@ void maplibre_native_ffi_style_image_options_set_stretch_y(
 );
 
 /**
- * maplibre_native_ffi_style_image_options_get_content:
+ * MaplibreNativeFfiStyleImageOptions:content: (setter set_content) (getter get_content)
  *
  * The `content` member.
+ */
+/**
+ * maplibre_native_ffi_style_image_options_get_content: (get-property content)
+ *
+ * Gets `MaplibreNativeFfiStyleImageOptions:content`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiImageContent*
 maplibre_native_ffi_style_image_options_get_content(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_image_options_has_content:
  *
- * Whether the value sets `maplibre_native_ffi_style_image_options_set_content`.
+ * Whether `MaplibreNativeFfiStyleImageOptions:content` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_image_options_has_content(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_image_options_set_content:
+ * maplibre_native_ffi_style_image_options_set_content: (set-property content)
  * @value: the value
  *
- * The `content` member.
+ * Sets `MaplibreNativeFfiStyleImageOptions:content`.
  */
 void maplibre_native_ffi_style_image_options_set_content(
   MaplibreNativeFfiStyleImageOptions* self,
@@ -13889,32 +13819,37 @@ void maplibre_native_ffi_style_image_options_set_content(
 );
 
 /**
- * maplibre_native_ffi_style_image_options_get_text_fit_width:
+ * MaplibreNativeFfiStyleImageOptions:text-fit-width: (setter set_text_fit_width) (getter get_text_fit_width)
  *
  * The `text_fit_width` member.
+ */
+/**
+ * maplibre_native_ffi_style_image_options_get_text_fit_width: (get-property text-fit-width)
+ *
+ * Gets `MaplibreNativeFfiStyleImageOptions:text-fit-width`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiStyleImageTextFit
 maplibre_native_ffi_style_image_options_get_text_fit_width(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_image_options_has_text_fit_width:
  *
- * Whether the value sets `maplibre_native_ffi_style_image_options_set_text_fit_width`.
+ * Whether `MaplibreNativeFfiStyleImageOptions:text-fit-width` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_image_options_has_text_fit_width(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_image_options_set_text_fit_width:
+ * maplibre_native_ffi_style_image_options_set_text_fit_width: (set-property text-fit-width)
  *
- * The `text_fit_width` member.
+ * Sets `MaplibreNativeFfiStyleImageOptions:text-fit-width`.
  */
 void maplibre_native_ffi_style_image_options_set_text_fit_width(
   MaplibreNativeFfiStyleImageOptions* self,
@@ -13922,32 +13857,37 @@ void maplibre_native_ffi_style_image_options_set_text_fit_width(
 );
 
 /**
- * maplibre_native_ffi_style_image_options_get_text_fit_height:
+ * MaplibreNativeFfiStyleImageOptions:text-fit-height: (setter set_text_fit_height) (getter get_text_fit_height)
  *
  * The `text_fit_height` member.
+ */
+/**
+ * maplibre_native_ffi_style_image_options_get_text_fit_height: (get-property text-fit-height)
+ *
+ * Gets `MaplibreNativeFfiStyleImageOptions:text-fit-height`.
  *
  * Returns: the value
  */
 MaplibreNativeFfiStyleImageTextFit
 maplibre_native_ffi_style_image_options_get_text_fit_height(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_image_options_has_text_fit_height:
  *
- * Whether the value sets `maplibre_native_ffi_style_image_options_set_text_fit_height`.
+ * Whether `MaplibreNativeFfiStyleImageOptions:text-fit-height` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_image_options_has_text_fit_height(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_image_options_set_text_fit_height:
+ * maplibre_native_ffi_style_image_options_set_text_fit_height: (set-property text-fit-height)
  *
- * The `text_fit_height` member.
+ * Sets `MaplibreNativeFfiStyleImageOptions:text-fit-height`.
  */
 void maplibre_native_ffi_style_image_options_set_text_fit_height(
   MaplibreNativeFfiStyleImageOptions* self,
@@ -13955,106 +13895,114 @@ void maplibre_native_ffi_style_image_options_set_text_fit_height(
 );
 
 /**
- * maplibre_native_ffi_style_image_options_get_pixel_ratio:
+ * MaplibreNativeFfiStyleImageOptions:pixel-ratio: (setter set_pixel_ratio) (getter get_pixel_ratio)
  *
  * The `pixel_ratio` member.
+ */
+/**
+ * maplibre_native_ffi_style_image_options_get_pixel_ratio: (get-property pixel-ratio)
+ *
+ * Gets `MaplibreNativeFfiStyleImageOptions:pixel-ratio`.
  *
  * Returns: the value
  */
 gfloat maplibre_native_ffi_style_image_options_get_pixel_ratio(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_image_options_has_pixel_ratio:
  *
- * Whether the value sets `maplibre_native_ffi_style_image_options_set_pixel_ratio`.
+ * Whether `MaplibreNativeFfiStyleImageOptions:pixel-ratio` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_image_options_has_pixel_ratio(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_image_options_set_pixel_ratio:
+ * maplibre_native_ffi_style_image_options_set_pixel_ratio: (set-property pixel-ratio)
  *
- * The `pixel_ratio` member.
+ * Sets `MaplibreNativeFfiStyleImageOptions:pixel-ratio`.
  */
 void maplibre_native_ffi_style_image_options_set_pixel_ratio(
   MaplibreNativeFfiStyleImageOptions* self, gfloat value
 );
 
 /**
- * maplibre_native_ffi_style_image_options_get_sdf:
+ * MaplibreNativeFfiStyleImageOptions:sdf: (setter set_sdf) (getter get_sdf)
  *
  * The `sdf` member.
+ */
+/**
+ * maplibre_native_ffi_style_image_options_get_sdf: (get-property sdf)
+ *
+ * Gets `MaplibreNativeFfiStyleImageOptions:sdf`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_style_image_options_get_sdf(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_image_options_has_sdf:
  *
- * Whether the value sets `maplibre_native_ffi_style_image_options_set_sdf`.
+ * Whether `MaplibreNativeFfiStyleImageOptions:sdf` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_image_options_has_sdf(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_image_options_set_sdf:
+ * maplibre_native_ffi_style_image_options_set_sdf: (set-property sdf)
  *
- * The `sdf` member.
+ * Sets `MaplibreNativeFfiStyleImageOptions:sdf`.
  */
 void maplibre_native_ffi_style_image_options_set_sdf(
   MaplibreNativeFfiStyleImageOptions* self, gboolean value
 );
 
 /**
- * maplibre_native_ffi_style_image_options_get_keep_unused:
+ * MaplibreNativeFfiStyleImageOptions:keep-unused: (setter set_keep_unused) (getter get_keep_unused)
  *
  * Keeps the image after no layer uses it. Without this, the map can remove an
  * image that it asked for through
  * `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING`.
+ */
+/**
+ * maplibre_native_ffi_style_image_options_get_keep_unused: (get-property keep-unused)
+ *
+ * Gets `MaplibreNativeFfiStyleImageOptions:keep-unused`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_style_image_options_get_keep_unused(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_image_options_has_keep_unused:
  *
- * Whether the value sets `maplibre_native_ffi_style_image_options_set_keep_unused`.
+ * Whether `MaplibreNativeFfiStyleImageOptions:keep-unused` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_image_options_has_keep_unused(
-  const MaplibreNativeFfiStyleImageOptions* self
+  MaplibreNativeFfiStyleImageOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_image_options_set_keep_unused:
+ * maplibre_native_ffi_style_image_options_set_keep_unused: (set-property keep-unused)
  *
- * Keeps the image after no layer uses it. Without this, the map can remove an
- * image that it asked for through
- * `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING`.
+ * Sets `MaplibreNativeFfiStyleImageOptions:keep-unused`.
  */
 void maplibre_native_ffi_style_image_options_set_keep_unused(
   MaplibreNativeFfiStyleImageOptions* self, gboolean value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiStyleImageOptions,
-  maplibre_native_ffi_style_image_options_free
-)
 
 /**
  * MaplibreNativeFfiStyleLayerInfo:
@@ -14525,17 +14473,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  * \[transition\](https://maplibre.org/maplibre-style-spec/transition/) for
  * changes to a style's paint properties.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_style_transition_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-GType maplibre_native_ffi_style_transition_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_TRANSITION_OPTIONS \
-  (maplibre_native_ffi_style_transition_options_get_type())
-
 /**
  * maplibre_native_ffi_style_transition_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiStyleTransitionOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiStyleTransitionOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -14543,126 +14490,114 @@ MaplibreNativeFfiStyleTransitionOptions*
 maplibre_native_ffi_style_transition_options_new(void);
 
 /**
- * maplibre_native_ffi_style_transition_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiStyleTransitionOptions*
-maplibre_native_ffi_style_transition_options_copy(
-  const MaplibreNativeFfiStyleTransitionOptions* self
-);
-
-/**
- * maplibre_native_ffi_style_transition_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_style_transition_options_free(
-  MaplibreNativeFfiStyleTransitionOptions* self
-);
-
-/**
- * maplibre_native_ffi_style_transition_options_get_duration_ms:
+ * MaplibreNativeFfiStyleTransitionOptions:duration-ms: (setter set_duration_ms) (getter get_duration_ms)
  *
  * The `duration_ms` member.
+ */
+/**
+ * maplibre_native_ffi_style_transition_options_get_duration_ms: (get-property duration-ms)
+ *
+ * Gets `MaplibreNativeFfiStyleTransitionOptions:duration-ms`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_style_transition_options_get_duration_ms(
-  const MaplibreNativeFfiStyleTransitionOptions* self
+  MaplibreNativeFfiStyleTransitionOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_transition_options_has_duration_ms:
  *
- * Whether the value sets `maplibre_native_ffi_style_transition_options_set_duration_ms`.
+ * Whether `MaplibreNativeFfiStyleTransitionOptions:duration-ms` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_transition_options_has_duration_ms(
-  const MaplibreNativeFfiStyleTransitionOptions* self
+  MaplibreNativeFfiStyleTransitionOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_transition_options_set_duration_ms:
+ * maplibre_native_ffi_style_transition_options_set_duration_ms: (set-property duration-ms)
  *
- * The `duration_ms` member.
+ * Sets `MaplibreNativeFfiStyleTransitionOptions:duration-ms`.
  */
 void maplibre_native_ffi_style_transition_options_set_duration_ms(
   MaplibreNativeFfiStyleTransitionOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_style_transition_options_get_delay_ms:
+ * MaplibreNativeFfiStyleTransitionOptions:delay-ms: (setter set_delay_ms) (getter get_delay_ms)
  *
  * The `delay_ms` member.
+ */
+/**
+ * maplibre_native_ffi_style_transition_options_get_delay_ms: (get-property delay-ms)
+ *
+ * Gets `MaplibreNativeFfiStyleTransitionOptions:delay-ms`.
  *
  * Returns: the value
  */
 gdouble maplibre_native_ffi_style_transition_options_get_delay_ms(
-  const MaplibreNativeFfiStyleTransitionOptions* self
+  MaplibreNativeFfiStyleTransitionOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_transition_options_has_delay_ms:
  *
- * Whether the value sets `maplibre_native_ffi_style_transition_options_set_delay_ms`.
+ * Whether `MaplibreNativeFfiStyleTransitionOptions:delay-ms` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_style_transition_options_has_delay_ms(
-  const MaplibreNativeFfiStyleTransitionOptions* self
+  MaplibreNativeFfiStyleTransitionOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_transition_options_set_delay_ms:
+ * maplibre_native_ffi_style_transition_options_set_delay_ms: (set-property delay-ms)
  *
- * The `delay_ms` member.
+ * Sets `MaplibreNativeFfiStyleTransitionOptions:delay-ms`.
  */
 void maplibre_native_ffi_style_transition_options_set_delay_ms(
   MaplibreNativeFfiStyleTransitionOptions* self, gdouble value
 );
 
 /**
- * maplibre_native_ffi_style_transition_options_get_enable_placement_transitions:
+ * MaplibreNativeFfiStyleTransitionOptions:enable-placement-transitions: (setter set_enable_placement_transitions) (getter get_enable_placement_transitions)
  *
  * Whether symbols fade in and out as the map places them.
+ */
+/**
+ * maplibre_native_ffi_style_transition_options_get_enable_placement_transitions: (get-property enable-placement-transitions)
+ *
+ * Gets `MaplibreNativeFfiStyleTransitionOptions:enable-placement-transitions`.
  *
  * Returns: the value
  */
 gboolean
 maplibre_native_ffi_style_transition_options_get_enable_placement_transitions(
-  const MaplibreNativeFfiStyleTransitionOptions* self
+  MaplibreNativeFfiStyleTransitionOptions* self
 );
 
 /**
  * maplibre_native_ffi_style_transition_options_has_enable_placement_transitions:
  *
- * Whether the value sets `maplibre_native_ffi_style_transition_options_set_enable_placement_transitions`.
+ * Whether `MaplibreNativeFfiStyleTransitionOptions:enable-placement-transitions` is set.
  *
  * Returns: whether the member is set
  */
 gboolean
 maplibre_native_ffi_style_transition_options_has_enable_placement_transitions(
-  const MaplibreNativeFfiStyleTransitionOptions* self
+  MaplibreNativeFfiStyleTransitionOptions* self
 );
 
 /**
- * maplibre_native_ffi_style_transition_options_set_enable_placement_transitions:
+ * maplibre_native_ffi_style_transition_options_set_enable_placement_transitions: (set-property enable-placement-transitions)
  *
- * Whether symbols fade in and out as the map places them.
+ * Sets `MaplibreNativeFfiStyleTransitionOptions:enable-placement-transitions`.
  */
 void maplibre_native_ffi_style_transition_options_set_enable_placement_transitions(
   MaplibreNativeFfiStyleTransitionOptions* self, gboolean value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiStyleTransitionOptions,
-  maplibre_native_ffi_style_transition_options_free
-)
 
 GType maplibre_native_ffi_texture_image_info_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_TEXTURE_IMAGE_INFO \
@@ -14848,7 +14783,7 @@ void maplibre_native_ffi_vulkan_context_descriptor_free(
 /**
  * maplibre_native_ffi_vulkan_context_descriptor_get_instance:
  *
- * A `VkInstance`.
+ * Gets the value that `maplibre_native_ffi_vulkan_context_descriptor_set_instance` sets.
  *
  * Returns: the value
  */
@@ -14868,7 +14803,7 @@ void maplibre_native_ffi_vulkan_context_descriptor_set_instance(
 /**
  * maplibre_native_ffi_vulkan_context_descriptor_get_physical_device:
  *
- * A `VkPhysicalDevice`.
+ * Gets the value that `maplibre_native_ffi_vulkan_context_descriptor_set_physical_device` sets.
  *
  * Returns: the value
  */
@@ -14888,7 +14823,7 @@ void maplibre_native_ffi_vulkan_context_descriptor_set_physical_device(
 /**
  * maplibre_native_ffi_vulkan_context_descriptor_get_device:
  *
- * A `VkDevice`.
+ * Gets the value that `maplibre_native_ffi_vulkan_context_descriptor_set_device` sets.
  *
  * Returns: the value
  */
@@ -14908,9 +14843,7 @@ void maplibre_native_ffi_vulkan_context_descriptor_set_device(
 /**
  * maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue:
  *
- * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If you
- * submit to it too, set
- * `maplibre_native_ffi_render_session_attach_options_set_queue_lock`.
+ * Gets the value that `maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue` sets.
  *
  * Returns: the value
  */
@@ -14932,7 +14865,7 @@ void maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue(
 /**
  * maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue_family_index:
  *
- * The `graphics_queue_family_index` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue_family_index` sets.
  *
  * Returns: the value
  */
@@ -14953,7 +14886,7 @@ void maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue_family_ind
 /**
  * maplibre_native_ffi_vulkan_context_descriptor_get_get_instance_proc_addr:
  *
- * Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
+ * Gets the value that `maplibre_native_ffi_vulkan_context_descriptor_set_get_instance_proc_addr` sets.
  *
  * Returns: the value
  */
@@ -14974,7 +14907,7 @@ void maplibre_native_ffi_vulkan_context_descriptor_set_get_instance_proc_addr(
 /**
  * maplibre_native_ffi_vulkan_context_descriptor_get_get_device_proc_addr:
  *
- * Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
+ * Gets the value that `maplibre_native_ffi_vulkan_context_descriptor_set_get_device_proc_addr` sets.
  *
  * Returns: the value
  */
@@ -15057,7 +14990,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_free(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -15080,7 +15013,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_physical_width:
  *
- * The `physical_width` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_width` sets.
  *
  * Returns: the value
  */
@@ -15101,7 +15034,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_width(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_physical_height:
  *
- * The `physical_height` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_height` sets.
  *
  * Returns: the value
  */
@@ -15122,7 +15055,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_height(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_context:
  *
- * The `context` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_context` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -15145,7 +15078,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_context(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_textures:
  *
- * The `textures` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiVulkanBorrowedTexture): the items
  */
@@ -15167,7 +15100,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_format:
  *
- * The images' VkFormat.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_format` sets.
  *
  * Returns: the value
  */
@@ -15187,7 +15120,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_format(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_final_layout:
  *
- * The VkImageLayout that each frame leaves its image in.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_final_layout` sets.
  *
  * Returns: the value
  */
@@ -15207,7 +15140,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_final_layout(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_owner:
  *
- * The `owner` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_owner` sets.
  *
  * Returns: the value
  */
@@ -15286,7 +15219,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_replacement_free(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -15309,7 +15242,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_logical_size(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_physical_width:
  *
- * The `physical_width` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_physical_width` sets.
  *
  * Returns: the value
  */
@@ -15330,7 +15263,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_physical_width(
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_physical_height:
  *
- * The `physical_height` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_physical_height` sets.
  *
  * Returns: the value
  */
@@ -15351,7 +15284,7 @@ void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_physical_height
 /**
  * maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_textures:
  *
- * The `textures` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_textures` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiVulkanBorrowedTexture): the items
  */
@@ -15444,17 +15377,16 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  *
  * Options for `maplibre_native_ffi_vulkan_device_create()`.
  *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
  * See `mln_vulkan_device_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
  */
-GType maplibre_native_ffi_vulkan_device_options_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_DEVICE_OPTIONS \
-  (maplibre_native_ffi_vulkan_device_options_get_type())
-
 /**
  * maplibre_native_ffi_vulkan_device_options_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiVulkanDeviceOptions` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiVulkanDeviceOptions` whose members are zero, empty, or unset.
  *
  * Returns: (transfer full): the new value
  */
@@ -15462,134 +15394,118 @@ MaplibreNativeFfiVulkanDeviceOptions*
 maplibre_native_ffi_vulkan_device_options_new(void);
 
 /**
- * maplibre_native_ffi_vulkan_device_options_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiVulkanDeviceOptions*
-maplibre_native_ffi_vulkan_device_options_copy(
-  const MaplibreNativeFfiVulkanDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_options_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_vulkan_device_options_free(
-  MaplibreNativeFfiVulkanDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_options_get_presentation:
+ * MaplibreNativeFfiVulkanDeviceOptions:presentation: (setter set_presentation) (getter get_presentation)
  *
  * Whether the device can present to a window. The instance then enables
  * VK_KHR_surface and the platform's surface extensions, and the device enables
  * VK_KHR_swapchain. Defaults to false.
+ */
+/**
+ * maplibre_native_ffi_vulkan_device_options_get_presentation: (get-property presentation)
+ *
+ * Gets `MaplibreNativeFfiVulkanDeviceOptions:presentation`.
  *
  * Returns: the value
  */
 gboolean maplibre_native_ffi_vulkan_device_options_get_presentation(
-  const MaplibreNativeFfiVulkanDeviceOptions* self
+  MaplibreNativeFfiVulkanDeviceOptions* self
 );
 
 /**
  * maplibre_native_ffi_vulkan_device_options_has_presentation:
  *
- * Whether the value sets `maplibre_native_ffi_vulkan_device_options_set_presentation`.
+ * Whether `MaplibreNativeFfiVulkanDeviceOptions:presentation` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_vulkan_device_options_has_presentation(
-  const MaplibreNativeFfiVulkanDeviceOptions* self
+  MaplibreNativeFfiVulkanDeviceOptions* self
 );
 
 /**
- * maplibre_native_ffi_vulkan_device_options_set_presentation:
+ * maplibre_native_ffi_vulkan_device_options_set_presentation: (set-property presentation)
  *
- * Whether the device can present to a window. The instance then enables
- * VK_KHR_surface and the platform's surface extensions, and the device enables
- * VK_KHR_swapchain. Defaults to false.
+ * Sets `MaplibreNativeFfiVulkanDeviceOptions:presentation`.
  */
 void maplibre_native_ffi_vulkan_device_options_set_presentation(
   MaplibreNativeFfiVulkanDeviceOptions* self, gboolean value
 );
 
 /**
- * maplibre_native_ffi_vulkan_device_options_get_device_uuid:
+ * MaplibreNativeFfiVulkanDeviceOptions:device-uuid: (setter set_device_uuid) (getter get_device_uuid)
  *
  * The 16-byte `deviceUUID` of the GPU to use, as `VkPhysicalDeviceIDProperties`
  * reports it.
+ */
+/**
+ * maplibre_native_ffi_vulkan_device_options_get_device_uuid: (get-property device-uuid)
+ *
+ * Gets `MaplibreNativeFfiVulkanDeviceOptions:device-uuid`.
  *
  * Returns: (transfer none) (nullable): the bytes
  */
 GBytes* maplibre_native_ffi_vulkan_device_options_get_device_uuid(
-  const MaplibreNativeFfiVulkanDeviceOptions* self
+  MaplibreNativeFfiVulkanDeviceOptions* self
 );
 
 /**
  * maplibre_native_ffi_vulkan_device_options_has_device_uuid:
  *
- * Whether the value sets `maplibre_native_ffi_vulkan_device_options_set_device_uuid`.
+ * Whether `MaplibreNativeFfiVulkanDeviceOptions:device-uuid` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_vulkan_device_options_has_device_uuid(
-  const MaplibreNativeFfiVulkanDeviceOptions* self
+  MaplibreNativeFfiVulkanDeviceOptions* self
 );
 
 /**
- * maplibre_native_ffi_vulkan_device_options_set_device_uuid:
+ * maplibre_native_ffi_vulkan_device_options_set_device_uuid: (set-property device-uuid)
  * @value: (nullable): the bytes
  *
- * The 16-byte `deviceUUID` of the GPU to use, as `VkPhysicalDeviceIDProperties`
- * reports it.
+ * Sets `MaplibreNativeFfiVulkanDeviceOptions:device-uuid`.
  */
 void maplibre_native_ffi_vulkan_device_options_set_device_uuid(
   MaplibreNativeFfiVulkanDeviceOptions* self, GBytes* value
 );
 
 /**
- * maplibre_native_ffi_vulkan_device_options_get_device_luid:
+ * MaplibreNativeFfiVulkanDeviceOptions:device-luid: (setter set_device_luid) (getter get_device_luid)
  *
  * The 8-byte `deviceLUID` of the GPU to use, as `VkPhysicalDeviceIDProperties`
  * reports it. On Windows, this is the GPU's DXGI adapter LUID.
+ */
+/**
+ * maplibre_native_ffi_vulkan_device_options_get_device_luid: (get-property device-luid)
+ *
+ * Gets `MaplibreNativeFfiVulkanDeviceOptions:device-luid`.
  *
  * Returns: (transfer none) (nullable): the bytes
  */
 GBytes* maplibre_native_ffi_vulkan_device_options_get_device_luid(
-  const MaplibreNativeFfiVulkanDeviceOptions* self
+  MaplibreNativeFfiVulkanDeviceOptions* self
 );
 
 /**
  * maplibre_native_ffi_vulkan_device_options_has_device_luid:
  *
- * Whether the value sets `maplibre_native_ffi_vulkan_device_options_set_device_luid`.
+ * Whether `MaplibreNativeFfiVulkanDeviceOptions:device-luid` is set.
  *
  * Returns: whether the member is set
  */
 gboolean maplibre_native_ffi_vulkan_device_options_has_device_luid(
-  const MaplibreNativeFfiVulkanDeviceOptions* self
+  MaplibreNativeFfiVulkanDeviceOptions* self
 );
 
 /**
- * maplibre_native_ffi_vulkan_device_options_set_device_luid:
+ * maplibre_native_ffi_vulkan_device_options_set_device_luid: (set-property device-luid)
  * @value: (nullable): the bytes
  *
- * The 8-byte `deviceLUID` of the GPU to use, as `VkPhysicalDeviceIDProperties`
- * reports it. On Windows, this is the GPU's DXGI adapter LUID.
+ * Sets `MaplibreNativeFfiVulkanDeviceOptions:device-luid`.
  */
 void maplibre_native_ffi_vulkan_device_options_set_device_luid(
   MaplibreNativeFfiVulkanDeviceOptions* self, GBytes* value
 );
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiVulkanDeviceOptions,
-  maplibre_native_ffi_vulkan_device_options_free
-)
 
 /**
  * MaplibreNativeFfiVulkanSurfaceDescriptor:
@@ -15645,7 +15561,7 @@ void maplibre_native_ffi_vulkan_surface_descriptor_free(
 /**
  * maplibre_native_ffi_vulkan_surface_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_surface_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -15668,7 +15584,7 @@ void maplibre_native_ffi_vulkan_surface_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_vulkan_surface_descriptor_get_context:
  *
- * The `context` member.
+ * Gets the value that `maplibre_native_ffi_vulkan_surface_descriptor_set_context` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -15691,7 +15607,7 @@ void maplibre_native_ffi_vulkan_surface_descriptor_set_context(
 /**
  * maplibre_native_ffi_vulkan_surface_descriptor_get_surface:
  *
- * Your VkSurfaceKHR.
+ * Gets the value that `maplibre_native_ffi_vulkan_surface_descriptor_set_surface` sets.
  *
  * Returns: the value
  */
@@ -15944,7 +15860,7 @@ void maplibre_native_ffi_wayland_surface_descriptor_free(
 /**
  * maplibre_native_ffi_wayland_surface_descriptor_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_wayland_surface_descriptor_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -15967,7 +15883,7 @@ void maplibre_native_ffi_wayland_surface_descriptor_set_logical_size(
 /**
  * maplibre_native_ffi_wayland_surface_descriptor_get_display:
  *
- * Your `wl_display*`.
+ * Gets the value that `maplibre_native_ffi_wayland_surface_descriptor_set_display` sets.
  *
  * Returns: the value
  */
@@ -15987,7 +15903,7 @@ void maplibre_native_ffi_wayland_surface_descriptor_set_display(
 /**
  * maplibre_native_ffi_wayland_surface_descriptor_get_surface:
  *
- * Your `wl_surface*`, on `display`.
+ * Gets the value that `maplibre_native_ffi_wayland_surface_descriptor_set_surface` sets.
  *
  * Returns: the value
  */
@@ -16059,7 +15975,7 @@ void maplibre_native_ffi_wayland_surface_replacement_free(
 /**
  * maplibre_native_ffi_wayland_surface_replacement_get_logical_size:
  *
- * The `logical_size` member.
+ * Gets the value that `maplibre_native_ffi_wayland_surface_replacement_set_logical_size` sets.
  *
  * Returns: (transfer none): the value
  */
@@ -16082,7 +15998,7 @@ void maplibre_native_ffi_wayland_surface_replacement_set_logical_size(
 /**
  * maplibre_native_ffi_wayland_surface_replacement_get_surface:
  *
- * Your `wl_surface*`, on the display that the session attached with.
+ * Gets the value that `maplibre_native_ffi_wayland_surface_replacement_set_surface` sets.
  *
  * Returns: the value
  */

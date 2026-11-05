@@ -12,29 +12,33 @@ namespace CameraSnippets {
 
 	// #region gesture
 	void begin_gesture (Map map) {
-		var delta = new CameraDelta ();
-		delta.set_gesture_phase (GesturePhase.BEGIN);
+		var delta = new CameraDelta () {
+			gesture_phase = GesturePhase.BEGIN,
+		};
 		map.apply_camera_delta_async.begin (delta);
 	}
 
 	void apply_drag (Map map, ScreenPoint movement) {
-		var delta = new CameraDelta ();
-		delta.set_offset (movement);
-		delta.set_gesture_phase (GesturePhase.UPDATE);
+		var delta = new CameraDelta () {
+			offset = movement,
+			gesture_phase = GesturePhase.UPDATE,
+		};
 		map.apply_camera_delta_async.begin (delta);
 	}
 
 	void apply_pinch (Map map, double scale, ScreenPoint center) {
-		var delta = new CameraDelta ();
-		delta.set_scale (scale);
-		delta.set_anchor (center);
-		delta.set_gesture_phase (GesturePhase.UPDATE);
+		var delta = new CameraDelta () {
+			scale = scale,
+			anchor = center,
+			gesture_phase = GesturePhase.UPDATE,
+		};
 		map.apply_camera_delta_async.begin (delta);
 	}
 
 	void end_gesture (Map map) {
-		var delta = new CameraDelta ();
-		delta.set_gesture_phase (GesturePhase.END);
+		var delta = new CameraDelta () {
+			gesture_phase = GesturePhase.END,
+		};
 		map.apply_camera_delta_async.begin (delta);
 	}
 	// #endregion gesture
@@ -49,9 +53,10 @@ namespace CameraSnippets {
 		// #endregion read
 
 		// #region jump
-		var paris = new CameraOptions ();
-		paris.set_center ({ latitude: 48.8566, longitude: 2.3522 });
-		paris.set_zoom (12);
+		var paris = new CameraOptions () {
+			center = { latitude: 48.8566, longitude: 2.3522 },
+			zoom = 12,
+		};
 		var jump = new CameraUpdate ();
 		jump.set_mode (CameraUpdateMode.JUMP);
 		jump.set_camera (paris);
@@ -67,15 +72,15 @@ namespace CameraSnippets {
 				end.outcome == CameraTransitionOutcome.COMPLETED
 			);
 		});
-		var animation = new AnimationOptions ();
-		animation.set_duration_ms (3000);
-		animation.set_end_handler (end_handler);
+		var animation = new AnimationOptions () {
+			duration_ms = 3000,
+			end_handler = end_handler,
+		};
 
-		var new_york = new CameraOptions ();
-		new_york.set_center (
-			{ latitude: 40.7128, longitude: -74.006 }
-		);
-		new_york.set_zoom (10);
+		var new_york = new CameraOptions () {
+			center = { latitude: 40.7128, longitude: -74.006 },
+			zoom = 10,
+		};
 		var fly = new CameraUpdate ();
 		fly.set_mode (CameraUpdateMode.FLY);
 		fly.set_camera (new_york);
@@ -88,8 +93,7 @@ namespace CameraSnippets {
 			{ latitude: 45.8, longitude: 5.9 },
 			{ latitude: 47.8, longitude: 10.5 },
 		};
-		var ease = new AnimationOptions ();
-		ease.set_duration_ms (500);
+		var ease = new AnimationOptions () { duration_ms = 500 };
 		var fit = new CameraFitUpdate ();
 		fit.set_mode (CameraUpdateMode.EASE);
 		fit.set_animation (ease);
@@ -97,10 +101,11 @@ namespace CameraSnippets {
 		// #endregion fit
 
 		// #region limit
-		var limits = new BoundOptions ();
-		limits.set_bounds (bounds);
-		limits.set_min_zoom (5);
-		limits.set_max_zoom (16);
+		var limits = new BoundOptions () {
+			bounds = bounds,
+			min_zoom = 5,
+			max_zoom = 16,
+		};
 		map.set_bounds_async.begin (limits);
 		// #endregion limit
 

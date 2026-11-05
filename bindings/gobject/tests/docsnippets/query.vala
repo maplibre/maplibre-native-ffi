@@ -14,8 +14,9 @@ namespace Query {
 		ScreenBox box = {
 			{ point.x - 5, point.y - 5 }, { point.x + 5, point.y + 5 }
 		};
-		var options = new RenderedFeatureQueryOptions ();
-		options.set_layer_ids ({ "poi" });
+		var options = new RenderedFeatureQueryOptions () {
+			layer_ids = { "poi" },
+		};
 		var hits = yield session.query_rendered_features_async (
 			new RenderedQueryGeometry.box (box), options
 		);
@@ -26,10 +27,11 @@ namespace Query {
 		// #endregion rendered
 
 		// #region source
-		var filter = new SourceFeatureQueryOptions ();
-		filter.set_source_layer_ids ({ "transportation" });
-		// A filter from the MapLibre style spec.
-		filter.set_filter ("[\"==\", [\"get\", \"class\"], \"motorway\"]");
+		var filter = new SourceFeatureQueryOptions () {
+			source_layer_ids = { "transportation" },
+			// A filter from the MapLibre style spec.
+			filter = "[\"==\", [\"get\", \"class\"], \"motorway\"]",
+		};
 		var features = yield session.query_source_features_async (
 			"openmaptiles", filter
 		);

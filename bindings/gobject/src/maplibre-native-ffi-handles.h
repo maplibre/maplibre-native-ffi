@@ -336,7 +336,7 @@ guint64 maplibre_native_ffi_geo_json_source_data_get_id(
  */
 MaplibreNativeFfiGeoJsonSourceData*
 maplibre_native_ffi_geo_json_source_data_create(
-  const char* data, const MaplibreNativeFfiGeoJsonSourceOptions* options,
+  const char* data, MaplibreNativeFfiGeoJsonSourceOptions* options,
   GError** error
 );
 
@@ -402,7 +402,7 @@ guint64 maplibre_native_ffi_map_get_id(MaplibreNativeFfiMap* self);
  */
 void maplibre_native_ffi_map_add_custom_geometry_source_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  const MaplibreNativeFfiCustomGeometrySourceOptions* options,
+  MaplibreNativeFfiCustomGeometrySourceOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -441,7 +441,7 @@ maplibre_native_ffi_map_add_custom_geometry_source_finish(
  */
 void maplibre_native_ffi_map_add_custom_vector_source_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  const MaplibreNativeFfiCustomVectorSourceOptions* options,
+  MaplibreNativeFfiCustomVectorSourceOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -650,7 +650,7 @@ maplibre_native_ffi_map_add_style_source_json_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_apply_camera_delta_async(
-  MaplibreNativeFfiMap* self, const MaplibreNativeFfiCameraDelta* delta,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiCameraDelta* delta,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -985,7 +985,7 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_vulkan_surface(
  * It fails with these errors:
  *
  * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when you created `device` without
- *   `maplibre_native_ffi_vulkan_device_options_set_presentation`.
+ *   `MaplibreNativeFfiVulkanDeviceOptions:presentation`.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the GPU or the Vulkan loader
  *   can't present to Wayland.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the library can't create the
@@ -1057,8 +1057,8 @@ maplibre_native_ffi_map_begin_command_group_finish(
  */
 void maplibre_native_ffi_map_camera_for_geometry_async(
   MaplibreNativeFfiMap* self, const char* geometry,
-  const MaplibreNativeFfiCameraFitOptions* fit_options,
-  GAsyncReadyCallback callback, gpointer user_data
+  MaplibreNativeFfiCameraFitOptions* fit_options, GAsyncReadyCallback callback,
+  gpointer user_data
 );
 
 /**
@@ -1095,8 +1095,8 @@ maplibre_native_ffi_map_camera_for_geometry_finish(
  */
 void maplibre_native_ffi_map_camera_for_lat_lng_bounds_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLngBounds* bounds,
-  const MaplibreNativeFfiCameraFitOptions* fit_options,
-  GAsyncReadyCallback callback, gpointer user_data
+  MaplibreNativeFfiCameraFitOptions* fit_options, GAsyncReadyCallback callback,
+  gpointer user_data
 );
 
 /**
@@ -1135,7 +1135,7 @@ maplibre_native_ffi_map_camera_for_lat_lng_bounds_finish(
  */
 void maplibre_native_ffi_map_camera_for_lat_lngs_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLng* coordinates,
-  gsize coordinate_count, const MaplibreNativeFfiCameraFitOptions* fit_options,
+  gsize coordinate_count, MaplibreNativeFfiCameraFitOptions* fit_options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -1463,8 +1463,7 @@ MaplibreNativeFfiCameraQueryResult* maplibre_native_ffi_map_get_camera_finish(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 void maplibre_native_ffi_map_get_feature_state_async(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiFeatureStateSelector* selector,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiFeatureStateSelector* selector,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -2003,7 +2002,7 @@ maplibre_native_ffi_map_invalidate_custom_vector_source_tile_finish(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  */
 void maplibre_native_ffi_map_lat_lng_bounds_for_camera_async(
-  MaplibreNativeFfiMap* self, const MaplibreNativeFfiCameraOptions* camera,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiCameraOptions* camera,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -2153,8 +2152,7 @@ gboolean maplibre_native_ffi_map_release_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_remove_feature_state_async(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiFeatureStateSelector* selector,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiFeatureStateSelector* selector,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -2406,7 +2404,7 @@ MaplibreNativeFfiCommandCompletion* maplibre_native_ffi_map_resize_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_bounds_async(
-  MaplibreNativeFfiMap* self, const MaplibreNativeFfiBoundOptions* options,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiBoundOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -2668,9 +2666,8 @@ maplibre_native_ffi_map_set_event_mask_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_feature_state_async(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiFeatureStateSelector* selector, const char* state,
-  GAsyncReadyCallback callback, gpointer user_data
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiFeatureStateSelector* selector,
+  const char* state, GAsyncReadyCallback callback, gpointer user_data
 );
 
 /**
@@ -2703,7 +2700,7 @@ maplibre_native_ffi_map_set_feature_state_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_free_camera_options_async(
-  MaplibreNativeFfiMap* self, const MaplibreNativeFfiFreeCameraOptions* options,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiFreeCameraOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -3031,8 +3028,7 @@ maplibre_native_ffi_map_set_image_source_url_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_projection_mode_async(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiProjectionModeOptions* options,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiProjectionModeOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -3101,8 +3097,8 @@ maplibre_native_ffi_map_set_rendering_stats_view_enabled_finish(
 void maplibre_native_ffi_map_set_style_image_async(
   MaplibreNativeFfiMap* self, const char* image_id,
   const MaplibreNativeFfiPremultipliedRgba8Image* image,
-  const MaplibreNativeFfiStyleImageOptions* options,
-  GAsyncReadyCallback callback, gpointer user_data
+  MaplibreNativeFfiStyleImageOptions* options, GAsyncReadyCallback callback,
+  gpointer user_data
 );
 
 /**
@@ -3335,8 +3331,7 @@ maplibre_native_ffi_map_set_style_source_volatile_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_transition_options_async(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiStyleTransitionOptions* options,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiStyleTransitionOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -3416,7 +3411,7 @@ maplibre_native_ffi_map_set_style_url_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_tile_options_async(
-  MaplibreNativeFfiMap* self, const MaplibreNativeFfiMapTileOptions* options,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiMapTileOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -3448,8 +3443,7 @@ maplibre_native_ffi_map_set_tile_options_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_viewport_options_async(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiMapViewportOptions* options,
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiMapViewportOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -3753,8 +3747,8 @@ void maplibre_native_ffi_map_projection_release(
  * Returns: %TRUE on success, or %FALSE with `error` set
  */
 gboolean maplibre_native_ffi_map_projection_set_camera(
-  MaplibreNativeFfiMapProjection* self,
-  const MaplibreNativeFfiCameraOptions* camera, GError** error
+  MaplibreNativeFfiMapProjection* self, MaplibreNativeFfiCameraOptions* camera,
+  GError** error
 );
 
 /**
@@ -3808,7 +3802,7 @@ guint64 maplibre_native_ffi_offscreen_device_get_id(
  * Returns: (transfer full): the object
  */
 MaplibreNativeFfiOffscreenDevice* maplibre_native_ffi_offscreen_device_create(
-  const MaplibreNativeFfiOffscreenDeviceOptions* options, GError** error
+  MaplibreNativeFfiOffscreenDeviceOptions* options, GError** error
 );
 
 /**
@@ -4322,7 +4316,7 @@ maplibre_native_ffi_render_session_get_snapshot(
 void maplibre_native_ffi_render_session_query_rendered_features_async(
   MaplibreNativeFfiRenderSession* self,
   const MaplibreNativeFfiRenderedQueryGeometry* geometry,
-  const MaplibreNativeFfiRenderedFeatureQueryOptions* options,
+  MaplibreNativeFfiRenderedFeatureQueryOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -4355,7 +4349,7 @@ GPtrArray* maplibre_native_ffi_render_session_query_rendered_features_finish(
  */
 void maplibre_native_ffi_render_session_query_source_features_async(
   MaplibreNativeFfiRenderSession* self, const char* source_id,
-  const MaplibreNativeFfiSourceFeatureQueryOptions* options,
+  MaplibreNativeFfiSourceFeatureQueryOptions* options,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -4960,7 +4954,7 @@ guint64 maplibre_native_ffi_resource_request_get_id(
  */
 gboolean maplibre_native_ffi_resource_request_complete(
   MaplibreNativeFfiResourceRequest* self,
-  const MaplibreNativeFfiResourceResponse* response, GError** error
+  MaplibreNativeFfiResourceResponse* response, GError** error
 );
 
 /**
@@ -5102,7 +5096,7 @@ gboolean maplibre_native_ffi_resource_transform_request_complete(
  */
 gboolean maplibre_native_ffi_resource_transform_request_fail(
   MaplibreNativeFfiResourceTransformRequest* self,
-  const MaplibreNativeFfiResourceTransformError* error_value, GError** error
+  MaplibreNativeFfiResourceTransformError* error_value, GError** error
 );
 
 /**
@@ -5301,7 +5295,7 @@ MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(
  * Returns: (transfer full): the new object, or %NULL with `error` set
  */
 MaplibreNativeFfiMap* maplibre_native_ffi_runtime_create_map(
-  MaplibreNativeFfiRuntime* self, const MaplibreNativeFfiMapOptions* options,
+  MaplibreNativeFfiRuntime* self, MaplibreNativeFfiMapOptions* options,
   GError** error
 );
 
@@ -5960,8 +5954,8 @@ guint64 maplibre_native_ffi_style_expression_get_id(
  * Returns: (transfer full): the object
  */
 MaplibreNativeFfiStyleExpression* maplibre_native_ffi_style_expression_create(
-  const char* expression,
-  const MaplibreNativeFfiStyleExpressionOptions* options, GError** error
+  const char* expression, MaplibreNativeFfiStyleExpressionOptions* options,
+  GError** error
 );
 
 /**
@@ -5984,7 +5978,7 @@ MaplibreNativeFfiStyleExpression* maplibre_native_ffi_style_expression_create(
  */
 char* maplibre_native_ffi_style_expression_evaluate(
   MaplibreNativeFfiStyleExpression* self,
-  const MaplibreNativeFfiStyleExpressionInputs* inputs, GError** error
+  MaplibreNativeFfiStyleExpressionInputs* inputs, GError** error
 );
 
 /**
@@ -6073,7 +6067,7 @@ guint64 maplibre_native_ffi_vulkan_device_get_id(
  * Returns: (transfer full): the object
  */
 MaplibreNativeFfiVulkanDevice* maplibre_native_ffi_vulkan_device_create(
-  const MaplibreNativeFfiVulkanDeviceOptions* options, GError** error
+  MaplibreNativeFfiVulkanDeviceOptions* options, GError** error
 );
 
 /**
@@ -6125,9 +6119,9 @@ void maplibre_native_ffi_vulkan_device_release(
  * You can call it on any thread. The pacer needs no run loop of yours. On
  * macOS, it follows the main display, the one with the menu bar.
  *
- * With `maplibre_native_ffi_frame_pacer_options_set_maximum_frames_per_second`,
- * the pacer also asks the system for that refresh rate. On iPhone, a rate above
- * 60 needs `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+ * With `MaplibreNativeFfiFramePacerOptions:maximum-frames-per-second`, the
+ * pacer also asks the system for that refresh rate. On iPhone, a rate above 60
+ * needs `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
  *
  * See `mln_apple_frame_pacer_create` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
@@ -6140,7 +6134,7 @@ void maplibre_native_ffi_vulkan_device_release(
  * Returns: (transfer full): the object
  */
 MaplibreNativeFfiFramePacer* maplibre_native_ffi_apple_frame_pacer_create(
-  const MaplibreNativeFfiFramePacerOptions* options, GError** error
+  MaplibreNativeFfiFramePacerOptions* options, GError** error
 );
 #endif
 

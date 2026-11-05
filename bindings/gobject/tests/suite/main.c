@@ -1,7 +1,7 @@
 // What the GObject library adds to the C API: its errors, completions that
 // finish on the main context that started them, handle objects, boxed values,
-// callback registrations, and render sessions whose wakes run on the main
-// context.
+// option objects, callback registrations, and render sessions whose wakes run
+// on the main context.
 
 #include <maplibre-native-ffi.h>
 #include <mln_test_graphics.h>
@@ -226,18 +226,13 @@ static void a_map_keeps_its_runtime_alive(void) {
   g_object_unref(map);
 }
 
-static void boxed_values_copy_deeply_and_track_their_members(void) {
+static void a_holder_copies_its_members(void) {
   g_autoptr(MaplibreNativeFfiCameraOptions) camera =
-    maplibre_native_ffi_camera_options_new();
-  g_assert_false(maplibre_native_ffi_camera_options_has_zoom(camera));
-  maplibre_native_ffi_camera_options_set_zoom(camera, 3);
-  g_assert_true(maplibre_native_ffi_camera_options_has_zoom(camera));
-  g_assert_false(maplibre_native_ffi_camera_options_has_bearing(camera));
-
+    g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_OPTIONS, "zoom", 3.0, NULL);
   g_autoptr(MaplibreNativeFfiCameraUpdate) update =
     maplibre_native_ffi_camera_update_new();
   maplibre_native_ffi_camera_update_set_camera(update, camera);
-  maplibre_native_ffi_camera_options_set_zoom(camera, 5);
+  g_object_set(camera, "zoom", 5.0, NULL);
   // The update copied the camera.
   g_assert_cmpfloat(
     maplibre_native_ffi_camera_options_get_zoom(
@@ -245,18 +240,6 @@ static void boxed_values_copy_deeply_and_track_their_members(void) {
     ),
     ==, 3
   );
-
-  const char* const ids[] = {"roads", "water", NULL};
-  g_autoptr(MaplibreNativeFfiRenderedFeatureQueryOptions) query =
-    maplibre_native_ffi_rendered_feature_query_options_new();
-  maplibre_native_ffi_rendered_feature_query_options_set_layer_ids(query, ids);
-  g_autoptr(MaplibreNativeFfiRenderedFeatureQueryOptions) copy =
-    maplibre_native_ffi_rendered_feature_query_options_copy(query);
-  maplibre_native_ffi_rendered_feature_query_options_set_layer_ids(query, NULL);
-  const char* const* copied =
-    maplibre_native_ffi_rendered_feature_query_options_get_layer_ids(copy);
-  g_assert_cmpstr(copied[1], ==, "water");
-  g_assert_null(copied[2]);
 
   g_autoptr(MaplibreNativeFfiFeatureId) id =
     maplibre_native_ffi_feature_id_new_string_value("feature");
@@ -269,14 +252,10 @@ static void boxed_values_copy_deeply_and_track_their_members(void) {
   );
 }
 
-static void a_record_reaches_native_and_comes_back(void) {
-  MaplibreNativeFfiRuntime* runtime = create_runtime();
-  MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 64);
-  g_autoptr(MaplibreNativeFfiCameraOptions) camera =
-    maplibre_native_ffi_camera_options_new();
-  maplibre_native_ffi_camera_options_set_zoom(camera, 4);
-  const MaplibreNativeFfiLatLng center = {.latitude = 10, .longitude = 20};
-  maplibre_native_ffi_camera_options_set_center(camera, &center);
+/** Moves the map's camera to `camera`'s members at once. */
+static void jump(
+  MaplibreNativeFfiMap* map, MaplibreNativeFfiCameraOptions* camera
+) {
   g_autoptr(MaplibreNativeFfiCameraUpdate) update =
     maplibre_native_ffi_camera_update_new();
   maplibre_native_ffi_camera_update_set_mode(
@@ -284,7 +263,30 @@ static void a_record_reaches_native_and_comes_back(void) {
   );
   maplibre_native_ffi_camera_update_set_camera(update, camera);
   maplibre_native_ffi_map_update_camera_async(map, update, NULL, NULL);
+}
 
+static void an_option_is_unset_until_a_property_sets_it(void) {
+  MaplibreNativeFfiRuntime* runtime = create_runtime();
+  MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 64);
+  g_autoptr(MaplibreNativeFfiCameraOptions) turn = g_object_new(
+    MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_OPTIONS, "bearing", 30.0, NULL
+  );
+  g_assert_true(maplibre_native_ffi_camera_options_has_bearing(turn));
+  g_assert_false(maplibre_native_ffi_camera_options_has_zoom(turn));
+  jump(map, turn);
+
+  g_autoptr(MaplibreNativeFfiCameraOptions) move =
+    maplibre_native_ffi_camera_options_new();
+  g_assert_false(maplibre_native_ffi_camera_options_has_zoom(move));
+  const MaplibreNativeFfiLatLng center = {.latitude = 10, .longitude = 20};
+  g_object_set(move, "zoom", 4.0, "center", &center, NULL);
+  g_assert_true(maplibre_native_ffi_camera_options_has_zoom(move));
+  g_assert_true(maplibre_native_ffi_camera_options_has_center(move));
+  g_assert_false(maplibre_native_ffi_camera_options_has_bearing(move));
+  jump(map, move);
+
+  // The map applies commands in order, so the query sees both jumps, and the
+  // second, which leaves the bearing unset, keeps the first's bearing.
   Pending pending = {0};
   maplibre_native_ffi_map_get_camera_async(map, store_result, &pending);
   g_autoptr(GAsyncResult) result = take(&pending, "the camera");
@@ -295,6 +297,7 @@ static void a_record_reaches_native_and_comes_back(void) {
   g_assert_cmpfloat_with_epsilon(found->camera.zoom, 4, 1e-9);
   g_assert_cmpfloat_with_epsilon(found->camera.center.latitude, 10, 1e-9);
   g_assert_cmpfloat_with_epsilon(found->camera.center.longitude, 20, 1e-9);
+  g_assert_cmpfloat_with_epsilon(found->camera.bearing, 30, 1e-9);
   release_map(map);
   release_runtime(runtime);
 }
@@ -1020,12 +1023,11 @@ int main(int argc, char** argv) {
     "/handles/a-map-keeps-its-runtime-alive", a_map_keeps_its_runtime_alive
   );
   g_test_add_func(
-    "/values/copy-deeply-and-track-their-members",
-    boxed_values_copy_deeply_and_track_their_members
+    "/values/a-holder-copies-its-members", a_holder_copies_its_members
   );
   g_test_add_func(
-    "/values/a-record-reaches-native-and-comes-back",
-    a_record_reaches_native_and_comes_back
+    "/values/an-option-is-unset-until-a-property-sets-it",
+    an_option_is_unset_until_a_property_sets_it
   );
   g_test_add_func(
     "/values/a-bulk-projection-returns-every-result",

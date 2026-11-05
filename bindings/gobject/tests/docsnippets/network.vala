@@ -66,12 +66,12 @@ namespace Network {
 		provider.set_routes ({ route });
 		provider.set_callback ((request, handle) => {
 			var tile = find_tile (request.get_requested_url ());
-			var response = new ResourceResponse ();
-			if (tile == null) {
-				response.set_status (ResourceResponseStatus.NO_CONTENT);
-			} else {
-				response.set_status (ResourceResponseStatus.OK);
-				response.set_bytes (tile);
+			var response = new ResourceResponse () {
+				status = ResourceResponseStatus.NO_CONTENT,
+			};
+			if (tile != null) {
+				response.status = ResourceResponseStatus.OK;
+				response.bytes = tile;
 			}
 			try {
 				handle.complete (response);

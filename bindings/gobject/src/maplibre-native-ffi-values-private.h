@@ -40,8 +40,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiAnimationOptions*
 maplibre_native_ffi_animation_options_from_native(
   const mln_animation_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_animation_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiAnimationOptions*
+maplibre_native_ffi_animation_options_copy(
+  const MaplibreNativeFfiAnimationOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_lat_lng_to_native(
   const MaplibreNativeFfiLatLng* self, mln_lat_lng* out,
@@ -71,8 +72,10 @@ G_GNUC_INTERNAL void maplibre_native_ffi_bound_options_to_native(
 );
 G_GNUC_INTERNAL MaplibreNativeFfiBoundOptions*
 maplibre_native_ffi_bound_options_from_native(const mln_bound_options* in);
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_bound_options_copy_func(gconstpointer self, gpointer data);
+G_GNUC_INTERNAL MaplibreNativeFfiBoundOptions*
+maplibre_native_ffi_bound_options_copy(
+  const MaplibreNativeFfiBoundOptions* self
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_edge_insets_to_native(
   const MaplibreNativeFfiEdgeInsets* self, mln_edge_insets* out,
   MaplibreNativeFfiCall* call
@@ -124,8 +127,8 @@ G_GNUC_INTERNAL void maplibre_native_ffi_camera_delta_to_native(
 );
 G_GNUC_INTERNAL MaplibreNativeFfiCameraDelta*
 maplibre_native_ffi_camera_delta_from_native(const mln_camera_delta* in);
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_camera_delta_copy_func(gconstpointer self, gpointer data);
+G_GNUC_INTERNAL MaplibreNativeFfiCameraDelta*
+maplibre_native_ffi_camera_delta_copy(const MaplibreNativeFfiCameraDelta* self);
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_fit_options_to_native(
   const MaplibreNativeFfiCameraFitOptions* self, mln_camera_fit_options* out,
   MaplibreNativeFfiCall* call
@@ -134,8 +137,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiCameraFitOptions*
 maplibre_native_ffi_camera_fit_options_from_native(
   const mln_camera_fit_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_camera_fit_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiCameraFitOptions*
+maplibre_native_ffi_camera_fit_options_copy(
+  const MaplibreNativeFfiCameraFitOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_fit_update_to_native(
   const MaplibreNativeFfiCameraFitUpdate* self, mln_camera_fit_update* out,
@@ -154,8 +158,10 @@ G_GNUC_INTERNAL void maplibre_native_ffi_camera_options_to_native(
 );
 G_GNUC_INTERNAL MaplibreNativeFfiCameraOptions*
 maplibre_native_ffi_camera_options_from_native(const mln_camera_options* in);
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_camera_options_copy_func(gconstpointer self, gpointer data);
+G_GNUC_INTERNAL MaplibreNativeFfiCameraOptions*
+maplibre_native_ffi_camera_options_copy(
+  const MaplibreNativeFfiCameraOptions* self
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_query_result_to_native(
   const MaplibreNativeFfiCameraQueryResult* self, mln_camera_query_result* out,
   MaplibreNativeFfiCall* call
@@ -215,9 +221,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiCustomGeometrySourceOptions*
 maplibre_native_ffi_custom_geometry_source_options_from_native(
   const mln_custom_geometry_source_options* in
 );
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_custom_geometry_source_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiCustomGeometrySourceOptions*
+maplibre_native_ffi_custom_geometry_source_options_copy(
+  const MaplibreNativeFfiCustomGeometrySourceOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_custom_vector_source_options_to_native(
   const MaplibreNativeFfiCustomVectorSourceOptions* self,
@@ -227,9 +233,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiCustomVectorSourceOptions*
 maplibre_native_ffi_custom_vector_source_options_from_native(
   const mln_custom_vector_source_options* in
 );
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_custom_vector_source_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiCustomVectorSourceOptions*
+maplibre_native_ffi_custom_vector_source_options_copy(
+  const MaplibreNativeFfiCustomVectorSourceOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_dma_buf_format_to_native(
   const MaplibreNativeFfiDmaBufFormat* self, mln_dma_buf_format* out,
@@ -310,8 +316,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiFeatureStateSelector*
 maplibre_native_ffi_feature_state_selector_from_native(
   const mln_feature_state_selector* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_feature_state_selector_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiFeatureStateSelector*
+maplibre_native_ffi_feature_state_selector_copy(
+  const MaplibreNativeFfiFeatureStateSelector* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_frame_demand_to_native(
   const MaplibreNativeFfiFrameDemand* self, mln_frame_demand* out,
@@ -332,8 +339,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiFramePacerOptions*
 maplibre_native_ffi_frame_pacer_options_from_native(
   const mln_frame_pacer_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_frame_pacer_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiFramePacerOptions*
+maplibre_native_ffi_frame_pacer_options_copy(
+  const MaplibreNativeFfiFramePacerOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_vec3_to_native(
   const MaplibreNativeFfiVec3* self, mln_vec3* out, MaplibreNativeFfiCall* call
@@ -376,8 +384,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiFreeCameraOptions*
 maplibre_native_ffi_free_camera_options_from_native(
   const mln_free_camera_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_free_camera_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiFreeCameraOptions*
+maplibre_native_ffi_free_camera_options_copy(
+  const MaplibreNativeFfiFreeCameraOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_geo_json_source_options_to_native(
   const MaplibreNativeFfiGeoJsonSourceOptions* self,
@@ -387,8 +396,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiGeoJsonSourceOptions*
 maplibre_native_ffi_geo_json_source_options_from_native(
   const mln_geo_json_source_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_geo_json_source_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiGeoJsonSourceOptions*
+maplibre_native_ffi_geo_json_source_options_copy(
+  const MaplibreNativeFfiGeoJsonSourceOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_gpu_sync_to_native(
   const MaplibreNativeFfiGpuSync* self, mln_gpu_sync* out,
@@ -512,8 +522,8 @@ G_GNUC_INTERNAL void maplibre_native_ffi_map_options_to_native(
 );
 G_GNUC_INTERNAL MaplibreNativeFfiMapOptions*
 maplibre_native_ffi_map_options_from_native(const mln_map_options* in);
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_map_options_copy_func(gconstpointer self, gpointer data);
+G_GNUC_INTERNAL MaplibreNativeFfiMapOptions*
+maplibre_native_ffi_map_options_copy(const MaplibreNativeFfiMapOptions* self);
 G_GNUC_INTERNAL void maplibre_native_ffi_map_projection_camera_result_to_native(
   const MaplibreNativeFfiMapProjectionCameraResult* self,
   mln_map_projection_camera_result* out, MaplibreNativeFfiCall* call
@@ -597,8 +607,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiMapTileOptions*
 maplibre_native_ffi_map_tile_options_from_native(
   const mln_map_tile_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_map_tile_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiMapTileOptions*
+maplibre_native_ffi_map_tile_options_copy(
+  const MaplibreNativeFfiMapTileOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_map_viewport_options_to_native(
   const MaplibreNativeFfiMapViewportOptions* self,
@@ -608,8 +619,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiMapViewportOptions*
 maplibre_native_ffi_map_viewport_options_from_native(
   const mln_map_viewport_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_map_viewport_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiMapViewportOptions*
+maplibre_native_ffi_map_viewport_options_copy(
+  const MaplibreNativeFfiMapViewportOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_metal_borrowed_texture_to_native(
   const MaplibreNativeFfiMetalBorrowedTexture* self,
@@ -767,8 +779,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiOffscreenDeviceOptions*
 maplibre_native_ffi_offscreen_device_options_from_native(
   const mln_offscreen_device_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_offscreen_device_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiOffscreenDeviceOptions*
+maplibre_native_ffi_offscreen_device_options_copy(
+  const MaplibreNativeFfiOffscreenDeviceOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_open_gl_borrowed_texture_to_native(
   const MaplibreNativeFfiOpenGlBorrowedTexture* self,
@@ -932,8 +945,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiProjectionModeOptions*
 maplibre_native_ffi_projection_mode_options_from_native(
   const mln_projection_mode_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_projection_mode_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiProjectionModeOptions*
+maplibre_native_ffi_projection_mode_options_copy(
+  const MaplibreNativeFfiProjectionModeOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_queue_lock_to_native(
   const MaplibreNativeFfiQueueLock* self, mln_queue_lock* out,
@@ -1043,9 +1057,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiRenderedFeatureQueryOptions*
 maplibre_native_ffi_rendered_feature_query_options_from_native(
   const mln_rendered_feature_query_options* in
 );
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_rendered_feature_query_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiRenderedFeatureQueryOptions*
+maplibre_native_ffi_rendered_feature_query_options_copy(
+  const MaplibreNativeFfiRenderedFeatureQueryOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_screen_box_to_native(
   const MaplibreNativeFfiScreenBox* self, mln_screen_box* out,
@@ -1154,8 +1168,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiResourceResponse*
 maplibre_native_ffi_resource_response_from_native(
   const mln_resource_response* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_resource_response_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiResourceResponse*
+maplibre_native_ffi_resource_response_copy(
+  const MaplibreNativeFfiResourceResponse* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_url_query_parameter_to_native(
   const MaplibreNativeFfiUrlQueryParameter* self, mln_url_query_parameter* out,
@@ -1198,8 +1213,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiResourceTransformError*
 maplibre_native_ffi_resource_transform_error_from_native(
   const mln_resource_transform_error* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_resource_transform_error_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiResourceTransformError*
+maplibre_native_ffi_resource_transform_error_copy(
+  const MaplibreNativeFfiResourceTransformError* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_runtime_event_camera_change_to_native(
   const MaplibreNativeFfiRuntimeEventCameraChange* self,
@@ -1430,9 +1446,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiSourceFeatureQueryOptions*
 maplibre_native_ffi_source_feature_query_options_from_native(
   const mln_source_feature_query_options* in
 );
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_source_feature_query_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiSourceFeatureQueryOptions*
+maplibre_native_ffi_source_feature_query_options_copy(
+  const MaplibreNativeFfiSourceFeatureQueryOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_style_expression_info_to_native(
   const MaplibreNativeFfiStyleExpressionInfo* self,
@@ -1456,8 +1472,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiStyleExpressionInputs*
 maplibre_native_ffi_style_expression_inputs_from_native(
   const mln_style_expression_inputs* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_style_expression_inputs_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiStyleExpressionInputs*
+maplibre_native_ffi_style_expression_inputs_copy(
+  const MaplibreNativeFfiStyleExpressionInputs* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_style_expression_type_to_native(
   const MaplibreNativeFfiStyleExpressionType* self,
@@ -1481,8 +1498,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiStyleExpressionOptions*
 maplibre_native_ffi_style_expression_options_from_native(
   const mln_style_expression_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_style_expression_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiStyleExpressionOptions*
+maplibre_native_ffi_style_expression_options_copy(
+  const MaplibreNativeFfiStyleExpressionOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_style_image_info_to_native(
   const MaplibreNativeFfiStyleImageInfo* self, mln_style_image_info* out,
@@ -1503,8 +1521,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiStyleImageOptions*
 maplibre_native_ffi_style_image_options_from_native(
   const mln_style_image_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_style_image_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiStyleImageOptions*
+maplibre_native_ffi_style_image_options_copy(
+  const MaplibreNativeFfiStyleImageOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_style_layer_info_to_native(
   const MaplibreNativeFfiStyleLayerInfo* self, mln_style_layer_info* out,
@@ -1547,8 +1566,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiStyleTransitionOptions*
 maplibre_native_ffi_style_transition_options_from_native(
   const mln_style_transition_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_style_transition_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiStyleTransitionOptions*
+maplibre_native_ffi_style_transition_options_copy(
+  const MaplibreNativeFfiStyleTransitionOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_texture_image_info_to_native(
   const MaplibreNativeFfiTextureImageInfo* self, mln_texture_image_info* out,
@@ -1648,8 +1668,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiVulkanDeviceOptions*
 maplibre_native_ffi_vulkan_device_options_from_native(
   const mln_vulkan_device_options* in
 );
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_vulkan_device_options_copy_func(
-  gconstpointer self, gpointer data
+G_GNUC_INTERNAL MaplibreNativeFfiVulkanDeviceOptions*
+maplibre_native_ffi_vulkan_device_options_copy(
+  const MaplibreNativeFfiVulkanDeviceOptions* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_surface_descriptor_to_native(
   const MaplibreNativeFfiVulkanSurfaceDescriptor* self,

@@ -487,14 +487,15 @@ class Emitter:
             record = value.unwrapped
             if record.kind not in {"record", "union"}:
                 raise Unsupported(f"{native}: a reference to a {record.kind}")
-            type_ = type_name(record.native)
             prefix = symbol_name(record.native)
-            call.parameters.append((f"const {type_}*", name))
+            call.parameters.append((values.record_parameter(record), name))
             local = f"{name}_native_"
             call.setup += f"  {record.native} {local};\n"
             call.uses_call |= values.scoped(record)
             if value.nullable:
                 call.annotations[name] = "(nullable): the value, or %NULL"
+                if values.is_object(record):
+                    call.checks += f"  g_return_val_if_fail({name} == NULL || {values.record_check(record, name)}, {fail});\n"
                 call.setup += f"  if ({name} != NULL) {prefix}_to_native({name}, &{local}, &{CALL});\n"
                 call.arguments[native] = (
                     f"({name} != NULL ? &{local} : NULL)"
@@ -502,7 +503,7 @@ class Emitter:
                     else local
                 )
             else:
-                call.checks += f"  g_return_val_if_fail({name} != NULL, {fail});\n"
+                call.checks += f"  g_return_val_if_fail({values.record_check(record, name)}, {fail});\n"
                 call.setup += f"  {prefix}_to_native({name}, &{local}, &{CALL});\n"
                 call.arguments[native] = f"&{local}" if kind == "reference" else local
             return
@@ -545,6 +546,8 @@ class Emitter:
         count = parameter_name(length.name)
         count_type = values.gtype(length.value)
         if element.kind == "record":
+            if self.values.is_object(element):
+                raise Unsupported(f"an array of {element.native}")
             type_ = type_name(element.native)
             prefix = symbol_name(element.native)
             # A plain record's array is flat, as C's is.
@@ -643,6 +646,8 @@ class Emitter:
                 call.uses_call = True
                 call.arguments[output.name] = local
                 if element.kind == "record":
+                    if self.values.is_object(element):
+                        raise Unsupported(f"an array of {element.native}")
                     prefix = symbol_name(element.native)
                     expression = f"{output.name}_items_"
                     convert = (
@@ -1126,7 +1131,7 @@ class Emitter:
             )
             return (
                 decode,
-                f"(GDestroyNotify){prefix}_free",
+                f"(GDestroyNotify){values.destroy(result)}",
                 f"{type_name(result.native)}*",
                 "  return g_task_propagate_pointer(G_TASK(result), error);\n",
                 f"(transfer full){nullable}: the value",
@@ -1135,6 +1140,8 @@ class Emitter:
             element = result.element
             assert element is not None
             if element.kind == "record":
+                if self.values.is_object(element):
+                    raise Unsupported(f"an array of {element.native}")
                 prefix = symbol_name(element.native)
                 values.use(element)
                 item = f"{prefix}_from_native((const {element.native}*)(const void*)((const char*)result->value + index * result->value_size))"
@@ -1667,9 +1674,24 @@ def render(emitter: Emitter) -> dict[str, str]:
         for v in emitter.values.presented()
         if emitter.values.transparent(v)
     )
+    # Vala reads a struct property through a getter that writes an output,
+    # and a text array through one that returns its length, so it reads and
+    # writes each property of either kind as a GObject property.
+    unaccessed = sorted(
+        f"{type_name(v.native).removeprefix(NAMESPACE)}.{prop.replace('-', '_')}#property"
+        for v in emitter.values.presented()
+        if emitter.values.is_object(v)
+        for m in emitter.values.members(v)
+        if (prop := emitter.values.property_name(v, m)) is not None
+        and (
+            m.value.kind == "array"
+            or (m.value.kind == "record" and emitter.values.transparent(m.value))
+        )
+    )
     files = {
         f"{DIRECTORY}/vapi/{NAMESPACE}-0.metadata": "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-        + "".join(f"{name} struct\n" for name in [*structs, "CommandCompletion"]),
+        + "".join(f"{name} struct\n" for name in [*structs, "CommandCompletion"])
+        + "".join(f"{name} no_accessor_method\n" for name in unaccessed),
         f"{SOURCE}/maplibre-native-ffi-values.h": HEADER
         + f"#ifndef {guard_}\n#define {guard_}\n\n"
         + "#include <glib-object.h>\n\n"
@@ -1680,10 +1702,11 @@ def render(emitter: Emitter) -> dict[str, str]:
         + "G_END_DECLS\n\n#endif\n",
         f"{SOURCE}/maplibre-native-ffi-values.c": HEADER
         + '#include "maplibre-native-ffi-values.h"\n\n'
-        + "#include <maplibre_native_c.h>\n#include <string.h>\n\n"
+        + "#include <maplibre_native_c.h>\n#include <math.h>\n#include <string.h>\n\n"
         + '#include "maplibre-native-ffi-handles-private.h"\n'
         + '#include "maplibre-native-ffi-private.h"\n'
         + '#include "maplibre-native-ffi-values-private.h"\n\n'
+        + gobject_values.PROPERTY_FLAGS_DEFINITION
         + constants_source
         + "\n"
         + values_source,
@@ -1775,6 +1798,9 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             return f"{type_name(value.native)}.{member.name}"
         if member.value.kind == "callback":
             return f"{symbol_name(value.native)}_set_{member.name}"
+        prop = values.property_name(value, member)
+        if prop is not None:
+            return f"{type_name(value.native)}:{prop}"
         verb = "set" if value.native in bound.inputs else "get"
         return f"{symbol_name(value.native)}_{verb}_{accessor(value, member.name)}"
 
