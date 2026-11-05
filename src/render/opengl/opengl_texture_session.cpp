@@ -592,6 +592,53 @@ class ExportedTexture {
   [[nodiscard]] virtual auto frame_metadata(
     const mln::core::RenderFrameMetadata& frame
   ) const -> std::any = 0;
+
+  // Copies the frame in `source`, a framebuffer of the texture's size, into
+  // the texture upside down. OpenGL keeps a framebuffer's bottom row first,
+  // and a host that imports the buffer takes its first row as the top, as
+  // every other ring gives it.
+  void copy_flipped(mln::gl::Context& gl, mln::platform::GLuint source) {
+    if (framebuffer_ == 0) {
+      mln::platform::glGenFramebuffers(1, &framebuffer_);
+      gl.bindFramebuffer = framebuffer_;
+      mln::platform::glFramebufferTexture2D(
+        GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture(), 0
+      );
+      if (
+        mln::platform::glCheckFramebufferStatus(GL_FRAMEBUFFER) !=
+        GL_FRAMEBUFFER_COMPLETE
+      ) {
+        release_framebuffer();
+        throw std::runtime_error(
+          "OpenGL can't make a framebuffer of the exported buffer"
+        );
+      }
+    }
+    const auto width = static_cast<mln::platform::GLint>(size().width);
+    const auto height = static_cast<mln::platform::GLint>(size().height);
+    gl.bindFramebuffer = source;
+    mln::platform::glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer_);
+    // The scissor test clips a blit.
+    gl.scissorTest = {0, 0, 0, 0};
+    mln::platform::glBlitFramebuffer(
+      0, 0, width, height, 0, height, width, 0, GL_COLOR_BUFFER_BIT, GL_NEAREST
+    );
+    // The context tracks one binding for both targets, and the draw target
+    // no longer matches it.
+    gl.bindFramebuffer.setDirty();
+  }
+
+ protected:
+  // Runs before a subclass deletes the texture, which the framebuffer would
+  // otherwise keep alive.
+  void release_framebuffer() noexcept {
+    if (framebuffer_ != 0)
+      mln::platform::glDeleteFramebuffers(1, &framebuffer_);
+    framebuffer_ = 0;
+  }
+
+ private:
+  mln::platform::GLuint framebuffer_ = 0;
 };
 
 // The ring of a session that allocates a buffer for each slot, and makes a
@@ -735,6 +782,7 @@ class HardwareBufferTexture final : public ExportedTexture {
   void destroy() noexcept {
     // A framebuffer that still attaches the texture keeps its storage until
     // the context deletes that framebuffer.
+    release_framebuffer();
     if (texture_ != 0) mln::platform::glDeleteTextures(1, &texture_);
     texture_ = 0;
     if (image_ != EGL_NO_IMAGE_KHR) egl_.destroy_image(egl_.display, image_);
@@ -974,6 +1022,7 @@ class DmaBufTexture final : public ExportedTexture {
   void destroy() noexcept {
     // A framebuffer that still attaches the texture keeps its storage until
     // the context deletes that framebuffer.
+    release_framebuffer();
     if (texture_ != 0) mln::platform::glDeleteTextures(1, &texture_);
     texture_ = 0;
     if (image_ != EGL_NO_IMAGE_KHR) egl_.destroy_image(egl_.display, image_);
@@ -1028,6 +1077,11 @@ class OpenGLTextureRenderableResource final
       return borrowed_texture_;
     }
     return static_cast<mln::gl::Texture2D&>(*texture_).getTextureID();
+  }
+
+  auto framebuffer() -> mln::platform::GLuint {
+    ensure_resources();
+    return framebuffer_->framebuffer;
   }
 
  private:
@@ -1231,6 +1285,16 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   [[nodiscard]] auto exported_texture() const -> const ExportedTexture* {
     if (!exported_) return nullptr;
     return exported_textures_.at(ring_.selected()).get();
+  }
+
+  // Copies the frame that the selected slot rendered into the slot's texture
+  // of an exported ring, the right way up. The context is current.
+  void copy_to_exported_texture() {
+    if (!exported_) return;
+    auto& renderable =
+      getDefaultRenderable().getResource<OpenGLTextureRenderableResource>();
+    exported_textures_.at(ring_.selected())
+      ->copy_flipped(getContext<mln::gl::Context>(), renderable.framebuffer());
   }
 #endif
 
@@ -1467,10 +1531,11 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 #endif
 
   // The texture that the selected slot renders into at `size`: the caller's
-  // for a borrowed ring, one over the slot's buffer for an exported ring, or 0
-  // for one that the renderable makes. A slot whose buffer has
-  // another size gets a new buffer. It runs while the renderer builds the
-  // slot's renderable, so the context is current.
+  // for a borrowed ring, or 0 for one that the renderable makes. An exported
+  // ring's slot renders into the renderable's texture too, and makes its
+  // texture over a buffer of `size` here, for copy_to_exported_texture(). A
+  // slot whose buffer has another size gets a new buffer. It runs while the
+  // renderer builds the slot's renderable, so the context is current.
   auto slot_texture(mln::Size size) -> uint32_t {
     if (!borrowed_textures_.empty()) {
       return borrowed_textures_[ring_.selected()];
@@ -1482,7 +1547,7 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
         slot.reset();
         slot = exported_->allocate(getContext<mln::gl::Context>(), size);
       }
-      return slot->texture();
+      return 0;
     }
 #else
     (void)size;
@@ -1686,6 +1751,10 @@ class OpenGLTextureSessionBackend final
         "rendered OpenGL texture is not available"
       );
     }
+#if defined(MLN_FFI_EGL_EXPORTED_RINGS)
+    // Before the producer sync, which covers the copy.
+    backend_.copy_to_exported_texture();
+#endif
     if (producer_sync_kind_ == MLN_GPU_SYNC_OPEN_GL_FENCE) {
       auto& fence = producer_fences_.at(frame.slot);
       if (fence != nullptr) mln::platform::glDeleteSync(fence);
