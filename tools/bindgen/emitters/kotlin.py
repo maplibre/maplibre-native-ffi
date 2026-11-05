@@ -103,6 +103,40 @@ def source_sets(platforms: frozenset[str], source_set: str = "commonMain") -> li
     ]
 
 
+def jvm_source_set(source_set: str) -> bool:
+    """Whether the JVM or Android compiles `source_set`."""
+    children = SOURCE_SET_CHILDREN.get(source_set, ())
+    return source_set in ("jvmMain", "androidMain") or any(
+        map(jvm_source_set, children)
+    )
+
+
+# A file of the public package that a JVM or Android source set compiles, and
+# the declarations at its top level. Java calls these as statics of one class,
+# `MaplibreNative`, which the .NET binding's static class matches, rather than
+# of a class named for each file.
+PUBLIC_FILE = re.compile(r"src/(\w+)/kotlin/org/maplibre/nativeffi/[^/]+\.kt")
+TOP_LEVEL = re.compile(
+    r"^(?:@\w+(?:\(.*\))? +)*"
+    r"(?:(?:public|internal|private|inline|suspend|const|actual|expect) +)*"
+    r"(?:fun|val|var)\b",
+    re.MULTILINE,
+)
+FACADE = (
+    '@file:kotlin.jvm.JvmMultifileClass\n@file:kotlin.jvm.JvmName("MaplibreNative")\n\n'
+)
+
+
+def java_facade(path: str, source: str) -> str:
+    """`source` with the file annotations that put its top level in `MaplibreNative`."""
+    match = PUBLIC_FILE.fullmatch(path)
+    if not match or not jvm_source_set(match.group(1)) or not TOP_LEVEL.search(source):
+        return source
+    head, package, body = source.partition("package org.maplibre.nativeffi\n")
+    assert package, path
+    return head + FACADE + package + body
+
+
 def placement(plan) -> list[str] | None:
     """The source sets of an operation that serves only some platforms."""
     platforms = served(plan.function, TARGETS)
@@ -672,7 +706,10 @@ def lower(api: Api | BoundApi) -> Lowered:
         for file, source in files.items():
             outputs[f"{base}/{file}"] = source
     return Lowered(
-        {f"{DIRECTORY}/{path}": source for path, source in outputs.items()},
+        {
+            f"{DIRECTORY}/{path}": java_facade(path, source)
+            for path, source in outputs.items()
+        },
         unsupported,
         [function.name for function in functions],
     )

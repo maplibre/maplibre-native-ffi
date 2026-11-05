@@ -1,3 +1,6 @@
+@file:kotlin.jvm.JvmMultifileClass
+@file:kotlin.jvm.JvmName("MaplibreNative")
+
 package org.maplibre.nativeffi
 
 import java.util.concurrent.CompletableFuture

@@ -24,8 +24,8 @@ dependencies {
 Start Java with `--enable-native-access=ALL-UNNAMED`.
 
 On Android, add `maplibre-native-ffi` and a runtime, as the Kotlin page's
-Android section shows. Call `NativeLibrary_androidKt.initAndroid(context)` once
-before you create a runtime.
+Android section shows. Call `MaplibreNative.initAndroid(context)` once before
+you create a runtime.
 
 ## From Java
 
@@ -46,6 +46,8 @@ these differences:
 - An enum's constants are static fields, such as `CameraUpdateMode.FLY`.
   `X.of(int)` gives the value for a raw number, and each `X_VALUE` constant is a
   raw number to `switch` on.
-- Functions outside a class, such as `setLogCallback`, are static methods of
-  their file's class, such as `GeneratedGlobalsKt`.
+- Functions, extensions, and constants outside a class are statics of
+  `MaplibreNative`, as in `MaplibreNative.setLogCallback(handler)`. An extension
+  takes its receiver first, as in `MaplibreNative.getHardwareBuffer(frame)` on
+  Android.
 - To release a handle, call `release().join()` in a `finally` block.
