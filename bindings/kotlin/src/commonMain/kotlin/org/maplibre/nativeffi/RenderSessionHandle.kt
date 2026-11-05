@@ -3,6 +3,7 @@ package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -17,15 +18,16 @@ import org.maplibre.nativeffi.internal.memory.*
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class RenderSessionHandle
-internal constructor(
+private constructor(
   handle: Long,
   @Suppress("unused") private val parent: MapHandle,
   /**
    * Completes once the session is ready, and fails with a [MaplibreException] when it fails to
    * become ready. The session takes calls before then.
    */
-  public val ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit),
+  public val ready: Deferred<Unit>,
 ) : AsyncReleasable, AutoCloseable {
+  @get:JvmSynthetic
   internal val binding =
     HandleState("RenderSessionHandle", handle, GeneratedOwnerDisposal::renderSession)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
@@ -45,7 +47,7 @@ internal constructor(
     dispose()
   }
 
-  internal val bindingCallbacks: CallbackOwner = CallbackOwner()
+  @get:JvmSynthetic internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
    * Stops the session right away, without running its pending graphics work.
@@ -90,7 +92,7 @@ internal constructor(
       val out = allocate(8, w(8, 8, 4))
       if (published(C.mln_render_session_acquire_frame(handle, out, diagnostic), out))
         adopt(out, GeneratedOwnerDisposal::acquiredFrame) {
-          AcquiredFrameHandle(it, this@RenderSessionHandle)
+          AcquiredFrameHandle.wrap(it, this@RenderSessionHandle)
         }
       else null
     }
@@ -663,12 +665,23 @@ internal constructor(
 
   override fun toString(): String =
     "RenderSessionHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
+
+  internal companion object {
+    /** Creates the owner of `handle`. */
+    @JvmSynthetic
+    internal fun wrap(
+      handle: Long,
+      parent: MapHandle,
+      ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit),
+    ): RenderSessionHandle = RenderSessionHandle(handle, parent, ready)
+  }
 }
 
 /** The commands of a [RenderSessionHandle] that drop their completions. */
 @JvmInline
 public value class RenderSessionDiscarding
 internal constructor(internal val owner: RenderSessionHandle) {
+  @get:JvmSynthetic
   internal val binding
     get() = owner.binding
 

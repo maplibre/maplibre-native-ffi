@@ -89,7 +89,7 @@ public fun VulkanDeviceHandle.Companion.create(
         diagnostic,
       ),
     )
-    adopt(out, GeneratedOwnerDisposal::vulkanDevice) { VulkanDeviceHandle(it) }
+    adopt(out, GeneratedOwnerDisposal::vulkanDevice) { VulkanDeviceHandle.wrap(it) }
   }
 
 /**
@@ -140,7 +140,9 @@ public fun MapHandle.attachDxgiSharedTextureRing(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachDxgiSharedTextureRing, ready) },
+      { created, ready ->
+        RenderSessionHandle.wrap(created, this@attachDxgiSharedTextureRing, ready)
+      },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -174,7 +176,9 @@ public fun MapHandle.attachVulkanBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachVulkanBorrowedTexture, ready) },
+      { created, ready ->
+        RenderSessionHandle.wrap(created, this@attachVulkanBorrowedTexture, ready)
+      },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -207,7 +211,7 @@ public fun MapHandle.attachVulkanSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachVulkanSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachVulkanSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -263,7 +267,7 @@ public fun MapHandle.attachWin32Window(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachWin32Window, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachWin32Window, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )

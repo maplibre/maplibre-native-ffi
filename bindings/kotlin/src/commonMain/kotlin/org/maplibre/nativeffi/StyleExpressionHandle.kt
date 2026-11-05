@@ -1,6 +1,7 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -13,9 +14,10 @@ import org.maplibre.nativeffi.internal.memory.*
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class StyleExpressionHandle
-internal constructor(
+private constructor(
   handle: Long,
 ) : AutoCloseable {
+  @get:JvmSynthetic
   internal val binding =
     HandleState("StyleExpressionHandle", handle, GeneratedOwnerDisposal::styleExpression)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
@@ -121,7 +123,11 @@ internal constructor(
             diagnostic,
           ),
         )
-        adopt(out, GeneratedOwnerDisposal::styleExpression) { StyleExpressionHandle(it) }
+        adopt(out, GeneratedOwnerDisposal::styleExpression) { StyleExpressionHandle.wrap(it) }
       }
+
+    /** Creates the owner of `handle`. */
+    @JvmSynthetic
+    internal fun wrap(handle: Long): StyleExpressionHandle = StyleExpressionHandle(handle)
   }
 }

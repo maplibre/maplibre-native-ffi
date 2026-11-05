@@ -578,12 +578,14 @@ def owned(plan, values, native):
             if parent_param.name == plan.receiver
             else parameter_name(parent_param.name)
         )
-    create = f"{{ {owner_name(handle)}(it{parent}) }}"
+    create = f"{{ {owner_name(handle)}.wrap(it{parent}) }}"
     attachment = immediate_owner and bool(plan.completion)
     if attachment:
         # The owner exposes the completion that reports it ready.
         returns = owner_name(handle)
-        create = f"{{ created, ready -> {owner_name(handle)}(created{parent}, ready) }}"
+        create = (
+            f"{{ created, ready -> {owner_name(handle)}.wrap(created{parent}, ready) }}"
+        )
     else:
         returns = f"Deferred<{result_type}>" if plan.completion else result_type
     head = f"  public fun {method}({declaration(params)}): {returns} ="
@@ -715,5 +717,5 @@ def owner_disposal(bound, native):
         )
         if function.diagnostic:
             call = "NativeDiagnostics.check { diagnostic -> " + call + " }"
-        lines.append(f"  fun {method}(handle: Long) {{ {call} }}")
+        lines.append(f"  @JvmSynthetic fun {method}(handle: Long) {{ {call} }}")
     return "internal object GeneratedOwnerDisposal {\n" + "\n".join(lines) + "\n}\n"

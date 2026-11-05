@@ -3,6 +3,7 @@ package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -17,9 +18,10 @@ import org.maplibre.nativeffi.internal.memory.*
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class RuntimeHandle
-internal constructor(
+private constructor(
   handle: Long,
 ) : AsyncReleasable, AutoCloseable {
+  @get:JvmSynthetic
   internal val binding = HandleState("RuntimeHandle", handle, GeneratedOwnerDisposal::runtime)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /**
@@ -41,7 +43,7 @@ internal constructor(
     dispose()
   }
 
-  internal val bindingCallbacks: CallbackOwner = CallbackOwner()
+  @get:JvmSynthetic internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
    * Stops sending the events of the runtime and its maps to a callback.
@@ -100,7 +102,7 @@ internal constructor(
           C.mln_runtime_create_map(handle, writeMapOptions(options), out, completion, diagnostic)
         },
         GeneratedOwnerDisposal::map,
-        { created, ready -> MapHandle(created, this@RuntimeHandle, ready) },
+        { created, ready -> MapHandle.wrap(created, this@RuntimeHandle, ready) },
         null,
         { it.dispose() },
       )
@@ -509,17 +511,22 @@ internal constructor(
         threadStart { diagnostic ->
           C.mln_runtime_create(options?.let { writeRuntimeOptions(it) } ?: 0L, out, diagnostic)
         }
-        adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle(it) }
+        adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle.wrap(it) }
       }
+
+    /** Creates the owner of `handle`. */
+    @JvmSynthetic internal fun wrap(handle: Long): RuntimeHandle = RuntimeHandle(handle)
   }
 }
 
 /** The commands of a [RuntimeHandle] that drop their completions. */
 @JvmInline
 public value class RuntimeDiscarding internal constructor(internal val owner: RuntimeHandle) {
+  @get:JvmSynthetic
   internal val binding
     get() = owner.binding
 
+  @get:JvmSynthetic
   internal val bindingCallbacks
     get() = owner.bindingCallbacks
 

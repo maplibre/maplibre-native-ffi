@@ -145,7 +145,7 @@ public fun appleFramePacerCreate(options: FramePacerOptions? = null): FramePacer
         diagnostic,
       ),
     )
-    adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle(it) }
+    adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle.wrap(it) }
   }
 
 /**
@@ -193,7 +193,7 @@ public fun MapHandle.attachDmaBufRing(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachDmaBufRing, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachDmaBufRing, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -247,7 +247,9 @@ public fun MapHandle.attachDxgiSharedTextureRing(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachDxgiSharedTextureRing, ready) },
+      { created, ready ->
+        RenderSessionHandle.wrap(created, this@attachDxgiSharedTextureRing, ready)
+      },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -291,7 +293,7 @@ public fun MapHandle.attachIoSurfaceRing(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachIoSurfaceRing, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachIoSurfaceRing, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -325,7 +327,9 @@ public fun MapHandle.attachMetalBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachMetalBorrowedTexture, ready) },
+      { created, ready ->
+        RenderSessionHandle.wrap(created, this@attachMetalBorrowedTexture, ready)
+      },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -358,7 +362,7 @@ public fun MapHandle.attachMetalSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachMetalSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachMetalSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -408,7 +412,7 @@ public fun MapHandle.attachWaylandSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachWaylandSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachWaylandSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -464,7 +468,7 @@ public fun MapHandle.attachWin32Window(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachWin32Window, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachWin32Window, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )

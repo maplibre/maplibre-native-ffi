@@ -12,6 +12,6 @@ internal expect fun loadNativeLibraryUnchecked()
 /** Throws when the loaded library reports another C ABI version. */
 internal fun checkAbiVersion(version: Long) {
   if (version != EXPECTED_C_ABI_VERSION) {
-    throw AbiVersionMismatchException(version, EXPECTED_C_ABI_VERSION)
+    throw AbiVersionMismatchException.create(version, EXPECTED_C_ABI_VERSION)
   }
 }

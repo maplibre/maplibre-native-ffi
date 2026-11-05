@@ -1,6 +1,7 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -13,9 +14,10 @@ import org.maplibre.nativeffi.internal.memory.*
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class FramePacerHandle
-internal constructor(
+private constructor(
   handle: Long,
 ) : AutoCloseable {
+  @get:JvmSynthetic
   internal val binding = HandleState("FramePacerHandle", handle, GeneratedOwnerDisposal::framePacer)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /** The native handle value. It stays readable after release. */
@@ -43,4 +45,9 @@ internal constructor(
 
   override fun toString(): String =
     "FramePacerHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
+
+  internal companion object {
+    /** Creates the owner of `handle`. */
+    @JvmSynthetic internal fun wrap(handle: Long): FramePacerHandle = FramePacerHandle(handle)
+  }
 }

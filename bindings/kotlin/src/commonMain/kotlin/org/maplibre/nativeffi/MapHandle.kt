@@ -3,6 +3,7 @@ package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -17,16 +18,17 @@ import org.maplibre.nativeffi.internal.memory.*
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class MapHandle
-internal constructor(
+private constructor(
   handle: Long,
   @Suppress("unused") private val parent: RuntimeHandle?,
   /**
    * Completes once the map is ready, and fails with a [MaplibreException] when it fails to become
    * ready. The map takes calls before then.
    */
-  public val ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit),
-  borrowed: Boolean = false,
+  public val ready: Deferred<Unit>,
+  borrowed: Boolean,
 ) : AsyncReleasable, AutoCloseable {
+  @get:JvmSynthetic
   internal val binding = HandleState("MapHandle", handle, GeneratedOwnerDisposal::map, borrowed)
   @Suppress("unused")
   private val cleanup = if (borrowed) null else disposeWhenUnreachable(this, binding)
@@ -49,6 +51,7 @@ internal constructor(
     dispose()
   }
 
+  @get:JvmSynthetic
   internal val bindingCallbacks: CallbackOwner =
     if (binding.borrowed) CallbackOwner.global else CallbackOwner()
 
@@ -279,7 +282,7 @@ internal constructor(
           )
         },
         GeneratedOwnerDisposal::renderSession,
-        { created, ready -> RenderSessionHandle(created, this@MapHandle, ready) },
+        { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) },
         { it.bindingCallbacks },
         { it.dispose() },
       )
@@ -313,7 +316,7 @@ internal constructor(
           )
         },
         GeneratedOwnerDisposal::renderSession,
-        { created, ready -> RenderSessionHandle(created, this@MapHandle, ready) },
+        { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) },
         { it.bindingCallbacks },
         { it.dispose() },
       )
@@ -347,7 +350,7 @@ internal constructor(
           )
         },
         GeneratedOwnerDisposal::renderSession,
-        { created, ready -> RenderSessionHandle(created, this@MapHandle, ready) },
+        { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) },
         { it.bindingCallbacks },
         { it.dispose() },
       )
@@ -1910,14 +1913,27 @@ internal constructor(
 
   override fun toString(): String =
     "MapHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
+
+  internal companion object {
+    /** Creates the owner of `handle`. */
+    @JvmSynthetic
+    internal fun wrap(
+      handle: Long,
+      parent: RuntimeHandle?,
+      ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit),
+      borrowed: Boolean = false,
+    ): MapHandle = MapHandle(handle, parent, ready, borrowed)
+  }
 }
 
 /** The commands of a [MapHandle] that drop their completions. */
 @JvmInline
 public value class MapDiscarding internal constructor(internal val owner: MapHandle) {
+  @get:JvmSynthetic
   internal val binding
     get() = owner.binding
 
+  @get:JvmSynthetic
   internal val bindingCallbacks
     get() = owner.bindingCallbacks
 

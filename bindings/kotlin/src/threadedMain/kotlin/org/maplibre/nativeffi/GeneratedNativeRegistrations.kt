@@ -24,8 +24,7 @@ public fun Wake.Companion.native(
   userData: NativePointer = NativePointer.NULL_POINTER,
   releaseUserData: NativePointer = NativePointer.NULL_POINTER,
 ): Wake =
-  Wake(
-    null,
+  Wake.wrap(
     NativeRegistration(longArrayOf(callback.address), userData.address, releaseUserData.address),
   )
 
@@ -51,9 +50,7 @@ public fun QueueLock.Companion.native(
   userData: NativePointer = NativePointer.NULL_POINTER,
   releaseUserData: NativePointer = NativePointer.NULL_POINTER,
 ): QueueLock =
-  QueueLock(
-    null,
-    null,
+  QueueLock.wrap(
     NativeRegistration(
       longArrayOf(lock.address, unlock.address),
       userData.address,

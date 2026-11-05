@@ -316,6 +316,10 @@ kotlin {
       implementation(libs.coroutines.test)
     }
 
+    // A JVM test compares each member's JVM access with the visibility its Kotlin metadata
+    // declares.
+    jvmTest.dependencies { implementation(libs.kotlin.metadata.jvm) }
+
     configureEach {
       if (
         name.startsWith("native") ||
@@ -442,13 +446,15 @@ tasks.named<Test>("jvmTest") {
   testLogging { exceptionFormat = TestExceptionFormat.FULL }
 }
 
-// Stage the classpath for JVMs launched outside Gradle.
+// Stage the classpath for JVMs launched outside Gradle. As under Gradle, the binding's classes stay
+// apart from the test classes, so a test can read the binding's classes alone.
 tasks.register<Sync>("jvmDeviceTestClasspath") {
+  val main = kotlin.jvm().compilations.getByName("main")
   val test = kotlin.jvm().compilations.getByName("test")
-  val classpath = files(test.output.allOutputs, test.runtimeDependencyFiles)
   into(layout.buildDirectory.dir("jvm-device-test"))
-  from(classpath.filter(File::isFile)) { into("lib") }
-  from(classpath.filter(File::isDirectory)) { into("classes") }
+  from(test.runtimeDependencyFiles.filter(File::isFile)) { into("lib") }
+  from(main.output.allOutputs) { into("main") }
+  from(test.output.allOutputs) { into("classes") }
 }
 
 // The wasm suite runs in headless Chromium against the browser module that bindings/kotlin/wasm

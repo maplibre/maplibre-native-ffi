@@ -275,10 +275,18 @@ def declaration(value, values):
             + "\n}"
         )
     if value.response:
+        scope = "org.maplibre.nativeffi.internal.callback.CallbackScope"
         return (
-            f"{doc(values.bound, value.native)}public class {public} internal constructor("
-            "internal val bindingAddress: Long, "
-            "internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope)"
+            f"{doc(values.bound, value.native)}public class {public} private constructor("
+            "@get:JvmSynthetic internal val bindingAddress: Long, "
+            f"@get:JvmSynthetic internal val bindingScope: {scope}) {{\n"
+            # Java can read an internal companion, but can't call its members.
+            "  internal companion object {\n"
+            "    /** Creates the response at `address`, which `scope` keeps valid. */\n"
+            f"    @JvmSynthetic internal fun wrap(address: Long, scope: {scope}): {public} =\n"
+            f"      {public}(address, scope)\n"
+            "  }\n"
+            "}"
         )
     parameters = []
     defaults = []
@@ -301,18 +309,27 @@ def declaration(value, values):
             + ",\n".join(parameters)
             + "\n)"
         )
-    # The internal member holds a native registration, which only the threaded
-    # factory creates, so the public constructor leaves it null.
+    # The private member holds a native registration, which only the threaded
+    # factory creates, so the public constructor leaves it null. It is private
+    # because Java would see an internal one, and its component function, as
+    # public.
+    nulls = "".join("null, " for _ in members)
     members = ", ".join(member for member, _typ, _field in members)
-    parameters.append(f"  internal val {NATIVE_MEMBER}: NativeRegistration?")
+    parameters.append("  private val nativeRegistration: NativeRegistration?")
     return (
         f"{declaration_doc(value, values)}@ConsistentCopyVisibility\n"
-        f"public data class {public} internal constructor(\n"
+        f"public data class {public} private constructor(\n"
         + ",\n".join(parameters)
         + "\n) {\n"
         f"  /** A registration of Kotlin callbacks. */\n"
         f"  public constructor({', '.join(defaults)}) : this({members}, null)\n\n"
-        "  public companion object\n"
+        f"  @get:JvmSynthetic internal val {NATIVE_MEMBER}: NativeRegistration?\n"
+        "    get() = nativeRegistration\n\n"
+        "  public companion object {\n"
+        "    /** A registration of native functions, which only `native` creates. */\n"
+        f"    @JvmSynthetic internal fun wrap(native: NativeRegistration): {public} =\n"
+        f"      {public}({nulls}native)\n"
+        "  }\n"
         "}"
     )
 
@@ -403,8 +420,7 @@ def native_factories(values):
         factories.append(
             f"{documentation}public fun {public}.Companion.{factory.function}(\n"
             + ",\n".join(parameters)
-            + f"\n): {public} =\n  {public}("
-            + "".join("null, " for _ in functions)
+            + f"\n): {public} =\n  {public}.wrap("
             + f"NativeRegistration(longArrayOf({addresses}), "
             f"{context}.address, {release}.address))"
         )
@@ -565,7 +581,7 @@ def callback_argument(parameter, values):
     local = identifier(parameter.name)
     if value.kind == "reference":
         if value.element.response:
-            return f"{public_name(value.element, values)}({local}, scope)"
+            return f"{public_name(value.element, values)}.wrap({local}, scope)"
         decoded = values.decode(value.element, local)
         return f"if ({local} == 0L) null else {decoded}" if value.nullable else decoded
     if value.kind == "buffer" and value.length == "nul":
@@ -600,9 +616,7 @@ def borrowed_owner(parameter, values):
         return None
     handle = values.bound.handles[value.native]
     parent = ", null" if handle.parent else ""
-    return (
-        f"{owner_class(handle)}({identifier(parameter.name)}{parent}, borrowed = true)"
-    )
+    return f"{owner_class(handle)}.wrap({identifier(parameter.name)}{parent}, borrowed = true)"
 
 
 def callback_site(site_name, callback_value, member, root_type, values, site_form):
@@ -626,7 +640,7 @@ def callback_site(site_name, callback_value, member, root_type, values, site_for
             # The callback owns the handle; a callback that throws releases it.
             local = identifier(parameter.name) + "Owner"
             lines.append(
-                f"val {local} = {owner_class(parameter.value.handle)}({identifier(parameter.name)})"
+                f"val {local} = {owner_class(parameter.value.handle)}.wrap({identifier(parameter.name)})"
             )
             arguments.append(local)
             owned.append(local)
@@ -691,7 +705,7 @@ def queued_site(
             handle = parameter.value.handle
             local = identifier(parameter.name) + "Owner"
             adopted.append(
-                f"val {local} = {owner_class(handle)}({identifier(parameter.name)})"
+                f"val {local} = {owner_class(handle)}.wrap({identifier(parameter.name)})"
             )
             owners.append(local)
             arguments.append(local)
@@ -858,7 +872,7 @@ def put_function(value, values):
         if f.name in value.registration.callbacks and f.name not in omitted
     ]
     lines = [
-        f"internal fun NativeCall.{values.put(value)}(target: Long, value: {public}) {{"
+        f"{values.hidden}internal fun NativeCall.{values.put(value)}(target: Long, value: {public}) {{"
     ]
     for field in value.fields:
         if field.role == "presence_mask":
@@ -963,7 +977,7 @@ def put_function(value, values):
 
 def writer(value, values, public):
     return (
-        f"internal fun NativeCall.{values.write(value)}(value: {public}): Long = "
+        f"{values.hidden}internal fun NativeCall.{values.write(value)}(value: {public}): Long = "
         f"allocate({values.size(value.native)}, {values.align(value.native)}).also {{ {values.put(value)}(it, value) }}"
     )
 
@@ -1005,11 +1019,11 @@ def read_function(value, values):
     )
     if locals:
         return (
-            f"internal fun {values.read(value)}({parameters}): {public_name} {{\n  "
+            f"{values.hidden}internal fun {values.read(value)}({parameters}): {public_name} {{\n  "
             + "\n  ".join(locals)
             + f"\n  return {body}\n}}"
         )
-    return f"internal fun {values.read(value)}({parameters}): {public_name} = {body}"
+    return f"{values.hidden}internal fun {values.read(value)}({parameters}): {public_name} = {body}"
 
 
 def operation(plan, values, native):

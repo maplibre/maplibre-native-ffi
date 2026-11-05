@@ -84,7 +84,7 @@ public fun appleFramePacerCreate(options: FramePacerOptions? = null): FramePacer
         diagnostic,
       ),
     )
-    adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle(it) }
+    adopt(out, GeneratedOwnerDisposal::framePacer) { FramePacerHandle.wrap(it) }
   }
 
 /**
@@ -125,7 +125,7 @@ public fun MapHandle.attachIoSurfaceRing(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachIoSurfaceRing, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachIoSurfaceRing, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -159,7 +159,9 @@ public fun MapHandle.attachMetalBorrowedTexture(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachMetalBorrowedTexture, ready) },
+      { created, ready ->
+        RenderSessionHandle.wrap(created, this@attachMetalBorrowedTexture, ready)
+      },
       { it.bindingCallbacks },
       { it.dispose() },
     )
@@ -192,7 +194,7 @@ public fun MapHandle.attachMetalSurface(
         )
       },
       GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle(created, this@attachMetalSurface, ready) },
+      { created, ready -> RenderSessionHandle.wrap(created, this@attachMetalSurface, ready) },
       { it.bindingCallbacks },
       { it.dispose() },
     )

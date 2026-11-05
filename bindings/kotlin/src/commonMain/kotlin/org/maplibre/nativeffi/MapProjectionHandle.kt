@@ -1,6 +1,7 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -13,9 +14,10 @@ import org.maplibre.nativeffi.internal.memory.*
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class MapProjectionHandle
-internal constructor(
+private constructor(
   handle: Long,
 ) : AutoCloseable {
+  @get:JvmSynthetic
   internal val binding =
     HandleState("MapProjectionHandle", handle, GeneratedOwnerDisposal::mapProjection)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
@@ -218,7 +220,10 @@ internal constructor(
       nativeCall(null, null) {
         val out = allocate(8, w(8, 8, 4))
         check(C.mln_map_projection_create(writeMapView(view), out, diagnostic))
-        adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
+        adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle.wrap(it) }
       }
+
+    /** Creates the owner of `handle`. */
+    @JvmSynthetic internal fun wrap(handle: Long): MapProjectionHandle = MapProjectionHandle(handle)
   }
 }

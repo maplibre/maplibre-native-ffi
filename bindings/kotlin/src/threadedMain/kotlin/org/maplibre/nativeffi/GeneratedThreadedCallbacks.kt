@@ -2,6 +2,7 @@
 package org.maplibre.nativeffi
 
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.*
@@ -55,11 +56,22 @@ public fun interface HttpHeaderTransformCallback {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class HttpHeaderTransformResponse
-internal constructor(
-  internal val bindingAddress: Long,
+private constructor(
+  @get:JvmSynthetic internal val bindingAddress: Long,
+  @get:JvmSynthetic
   internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
-)
+) {
+  internal companion object {
+    /** Creates the response at `address`, which `scope` keeps valid. */
+    @JvmSynthetic
+    internal fun wrap(
+      address: Long,
+      scope: org.maplibre.nativeffi.internal.callback.CallbackScope,
+    ): HttpHeaderTransformResponse = HttpHeaderTransformResponse(address, scope)
+  }
+}
 
+@JvmSynthetic
 internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTransform) {
   writeU32(target, w(24, 48).toUInt())
   writeAddress(
@@ -73,6 +85,7 @@ internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTr
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
+@JvmSynthetic
 internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Long =
   allocate(w(24, 48), w(4, 8)).also { putHttpHeaderTransform(it, value) }
 
