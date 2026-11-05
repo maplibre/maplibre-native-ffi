@@ -1,0 +1,30 @@
+# The C API on Orbis (https://github.com/sargunv/orbis), a GPU-driven map
+# engine in Rust. cmake/mln_ffi_orbis.cmake builds it as the maplibre_native_c
+# static library when MLN_FFI_IMPLEMENTATION is orbis.
+[package]
+name = "maplibre-native-ffi-orbis"
+version = "0.0.0"
+edition = "2024"
+license = "BSD-2-Clause"
+publish = false
+
+[lib]
+name = "maplibre_native_c"
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+
+[dependencies]
+# Orbis's embedding API. MLN_FFI_ORBIS_SOURCE_DIR patches it to a local
+# checkout.
+orb-api = { git = "https://github.com/sargunv/orbis" }
+# orb-api's screen points.
+glam = { version = "0.34.2", default-features = false, features = [
+  "std",
+  "f64",
+] }
+
+[profile.release]
+debug = 1
+
+# A workspace of its own: the repository's workspace builds without Orbis.
+[workspace]

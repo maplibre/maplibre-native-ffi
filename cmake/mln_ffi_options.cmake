@@ -12,6 +12,17 @@ function(mln_ffi_configure_options)
   set(MLN_WITH_LEGACY_ANNOTATIONS OFF
       CACHE BOOL "Build MapLibre Native legacy annotations" FORCE)
 
+  # Orbis is a map engine in Rust that implements this C API. See
+  # cmake/mln_ffi_orbis.cmake.
+  set(MLN_FFI_IMPLEMENTATION "maplibre-native"
+      CACHE STRING "Map engine that the C API runs on")
+  set_property(
+    CACHE MLN_FFI_IMPLEMENTATION
+    PROPERTY STRINGS maplibre-native orbis)
+  if(NOT MLN_FFI_IMPLEMENTATION MATCHES "^(maplibre-native|orbis)$")
+    message(FATAL_ERROR "Unsupported implementation: ${MLN_FFI_IMPLEMENTATION}")
+  endif()
+
   set(MLN_FFI_RENDER_BACKEND ""
       CACHE STRING "Render backend for this wrapper build")
   set_property(
