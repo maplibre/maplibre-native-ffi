@@ -801,6 +801,36 @@ jobs:
           mise run --no-deps install-native-package android-x64-egl
           build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
       - run: mise run //examples/compose:build-android x64
+  # The GTK example builds the GObject library and the app against the archive
+  # that a target job built and tested. It doesn't run the app.
+  gtk-linux:
+    name: example / gtk linux
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'gtk-linux')
+    env:
+      MISE_TASK_SKIP: //:build
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          zig: skip
+          gradle: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist
+      - run: >-
+          mise run --no-deps install-native-package linux-gnu-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
+      - run: mise run //examples/gtk:build linux-gnu-x64-vulkan
   # The ArkUI example builds against the OHPM packages packed from the addon
   # that a target job built and tested. It doesn't run the app.
   arkui-hap:
@@ -859,6 +889,7 @@ jobs:
       - swiftui-ios
       - swiftui-macos
       - compose-android
+      - gtk-linux
       - arkui-hap
       - support-matrix
     steps:
