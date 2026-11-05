@@ -1,4 +1,7 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
+@file:kotlin.jvm.JvmMultifileClass
+@file:kotlin.jvm.JvmName("MaplibreNative")
+
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName

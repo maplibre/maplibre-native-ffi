@@ -6,12 +6,12 @@ package org.maplibre.nativeffi.docsnippets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.junit.Test;
-import org.maplibre.nativeffi.GeneratedGlobalsKt;
 import org.maplibre.nativeffi.LogHandler;
 import org.maplibre.nativeffi.LogSeverity;
 import org.maplibre.nativeffi.LogicalExtent;
 import org.maplibre.nativeffi.MapHandle;
 import org.maplibre.nativeffi.MapOptions;
+import org.maplibre.nativeffi.MaplibreNative;
 import org.maplibre.nativeffi.RuntimeEvent;
 import org.maplibre.nativeffi.RuntimeEventFlag;
 import org.maplibre.nativeffi.RuntimeEventHandler;
@@ -82,13 +82,13 @@ public class EventsAndLogsTest {
       try {
         // #region logs
         // Runs on a library thread, and can't call the library.
-        GeneratedGlobalsKt.setLogCallback(
+        MaplibreNative.setLogCallback(
             LogHandler.of(
                 (severity, event, code, message) ->
                     writeLog(severity, message)));
         // #endregion logs
       } finally {
-        GeneratedGlobalsKt.clearLogCallback();
+        MaplibreNative.clearLogCallback();
       }
     } finally {
       runtime.release().join();

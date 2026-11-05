@@ -33,6 +33,7 @@ import org.maplibre.nativeffi.RuntimeHandle
 
 private const val PUBLIC_PACKAGE = "org/maplibre/nativeffi"
 private const val PUBLISHED_API = "Lkotlin/PublishedApi;"
+private const val FACADE = "MaplibreNative"
 
 /**
  * Java sees a Kotlin `internal` declaration as public. A Java caller could otherwise forge a
@@ -71,6 +72,17 @@ class JavaVisibilityTest {
       "Kotlin callers can call these members, but Java can't, and they have no Java form.",
     )
   }
+
+  /** Java calls the package's top-level declarations as statics of one class, as .NET does. */
+  @Test
+  fun javaCallsTopLevelDeclarationsOnMaplibreNative() {
+    assertEquals(
+      emptyList(),
+      bindingClasses().values.filter { it.strayFacade }.map { it.internalName }.sorted(),
+      "These classes hold top-level declarations. Annotate their files " +
+        "@file:JvmMultifileClass and @file:JvmName(\"$FACADE\").",
+    )
+  }
 }
 
 /** A compiled class of the public package, and the Kotlin declarations that it compiles. */
@@ -94,6 +106,20 @@ private class BindingClass(val model: ClassModel, private val classes: Map<Strin
         is KotlinClassMetadata.MultiFileClassPart -> metadata.kmPackage
         else -> null
       }
+
+  /**
+   * A multi-file facade's parts. The facade declares nothing itself: each of its statics delegates
+   * to the same member of the part that declares it.
+   */
+  private val parts: List<BindingClass>
+    get() =
+      (metadata as? KotlinClassMetadata.MultiFileClassFacade)?.partClassNames.orEmpty().map {
+        classes.getValue(it)
+      }
+
+  /** The containers of the Kotlin declarations whose members this class compiles. */
+  private val containers: List<KmDeclarationContainer>
+    get() = listOfNotNull(container) + parts.mapNotNull { it.container }
 
   /** This class's entry in its own InnerClasses attribute, which only a nested class has. */
   private val nesting by lazy {
@@ -130,6 +156,15 @@ private class BindingClass(val model: ClassModel, private val classes: Map<Strin
       }
     own && (nesting == null || outer?.kotlinVisible == true)
   }
+
+  /** Whether this class holds top-level declarations, but isn't `MaplibreNative`. */
+  val strayFacade: Boolean
+    get() =
+      when (metadata) {
+        is KotlinClassMetadata.FileFacade -> true
+        is KotlinClassMetadata.MultiFileClassFacade -> internalName != "$PUBLIC_PACKAGE/$FACADE"
+        else -> false
+      }
 
   private val companion: BindingClass?
     get() = kmClass?.companionObject?.let { classes["$internalName$$it"] }
@@ -172,6 +207,7 @@ private class BindingClass(val model: ClassModel, private val classes: Map<Strin
   /** The JVM members that this class's Kotlin declarations compile to. */
   private fun declarations(): Map<String, Declaration> {
     val result = mutableMapOf<String, Declaration>()
+    parts.forEach { result += it.declarations() }
     val container = container ?: return result
     kmClass?.constructors?.forEach { constructor ->
       val declaration = Declaration(constructor.visibility, publishedApi(constructor.signature))
@@ -224,7 +260,6 @@ private class BindingClass(val model: ClassModel, private val classes: Map<Strin
   /** The members that other Kotlin modules can call, but that Java can't call in any form. */
   fun unusable(): List<String> {
     if (!javaVisible || !kotlinVisible) return emptyList()
-    val container = container ?: return emptyList()
     val name = internalName.replace('/', '.')
     val methods = model.methods().associateBy { it.signature() }
     // A Java form shares the name, without its mangled suffix, and the arity.
@@ -255,11 +290,11 @@ private class BindingClass(val model: ClassModel, private val classes: Map<Strin
     // A data class's component and copy functions have Java forms of their own: its getters, and
     // its factory and `withX` copies.
     val data = kmClass?.isData == true
-    container.functions.forEach { function ->
+    for (function in containers.flatMap { it.functions }) {
       val kotlinOnly = data && (function.name == "copy" || function.name.matches(COMPONENT))
       if (function.visibility.published && !kotlinOnly) check(function.signature, "function")
     }
-    container.properties.forEach { property ->
+    for (property in containers.flatMap { it.properties }) {
       if (property.visibility.published) check(property.getterSignature, "property")
     }
     return result
