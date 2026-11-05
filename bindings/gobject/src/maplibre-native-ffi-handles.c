@@ -504,17 +504,12 @@ gboolean maplibre_native_ffi_acquired_frame_discard(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_acquired_frame_discard(self->handle, &diagnostic_);
   if (status_ == MLN_STATUS_OK) self->handle = MLN_HANDLE_NULL;
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -524,12 +519,9 @@ MaplibreNativeFfiDmaBufFrame* maplibre_native_ffi_acquired_frame_get_dma_buf(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_dma_buf_frame out_frame_;
   memset(&out_frame_, 0, sizeof out_frame_);
   (&out_frame_)->size = sizeof *(&out_frame_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
   MaplibreNativeFfiDmaBufFrame* value_ = NULL;
@@ -544,10 +536,8 @@ MaplibreNativeFfiDmaBufFrame* maplibre_native_ffi_acquired_frame_get_dma_buf(
     mln_acquired_frame_view_end(scope_);
   }
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return value_;
 }
 #endif
@@ -559,12 +549,9 @@ maplibre_native_ffi_acquired_frame_get_io_surface(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_io_surface_frame out_frame_;
   memset(&out_frame_, 0, sizeof out_frame_);
   (&out_frame_)->size = sizeof *(&out_frame_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
   MaplibreNativeFfiIoSurfaceFrame* value_ = NULL;
@@ -580,10 +567,8 @@ maplibre_native_ffi_acquired_frame_get_io_surface(
     mln_acquired_frame_view_end(scope_);
   }
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return value_;
 }
 #endif
@@ -595,12 +580,9 @@ maplibre_native_ffi_acquired_frame_get_metal_texture(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_metal_texture_frame out_frame_;
   memset(&out_frame_, 0, sizeof out_frame_);
   (&out_frame_)->size = sizeof *(&out_frame_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
   MaplibreNativeFfiMetalTextureFrame* value_ = NULL;
@@ -616,10 +598,8 @@ maplibre_native_ffi_acquired_frame_get_metal_texture(
     mln_acquired_frame_view_end(scope_);
   }
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return value_;
 }
 #endif
@@ -630,12 +610,9 @@ maplibre_native_ffi_acquired_frame_get_open_gl_texture(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_open_gl_texture_frame out_frame_;
   memset(&out_frame_, 0, sizeof out_frame_);
   (&out_frame_)->size = sizeof *(&out_frame_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
   MaplibreNativeFfiOpenGlTextureFrame* value_ = NULL;
@@ -652,10 +629,8 @@ maplibre_native_ffi_acquired_frame_get_open_gl_texture(
     mln_acquired_frame_view_end(scope_);
   }
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return value_;
 }
 
@@ -664,12 +639,9 @@ MaplibreNativeFfiGpuSync* maplibre_native_ffi_acquired_frame_get_producer_sync(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_gpu_sync out_sync_;
   memset(&out_sync_, 0, sizeof out_sync_);
   (&out_sync_)->size = sizeof *(&out_sync_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
   MaplibreNativeFfiGpuSync* value_ = NULL;
@@ -685,10 +657,8 @@ MaplibreNativeFfiGpuSync* maplibre_native_ffi_acquired_frame_get_producer_sync(
     mln_acquired_frame_view_end(scope_);
   }
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return value_;
 }
 
@@ -698,20 +668,15 @@ maplibre_native_ffi_acquired_frame_get_result(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_render_frame_result out_result_;
   memset(&out_result_, 0, sizeof out_result_);
   (&out_result_)->size = sizeof *(&out_result_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_acquired_frame_get_result(self->handle, &out_result_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_render_frame_result_from_native(&out_result_);
 }
 
@@ -721,12 +686,9 @@ maplibre_native_ffi_acquired_frame_get_vulkan_texture(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_vulkan_texture_frame out_frame_;
   memset(&out_frame_, 0, sizeof out_frame_);
   (&out_frame_)->size = sizeof *(&out_frame_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
   MaplibreNativeFfiVulkanTextureFrame* value_ = NULL;
@@ -743,10 +705,8 @@ maplibre_native_ffi_acquired_frame_get_vulkan_texture(
     mln_acquired_frame_view_end(scope_);
   }
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return value_;
 }
 
@@ -757,23 +717,18 @@ gboolean maplibre_native_ffi_acquired_frame_release(
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), FALSE);
   g_return_val_if_fail(consumer_completion != NULL, FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_gpu_sync consumer_completion_native_;
   maplibre_native_ffi_gpu_sync_to_native(
-    consumer_completion, &consumer_completion_native_, &call_
+    consumer_completion, &consumer_completion_native_, NULL
   );
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_acquired_frame_release(
     self->handle, &consumer_completion_native_, &diagnostic_
   );
   if (status_ == MLN_STATUS_OK) self->handle = MLN_HANDLE_NULL;
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -834,12 +789,8 @@ void maplibre_native_ffi_frame_pacer_release(
   MaplibreNativeFfiFramePacer* self
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER(self));
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_frame_pacer_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
-  maplibre_native_ffi_call_end(&call_, TRUE);
 }
 
 G_DEFINE_FINAL_TYPE(
@@ -907,25 +858,20 @@ maplibre_native_ffi_geo_json_source_data_create(
   GError** error
 ) {
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_geo_json_source_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_geo_json_source_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, NULL
     );
   mln_geo_json_source_data out_data_ = MLN_HANDLE_NULL;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_geo_json_source_data_create(
     maplibre_native_ffi_text_view(data),
     (options != NULL ? &options_native_ : NULL), &out_data_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_geo_json_source_data_wrap(
     out_data_, NULL, FALSE, NULL
   );
@@ -935,12 +881,8 @@ void maplibre_native_ffi_geo_json_source_data_release(
   MaplibreNativeFfiGeoJsonSourceData* self
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_DATA(self));
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_geo_json_source_data_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
-  maplibre_native_ffi_call_end(&call_, TRUE);
 }
 
 G_DEFINE_FINAL_TYPE(
@@ -997,56 +939,25 @@ void maplibre_native_ffi_map_add_custom_geometry_source_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(options != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_add_custom_geometry_source_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_add_custom_geometry_source_async,
+    callback, user_data, TRUE
+  );
   mln_custom_geometry_source_options options_native_;
   maplibre_native_ffi_custom_geometry_source_options_to_native(
-    options, &options_native_, &call_
+    options, &options_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_add_custom_geometry_source(
     self->handle, maplibre_native_ffi_text_view(source_id), &options_native_,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -1064,56 +975,25 @@ void maplibre_native_ffi_map_add_custom_vector_source_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(options != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_add_custom_vector_source_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_add_custom_vector_source_async,
+    callback, user_data, TRUE
+  );
   mln_custom_vector_source_options options_native_;
   maplibre_native_ffi_custom_vector_source_options_to_native(
-    options, &options_native_, &call_
+    options, &options_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_add_custom_vector_source(
     self->handle, maplibre_native_ffi_text_view(source_id), &options_native_,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -1131,53 +1011,22 @@ void maplibre_native_ffi_map_add_geo_json_source_data_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_DATA(data));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_add_geo_json_source_data_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_add_geo_json_source_data_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_add_geo_json_source_data(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (data != NULL ? data->handle : MLN_HANDLE_NULL), completion_argument_,
-    &diagnostic_
+    (data != NULL ? data->handle : MLN_HANDLE_NULL), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -1196,65 +1045,34 @@ void maplibre_native_ffi_map_add_image_source_image_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(image != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_add_image_source_image_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_add_image_source_image_async,
+    callback, user_data, TRUE
+  );
   mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &call_, coordinate_count, sizeof *coordinates_native_
+    &async_.call, coordinate_count, sizeof *coordinates_native_
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &async_.call
     );
   }
   mln_premultiplied_rgba8_image image_native_;
   maplibre_native_ffi_premultiplied_rgba8_image_to_native(
-    image, &image_native_, &call_
+    image, &image_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_add_image_source_image(
     self->handle, maplibre_native_ffi_text_view(source_id), coordinates_native_,
-    (size_t)(coordinate_count), &image_native_, completion_argument_,
-    &diagnostic_
+    (size_t)(coordinate_count), &image_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -1270,53 +1088,22 @@ void maplibre_native_ffi_map_add_style_layer_json_async(
   const char* before_layer_id, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_add_style_layer_json_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_add_style_layer_json_async, callback,
+    user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_add_style_layer_json(
     self->handle, maplibre_native_ffi_text_view(layer_json),
-    maplibre_native_ffi_text_view(before_layer_id), completion_argument_,
-    &diagnostic_
+    maplibre_native_ffi_text_view(before_layer_id), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -1332,53 +1119,22 @@ void maplibre_native_ffi_map_add_style_source_json_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_add_style_source_json_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_add_style_source_json_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_add_style_source_json(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    maplibre_native_ffi_text_view(source_json), completion_argument_,
-    &diagnostic_
+    maplibre_native_ffi_text_view(source_json), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -1395,53 +1151,24 @@ void maplibre_native_ffi_map_apply_camera_delta_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(delta != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_apply_camera_delta_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  mln_camera_delta delta_native_;
-  maplibre_native_ffi_camera_delta_to_native(delta, &delta_native_, &call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_apply_camera_delta(
-    self->handle, &delta_native_, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_apply_camera_delta_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_camera_delta delta_native_;
+  maplibre_native_ffi_camera_delta_to_native(
+    delta, &delta_native_, &async_.call
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_apply_camera_delta(
+    self->handle, &delta_native_, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -1935,51 +1662,20 @@ void maplibre_native_ffi_map_begin_command_group_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_begin_command_group_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_begin_command_group(
-    self->handle, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_begin_command_group_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_begin_command_group(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -1996,55 +1692,27 @@ void maplibre_native_ffi_map_camera_for_geometry_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_camera_for_geometry_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_camera_for_geometry_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_camera_fit_options fit_options_native_;
   if (fit_options != NULL)
     maplibre_native_ffi_camera_fit_options_to_native(
-      fit_options, &fit_options_native_, &call_
+      fit_options, &fit_options_native_, &async_.call
     );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_camera_for_geometry_decode,
+        (GDestroyNotify)maplibre_native_ffi_camera_options_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_camera_for_geometry_decode,
-          (GDestroyNotify)maplibre_native_ffi_camera_options_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_camera_for_geometry(
     self->handle, maplibre_native_ffi_text_view(geometry),
-    (fit_options != NULL ? &fit_options_native_ : NULL), completion_argument_,
-    &diagnostic_
+    (fit_options != NULL ? &fit_options_native_ : NULL),
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCameraOptions*
@@ -2062,57 +1730,31 @@ void maplibre_native_ffi_map_camera_for_lat_lng_bounds_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(bounds != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_camera_for_lat_lng_bounds_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_camera_for_lat_lng_bounds_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_lat_lng_bounds bounds_native_;
-  maplibre_native_ffi_lat_lng_bounds_to_native(bounds, &bounds_native_, &call_);
+  maplibre_native_ffi_lat_lng_bounds_to_native(
+    bounds, &bounds_native_, &async_.call
+  );
   mln_camera_fit_options fit_options_native_;
   if (fit_options != NULL)
     maplibre_native_ffi_camera_fit_options_to_native(
-      fit_options, &fit_options_native_, &call_
+      fit_options, &fit_options_native_, &async_.call
     );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_camera_for_lat_lng_bounds_decode,
+        (GDestroyNotify)maplibre_native_ffi_camera_options_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_camera_for_lat_lng_bounds_decode,
-          (GDestroyNotify)maplibre_native_ffi_camera_options_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_camera_for_lat_lng_bounds(
     self->handle, bounds_native_,
-    (fit_options != NULL ? &fit_options_native_ : NULL), completion_argument_,
-    &diagnostic_
+    (fit_options != NULL ? &fit_options_native_ : NULL),
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCameraOptions*
@@ -2129,63 +1771,35 @@ void maplibre_native_ffi_map_camera_for_lat_lngs_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_camera_for_lat_lngs_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_camera_for_lat_lngs_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &call_, coordinate_count, sizeof *coordinates_native_
+    &async_.call, coordinate_count, sizeof *coordinates_native_
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &async_.call
     );
   }
   mln_camera_fit_options fit_options_native_;
   if (fit_options != NULL)
     maplibre_native_ffi_camera_fit_options_to_native(
-      fit_options, &fit_options_native_, &call_
+      fit_options, &fit_options_native_, &async_.call
     );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_camera_for_lat_lngs_decode,
+        (GDestroyNotify)maplibre_native_ffi_camera_options_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_camera_for_lat_lngs_decode,
-          (GDestroyNotify)maplibre_native_ffi_camera_options_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_camera_for_lat_lngs(
     self->handle, coordinates_native_, (size_t)(coordinate_count),
-    (fit_options != NULL ? &fit_options_native_ : NULL), completion_argument_,
-    &diagnostic_
+    (fit_options != NULL ? &fit_options_native_ : NULL),
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCameraOptions*
@@ -2200,51 +1814,20 @@ void maplibre_native_ffi_map_cancel_camera_transitions_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_cancel_camera_transitions_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_cancel_camera_transitions(
-    self->handle, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_cancel_camera_transitions_async,
+    callback, user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_cancel_camera_transitions(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -2260,51 +1843,22 @@ void maplibre_native_ffi_map_cancel_camera_transitions_with_id_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_cancel_camera_transitions_with_id_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_cancel_camera_transitions_with_id(
-    self->handle, (uint64_t)(transition_id), completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_cancel_camera_transitions_with_id_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_cancel_camera_transitions_with_id(
+    self->handle, (uint64_t)(transition_id), async_.completion_argument,
+    &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -2330,48 +1884,20 @@ void maplibre_native_ffi_map_dump_debug_logs_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_dump_debug_logs_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_dump_debug_logs_async, callback,
+    user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_map_dump_debug_logs(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_status status_ = mln_map_dump_debug_logs(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -2386,50 +1912,20 @@ void maplibre_native_ffi_map_end_command_group_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_end_command_group_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_end_command_group_async, callback,
+    user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_map_end_command_group(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_status status_ = mln_map_end_command_group(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -2447,56 +1943,25 @@ void maplibre_native_ffi_map_fit_camera_to_geometry_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(update != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_fit_camera_to_geometry_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_fit_camera_to_geometry_async,
+    callback, user_data, TRUE
+  );
   mln_camera_fit_update update_native_;
   maplibre_native_ffi_camera_fit_update_to_native(
-    update, &update_native_, &call_
+    update, &update_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_fit_camera_to_geometry(
     self->handle, maplibre_native_ffi_text_view(geometry), &update_native_,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -2515,58 +1980,29 @@ void maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_async(
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(bounds != NULL);
   g_return_if_fail(update != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_async,
+    callback, user_data, TRUE
+  );
   mln_lat_lng_bounds bounds_native_;
-  maplibre_native_ffi_lat_lng_bounds_to_native(bounds, &bounds_native_, &call_);
+  maplibre_native_ffi_lat_lng_bounds_to_native(
+    bounds, &bounds_native_, &async_.call
+  );
   mln_camera_fit_update update_native_;
   maplibre_native_ffi_camera_fit_update_to_native(
-    update, &update_native_, &call_
+    update, &update_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_fit_camera_to_lat_lng_bounds(
-    self->handle, bounds_native_, &update_native_, completion_argument_,
-    &diagnostic_
+    self->handle, bounds_native_, &update_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -2584,64 +2020,33 @@ void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(update != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_fit_camera_to_lat_lngs_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_fit_camera_to_lat_lngs_async,
+    callback, user_data, TRUE
+  );
   mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &call_, coordinate_count, sizeof *coordinates_native_
+    &async_.call, coordinate_count, sizeof *coordinates_native_
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &async_.call
     );
   }
   mln_camera_fit_update update_native_;
   maplibre_native_ffi_camera_fit_update_to_native(
-    update, &update_native_, &call_
+    update, &update_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_fit_camera_to_lat_lngs(
     self->handle, coordinates_native_, (size_t)(coordinate_count),
-    &update_native_, completion_argument_, &diagnostic_
+    &update_native_, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -2656,45 +2061,20 @@ void maplibre_native_ffi_map_get_camera_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_get_camera_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_camera_async, callback,
+    user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_camera_decode,
+        (GDestroyNotify)maplibre_native_ffi_camera_query_result_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_camera_decode,
-          (GDestroyNotify)maplibre_native_ffi_camera_query_result_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_map_get_camera(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_status status_ = mln_map_get_camera(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCameraQueryResult* maplibre_native_ffi_map_get_camera_finish(
@@ -2711,49 +2091,24 @@ void maplibre_native_ffi_map_get_feature_state_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(selector != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_get_feature_state_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_feature_state_async, callback,
+    user_data, FALSE
+  );
   mln_feature_state_selector selector_native_;
   maplibre_native_ffi_feature_state_selector_to_native(
-    selector, &selector_native_, &call_
+    selector, &selector_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_feature_state_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_feature_state_decode, g_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_get_feature_state(
-    self->handle, &selector_native_, completion_argument_, &diagnostic_
+    self->handle, &selector_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_map_get_feature_state_finish(
@@ -2767,44 +2122,19 @@ void maplibre_native_ffi_map_get_global_state_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_get_global_state_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_global_state_async, callback,
+    user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_global_state_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_global_state_decode, g_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_map_get_global_state(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_status status_ = mln_map_get_global_state(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_map_get_global_state_finish(
@@ -2819,49 +2149,21 @@ void maplibre_native_ffi_map_get_image_source_coordinates_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_get_image_source_coordinates_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_image_source_coordinates_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_image_source_coordinates_decode,
+        (GDestroyNotify)g_ptr_array_unref
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_image_source_coordinates_decode,
-          (GDestroyNotify)g_ptr_array_unref, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_get_image_source_coordinates(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 GPtrArray* maplibre_native_ffi_map_get_image_source_coordinates_finish(
@@ -2875,48 +2177,19 @@ void maplibre_native_ffi_map_get_loaded_style_json_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_get_loaded_style_json_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_loaded_style_json_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_loaded_style_json_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_loaded_style_json_decode, g_free,
-          &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_get_loaded_style_json(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_map_get_loaded_style_json_finish(
@@ -2931,20 +2204,15 @@ MaplibreNativeFfiMapSnapshot* maplibre_native_ffi_map_get_snapshot(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_map_snapshot out_snapshot_;
   memset(&out_snapshot_, 0, sizeof out_snapshot_);
   (&out_snapshot_)->size = sizeof *(&out_snapshot_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_map_get_snapshot(self->handle, &out_snapshot_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_map_snapshot_from_native(&out_snapshot_);
 }
 
@@ -2953,47 +2221,21 @@ void maplibre_native_ffi_map_get_style_image_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_get_style_image_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_style_image_decode,
-          (GDestroyNotify)maplibre_native_ffi_style_image_info_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_get_style_image(
-    self->handle, maplibre_native_ffi_text_view(image_id), completion_argument_,
-    &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_image_async, callback,
+    user_data, FALSE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_image_decode,
+        (GDestroyNotify)maplibre_native_ffi_style_image_info_free
+      ))
+    return;
+  mln_status status_ = mln_map_get_style_image(
+    self->handle, maplibre_native_ffi_text_view(image_id),
+    async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiStyleImageInfo* maplibre_native_ffi_map_get_style_image_finish(
@@ -3008,47 +2250,21 @@ void maplibre_native_ffi_map_get_style_layer_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_get_style_layer_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_style_layer_decode,
-          (GDestroyNotify)maplibre_native_ffi_style_layer_info_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_get_style_layer(
-    self->handle, maplibre_native_ffi_text_view(layer_id), completion_argument_,
-    &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_layer_async, callback,
+    user_data, FALSE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_layer_decode,
+        (GDestroyNotify)maplibre_native_ffi_style_layer_info_free
+      ))
+    return;
+  mln_status status_ = mln_map_get_style_layer(
+    self->handle, maplibre_native_ffi_text_view(layer_id),
+    async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiStyleLayerInfo* maplibre_native_ffi_map_get_style_layer_finish(
@@ -3063,49 +2279,20 @@ void maplibre_native_ffi_map_get_style_layer_json_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_get_style_layer_json_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_layer_json_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_layer_json_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_style_layer_json_decode, g_free,
-          &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_get_style_layer_json(
-    self->handle, maplibre_native_ffi_text_view(layer_id), completion_argument_,
-    &diagnostic_
+    self->handle, maplibre_native_ffi_text_view(layer_id),
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_map_get_style_layer_json_finish(
@@ -3120,50 +2307,21 @@ void maplibre_native_ffi_map_get_style_layer_property_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_get_style_layer_property_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_layer_property_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_layer_property_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_style_layer_property_decode, g_free,
-          &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_get_style_layer_property(
     self->handle, maplibre_native_ffi_text_view(layer_id),
-    maplibre_native_ffi_text_view(property_name), completion_argument_,
-    &diagnostic_
+    maplibre_native_ffi_text_view(property_name), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_map_get_style_layer_property_finish(
@@ -3178,49 +2336,20 @@ void maplibre_native_ffi_map_get_style_light_property_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_get_style_light_property_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_light_property_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_light_property_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_style_light_property_decode, g_free,
-          &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_get_style_light_property(
     self->handle, maplibre_native_ffi_text_view(property_name),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_map_get_style_light_property_finish(
@@ -3235,47 +2364,21 @@ void maplibre_native_ffi_map_get_style_source_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_get_style_source_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_source_async, callback,
+    user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_source_decode,
+        (GDestroyNotify)maplibre_native_ffi_style_source_info_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_style_source_decode,
-          (GDestroyNotify)maplibre_native_ffi_style_source_info_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_get_style_source(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiStyleSourceInfo*
@@ -3290,49 +2393,20 @@ void maplibre_native_ffi_map_get_style_transition_options_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_get_style_transition_options_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_transition_options_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_transition_options_decode,
+        (GDestroyNotify)maplibre_native_ffi_style_transition_options_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_style_transition_options_decode,
-          (GDestroyNotify)maplibre_native_ffi_style_transition_options_free,
-          &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_get_style_transition_options(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiStyleTransitionOptions*
@@ -3347,44 +2421,19 @@ void maplibre_native_ffi_map_get_style_url_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_get_style_url_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_url_async, callback,
+    user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_url_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_get_style_url_decode, g_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_map_get_style_url(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_status status_ = mln_map_get_style_url(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_map_get_style_url_finish(
@@ -3401,55 +2450,26 @@ void maplibre_native_ffi_map_invalidate_custom_geometry_source_region_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(bounds != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_,
-      maplibre_native_ffi_map_invalidate_custom_geometry_source_region_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_invalidate_custom_geometry_source_region_async,
+    callback, user_data, TRUE
+  );
   mln_lat_lng_bounds bounds_native_;
-  maplibre_native_ffi_lat_lng_bounds_to_native(bounds, &bounds_native_, &call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  maplibre_native_ffi_lat_lng_bounds_to_native(
+    bounds, &bounds_native_, &async_.call
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_invalidate_custom_geometry_source_region(
     self->handle, maplibre_native_ffi_text_view(source_id), bounds_native_,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -3467,57 +2487,26 @@ void maplibre_native_ffi_map_invalidate_custom_geometry_source_tile_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(tile_id != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_,
-      maplibre_native_ffi_map_invalidate_custom_geometry_source_tile_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_invalidate_custom_geometry_source_tile_async,
+    callback, user_data, TRUE
+  );
   mln_canonical_tile_id tile_id_native_;
   maplibre_native_ffi_canonical_tile_id_to_native(
-    tile_id, &tile_id_native_, &call_
+    tile_id, &tile_id_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_invalidate_custom_geometry_source_tile(
     self->handle, maplibre_native_ffi_text_view(source_id), tile_id_native_,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -3535,55 +2524,26 @@ void maplibre_native_ffi_map_invalidate_custom_vector_source_region_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(bounds != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_,
-      maplibre_native_ffi_map_invalidate_custom_vector_source_region_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_invalidate_custom_vector_source_region_async,
+    callback, user_data, TRUE
+  );
   mln_lat_lng_bounds bounds_native_;
-  maplibre_native_ffi_lat_lng_bounds_to_native(bounds, &bounds_native_, &call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  maplibre_native_ffi_lat_lng_bounds_to_native(
+    bounds, &bounds_native_, &async_.call
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_invalidate_custom_vector_source_region(
     self->handle, maplibre_native_ffi_text_view(source_id), bounds_native_,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -3601,56 +2561,26 @@ void maplibre_native_ffi_map_invalidate_custom_vector_source_tile_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(tile_id != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_invalidate_custom_vector_source_tile_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_invalidate_custom_vector_source_tile_async,
+    callback, user_data, TRUE
+  );
   mln_canonical_tile_id tile_id_native_;
   maplibre_native_ffi_canonical_tile_id_to_native(
-    tile_id, &tile_id_native_, &call_
+    tile_id, &tile_id_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_invalidate_custom_vector_source_tile(
     self->handle, maplibre_native_ffi_text_view(source_id), tile_id_native_,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -3667,50 +2597,25 @@ void maplibre_native_ffi_map_lat_lng_bounds_for_camera_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(camera != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_lat_lng_bounds_for_camera_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_lat_lng_bounds_for_camera_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_camera_options camera_native_;
-  maplibre_native_ffi_camera_options_to_native(camera, &camera_native_, &call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_lat_lng_bounds_for_camera_decode,
-          (GDestroyNotify)maplibre_native_ffi_lat_lng_bounds_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_lat_lng_bounds_for_camera(
-    self->handle, &camera_native_, completion_argument_, &diagnostic_
+  maplibre_native_ffi_camera_options_to_native(
+    camera, &camera_native_, &async_.call
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_lat_lng_bounds_for_camera_decode,
+        (GDestroyNotify)maplibre_native_ffi_lat_lng_bounds_free
+      ))
+    return;
+  mln_status status_ = mln_map_lat_lng_bounds_for_camera(
+    self->handle, &camera_native_, async_.completion_argument,
+    &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiLatLngBounds*
@@ -3725,45 +2630,20 @@ void maplibre_native_ffi_map_list_style_layers_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_list_style_layers_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_list_style_layers_async, callback,
+    user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_list_style_layers_decode,
+        (GDestroyNotify)g_ptr_array_unref
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_list_style_layers_decode,
-          (GDestroyNotify)g_ptr_array_unref, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_map_list_style_layers(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_status status_ = mln_map_list_style_layers(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 GPtrArray* maplibre_native_ffi_map_list_style_layers_finish(
@@ -3777,48 +2657,20 @@ void maplibre_native_ffi_map_list_style_sources_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_list_style_sources_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_list_style_sources_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_list_style_sources_decode,
+        (GDestroyNotify)g_ptr_array_unref
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_map_list_style_sources_decode,
-          (GDestroyNotify)g_ptr_array_unref, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_list_style_sources(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 GPtrArray* maplibre_native_ffi_map_list_style_sources_finish(
@@ -3833,53 +2685,22 @@ void maplibre_native_ffi_map_move_style_layer_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_move_style_layer_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_move_style_layer_async, callback,
+    user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_move_style_layer(
     self->handle, maplibre_native_ffi_text_view(layer_id),
-    maplibre_native_ffi_text_view(before_layer_id), completion_argument_,
-    &diagnostic_
+    maplibre_native_ffi_text_view(before_layer_id), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -3894,55 +2715,29 @@ void maplibre_native_ffi_map_release_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_map_release_async);
   if (self->borrowed) {
     GError* borrowed_ = NULL;
     maplibre_native_ffi_set_borrowed_error(&borrowed_);
-    g_task_return_error(task_, borrowed_);
-    g_object_unref(task_);
+    g_task_report_error(
+      self, callback, user_data, maplibre_native_ffi_map_release_async,
+      borrowed_
+    );
     return;
   }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_map_release(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_release_async, callback, user_data,
+    FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
+  mln_status status_ = mln_map_release(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
   if (status_ == MLN_STATUS_OK) {
     self->released_handle = self->handle;
     self->handle = MLN_HANDLE_NULL;
   }
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_map_release_finish(
@@ -3959,55 +2754,25 @@ void maplibre_native_ffi_map_remove_feature_state_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(selector != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_remove_feature_state_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_remove_feature_state_async, callback,
+    user_data, TRUE
+  );
   mln_feature_state_selector selector_native_;
   maplibre_native_ffi_feature_state_selector_to_native(
-    selector, &selector_native_, &call_
+    selector, &selector_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_remove_feature_state(
-    self->handle, &selector_native_, completion_argument_, &diagnostic_
+    self->handle, &selector_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4023,52 +2788,21 @@ void maplibre_native_ffi_map_remove_style_image_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_remove_style_image_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_remove_style_image(
-    self->handle, maplibre_native_ffi_text_view(image_id), completion_argument_,
-    &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_remove_style_image_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_remove_style_image(
+    self->handle, maplibre_native_ffi_text_view(image_id),
+    async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4084,52 +2818,21 @@ void maplibre_native_ffi_map_remove_style_layer_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_remove_style_layer_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_remove_style_layer(
-    self->handle, maplibre_native_ffi_text_view(layer_id), completion_argument_,
-    &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_remove_style_layer_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_remove_style_layer(
+    self->handle, maplibre_native_ffi_text_view(layer_id),
+    async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4145,52 +2848,21 @@ void maplibre_native_ffi_map_remove_style_source_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_remove_style_source_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_remove_style_source_async, callback,
+    user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_remove_style_source(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4205,48 +2877,20 @@ void maplibre_native_ffi_map_request_repaint_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_request_repaint_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_request_repaint_async, callback,
+    user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_map_request_repaint(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_status status_ = mln_map_request_repaint(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4261,47 +2905,16 @@ void maplibre_native_ffi_map_request_still_image_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_map_request_still_image_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_request_still_image_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_map_request_still_image(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_map_request_still_image_finish(
@@ -4317,53 +2930,25 @@ void maplibre_native_ffi_map_resize_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(logical_size != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_resize_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_resize_async, callback, user_data,
+    TRUE
+  );
   mln_logical_size logical_size_native_;
   maplibre_native_ffi_logical_size_to_native(
-    logical_size, &logical_size_native_, &call_
+    logical_size, &logical_size_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_resize(
-    self->handle, logical_size_native_, completion_argument_, &diagnostic_
+    self->handle, logical_size_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion* maplibre_native_ffi_map_resize_finish(
@@ -4379,53 +2964,25 @@ void maplibre_native_ffi_map_set_bounds_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(options != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_set_bounds_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_bounds_async, callback,
+    user_data, TRUE
+  );
   mln_bound_options options_native_;
   maplibre_native_ffi_bound_options_to_native(
-    options, &options_native_, &call_
+    options, &options_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_bounds(
-    self->handle, &options_native_, completion_argument_, &diagnostic_
+    self->handle, &options_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion* maplibre_native_ffi_map_set_bounds_finish(
@@ -4442,56 +2999,27 @@ void maplibre_native_ffi_map_set_custom_geometry_source_tile_data_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(tile_id != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_custom_geometry_source_tile_data_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_set_custom_geometry_source_tile_data_async,
+    callback, user_data, TRUE
+  );
   mln_canonical_tile_id tile_id_native_;
   maplibre_native_ffi_canonical_tile_id_to_native(
-    tile_id, &tile_id_native_, &call_
+    tile_id, &tile_id_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_custom_geometry_source_tile_data(
     self->handle, maplibre_native_ffi_text_view(source_id), tile_id_native_,
-    maplibre_native_ffi_text_view(data), completion_argument_, &diagnostic_
+    maplibre_native_ffi_text_view(data), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4509,56 +3037,27 @@ void maplibre_native_ffi_map_set_custom_geometry_source_tile_error_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(tile_id != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_custom_geometry_source_tile_error_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_set_custom_geometry_source_tile_error_async,
+    callback, user_data, TRUE
+  );
   mln_canonical_tile_id tile_id_native_;
   maplibre_native_ffi_canonical_tile_id_to_native(
-    tile_id, &tile_id_native_, &call_
+    tile_id, &tile_id_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_custom_geometry_source_tile_error(
     self->handle, maplibre_native_ffi_text_view(source_id), tile_id_native_,
-    maplibre_native_ffi_text_view(message), completion_argument_, &diagnostic_
+    maplibre_native_ffi_text_view(message), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4577,57 +3076,28 @@ void maplibre_native_ffi_map_set_custom_vector_source_tile_data_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(tile_id != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_custom_vector_source_tile_data_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_set_custom_vector_source_tile_data_async, callback,
+    user_data, TRUE
+  );
   mln_canonical_tile_id tile_id_native_;
   maplibre_native_ffi_canonical_tile_id_to_native(
-    tile_id, &tile_id_native_, &call_
+    tile_id, &tile_id_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_custom_vector_source_tile_data(
     self->handle, maplibre_native_ffi_text_view(source_id), tile_id_native_,
     (mln_style_vector_tile_encoding)(encoding),
-    maplibre_native_ffi_bytes_view(data), completion_argument_, &diagnostic_
+    maplibre_native_ffi_bytes_view(data), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4645,56 +3115,27 @@ void maplibre_native_ffi_map_set_custom_vector_source_tile_error_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(tile_id != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_custom_vector_source_tile_error_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_set_custom_vector_source_tile_error_async, callback,
+    user_data, TRUE
+  );
   mln_canonical_tile_id tile_id_native_;
   maplibre_native_ffi_canonical_tile_id_to_native(
-    tile_id, &tile_id_native_, &call_
+    tile_id, &tile_id_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_custom_vector_source_tile_error(
     self->handle, maplibre_native_ffi_text_view(source_id), tile_id_native_,
-    maplibre_native_ffi_text_view(message), completion_argument_, &diagnostic_
+    maplibre_native_ffi_text_view(message), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4710,50 +3151,21 @@ void maplibre_native_ffi_map_set_debug_flags_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_set_debug_flags_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_set_debug_flags(
-    self->handle, (mln_map_debug_flags)(flags), completion_argument_,
-    &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_debug_flags_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_set_debug_flags(
+    self->handle, (mln_map_debug_flags)(flags), async_.completion_argument,
+    &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4769,50 +3181,21 @@ void maplibre_native_ffi_map_set_event_mask_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_set_event_mask_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_set_event_mask(
-    self->handle, (mln_runtime_event_flags)(mask), completion_argument_,
-    &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_event_mask_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_set_event_mask(
+    self->handle, (mln_runtime_event_flags)(mask), async_.completion_argument,
+    &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4830,56 +3213,25 @@ void maplibre_native_ffi_map_set_feature_state_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(selector != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_feature_state_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_feature_state_async, callback,
+    user_data, TRUE
+  );
   mln_feature_state_selector selector_native_;
   maplibre_native_ffi_feature_state_selector_to_native(
-    selector, &selector_native_, &call_
+    selector, &selector_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_feature_state(
     self->handle, &selector_native_, maplibre_native_ffi_text_view(state),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4896,55 +3248,25 @@ void maplibre_native_ffi_map_set_free_camera_options_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(options != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_free_camera_options_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_free_camera_options_async,
+    callback, user_data, TRUE
+  );
   mln_free_camera_options options_native_;
   maplibre_native_ffi_free_camera_options_to_native(
-    options, &options_native_, &call_
+    options, &options_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_free_camera_options(
-    self->handle, &options_native_, completion_argument_, &diagnostic_
+    self->handle, &options_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -4962,53 +3284,22 @@ void maplibre_native_ffi_map_set_geo_json_source_data_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_DATA(data));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_geo_json_source_data_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_geo_json_source_data_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_geo_json_source_data(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (data != NULL ? data->handle : MLN_HANDLE_NULL), completion_argument_,
-    &diagnostic_
+    (data != NULL ? data->handle : MLN_HANDLE_NULL), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5024,53 +3315,22 @@ void maplibre_native_ffi_map_set_geo_json_source_synchronous_tiling_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_,
-      maplibre_native_ffi_map_set_geo_json_source_synchronous_tiling_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_set_geo_json_source_synchronous_tiling_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_geo_json_source_synchronous_tiling(
     self->handle, maplibre_native_ffi_text_view(source_id), (enabled) != FALSE,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5086,52 +3346,22 @@ void maplibre_native_ffi_map_set_geo_json_source_url_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_geo_json_source_url_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_geo_json_source_url_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_geo_json_source_url(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    maplibre_native_ffi_text_view(url), completion_argument_, &diagnostic_
+    maplibre_native_ffi_text_view(url), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5147,52 +3377,22 @@ void maplibre_native_ffi_map_set_global_state_property_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_global_state_property_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_global_state_property_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_global_state_property(
     self->handle, maplibre_native_ffi_text_view(property_name),
-    maplibre_native_ffi_text_view(value), completion_argument_, &diagnostic_
+    maplibre_native_ffi_text_view(value), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5209,60 +3409,29 @@ void maplibre_native_ffi_map_set_image_source_coordinates_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_image_source_coordinates_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_image_source_coordinates_async,
+    callback, user_data, TRUE
+  );
   mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &call_, coordinate_count, sizeof *coordinates_native_
+    &async_.call, coordinate_count, sizeof *coordinates_native_
   );
   for (gsize index = 0; index < (gsize)coordinate_count; index++) {
     maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &call_
+      &coordinates[index], &coordinates_native_[index], &async_.call
     );
   }
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_image_source_coordinates(
     self->handle, maplibre_native_ffi_text_view(source_id), coordinates_native_,
-    (size_t)(coordinate_count), completion_argument_, &diagnostic_
+    (size_t)(coordinate_count), async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5280,56 +3449,25 @@ void maplibre_native_ffi_map_set_image_source_image_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(image != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_image_source_image_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_image_source_image_async,
+    callback, user_data, TRUE
+  );
   mln_premultiplied_rgba8_image image_native_;
   maplibre_native_ffi_premultiplied_rgba8_image_to_native(
-    image, &image_native_, &call_
+    image, &image_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_image_source_image(
     self->handle, maplibre_native_ffi_text_view(source_id), &image_native_,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5345,52 +3483,22 @@ void maplibre_native_ffi_map_set_image_source_url_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_image_source_url_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_image_source_url_async, callback,
+    user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_image_source_url(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    maplibre_native_ffi_text_view(url), completion_argument_, &diagnostic_
+    maplibre_native_ffi_text_view(url), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5408,55 +3516,25 @@ void maplibre_native_ffi_map_set_projection_mode_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(options != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_projection_mode_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_projection_mode_async, callback,
+    user_data, TRUE
+  );
   mln_projection_mode_options options_native_;
   maplibre_native_ffi_projection_mode_options_to_native(
-    options, &options_native_, &call_
+    options, &options_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_projection_mode(
-    self->handle, &options_native_, completion_argument_, &diagnostic_
+    self->handle, &options_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5472,51 +3550,22 @@ void maplibre_native_ffi_map_set_rendering_stats_view_enabled_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_rendering_stats_view_enabled_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_set_rendering_stats_view_enabled(
-    self->handle, (enabled) != FALSE, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_map_set_rendering_stats_view_enabled_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_set_rendering_stats_view_enabled(
+    self->handle, (enabled) != FALSE, async_.completion_argument,
+    &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5535,60 +3584,31 @@ void maplibre_native_ffi_map_set_style_image_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(image != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_set_style_image_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_image_async, callback,
+    user_data, TRUE
+  );
   mln_premultiplied_rgba8_image image_native_;
   maplibre_native_ffi_premultiplied_rgba8_image_to_native(
-    image, &image_native_, &call_
+    image, &image_native_, &async_.call
   );
   mln_style_image_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_style_image_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, &async_.call
     );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_style_image(
     self->handle, maplibre_native_ffi_text_view(image_id), &image_native_,
-    (options != NULL ? &options_native_ : NULL), completion_argument_,
-    &diagnostic_
+    (options != NULL ? &options_native_ : NULL), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5604,50 +3624,21 @@ void maplibre_native_ffi_map_set_style_json_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_set_style_json_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_set_style_json(
-    self->handle, maplibre_native_ffi_text_view(json), completion_argument_,
-    &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_json_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_set_style_json(
+    self->handle, maplibre_native_ffi_text_view(json),
+    async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5663,53 +3654,23 @@ void maplibre_native_ffi_map_set_style_layer_property_async(
   const char* value, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_style_layer_property_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_layer_property_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_style_layer_property(
     self->handle, maplibre_native_ffi_text_view(layer_id),
     maplibre_native_ffi_text_view(property_name),
-    maplibre_native_ffi_text_view(value), completion_argument_, &diagnostic_
+    maplibre_native_ffi_text_view(value), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5725,52 +3686,21 @@ void maplibre_native_ffi_map_set_style_light_json_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_style_light_json_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_light_json_async, callback,
+    user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_style_light_json(
     self->handle, maplibre_native_ffi_text_view(light_json),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5786,52 +3716,22 @@ void maplibre_native_ffi_map_set_style_light_property_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_style_light_property_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_light_property_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_style_light_property(
     self->handle, maplibre_native_ffi_text_view(property_name),
-    maplibre_native_ffi_text_view(value), completion_argument_, &diagnostic_
+    maplibre_native_ffi_text_view(value), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5847,52 +3747,21 @@ void maplibre_native_ffi_map_set_style_source_volatile_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_style_source_volatile_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_source_volatile_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_style_source_volatile(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (is_volatile) != FALSE, completion_argument_, &diagnostic_
+    (is_volatile) != FALSE, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5910,55 +3779,25 @@ void maplibre_native_ffi_map_set_style_transition_options_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(options != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_style_transition_options_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_transition_options_async,
+    callback, user_data, TRUE
+  );
   mln_style_transition_options options_native_;
   maplibre_native_ffi_style_transition_options_to_native(
-    options, &options_native_, &call_
+    options, &options_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_style_transition_options(
-    self->handle, &options_native_, completion_argument_, &diagnostic_
+    self->handle, &options_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -5974,50 +3813,21 @@ void maplibre_native_ffi_map_set_style_url_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_set_style_url_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_set_style_url(
-    self->handle, maplibre_native_ffi_text_view(url), completion_argument_,
-    &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_url_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_set_style_url(
+    self->handle, maplibre_native_ffi_text_view(url),
+    async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -6034,55 +3844,25 @@ void maplibre_native_ffi_map_set_tile_options_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(options != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_tile_options_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_tile_options_async, callback,
+    user_data, TRUE
+  );
   mln_map_tile_options options_native_;
   maplibre_native_ffi_map_tile_options_to_native(
-    options, &options_native_, &call_
+    options, &options_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_tile_options(
-    self->handle, &options_native_, completion_argument_, &diagnostic_
+    self->handle, &options_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -6100,55 +3880,25 @@ void maplibre_native_ffi_map_set_viewport_options_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(options != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_map_set_viewport_options_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_viewport_options_async, callback,
+    user_data, TRUE
+  );
   mln_map_viewport_options options_native_;
   maplibre_native_ffi_map_viewport_options_to_native(
-    options, &options_native_, &call_
+    options, &options_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_set_viewport_options(
-    self->handle, &options_native_, completion_argument_, &diagnostic_
+    self->handle, &options_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -6165,51 +3915,25 @@ void maplibre_native_ffi_map_update_camera_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(update != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(task_, maplibre_native_ffi_map_update_camera_async);
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  mln_camera_update update_native_;
-  maplibre_native_ffi_camera_update_to_native(update, &update_native_, &call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_map_update_camera(
-    self->handle, &update_native_, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_update_camera_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  mln_camera_update update_native_;
+  maplibre_native_ffi_camera_update_to_native(
+    update, &update_native_, &async_.call
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_update_camera(
+    self->handle, &update_native_, async_.completion_argument,
+    &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -6309,20 +4033,15 @@ MaplibreNativeFfiMapProjection* maplibre_native_ffi_map_projection_create(
 ) {
   g_return_val_if_fail(view != NULL, NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_map_view view_native_;
-  maplibre_native_ffi_map_view_to_native(view, &view_native_, &call_);
+  maplibre_native_ffi_map_view_to_native(view, &view_native_, NULL);
   mln_map_projection out_projection_ = MLN_HANDLE_NULL;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_map_projection_create(&view_native_, &out_projection_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_map_projection_wrap(
     out_projection_, NULL, FALSE, NULL
   );
@@ -6334,20 +4053,15 @@ maplibre_native_ffi_map_projection_get_camera(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_map_projection_camera_result out_result_;
   memset(&out_result_, 0, sizeof out_result_);
   (&out_result_)->size = sizeof *(&out_result_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_map_projection_get_camera(self->handle, &out_result_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_map_projection_camera_result_from_native(
     &out_result_
   );
@@ -6360,22 +4074,17 @@ MaplibreNativeFfiLatLng* maplibre_native_ffi_map_projection_lat_lng_for_pixel(
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), NULL);
   g_return_val_if_fail(point != NULL, NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_screen_point point_native_;
-  maplibre_native_ffi_screen_point_to_native(point, &point_native_, &call_);
+  maplibre_native_ffi_screen_point_to_native(point, &point_native_, NULL);
   mln_lat_lng out_coordinate_;
   memset(&out_coordinate_, 0, sizeof out_coordinate_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_projection_lat_lng_for_pixel(
     self->handle, point_native_, &out_coordinate_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_lat_lng_from_native(&out_coordinate_);
 }
 
@@ -6387,22 +4096,17 @@ maplibre_native_ffi_map_projection_lat_lng_for_pixel_unwrapped(
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), NULL);
   g_return_val_if_fail(point != NULL, NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_screen_point point_native_;
-  maplibre_native_ffi_screen_point_to_native(point, &point_native_, &call_);
+  maplibre_native_ffi_screen_point_to_native(point, &point_native_, NULL);
   mln_lat_lng out_coordinate_;
   memset(&out_coordinate_, 0, sizeof out_coordinate_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_projection_lat_lng_for_pixel_unwrapped(
     self->handle, point_native_, &out_coordinate_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_lat_lng_from_native(&out_coordinate_);
 }
 
@@ -6497,19 +4201,14 @@ gdouble maplibre_native_ffi_map_projection_meters_per_pixel_at_latitude(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), 0);
   g_return_val_if_fail(error == NULL || *error == NULL, 0);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   double out_meters_per_pixel_ = 0;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return 0;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_projection_meters_per_pixel_at_latitude(
     self->handle, (double)(latitude), &out_meters_per_pixel_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return 0;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return (gdouble)(out_meters_per_pixel_);
 }
 
@@ -6521,24 +4220,17 @@ maplibre_native_ffi_map_projection_pixel_for_lat_lng(
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), NULL);
   g_return_val_if_fail(coordinate != NULL, NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_lat_lng coordinate_native_;
-  maplibre_native_ffi_lat_lng_to_native(
-    coordinate, &coordinate_native_, &call_
-  );
+  maplibre_native_ffi_lat_lng_to_native(coordinate, &coordinate_native_, NULL);
   mln_screen_point out_point_;
   memset(&out_point_, 0, sizeof out_point_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_projection_pixel_for_lat_lng(
     self->handle, coordinate_native_, &out_point_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_screen_point_from_native(&out_point_);
 }
 
@@ -6591,12 +4283,8 @@ void maplibre_native_ffi_map_projection_release(
   MaplibreNativeFfiMapProjection* self
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self));
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_map_projection_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
-  maplibre_native_ffi_call_end(&call_, TRUE);
 }
 
 gboolean maplibre_native_ffi_map_projection_set_camera(
@@ -6606,19 +4294,14 @@ gboolean maplibre_native_ffi_map_projection_set_camera(
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), FALSE);
   g_return_val_if_fail(camera != NULL, FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_camera_options camera_native_;
-  maplibre_native_ffi_camera_options_to_native(camera, &camera_native_, &call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
+  maplibre_native_ffi_camera_options_to_native(camera, &camera_native_, NULL);
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_map_projection_set_camera(self->handle, &camera_native_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -6684,24 +4367,19 @@ MaplibreNativeFfiOffscreenDevice* maplibre_native_ffi_offscreen_device_create(
   const MaplibreNativeFfiOffscreenDeviceOptions* options, GError** error
 ) {
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_offscreen_device_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_offscreen_device_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, NULL
     );
   mln_offscreen_device out_device_ = MLN_HANDLE_NULL;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_offscreen_device_create(
     (options != NULL ? &options_native_ : NULL), &out_device_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_offscreen_device_wrap(
     out_device_, NULL, FALSE, NULL
   );
@@ -6711,12 +4389,8 @@ void maplibre_native_ffi_offscreen_device_release(
   MaplibreNativeFfiOffscreenDevice* self
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_OFFSCREEN_DEVICE(self));
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_offscreen_device_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
-  maplibre_native_ffi_call_end(&call_, TRUE);
 }
 
 G_DEFINE_FINAL_TYPE(
@@ -6781,20 +4455,15 @@ maplibre_native_ffi_render_session_abandon(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_render_abandon_result out_result_;
   memset(&out_result_, 0, sizeof out_result_);
   (&out_result_)->size = sizeof *(&out_result_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_render_session_abandon(self->handle, &out_result_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_render_abandon_result_from_native(&out_result_);
 }
 
@@ -6804,18 +4473,13 @@ maplibre_native_ffi_render_session_acquire_frame(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_acquired_frame out_frame_ = MLN_HANDLE_NULL;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_render_session_acquire_frame(self->handle, &out_frame_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return (
     out_frame_ != MLN_HANDLE_NULL
       ? maplibre_native_ffi_acquired_frame_wrap(out_frame_, self, FALSE, NULL)
@@ -6828,47 +4492,16 @@ void maplibre_native_ffi_render_session_barrier_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_barrier_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_barrier_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_barrier(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_barrier_finish(
@@ -6883,47 +4516,16 @@ void maplibre_native_ffi_render_session_clear_data_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_clear_data_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_clear_data_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_clear_data(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_clear_data_finish(
@@ -6940,20 +4542,15 @@ gboolean maplibre_native_ffi_render_session_demand_frame(
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), FALSE);
   g_return_val_if_fail(demand != NULL, FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_frame_demand demand_native_;
-  maplibre_native_ffi_frame_demand_to_native(demand, &demand_native_, &call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
+  maplibre_native_ffi_frame_demand_to_native(demand, &demand_native_, NULL);
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_demand_frame(
     self->handle, &demand_native_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -6962,44 +4559,16 @@ void maplibre_native_ffi_render_session_detach_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_render_session_detach_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_render_session_detach(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_detach_async, callback,
+    user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
+  mln_status status_ = mln_render_session_detach(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_detach_finish(
@@ -7060,47 +4629,16 @@ void maplibre_native_ffi_render_session_dump_debug_logs_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_dump_debug_logs_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_dump_debug_logs_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_dump_debug_logs(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_dump_debug_logs_finish(
@@ -7116,21 +4654,16 @@ maplibre_native_ffi_render_session_get_capabilities(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_render_session_capabilities out_capabilities_;
   memset(&out_capabilities_, 0, sizeof out_capabilities_);
   (&out_capabilities_)->size = sizeof *(&out_capabilities_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_get_capabilities(
     self->handle, &out_capabilities_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_render_session_capabilities_from_native(
     &out_capabilities_
   );
@@ -7141,49 +4674,21 @@ void maplibre_native_ffi_render_session_get_cluster_children_async(
   guint32 cluster_id, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_get_cluster_children_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_get_cluster_children_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_render_session_get_cluster_children_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_render_session_get_cluster_children_decode,
-          g_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_get_cluster_children(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (uint32_t)(cluster_id), completion_argument_, &diagnostic_
+    (uint32_t)(cluster_id), async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_render_session_get_cluster_children_finish(
@@ -7198,49 +4703,21 @@ void maplibre_native_ffi_render_session_get_cluster_expansion_zoom_async(
   guint32 cluster_id, GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_get_cluster_expansion_zoom_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_get_cluster_expansion_zoom_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_render_session_get_cluster_expansion_zoom_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_,
-          mln_render_session_get_cluster_expansion_zoom_decode, g_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_get_cluster_expansion_zoom(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (uint32_t)(cluster_id), completion_argument_, &diagnostic_
+    (uint32_t)(cluster_id), async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 guint32 maplibre_native_ffi_render_session_get_cluster_expansion_zoom_finish(
@@ -7260,50 +4737,21 @@ void maplibre_native_ffi_render_session_get_cluster_leaves_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_get_cluster_leaves_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_get_cluster_leaves_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_render_session_get_cluster_leaves_decode, g_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_render_session_get_cluster_leaves_decode,
-          g_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_get_cluster_leaves(
     self->handle, maplibre_native_ffi_text_view(source_id),
     (uint32_t)(cluster_id), (uint32_t)(limit), (uint32_t)(offset),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 char* maplibre_native_ffi_render_session_get_cluster_leaves_finish(
@@ -7318,9 +4766,6 @@ char* maplibre_native_ffi_render_session_get_failure(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   size_t capacity_ = 256;
   size_t length_ = 0;
@@ -7338,10 +4783,8 @@ char* maplibre_native_ffi_render_session_get_failure(
     status_ == MLN_STATUS_OK ? g_strndup(text_, length_) : NULL;
   g_free(text_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return text_value_;
 }
 
@@ -7351,20 +4794,15 @@ maplibre_native_ffi_render_session_get_snapshot(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_render_session_snapshot out_snapshot_;
   memset(&out_snapshot_, 0, sizeof out_snapshot_);
   (&out_snapshot_)->size = sizeof *(&out_snapshot_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_render_session_get_snapshot(self->handle, &out_snapshot_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_render_session_snapshot_from_native(
     &out_snapshot_
   );
@@ -7378,60 +4816,32 @@ void maplibre_native_ffi_render_session_query_rendered_features_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(geometry != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_query_rendered_features_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_query_rendered_features_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_rendered_query_geometry geometry_native_;
   maplibre_native_ffi_rendered_query_geometry_to_native(
-    geometry, &geometry_native_, &call_
+    geometry, &geometry_native_, &async_.call
   );
   mln_rendered_feature_query_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_rendered_feature_query_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, &async_.call
     );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_render_session_query_rendered_features_decode,
+        (GDestroyNotify)g_ptr_array_unref
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_,
-          mln_render_session_query_rendered_features_decode,
-          (GDestroyNotify)g_ptr_array_unref, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_query_rendered_features(
     self->handle, &geometry_native_,
-    (options != NULL ? &options_native_ : NULL), completion_argument_,
-    &diagnostic_
+    (options != NULL ? &options_native_ : NULL), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 GPtrArray* maplibre_native_ffi_render_session_query_rendered_features_finish(
@@ -7447,55 +4857,28 @@ void maplibre_native_ffi_render_session_query_source_features_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_query_source_features_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_query_source_features_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_source_feature_query_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_source_feature_query_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, &async_.call
     );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_render_session_query_source_features_decode,
+        (GDestroyNotify)g_ptr_array_unref
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_render_session_query_source_features_decode,
-          (GDestroyNotify)g_ptr_array_unref, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_query_source_features(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (options != NULL ? &options_native_ : NULL), completion_argument_,
-    &diagnostic_
+    (options != NULL ? &options_native_ : NULL), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 GPtrArray* maplibre_native_ffi_render_session_query_source_features_finish(
@@ -7510,49 +4893,20 @@ void maplibre_native_ffi_render_session_read_texture_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_read_texture_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_read_texture_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_render_session_read_texture_decode,
+        (GDestroyNotify)maplibre_native_ffi_texture_readback_result_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_render_session_read_texture_decode,
-          (GDestroyNotify)maplibre_native_ffi_texture_readback_result_free,
-          &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_read_texture(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiTextureReadbackResult*
@@ -7568,47 +4922,16 @@ void maplibre_native_ffi_render_session_reduce_memory_use_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_reduce_memory_use_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_reduce_memory_use_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_reduce_memory_use(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_reduce_memory_use_finish(
@@ -7623,51 +4946,20 @@ void maplibre_native_ffi_render_session_release_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_release_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_release_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_release(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ == MLN_STATUS_OK) {
     self->released_handle = self->handle;
     self->handle = MLN_HANDLE_NULL;
   }
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_release_finish(
@@ -7682,47 +4974,16 @@ void maplibre_native_ffi_render_session_release_target_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_release_target_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_release_target_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_release_target(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_release_target_finish(
@@ -7739,55 +5000,25 @@ void maplibre_native_ffi_render_session_resize_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(logical_size != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_render_session_resize_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_render_session_resize_async, callback,
+    user_data, TRUE
+  );
   mln_logical_size logical_size_native_;
   maplibre_native_ffi_logical_size_to_native(
-    logical_size, &logical_size_native_, &call_
+    logical_size, &logical_size_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_resize(
-    self->handle, logical_size_native_, completion_argument_, &diagnostic_
+    self->handle, logical_size_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -7803,19 +5034,14 @@ gboolean maplibre_native_ffi_render_session_service_driver_work(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_service_driver_work(
     (self->handle != MLN_HANDLE_NULL ? self->handle : self->released_handle),
     &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -7825,19 +5051,14 @@ gboolean maplibre_native_ffi_render_session_set_frame_pacer(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_render_session_set_frame_pacer(
     self->handle, (pacer != NULL ? pacer->handle : MLN_HANDLE_NULL),
     &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -7849,52 +5070,22 @@ void maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(replacement != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_,
-    maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_metal_borrowed_texture_replacement replacement_native_;
   maplibre_native_ffi_metal_borrowed_texture_replacement_to_native(
-    replacement, &replacement_native_, &call_
+    replacement, &replacement_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_set_metal_borrowed_texture_target(
-    self->handle, &replacement_native_, completion_argument_, &diagnostic_
+    self->handle, &replacement_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 #endif
 
@@ -7916,51 +5107,22 @@ void maplibre_native_ffi_render_session_set_metal_surface_target_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(replacement != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_set_metal_surface_target_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_set_metal_surface_target_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_metal_surface_replacement replacement_native_;
   maplibre_native_ffi_metal_surface_replacement_to_native(
-    replacement, &replacement_native_, &call_
+    replacement, &replacement_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_set_metal_surface_target(
-    self->handle, &replacement_native_, completion_argument_, &diagnostic_
+    self->handle, &replacement_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 #endif
 
@@ -7980,52 +5142,22 @@ void maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_asyn
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(replacement != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_,
-    maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_open_gl_borrowed_texture_replacement replacement_native_;
   maplibre_native_ffi_open_gl_borrowed_texture_replacement_to_native(
-    replacement, &replacement_native_, &call_
+    replacement, &replacement_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_set_open_gl_borrowed_texture_target(
-    self->handle, &replacement_native_, completion_argument_, &diagnostic_
+    self->handle, &replacement_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean
@@ -8043,51 +5175,22 @@ void maplibre_native_ffi_render_session_set_open_gl_surface_target_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(replacement != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_set_open_gl_surface_target_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_set_open_gl_surface_target_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_open_gl_surface_replacement replacement_native_;
   maplibre_native_ffi_open_gl_surface_replacement_to_native(
-    replacement, &replacement_native_, &call_
+    replacement, &replacement_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_set_open_gl_surface_target(
-    self->handle, &replacement_native_, completion_argument_, &diagnostic_
+    self->handle, &replacement_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_set_open_gl_surface_target_finish(
@@ -8104,52 +5207,22 @@ void maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(replacement != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_,
-    maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_vulkan_borrowed_texture_replacement replacement_native_;
   maplibre_native_ffi_vulkan_borrowed_texture_replacement_to_native(
-    replacement, &replacement_native_, &call_
+    replacement, &replacement_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_set_vulkan_borrowed_texture_target(
-    self->handle, &replacement_native_, completion_argument_, &diagnostic_
+    self->handle, &replacement_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean
@@ -8167,51 +5240,22 @@ void maplibre_native_ffi_render_session_set_vulkan_surface_target_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(replacement != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_set_vulkan_surface_target_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_set_vulkan_surface_target_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_vulkan_surface_replacement replacement_native_;
   maplibre_native_ffi_vulkan_surface_replacement_to_native(
-    replacement, &replacement_native_, &call_
+    replacement, &replacement_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_set_vulkan_surface_target(
-    self->handle, &replacement_native_, completion_argument_, &diagnostic_
+    self->handle, &replacement_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_render_session_set_vulkan_surface_target_finish(
@@ -8229,51 +5273,22 @@ void maplibre_native_ffi_render_session_set_wayland_surface_target_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self));
   g_return_if_fail(replacement != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_render_session_set_wayland_surface_target_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_render_session_set_wayland_surface_target_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_wayland_surface_replacement replacement_native_;
   maplibre_native_ffi_wayland_surface_replacement_to_native(
-    replacement, &replacement_native_, &call_
+    replacement, &replacement_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_render_session_set_wayland_surface_target(
-    self->handle, &replacement_native_, completion_argument_, &diagnostic_
+    self->handle, &replacement_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 #endif
 
@@ -8369,13 +5384,10 @@ gboolean maplibre_native_ffi_resource_request_complete(
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RESOURCE_REQUEST(self), FALSE);
   g_return_val_if_fail(response != NULL, FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_resource_response response_native_;
   maplibre_native_ffi_resource_response_to_native(
-    response, &response_native_, &call_
+    response, &response_native_, NULL
   );
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_resource_request_complete(
     self->handle, &response_native_, &diagnostic_
@@ -8383,11 +5395,9 @@ gboolean maplibre_native_ffi_resource_request_complete(
   mln_resource_request consumed_ = self->handle;
   self->handle = MLN_HANDLE_NULL;
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     if (status_ != MLN_STATUS_OK) mln_resource_request_release(consumed_);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ != MLN_STATUS_OK) mln_resource_request_release(consumed_);
   return TRUE;
 }
@@ -8397,19 +5407,14 @@ gboolean maplibre_native_ffi_resource_request_is_cancelled(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RESOURCE_REQUEST(self), FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   bool out_cancelled_ = 0;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_resource_request_is_cancelled(
     self->handle, &out_cancelled_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return (out_cancelled_) ? TRUE : FALSE;
 }
 
@@ -8418,20 +5423,15 @@ gboolean maplibre_native_ffi_resource_request_pass_through(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RESOURCE_REQUEST(self), FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_resource_request_pass_through(self->handle, &diagnostic_);
   mln_resource_request consumed_ = self->handle;
   self->handle = MLN_HANDLE_NULL;
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     if (status_ != MLN_STATUS_OK) mln_resource_request_release(consumed_);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ != MLN_STATUS_OK) mln_resource_request_release(consumed_);
   return TRUE;
 }
@@ -8440,12 +5440,8 @@ void maplibre_native_ffi_resource_request_release(
   MaplibreNativeFfiResourceRequest* self
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RESOURCE_REQUEST(self));
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_resource_request_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
-  maplibre_native_ffi_call_end(&call_, TRUE);
 }
 
 gboolean maplibre_native_ffi_resource_request_set_cancel_callback(
@@ -8548,9 +5544,6 @@ gboolean maplibre_native_ffi_resource_transform_request_complete(
     MAPLIBRE_NATIVE_FFI_IS_RESOURCE_TRANSFORM_REQUEST(self), FALSE
   );
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_resource_transform_request_complete(
     self->handle, maplibre_native_ffi_text_view(url), &diagnostic_
@@ -8558,12 +5551,10 @@ gboolean maplibre_native_ffi_resource_transform_request_complete(
   mln_resource_transform_request consumed_ = self->handle;
   self->handle = MLN_HANDLE_NULL;
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     if (status_ != MLN_STATUS_OK)
       mln_resource_transform_request_release(consumed_);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ != MLN_STATUS_OK)
     mln_resource_transform_request_release(consumed_);
   return TRUE;
@@ -8578,13 +5569,10 @@ gboolean maplibre_native_ffi_resource_transform_request_fail(
   );
   g_return_val_if_fail(error_value != NULL, FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_resource_transform_error error_value_native_;
   maplibre_native_ffi_resource_transform_error_to_native(
-    error_value, &error_value_native_, &call_
+    error_value, &error_value_native_, NULL
   );
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_resource_transform_request_fail(
     self->handle, &error_value_native_, &diagnostic_
@@ -8592,12 +5580,10 @@ gboolean maplibre_native_ffi_resource_transform_request_fail(
   mln_resource_transform_request consumed_ = self->handle;
   self->handle = MLN_HANDLE_NULL;
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     if (status_ != MLN_STATUS_OK)
       mln_resource_transform_request_release(consumed_);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ != MLN_STATUS_OK)
     mln_resource_transform_request_release(consumed_);
   return TRUE;
@@ -8607,12 +5593,8 @@ void maplibre_native_ffi_resource_transform_request_release(
   MaplibreNativeFfiResourceTransformRequest* self
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RESOURCE_TRANSFORM_REQUEST(self));
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_resource_transform_request_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
-  maplibre_native_ffi_call_end(&call_, TRUE);
 }
 
 G_DEFINE_FINAL_TYPE(
@@ -8668,51 +5650,20 @@ void maplibre_native_ffi_runtime_clear_event_handler_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_runtime_clear_event_handler_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_runtime_clear_event_handler(
-    self->handle, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_clear_event_handler_async,
+    callback, user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_runtime_clear_event_handler(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -8728,51 +5679,21 @@ void maplibre_native_ffi_runtime_clear_http_header_transform_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_runtime_clear_http_header_transform_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_runtime_clear_http_header_transform(
-    self->handle, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_runtime_clear_http_header_transform_async, callback,
+    user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_runtime_clear_http_header_transform(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -8788,51 +5709,20 @@ void maplibre_native_ffi_runtime_clear_resource_provider_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_runtime_clear_resource_provider_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_runtime_clear_resource_provider(
-    self->handle, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_clear_resource_provider_async,
+    callback, user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_runtime_clear_resource_provider(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -8848,51 +5738,20 @@ void maplibre_native_ffi_runtime_clear_resource_transform_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_runtime_clear_resource_transform_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_runtime_clear_resource_transform(
-    self->handle, completion_argument_, &diagnostic_
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_clear_resource_transform_async,
+    callback, user_data, TRUE
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_runtime_clear_resource_transform(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -8907,24 +5766,19 @@ MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(
   const MaplibreNativeFfiRuntimeOptions* options, GError** error
 ) {
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_runtime_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_runtime_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, NULL
     );
   mln_runtime out_runtime_ = MLN_HANDLE_NULL;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_create(
     (options != NULL ? &options_native_ : NULL), &out_runtime_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_runtime_wrap(out_runtime_, NULL, FALSE, NULL);
 }
 
@@ -8972,54 +5826,26 @@ void maplibre_native_ffi_runtime_create_offline_region_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
   g_return_if_fail(definition != NULL);
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_create_offline_region_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_create_offline_region_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_offline_region_definition definition_native_;
   maplibre_native_ffi_offline_region_definition_to_native(
-    definition, &definition_native_, &call_
+    definition, &definition_native_, &async_.call
   );
   mln_buffer_view metadata_view_ = maplibre_native_ffi_bytes_view(metadata);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_runtime_create_offline_region_decode,
+        (GDestroyNotify)maplibre_native_ffi_offline_region_info_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_runtime_create_offline_region_decode,
-          (GDestroyNotify)maplibre_native_ffi_offline_region_info_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_create_offline_region(
     self->handle, &definition_native_, metadata_view_.data, metadata_view_.size,
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiOfflineRegionInfo*
@@ -9035,48 +5861,17 @@ void maplibre_native_ffi_runtime_delete_offline_region_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_delete_offline_region_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_delete_offline_region_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_runtime_delete_offline_region(
-    self->handle, (mln_offline_region_id)(region_id), completion_argument_,
-    &diagnostic_
+    self->handle, (mln_offline_region_id)(region_id),
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_runtime_delete_offline_region_finish(
@@ -9101,49 +5896,21 @@ void maplibre_native_ffi_runtime_get_offline_region_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_get_offline_region_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_get_offline_region_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_runtime_get_offline_region_decode,
+        (GDestroyNotify)maplibre_native_ffi_offline_region_info_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_runtime_get_offline_region_decode,
-          (GDestroyNotify)maplibre_native_ffi_offline_region_info_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_get_offline_region(
-    self->handle, (mln_offline_region_id)(region_id), completion_argument_,
-    &diagnostic_
+    self->handle, (mln_offline_region_id)(region_id),
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiOfflineRegionInfo*
@@ -9159,50 +5926,21 @@ void maplibre_native_ffi_runtime_get_offline_region_status_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_get_offline_region_status_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_get_offline_region_status_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_runtime_get_offline_region_status_decode,
+        (GDestroyNotify)maplibre_native_ffi_offline_region_status_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_runtime_get_offline_region_status_decode,
-          (GDestroyNotify)maplibre_native_ffi_offline_region_status_free,
-          &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_get_offline_region_status(
-    self->handle, (mln_offline_region_id)(region_id), completion_argument_,
-    &diagnostic_
+    self->handle, (mln_offline_region_id)(region_id),
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiOfflineRegionStatus*
@@ -9218,48 +5956,17 @@ void maplibre_native_ffi_runtime_invalidate_offline_region_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_invalidate_offline_region_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_invalidate_offline_region_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_runtime_invalidate_offline_region(
-    self->handle, (mln_offline_region_id)(region_id), completion_argument_,
-    &diagnostic_
+    self->handle, (mln_offline_region_id)(region_id),
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_runtime_invalidate_offline_region_finish(
@@ -9274,48 +5981,20 @@ void maplibre_native_ffi_runtime_list_offline_regions_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_list_offline_regions_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_list_offline_regions_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_runtime_list_offline_regions_decode,
+        (GDestroyNotify)g_ptr_array_unref
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_runtime_list_offline_regions_decode,
-          (GDestroyNotify)g_ptr_array_unref, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_list_offline_regions(
-    self->handle, completion_argument_, &diagnostic_
+    self->handle, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 GPtrArray* maplibre_native_ffi_runtime_list_offline_regions_finish(
@@ -9330,49 +6009,21 @@ void maplibre_native_ffi_runtime_merge_offline_regions_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_merge_offline_regions_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_merge_offline_regions_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_runtime_merge_offline_regions_decode,
+        (GDestroyNotify)g_ptr_array_unref
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, mln_runtime_merge_offline_regions_decode,
-          (GDestroyNotify)g_ptr_array_unref, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_merge_offline_regions(
     self->handle, maplibre_native_ffi_text_view(side_database_path),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 GPtrArray* maplibre_native_ffi_runtime_merge_offline_regions_finish(
@@ -9387,48 +6038,20 @@ void maplibre_native_ffi_runtime_release_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(task_, maplibre_native_ffi_runtime_release_async);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_runtime_release(self->handle, completion_argument_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_release_async, callback,
+    user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
+  mln_status status_ = mln_runtime_release(
+    self->handle, async_.completion_argument, &async_.diagnostic
+  );
   if (status_ == MLN_STATUS_OK) {
     self->released_handle = self->handle;
     self->handle = MLN_HANDLE_NULL;
   }
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_runtime_release_finish(
@@ -9444,48 +6067,18 @@ void maplibre_native_ffi_runtime_run_cache_database_operation_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_run_cache_database_operation_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_runtime_run_cache_database_operation_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_runtime_run_cache_database_operation(
     self->handle, (mln_cache_database_operation)(operation),
-    completion_argument_, &diagnostic_
+    async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_runtime_run_cache_database_operation_finish(
@@ -9502,55 +6095,25 @@ void maplibre_native_ffi_runtime_set_event_handler_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
   g_return_if_fail(handler != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_runtime_set_event_handler_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_set_event_handler_async,
+    callback, user_data, TRUE
+  );
   mln_runtime_event_handler handler_native_;
   maplibre_native_ffi_runtime_event_handler_to_native(
-    handler, &handler_native_, &call_
+    handler, &handler_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_set_event_handler(
-    self->handle, &handler_native_, completion_argument_, &diagnostic_
+    self->handle, &handler_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -9568,55 +6131,25 @@ void maplibre_native_ffi_runtime_set_http_header_transform_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
   g_return_if_fail(transform != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_runtime_set_http_header_transform_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_set_http_header_transform_async,
+    callback, user_data, TRUE
+  );
   mln_http_header_transform transform_native_;
   maplibre_native_ffi_http_header_transform_to_native(
-    transform, &transform_native_, &call_
+    transform, &transform_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_set_http_header_transform(
-    self->handle, &transform_native_, completion_argument_, &diagnostic_
+    self->handle, &transform_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -9632,47 +6165,18 @@ void maplibre_native_ffi_runtime_set_maximum_ambient_cache_size_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_set_maximum_ambient_cache_size_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_runtime_set_maximum_ambient_cache_size_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_runtime_set_maximum_ambient_cache_size(
-    self->handle, (uint64_t)(size), completion_argument_, &diagnostic_
+    self->handle, (uint64_t)(size), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_runtime_set_maximum_ambient_cache_size_finish(
@@ -9688,49 +6192,19 @@ void maplibre_native_ffi_runtime_set_offline_region_download_state_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_set_offline_region_download_state_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_runtime_set_offline_region_download_state_async,
+    callback, user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_runtime_set_offline_region_download_state(
     self->handle, (mln_offline_region_id)(region_id),
-    (mln_offline_region_download_state)(state), completion_argument_,
-    &diagnostic_
+    (mln_offline_region_download_state)(state), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_runtime_set_offline_region_download_state_finish(
@@ -9746,48 +6220,19 @@ void maplibre_native_ffi_runtime_set_offline_region_observed_async(
   gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_set_offline_region_observed_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_runtime_set_offline_region_observed_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
-    return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, NULL, NULL, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
   mln_status status_ = mln_runtime_set_offline_region_observed(
     self->handle, (mln_offline_region_id)(region_id),
-    (mln_runtime_event_flags)(events), completion_argument_, &diagnostic_
+    (mln_runtime_event_flags)(events), async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 gboolean maplibre_native_ffi_runtime_set_offline_region_observed_finish(
@@ -9804,55 +6249,25 @@ void maplibre_native_ffi_runtime_set_resource_provider_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
   g_return_if_fail(provider != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_runtime_set_resource_provider_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_set_resource_provider_async,
+    callback, user_data, TRUE
+  );
   mln_resource_provider provider_native_;
   maplibre_native_ffi_resource_provider_to_native(
-    provider, &provider_native_, &call_
+    provider, &provider_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_set_resource_provider(
-    self->handle, &provider_native_, completion_argument_, &diagnostic_
+    self->handle, &provider_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -9870,55 +6285,25 @@ void maplibre_native_ffi_runtime_set_resource_transform_async(
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
   g_return_if_fail(transform != NULL);
-  GTask* task_ = NULL;
-  if (callback != NULL) {
-    task_ = g_task_new(self, NULL, callback, user_data);
-    g_task_set_source_tag(
-      task_, maplibre_native_ffi_runtime_set_resource_transform_async
-    );
-  }
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_set_resource_transform_async,
+    callback, user_data, TRUE
+  );
   mln_resource_transform transform_native_;
   maplibre_native_ffi_resource_transform_to_native(
-    transform, &transform_native_, &call_
+    transform, &transform_native_, &async_.call
   );
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (task_ != NULL) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_, maplibre_native_ffi_command_decode,
-          (GDestroyNotify)maplibre_native_ffi_command_completion_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_set_resource_transform(
-    self->handle, &transform_native_, completion_argument_, &diagnostic_
+    self->handle, &transform_native_, async_.completion_argument,
+    &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiCommandCompletion*
@@ -9934,51 +6319,23 @@ void maplibre_native_ffi_runtime_update_offline_region_metadata_async(
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
-  GTask* task_ = g_task_new(self, NULL, callback, user_data);
-  g_task_set_source_tag(
-    task_, maplibre_native_ffi_runtime_update_offline_region_metadata_async
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self,
+    maplibre_native_ffi_runtime_update_offline_region_metadata_async, callback,
+    user_data, FALSE
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_buffer_view metadata_view_ = maplibre_native_ffi_bytes_view(metadata);
-  GError* error_ = NULL;
-  if (!maplibre_native_ffi_call_check(&call_, &error_)) {
-    if (task_ != NULL) {
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-    } else {
-      g_error_free(error_);
-    }
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_runtime_update_offline_region_metadata_decode,
+        (GDestroyNotify)maplibre_native_ffi_offline_region_info_free
+      ))
     return;
-  }
-  mln_completion completion_;
-  const mln_completion* completion_argument_ = NULL;
-  if (TRUE) {
-    if (!maplibre_native_ffi_completion_init(
-          &completion_, task_,
-          mln_runtime_update_offline_region_metadata_decode,
-          (GDestroyNotify)maplibre_native_ffi_offline_region_info_free, &error_
-        )) {
-      maplibre_native_ffi_call_end(&call_, FALSE);
-      g_task_return_error(task_, error_);
-      g_object_unref(task_);
-      return;
-    }
-    completion_argument_ = &completion_;
-  }
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_runtime_update_offline_region_metadata(
     self->handle, (mln_offline_region_id)(region_id), metadata_view_.data,
-    metadata_view_.size, completion_argument_, &diagnostic_
+    metadata_view_.size, async_.completion_argument, &async_.diagnostic
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {
-    maplibre_native_ffi_completion_reject(&completion_);
-    g_task_return_error(
-      task_, maplibre_native_ffi_error_new(status_, &diagnostic_)
-    );
-  }
-  if (task_ != NULL) g_object_unref(task_);
+  maplibre_native_ffi_async_end(&async_, status_);
 }
 
 MaplibreNativeFfiOfflineRegionInfo*
@@ -10063,25 +6420,20 @@ MaplibreNativeFfiStyleExpression* maplibre_native_ffi_style_expression_create(
   const MaplibreNativeFfiStyleExpressionOptions* options, GError** error
 ) {
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_style_expression_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_style_expression_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, NULL
     );
   mln_style_expression out_expression_ = MLN_HANDLE_NULL;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_style_expression_create(
     maplibre_native_ffi_text_view(expression),
     (options != NULL ? &options_native_ : NULL), &out_expression_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_style_expression_wrap(
     out_expression_, NULL, FALSE, NULL
   );
@@ -10132,20 +6484,15 @@ maplibre_native_ffi_style_expression_get_info(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_STYLE_EXPRESSION(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_style_expression_info out_info_;
   memset(&out_info_, 0, sizeof out_info_);
   (&out_info_)->size = sizeof *(&out_info_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_style_expression_get_info(self->handle, &out_info_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_style_expression_info_from_native(&out_info_);
 }
 
@@ -10153,12 +6500,8 @@ void maplibre_native_ffi_style_expression_release(
   MaplibreNativeFfiStyleExpression* self
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_STYLE_EXPRESSION(self));
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_style_expression_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
-  maplibre_native_ffi_call_end(&call_, TRUE);
 }
 
 G_DEFINE_FINAL_TYPE(
@@ -10221,24 +6564,19 @@ MaplibreNativeFfiVulkanDevice* maplibre_native_ffi_vulkan_device_create(
   const MaplibreNativeFfiVulkanDeviceOptions* options, GError** error
 ) {
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_vulkan_device_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_vulkan_device_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, NULL
     );
   mln_vulkan_device out_device_ = MLN_HANDLE_NULL;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_vulkan_device_create(
     (options != NULL ? &options_native_ : NULL), &out_device_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_vulkan_device_wrap(out_device_, NULL, FALSE, NULL);
 }
 
@@ -10248,20 +6586,15 @@ maplibre_native_ffi_vulkan_device_get_context(
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_VULKAN_DEVICE(self), NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_vulkan_device_context_result out_result_;
   memset(&out_result_, 0, sizeof out_result_);
   (&out_result_)->size = sizeof *(&out_result_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_vulkan_device_get_context(self->handle, &out_result_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_vulkan_device_context_result_from_native(
     &out_result_
   );
@@ -10271,12 +6604,8 @@ void maplibre_native_ffi_vulkan_device_release(
   MaplibreNativeFfiVulkanDevice* self
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_VULKAN_DEVICE(self));
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_vulkan_device_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
-  maplibre_native_ffi_call_end(&call_, TRUE);
 }
 
 #if defined(__APPLE__)
@@ -10284,34 +6613,25 @@ MaplibreNativeFfiFramePacer* maplibre_native_ffi_apple_frame_pacer_create(
   const MaplibreNativeFfiFramePacerOptions* options, GError** error
 ) {
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_frame_pacer_options options_native_;
   if (options != NULL)
     maplibre_native_ffi_frame_pacer_options_to_native(
-      options, &options_native_, &call_
+      options, &options_native_, NULL
     );
   mln_frame_pacer out_pacer_ = MLN_HANDLE_NULL;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_apple_frame_pacer_create(
     (options != NULL ? &options_native_ : NULL), &out_pacer_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_frame_pacer_wrap(out_pacer_, NULL, FALSE, NULL);
 }
 #endif
 
 guint32 maplibre_native_ffi_c_version(void) {
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   uint32_t result_ = mln_c_version();
-  maplibre_native_ffi_call_end(&call_, TRUE);
   return (guint32)(result_);
 }
 
@@ -10322,27 +6642,22 @@ MaplibreNativeFfiCameraOptions* maplibre_native_ffi_camera_for_tile(
   g_return_val_if_fail(tile != NULL, NULL);
   g_return_val_if_fail(logical_size != NULL, NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_canonical_tile_id tile_native_;
-  maplibre_native_ffi_canonical_tile_id_to_native(tile, &tile_native_, &call_);
+  maplibre_native_ffi_canonical_tile_id_to_native(tile, &tile_native_, NULL);
   mln_logical_size logical_size_native_;
   maplibre_native_ffi_logical_size_to_native(
-    logical_size, &logical_size_native_, &call_
+    logical_size, &logical_size_native_, NULL
   );
   mln_camera_options out_camera_;
   memset(&out_camera_, 0, sizeof out_camera_);
   (&out_camera_)->size = sizeof *(&out_camera_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_camera_for_tile(
     tile_native_, logical_size_native_, &out_camera_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_camera_options_from_native(&out_camera_);
 }
 
@@ -10351,39 +6666,27 @@ MaplibreNativeFfiLatLng* maplibre_native_ffi_lat_lng_for_projected_meters(
 ) {
   g_return_val_if_fail(meters != NULL, NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_projected_meters meters_native_;
-  maplibre_native_ffi_projected_meters_to_native(
-    meters, &meters_native_, &call_
-  );
+  maplibre_native_ffi_projected_meters_to_native(meters, &meters_native_, NULL);
   mln_lat_lng out_coordinate_;
   memset(&out_coordinate_, 0, sizeof out_coordinate_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_lat_lng_for_projected_meters(
     meters_native_, &out_coordinate_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_lat_lng_from_native(&out_coordinate_);
 }
 
 gboolean maplibre_native_ffi_clear_log_callback(GError** error) {
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_log_clear_callback(&diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -10391,18 +6694,13 @@ gboolean maplibre_native_ffi_set_log_async_severity_mask(
   MaplibreNativeFfiLogSeverityFlag mask, GError** error
 ) {
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_log_set_async_severity_mask(
     (mln_log_severity_flags)(mask), &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -10432,24 +6730,19 @@ gboolean maplibre_native_ffi_logical_extent_physical_size(
 ) {
   g_return_val_if_fail(extent != NULL, FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_logical_extent extent_native_;
-  maplibre_native_ffi_logical_extent_to_native(extent, &extent_native_, &call_);
+  maplibre_native_ffi_logical_extent_to_native(extent, &extent_native_, NULL);
   uint32_t out_width_ = 0;
   uint32_t out_height_ = 0;
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_logical_extent_physical_size(
     extent_native_, &out_width_, &out_height_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
   if (out_width != NULL) *out_width = (guint32)(out_width_);
   if (out_height != NULL) *out_height = (guint32)(out_height_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -10459,18 +6752,12 @@ MaplibreNativeFfiNetworkStatus maplibre_native_ffi_get_network_status(
   g_return_val_if_fail(
     error == NULL || *error == NULL, (MaplibreNativeFfiNetworkStatus)0
   );
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_network_status out_status_ = 0;
-  if (!maplibre_native_ffi_call_check(&call_, error))
-    return (MaplibreNativeFfiNetworkStatus)0;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_network_get_status(&out_status_, &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return (MaplibreNativeFfiNetworkStatus)0;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return (MaplibreNativeFfiNetworkStatus)(out_status_);
 }
 
@@ -10478,38 +6765,25 @@ gboolean maplibre_native_ffi_set_network_status(
   MaplibreNativeFfiNetworkStatus status, GError** error
 ) {
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_network_set_status((mln_network_status)(status), &diagnostic_);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
 MaplibreNativeFfiOpenGlContextProviderFlag
 maplibre_native_ffi_open_gl_supported_context_provider_mask(void) {
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_open_gl_context_provider_flags result_ =
     mln_open_gl_supported_context_provider_mask();
-  maplibre_native_ffi_call_end(&call_, TRUE);
   return (MaplibreNativeFfiOpenGlContextProviderFlag)(result_);
 }
 
 gpointer maplibre_native_ffi_get_plugin_register_function_v1(void) {
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_plugin_register_function_v1 result_ =
     mln_plugin_get_register_function_v1();
-  maplibre_native_ffi_call_end(&call_, TRUE);
   return (gpointer)(result_);
 }
 
@@ -10519,33 +6793,22 @@ maplibre_native_ffi_projected_meters_for_lat_lng(
 ) {
   g_return_val_if_fail(coordinate != NULL, NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
   mln_lat_lng coordinate_native_;
-  maplibre_native_ffi_lat_lng_to_native(
-    coordinate, &coordinate_native_, &call_
-  );
+  maplibre_native_ffi_lat_lng_to_native(coordinate, &coordinate_native_, NULL);
   mln_projected_meters out_meters_;
   memset(&out_meters_, 0, sizeof out_meters_);
-  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_projected_meters_for_lat_lng(
     coordinate_native_, &out_meters_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return NULL;
   }
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return maplibre_native_ffi_projected_meters_from_native(&out_meters_);
 }
 
 MaplibreNativeFfiRenderBackendFlag
 maplibre_native_ffi_supported_render_backend_mask(void) {
-  MaplibreNativeFfiCall call_;
-  maplibre_native_ffi_call_init(&call_);
-  maplibre_native_ffi_call_check(&call_, NULL);
   mln_render_backend_flags result_ = mln_supported_render_backend_mask();
-  maplibre_native_ffi_call_end(&call_, TRUE);
   return (MaplibreNativeFfiRenderBackendFlag)(result_);
 }

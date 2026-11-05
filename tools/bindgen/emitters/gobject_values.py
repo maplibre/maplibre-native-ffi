@@ -1180,6 +1180,31 @@ class Values:
             + "}\n\n"
         )
 
+    def scoped(self, value: ValuePlan, seen: frozenset[str] = frozenset()) -> bool:
+        """Whether converting a value anywhere within it allocates storage or
+        registers callbacks in the call's scope."""
+        kind = value.kind
+        if kind == "array":
+            return True
+        if kind == "reference" and value.element is not None:
+            return self.scoped(value.element, seen)
+        if kind not in {"record", "union"} or value.native in seen:
+            return False
+        if value.native in self.bound.slices:
+            return True
+        record = self.record(value.native)
+        if record.registration and self.hosted(record):
+            return True
+        seen = seen | {record.native}
+        fields = list(record.fields)
+        if record.kind == "record" and record.union_member:
+            fields += list(record.union_member.value.fields)
+        return any(
+            self.scoped(member.value, seen)
+            for member in fields
+            if member.public or record.kind == "union"
+        )
+
     def needs_call(self, value: ValuePlan) -> bool:
         """Whether a value's conversion uses the call's scope."""
         if value.registration and self.hosted(value):

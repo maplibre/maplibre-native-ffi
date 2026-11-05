@@ -284,9 +284,11 @@ void maplibre_native_ffi_registration_release(void* context) {
   if (dispatcher != NULL) dispatcher_release(dispatcher);
 }
 
+// A call creates its arrays on first use, since most calls convert nothing
+// that needs them.
 void maplibre_native_ffi_call_init(MaplibreNativeFfiCall* call) {
-  call->allocations = g_ptr_array_new_with_free_func(g_free);
-  call->registrations = g_ptr_array_new();
+  call->allocations = NULL;
+  call->registrations = NULL;
   call->error = NULL;
 }
 
@@ -295,6 +297,9 @@ gpointer maplibre_native_ffi_call_alloc(
 ) {
   if (count == 0) return NULL;
   gpointer storage = g_malloc0_n(count, size);
+  if (call->allocations == NULL) {
+    call->allocations = g_ptr_array_new_with_free_func(g_free);
+  }
   g_ptr_array_add(call->allocations, storage);
   return storage;
 }
@@ -320,6 +325,7 @@ void* maplibre_native_ffi_call_register(
     registration->closures[index] =
       maplibre_native_ffi_closure_ref(closures[index]);
   }
+  if (call->registrations == NULL) call->registrations = g_ptr_array_new();
   g_ptr_array_add(call->registrations, registration);
   return registration;
 }
@@ -339,15 +345,15 @@ void maplibre_native_ffi_call_end(
 ) {
   // A rejected call hands nothing to native code, which then never calls or
   // releases its registrations.
-  if (!accepted) {
+  if (!accepted && call->registrations != NULL) {
     for (guint index = 0; index < call->registrations->len; index++) {
       maplibre_native_ffi_registration_release(
         call->registrations->pdata[index]
       );
     }
   }
-  g_ptr_array_unref(call->registrations);
-  g_ptr_array_unref(call->allocations);
+  g_clear_pointer(&call->registrations, g_ptr_array_unref);
+  g_clear_pointer(&call->allocations, g_ptr_array_unref);
   g_clear_error(&call->error);
 }
 
@@ -438,6 +444,65 @@ gpointer maplibre_native_ffi_command_decode(
 
 void maplibre_native_ffi_completion_reject(const mln_completion* completion) {
   completion_release(completion->user_data);
+}
+
+void maplibre_native_ffi_async_init(
+  MaplibreNativeFfiAsync* async, gpointer source_object, gpointer source_tag,
+  GAsyncReadyCallback callback, gpointer user_data, gboolean discardable
+) {
+  async->task = NULL;
+  if (callback != NULL || !discardable) {
+    async->task = g_task_new(source_object, NULL, callback, user_data);
+    g_task_set_source_tag(async->task, source_tag);
+  }
+  maplibre_native_ffi_call_init(&async->call);
+  async->completion_argument = NULL;
+  memset(&async->diagnostic, 0, sizeof async->diagnostic);
+  async->diagnostic.size = sizeof async->diagnostic;
+}
+
+/** Returns `error` through the call's task, or drops it without one. */
+static void async_fail(MaplibreNativeFfiAsync* async, GError* error) {
+  if (async->task == NULL) {
+    g_error_free(error);
+    return;
+  }
+  g_task_return_error(async->task, error);
+  g_clear_object(&async->task);
+}
+
+gboolean maplibre_native_ffi_async_begin(
+  MaplibreNativeFfiAsync* async, MaplibreNativeFfiDecode decode,
+  GDestroyNotify destroy
+) {
+  GError* error = NULL;
+  if (!maplibre_native_ffi_call_check(&async->call, &error)) {
+    async_fail(async, error);
+    return FALSE;
+  }
+  if (async->task == NULL) return TRUE;
+  if (!maplibre_native_ffi_completion_init(
+        &async->completion, async->task, decode, destroy, &error
+      )) {
+    maplibre_native_ffi_call_end(&async->call, FALSE);
+    async_fail(async, error);
+    return FALSE;
+  }
+  async->completion_argument = &async->completion;
+  return TRUE;
+}
+
+void maplibre_native_ffi_async_end(
+  MaplibreNativeFfiAsync* async, mln_status status
+) {
+  maplibre_native_ffi_call_end(&async->call, status == MLN_STATUS_OK);
+  if (status != MLN_STATUS_OK && async->completion_argument != NULL) {
+    maplibre_native_ffi_completion_reject(&async->completion);
+    async_fail(
+      async, maplibre_native_ffi_error_new(status, &async->diagnostic)
+    );
+  }
+  g_clear_object(&async->task);
 }
 
 MaplibreNativeFfiReady* maplibre_native_ffi_ready_new(void) {

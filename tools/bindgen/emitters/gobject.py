@@ -152,7 +152,16 @@ class Call:
         self.arguments: dict[str, str] = {}
         self.uses_call = False
 
-    def native_call(self, extra: dict[str, str] | None = None) -> str:
+    def scope_setup(self) -> str:
+        """The setup, which passes no scope to conversions when the call has
+        none."""
+        if self.uses_call:
+            return self.setup
+        return self.setup.replace(f"&{CALL}", "NULL")
+
+    def native_call(
+        self, extra: dict[str, str] | None = None, diagnostic: str = "&diagnostic_"
+    ) -> str:
         arguments = {**self.arguments, **(extra or {})}
         names = [p.name for p in self.plan.function.parameters]
         missing = [n for n in names if n not in arguments]
@@ -162,7 +171,7 @@ class Call:
             )
         args = [arguments[n] for n in names]
         if self.plan.function.diagnostic:
-            args.append("&diagnostic_")
+            args.append(diagnostic)
         return f"{self.plan.name}({', '.join(args)})"
 
 
@@ -483,7 +492,7 @@ class Emitter:
             call.parameters.append((f"const {type_}*", name))
             local = f"{name}_native_"
             call.setup += f"  {record.native} {local};\n"
-            call.uses_call = True
+            call.uses_call |= values.scoped(record)
             if value.nullable:
                 call.annotations[name] = "(nullable): the value, or %NULL"
                 call.setup += f"  if ({name} != NULL) {prefix}_to_native({name}, &{local}, &{CALL});\n"
@@ -701,8 +710,11 @@ class Emitter:
 
     # Shapes.
 
-    def immediate(self, plan: OperationPlan, view: bool = False) -> Function:
-        """A synchronous call, and a view's call inside its owner's scope."""
+    def immediate(
+        self, plan: OperationPlan, view: bool = False, prelude: str = ""
+    ) -> Function:
+        """A synchronous call, and a view's call inside its owner's scope.
+        The `prelude` runs after the checks."""
         call = Call(plan)
         values = self.values
         # The return type is known only after the outputs, so checks use a
@@ -767,12 +779,18 @@ class Emitter:
             checks = checks.replace(
                 "g_return_val_if_fail(", "g_return_if_fail("
             ).replace(", );", ");")
-        body = checks
-        body += f"  MaplibreNativeFfiCall {CALL};\n  maplibre_native_ffi_call_init(&{CALL});\n"
-        body += call.setup.replace(fail, failing)
-        if throws:
+        body = checks + prelude.replace(
+            f"return {fail};", f"return {failing};" if failing else "return;"
+        )
+        # A call whose inputs borrow no storage and register nothing has no
+        # scope.
+        scoped = call.uses_call
+        if scoped:
+            body += f"  MaplibreNativeFfiCall {CALL};\n  maplibre_native_ffi_call_init(&{CALL});\n"
+        body += call.scope_setup().replace(fail, failing)
+        if scoped and throws:
             body += f"  if (!maplibre_native_ffi_call_check(&{CALL}, error)) return {failing};\n"
-        else:
+        elif scoped:
             body += f"  maplibre_native_ffi_call_check(&{CALL}, NULL);\n"
         if plan.function.diagnostic:
             body += "  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};\n"
@@ -810,7 +828,9 @@ class Emitter:
             if registration.accepted_unless:
                 accepted += f" && !{registration.accepted_unless}_"
         consumes = self.consumes(plan)
-        end = f"  maplibre_native_ffi_call_end(&{CALL}, {accepted});\n" + consumes[1]
+        end = consumes[1]
+        if scoped:
+            end = f"  maplibre_native_ffi_call_end(&{CALL}, {accepted});\n" + end
         body += consumes[0]
         # The outputs live in the call's storage, so they're copied before the
         # call ends.
@@ -907,21 +927,18 @@ class Emitter:
         """An immediate release, which the object's dispose also calls."""
         owner = receiver_type(plan)
         assert owner is not None
-        function = self.immediate(plan)
+        prelude = ""
         if owner in self.bound.borrowed_handles:
-            fail = fail_value(function.returns)
-            function.body = function.body.replace(
-                f"  MaplibreNativeFfiCall {CALL};",
+            prelude = (
                 "  if (self->borrowed) {\n"
                 + (
                     "    maplibre_native_ffi_set_borrowed_error(error);\n"
                     if plan.status
                     else ""
                 )
-                + f"    return{' ' + fail if fail else ''};\n  }}\n"
-                f"  MaplibreNativeFfiCall {CALL};",
-                1,
+                + "    return FAIL_;\n  }\n"
             )
+        function = self.immediate(plan, prelude=prelude)
         function.doc = self.doc_lines(
             plan.name,
             (
@@ -980,19 +997,6 @@ class Emitter:
                 ),
             ),
         )
-
-    def task_start(
-        self, plan: OperationPlan, start: str, call: Call, discardable: bool
-    ) -> str:
-        source = "self" if receiver_type(plan) else "NULL"
-        task = f"  GTask* task_ = g_task_new({source}, NULL, callback, user_data);\n  g_task_set_source_tag(task_, {start});\n"
-        if discardable:
-            task = (
-                "  GTask* task_ = NULL;\n  if (callback != NULL) {\n"
-                + textwrap.indent(task.replace("  GTask* task_ =", "  task_ ="), "  ")
-                + "  }\n"
-            )
-        return task
 
     def async_parameters(self, call: Call, what: str) -> None:
         call.parameters += [
@@ -1179,8 +1183,7 @@ class Emitter:
         body = call.checks.replace(
             "g_return_val_if_fail(", "g_return_if_fail("
         ).replace(", FAIL_);", ");")
-        body += self.task_start(plan, start, call, discardable)
-        body += self.async_call(plan, call, decode, destroy, discardable)
+        body += self.async_call(plan, call, start, decode, destroy, discardable)
         doc = self.doc_lines(plan.name)
         if discardable:
             doc += [
@@ -1208,46 +1211,34 @@ class Emitter:
         self,
         plan: OperationPlan,
         call: Call,
+        start: str,
         decode: str,
         destroy: str,
         discardable: bool,
         release: bool = False,
     ) -> str:
-        """Converts the inputs, starts the call with a completion that returns
-        the task, and returns any failure through the task."""
-        task = "task_ != NULL" if discardable else "TRUE"
-        body = f"  MaplibreNativeFfiCall {CALL};\n  maplibre_native_ffi_call_init(&{CALL});\n"
-        body += call.setup.replace("FAIL_", "")
-        body += (
-            "  GError* error_ = NULL;\n"
-            f"  if (!maplibre_native_ffi_call_check(&{CALL}, &error_)) {{\n"
-            "    if (task_ != NULL) {\n      g_task_return_error(task_, error_);\n"
-            "      g_object_unref(task_);\n    } else {\n      g_error_free(error_);\n    }\n"
-            "    return;\n  }\n"
-            "  mln_completion completion_;\n"
-            "  const mln_completion* completion_argument_ = NULL;\n"
-            f"  if ({task}) {{\n"
-            f"    if (!maplibre_native_ffi_completion_init(&completion_, task_, {decode}, {destroy}, &error_)) {{\n"
-            f"      maplibre_native_ffi_call_end(&{CALL}, FALSE);\n"
-            "      g_task_return_error(task_, error_);\n      g_object_unref(task_);\n      return;\n    }\n"
-            "    completion_argument_ = &completion_;\n  }\n"
-            "  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};\n"
+        """Starts the task, converts the inputs, starts the call with a
+        completion that returns the task, and returns any failure through the
+        task."""
+        source = "self" if receiver_type(plan) else "NULL"
+        body = (
+            "  MaplibreNativeFfiAsync async_;\n"
+            f"  maplibre_native_ffi_async_init(&async_, {source}, {start}, callback, user_data, {'TRUE' if discardable else 'FALSE'});\n"
         )
+        body += call.setup.replace("FAIL_", "").replace(f"&{CALL}", "&async_.call")
+        body += f"  if (!maplibre_native_ffi_async_begin(&async_, {decode}, {destroy})) return;\n"
         completion = next(
             p.name for p in plan.function.parameters if is_completion(p.type)
         )
-        body += f"  mln_status status_ = {call.native_call({completion: 'completion_argument_'})};\n"
-        body += f"  maplibre_native_ffi_call_end(&{CALL}, status_ == MLN_STATUS_OK);\n"
+        native = call.native_call(
+            {completion: "async_.completion_argument"}, "&async_.diagnostic"
+        )
+        body += f"  mln_status status_ = {native};\n"
         if release:
             body += "  if (status_ == MLN_STATUS_OK) {\n"
             body += "    self->released_handle = self->handle;\n"
             body += "    self->handle = MLN_HANDLE_NULL;\n  }\n"
-        body += (
-            "  if (status_ != MLN_STATUS_OK && completion_argument_ != NULL) {\n"
-            "    maplibre_native_ffi_completion_reject(&completion_);\n"
-            "    g_task_return_error(task_, maplibre_native_ffi_error_new(status_, &diagnostic_));\n  }\n"
-            "  if (task_ != NULL) g_object_unref(task_);\n"
-        )
+        body += "  maplibre_native_ffi_async_end(&async_, status_);\n"
         return body
 
     def release_async(self, plan: OperationPlan) -> list[Function]:
@@ -1263,15 +1254,14 @@ class Emitter:
         body = call.checks.replace(
             "g_return_val_if_fail(", "g_return_if_fail("
         ).replace(", FAIL_);", ");")
-        body += self.task_start(plan, start, call, False)
         if owner in self.bound.borrowed_handles:
             body += (
                 "  if (self->borrowed) {\n    GError* borrowed_ = NULL;\n"
                 "    maplibre_native_ffi_set_borrowed_error(&borrowed_);\n"
-                "    g_task_return_error(task_, borrowed_);\n    g_object_unref(task_);\n"
+                f"    g_task_report_error(self, callback, user_data, {start}, borrowed_);\n"
                 "    return;\n  }\n"
             )
-        body += self.async_call(plan, call, "NULL", "NULL", False, release=True)
+        body += self.async_call(plan, call, start, "NULL", "NULL", False, release=True)
         return [
             Function(
                 start,

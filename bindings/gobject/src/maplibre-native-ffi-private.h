@@ -156,6 +156,50 @@ G_GNUC_INTERNAL void maplibre_native_ffi_completion_reject(
 );
 
 /**
+ * One asynchronous call: the scope of its native call, the task that it
+ * returns, and the completion that native code receives.
+ */
+typedef struct {
+  MaplibreNativeFfiCall call;
+  // Null for a call that may go unreported and started without a callback.
+  GTask* task;
+  mln_completion completion;
+  // The completion argument of the native call: null without a task.
+  const mln_completion* completion_argument;
+  mln_diagnostic diagnostic;
+} MaplibreNativeFfiAsync;
+
+/**
+ * Starts an asynchronous call of `source_object`, or of no object, whose
+ * task finishes on the thread-default main context. A call that may go
+ * unreported (`discardable`) and starts without `callback` has no task and
+ * passes native code no completion.
+ */
+G_GNUC_INTERNAL void maplibre_native_ffi_async_init(
+  MaplibreNativeFfiAsync* async, gpointer source_object, gpointer source_tag,
+  GAsyncReadyCallback callback, gpointer user_data, gboolean discardable
+);
+
+/**
+ * Whether the call's inputs converted and its completion, which returns what
+ * `decode` copies, started. Otherwise it ends the call as rejected, returns
+ * the error through the task, and the caller returns.
+ */
+G_GNUC_INTERNAL gboolean maplibre_native_ffi_async_begin(
+  MaplibreNativeFfiAsync* async, MaplibreNativeFfiDecode decode,
+  GDestroyNotify destroy
+);
+
+/**
+ * Ends the call after native code returned `status`. A rejected call frees
+ * its registrations and its completion, and returns its error through the
+ * task.
+ */
+G_GNUC_INTERNAL void maplibre_native_ffi_async_end(
+  MaplibreNativeFfiAsync* async, mln_status status
+);
+
+/**
  * Whether a handle that a call creates at once is ready: the call's
  * completion settles it, and any number of waits read it.
  */
