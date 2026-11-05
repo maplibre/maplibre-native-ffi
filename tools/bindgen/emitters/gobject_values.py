@@ -186,12 +186,20 @@ def guarded(condition: str | None, text: str) -> str:
 
 
 def wrap(text: str) -> list[str]:
+    """An annotation's lines, whose continuations gtk-doc reads indented."""
     return textwrap.wrap(
         text,
         docs.WIDTH - 3,
         subsequent_indent="  ",
         break_long_words=False,
         break_on_hyphens=False,
+    )
+
+
+def paragraph(text: str) -> list[str]:
+    """A paragraph's lines."""
+    return textwrap.wrap(
+        text, docs.WIDTH - 3, break_long_words=False, break_on_hyphens=False
     )
 
 

@@ -499,6 +499,22 @@ guint64 maplibre_native_ffi_acquired_frame_get_id(
                                                    : self->released_handle);
 }
 
+gboolean maplibre_native_ffi_acquired_frame_discard(
+  MaplibreNativeFfiAcquiredFrame* self, GError** error
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ACQUIRED_FRAME(self), FALSE);
+  g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+  MaplibreNativeFfiCall call_;
+  maplibre_native_ffi_call_init(&call_);
+  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
+  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  mln_status status_ = mln_acquired_frame_discard(self->handle, &diagnostic_);
+  if (status_ == MLN_STATUS_OK) self->handle = MLN_HANDLE_NULL;
+  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
+  return TRUE;
+}
+
 #if defined(__linux__)
 MaplibreNativeFfiDmaBufFrame* maplibre_native_ffi_acquired_frame_get_dma_buf(
   MaplibreNativeFfiAcquiredFrame* self, GError** error
@@ -513,16 +529,20 @@ MaplibreNativeFfiDmaBufFrame* maplibre_native_ffi_acquired_frame_get_dma_buf(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
+  MaplibreNativeFfiDmaBufFrame* value_ = NULL;
   mln_status status_ =
     mln_acquired_frame_view_begin(self->handle, &scope_, &diagnostic_);
   if (status_ == MLN_STATUS_OK) {
     status_ =
       mln_acquired_frame_get_dma_buf(self->handle, &out_frame_, &diagnostic_);
+    if (status_ == MLN_STATUS_OK) {
+      value_ = maplibre_native_ffi_dma_buf_frame_from_native(&out_frame_);
+    }
     mln_acquired_frame_view_end(scope_);
   }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
-  return maplibre_native_ffi_dma_buf_frame_from_native(&out_frame_);
+  return value_;
 }
 #endif
 
@@ -541,17 +561,21 @@ maplibre_native_ffi_acquired_frame_get_io_surface(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
+  MaplibreNativeFfiIoSurfaceFrame* value_ = NULL;
   mln_status status_ =
     mln_acquired_frame_view_begin(self->handle, &scope_, &diagnostic_);
   if (status_ == MLN_STATUS_OK) {
     status_ = mln_acquired_frame_get_io_surface(
       self->handle, &out_frame_, &diagnostic_
     );
+    if (status_ == MLN_STATUS_OK) {
+      value_ = maplibre_native_ffi_io_surface_frame_from_native(&out_frame_);
+    }
     mln_acquired_frame_view_end(scope_);
   }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
-  return maplibre_native_ffi_io_surface_frame_from_native(&out_frame_);
+  return value_;
 }
 #endif
 
@@ -570,17 +594,21 @@ maplibre_native_ffi_acquired_frame_get_metal_texture(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
+  MaplibreNativeFfiMetalTextureFrame* value_ = NULL;
   mln_status status_ =
     mln_acquired_frame_view_begin(self->handle, &scope_, &diagnostic_);
   if (status_ == MLN_STATUS_OK) {
     status_ = mln_acquired_frame_get_metal_texture(
       self->handle, &out_frame_, &diagnostic_
     );
+    if (status_ == MLN_STATUS_OK) {
+      value_ = maplibre_native_ffi_metal_texture_frame_from_native(&out_frame_);
+    }
     mln_acquired_frame_view_end(scope_);
   }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
-  return maplibre_native_ffi_metal_texture_frame_from_native(&out_frame_);
+  return value_;
 }
 #endif
 
@@ -598,17 +626,22 @@ maplibre_native_ffi_acquired_frame_get_open_gl_texture(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
+  MaplibreNativeFfiOpenGlTextureFrame* value_ = NULL;
   mln_status status_ =
     mln_acquired_frame_view_begin(self->handle, &scope_, &diagnostic_);
   if (status_ == MLN_STATUS_OK) {
     status_ = mln_acquired_frame_get_open_gl_texture(
       self->handle, &out_frame_, &diagnostic_
     );
+    if (status_ == MLN_STATUS_OK) {
+      value_ =
+        maplibre_native_ffi_open_gl_texture_frame_from_native(&out_frame_);
+    }
     mln_acquired_frame_view_end(scope_);
   }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
-  return maplibre_native_ffi_open_gl_texture_frame_from_native(&out_frame_);
+  return value_;
 }
 
 MaplibreNativeFfiGpuSync* maplibre_native_ffi_acquired_frame_get_producer_sync(
@@ -624,17 +657,21 @@ MaplibreNativeFfiGpuSync* maplibre_native_ffi_acquired_frame_get_producer_sync(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
+  MaplibreNativeFfiGpuSync* value_ = NULL;
   mln_status status_ =
     mln_acquired_frame_view_begin(self->handle, &scope_, &diagnostic_);
   if (status_ == MLN_STATUS_OK) {
     status_ = mln_acquired_frame_get_producer_sync(
       self->handle, &out_sync_, &diagnostic_
     );
+    if (status_ == MLN_STATUS_OK) {
+      value_ = maplibre_native_ffi_gpu_sync_from_native(&out_sync_);
+    }
     mln_acquired_frame_view_end(scope_);
   }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
-  return maplibre_native_ffi_gpu_sync_from_native(&out_sync_);
+  return value_;
 }
 
 MaplibreNativeFfiRenderFrameResult*
@@ -671,17 +708,22 @@ maplibre_native_ffi_acquired_frame_get_vulkan_texture(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   void* scope_ = NULL;
+  MaplibreNativeFfiVulkanTextureFrame* value_ = NULL;
   mln_status status_ =
     mln_acquired_frame_view_begin(self->handle, &scope_, &diagnostic_);
   if (status_ == MLN_STATUS_OK) {
     status_ = mln_acquired_frame_get_vulkan_texture(
       self->handle, &out_frame_, &diagnostic_
     );
+    if (status_ == MLN_STATUS_OK) {
+      value_ =
+        maplibre_native_ffi_vulkan_texture_frame_from_native(&out_frame_);
+    }
     mln_acquired_frame_view_end(scope_);
   }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
-  return maplibre_native_ffi_vulkan_texture_frame_from_native(&out_frame_);
+  return value_;
 }
 
 gboolean maplibre_native_ffi_acquired_frame_release(

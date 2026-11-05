@@ -69,6 +69,7 @@ from .gobject_values import (
     define_name,
     fail_value,
     guarded,
+    paragraph,
     symbol_name,
     type_macro,
     type_name,
@@ -360,9 +361,7 @@ class Emitter:
             return
         match plan.shape:
             case "discard":
-                # The object's dispose runs it for a frame that its owner
-                # dropped.
-                self.generated.append(plan.name)
+                self.add(plan, self.discard(plan))
             case "release_async":
                 self.add(plan, *self.release_async(plan))
             case "release":
@@ -778,13 +777,20 @@ class Emitter:
             accepted = "status_ == MLN_STATUS_OK"
         elif view:
             assert plan.view is not None
+            if outs or convert:
+                raise Unsupported("a view with more than one output")
+            # The copy reads what the view lends, so it happens inside the
+            # view's scope.
             body += (
                 "  void* scope_ = NULL;\n"
+                f"  {returns} value_ = {failing};\n"
                 f"  mln_status status_ = {plan.view.begin}(self->handle, &scope_, &diagnostic_);\n"
                 f"  if (status_ == MLN_STATUS_OK) {{\n"
                 f"    status_ = {call.native_call()};\n"
+                f"    if (status_ == MLN_STATUS_OK) {{\n      value_ = {expression};\n    }}\n"
                 f"    {plan.view.end}(scope_);\n  }}\n"
             )
+            expression = "value_"
             accepted = "status_ == MLN_STATUS_OK"
         elif throws:
             body += f"  mln_status status_ = {call.native_call()};\n"
@@ -912,6 +918,21 @@ class Emitter:
                 (
                     "The object calls this when it is disposed, unless it was"
                     " released. Later calls fail as on any released handle."
+                ),
+            ),
+        )
+        return function
+
+    def discard(self, plan: OperationPlan) -> Function:
+        """A discard, which the object's dispose also calls."""
+        function = self.immediate(plan)
+        function.doc = self.doc_lines(
+            plan.name,
+            (
+                (
+                    "The object calls this when it is disposed, unless it was"
+                    " released or discarded. Later calls fail as on any"
+                    " released handle."
                 ),
             ),
         )
@@ -1151,9 +1172,8 @@ class Emitter:
         if discardable:
             doc += [
                 "",
-                *wrap(
-                    "Without `callback`, the call passes no completion, and"
-                    " nothing reports whether it succeeds."
+                *paragraph(
+                    "Without `callback`, nothing reports whether the call succeeds."
                 ),
             ]
         start_function = Function(
@@ -1540,7 +1560,7 @@ class Emitter:
                 f"  return {event_prefix}_get_{accessor(record, kind.name)}(event) == {constant} &&\n"
                 f"    {event_prefix}_get_{accessor(record, source)}(event) == {prefix}_get_id(self);\n",
                 doc=[
-                    *wrap(
+                    *paragraph(
                         "Whether a runtime event comes from this handle. A handle's"
                         f" ID needs all of its 64 bits, so compare with this, rather"
                         f" than with `{prefix}_get_id`, where numbers are doubles, as"
@@ -1570,12 +1590,12 @@ class Emitter:
                 "  maplibre_native_ffi_ready_wait(self->ready, task_);\n"
                 "  g_object_unref(task_);\n",
                 doc=[
-                    *wrap(
+                    *paragraph(
                         "Waits until the handle is ready, as the call that created"
                         " it reports. A handle that a callback lends is ready at once."
                     ),
                     "",
-                    *wrap(THREADS),
+                    *paragraph(THREADS),
                 ],
                 annotations={
                     "callback": "(scope async) (nullable): the callback to call when the handle is ready",

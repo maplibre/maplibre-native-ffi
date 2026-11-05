@@ -35,6 +35,26 @@ guint64 maplibre_native_ffi_acquired_frame_get_id(
   MaplibreNativeFfiAcquiredFrame* self
 );
 
+/**
+ * maplibre_native_ffi_acquired_frame_discard:
+ *
+ * Gives up an acquired frame without saying when your GPU stops reading it.
+ *
+ * Because your GPU may still read the frame's texture, the session never
+ * renders into that texture again.
+ *
+ * The object calls this when it is disposed, unless it was released or
+ * discarded. Later calls fail as on any released handle.
+ *
+ * See `mln_acquired_frame_discard` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ *
+ * Returns: %TRUE on success, or %FALSE with `error` set
+ */
+gboolean maplibre_native_ffi_acquired_frame_discard(
+  MaplibreNativeFfiAcquiredFrame* self, GError** error
+);
+
 #if defined(__linux__)
 /**
  * maplibre_native_ffi_acquired_frame_get_dma_buf:
@@ -378,8 +398,7 @@ guint64 maplibre_native_ffi_map_get_id(MaplibreNativeFfiMap* self);
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_add_custom_geometry_source_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -418,8 +437,7 @@ maplibre_native_ffi_map_add_custom_geometry_source_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_add_custom_vector_source_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -461,8 +479,7 @@ maplibre_native_ffi_map_add_custom_vector_source_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_add_geo_json_source_data_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -504,8 +521,7 @@ maplibre_native_ffi_map_add_geo_json_source_data_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_add_image_source_image_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -552,8 +568,7 @@ maplibre_native_ffi_map_add_image_source_image_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_add_style_layer_json_async(
   MaplibreNativeFfiMap* self, const char* layer_json,
@@ -595,8 +610,7 @@ maplibre_native_ffi_map_add_style_layer_json_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_add_style_source_json_async(
   MaplibreNativeFfiMap* self, const char* source_id, const char* source_json,
@@ -633,8 +647,7 @@ maplibre_native_ffi_map_add_style_source_json_finish(
  * See `mln_map_apply_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_apply_camera_delta_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiCameraDelta* delta,
@@ -1002,8 +1015,7 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_wayland_surface(
  * See `mln_map_begin_command_group` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_begin_command_group_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
@@ -1153,8 +1165,7 @@ maplibre_native_ffi_map_camera_for_lat_lngs_finish(
  * See `mln_map_cancel_camera_transitions` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_cancel_camera_transitions_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
@@ -1187,8 +1198,7 @@ maplibre_native_ffi_map_cancel_camera_transitions_finish(
  * See `mln_map_cancel_camera_transitions_with_id` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_cancel_camera_transitions_with_id_async(
   MaplibreNativeFfiMap* self, guint64 transition_id,
@@ -1234,8 +1244,7 @@ void maplibre_native_ffi_map_dispose(MaplibreNativeFfiMap* self);
  * See `mln_map_dump_debug_logs` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_dump_debug_logs_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
@@ -1265,8 +1274,7 @@ maplibre_native_ffi_map_dump_debug_logs_finish(
  * See `mln_map_end_command_group` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_end_command_group_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
@@ -1308,8 +1316,7 @@ maplibre_native_ffi_map_end_command_group_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the padding in `update`
  *   leaves no room for the area. The camera doesn't move.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_fit_camera_to_geometry_async(
   MaplibreNativeFfiMap* self, const char* geometry,
@@ -1351,8 +1358,7 @@ maplibre_native_ffi_map_fit_camera_to_geometry_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the padding in `update`
  *   leaves no room for the area. The camera doesn't move.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLngBounds* bounds,
@@ -1395,8 +1401,7 @@ maplibre_native_ffi_map_fit_camera_to_lat_lng_bounds_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the padding in `update`
  *   leaves no room for the area. The camera doesn't move.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLatLng* coordinates,
@@ -1844,8 +1849,7 @@ char* maplibre_native_ffi_map_get_style_url_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
  *   `source_id` isn't a custom geometry source.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_invalidate_custom_geometry_source_region_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -1884,8 +1888,7 @@ maplibre_native_ffi_map_invalidate_custom_geometry_source_region_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
  *   `source_id` isn't a custom geometry source.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_invalidate_custom_geometry_source_tile_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -1925,8 +1928,7 @@ maplibre_native_ffi_map_invalidate_custom_geometry_source_tile_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
  *   `source_id` isn't a custom vector source.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_invalidate_custom_vector_source_region_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -1965,8 +1967,7 @@ maplibre_native_ffi_map_invalidate_custom_vector_source_region_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
  *   `source_id` isn't a custom vector source.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_invalidate_custom_vector_source_tile_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -2091,8 +2092,7 @@ GPtrArray* maplibre_native_ffi_map_list_style_sources_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_move_style_layer_async(
   MaplibreNativeFfiMap* self, const char* layer_id, const char* before_layer_id,
@@ -2150,8 +2150,7 @@ gboolean maplibre_native_ffi_map_release_finish(
  * See `mln_map_remove_feature_state` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_remove_feature_state_async(
   MaplibreNativeFfiMap* self,
@@ -2190,8 +2189,7 @@ maplibre_native_ffi_map_remove_feature_state_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_remove_style_image_async(
   MaplibreNativeFfiMap* self, const char* image_id,
@@ -2229,8 +2227,7 @@ maplibre_native_ffi_map_remove_style_image_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_remove_style_layer_async(
   MaplibreNativeFfiMap* self, const char* layer_id,
@@ -2269,8 +2266,7 @@ maplibre_native_ffi_map_remove_style_layer_finish(
  *   source, or while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_remove_style_source_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -2300,8 +2296,7 @@ maplibre_native_ffi_map_remove_style_source_finish(
  * See `mln_map_request_repaint` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_request_repaint_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
@@ -2376,8 +2371,7 @@ gboolean maplibre_native_ffi_map_request_still_image_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when a render session attached to
  *   the map before the resize applied.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_resize_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiLogicalSize* logical_size,
@@ -2409,8 +2403,7 @@ MaplibreNativeFfiCommandCompletion* maplibre_native_ffi_map_resize_finish(
  * See `mln_map_set_bounds` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_bounds_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiBoundOptions* options,
@@ -2451,8 +2444,7 @@ MaplibreNativeFfiCommandCompletion* maplibre_native_ffi_map_set_bounds_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
  *   `source_id` isn't a custom geometry source.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_custom_geometry_source_tile_data_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -2492,8 +2484,7 @@ maplibre_native_ffi_map_set_custom_geometry_source_tile_data_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
  *   `source_id` isn't a custom geometry source.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_custom_geometry_source_tile_error_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -2536,8 +2527,7 @@ maplibre_native_ffi_map_set_custom_geometry_source_tile_error_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
  *   `source_id` isn't a custom vector source.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_custom_vector_source_tile_data_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -2578,8 +2568,7 @@ maplibre_native_ffi_map_set_custom_vector_source_tile_data_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
  *   `source_id` isn't a custom vector source.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_custom_vector_source_tile_error_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -2612,8 +2601,7 @@ maplibre_native_ffi_map_set_custom_vector_source_tile_error_finish(
  * See `mln_map_set_debug_flags` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_debug_flags_async(
   MaplibreNativeFfiMap* self, MaplibreNativeFfiMapDebugFlag flags,
@@ -2643,8 +2631,7 @@ maplibre_native_ffi_map_set_debug_flags_finish(
  * See `mln_map_set_event_mask` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_event_mask_async(
   MaplibreNativeFfiMap* self, MaplibreNativeFfiRuntimeEventFlag mask,
@@ -2678,8 +2665,7 @@ maplibre_native_ffi_map_set_event_mask_finish(
  * See `mln_map_set_feature_state` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_feature_state_async(
   MaplibreNativeFfiMap* self,
@@ -2714,8 +2700,7 @@ maplibre_native_ffi_map_set_feature_state_finish(
  * See `mln_map_set_free_camera_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_free_camera_options_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiFreeCameraOptions* options,
@@ -2760,8 +2745,7 @@ maplibre_native_ffi_map_set_free_camera_options_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_geo_json_source_data_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -2806,8 +2790,7 @@ maplibre_native_ffi_map_set_geo_json_source_data_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_geo_json_source_synchronous_tiling_async(
   MaplibreNativeFfiMap* self, const char* source_id, gboolean enabled,
@@ -2848,8 +2831,7 @@ maplibre_native_ffi_map_set_geo_json_source_synchronous_tiling_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_geo_json_source_url_async(
   MaplibreNativeFfiMap* self, const char* source_id, const char* url,
@@ -2887,8 +2869,7 @@ maplibre_native_ffi_map_set_geo_json_source_url_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_global_state_property_async(
   MaplibreNativeFfiMap* self, const char* property_name, const char* value,
@@ -2931,8 +2912,7 @@ maplibre_native_ffi_map_set_global_state_property_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_image_source_coordinates_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -2973,8 +2953,7 @@ maplibre_native_ffi_map_set_image_source_coordinates_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_image_source_image_async(
   MaplibreNativeFfiMap* self, const char* source_id,
@@ -3016,8 +2995,7 @@ maplibre_native_ffi_map_set_image_source_image_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_image_source_url_async(
   MaplibreNativeFfiMap* self, const char* source_id, const char* url,
@@ -3050,8 +3028,7 @@ maplibre_native_ffi_map_set_image_source_url_finish(
  * See `mln_map_set_projection_mode` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_projection_mode_async(
   MaplibreNativeFfiMap* self,
@@ -3082,8 +3059,7 @@ maplibre_native_ffi_map_set_projection_mode_finish(
  * See `mln_map_set_rendering_stats_view_enabled` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_rendering_stats_view_enabled_async(
   MaplibreNativeFfiMap* self, gboolean enabled, GAsyncReadyCallback callback,
@@ -3120,8 +3096,7 @@ maplibre_native_ffi_map_set_rendering_stats_view_enabled_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_image_async(
   MaplibreNativeFfiMap* self, const char* image_id,
@@ -3163,8 +3138,7 @@ maplibre_native_ffi_map_set_style_image_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when `json` isn't a valid style.
  *   The map keeps its current style.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_json_async(
   MaplibreNativeFfiMap* self, const char* json, GAsyncReadyCallback callback,
@@ -3209,8 +3183,7 @@ maplibre_native_ffi_map_set_style_json_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_layer_property_async(
   MaplibreNativeFfiMap* self, const char* layer_id, const char* property_name,
@@ -3247,8 +3220,7 @@ maplibre_native_ffi_map_set_style_layer_property_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_light_json_async(
   MaplibreNativeFfiMap* self, const char* light_json,
@@ -3285,8 +3257,7 @@ maplibre_native_ffi_map_set_style_light_json_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_light_property_async(
   MaplibreNativeFfiMap* self, const char* property_name, const char* value,
@@ -3326,8 +3297,7 @@ maplibre_native_ffi_map_set_style_light_property_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_source_volatile_async(
   MaplibreNativeFfiMap* self, const char* source_id, gboolean is_volatile,
@@ -3362,8 +3332,7 @@ maplibre_native_ffi_map_set_style_source_volatile_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
  *   `maplibre_native_ffi_map_set_style_url_async()` describes.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_transition_options_async(
   MaplibreNativeFfiMap* self,
@@ -3412,8 +3381,7 @@ maplibre_native_ffi_map_set_style_transition_options_finish(
  *   function or `maplibre_native_ffi_map_set_style_json_async()` loads another
  *   style, before the style document parses.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_style_url_async(
   MaplibreNativeFfiMap* self, const char* url, GAsyncReadyCallback callback,
@@ -3445,8 +3413,7 @@ maplibre_native_ffi_map_set_style_url_finish(
  * See `mln_map_set_tile_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_tile_options_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiMapTileOptions* options,
@@ -3478,8 +3445,7 @@ maplibre_native_ffi_map_set_tile_options_finish(
  * See `mln_map_set_viewport_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_set_viewport_options_async(
   MaplibreNativeFfiMap* self,
@@ -3516,8 +3482,7 @@ maplibre_native_ffi_map_set_viewport_options_finish(
  * See `mln_map_update_camera` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_update_camera_async(
   MaplibreNativeFfiMap* self, const MaplibreNativeFfiCameraUpdate* update,
@@ -3543,7 +3508,7 @@ maplibre_native_ffi_map_update_camera_finish(
  * @user_data: the data to pass to `callback`
  *
  * Waits until the handle is ready, as the call that created it reports. A
- *   handle that a callback lends is ready at once.
+ * handle that a callback lends is ready at once.
  *
  * Runs on the thread-default main context of the thread that started the call.
  */
@@ -3568,9 +3533,9 @@ gboolean maplibre_native_ffi_map_ready_finish(
  * @event: the event
  *
  * Whether a runtime event comes from this handle. A handle's ID needs all of
- *   its 64 bits, so compare with this, rather than with
- *   `maplibre_native_ffi_map_get_id`, where numbers are doubles, as in
- *   JavaScript.
+ * its 64 bits, so compare with this, rather than with
+ * `maplibre_native_ffi_map_get_id`, where numbers are doubles, as in
+ * JavaScript.
  *
  * Returns: whether the event's source is this handle
  */
@@ -4581,8 +4546,7 @@ gboolean maplibre_native_ffi_render_session_release_target_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` when the session loses its target
  *   before the resize applies.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_render_session_resize_async(
   MaplibreNativeFfiRenderSession* self,
@@ -4928,7 +4892,7 @@ gboolean maplibre_native_ffi_render_session_set_wayland_surface_target_finish(
  * @user_data: the data to pass to `callback`
  *
  * Waits until the handle is ready, as the call that created it reports. A
- *   handle that a callback lends is ready at once.
+ * handle that a callback lends is ready at once.
  *
  * Runs on the thread-default main context of the thread that started the call.
  */
@@ -5193,8 +5157,7 @@ guint64 maplibre_native_ffi_runtime_get_id(MaplibreNativeFfiRuntime* self);
  * See `mln_runtime_clear_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_runtime_clear_event_handler_async(
   MaplibreNativeFfiRuntime* self, GAsyncReadyCallback callback,
@@ -5224,8 +5187,7 @@ maplibre_native_ffi_runtime_clear_event_handler_finish(
  * See `mln_runtime_clear_http_header_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_runtime_clear_http_header_transform_async(
   MaplibreNativeFfiRuntime* self, GAsyncReadyCallback callback,
@@ -5256,8 +5218,7 @@ maplibre_native_ffi_runtime_clear_http_header_transform_finish(
  * See `mln_runtime_clear_resource_provider` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_runtime_clear_resource_provider_async(
   MaplibreNativeFfiRuntime* self, GAsyncReadyCallback callback,
@@ -5287,8 +5248,7 @@ maplibre_native_ffi_runtime_clear_resource_provider_finish(
  * See `mln_runtime_clear_resource_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_runtime_clear_resource_transform_async(
   MaplibreNativeFfiRuntime* self, GAsyncReadyCallback callback,
@@ -5672,8 +5632,7 @@ gboolean maplibre_native_ffi_runtime_run_cache_database_operation_finish(
  * See `mln_runtime_set_event_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_runtime_set_event_handler_async(
   MaplibreNativeFfiRuntime* self,
@@ -5713,8 +5672,7 @@ maplibre_native_ffi_runtime_set_event_handler_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the library runs in a browser
  *   or on OpenHarmony.
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_runtime_set_http_header_transform_async(
   MaplibreNativeFfiRuntime* self,
@@ -5853,8 +5811,7 @@ gboolean maplibre_native_ffi_runtime_set_offline_region_observed_finish(
  * See `mln_runtime_set_resource_provider` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_runtime_set_resource_provider_async(
   MaplibreNativeFfiRuntime* self,
@@ -5887,8 +5844,7 @@ maplibre_native_ffi_runtime_set_resource_provider_finish(
  * See `mln_runtime_set_resource_transform` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  *
- * Without `callback`, the call passes no completion, and nothing reports
- *   whether it succeeds.
+ * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_runtime_set_resource_transform_async(
   MaplibreNativeFfiRuntime* self,
@@ -5948,9 +5904,9 @@ maplibre_native_ffi_runtime_update_offline_region_metadata_finish(
  * @event: the event
  *
  * Whether a runtime event comes from this handle. A handle's ID needs all of
- *   its 64 bits, so compare with this, rather than with
- *   `maplibre_native_ffi_runtime_get_id`, where numbers are doubles, as in
- *   JavaScript.
+ * its 64 bits, so compare with this, rather than with
+ * `maplibre_native_ffi_runtime_get_id`, where numbers are doubles, as in
+ * JavaScript.
  *
  * Returns: whether the event's source is this handle
  */
