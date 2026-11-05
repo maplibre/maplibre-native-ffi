@@ -1,6 +1,6 @@
 // Bundles the facade and packs the npm packages for one or more presets:
 //
-//   node scripts/pack.ts [--version <version>] [--xcframework <directory>] [--android <directory>] <out dir> <preset>...
+//   node scripts/pack.ts [--version <version>] [--xcframework <directory> [--sign-apple-sdk]] [--android <directory>] <out dir> <preset>...
 //
 // A desktop user installs the facade, @maplibre/native-ffi, and one backend package,
 // such as @maplibre/native-ffi-vulkan. A backend package holds no code. It
@@ -37,13 +37,14 @@ const { values, positionals } = parseArgs({
     version: { type: "string", default: "0.0.0" },
     xcframework: { type: "string" },
     android: { type: "string" },
+    "sign-apple-sdk": { type: "boolean", default: false },
   },
   allowPositionals: true,
 });
 const [outArgument, ...presets] = positionals;
 if (outArgument === undefined || presets.length === 0) {
   throw new Error(
-    "usage: pack.ts [--version <version>] [--xcframework <directory>] [--android <directory>] <out dir> <preset>...",
+    "usage: pack.ts [--version <version>] [--xcframework <directory> [--sign-apple-sdk]] [--android <directory>] <out dir> <preset>...",
   );
 }
 const version = values.version;
@@ -425,6 +426,15 @@ function packReactNative(): void {
       ],
       { stdio: "inherit" },
     );
+    // npm omits symlinks and the SBOM step restamps the bundle, so sign the
+    // final layout.
+    if (values["sign-apple-sdk"]) {
+      execFileSync(
+        "python3",
+        [join(root, "tools/release/apple_sdk_signing.py"), xcframework],
+        { stdio: "inherit" },
+      );
+    }
     reactNativeInventories.push(
       ...readdirSync(xcframework, { recursive: true, withFileTypes: true })
         .filter((entry) => entry.isFile() && entry.name === "sbom.cdx.json")

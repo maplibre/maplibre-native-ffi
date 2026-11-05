@@ -27,7 +27,11 @@ permissions:
 jobs:
   pack:
     name: pack
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # A release signs the Apple SDK, which needs macOS.
+    runs-on:
+      ${{ inputs.tag != '' && 'blacksmith-6vcpu-macos-26' ||
+      'blacksmith-2vcpu-ubuntu-2404' }}
+    environment: ${{ inputs.tag != '' && 'apple-sdk' || '' }}
     timeout-minutes: 30
     permissions:
       actions: read
@@ -80,13 +84,19 @@ jobs:
           gh release download "$PACKAGE_TAG" --repo "$GITHUB_REPOSITORY" \
             --pattern MaplibreNativeC.xcframework.zip --pattern SHA256SUMS \
             --dir "$destination"
-          (cd "$destination" && grep '  MaplibreNativeC.xcframework.zip$' SHA256SUMS | sha256sum --check --strict)
+          (cd "$destination" && grep '  MaplibreNativeC.xcframework.zip$' SHA256SUMS | shasum -a 256 --check --strict)
           android=build/typescript-android
           gh release download "$PACKAGE_TAG" --repo "$GITHUB_REPOSITORY" \
             --pattern 'maplibre-native-c-android-*-egl.tar.gz' --dir "$android"
           cp "$destination/SHA256SUMS" "$android/SHA256SUMS"
-          (cd "$android" && sha256sum --check --ignore-missing --strict SHA256SUMS)
+          (cd "$android" && shasum -a 256 --check --ignore-missing --strict SHA256SUMS)
       - name: Pack the packages
+        env:
+          APPLE_SDK_TEAM_ID: ${{ vars.APPLE_SDK_TEAM_ID }}
+          APPLE_SDK_CERTIFICATE_BASE64:
+            ${{ secrets.APPLE_SDK_CERTIFICATE_BASE64 }}
+          APPLE_SDK_CERTIFICATE_PASSWORD:
+            ${{ secrets.APPLE_SDK_CERTIFICATE_PASSWORD }}
         run: |
           set -euo pipefail
 
@@ -102,8 +112,12 @@ jobs:
             mv "$artifact" "bindings/typescript/native/build/$preset/install"
             presets+=("$preset")
           done
+          signing=()
+          if [[ -n "$PACKAGE_TAG" ]]; then
+            signing=(--sign-apple-sdk)
+          fi
           mise exec --no-deps core:node -- node bindings/typescript/scripts/pack.ts \
-            --version "$PACKAGE_VERSION" \
+            --version "$PACKAGE_VERSION" "${signing[@]}" \
             --xcframework build/typescript-xcframework/MaplibreNativeC.xcframework \
             --android build/typescript-android \
             build/npm "${presets[@]}"
