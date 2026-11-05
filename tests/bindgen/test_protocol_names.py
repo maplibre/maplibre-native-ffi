@@ -11,6 +11,7 @@ GENERATOR = ROOT / "tools/bindgen"
 POLICY_TABLES = {
     "emitters/dart_values.py": {"NOTES", "NATIVE_ONLY"},
     "emitters/dotnet.py": {"NOTES"},
+    "emitters/gobject.py": {"SLICE"},
     "emitters/kotlin.py": {"HANDWRITTEN"},
 }
 

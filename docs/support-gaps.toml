@@ -166,6 +166,27 @@ link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 # Medium integration work with an established toolchain and approach.
 
 [[entry]]
+bindings = ["gobject"]
+platforms = ["linux-musl", "freebsd", "windows", "windows-mingw"]
+status = "path-known"
+reason = "The library builds against the system's GLib, gobject-introspection, Vala, and GJS, which CI installs only on Linux (GNU) and macOS. Alpine, FreeBSD, and MSYS2 package them."
+link = "https://github.com/maplibre/maplibre-native-ffi/issues/119"
+
+[[entry]]
+bindings = ["gobject"]
+platforms = ["linux-gnu"]
+archs = ["riscv64", "loongarch64"]
+status = "path-known"
+reason = "These targets cross-compile on an x64 runner and run under QEMU, without the target architecture's GLib and GJS to build and run against."
+
+[[entry]]
+bindings = ["gobject"]
+platforms = ["macos"]
+archs = ["x64"]
+status = "path-known"
+reason = "The macOS x64 suites run under Rosetta on ARM64 runners, whose Homebrew GLib and GJS are ARM64 only."
+
+[[entry]]
 bindings = ["kotlin-jvm"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["loongarch64"]
@@ -173,6 +194,19 @@ status = "blocked"
 reason = "Debian and Alpine's Java 25 Zero/libffi runtimes pass 76 of 77 binding tests under QEMU, but hang when a render-completion callback exits the JVM. Their shutdown stack traces omit the callback frames that the binding uses to avoid deadlocking session abandonment."
 
 # No supported toolchain or ABI.
+
+[[entry]]
+bindings = ["gobject"]
+platforms = [
+  "android",
+  "ios",
+  "ios-maccatalyst",
+  "tvos",
+  "visionos",
+  "ohos",
+  "emscripten",
+]
+status = "not-investigated"
 
 [[entry]]
 bindings = ["dotnet"]

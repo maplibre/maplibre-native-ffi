@@ -15,6 +15,7 @@ import {
   defaultLanguage,
   languageStorageKey,
   languages,
+  libraries,
 } from "./src/languages";
 
 const site = "https://maplibre.org";
@@ -33,7 +34,7 @@ const languageRules = [
   .join("\n");
 
 // Gives each element tagged with a language its logo, which the sidebar shows.
-const logoRules = languages
+const logoRules = [...languages, ...libraries]
   .map(({ id, logo }) => `[data-logo="${id}"] { --logo: url("${logo}"); }`)
   .join("\n");
 
@@ -137,6 +138,7 @@ export default defineConfig({
             reference("python", "Python API", "/reference/python/"),
             reference("dotnet", ".NET API", "/reference/dotnet/"),
             reference("go", "Go API", "/reference/go/"),
+            reference("gobject", "GObject API", "/reference/gobject/"),
             reference(
               "swift",
               "Swift API",

@@ -1,0 +1,52 @@
+---
+title: GObject
+description:
+  Build the GObject library for C, Vala, GJS, and other GObject languages.
+sidebar:
+  attrs:
+    data-logo: gobject
+---
+
+## Install
+
+The GObject library is a shared library with a C header, a pkg-config file,
+introspection data, and Vala bindings. No release publishes it yet, so build it
+from the repository against the [C library](/maplibre-native-ffi/install/c/) of
+your preset, on Linux or macOS. It needs GLib 2.80, gobject-introspection 1.80,
+Vala, and [meson](https://mesonbuild.com/) 1.3 or later.
+
+Unpack the C library's archive, then build the library from `bindings/gobject`
+and install it into the same prefix:
+
+```bash frame="terminal"
+export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
+meson setup build bindings/gobject --prefix=<prefix> --libdir=lib
+meson install -C build
+```
+
+## Use
+
+C programs include `<maplibre-native-ffi.h>` and link with pkg-config:
+
+```bash frame="terminal"
+cc main.c $(pkg-config --cflags --libs maplibre-native-ffi-gobject-0) -o main
+```
+
+Vala programs read the VAPI from the prefix:
+
+```bash frame="terminal"
+valac --vapidir=<prefix>/share/vala/vapi --pkg maplibre-native-ffi-gobject-0 main.vala
+```
+
+GJS and PyGObject load the typelib from `<prefix>/lib/girepository-1.0`, and
+other GObject language bindings read `MaplibreNativeFfi-0.gir` from
+`<prefix>/share/gir-1.0`. Unless the prefix is a system one, put those
+directories on `GI_TYPELIB_PATH` and `XDG_DATA_DIRS`, and `<prefix>/lib` on the
+library path:
+
+```js title="main.js"
+import MaplibreNativeFfi from "gi://MaplibreNativeFfi?version=0";
+```
+
+Asynchronous calls finish on the thread-default main context of the thread that
+starts them, so that thread must run its main loop.
