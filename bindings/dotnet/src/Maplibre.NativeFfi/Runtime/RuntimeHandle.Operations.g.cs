@@ -534,10 +534,9 @@ public sealed unsafe partial class RuntimeHandle
     /// Limits the size of the runtime's ambient cache.
     /// </summary>
     /// <remarks>
-    /// <para><c>size</c> is in bytes. Offline regions don't count toward it.
-    /// The limit defaults to 50 MB. In the browser, a runtime without a cache
-    /// file defaults to 0, because the browser's HTTP cache already holds what
-    /// maps load.</para>
+    /// <para><c>size</c> is in bytes. Offline regions don't count toward it. It
+    /// defaults to 50 MB, or to 0 in the browser when the runtime has no cache
+    /// file.</para>
     /// <para>See <c>mln_runtime_set_maximum_ambient_cache_size</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
     /// </remarks>

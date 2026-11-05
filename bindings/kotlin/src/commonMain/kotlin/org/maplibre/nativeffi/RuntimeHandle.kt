@@ -340,9 +340,8 @@ private constructor(
   /**
    * Limits the size of the runtime's ambient cache.
    *
-   * `size` is in bytes. Offline regions don't count toward it. The limit defaults to 50 MB. In the
-   * browser, a runtime without a cache file defaults to 0, because the browser's HTTP cache already
-   * holds what maps load.
+   * `size` is in bytes. Offline regions don't count toward it. It defaults to 50 MB, or to 0 in the
+   * browser when the runtime has no cache file.
    *
    * See `mln_runtime_set_maximum_ambient_cache_size` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
