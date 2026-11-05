@@ -967,6 +967,75 @@ void a_barrier_waits_for_an_ordered_operation_after_a_running_demand() {
   TEST_ASSERT_TRUE(maintenance_first);
 }
 
+struct ReleaseBehindAFrame {
+  SyncPointScope* points;
+  mln_render_session session;
+  mln_test_completion release = mln_test_completion_default(0);
+  std::atomic_bool submitted{false};
+  bool frame_held = false;
+  mln_status demand_submission = MLN_STATUS_NATIVE_ERROR;
+  mln_status release_submission = MLN_STATUS_NATIVE_ERROR;
+};
+
+void queue_a_frame_and_a_release(void* context) {
+  auto& queued = *static_cast<ReleaseBehindAFrame*>(context);
+  queued.frame_held =
+    queued.points->wait_for_hits(SyncPoint::RenderFrameResultPublished, 1);
+  auto demand = mln_frame_demand{};
+  demand.size = sizeof(mln_frame_demand);
+  demand.flags = MLN_FRAME_DEMAND_FORCE;
+  demand.token = 171;
+  queued.demand_submission =
+    mln_render_session_demand_frame(queued.session, &demand, nullptr);
+  queued.release_submission = mln_render_session_release_target(
+    queued.session, &queued.release.descriptor, nullptr
+  );
+  if (queued.release_submission != MLN_STATUS_OK)
+    mln_test_completion_reject(&queued.release);
+  queued.submitted.store(true);
+  queued.points->release(SyncPoint::RenderFrameResultPublished);
+}
+
+// A host giving up its target waits only for the frame in flight: a frame
+// that the driver had queued ahead of the release doesn't render to the
+// target first.
+void a_release_waits_only_for_the_frame_in_flight() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto queued =
+    ReleaseBehindAFrame{.points = &points, .session = fixture.render.session};
+  points.hold(SyncPoint::RenderFrameResultPublished);
+  auto* submitting =
+    mln_test_thread_start(queue_a_frame_and_a_release, &queued);
+  mln_test_render_demand_forced(&fixture.render, 170);
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture.render,
+    [](void* context) {
+      return static_cast<ReleaseBehindAFrame*>(context)->submitted.load();
+    },
+    &queued, mln_test_deadline_default(), "the frame and the release to queue"
+  ));
+  mln_test_thread_join(submitting);
+  TEST_ASSERT_TRUE(queued.frame_held);
+  MLN_TEST_OK(queued.demand_submission);
+  MLN_TEST_OK(queued.release_submission);
+  MLN_TEST_OK(
+    mln_test_render_fixture_finish_operation(&fixture.render, &queued.release)
+  );
+  mln_test_completion_destroy(&queued.release);
+  const auto [in_flight, behind] = wait_for_result_list<2>(fixture);
+  const auto rendered = points.hits(SyncPoint::RenderFrameRendered);
+  destroy_fixture(fixture);
+  TEST_ASSERT_EQUAL_UINT64(170, in_flight.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, in_flight.disposition);
+  TEST_ASSERT_EQUAL_UINT64(171, behind.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, behind.disposition
+  );
+  TEST_ASSERT_EQUAL_INT(1, rendered);
+}
+
 void unforced_demands_supersede_and_forced_demands_render() {
   auto fixture = Fixture{};
   create_fixture(fixture);
@@ -2043,6 +2112,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
   RUN_TEST(a_hook_replacement_waits_for_the_running_hook);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);
+  RUN_TEST(a_release_waits_only_for_the_frame_in_flight);
   RUN_TEST(unforced_demands_supersede_and_forced_demands_render);
   RUN_TEST(supersession_preserves_a_forced_demand_after_a_resize);
   RUN_TEST(scheduler_service_preserves_a_forced_demand_after_a_resize);

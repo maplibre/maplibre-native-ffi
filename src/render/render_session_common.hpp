@@ -997,6 +997,10 @@ struct mln_render_session_object
   // Written only by driver work, which runs one item at a time, under
   // control_mutex, so the driver reads it without the lock.
   bool target_released = false;
+  // Target releases accepted but not yet run, under control_mutex. A demand
+  // queued ahead of one ends without rendering to the target that the host is
+  // giving up.
+  std::uint32_t pending_target_releases = 0;
   // The host objects of the target that the session renders to, set by attach
   // and by each target replacement. Only driver work reads or writes it after
   // attach.

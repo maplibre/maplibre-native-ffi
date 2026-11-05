@@ -720,10 +720,10 @@ public sealed unsafe partial class RenderSessionHandle
     /// </summary>
     /// <remarks>
     /// <para>Use it when the platform takes a surface away, such as when your
-    /// app goes to the background. Release every acquired frame first. Until
-    /// you give the session a new target, frame demands finish with
-    /// <c>RenderResult.TargetNotReady</c>. Once the release completes, you can
-    /// destroy the old target.</para>
+    /// app goes to the background. Release every acquired frame first. Frame
+    /// demands that are still pending, and later ones until you give the
+    /// session a new target, finish with <c>RenderResult.TargetNotReady</c>.
+    /// Once the release completes, you can destroy the old target.</para>
     /// <para>See <c>mln_render_session_release_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>

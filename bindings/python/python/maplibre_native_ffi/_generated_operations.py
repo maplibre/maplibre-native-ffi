@@ -2590,10 +2590,10 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         the session.
 
         Use it when the platform takes a surface away, such as when your app
-        goes to the background. Release every acquired frame first. Until you
-        give the session a new target, frame demands finish with
-        `RenderResult.TARGET_NOT_READY`. Once the release completes, you can
-        destroy the old target.
+        goes to the background. Release every acquired frame first. Frame
+        demands that are still pending, and later ones until you give the
+        session a new target, finish with `RenderResult.TARGET_NOT_READY`.
+        Once the release completes, you can destroy the old target.
 
         See `mln_render_session_release_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
