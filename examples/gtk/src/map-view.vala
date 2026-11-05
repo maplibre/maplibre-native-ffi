@@ -24,12 +24,12 @@ namespace Example {
 	extern void dma_buf_wait (int fd);
 
 	CameraOptions initial_camera () {
-		var camera = new CameraOptions ();
-		camera.set_center ({ latitude: 48.8584, longitude: 2.2945 });
-		camera.set_zoom (15.5);
-		camera.set_bearing (-30);
-		camera.set_pitch (55);
-		return camera;
+		return new CameraOptions () {
+			center = { latitude: 48.8584, longitude: 2.2945 },
+			zoom = 15.5,
+			bearing = -30,
+			pitch = 55,
+		};
 	}
 
 	// An acquired frame that a texture shows. The texture reads the buffer
@@ -313,16 +313,15 @@ namespace Example {
 			if (runtime == null) {
 				start_runtime ();
 			}
-			var options = new MapOptions ();
-			options.set_initial_extent (
-				{ width: size.width, height: size.height, scale_factor: scale }
-			);
-			options.set_map_mode (MapMode.CONTINUOUS);
-			options.set_event_mask (
-				RuntimeEventFlag.MAP_STYLE_LOADED
-				| RuntimeEventFlag.MAP_LOADING_FAILED
-				| RuntimeEventFlag.MAP_RENDER_ERROR
-			);
+			var options = new MapOptions () {
+				initial_extent = {
+					width: size.width, height: size.height, scale_factor: scale
+				},
+				map_mode = MapMode.CONTINUOUS,
+				event_mask = RuntimeEventFlag.MAP_STYLE_LOADED
+					| RuntimeEventFlag.MAP_LOADING_FAILED
+					| RuntimeEventFlag.MAP_RENDER_ERROR,
+			};
 			maplibre_map = runtime.create_map (options);
 			map_scale_factor = scale;
 			yield maplibre_map.ready_async ();

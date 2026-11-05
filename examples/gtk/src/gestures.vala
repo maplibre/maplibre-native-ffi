@@ -48,10 +48,10 @@ namespace Example {
 				previous_y = offset_y;
 				var delta = phase (GesturePhase.UPDATE);
 				if (rotating) {
-					delta.set_bearing (dx * 0.5);
-					delta.set_pitch (-dy * 0.5);
+					delta.bearing = dx * 0.5;
+					delta.pitch = -dy * 0.5;
 				} else {
-					delta.set_offset ({ x: dx, y: dy });
+					delta.offset = { x: dx, y: dy };
 				}
 				apply (delta);
 			});
@@ -68,9 +68,9 @@ namespace Example {
 			});
 			zoom.scale_changed.connect ((scale) => {
 				var delta = phase (GesturePhase.UPDATE);
-				delta.set_scale (scale / previous_scale);
+				delta.scale = scale / previous_scale;
 				previous_scale = scale;
-				delta.set_anchor (center (zoom));
+				delta.anchor = center (zoom);
 				apply (delta);
 			});
 			zoom.end.connect (() => apply (phase (GesturePhase.END)));
@@ -83,8 +83,8 @@ namespace Example {
 				var turn = (angle_delta - previous_angle) * 180 / Math.PI;
 				previous_angle = angle_delta;
 				var delta = phase (GesturePhase.UPDATE);
-				delta.set_bearing (-wrap_degrees (turn));
-				delta.set_anchor (center (rotate));
+				delta.bearing = -wrap_degrees (turn);
+				delta.anchor = center (rotate);
 				apply (delta);
 			});
 			widget.add_controller (rotate);
@@ -106,12 +106,12 @@ namespace Example {
 				var delta = new CameraDelta ();
 				if (scroll.get_unit () == Gdk.ScrollUnit.WHEEL) {
 					// A wheel zooms about the pointer, by steps of 40 pixels.
-					delta.set_scale (Math.pow (2, -dy * 40 / 300));
-					delta.set_anchor ({ x: pointer_x, y: pointer_y });
+					delta.scale = Math.pow (2, -dy * 40 / 300);
+					delta.anchor = { x: pointer_x, y: pointer_y };
 				} else {
 					// A touchpad scroll pans.
-					delta.set_offset ({ x: -dx, y: -dy });
-					delta.set_gesture_phase (GesturePhase.UPDATE);
+					delta.offset = { x: -dx, y: -dy };
+					delta.gesture_phase = GesturePhase.UPDATE;
 				}
 				apply (delta);
 				return true;
@@ -134,30 +134,30 @@ namespace Example {
 				var delta = new CameraDelta ();
 				switch (keyval) {
 				case Gdk.Key.Left:
-					delta.set_offset ({ x: STEP, y: 0 });
+					delta.offset = { x: STEP, y: 0 };
 					break;
 				case Gdk.Key.Right:
-					delta.set_offset ({ x: -STEP, y: 0 });
+					delta.offset = { x: -STEP, y: 0 };
 					break;
 				case Gdk.Key.Up:
-					delta.set_offset ({ x: 0, y: STEP });
+					delta.offset = { x: 0, y: STEP };
 					break;
 				case Gdk.Key.Down:
-					delta.set_offset ({ x: 0, y: -STEP });
+					delta.offset = { x: 0, y: -STEP };
 					break;
 				case Gdk.Key.plus:
 				case Gdk.Key.equal:
 				case Gdk.Key.KP_Add:
-					delta.set_scale (2);
+					delta.scale = 2;
 					break;
 				case Gdk.Key.minus:
 				case Gdk.Key.KP_Subtract:
-					delta.set_scale (0.5);
+					delta.scale = 0.5;
 					break;
 				default:
 					return false;
 				}
-				delta.set_animation (animation ());
+				delta.animation = animation ();
 				apply (delta);
 				return true;
 			});
@@ -165,11 +165,11 @@ namespace Example {
 		}
 
 		private void zoom_by (double scale, ScreenPoint anchor) {
-			var delta = new CameraDelta ();
-			delta.set_scale (scale);
-			delta.set_anchor (anchor);
-			delta.set_animation (animation ());
-			apply (delta);
+			apply (new CameraDelta () {
+				scale = scale,
+				anchor = anchor,
+				animation = animation (),
+			});
 		}
 
 		private void apply (CameraDelta delta) {
@@ -177,15 +177,11 @@ namespace Example {
 		}
 
 		private static CameraDelta phase (GesturePhase phase) {
-			var delta = new CameraDelta ();
-			delta.set_gesture_phase (phase);
-			return delta;
+			return new CameraDelta () { gesture_phase = phase };
 		}
 
 		private static AnimationOptions animation () {
-			var animation = new AnimationOptions ();
-			animation.set_duration_ms (300);
-			return animation;
+			return new AnimationOptions () { duration_ms = 300 };
 		}
 
 		private static ScreenPoint center (Gtk.Gesture gesture) {
