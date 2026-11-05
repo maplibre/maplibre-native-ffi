@@ -701,16 +701,17 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         return native
 
     def operation(plan: OperationPlan) -> str | None:
+        # The C text that names a function writes its parentheses.
         if plan.name not in slice_operations:
-            return f"{plan.name}()"
+            return plan.name
         receiver = receiver_type(plan)
         if receiver is not None:
             handle = bound.handles[receiver]
             if plan.name == handle.release and handle.release_waits:
-                return f"{symbol_name(receiver)}_release_async()"
+                return f"{symbol_name(receiver)}_release_async"
             if plan.name == handle.dispose:
-                return f"{symbol_name(receiver)}_dispose()"
-        return f"{method_name(plan)}()"
+                return f"{symbol_name(receiver)}_dispose"
+        return method_name(plan)
 
     def constant(value: ValuePlan, member: str) -> str | None:
         if value.native == STATUS and dict(value.enum_values)[member] == 0:

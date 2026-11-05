@@ -119,13 +119,13 @@ GType maplibre_native_ffi_camera_change_mode_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_COMPLETED: The camera finished
  *   the change.
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_CANCELLED:
- *   `mln_map_cancel_camera_transitions()()`,
- *   `mln_map_cancel_camera_transitions_with_id()()`, a gesture's
+ *   `mln_map_cancel_camera_transitions()`,
+ *   `mln_map_cancel_camera_transitions_with_id()`, a gesture's
  *   `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_BEGIN` or
  *   `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_CANCEL`,
- *   `mln_map_set_free_camera_options()()`, or a resize that moved the camera
- *   back inside its bounds stopped the change. A command that fails before it
- *   moves the camera also reports this.
+ *   `mln_map_set_free_camera_options()`, or a resize that moved the camera back
+ *   inside its bounds stopped the change. A command that fails before it moves
+ *   the camera also reports this.
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_CLOSED: The map closed before
  *   the change ended.
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_REPLACED: A later camera
@@ -188,7 +188,7 @@ GType maplibre_native_ffi_camera_update_mode_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_CONSTRAIN_MODE_WIDTH_AND_HEIGHT: Keeps the world filling
  *   the view in both directions.
  * @MAPLIBRE_NATIVE_FFI_CONSTRAIN_MODE_SCREEN: Keeps the whole view inside the
- *   bounds from `mln_map_set_bounds()()`.
+ *   bounds from `mln_map_set_bounds()`.
  *
  * How the map keeps the camera within the world or within its bounds.
  *
@@ -292,9 +292,9 @@ GType maplibre_native_ffi_gesture_phase_get_type(void) G_GNUC_CONST;
  * How one side waits for the other's GPU work on a shared texture.
  *
  * A sync file descriptor or an OpenGL fence signals once, so when
- * `mln_acquired_frame_release()()` succeeds, the session takes the one you
- * pass. A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts
- * up with each frame, so the one you pass stays yours. Keep it valid until a
+ * `mln_acquired_frame_release()` succeeds, the session takes the one you pass.
+ * A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up
+ * with each frame, so the one you pass stays yours. Keep it valid until a
  * detach or release of the session completes.
  *
  * See `mln_gpu_sync_kind` in the
@@ -423,7 +423,7 @@ GType maplibre_native_ffi_log_severity_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_WARNING:
  * @MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_ERROR:
  * @MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_DEFAULT: The severities logged on a
- *   background thread until `mln_log_set_async_severity_mask()()` changes them.
+ *   background thread until `mln_log_set_async_severity_mask()` changes them.
  * @MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_ALL:
  *
  * A log severity, as a bit in a set.
@@ -502,7 +502,7 @@ GType maplibre_native_ffi_map_load_error_get_type(void) G_GNUC_CONST;
  * MaplibreNativeFfiMapMode:
  * @MAPLIBRE_NATIVE_FFI_MAP_MODE_CONTINUOUS: Renders whenever the map changes.
  * @MAPLIBRE_NATIVE_FFI_MAP_MODE_STATIC: Renders only when
- *   `mln_map_request_still_image()()` asks for an image.
+ *   `mln_map_request_still_image()` asks for an image.
  * @MAPLIBRE_NATIVE_FFI_MAP_MODE_TILE: Renders still images of single tiles, as
  *   `MAPLIBRE_NATIVE_FFI_MAP_MODE_STATIC` does.
  *
@@ -663,7 +663,7 @@ GType maplibre_native_ffi_open_gl_context_provider_flag_get_type(
  *   objects that it couldn't destroy safely. They stay allocated until the
  *   process exits.
  *
- * What `mln_render_session_abandon()()` did with a session's graphics objects.
+ * What `mln_render_session_abandon()` did with a session's graphics objects.
  *
  * See `mln_render_abandon_disposition` in the
  * [C API
@@ -708,7 +708,7 @@ GType maplibre_native_ffi_render_backend_flag_get_type(void) G_GNUC_CONST;
  * MaplibreNativeFfiRenderDriverKind:
  * @MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER: A library thread.
  * @MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD: Your thread, when
- *   it calls `mln_render_session_service_driver_work()()`.
+ *   it calls `mln_render_session_service_driver_work()`.
  *
  * The thread that runs a render session's graphics work.
  *
@@ -753,12 +753,12 @@ GType maplibre_native_ffi_render_mode_get_type(void) G_GNUC_CONST;
  *   draw.
  * @MAPLIBRE_NATIVE_FFI_RENDER_RESULT_TARGET_NOT_READY: The target couldn't take
  *   a frame, such as while a window is hidden or destroyed, or after
- *   `mln_render_session_release_target()()`. Demand a frame again later.
+ *   `mln_render_session_release_target()`. Demand a frame again later.
  * @MAPLIBRE_NATIVE_FFI_RENDER_RESULT_SUPERSEDED: A later demand with the same
  *   flags replaced this one.
  * @MAPLIBRE_NATIVE_FFI_RENDER_RESULT_FAILED: The session failed, and
- *   `mln_render_session_get_failure()()` reports why. Once
- *   `mln_render_session_release()()` completes, you can attach a new session.
+ *   `mln_render_session_get_failure()` reports why. Once
+ *   `mln_render_session_release()` completes, you can attach a new session.
  *
  * How a frame demand finished.
  *
@@ -781,9 +781,9 @@ GType maplibre_native_ffi_render_result_get_type(void) G_GNUC_CONST;
 /**
  * MaplibreNativeFfiRenderSessionCapabilityFlag:
  * @MAPLIBRE_NATIVE_FFI_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION:
- *   `mln_render_session_acquire_frame()()` can take the frames it renders.
+ *   `mln_render_session_acquire_frame()` can take the frames it renders.
  * @MAPLIBRE_NATIVE_FFI_RENDER_SESSION_CAPABILITY_READBACK:
- *   `mln_render_session_read_texture()()` can copy its texture to memory.
+ *   `mln_render_session_read_texture()` can copy its texture to memory.
  * @MAPLIBRE_NATIVE_FFI_RENDER_SESSION_CAPABILITY_PRESENTATION: It shows frames
  *   on a surface.
  *
@@ -1176,7 +1176,7 @@ GType maplibre_native_ffi_runtime_event_source_type_get_type(void) G_GNUC_CONST;
  * `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_LOADING_FINISHED`,
  * `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_IDLE`, and the render frame and render
  * map events. Offline region events come only for the regions and types that
- * `maplibre_native_ffi_runtime_set_offline_region_observed()()` selects.
+ * `maplibre_native_ffi_runtime_set_offline_region_observed()` selects.
  *
  * See `mln_runtime_event_type` in the
  * [C API

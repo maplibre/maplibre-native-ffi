@@ -9,7 +9,7 @@ G_BEGIN_DECLS
 /**
  * MaplibreNativeFfiRuntimeOptions:
  *
- * Options for `maplibre_native_ffi_runtime_create()()`.
+ * Options for `maplibre_native_ffi_runtime_create()`.
  *
  * See `mln_runtime_options` in the
  * [C API

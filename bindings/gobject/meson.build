@@ -47,6 +47,9 @@ library = shared_library(
   'src/maplibre-native-ffi-values.c',
   dependencies: [gio, native],
   soversion: api_version,
+  # The C library sits beside this one, so it loads from there wherever the
+  # prefix moves, as the C library's own dependencies do.
+  install_rpath: host_machine.system() == 'darwin' ? '@loader_path' : '$ORIGIN',
   install: true,
 )
 install_headers(headers, subdir: package)
