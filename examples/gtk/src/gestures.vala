@@ -9,7 +9,16 @@ namespace Example {
 	public class Gestures : Object {
 		public signal void delta (CameraDelta delta);
 
+		// A Vala closure that uses a local holds the instance, which would
+		// keep the gestures, and the view, alive from the handlers of the
+		// controllers that the widget keeps. Handlers that use only fields
+		// hold the instance weakly.
 		private unowned Gtk.Widget widget;
+		private Gtk.GestureDrag drag;
+		private Gtk.GestureZoom zoom;
+		private Gtk.GestureRotate rotate;
+		private Gtk.EventControllerScroll scroll;
+		private Gtk.GestureClick click;
 		private double previous_x;
 		private double previous_y;
 		private bool rotating;
@@ -21,10 +30,10 @@ namespace Example {
 		public Gestures (Gtk.Widget widget) {
 			this.widget = widget;
 
-			var drag = new Gtk.GestureDrag ();
+			drag = new Gtk.GestureDrag ();
 			drag.button = 0;
 			drag.drag_begin.connect ((x, y) => {
-				widget.grab_focus ();
+				this.widget.grab_focus ();
 				previous_x = 0;
 				previous_y = 0;
 				var state = drag.get_current_event_state ();
@@ -52,7 +61,7 @@ namespace Example {
 
 			// The span between two touches scales and turns about their
 			// midpoint.
-			var zoom = new Gtk.GestureZoom ();
+			zoom = new Gtk.GestureZoom ();
 			zoom.begin.connect (() => {
 				previous_scale = 1;
 				apply (phase (GesturePhase.BEGIN));
@@ -67,7 +76,7 @@ namespace Example {
 			zoom.end.connect (() => apply (phase (GesturePhase.END)));
 			widget.add_controller (zoom);
 
-			var rotate = new Gtk.GestureRotate ();
+			rotate = new Gtk.GestureRotate ();
 			rotate.begin.connect (() => previous_angle = 0);
 			rotate.angle_changed.connect ((angle) => {
 				var turn = (angle - previous_angle) * 180 / Math.PI;
@@ -87,7 +96,7 @@ namespace Example {
 			});
 			widget.add_controller (motion);
 
-			var scroll = new Gtk.EventControllerScroll (
+			scroll = new Gtk.EventControllerScroll (
 				Gtk.EventControllerScrollFlags.BOTH_AXES
 			);
 			scroll.scroll_begin.connect (() => apply (phase (GesturePhase.BEGIN)));
@@ -108,7 +117,7 @@ namespace Example {
 			});
 			widget.add_controller (scroll);
 
-			var click = new Gtk.GestureClick ();
+			click = new Gtk.GestureClick ();
 			click.pressed.connect ((presses, x, y) => {
 				if (presses != 2) {
 					return;

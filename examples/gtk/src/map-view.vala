@@ -261,10 +261,12 @@ namespace Example {
 		private async void apply_changes () throws GLib.Error {
 			if (!started) {
 				yield release_session ();
-				maplibre_map?.dispose ();
-				maplibre_map = null;
-				runtime?.dispose ();
+				yield release_map ();
+				var retired = runtime;
 				runtime = null;
+				if (retired != null) {
+					yield retired.release_async ();
+				}
 				return;
 			}
 			// Without a display there is nothing to import frames into. This
@@ -283,8 +285,7 @@ namespace Example {
 			if (maplibre_map != null && map_scale_factor != surface_scale) {
 				camera = maplibre_map.get_snapshot ().view.camera.to_options ();
 				yield release_session ();
-				maplibre_map.dispose ();
-				maplibre_map = null;
+				yield release_map ();
 			}
 
 			if (maplibre_map == null) {
@@ -327,14 +328,21 @@ namespace Example {
 
 		private void start_runtime () throws GLib.Error {
 			runtime = new Runtime.create (null);
-			var self = WeakRef (this);
+			runtime.set_event_handler_async.begin (event_handler (this));
+		}
+
+		// A Vala closure in an instance method holds the instance, so the
+		// callbacks that the library keeps are made in static methods, where
+		// a weak reference is all they hold.
+		private static RuntimeEventHandler event_handler (MapView view) {
+			var self = WeakRef (view);
 			var handler = new RuntimeEventHandler ();
 			// The handler runs on this thread's main context.
 			handler.set_callback ((events) => {
-				var view = self.get () as MapView;
-				view?.handle_events (events);
+				var target = self.get () as MapView;
+				target?.handle_events (events);
 			});
-			runtime.set_event_handler_async.begin (handler);
+			return handler;
 		}
 
 		private void handle_events (GenericArray<RuntimeEvent> events) {
@@ -366,27 +374,14 @@ namespace Example {
 			descriptor.set_buffer_count (3);
 			descriptor.set_formats (dma_buf_formats (display));
 
-			// The wakes run on this thread's main context. A wake of a
-			// session that the widget released finds no session to serve.
 			var number = ++session_number;
-			var self = WeakRef (this);
 			var options = new RenderSessionAttachOptions ();
 			options.set_driver (RenderDriverKind.CORE_WORKER);
 			// GdkDmabufTextureBuilder takes no sync file, so each frame
 			// finishes rendering before the session hands it over.
 			options.set_producer_sync_kinds (GpuSyncKindFlag.CPU_COMPLETE);
-			options.set_redraw_wake (wake (() => {
-				var view = self.get () as MapView;
-				if (view != null && view.session_number == number) {
-					view.on_redraw_wake ();
-				}
-			}));
-			options.set_frame_wake (wake (() => {
-				var view = self.get () as MapView;
-				if (view != null && view.session_number == number) {
-					view.on_frame_wake ();
-				}
-			}));
+			options.set_redraw_wake (session_wake (this, number, false));
+			options.set_frame_wake (session_wake (this, number, true));
 
 			session = maplibre_map.attach_dma_buf_ring (descriptor, null, options);
 			session_size = size;
@@ -413,9 +408,22 @@ namespace Example {
 			return result;
 		}
 
-		private static Wake wake (owned WakeCallback callback) {
+		// The wakes run on this thread's main context. A wake of a session
+		// that the widget released finds no session to serve.
+		private static Wake session_wake (MapView view, uint number, bool frame) {
+			var self = WeakRef (view);
 			var wake = new Wake ();
-			wake.set_callback ((owned) callback);
+			wake.set_callback (() => {
+				var target = self.get () as MapView;
+				if (target == null || target.session_number != number) {
+					return;
+				}
+				if (frame) {
+					target.on_frame_wake ();
+				} else {
+					target.on_redraw_wake ();
+				}
+			});
 			return wake;
 		}
 
@@ -454,6 +462,14 @@ namespace Example {
 			demands_in_flight = 0;
 			release_held_frames ();
 			yield retired.release_async ();
+		}
+
+		private async void release_map () throws GLib.Error {
+			var retired = maplibre_map;
+			maplibre_map = null;
+			if (retired != null) {
+				yield retired.release_async ();
+			}
 		}
 
 		private void release_held_frames () {
