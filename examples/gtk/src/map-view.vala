@@ -20,6 +20,9 @@ namespace Example {
 	[CCode (cheader_filename = "dma-buf.h", cname = "example_dma_buf_export_sync_file")]
 	extern int dma_buf_export_sync_file (int fd);
 
+	[CCode (cheader_filename = "dma-buf.h", cname = "example_dma_buf_wait")]
+	extern void dma_buf_wait (int fd);
+
 	CameraOptions initial_camera () {
 		var camera = new CameraOptions ();
 		camera.set_center ({ latitude: 48.8584, longitude: 2.2945 });
@@ -56,6 +59,12 @@ namespace Example {
 			var file = sync_file && fds.length > 0 ? dma_buf_export_sync_file (fds[0]) : -1;
 			if (file >= 0) {
 				sync = { kind: GpuSyncKind.SYNC_FD, handle: file };
+			} else {
+				// Without a sync file, the readers finish before the frame
+				// goes back.
+				foreach (var fd in fds) {
+					dma_buf_wait (fd);
+				}
 			}
 			try {
 				frame.release (sync);
