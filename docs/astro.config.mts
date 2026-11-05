@@ -15,7 +15,6 @@ import {
   defaultLanguage,
   languageStorageKey,
   languages,
-  libraries,
 } from "./src/languages";
 
 const site = "https://maplibre.org";
@@ -34,7 +33,7 @@ const languageRules = [
   .join("\n");
 
 // Gives each element tagged with a language its logo, which the sidebar shows.
-const logoRules = [...languages, ...libraries]
+const logoRules = languages
   .map(({ id, logo }) => `[data-logo="${id}"] { --logo: url("${logo}"); }`)
   .join("\n");
 

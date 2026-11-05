@@ -8,89 +8,88 @@ PyGObject, Vala, and every other GObject consumer sees.
 A `GError` domain carries `mln_status`, whose codes are the raw status values,
 so a status that these headers do not name survives. Each enum is a `GEnum`
 and each bitmask a `GFlags`, whose values the C compiler checks against the C
-constants. A handle is a final `GObject` class. A handle whose release waits
-has `release_async` and `release_finish`, and its object's `dispose` calls the
-C dispose unless the handle was released. An option record that holds text is
-an opaque boxed type with accessors, since introspection can't write its
-members.
+constants. Each value is a boxed type, as `gobject_values` describes.
 
-The emitter generates the declarations in `SLICE` and leaves out the rest of
-the API until it covers every shape; until then the generator-wide coverage
-checks leave it out too. A declaration of the slice that it cannot lower fails
-generation.
+A handle is a final `GObject` class. A handle whose release waits has
+`release_async` and `release_finish`, and its object's `dispose` calls the C
+dispose unless the handle was released. Any other handle's object releases it
+when disposed, unless its `release` already did. A handle that a call creates
+at once and readies later, such as a map, has `ready_async` and `ready_finish`.
+
+Each command, query, and operation is an `_async` and `_finish` pair, which
+finishes on the thread-default main context of the thread that started it. A
+command started without a callback passes no completion. Every other call is
+synchronous, and fails with a `GError`.
+
+A function that serves only some of the library's platforms compiles only for
+them.
 """
 
 from __future__ import annotations
 
-import re
 import textwrap
-from dataclasses import dataclass, field, replace
 
 from tools.bindgen import async_hosts, docs
-from tools.bindgen.compiler import compile_api
+from tools.bindgen.compiler import compile_api, served
 from tools.bindgen.model import Api, Lowered, Unsupported
-from tools.bindgen.names import pascal
-from tools.bindgen.protocol import STATUS
+from tools.bindgen.protocol import (
+    COMPLETION_RESULT,
+    RUNTIME_EVENT_SOURCE,
+    RUNTIME_EVENT_SOURCE_PREFIX,
+    STATUS,
+    is_completion,
+)
 from tools.bindgen.semantic import (
     BoundApi,
     DisposeSupport,
     FieldPlan,
     HandlePlan,
     OperationPlan,
+    ParameterPlan,
     ValuePlan,
     enum_member_prefix,
-    public_stem,
 )
 
-DIRECTORY = "bindings/gobject"
-SOURCE = f"{DIRECTORY}/src"
-NAMESPACE = "MaplibreNativeFfi"
-SYMBOL = "maplibre_native_ffi"
-MACRO = "MAPLIBRE_NATIVE_FFI"
+from . import gobject_values
+from .gobject_values import (
+    CALL,
+    HEADER,
+    MACRO,
+    NAMESPACE,
+    SOURCE,
+    SYMBOL,
+    THREADS,
+    Function,
+    Values,
+    accessor,
+    cast_macro,
+    check_macro,
+    comment,
+    constant_name,
+    define_name,
+    fail_value,
+    guarded,
+    paragraph,
+    symbol_name,
+    type_macro,
+    type_name,
+    without_const,
+    wrap,
+)
+
+DIRECTORY = gobject_values.DIRECTORY
 # The library builds for the platforms whose GTK it serves.
 TARGETS = frozenset({"linux", "macos"})
-HEADER = "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-# The handles whose operations the library generates so far.
-SLICE = ("mln_runtime",)
-THREADS = "Runs on the thread-default main context of the thread that started the call."
+PLATFORM_CONDITIONS = {"linux": "defined(__linux__)", "macos": "defined(__APPLE__)"}
 GINT_MIN, GINT_MAX, GUINT_MAX = -(2**31), 2**31 - 1, 2**32 - 1
-
-
-def type_name(native: str) -> str:
-    """The GObject type of a C declaration: `MaplibreNativeFfiRuntime`."""
-    if native == STATUS:
-        return f"{NAMESPACE}Error"
-    return NAMESPACE + pascal(public_stem(native))
-
-
-def symbol_name(native: str) -> str:
-    """The function prefix of a C declaration's type: `maplibre_native_ffi_runtime`."""
-    if native == STATUS:
-        return f"{SYMBOL}_error"
-    return f"{SYMBOL}_{public_stem(native)}"
-
-
-def type_macro(native: str) -> str:
-    """The macro that names a type's GType: `MAPLIBRE_NATIVE_FFI_TYPE_RUNTIME`."""
-    return f"{MACRO}_TYPE_{symbol_name(native).removeprefix(SYMBOL + '_').upper()}"
-
-
-def cast_macro(native: str) -> str:
-    """The macro that casts to a class: `MAPLIBRE_NATIVE_FFI_RUNTIME`."""
-    return symbol_name(native).upper()
-
-
-def check_macro(native: str) -> str:
-    """The macro that checks an instance's class: `MAPLIBRE_NATIVE_FFI_IS_RUNTIME`."""
-    return f"{MACRO}_IS_" + cast_macro(native).removeprefix(f"{MACRO}_")
-
-
-def constant_name(value: ValuePlan, member: str) -> str:
-    """The GObject constant of a C enum constant. A status's constant is a code
-    of the error domain: `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT`."""
-    if value.native == STATUS:
-        return f"{MACRO}_ERROR_" + member.removeprefix("MLN_STATUS_")
-    return f"{MACRO}_" + member.removeprefix("MLN_")
+# A returned GPtrArray frees its items when its last reference goes. GJS and
+# PyGObject free each item of a `(transfer full)` array before they free the
+# array, which would free the items twice, so the caller receives the array as
+# a container whose items it owns through the array.
+ARRAY_TRANSFER = "(transfer container)"
+# The names that a generated function's own parameters take, which a C
+# parameter of the same name gives up.
+RESERVED = frozenset({"self", "callback", "user_data", "error", "result"})
 
 
 def nick(value: ValuePlan, member: str) -> str:
@@ -120,69 +119,77 @@ def receiver_type(plan: OperationPlan) -> str | None:
 
 
 def method_name(plan: OperationPlan) -> str:
-    """A handle's method, or the factory that creates one, by its C member."""
-    return f"{symbol_name(receiver_type(plan) or plan.factory or '')}_{plan.member}"
+    """A handle's method, the factory that creates one, or a function."""
+    owner = receiver_type(plan) or plan.factory
+    if owner is not None:
+        return f"{symbol_name(owner)}_{plan.member}"
+    return f"{SYMBOL}_{plan.member}"
 
 
-@dataclass
-class Function:
-    """One generated function: its declaration's documentation and annotated
-    prototype for the header, and its body for the source."""
-
-    name: str
-    returns: str
-    parameters: list[tuple[str, str]]
-    body: str
-    doc: list[str] = field(default_factory=list)
-    annotations: dict[str, str] = field(default_factory=dict)
-    returns_doc: str = ""
-    identifier_annotation: str = ""
-
-    def prototype(self) -> str:
-        parameters = ", ".join(f"{t} {n}" for t, n in self.parameters) or "void"
-        return f"{self.returns} {self.name}({parameters})"
-
-    def comment(self) -> str:
-        head = f"{self.name}:"
-        if self.identifier_annotation:
-            head += f" {self.identifier_annotation}"
-        lines = [head]
-        for _, parameter in self.parameters:
-            if parameter in self.annotations:
-                lines.append(f"@{parameter}: {self.annotations[parameter]}")
-        lines += ["", *(self.doc or [f"Calls `{self.name}`."])]
-        if self.returns_doc:
-            lines += ["", f"Returns: {self.returns_doc}"]
-        return comment(lines)
+def guard(plan: OperationPlan) -> str | None:
+    """The preprocessor condition of an operation that serves only some of
+    the library's platforms."""
+    platforms = served(plan.function, TARGETS)
+    if platforms is None:
+        return None
+    return " || ".join(PLATFORM_CONDITIONS[p] for p in sorted(platforms))
 
 
-# Between a slash and an asterisk, which together open or close a C comment.
-COMMENT_MARK = re.compile(r"(?<=/)(?=\*)|(?<=\*)(?=/)")
+def parameter_name(name: str) -> str:
+    return f"{name}_value" if name in RESERVED else name
 
 
-def comment(lines: list[str]) -> str:
-    """A gtk-doc comment, which must not open or close a comment inside."""
-    body = "".join(
-        f" * {COMMENT_MARK.sub(' ', line)}".rstrip() + "\n" for line in lines
-    )
-    return f"/**\n{body} */\n"
+class Call:
+    """One operation's C call as it is built: the public parameters, the
+    statements that convert them, and the native arguments by C name."""
+
+    def __init__(self, plan: OperationPlan) -> None:
+        self.plan = plan
+        self.parameters: list[tuple[str, str]] = []
+        self.annotations: dict[str, str] = {}
+        self.checks = ""
+        self.setup = ""
+        self.arguments: dict[str, str] = {}
+        self.uses_call = False
+
+    def scope_setup(self) -> str:
+        """The setup, which passes no scope to conversions when the call has
+        none."""
+        if self.uses_call:
+            return self.setup
+        return self.setup.replace(f"&{CALL}", "NULL")
+
+    def native_call(
+        self, extra: dict[str, str] | None = None, diagnostic: str = "&diagnostic_"
+    ) -> str:
+        arguments = {**self.arguments, **(extra or {})}
+        names = [p.name for p in self.plan.function.parameters]
+        missing = [n for n in names if n not in arguments]
+        if missing:
+            raise Unsupported(
+                f"GObject: {self.plan.name}: no argument for {', '.join(missing)}"
+            )
+        args = [arguments[n] for n in names]
+        if self.plan.function.diagnostic:
+            args.append(diagnostic)
+        return f"{self.plan.name}({', '.join(args)})"
 
 
 class Emitter:
     def __init__(self, bound: BoundApi) -> None:
         self.bound = bound
         self.symbol = symbols(bound)
+        self.values = Values(bound, self.symbol)
         self.generated: list[str] = []
-
-    # Documentation.
+        self.support: list[str] = []
+        self.unsupported: dict[str, str] = {}
+        # The functions of each handle, and of the module, by owner.
+        self.functions: dict[str | None, list[Function]] = {}
+        self.statics: list[str] = []
+        self.handle_names: list[str] = []
 
     def doc_lines(self, native: str, extra: tuple[str, ...] = ()) -> list[str]:
-        doc = self.bound.doc(native)
-        if doc is not None and extra:
-            doc = replace(doc, notes=doc.notes + extra)
-        return docs.markdown_lines(
-            doc, docs.WIDTH - 3, self.symbol, errors="It fails with these errors:"
-        )
+        return self.values.doc_lines(native, extra)
 
     # Enums and flags.
 
@@ -195,10 +202,10 @@ class Emitter:
         for value in values:
             header.append(self.enum_declaration(value))
             source.append(self.enum_definition(value))
-        guard = f"{MACRO}_ENUMS_H"
+        guard_ = f"{MACRO}_ENUMS_H"
         return {
             f"{SOURCE}/maplibre-native-ffi-enums.h": HEADER
-            + f"#ifndef {guard}\n#define {guard}\n\n"
+            + f"#ifndef {guard_}\n#define {guard_}\n\n"
             + "#include <glib-object.h>\n\nG_BEGIN_DECLS\n\n"
             + "\n".join(header)
             + "\nG_END_DECLS\n\n#endif\n",
@@ -208,9 +215,17 @@ class Emitter:
             + "\n".join(source),
         }
 
+    def fits(self, value: ValuePlan) -> bool:
+        """Whether every constant of an enum fits a `GEnum`, or of a bitmask
+        a `GFlags`."""
+        low, high = (0, GUINT_MAX) if flags(value) else (GINT_MIN, GINT_MAX)
+        return all(low <= number <= high for _, number in enum_values(value))
+
     def enum_declaration(self, value: ValuePlan) -> str:
         name = type_name(value.native)
         members = enum_values(value)
+        if not self.fits(value):
+            return self.wide_enum_declaration(value)
         out = ""
         if value.native == STATUS:
             out += comment(
@@ -230,37 +245,42 @@ class Emitter:
             out += f"GQuark {SYMBOL}_error_quark(void);\n\n"
         lines = [f"{name}:"]
         for member, _ in members:
-            member_doc = self.bound.doc(member)
-            text = ""
-            if member_doc is not None:
-                text = " ".join(docs.markdown_lines(member_doc, 1000, self.symbol)[:1])
-            lines += textwrap.wrap(
-                f"@{constant_name(value, member)}: {text}".rstrip(),
-                docs.WIDTH - 3,
-                subsequent_indent="  ",
-                break_long_words=False,
-                break_on_hyphens=False,
-            )
+            text = self.values.summary(member)
+            lines += wrap(f"@{constant_name(value, member)}: {text}".rstrip())
         lines += ["", *self.doc_lines(value.native)]
         out += comment(lines)
         out += "typedef enum {\n"
         for member, number in members:
-            if flags(value):
-                if not 0 <= number <= GUINT_MAX:
-                    raise Unsupported(
-                        f"GObject: {value.native}: {member} does not fit GFlags"
-                    )
-                literal = f"0x{number:08x}u" if number > GINT_MAX else str(number)
-            else:
-                if not GINT_MIN <= number <= GINT_MAX:
-                    raise Unsupported(
-                        f"GObject: {value.native}: {member} does not fit GEnum"
-                    )
-                literal = str(number)
+            literal = f"0x{number:08x}u" if number > GINT_MAX else str(number)
             out += f"  {constant_name(value, member)} = {literal},\n"
         out += f"}} {name};\n\n"
         out += f"GType {symbol_name(value.native)}_get_type(void) G_GNUC_CONST;\n"
         out += f"#define {type_macro(value.native)} ({symbol_name(value.native)}_get_type())\n"
+        return out
+
+    def wide_enum_declaration(self, value: ValuePlan) -> str:
+        """An enum whose constants a `GEnum` or `GFlags` can't hold: an
+        integer type of the enum's width, and a constant for each value."""
+        name = type_name(value.native)
+        carrier = self.values.gtype(
+            ValuePlan(
+                kind="scalar",
+                native=value.scalar_carrier or "uint64_t",
+                ctype=value.enum_underlying or value.ctype,
+                scalar_carrier=value.scalar_carrier,
+            )
+        )
+        out = comment([f"{name}:", "", *self.doc_lines(value.native)])
+        out += f"typedef {carrier} {name};\n\n"
+        for member, number in enum_values(value):
+            constant = constant_name(value, member)
+            literal = (
+                f"G_GUINT64_CONSTANT({number})"
+                if number >= 0
+                else f"G_GINT64_CONSTANT({number})"
+            )
+            out += comment([f"{constant}:", "", *self.doc_lines(member)])
+            out += f"#define {constant} (({name}){literal})\n\n"
         return out
 
     def enum_definition(self, value: ValuePlan) -> str:
@@ -278,6 +298,8 @@ class Emitter:
             f"G_STATIC_ASSERT((gint64){constant_name(value, member)} == (gint64){member});\n"
             for member, _ in members
         )
+        if not self.fits(value):
+            return out
         kind = "FLAGS" if flags(value) else "ENUM"
         entries = ",\n".join(
             f'  G_DEFINE_ENUM_VALUE({constant_name(value, member)}, "{nick(value, member)}")'
@@ -286,368 +308,693 @@ class Emitter:
         out += f"\nG_DEFINE_{kind}_TYPE(\n  {name}, {symbol_name(value.native)},\n{entries}\n)\n"
         return out
 
-    # Records.
+    # Constants.
 
-    def record_fields(self, value: ValuePlan) -> list[FieldPlan]:
-        fields = [f for f in value.fields if f.role != "size"]
-        for member in fields:
-            if not (
-                member.role == "value"
-                and member.value.kind == "buffer"
-                and member.value.encoding == "utf8"
-            ):
-                raise Unsupported(
-                    f"GObject: {value.native}.{member.name}: only text members"
-                    " are supported yet"
+    def constants(self) -> tuple[str, str]:
+        header, source = "", ""
+        for constant in self.bound.public_constants:
+            name = define_name(constant)
+            if constant.value > GINT_MAX or constant.value < GINT_MIN:
+                literal = (
+                    f"G_GUINT64_CONSTANT({constant.value})"
+                    if constant.value >= 0
+                    else f"G_GINT64_CONSTANT({constant.value})"
                 )
-        return fields
-
-    def records(self, natives: list[str]) -> dict[str, str]:
-        header, source = [], []
-        for native in sorted(natives):
-            value = self.bound.values[native]
-            h, s = self.record(value)
-            header.append(h)
-            source.append(s)
-        guard = f"{MACRO}_VALUES_H"
-        return {
-            f"{SOURCE}/maplibre-native-ffi-values.h": HEADER
-            + f"#ifndef {guard}\n#define {guard}\n\n"
-            + "#include <glib-object.h>\n\nG_BEGIN_DECLS\n\n"
-            + "\n".join(header)
-            + "\nG_END_DECLS\n\n#endif\n",
-            f"{SOURCE}/maplibre-native-ffi-values.c": HEADER
-            + '#include "maplibre-native-ffi-values.h"\n\n'
-            + "#include <string.h>\n\n"
-            + '#include "maplibre-native-ffi-values-private.h"\n\n'
-            + "\n".join(source),
-            f"{SOURCE}/maplibre-native-ffi-values-private.h": HEADER
-            + f"#ifndef {MACRO}_VALUES_PRIVATE_H\n#define {MACRO}_VALUES_PRIVATE_H\n\n"
-            + "#include <maplibre_native_c.h>\n\n"
-            + '#include "maplibre-native-ffi-values.h"\n\n'
-            + "".join(
-                f"G_GNUC_INTERNAL void {symbol_name(n)}_to_native(\n"
-                f"  const {type_name(n)}* self, {n}* out\n);\n"
-                for n in sorted(natives)
-            )
-            + "\n#endif\n",
-        }
-
-    def record(self, value: ValuePlan) -> tuple[str, str]:
-        name, prefix = type_name(value.native), symbol_name(value.native)
-        fields = self.record_fields(value)
-        functions = [
-            Function(
-                f"{prefix}_new",
-                f"{name}*",
-                [],
-                f"  {name}* self = g_new0({name}, 1);\n"
-                + "".join(f'  self->{f.name} = g_strdup("");\n' for f in fields)
-                + "  return self;\n",
-                doc=[f"Creates a `{name}` that selects every default."],
-                identifier_annotation="(constructor)",
-                returns_doc="(transfer full): the new value",
-            ),
-            Function(
-                f"{prefix}_copy",
-                f"{name}*",
-                [(f"const {name}*", "self")],
-                f"  g_return_val_if_fail(self != NULL, NULL);\n"
-                f"  {name}* copy = g_new0({name}, 1);\n"
-                + "".join(
-                    f"  copy->{f.name} = g_strdup(self->{f.name});\n" for f in fields
-                )
-                + "  return copy;\n",
-                doc=["Copies the value."],
-                returns_doc="(transfer full): the copy",
-            ),
-            Function(
-                f"{prefix}_free",
-                "void",
-                [(f"{name}*", "self")],
-                "  if (self == NULL) return;\n"
-                + "".join(f"  g_free(self->{f.name});\n" for f in fields)
-                + "  g_free(self);\n",
-                doc=["Frees the value."],
-                annotations={"self": "(transfer full) (nullable): the value"},
-            ),
-        ]
-        for member in fields:
-            documented = f"{value.native}.{member.name}"
-            functions.append(
-                Function(
-                    f"{prefix}_get_{member.name}",
-                    "const char*",
-                    [(f"const {name}*", "self")],
-                    f"  g_return_val_if_fail(self != NULL, NULL);\n"
-                    f"  return self->{member.name};\n",
-                    doc=self.doc_lines(documented) or [f"Reads `{member.name}`."],
-                    returns_doc="(transfer none): the text",
-                )
-            )
-            functions.append(
-                Function(
-                    f"{prefix}_set_{member.name}",
-                    "void",
-                    [(f"{name}*", "self"), ("const char*", "value")],
-                    f"  g_return_if_fail(self != NULL);\n"
-                    f"  g_return_if_fail(value != NULL);\n"
-                    f"  char* previous = self->{member.name};\n"
-                    f"  self->{member.name} = g_strdup(value);\n"
-                    f"  g_free(previous);\n",
-                    doc=self.doc_lines(documented) or [f"Sets `{member.name}`."],
-                    annotations={"value": "the UTF-8 text"},
-                )
-            )
-        header = comment([f"{name}:", "", *self.doc_lines(value.native)])
-        header += f"typedef struct _{name} {name};\n\n"
-        header += f"GType {prefix}_get_type(void) G_GNUC_CONST;\n"
-        header += f"#define {type_macro(value.native)} ({prefix}_get_type())\n\n"
-        header += "".join(f.comment() + f.prototype() + ";\n\n" for f in functions)
-        source = f"struct _{name} {{\n"
-        source += "".join(f"  char* {f.name};\n" for f in fields)
-        source += "};\n\n"
-        source += (
-            f"G_DEFINE_BOXED_TYPE({name}, {prefix}, {prefix}_copy, {prefix}_free)\n\n"
-        )
-        source += "".join(f"{f.prototype()} {{\n{f.body}}}\n\n" for f in functions)
-        source += (
-            f"void {prefix}_to_native(const {name}* self, {value.native}* out) {{\n"
-        )
-        source += "  memset(out, 0, sizeof *out);\n  out->size = sizeof *out;\n"
-        for member in fields:
-            source += (
-                f"  out->{member.name}.data = self->{member.name};\n"
-                f"  out->{member.name}.size = strlen(self->{member.name});\n"
-            )
-        source += "}\n"
+            else:
+                literal = str(constant.value)
+            header += comment([f"{name}:", "", *self.doc_lines(constant.name)])
+            header += f"#define {name} {literal}\n\n"
+            source += f"G_STATIC_ASSERT({name} == {constant.name});\n"
         return header, source
 
-    # Handles.
+    # Operations.
 
-    def handles(self) -> tuple[dict[str, str], set[str]]:
-        header, source, records = [], [], set()
-        for native in SLICE:
-            handle = self.bound.handles.get(native)
-            if handle is None:
+    def lower_operations(self) -> None:
+        registrations = []
+        for plan in self.bound.operations:
+            # A call on a callback response has no caller unless a host
+            # callback receives the response.
+            if plan.scoped_receiver:
                 continue
-            h, s, reached = self.handle(handle)
-            header.append(h)
-            source.append(s)
-            records |= reached
-        guard = f"{MACRO}_HANDLES_H"
-        files = {
-            f"{SOURCE}/maplibre-native-ffi-handles.h": HEADER
-            + f"#ifndef {guard}\n#define {guard}\n\n"
-            + "#include <gio/gio.h>\n\n"
-            + '#include "maplibre-native-ffi-values.h"\n\n'
-            + "G_BEGIN_DECLS\n\n"
-            + "\n".join(header)
-            + "G_END_DECLS\n\n#endif\n",
-            f"{SOURCE}/maplibre-native-ffi-handles.c": HEADER
-            + '#include "maplibre-native-ffi-handles.h"\n\n'
-            + "#include <maplibre_native_c.h>\n\n"
-            + '#include "maplibre-native-ffi-private.h"\n'
-            + '#include "maplibre-native-ffi-values-private.h"\n\n'
-            + "\n".join(source),
+            try:
+                for parameter in (*plan.inputs, *plan.outputs):
+                    self.values.use(parameter.value)
+                self.values.use(plan.result)
+            except Unsupported as error:
+                self.unsupported[plan.name] = f"{plan.function.location}: {error}"
+        for value in self.values.used.values():
+            if value.registration:
+                registrations.append(value)
+        skipped = async_hosts.rule_answered_operations(self.bound, registrations)
+        for plan in self.bound.operations:
+            if plan.name in skipped:
+                continue
+            try:
+                self.lower(plan)
+            except Unsupported as error:
+                self.unsupported[plan.name] = f"{plan.function.location}: {error}"
+
+    def owner(self, plan: OperationPlan) -> str | None:
+        return receiver_type(plan) or plan.factory
+
+    def add(self, plan: OperationPlan, *functions: Function) -> None:
+        condition = guard(plan)
+        for function in functions:
+            function.guard = condition
+        self.functions.setdefault(self.owner(plan), []).extend(functions)
+        self.generated.append(plan.name)
+
+    def lower(self, plan: OperationPlan) -> None:
+        if plan.scoped_receiver:
+            raise Unsupported("a call on a callback response")
+        if isinstance(plan.support, DisposeSupport):
+            self.add(plan, self.dispose(plan.support.handle, plan))
+            return
+        if plan.support is not None:
+            self.support.append(plan.name)
+            return
+        match plan.shape:
+            case "discard":
+                self.add(plan, self.discard(plan))
+            case "release_async":
+                self.add(plan, *self.release_async(plan))
+            case "release":
+                self.add(plan, self.release(plan))
+            case "attach":
+                self.add(plan, self.attach(plan))
+            case "command" | "query" | "run":
+                self.add(plan, *self.asynchronous(plan))
+            case "drain":
+                self.add(plan, self.drain(plan))
+            case "view":
+                self.add(plan, self.immediate(plan, view=True))
+            case _:
+                self.add(plan, self.immediate(plan))
+
+    # Inputs.
+
+    def receiver(self, call: Call, fail: str) -> None:
+        plan = call.plan
+        owner = receiver_type(plan)
+        if owner is None:
+            return
+        handle = self.bound.handles[owner]
+        call.parameters.append((f"{type_name(owner)}*", "self"))
+        call.checks += f"  g_return_val_if_fail({check_macro(owner)}(self), {fail});\n"
+        live = "self->handle"
+        if plan.after_release:
+            live = "(self->handle != MLN_HANDLE_NULL ? self->handle : self->released_handle)"
+        assert plan.receiver is not None
+        call.arguments[plan.receiver] = live
+        del handle
+
+    def inputs(self, call: Call, fail: str) -> None:
+        plan = call.plan
+        sizes = {
+            p.value.length
+            for p in (*plan.inputs, *plan.outputs)
+            if p.value.length and p.value.kind == "buffer"
         }
-        return files, records
-
-    def handle(self, handle: HandlePlan) -> tuple[str, str, set[str]]:
-        native = handle.native
-        name, prefix = type_name(native), symbol_name(native)
-        upper = prefix.removeprefix(SYMBOL + "_").upper()
-        plans = [
-            plan
-            for plan in self.bound.operations
-            if plan.factory == native or receiver_type(plan) == native
-        ]
-        functions: list[Function] = []
-        records: set[str] = set()
-        dispose = None
-        for plan in plans:
-            if isinstance(plan.support, DisposeSupport):
-                dispose = plan
-                functions.append(self.dispose(handle, plan))
-            elif plan.name == handle.release and handle.release_waits:
-                functions += self.release_async(handle, plan)
-            elif plan.factory == native:
-                function, reached = self.factory(handle, plan)
-                functions.append(function)
-                records |= reached
-            else:
-                continue
-            self.generated.append(plan.name)
-        if not handle.release_waits or dispose is None:
-            raise Unsupported(
-                f"GObject: {native}: only a handle whose release waits is supported yet"
-            )
-        header = comment([f"{name}:", "", *self.doc_lines(native)])
-        header += f"#define {type_macro(native)} ({prefix}_get_type())\n"
-        header += (
-            f"G_DECLARE_FINAL_TYPE({name}, {prefix}, {MACRO}, {upper}, GObject)\n\n"
-        )
-        header += "".join(f.comment() + f.prototype() + ";\n\n" for f in functions)
-        source = (
-            f"struct _{name} {{\n  GObject parent_instance;\n  {native} handle;\n}};\n\n"
-            f"G_DEFINE_FINAL_TYPE({name}, {prefix}, G_TYPE_OBJECT)\n\n"
-            # A finalized object that its owner never released still holds
-            # its handle, which the C dispose tears down in any state.
-            f"static void {prefix}_object_dispose(GObject* object) {{\n"
-            f"  {prefix}_dispose({cast_macro(native)}(object));\n"
-            f"  G_OBJECT_CLASS({prefix}_parent_class)->dispose(object);\n}}\n\n"
-            f"static void {prefix}_class_init({name}Class* klass) {{\n"
-            f"  G_OBJECT_CLASS(klass)->dispose = {prefix}_object_dispose;\n}}\n\n"
-            f"static void {prefix}_init({name}* self) {{\n"
-            f"  self->handle = MLN_HANDLE_NULL;\n}}\n\n"
-        )
-        source += "".join(f"{f.prototype()} {{\n{f.body}}}\n\n" for f in functions)
-        return header, source, records
-
-    def factory(
-        self, handle: HandlePlan, plan: OperationPlan
-    ) -> tuple[Function, set[str]]:
-        name = type_name(handle.native)
-        owned = plan.owned_outputs
-        if (
-            plan.execution != "immediate"
-            or plan.completion
-            or len(owned) != 1
-            or len(plan.outputs) != 1
-            or plan.registrations
-        ):
-            raise Unsupported(f"GObject: {plan.name}: this factory's shape")
-        parameters: list[tuple[str, str]] = []
-        annotations: dict[str, str] = {}
-        setup, arguments, records = "", [], set()
+        counted = {
+            p.value.length: p
+            for p in plan.inputs
+            if p.value.kind == "array" and p.value.length
+        }
         for parameter in plan.inputs:
-            value = parameter.value
-            element = value.element
-            if value.kind != "reference" or element is None or element.kind != "record":
-                raise Unsupported(
-                    f"GObject: {plan.name}: {parameter.name} needs a lowering"
-                )
-            records.add(element.native)
-            record = type_name(element.native)
-            parameters.append((f"const {record}*", parameter.name))
-            annotations[parameter.name] = (
-                "(nullable): the options, or %NULL for every default"
-                if value.nullable
-                else "the options"
-            )
-            local = f"native_{parameter.name}"
-            setup += f"  {element.native} {local}_value;\n"
-            setup += f"  const {element.native}* {local} = NULL;\n"
-            guard = ""
+            if parameter.name == plan.receiver and receiver_type(plan):
+                continue
+            if parameter.name in sizes:
+                continue
+            if parameter.name in counted:
+                continue
+            self.input(call, parameter, fail, counted)
+
+    def input(
+        self,
+        call: Call,
+        parameter: ParameterPlan,
+        fail: str,
+        counted: dict[str, ParameterPlan],
+    ) -> None:
+        values = self.values
+        value = parameter.value
+        native = parameter.name
+        name = parameter_name(native)
+        kind = value.kind
+        nullable = " (nullable)" if value.nullable else ""
+        if kind == "handle":
+            assert value.handle is not None
+            call.parameters.append((f"{type_name(value.native)}*", name))
             if value.nullable:
-                guard = f"if ({parameter.name} != NULL) "
+                call.annotations[name] = "(nullable): the handle, or %NULL"
             else:
-                setup += f"  g_return_val_if_fail({parameter.name} != NULL, NULL);\n"
-            setup += (
-                f"  {guard}{{\n"
-                f"    {symbol_name(element.native)}_to_native({parameter.name}, &{local}_value);\n"
-                f"    {local} = &{local}_value;\n  }}\n"
+                call.checks += f"  g_return_val_if_fail({check_macro(value.native)}({name}), {fail});\n"
+            call.arguments[native] = (
+                f"({name} != NULL ? {name}->handle : MLN_HANDLE_NULL)"
             )
-            arguments.append(local)
-        parameters.append(("GError**", "error"))
-        body = (
-            "  g_return_val_if_fail(error == NULL || *error == NULL, NULL);\n"
-            + setup
-            + f"  {handle.native} handle = MLN_HANDLE_NULL;\n"
-            + "  mln_diagnostic diagnostic = {.size = sizeof diagnostic};\n"
-            + f"  mln_status status = {plan.name}({', '.join([*arguments, '&handle', '&diagnostic'])});\n"
-            + f"  if (!{SYMBOL}_check(status, &diagnostic, error)) return NULL;\n"
-            + f"  {name}* self = g_object_new({type_macro(handle.native)}, NULL);\n"
-            + "  self->handle = handle;\n  return self;\n"
+            return
+        if kind in {"scalar", "enum", "native_pointer"}:
+            call.parameters.append((values.gtype(value), name))
+            call.arguments[native] = values.to_c(value, name)
+            return
+        if values.text(value) or values.bytes_(value):
+            text = values.text(value)
+            call.parameters.append(("const char*" if text else "GBytes*", name))
+            call.annotations[name] = (
+                f"{nullable.strip()}: the UTF-8 text".lstrip(": ")
+                if text
+                else f"{nullable.strip()}: the bytes".lstrip(": ")
+            )
+            view = (
+                f"maplibre_native_ffi_text_view({name})"
+                if text
+                else f"maplibre_native_ffi_bytes_view({name})"
+            )
+            if value.buffer_form == "view":
+                call.arguments[native] = view
+            elif value.length is not None:
+                local = f"{name}_view_"
+                call.setup += f"  mln_buffer_view {local} = {view};\n"
+                call.arguments[native] = f"{local}.data"
+                call.arguments[value.length] = f"{local}.size"
+            else:
+                call.arguments[native] = name
+            return
+        if kind == "array":
+            self.array_input(call, parameter, name, counted)
+            return
+        if kind in {"record", "reference"}:
+            record = value.unwrapped
+            if record.kind not in {"record", "union"}:
+                raise Unsupported(f"{native}: a reference to a {record.kind}")
+            prefix = symbol_name(record.native)
+            call.parameters.append((values.record_parameter(record), name))
+            local = f"{name}_native_"
+            call.setup += f"  {record.native} {local};\n"
+            call.uses_call |= values.scoped(record)
+            if value.nullable:
+                call.annotations[name] = "(nullable): the value, or %NULL"
+                if values.is_object(record):
+                    call.checks += f"  g_return_val_if_fail({name} == NULL || {values.record_check(record, name)}, {fail});\n"
+                call.setup += f"  if ({name} != NULL) {prefix}_to_native({name}, &{local}, &{CALL});\n"
+                call.arguments[native] = (
+                    f"({name} != NULL ? &{local} : NULL)"
+                    if kind == "reference"
+                    else local
+                )
+            else:
+                call.checks += f"  g_return_val_if_fail({values.record_check(record, name)}, {fail});\n"
+                call.setup += f"  {prefix}_to_native({name}, &{local}, &{CALL});\n"
+                call.arguments[native] = f"&{local}" if kind == "reference" else local
+            return
+        raise Unsupported(f"{native}: a {kind} input")
+
+    def array_input(
+        self,
+        call: Call,
+        parameter: ParameterPlan,
+        name: str,
+        counted: dict[str, ParameterPlan],
+    ) -> None:
+        values = self.values
+        value = parameter.value
+        element = value.element
+        assert element is not None
+        native = parameter.name
+        nullable = " (nullable)" if value.nullable else ""
+        local = f"{name}_native_"
+        if values.text(element) and element.buffer_form == "view":
+            call.uses_call = True
+            call.parameters.append(("const char* const*", name))
+            call.annotations[name] = f"(array zero-terminated=1){nullable}: the texts"
+            count = f"{name}_count_"
+            call.setup += (
+                f"  guint {count} = {name} != NULL ? g_strv_length((char**){name}) : 0;\n"
+                f"  mln_buffer_view* {local} = maplibre_native_ffi_call_alloc(&{CALL}, {count}, sizeof *{local});\n"
+                f"  for (guint index = 0; index < {count}; index++) {{\n"
+                f"    {local}[index] = maplibre_native_ffi_text_view({name}[index]);\n  }}\n"
+            )
+            call.arguments[native] = local
+            if value.length:
+                call.arguments[value.length] = count
+            return
+        if value.length is None or value.length not in {
+            p.name for p in call.plan.inputs
+        }:
+            raise Unsupported(f"{native}: an array without a count input")
+        length = next(p for p in call.plan.inputs if p.name == value.length)
+        count = parameter_name(length.name)
+        count_type = values.gtype(length.value)
+        if element.kind == "record":
+            type_ = type_name(element.native)
+            prefix = symbol_name(element.native)
+            # A plain record's array is flat, as C's is.
+            flat = values.transparent(element)
+            item = f"&{name}[index]" if flat else f"{name}[index]"
+            call.parameters.append(
+                (f"const {type_}*" if flat else f"{type_}* const*", name)
+            )
+            call.parameters.append((count_type, count))
+            call.annotations[name] = f"(array length={count}){nullable}: the items"
+            if values.same_layout(element):
+                # Native code reads the items where they are.
+                call.arguments[native] = f"(const {element.native}*){name}"
+                call.arguments[length.name] = values.to_c(length.value, count)
+                return
+            call.uses_call = True
+            call.setup += (
+                f"  {element.native}* {local} = maplibre_native_ffi_call_alloc(&{CALL}, {count}, sizeof *{local});\n"
+                f"  for (gsize index = 0; index < (gsize){count}; index++) {{\n"
+                f"    {prefix}_to_native({item}, &{local}[index], &{CALL});\n  }}\n"
+            )
+        elif element.kind in {"scalar", "enum"}:
+            call.uses_call = True
+            call.parameters.append((f"const {values.gtype(element)}*", name))
+            call.parameters.append((count_type, count))
+            call.annotations[name] = f"(array length={count}){nullable}: the items"
+            spelled = without_const(ctype_of(element))
+            call.setup += (
+                f"  {spelled}* {local} = maplibre_native_ffi_call_alloc(&{CALL}, {count}, sizeof *{local});\n"
+                f"  for (gsize index = 0; index < (gsize){count}; index++) {{\n"
+                f"    {local}[index] = {values.to_c(element, f'{name}[index]')};\n  }}\n"
+            )
+        else:
+            raise Unsupported(f"{native}: an array of {element.kind}")
+        call.arguments[native] = local
+        call.arguments[length.name] = values.to_c(length.value, count)
+
+    # Outputs.
+
+    def outputs(self, call: Call) -> list[tuple[str, str, str, str]]:
+        """Declare each output's storage and return what the call returns:
+        each output's type, its expression after the call, its return
+        annotation, and the statements that free it on a later failure."""
+        plan = call.plan
+        values = self.values
+        returned = []
+        owned = {o.parameter: o for o in plan.owned_outputs}
+        lengths = {p.result_length for p in plan.outputs if p.result_length}
+        for output in plan.outputs:
+            if output.name in lengths:
+                continue
+            value = output.value
+            local = f"{output.name}_"
+            if output.name in owned:
+                handle = owned[output.name].handle
+                parent = owned[output.name].parent_parameter
+                parent_object = "NULL"
+                if parent is not None:
+                    parent_object = (
+                        "self" if parent == plan.receiver else parameter_name(parent)
+                    )
+                call.setup += f"  {handle.native} {local} = MLN_HANDLE_NULL;\n"
+                call.arguments[output.name] = f"&{local}"
+                ready = "ready_" if plan.shape == "attach" else "NULL"
+                wrapped = f"{symbol_name(handle.native)}_wrap({local}, {parent_object}, FALSE, {ready})"
+                nullable = (
+                    plan.absence is not None and plan.absence.output.name == output.name
+                )
+                if nullable:
+                    wrapped = f"({local} != MLN_HANDLE_NULL ? {wrapped} : NULL)"
+                returned.append(
+                    (
+                        f"{type_name(handle.native)}*",
+                        wrapped,
+                        "(transfer full)"
+                        + (" (nullable)" if nullable else "")
+                        + ": the object",
+                        "",
+                    )
+                )
+                continue
+            if output.result_length:
+                returned.append(
+                    ("char*", "text_value_", "(transfer full): the text", "")
+                )
+                continue
+            if value.kind == "array":
+                element = value.element
+                assert element is not None
+                if output.sized_by is None:
+                    raise Unsupported(f"{output.name}: an output array without a size")
+                count = call.arguments[value.length] if value.length else None
+                if count is None:
+                    raise Unsupported(f"{output.name}: an output array without a count")
+                count_local = f"{output.name}_count_"
+                call.setup += f"  gsize {count_local} = (gsize)({count});\n"
+                spelled = (
+                    element.native
+                    if element.kind == "record"
+                    else without_const(ctype_of(element))
+                )
+                call.setup += f"  {spelled}* {local} = maplibre_native_ffi_call_alloc(&{CALL}, {count_local}, sizeof *{local});\n"
+                call.uses_call = True
+                call.arguments[output.name] = local
+                if element.kind == "record":
+                    prefix = symbol_name(element.native)
+                    expression = f"{output.name}_items_"
+                    convert = (
+                        f"  GPtrArray* {expression} = g_ptr_array_new_full((guint){count_local}, (GDestroyNotify){self.values.destroy(element)});\n"
+                        f"  for (gsize index = 0; index < {count_local}; index++) {{\n"
+                        f"    g_ptr_array_add({expression}, {prefix}_from_native(&{local}[index]));\n  }}\n"
+                    )
+                    returned.append(
+                        (
+                            "GPtrArray*",
+                            expression,
+                            f"{ARRAY_TRANSFER} (element-type {type_name(element.native)}): the items",
+                            convert,
+                        )
+                    )
+                else:
+                    gtype = values.gtype(element)
+                    expression = f"{output.name}_items_"
+                    convert = (
+                        f"  GArray* {expression} = g_array_sized_new(FALSE, TRUE, sizeof({gtype}), (guint){count_local});\n"
+                        f"  for (gsize index = 0; index < {count_local}; index++) {{\n"
+                        f"    {gtype} item = {values.from_c(element, f'{local}[index]')};\n"
+                        f"    g_array_append_val({expression}, item);\n  }}\n"
+                    )
+                    returned.append(
+                        (
+                            "GArray*",
+                            expression,
+                            f"(transfer full) (element-type {gtype}): the items",
+                            convert,
+                        )
+                    )
+                continue
+            if value.kind != "reference" or value.element is None:
+                raise Unsupported(f"{output.name}: a {value.kind} output")
+            element = value.element
+            if element.kind in {"scalar", "enum"}:
+                call.setup += f"  {without_const(ctype_of(element))} {local} = 0;\n"
+                call.arguments[output.name] = f"&{local}"
+                returned.append(
+                    (
+                        values.gtype(element),
+                        values.from_c(element, local),
+                        "the value",
+                        "",
+                    )
+                )
+                continue
+            if element.kind == "record":
+                call.setup += f"  {element.native} {local};\n  memset(&{local}, 0, sizeof {local});\n"
+                call.setup += values.size_line(element, f"(&{local})")
+                call.arguments[output.name] = f"&{local}"
+                values.use(element)
+                returned.append(
+                    (
+                        f"{type_name(element.native)}*",
+                        f"{symbol_name(element.native)}_from_native(&{local})",
+                        "(transfer full): the value",
+                        "",
+                    )
+                )
+                continue
+            raise Unsupported(f"{output.name}: a reference to a {element.kind}")
+        return returned
+
+    # Shapes.
+
+    def immediate(
+        self, plan: OperationPlan, view: bool = False, prelude: str = ""
+    ) -> Function:
+        """A synchronous call, and a view's call inside its owner's scope.
+        The `prelude` runs after the checks."""
+        call = Call(plan)
+        values = self.values
+        # The return type is known only after the outputs, so checks use a
+        # placeholder that the return type replaces.
+        fail = "FAIL_"
+        self.receiver(call, fail)
+        self.inputs(call, fail)
+        returned = self.outputs(call)
+        text = plan.caller_sized_text
+        result = plan.result
+        if result is not None and not returned:
+            if result.kind in {"scalar", "enum", "native_pointer"}:
+                returned.append(
+                    (
+                        values.gtype(result),
+                        values.from_c(result, "result_"),
+                        "the result",
+                        "",
+                    )
+                )
+            else:
+                raise Unsupported(f"a {result.kind} result")
+        throws = plan.status
+        if len(returned) == 1:
+            returns, expression, annotation, convert = returned[0]
+            outs: list[tuple[str, str, str, str]] = []
+        else:
+            returns = "gboolean" if throws or returned else "void"
+            expression, annotation, convert = "TRUE", "", ""
+            outs = returned
+            if not throws and not returned:
+                expression = ""
+        if not throws and not returned and result is None:
+            returns = "void"
+        out_parameters = []
+        for index, (type_, value_expression, out_annotation, out_convert) in enumerate(
+            outs
+        ):
+            name = f"out_{index}" if True else ""
+            out_name = self.out_name(plan, index)
+            out_parameters.append((f"{type_}*", out_name))
+            call.annotations[out_name] = (
+                f"(out) {out_annotation}"
+                if out_annotation.startswith("(")
+                else f"(out): {out_annotation}"
+            )
+            convert += (
+                out_convert
+                + f"  if ({out_name} != NULL) *{out_name} = {value_expression};\n"
+            )
+            del name
+        call.parameters += out_parameters
+        if throws:
+            call.parameters.append(("GError**", "error"))
+        failing = fail_value(returns)
+        checks = call.checks.replace(fail, failing)
+        if throws:
+            checks += (
+                f"  g_return_val_if_fail(error == NULL || *error == NULL, {failing});\n"
+            )
+        if returns == "void":
+            checks = checks.replace(
+                "g_return_val_if_fail(", "g_return_if_fail("
+            ).replace(", );", ");")
+        body = checks + prelude.replace(
+            f"return {fail};", f"return {failing};" if failing else "return;"
+        )
+        # A call whose inputs borrow no storage and register nothing has no
+        # scope.
+        scoped = call.uses_call
+        if scoped:
+            body += f"  MaplibreNativeFfiCall {CALL};\n  maplibre_native_ffi_call_init(&{CALL});\n"
+        body += call.scope_setup().replace(fail, failing)
+        if scoped and throws:
+            body += f"  if (!maplibre_native_ffi_call_check(&{CALL}, error)) return {failing};\n"
+        elif scoped:
+            body += f"  maplibre_native_ffi_call_check(&{CALL}, NULL);\n"
+        if plan.function.diagnostic:
+            body += "  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};\n"
+        accepted = "TRUE"
+        if text is not None:
+            body += self.caller_sized(plan, call, text)
+            accepted = "status_ == MLN_STATUS_OK"
+        elif view:
+            assert plan.view is not None
+            if outs or convert:
+                raise Unsupported("a view with more than one output")
+            # The copy reads what the view lends, so it happens inside the
+            # view's scope.
+            body += (
+                "  void* scope_ = NULL;\n"
+                f"  {returns} value_ = {failing};\n"
+                f"  mln_status status_ = {plan.view.begin}(self->handle, &scope_, &diagnostic_);\n"
+                f"  if (status_ == MLN_STATUS_OK) {{\n"
+                f"    status_ = {call.native_call()};\n"
+                f"    if (status_ == MLN_STATUS_OK) {{\n      value_ = {expression};\n    }}\n"
+                f"    {plan.view.end}(scope_);\n  }}\n"
+            )
+            expression = "value_"
+            accepted = "status_ == MLN_STATUS_OK"
+        elif throws:
+            body += f"  mln_status status_ = {call.native_call()};\n"
+            accepted = "status_ == MLN_STATUS_OK"
+        elif result is not None:
+            body += (
+                f"  {without_const(ctype_of(result))} result_ = {call.native_call()};\n"
+            )
+        else:
+            body += f"  {call.native_call()};\n"
+        for registration in plan.registrations:
+            if registration.accepted_unless:
+                accepted += f" && !{registration.accepted_unless}_"
+        consumes = self.consumes(plan)
+        end = consumes[1]
+        if scoped:
+            end = f"  maplibre_native_ffi_call_end(&{CALL}, {accepted});\n" + end
+        body += consumes[0]
+        # The outputs live in the call's storage, so they're copied before the
+        # call ends.
+        if throws:
+            body += (
+                "  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {\n"
+                + textwrap.indent(end, "  ")
+                + f"    return {failing};\n  }}\n"
+            )
+        body += convert + end
+        if returns != "void":
+            body += f"  return {expression};\n"
+        doc = self.doc_lines(plan.name)
+        identifier = ""
+        if plan.factory and receiver_type(plan) is None:
+            identifier = "(constructor)"
+        return Function(
+            self.function_name(plan),
+            returns,
+            call.parameters,
+            body,
+            doc=doc,
+            annotations=call.annotations,
+            identifier_annotation=identifier,
+            returns_doc=annotation
+            or (
+                "%TRUE on success, or %FALSE with `error` set"
+                if returns == "gboolean"
+                else ""
+            ),
+        )
+
+    def out_name(self, plan: OperationPlan, index: int) -> str:
+        names = [
+            p.name
+            for p in plan.outputs
+            if not any(o.result_length == p.name for o in plan.outputs)
+        ]
+        return names[index] if index < len(names) else f"out_{index}"
+
+    def function_name(self, plan: OperationPlan) -> str:
+        if plan.view is not None:
+            return f"{symbol_name(plan.view.owner.native)}_get_{plan.view.stem}"
+        return method_name(plan)
+
+    def consumes(self, plan: OperationPlan) -> tuple[str, str]:
+        """The statements before and after the call's end that retire the
+        receiver of a call that consumes it."""
+        owner = receiver_type(plan)
+        if owner is None or not plan.consumes:
+            return "", ""
+        handle = self.bound.handles[owner]
+        if plan.answers:
+            # The answer ends the handle whatever it returns. A failure may
+            # come before native code, so the handle is released too.
+            return (
+                (
+                    f"  {handle.native} consumed_ = self->handle;\n"
+                    "  self->handle = MLN_HANDLE_NULL;\n"
+                ),
+                f"  if (status_ != MLN_STATUS_OK) {handle.release}(consumed_);\n",
+            )
+        if plan.consumes == "always":
+            return "  self->handle = MLN_HANDLE_NULL;\n", ""
+        return (
+            "  if (status_ == MLN_STATUS_OK) self->handle = MLN_HANDLE_NULL;\n",
+            "",
+        )
+
+    def caller_sized(self, plan: OperationPlan, call: Call, text: ParameterPlan) -> str:
+        """Calls again with more storage until the text fits."""
+        capacity = text.value.length
+        assert capacity is not None and text.result_length is not None
+        call_text = call.native_call(
+            {
+                text.name: "text_",
+                capacity: "capacity_",
+                text.result_length: "&length_",
+            }
         )
         return (
-            Function(
-                method_name(plan),
-                f"{name}*",
-                parameters,
-                body,
-                doc=self.doc_lines(plan.name),
-                annotations=annotations,
-                identifier_annotation="(constructor)",
-                returns_doc=f"(transfer full): the new `{name}`, or %NULL with `error` set",
-            ),
-            records,
+            "  size_t capacity_ = 256;\n  size_t length_ = 0;\n  char* text_ = NULL;\n"
+            "  mln_status status_;\n"
+            "  for (;;) {\n"
+            "    text_ = g_realloc(text_, capacity_);\n"
+            f"    status_ = {call_text};\n"
+            "    if (status_ != MLN_STATUS_OK || length_ < capacity_) break;\n"
+            "    capacity_ = length_ + 1;\n  }\n"
+            "  char* text_value_ = status_ == MLN_STATUS_OK ? g_strndup(text_, length_) : NULL;\n"
+            "  g_free(text_);\n"
         )
 
-    def release_async(self, handle: HandlePlan, plan: OperationPlan) -> list[Function]:
-        name, prefix = type_name(handle.native), symbol_name(handle.native)
-        if plan.inputs[1:] or plan.outputs or plan.result or not plan.completion:
-            raise Unsupported(f"GObject: {plan.name}: this release's shape")
-        start = f"{prefix}_release_async"
-        finish = f"{prefix}_release_finish"
-        start_body = (
-            f"  g_return_if_fail({check_macro(handle.native)}(self));\n"
-            f"  GTask* task = g_task_new(self, NULL, callback, user_data);\n"
-            f"  g_task_set_source_tag(task, {start});\n"
-            "  mln_completion completion;\n"
-            "  GError* error = NULL;\n"
-            f"  if (!{SYMBOL}_completion_init(&completion, task, &error)) {{\n"
-            "    g_task_return_error(task, error);\n"
-            "    g_object_unref(task);\n"
-            "    return;\n  }\n"
-            "  mln_diagnostic diagnostic = {.size = sizeof diagnostic};\n"
-            f"  mln_status status = {plan.name}(self->handle, &completion, &diagnostic);\n"
-            "  if (status == MLN_STATUS_OK) {\n"
-            "    self->handle = MLN_HANDLE_NULL;\n"
-            "  } else {\n"
-            f"    {SYMBOL}_completion_reject(&completion);\n"
-            f"    g_task_return_error(task, {SYMBOL}_error_new(status, &diagnostic));\n"
-            "  }\n"
-            "  g_object_unref(task);\n"
-        )
-        finish_body = (
-            "  g_return_val_if_fail(g_task_is_valid(result, self), FALSE);\n"
-            "  return g_task_propagate_boolean(G_TASK(result), error);\n"
-        )
-        return [
-            Function(
-                start,
-                "void",
-                [
-                    (f"{name}*", "self"),
-                    ("GAsyncReadyCallback", "callback"),
-                    ("gpointer", "user_data"),
-                ],
-                start_body,
-                doc=self.doc_lines(plan.name),
-                annotations={
-                    "callback": "(scope async) (nullable): the callback to call when the release finishes",
-                    "user_data": "the data to pass to `callback`",
-                },
+    def release(self, plan: OperationPlan) -> Function:
+        """An immediate release, which the object's dispose also calls."""
+        owner = receiver_type(plan)
+        assert owner is not None
+        prelude = ""
+        if owner in self.bound.borrowed_handles:
+            prelude = (
+                "  if (self->borrowed) {\n"
+                + (
+                    "    maplibre_native_ffi_set_borrowed_error(error);\n"
+                    if plan.status
+                    else ""
+                )
+                + "    return FAIL_;\n  }\n"
+            )
+        function = self.immediate(plan, prelude=prelude)
+        function.doc = self.doc_lines(
+            plan.name,
+            (
+                (
+                    "The object calls this when it is disposed, unless it was"
+                    " released. Later calls fail as on any released handle."
+                ),
             ),
-            Function(
-                finish,
-                "gboolean",
-                [
-                    (f"{name}*", "self"),
-                    ("GAsyncResult*", "result"),
-                    ("GError**", "error"),
-                ],
-                finish_body,
-                doc=[f"Finishes a release that `{start}` started."],
-                annotations={"result": "the result that the callback received"},
-                returns_doc="%TRUE when the handle retired, or %FALSE with `error` set",
+        )
+        return function
+
+    def discard(self, plan: OperationPlan) -> Function:
+        """A discard, which the object's dispose also calls."""
+        function = self.immediate(plan)
+        function.doc = self.doc_lines(
+            plan.name,
+            (
+                (
+                    "The object calls this when it is disposed, unless it was"
+                    " released or discarded. Later calls fail as on any"
+                    " released handle."
+                ),
             ),
-        ]
+        )
+        return function
 
     def dispose(self, handle: HandlePlan, plan: OperationPlan) -> Function:
         name, prefix = type_name(handle.native), symbol_name(handle.native)
+        borrowed = (
+            "  if (self->borrowed) return;\n"
+            if handle.native in self.bound.borrowed_handles
+            else ""
+        )
         return Function(
             f"{prefix}_dispose",
             "void",
             [(f"{name}*", "self")],
             f"  g_return_if_fail({check_macro(handle.native)}(self));\n"
-            f"  {handle.native} handle = self->handle;\n"
+            + borrowed
+            + f"  {handle.native} handle = self->handle;\n"
             "  self->handle = MLN_HANDLE_NULL;\n"
             # A released handle no longer belongs to the object, and a dispose
             # can't report a failure.
             "  if (handle != MLN_HANDLE_NULL) {\n"
-            f"    (void){plan.name}(handle, NULL);\n  }}\n",
+            f"    (void){plan.name}(handle, NULL);\n"
+            # Calls such as a caller-driven session's driver service still
+            # reach a disposed handle until its teardown finishes.
+            "    self->released_handle = handle;\n  }\n",
             doc=self.doc_lines(
                 plan.name,
                 (
@@ -659,15 +1006,747 @@ class Emitter:
             ),
         )
 
+    def async_parameters(self, call: Call, what: str) -> None:
+        call.parameters += [
+            ("GAsyncReadyCallback", "callback"),
+            ("gpointer", "user_data"),
+        ]
+        call.annotations["callback"] = (
+            f"(scope async) (nullable): the callback to call when {what} finishes"
+        )
+        call.annotations["user_data"] = "the data to pass to `callback`"
+
+    def finish(
+        self,
+        plan: OperationPlan,
+        start: str,
+        returns: str,
+        body: str,
+        doc: str,
+        returns_doc: str,
+    ) -> Function:
+        owner = receiver_type(plan)
+        parameters = []
+        source = "NULL"
+        if owner is not None:
+            parameters.append((f"{type_name(owner)}*", "self"))
+            source = "self"
+        parameters += [("GAsyncResult*", "result"), ("GError**", "error")]
+        failing = fail_value(returns)
+        return Function(
+            start.removesuffix("_async") + "_finish",
+            returns,
+            parameters,
+            f"  g_return_val_if_fail(g_task_is_valid(result, {source}), {failing});\n"
+            + body,
+            doc=[doc],
+            annotations={"result": "the result that the callback received"},
+            returns_doc=returns_doc,
+        )
+
+    def decoder(self, plan: OperationPlan) -> tuple[str, str, str, str, str]:
+        """How a query's result is copied and returned: the decoder and
+        destroy function, the finish function's return type, its body, and
+        its return annotation."""
+        result = plan.result
+        values = self.values
+        if plan.shape == "command":
+            return (
+                "maplibre_native_ffi_command_decode",
+                "(GDestroyNotify)maplibre_native_ffi_command_completion_free",
+                "MaplibreNativeFfiCommandCompletion*",
+                "  return g_task_propagate_pointer(G_TASK(result), error);\n",
+                "(transfer full): the command's completion, or %NULL with `error` set",
+            )
+        if result is None:
+            return (
+                "NULL",
+                "NULL",
+                "gboolean",
+                "  return g_task_propagate_boolean(G_TASK(result), error);\n",
+                "%TRUE when the call finished, or %FALSE with `error` set",
+            )
+        decode = f"{plan.name}_decode"
+        nullable = " (nullable)" if result.nullable else ""
+        guard_null = "  if (result->value == NULL) return NULL;\n"
+        if result.kind in {"scalar", "enum"}:
+            gtype = values.gtype(result)
+            spelled = without_const(ctype_of(result))
+            self.statics.append(
+                guarded(
+                    guard(plan),
+                    f"static gpointer {decode}(const mln_completion_result* result) {{\n"
+                    + guard_null
+                    + f"  {gtype}* value = g_new0({gtype}, 1);\n"
+                    f"  *value = {values.from_c(result, f'*(const {spelled}*)result->value')};\n"
+                    "  return value;\n}\n",
+                )
+                + "\n"
+            )
+            return (
+                decode,
+                "g_free",
+                gtype,
+                (
+                    f"  {gtype}* value = g_task_propagate_pointer(G_TASK(result), error);\n"
+                    f"  if (value == NULL) return {fail_value(gtype) or '0'};\n"
+                    f"  {gtype} copy = *value;\n  g_free(value);\n  return copy;\n"
+                ),
+                "the result, or 0 with `error` set",
+            )
+        if values.text(result) or values.bytes_(result):
+            if result.buffer_form != "view":
+                raise Unsupported("a result that is not a buffer view")
+            text = values.text(result)
+            copy = (
+                "maplibre_native_ffi_text_new(*view)"
+                if text
+                else "maplibre_native_ffi_bytes_new(view->data, view->size)"
+            )
+            self.statics.append(
+                guarded(
+                    guard(plan),
+                    f"static gpointer {decode}(const mln_completion_result* result) {{\n"
+                    + guard_null
+                    + "  const mln_buffer_view* view = result->value;\n"
+                    f"  return {copy};\n}}\n",
+                )
+                + "\n"
+            )
+            return (
+                decode,
+                "g_free" if text else "(GDestroyNotify)g_bytes_unref",
+                "char*" if text else "GBytes*",
+                "  return g_task_propagate_pointer(G_TASK(result), error);\n",
+                f"(transfer full){nullable}: the {'text' if text else 'bytes'}",
+            )
+        if result.kind == "record":
+            prefix = symbol_name(result.native)
+            values.use(result)
+            self.statics.append(
+                guarded(
+                    guard(plan),
+                    f"static gpointer {decode}(const mln_completion_result* result) {{\n"
+                    + guard_null
+                    + f"  return {prefix}_from_native(result->value);\n}}\n",
+                )
+                + "\n"
+            )
+            return (
+                decode,
+                f"(GDestroyNotify){values.destroy(result)}",
+                f"{type_name(result.native)}*",
+                "  return g_task_propagate_pointer(G_TASK(result), error);\n",
+                f"(transfer full){nullable}: the value",
+            )
+        if result.kind == "array":
+            element = result.element
+            assert element is not None
+            if element.kind == "record":
+                prefix = symbol_name(element.native)
+                values.use(element)
+                item = f"{prefix}_from_native((const {element.native}*)(const void*)((const char*)result->value + index * result->value_size))"
+                free = f"(GDestroyNotify){self.values.destroy(element)}"
+            elif values.text(element) and element.buffer_form == "view":
+                item = "maplibre_native_ffi_text_new(*(const mln_buffer_view*)(const void*)((const char*)result->value + index * result->value_size))"
+                free = "g_free"
+            else:
+                raise Unsupported(f"a result array of {element.kind}")
+            self.statics.append(
+                guarded(
+                    guard(plan),
+                    f"static gpointer {decode}(const mln_completion_result* result) {{\n"
+                    + (guard_null if result.nullable else "")
+                    + f"  GPtrArray* items = g_ptr_array_new_full((guint)result->value_count, {free});\n"
+                    "  for (size_t index = 0; index < result->value_count; index++) {\n"
+                    f"    g_ptr_array_add(items, {item});\n  }}\n"
+                    "  return items;\n}\n",
+                )
+                + "\n"
+            )
+            element_type = (
+                type_name(element.native) if element.kind == "record" else "utf8"
+            )
+            return (
+                decode,
+                "(GDestroyNotify)g_ptr_array_unref",
+                "GPtrArray*",
+                "  return g_task_propagate_pointer(G_TASK(result), error);\n",
+                f"{ARRAY_TRANSFER} (element-type {element_type}){nullable}: the items",
+            )
+        raise Unsupported(f"a {result.kind} result")
+
+    def asynchronous(self, plan: OperationPlan) -> list[Function]:
+        """A command, query, or operation as an `_async` and `_finish` pair."""
+        assert plan.completion is not None
+        if plan.outputs:
+            raise Unsupported("an asynchronous call with outputs")
+        call = Call(plan)
+        self.receiver(call, "FAIL_")
+        self.inputs(call, "FAIL_")
+        start = f"{method_name(plan)}_async"
+        discardable = plan.completion.discardable
+        self.async_parameters(call, "the call")
+        decode, destroy, returns, finish_body, returns_doc = self.decoder(plan)
+        body = call.checks.replace(
+            "g_return_val_if_fail(", "g_return_if_fail("
+        ).replace(", FAIL_);", ");")
+        body += self.async_call(plan, call, start, decode, destroy, discardable)
+        doc = self.doc_lines(plan.name)
+        if discardable:
+            doc += [
+                "",
+                *paragraph(
+                    "Without `callback`, nothing reports whether the call succeeds."
+                ),
+            ]
+        start_function = Function(
+            start, "void", call.parameters, body, doc=doc, annotations=call.annotations
+        )
+        return [
+            start_function,
+            self.finish(
+                plan,
+                start,
+                returns,
+                finish_body,
+                f"Finishes a call that `{start}` started.",
+                returns_doc,
+            ),
+        ]
+
+    def async_call(
+        self,
+        plan: OperationPlan,
+        call: Call,
+        start: str,
+        decode: str,
+        destroy: str,
+        discardable: bool,
+        release: bool = False,
+    ) -> str:
+        """Starts the task, converts the inputs, starts the call with a
+        completion that returns the task, and returns any failure through the
+        task."""
+        source = "self" if receiver_type(plan) else "NULL"
+        body = (
+            "  MaplibreNativeFfiAsync async_;\n"
+            f"  maplibre_native_ffi_async_init(&async_, {source}, {start}, callback, user_data, {'TRUE' if discardable else 'FALSE'});\n"
+        )
+        body += call.setup.replace("FAIL_", "").replace(f"&{CALL}", "&async_.call")
+        body += f"  if (!maplibre_native_ffi_async_begin(&async_, {decode}, {destroy})) return;\n"
+        completion = next(
+            p.name for p in plan.function.parameters if is_completion(p.type)
+        )
+        native = call.native_call(
+            {completion: "async_.completion_argument"}, "&async_.diagnostic"
+        )
+        body += f"  mln_status status_ = {native};\n"
+        if release:
+            body += "  if (status_ == MLN_STATUS_OK) {\n"
+            body += "    self->released_handle = self->handle;\n"
+            body += "    self->handle = MLN_HANDLE_NULL;\n  }\n"
+        body += "  maplibre_native_ffi_async_end(&async_, status_);\n"
+        return body
+
+    def release_async(self, plan: OperationPlan) -> list[Function]:
+        owner = receiver_type(plan)
+        assert owner is not None and plan.completion is not None
+        if plan.outputs or plan.result:
+            raise Unsupported("a release with outputs")
+        call = Call(plan)
+        self.receiver(call, "FAIL_")
+        self.inputs(call, "FAIL_")
+        start = f"{symbol_name(owner)}_release_async"
+        self.async_parameters(call, "the release")
+        body = call.checks.replace(
+            "g_return_val_if_fail(", "g_return_if_fail("
+        ).replace(", FAIL_);", ");")
+        if owner in self.bound.borrowed_handles:
+            body += (
+                "  if (self->borrowed) {\n    GError* borrowed_ = NULL;\n"
+                "    maplibre_native_ffi_set_borrowed_error(&borrowed_);\n"
+                f"    g_task_report_error(self, callback, user_data, {start}, borrowed_);\n"
+                "    return;\n  }\n"
+            )
+        body += self.async_call(plan, call, start, "NULL", "NULL", False, release=True)
+        return [
+            Function(
+                start,
+                "void",
+                call.parameters,
+                body,
+                doc=self.doc_lines(plan.name),
+                annotations=call.annotations,
+            ),
+            self.finish(
+                plan,
+                start,
+                "gboolean",
+                "  return g_task_propagate_boolean(G_TASK(result), error);\n",
+                f"Finishes a release that `{start}` started.",
+                "%TRUE when the handle retired, or %FALSE with `error` set",
+            ),
+        ]
+
+    def attach(self, plan: OperationPlan) -> Function:
+        """A call that creates its handle at once and readies it later: it
+        returns the object, whose `ready_async` waits for the completion."""
+        assert plan.completion is not None
+        if len(plan.completion.immediate_owners) != 1 or plan.result:
+            raise Unsupported("an attach with other than one handle")
+        call = Call(plan)
+        self.receiver(call, "NULL")
+        self.inputs(call, "NULL")
+        returned = self.outputs(call)
+        if len(returned) != 1:
+            raise Unsupported("an attach with other outputs")
+        returns, expression, annotation, _ = returned[0]
+        call.parameters.append(("GError**", "error"))
+        completion = next(
+            p.name for p in plan.function.parameters if is_completion(p.type)
+        )
+        body = call.checks
+        body += "  g_return_val_if_fail(error == NULL || *error == NULL, NULL);\n"
+        body += f"  MaplibreNativeFfiCall {CALL};\n  maplibre_native_ffi_call_init(&{CALL});\n"
+        body += call.setup
+        body += f"  if (!maplibre_native_ffi_call_check(&{CALL}, error)) return NULL;\n"
+        body += (
+            "  MaplibreNativeFfiReady* ready_ = maplibre_native_ffi_ready_new();\n"
+            "  mln_completion completion_;\n"
+            "  if (!maplibre_native_ffi_completion_init_ready(&completion_, ready_, error)) {\n"
+            f"    maplibre_native_ffi_call_end(&{CALL}, FALSE);\n"
+            "    maplibre_native_ffi_ready_unref(ready_);\n    return NULL;\n  }\n"
+            "  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};\n"
+            f"  mln_status status_ = {call.native_call({completion: '&completion_'})};\n"
+            f"  maplibre_native_ffi_call_end(&{CALL}, status_ == MLN_STATUS_OK);\n"
+            "  if (status_ != MLN_STATUS_OK) {\n"
+            "    maplibre_native_ffi_completion_reject(&completion_);\n"
+            "    maplibre_native_ffi_ready_unref(ready_);\n"
+            "    (void)maplibre_native_ffi_check(status_, &diagnostic_, error);\n"
+            "    return NULL;\n  }\n"
+            f"  {returns} object_ = {expression};\n"
+            "  maplibre_native_ffi_ready_unref(ready_);\n"
+            "  return object_;\n"
+        )
+        handle = plan.completion.immediate_owners[0].handle
+        ready = f"{symbol_name(handle.native)}_ready_async"
+        return Function(
+            method_name(plan),
+            returns,
+            call.parameters,
+            body,
+            doc=self.doc_lines(
+                plan.name,
+                (
+                    (
+                        f"The object is ready once `{ready}` finishes, which fails"
+                        " with the errors that the completion reports."
+                    ),
+                ),
+            ),
+            annotations=call.annotations,
+            returns_doc=annotation.replace(
+                ": the object", ": the new object, or %NULL with `error` set"
+            ),
+        )
+
+    def drain(self, plan: OperationPlan) -> Function:
+        """A drain that returns a copy of the batch's slice, empty when nothing
+        is queued, and releases the batch."""
+        drain = plan.drain
+        assert drain is not None
+        call = Call(plan)
+        self.receiver(call, "NULL")
+        self.inputs(call, "NULL")
+        batch_handle = drain.batch.value.unwrapped
+        view = drain.view.value.unwrapped
+        slice_ = drain.slice
+        element = slice_.value.element
+        assert element is not None
+        self.values.use(element)
+        prefix = symbol_name(element.native)
+        release = self.bound.handles[batch_handle.native].release
+        call.parameters.append(("GError**", "error"))
+        item = f"&view_.{slice_.name}[index]"
+        if slice_.value.stride:
+            item = f"(const {element.native}*)(const void*)((const char*)view_.{slice_.name} + index * view_.{slice_.value.stride})"
+        body = call.checks
+        body += "  g_return_val_if_fail(error == NULL || *error == NULL, NULL);\n"
+        body += (
+            f"  {batch_handle.native} batch_ = MLN_HANDLE_NULL;\n"
+            f"  {view.native} view_;\n  memset(&view_, 0, sizeof view_);\n"
+            + self.values.size_line(view, "(&view_)")
+            + "  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};\n"
+            f"  mln_status status_ = {call.native_call({drain.batch.name: '&batch_', drain.view.name: '&view_'})};\n"
+            "  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;\n"
+            f"  GPtrArray* items_ = g_ptr_array_new_with_free_func((GDestroyNotify){self.values.destroy(element)});\n"
+            "  if (batch_ != MLN_HANDLE_NULL) {\n"
+            f"    for (size_t index = 0; index < view_.{slice_.value.length}; index++) {{\n"
+            f"      g_ptr_array_add(items_, {prefix}_from_native({item}));\n    }}\n"
+            f"    {release}(batch_);\n  }}\n"
+            "  return items_;\n"
+        )
+        self.generated.append(release)
+        return Function(
+            method_name(plan),
+            "GPtrArray*",
+            call.parameters,
+            body,
+            doc=self.doc_lines(plan.name),
+            annotations=call.annotations,
+            returns_doc=f"{ARRAY_TRANSFER} (element-type {type_name(element.native)}): the items, or %NULL with `error` set",
+        )
+
+    # Handles.
+
+    def handles(self) -> tuple[str, str, str]:
+        header, source, private = "", "", ""
+        structs = ""
+        handles = [
+            h
+            for name, h in sorted(self.bound.public_handles.items())
+            if name not in self.bound.slices
+        ]
+        handles = [h for h in handles if self.handle_used(h)]
+        self.handle_names = [h.native for h in handles]
+        for handle in handles:
+            name, prefix = type_name(handle.native), symbol_name(handle.native)
+            structs += (
+                f"struct _{name} {{\n  GObject parent_instance;\n  {handle.native} handle;\n"
+                f"  {handle.native} released_handle;\n"
+                "  // The object of the handle's parent, which outlives it.\n"
+                "  GObject* parent;\n"
+                "  gboolean borrowed;\n"
+                "  MaplibreNativeFfiReady* ready;\n};\n\n"
+            )
+            private += (
+                f"G_GNUC_INTERNAL {name}* {prefix}_wrap(\n"
+                f"  {handle.native} handle, gpointer parent, gboolean borrowed,\n"
+                "  MaplibreNativeFfiReady* ready\n);\n"
+            )
+        for handle in handles:
+            h, s = self.handle(handle)
+            header += h
+            source += s
+        return header, structs + "".join(self.statics) + source, private
+
+    def handle_used(self, handle: HandlePlan) -> bool:
+        if handle.native not in self.bound.handles:
+            return False
+        return any(
+            self.owner(plan) == handle.native
+            or any(o.handle.native == handle.native for o in plan.owned_outputs)
+            or any(
+                p.value.kind == "handle" and p.value.native == handle.native
+                for p in plan.inputs
+            )
+            for plan in self.bound.operations
+            if plan.name in self.generated
+        ) or any(
+            p.value.unwrapped.kind == "handle"
+            and p.value.unwrapped.native == handle.native
+            for callback in self.values.callbacks.values()
+            for p in callback.arguments
+        )
+
+    def handle(self, handle: HandlePlan) -> tuple[str, str]:
+        native = handle.native
+        name, prefix = type_name(native), symbol_name(native)
+        upper = prefix.removeprefix(SYMBOL + "_").upper()
+        functions = list(self.functions.get(native, []))
+        readied = native in self.bound.readied_handles
+        functions.insert(
+            0,
+            Function(
+                f"{prefix}_get_id",
+                "guint64",
+                [(f"{name}*", "self")],
+                f"  g_return_val_if_fail({check_macro(native)}(self), 0);\n"
+                "  return (guint64)(self->handle != MLN_HANDLE_NULL ? self->handle : self->released_handle);\n",
+                doc=[
+                    "The handle's ID, which runtime events name as their source.",
+                ],
+                returns_doc="the ID",
+            ),
+        )
+        if readied:
+            functions += self.ready(handle)
+        functions += self.event_source(handle)
+        header = comment([f"{name}:", "", *self.doc_lines(native)])
+        header += f"#define {type_macro(native)} ({prefix}_get_type())\n"
+        header += (
+            f"G_DECLARE_FINAL_TYPE({name}, {prefix}, {MACRO}, {upper}, GObject)\n\n"
+        )
+        header += "".join(f.declaration() for f in functions)
+        cleanup = handle.cleanup
+        release = handle.release
+        if (
+            cleanup is not None
+            and cleanup == handle.dispose
+            and handle.dispose != release
+        ):
+            dispose_call = f"    {prefix}_dispose(self);\n"
+        elif cleanup is not None and handle.discard:
+            dispose_call = f"    (void){cleanup}(self->handle, NULL);\n"
+        else:
+            release_function = self.bound.source.functions_by_name[release]
+            arguments = ["self->handle"]
+            arguments += ["NULL"] * (len(release_function.parameters) - 1)
+            if release_function.diagnostic:
+                arguments.append("NULL")
+            dispose_call = f"    (void){release}({', '.join(arguments)});\n"
+        borrowed = (
+            "!self->borrowed && " if native in self.bound.borrowed_handles else ""
+        )
+        source = (
+            f"G_DEFINE_FINAL_TYPE({name}, {prefix}, G_TYPE_OBJECT)\n\n"
+            # A finalized object that its owner never released still holds
+            # its handle, which the cleanup tears down in any state.
+            f"static void {prefix}_object_dispose(GObject* object) {{\n"
+            f"  {name}* self = {cast_macro(native)}(object);\n"
+            f"  if ({borrowed}self->handle != MLN_HANDLE_NULL) {{\n"
+            + dispose_call
+            + "    self->handle = MLN_HANDLE_NULL;\n  }\n"
+            "  g_clear_object(&self->parent);\n"
+            "  g_clear_pointer(&self->ready, maplibre_native_ffi_ready_unref);\n"
+            f"  G_OBJECT_CLASS({prefix}_parent_class)->dispose(object);\n}}\n\n"
+            f"static void {prefix}_class_init({name}Class* klass) {{\n"
+            f"  G_OBJECT_CLASS(klass)->dispose = {prefix}_object_dispose;\n}}\n\n"
+            f"static void {prefix}_init({name}* self) {{\n"
+            f"  self->handle = MLN_HANDLE_NULL;\n  self->released_handle = MLN_HANDLE_NULL;\n}}\n\n"
+            f"{name}* {prefix}_wrap(\n"
+            f"  {native} handle, gpointer parent, gboolean borrowed,\n"
+            "  MaplibreNativeFfiReady* ready\n) {\n"
+            f"  {name}* self = g_object_new({type_macro(native)}, NULL);\n"
+            "  self->handle = handle;\n"
+            "  self->parent = parent != NULL ? g_object_ref(G_OBJECT(parent)) : NULL;\n"
+            "  self->borrowed = borrowed;\n"
+            "  if (ready != NULL) {\n"
+            "    // The wrapper takes its own reference, which the caller keeps.\n"
+            "    self->ready = maplibre_native_ffi_ready_ref(ready);\n  }\n"
+            "  return self;\n}\n\n"
+        )
+        source += "".join(f.definition() for f in functions)
+        return header, source
+
+    def event_source(self, handle: HandlePlan) -> list[Function]:
+        """Whether a runtime event comes from the handle, for a handle that
+        events name as their source.
+
+        A handle's ID needs all 64 bits, which a binding that holds numbers as
+        doubles, such as GJS, can't compare.
+        """
+        if handle.native not in self.bound.event_sources:
+            return []
+        found = next(
+            (
+                (record, member)
+                for record in self.values.used.values()
+                for member in record.fields
+                if member.value.kind == "enum"
+                and member.value.native == RUNTIME_EVENT_SOURCE
+            ),
+            None,
+        )
+        if found is None:
+            return []
+        record, kind = found
+        source = kind.name.removesuffix("_type")
+        if not any(f.name == source for f in record.fields):
+            return []
+        name, prefix = type_name(handle.native), symbol_name(handle.native)
+        event, event_prefix = type_name(record.native), symbol_name(record.native)
+        constant = constant_name(
+            kind.value,
+            RUNTIME_EVENT_SOURCE_PREFIX + handle.stem.upper(),
+        )
+        return [
+            Function(
+                f"{prefix}_is_event_source",
+                "gboolean",
+                [(f"{name}*", "self"), (f"const {event}*", "event")],
+                f"  g_return_val_if_fail({check_macro(handle.native)}(self), FALSE);\n"
+                "  g_return_val_if_fail(event != NULL, FALSE);\n"
+                f"  return {event_prefix}_get_{accessor(record, kind.name)}(event) == {constant} &&\n"
+                f"    {event_prefix}_get_{accessor(record, source)}(event) == {prefix}_get_id(self);\n",
+                doc=[
+                    *paragraph(
+                        "Whether a runtime event comes from this handle. A handle's"
+                        f" ID needs all of its 64 bits, so compare with this, rather"
+                        f" than with `{prefix}_get_id`, where numbers are doubles, as"
+                        " in JavaScript."
+                    )
+                ],
+                annotations={"event": "the event"},
+                returns_doc="whether the event's source is this handle",
+            )
+        ]
+
+    def ready(self, handle: HandlePlan) -> list[Function]:
+        name, prefix = type_name(handle.native), symbol_name(handle.native)
+        start = f"{prefix}_ready_async"
+        return [
+            Function(
+                start,
+                "void",
+                [
+                    (f"{name}*", "self"),
+                    ("GAsyncReadyCallback", "callback"),
+                    ("gpointer", "user_data"),
+                ],
+                f"  g_return_if_fail({check_macro(handle.native)}(self));\n"
+                "  GTask* task_ = g_task_new(self, NULL, callback, user_data);\n"
+                f"  g_task_set_source_tag(task_, {start});\n"
+                "  maplibre_native_ffi_ready_wait(self->ready, task_);\n"
+                "  g_object_unref(task_);\n",
+                doc=[
+                    *paragraph(
+                        "Waits until the handle is ready, as the call that created"
+                        " it reports. A handle that a callback lends is ready at once."
+                    ),
+                    "",
+                    *paragraph(THREADS),
+                ],
+                annotations={
+                    "callback": "(scope async) (nullable): the callback to call when the handle is ready",
+                    "user_data": "the data to pass to `callback`",
+                },
+            ),
+            Function(
+                f"{prefix}_ready_finish",
+                "gboolean",
+                [
+                    (f"{name}*", "self"),
+                    ("GAsyncResult*", "result"),
+                    ("GError**", "error"),
+                ],
+                "  g_return_val_if_fail(g_task_is_valid(result, self), FALSE);\n"
+                "  return g_task_propagate_boolean(G_TASK(result), error);\n",
+                doc=[f"Finishes a wait that `{start}` started."],
+                annotations={"result": "the result that the callback received"},
+                returns_doc="%TRUE when the handle is ready, or %FALSE with `error` set",
+            ),
+        ]
+
+    def module_functions(self) -> tuple[str, str]:
+        functions = self.functions.get(None, [])
+        return (
+            "".join(f.declaration() for f in functions),
+            "".join(f.definition() for f in functions),
+        )
+
+
+def ctype_of(value: ValuePlan) -> str:
+    return value.ctype.spelling
+
 
 def lower(api: Api | BoundApi) -> Lowered:
     bound = compile_api(api, TARGETS)
     emitter = Emitter(bound)
     files = emitter.enums()
-    handles, records = emitter.handles()
-    files.update(handles)
-    files.update(emitter.records(sorted(records)))
-    return Lowered(files, {}, emitter.generated)
+    emitter.lower_operations()
+    emitter.unsupported.update(
+        {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
+    )
+    if emitter.unsupported:
+        return Lowered(
+            {}, emitter.unsupported, emitter.generated, tuple(emitter.support)
+        )
+    try:
+        files.update(render(emitter))
+    except Unsupported as error:
+        raise Unsupported(f"GObject: {error}") from error
+    return Lowered(files, {}, emitter.generated, tuple(emitter.support))
+
+
+def render(emitter: Emitter) -> dict[str, str]:
+    handles_header, handles_source, handles_private = emitter.handles()
+    values_header, values_source, values_private = emitter.values.render(
+        emitter.handle_names
+    )
+    constants_header, constants_source = emitter.constants()
+    module_header, module_source = emitter.module_functions()
+    guard_ = f"{MACRO}_VALUES_H"
+    # vapigen makes a boxed record a compact class unless its metadata names
+    # it a struct, which Vala copies by value as C does.
+    structs = sorted(
+        type_name(v.native).removeprefix(NAMESPACE)
+        for v in emitter.values.presented()
+        if emitter.values.transparent(v)
+    )
+    # Vala reads a struct property through a getter that writes an output,
+    # and a text array through one that returns its length, so it reads and
+    # writes each property of either kind as a GObject property.
+    unaccessed = sorted(
+        f"{type_name(v.native).removeprefix(NAMESPACE)}.{prop.replace('-', '_')}#property"
+        for v in emitter.values.presented()
+        if emitter.values.is_object(v)
+        for m in emitter.values.members(v)
+        if (prop := emitter.values.property_name(v, m)) is not None
+        and (
+            m.value.kind == "array"
+            or (m.value.kind == "record" and emitter.values.transparent(m.value))
+        )
+    )
+    files = {
+        f"{DIRECTORY}/vapi/{NAMESPACE}-0.metadata": "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+        + "".join(f"{name} struct\n" for name in [*structs, "CommandCompletion"])
+        + "".join(f"{name} no_accessor_method\n" for name in unaccessed),
+        f"{SOURCE}/maplibre-native-ffi-values.h": HEADER
+        + f"#ifndef {guard_}\n#define {guard_}\n\n"
+        + "#include <glib-object.h>\n\n"
+        + '#include "maplibre-native-ffi-enums.h"\n\n'
+        + "G_BEGIN_DECLS\n\n"
+        + constants_header
+        + values_header
+        + "G_END_DECLS\n\n#endif\n",
+        f"{SOURCE}/maplibre-native-ffi-values.c": HEADER
+        + '#include "maplibre-native-ffi-values.h"\n\n'
+        + "#include <maplibre_native_c.h>\n#include <math.h>\n#include <string.h>\n\n"
+        + '#include "maplibre-native-ffi-handles-private.h"\n'
+        + '#include "maplibre-native-ffi-private.h"\n'
+        + '#include "maplibre-native-ffi-values-private.h"\n\n'
+        + gobject_values.PROPERTY_FLAGS_DEFINITION
+        + gobject_values.SAME_MEMBER_DEFINITION
+        + constants_source
+        + "\n"
+        + values_source,
+        f"{SOURCE}/maplibre-native-ffi-values-private.h": HEADER
+        + f"#ifndef {MACRO}_VALUES_PRIVATE_H\n#define {MACRO}_VALUES_PRIVATE_H\n\n"
+        + "#include <maplibre_native_c.h>\n\n"
+        + '#include "maplibre-native-ffi-private.h"\n'
+        + '#include "maplibre-native-ffi-values.h"\n\n'
+        + "G_BEGIN_DECLS\n\n"
+        + values_private
+        + "\nG_END_DECLS\n\n#endif\n",
+        f"{SOURCE}/maplibre-native-ffi-handles.h": HEADER
+        + f"#ifndef {MACRO}_HANDLES_H\n#define {MACRO}_HANDLES_H\n\n"
+        + "#include <gio/gio.h>\n\n"
+        + '#include "maplibre-native-ffi-command-completion.h"\n'
+        + '#include "maplibre-native-ffi-values.h"\n\n'
+        + "G_BEGIN_DECLS\n\n"
+        + handles_header
+        + module_header
+        + "G_END_DECLS\n\n#endif\n",
+        f"{SOURCE}/maplibre-native-ffi-handles-private.h": HEADER
+        + f"#ifndef {MACRO}_HANDLES_PRIVATE_H\n#define {MACRO}_HANDLES_PRIVATE_H\n\n"
+        + "#include <maplibre_native_c.h>\n\n"
+        + '#include "maplibre-native-ffi-handles.h"\n'
+        + '#include "maplibre-native-ffi-private.h"\n\n'
+        + "G_BEGIN_DECLS\n\n"
+        + handles_private
+        + "\nG_END_DECLS\n\n#endif\n",
+        f"{SOURCE}/maplibre-native-ffi-handles.c": HEADER
+        + '#include "maplibre-native-ffi-handles.h"\n\n'
+        + "#include <maplibre_native_c.h>\n#include <maplibre_native_c/plugin.h>\n#include <string.h>\n\n"
+        + '#include "maplibre-native-ffi-handles-private.h"\n'
+        + '#include "maplibre-native-ffi-private.h"\n'
+        + '#include "maplibre-native-ffi-values-private.h"\n\n'
+        + handles_source
+        + module_source,
+    }
+    return files
 
 
 def symbols(bound: BoundApi) -> docs.Symbol:
@@ -677,51 +1756,55 @@ def symbols(bound: BoundApi) -> docs.Symbol:
 
 
 def _symbols(bound: BoundApi) -> docs.Symbol:
-    # A declaration that the library doesn't generate yet keeps its C name, so
-    # the text that names it stays.
-    slice_operations = {
-        plan.name
-        for plan in bound.operations
-        if plan.factory in SLICE or receiver_type(plan) in SLICE
-    }
-    reached = {
-        parameter.value.element.native
-        for plan in bound.operations
-        if plan.name in slice_operations
-        for parameter in plan.inputs
-        if parameter.value.element is not None
-    }
+    bound = compile_api(bound, TARGETS)
 
     def type_(native: str) -> str | None:
-        value = bound.values.get(native)
-        if native in SLICE or native in reached:
-            return type_name(native)
-        if value is not None and value.kind == "enum":
-            return type_name(native)
-        return native
+        if native == COMPLETION_RESULT:
+            return None
+        return type_name(native)
 
     def operation(plan: OperationPlan) -> str | None:
         # The C text that names a function writes its parentheses.
-        if plan.name not in slice_operations:
-            return plan.name
         receiver = receiver_type(plan)
+        if plan.view is not None:
+            return f"{symbol_name(plan.view.owner.native)}_get_{plan.view.stem}"
         if receiver is not None:
             handle = bound.handles[receiver]
             if plan.name == handle.release and handle.release_waits:
                 return f"{symbol_name(receiver)}_release_async"
-            if plan.name == handle.dispose:
+            # A handle whose one teardown is both its release and its dispose
+            # names it as its release.
+            if plan.name == handle.dispose and handle.dispose != handle.release:
                 return f"{symbol_name(receiver)}_dispose"
+        if plan.completion is not None and plan.shape != "attach":
+            return f"{method_name(plan)}_async"
         return method_name(plan)
 
     def constant(value: ValuePlan, member: str) -> str | None:
+        # The error domain has no code for success, which a status member
+        # holds as 0.
         if value.native == STATUS and dict(value.enum_values)[member] == 0:
+            return "0"
+        if value.native in bound.control_enums:
             return None
         return constant_name(value, member)
 
+    values = Values(bound, lambda name: None)
+
     def field_(value: ValuePlan, member: FieldPlan) -> str | None:
-        if value.native not in reached:
-            return f"{value.native}.{member.name}"
-        return f"{symbol_name(value.native)}_set_{member.name}()"
+        if value.kind == "union":
+            return f"{symbol_name(value.native)}_get_{member.name}"
+        if value.kind == "record" and value.union_member:
+            return None
+        if values.transparent(value):
+            return f"{type_name(value.native)}.{member.name}"
+        if member.value.kind == "callback":
+            return f"{symbol_name(value.native)}_set_{member.name}"
+        prop = values.property_name(value, member)
+        if prop is not None:
+            return f"{type_name(value.native)}:{prop}"
+        verb = "set" if value.native in bound.inputs else "get"
+        return f"{symbol_name(value.native)}_{verb}_{accessor(value, member.name)}"
 
     return docs.resolver(
         bound,
@@ -729,5 +1812,11 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         operation=operation,
         constant=constant,
         field=field_,
+        define=define_name,
+        extra={
+            f"{COMPLETION_RESULT}.{name}": f"MaplibreNativeFfiCommandCompletion.{name}"
+            for name in ("generation", "render_update_generation")
+        },
         threads=async_hosts.threads(bound, THREADS),
+        fields=async_hosts.omitted_fields(bound),
     )

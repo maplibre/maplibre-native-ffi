@@ -73,6 +73,7 @@ mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_di
             "dart",
             "dotnet",
             "go",
+            "gobject",
             "kotlin",
             "python",
             "rust",

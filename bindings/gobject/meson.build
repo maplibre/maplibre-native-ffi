@@ -34,6 +34,7 @@ add_project_arguments(
 )
 
 headers = files(
+  'src/maplibre-native-ffi-command-completion.h',
   'src/maplibre-native-ffi-enums.h',
   'src/maplibre-native-ffi-handles.h',
   'src/maplibre-native-ffi-values.h',
@@ -87,5 +88,6 @@ gnome.generate_vapi(
   package,
   sources: gir[0],
   packages: ['gio-2.0'],
+  metadata_dirs: [meson.current_source_dir() / 'vapi'],
   install: true,
 )

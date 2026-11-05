@@ -11,6 +11,7 @@ from tools.bindgen.emitters import (
     dart_native,
     dotnet,
     go,
+    gobject,
     kotlin,
     python,
     rust,
@@ -21,7 +22,7 @@ from tools.bindgen.emitters import (
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
 
-EMITTERS = (dart, dotnet, go, kotlin, python, rust, swift, typescript, zig)
+EMITTERS = (dart, dotnet, go, gobject, kotlin, python, rust, swift, typescript, zig)
 
 # Protocol shapes an emitter's runtime cannot represent yet. Each emitter
 # reports these declarations as unsupported with its reason.
@@ -347,6 +348,12 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
             go: (
                 "func (value View) ToOptions() ViewOptions { return ViewOptions{Zoom: &value.Zoom, Center: &value.Center} }",
             ),
+            gobject: (
+                (
+                    "  maplibre_native_ffi_view_options_set_center(options, &self->center);\n"
+                    "  maplibre_native_ffi_view_options_set_zoom(options, self->zoom);\n"
+                ),
+            ),
             kotlin: (
                 "public fun toOptions(): ViewOptions = ViewOptions(zoom = zoom, center = center)",
             ),
@@ -374,7 +381,10 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 source = self.rendered(emitter, api)
                 for line in lines:
                     self.assertIn(line, source)
-                self.assertRegex(source, r"ViewOptions(`|</c>)? that set each of its")
+                # A comment's line may break between the words.
+                self.assertRegex(
+                    source, r"ViewOptions(`|</c>)? that[\s*]+set each of its"
+                )
 
     def test_an_input_record_converts_its_absent_members_to_zero(self):
         # A TypeScript record that native never returns may omit a member,

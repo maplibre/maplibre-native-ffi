@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#MISE description="Run the GObject library's GTest suite and GJS smoke test, and compile its docs snippets, against the installed library."
+#MISE extends="ffi:preset"
+#MISE depends=[{ task = ":build", args = ["{{usage.preset}}"] }]
+#MISE shell="bash"
+set -euo pipefail
+
+install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sources="$PWD/tests"
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
+export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
+package=maplibre-native-ffi-gobject-0
+
+# The suite renders with the graphics objects of the C suite's fixtures.
+# shellcheck disable=SC2046 # pkg-config prints one flag per word.
+cc -std=c11 -Wall -Wextra -Werror "$sources/suite/main.c" \
+  $(pkg-config --cflags --libs "$package" mln-test-graphics) -o "$scratch/suite"
+"$scratch/suite"
+
+case "$(uname -s)" in
+  # Homebrew's GJS typelib names libgjs by its leaf name, which the rpath of
+  # Homebrew's gjs doesn't reach, so its Gio overrides fail to load.
+  Darwin)
+    gjs_lib="$(dirname "$(realpath "$(command -v gjs)")")/../lib"
+    export DYLD_LIBRARY_PATH="$install_dir/lib:$gjs_lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+    ;;
+  *) export LD_LIBRARY_PATH="$install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+esac
+GI_TYPELIB_PATH="$install_dir/lib/girepository-1.0" gjs -m "$sources/smoke/main.js"
+
+# The guides' Vala snippets compile through the installed VAPI, and never run.
+# valac writes its objects to the working directory.
+(
+  cd "$scratch"
+  valac --compile --vapidir="$install_dir/share/vala/vapi" --pkg "$package" \
+    "$sources"/docsnippets/*.vala
+)

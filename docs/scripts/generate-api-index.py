@@ -33,7 +33,17 @@ from tools.bindgen.frontend import parse_headers
 from tools.bindgen.model import Api
 from tools.bindgen.schema import platforms, validate
 
-BINDINGS = ("dart", "dotnet", "go", "kotlin", "python", "rust", "swift", "zig")
+BINDINGS = (
+    "dart",
+    "dotnet",
+    "go",
+    "gobject",
+    "kotlin",
+    "python",
+    "rust",
+    "swift",
+    "zig",
+)
 
 # A symbol's link within its language's reference, or None.
 Link = Callable[[str], str | None]
@@ -107,6 +117,60 @@ def dotnet_links() -> Link:
 def go_links() -> Link:
     ids = anchors(REFERENCE / "go" / "index.html")
     return lambda name: f"#{name}" if name in ids else None
+
+
+def gobject_links(api: Api, names: dict[str, str]) -> Link:
+    """gi-docgen names a page for each type and function, by its kind, its
+    type, and its name, and its search index gives each one's C name.
+
+    An enum's constants and a struct's fields are on the type's page.
+    """
+    index = json.loads((REFERENCE / "gobject" / "index.json").read_text())
+    kinds = {
+        "bitfield": "flags",
+        "callback": "callback",
+        "class": "class",
+        "constant": "const",
+        "domain": "error",
+        "enum": "enum",
+        "function": "func",
+        "record": "struct",
+    }
+    pages: dict[str, str] = {}
+    # A property has no C name of its own, so it's keyed as the binding
+    # spells it: its type's C name, a colon, and its name.
+    ctypes = {
+        symbol["name"]: symbol["ctype"]
+        for symbol in index["symbols"]
+        if symbol["type"] in {"class", "record"} and "ctype" in symbol
+    }
+    for symbol in index["symbols"]:
+        if symbol["type"] == "property" and symbol["type_name"] in ctypes:
+            page = f"property.{symbol['type_name']}.{symbol['name']}.html"
+            pages[f"{ctypes[symbol['type_name']]}:{symbol['name']}"] = page
+        kind = symbol["type"]
+        if "type_name" in symbol:
+            page = f"{kind}.{symbol['type_name']}.{symbol['name']}.html"
+        elif kind in kinds:
+            page = f"{kinds[kind]}.{symbol['name']}.html"
+        else:
+            continue
+        for key in ("ctype", "ident"):
+            if key in symbol:
+                pages[symbol[key]] = page
+    owners = {
+        names[member.name]: names[enum.name]
+        for enum in api.enums
+        for member in enum.values
+        if member.name in names and enum.name in names
+    }
+
+    def link(name: str) -> str | None:
+        if name in pages:
+            return pages[name]
+        return pages.get(owners.get(name, name.partition(".")[0]))
+
+    return link
 
 
 def kotlin_links() -> Link:
@@ -276,6 +340,7 @@ def main() -> None:
     index: dict[str, dict[str, dict[str, str]]] = {}
     links = {language: make() for language, make in LINKS.items()}
     links["zig"] = zig_links(names["zig"])
+    links["gobject"] = gobject_links(api, names["gobject"])
     for language, link in links.items():
         for native, spelled in names[language].items():
             url = link(spelled)

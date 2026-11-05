@@ -40,8 +40,7 @@ GQuark maplibre_native_ffi_error_quark(void);
  * The result of a call or of asynchronous work.
  *
  * See `mln_status` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT = -1,
@@ -75,13 +74,11 @@ GType maplibre_native_ffi_error_get_type(void) G_GNUC_CONST;
  * A maintenance action on a runtime's cache database.
  *
  * The cache database is the file that
- * `maplibre_native_ffi_runtime_options_set_cache_path()` names. It holds the
- * ambient cache, meaning the resources that maps loaded, and the offline
- * regions.
+ * `MaplibreNativeFfiRuntimeOptions:cache-path` names. It holds the ambient
+ * cache, meaning the resources that maps loaded, and the offline regions.
  *
  * See `mln_cache_database_operation` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_CACHE_DATABASE_OPERATION_CLEAR = 1,
@@ -102,8 +99,7 @@ GType maplibre_native_ffi_cache_database_operation_get_type(void) G_GNUC_CONST;
  * Whether a camera change jumps or animates.
  *
  * See `mln_camera_change_mode` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
@@ -119,13 +115,13 @@ GType maplibre_native_ffi_camera_change_mode_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_COMPLETED: The camera finished
  *   the change.
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_CANCELLED:
- *   `mln_map_cancel_camera_transitions()`,
- *   `mln_map_cancel_camera_transitions_with_id()`, a gesture's
- *   `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_BEGIN` or
+ *   `maplibre_native_ffi_map_cancel_camera_transitions_async()`,
+ *   `maplibre_native_ffi_map_cancel_camera_transitions_with_id_async()`, a
+ *   gesture's `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_BEGIN` or
  *   `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_CANCEL`,
- *   `mln_map_set_free_camera_options()`, or a resize that moved the camera back
- *   inside its bounds stopped the change. A command that fails before it moves
- *   the camera also reports this.
+ *   `maplibre_native_ffi_map_set_free_camera_options_async()`, or a resize that
+ *   moved the camera back inside its bounds stopped the change. A command that
+ *   fails before it moves the camera also reports this.
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_CLOSED: The map closed before
  *   the change ended.
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_REPLACED: A later camera
@@ -142,8 +138,7 @@ GType maplibre_native_ffi_camera_change_mode_get_type(void) G_GNUC_CONST;
  * replaced.
  *
  * See `mln_camera_transition_outcome` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0,
@@ -167,8 +162,7 @@ GType maplibre_native_ffi_camera_transition_outcome_get_type(void) G_GNUC_CONST;
  * How a camera command moves the camera.
  *
  * See `mln_camera_update_mode` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_CAMERA_UPDATE_MODE_JUMP = 0,
@@ -188,13 +182,12 @@ GType maplibre_native_ffi_camera_update_mode_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_CONSTRAIN_MODE_WIDTH_AND_HEIGHT: Keeps the world filling
  *   the view in both directions.
  * @MAPLIBRE_NATIVE_FFI_CONSTRAIN_MODE_SCREEN: Keeps the whole view inside the
- *   bounds from `mln_map_set_bounds()`.
+ *   bounds from `maplibre_native_ffi_map_set_bounds_async()`.
  *
  * How the map keeps the camera within the world or within its bounds.
  *
  * See `mln_constrain_mode` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_CONSTRAIN_MODE_NONE = 0,
@@ -224,8 +217,7 @@ GType maplibre_native_ffi_constrain_mode_get_type(void) G_GNUC_CONST;
  * target shows each frame that it draws.
  *
  * See `mln_frame_demand_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_FRAME_DEMAND_FORCE = 1,
@@ -257,8 +249,7 @@ GType maplibre_native_ffi_frame_demand_flag_get_type(void) G_GNUC_CONST;
  * `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_CANCEL` end it.
  *
  * See `mln_gesture_phase` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_NONE = 0,
@@ -292,14 +283,13 @@ GType maplibre_native_ffi_gesture_phase_get_type(void) G_GNUC_CONST;
  * How one side waits for the other's GPU work on a shared texture.
  *
  * A sync file descriptor or an OpenGL fence signals once, so when
- * `mln_acquired_frame_release()` succeeds, the session takes the one you pass.
- * A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up
- * with each frame, so the one you pass stays yours. Keep it valid until a
- * detach or release of the session completes.
+ * `maplibre_native_ffi_acquired_frame_release()` succeeds, the session takes
+ * the one you pass. A Vulkan timeline semaphore, Metal shared event, or D3D12
+ * fence counts up with each frame, so the one you pass stays yours. Keep it
+ * valid until a detach or release of the session completes.
  *
  * See `mln_gpu_sync_kind` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE = 0,
@@ -328,8 +318,7 @@ GType maplibre_native_ffi_gpu_sync_kind_get_type(void) G_GNUC_CONST;
  * A GPU sync kind, as a bit in a set.
  *
  * See `mln_gpu_sync_kind_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_GPU_SYNC_KIND_FLAG_CPU_COMPLETE = 1,
@@ -368,8 +357,7 @@ GType maplibre_native_ffi_gpu_sync_kind_flag_get_type(void) G_GNUC_CONST;
  * The part of the library that logged a message.
  *
  * See `mln_log_event` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_LOG_EVENT_GENERAL = 0,
@@ -404,8 +392,7 @@ GType maplibre_native_ffi_log_event_get_type(void) G_GNUC_CONST;
  * The severity of a log message.
  *
  * See `mln_log_severity` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_INFO = 1,
@@ -423,14 +410,14 @@ GType maplibre_native_ffi_log_severity_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_WARNING:
  * @MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_ERROR:
  * @MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_DEFAULT: The severities logged on a
- *   background thread until `mln_log_set_async_severity_mask()` changes them.
+ *   background thread until `maplibre_native_ffi_set_log_async_severity_mask()`
+ *   changes them.
  * @MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_ALL:
  *
  * A log severity, as a bit in a set.
  *
  * See `mln_log_severity_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_LOG_SEVERITY_FLAG_INFO = 2,
@@ -457,8 +444,7 @@ GType maplibre_native_ffi_log_severity_flag_get_type(void) G_GNUC_CONST;
  * A debug overlay that the map draws.
  *
  * See `mln_map_debug_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_MAP_DEBUG_TILE_BORDERS = 2,
@@ -485,8 +471,7 @@ GType maplibre_native_ffi_map_debug_flag_get_type(void) G_GNUC_CONST;
  * Why a map failed to load a style.
  *
  * See `mln_map_load_error` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_MAP_LOAD_ERROR_UNKNOWN = 0,
@@ -502,15 +487,14 @@ GType maplibre_native_ffi_map_load_error_get_type(void) G_GNUC_CONST;
  * MaplibreNativeFfiMapMode:
  * @MAPLIBRE_NATIVE_FFI_MAP_MODE_CONTINUOUS: Renders whenever the map changes.
  * @MAPLIBRE_NATIVE_FFI_MAP_MODE_STATIC: Renders only when
- *   `mln_map_request_still_image()` asks for an image.
+ *   `maplibre_native_ffi_map_request_still_image_async()` asks for an image.
  * @MAPLIBRE_NATIVE_FFI_MAP_MODE_TILE: Renders still images of single tiles, as
  *   `MAPLIBRE_NATIVE_FFI_MAP_MODE_STATIC` does.
  *
  * When a map renders.
  *
  * See `mln_map_mode` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_MAP_MODE_CONTINUOUS = 0,
@@ -530,8 +514,7 @@ GType maplibre_native_ffi_map_mode_get_type(void) G_GNUC_CONST;
  * Whether the library may use the network.
  *
  * See `mln_network_status` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_NETWORK_STATUS_ONLINE = 1,
@@ -552,8 +535,7 @@ GType maplibre_native_ffi_network_status_get_type(void) G_GNUC_CONST;
  * The screen direction that north points to when the bearing is 0.
  *
  * See `mln_north_orientation` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_NORTH_ORIENTATION_UP = 0,
@@ -574,8 +556,7 @@ GType maplibre_native_ffi_north_orientation_get_type(void) G_GNUC_CONST;
  * Whether an offline region is downloading.
  *
  * See `mln_offline_region_download_state` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0,
@@ -597,8 +578,7 @@ GType maplibre_native_ffi_offline_region_download_state_get_type(
  * The OpenGL API that a context renders with.
  *
  * See `mln_open_gl_client_api` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_UNSPECIFIED = 0,
@@ -620,8 +600,7 @@ GType maplibre_native_ffi_open_gl_client_api_get_type(void) G_GNUC_CONST;
  * Whether a render session's OpenGL context shares objects with yours.
  *
  * See `mln_open_gl_context_ownership` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0,
@@ -641,8 +620,7 @@ GType maplibre_native_ffi_open_gl_context_ownership_get_type(void) G_GNUC_CONST;
  * An OpenGL context platform, as a bit in a set.
  *
  * See `mln_open_gl_context_provider_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1,
@@ -663,11 +641,11 @@ GType maplibre_native_ffi_open_gl_context_provider_flag_get_type(
  *   objects that it couldn't destroy safely. They stay allocated until the
  *   process exits.
  *
- * What `mln_render_session_abandon()` did with a session's graphics objects.
+ * What `maplibre_native_ffi_render_session_abandon()` did with a session's
+ * graphics objects.
  *
  * See `mln_render_abandon_disposition` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_ABANDON_DISPOSITION_CLEAN = 0,
@@ -690,8 +668,7 @@ GType maplibre_native_ffi_render_abandon_disposition_get_type(
  * A render backend, as a bit in a set.
  *
  * See `mln_render_backend_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_METAL = 1,
@@ -708,13 +685,12 @@ GType maplibre_native_ffi_render_backend_flag_get_type(void) G_GNUC_CONST;
  * MaplibreNativeFfiRenderDriverKind:
  * @MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER: A library thread.
  * @MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD: Your thread, when
- *   it calls `mln_render_session_service_driver_work()`.
+ *   it calls `maplibre_native_ffi_render_session_service_driver_work()`.
  *
  * The thread that runs a render session's graphics work.
  *
  * See `mln_render_driver_kind` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER = 1,
@@ -734,8 +710,7 @@ GType maplibre_native_ffi_render_driver_kind_get_type(void) G_GNUC_CONST;
  * loading.
  *
  * See `mln_render_mode` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_MODE_PARTIAL = 0,
@@ -753,18 +728,19 @@ GType maplibre_native_ffi_render_mode_get_type(void) G_GNUC_CONST;
  *   draw.
  * @MAPLIBRE_NATIVE_FFI_RENDER_RESULT_TARGET_NOT_READY: The target couldn't take
  *   a frame, such as while a window is hidden or destroyed, or after
- *   `mln_render_session_release_target()`. Demand a frame again later.
+ *   `maplibre_native_ffi_render_session_release_target_async()`. Demand a frame
+ *   again later.
  * @MAPLIBRE_NATIVE_FFI_RENDER_RESULT_SUPERSEDED: A later demand with the same
  *   flags replaced this one.
  * @MAPLIBRE_NATIVE_FFI_RENDER_RESULT_FAILED: The session failed, and
- *   `mln_render_session_get_failure()` reports why. Once
- *   `mln_render_session_release()` completes, you can attach a new session.
+ *   `maplibre_native_ffi_render_session_get_failure()` reports why. Once
+ *   `maplibre_native_ffi_render_session_release_async()` completes, you can
+ *   attach a new session.
  *
  * How a frame demand finished.
  *
  * See `mln_render_result` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_RESULT_RENDERED = 0,
@@ -781,17 +757,18 @@ GType maplibre_native_ffi_render_result_get_type(void) G_GNUC_CONST;
 /**
  * MaplibreNativeFfiRenderSessionCapabilityFlag:
  * @MAPLIBRE_NATIVE_FFI_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION:
- *   `mln_render_session_acquire_frame()` can take the frames it renders.
+ *   `maplibre_native_ffi_render_session_acquire_frame()` can take the frames it
+ *   renders.
  * @MAPLIBRE_NATIVE_FFI_RENDER_SESSION_CAPABILITY_READBACK:
- *   `mln_render_session_read_texture()` can copy its texture to memory.
+ *   `maplibre_native_ffi_render_session_read_texture_async()` can copy its
+ *   texture to memory.
  * @MAPLIBRE_NATIVE_FFI_RENDER_SESSION_CAPABILITY_PRESENTATION: It shows frames
  *   on a surface.
  *
  * Something that a render session can do.
  *
  * See `mln_render_session_capability_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1,
@@ -817,8 +794,7 @@ GType maplibre_native_ffi_render_session_capability_flag_get_type(
  * Where a render session is in its life.
  *
  * See `mln_render_session_state` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_SESSION_STATE_ATTACHING = 1,
@@ -847,8 +823,7 @@ GType maplibre_native_ffi_render_session_state_get_type(void) G_GNUC_CONST;
  * Why a resource request failed.
  *
  * See `mln_resource_error_reason` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RESOURCE_ERROR_REASON_OTHER = 0,
@@ -876,8 +851,7 @@ GType maplibre_native_ffi_resource_error_reason_get_type(void) G_GNUC_CONST;
  * The kind of a resource that the library loads.
  *
  * See `mln_resource_kind` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RESOURCE_KIND_UNKNOWN = 0,
@@ -909,8 +883,7 @@ GType maplibre_native_ffi_resource_kind_get_type(void) G_GNUC_CONST;
  * A resource kind, as a bit in a set.
  *
  * See `mln_resource_kind_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RESOURCE_KIND_FLAG_UNKNOWN = 1,
@@ -937,8 +910,7 @@ GType maplibre_native_ffi_resource_kind_flag_get_type(void) G_GNUC_CONST;
  * Where a request may load its resource from.
  *
  * See `mln_resource_loading_method` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RESOURCE_LOADING_METHOD_ALL = 0,
@@ -958,8 +930,7 @@ GType maplibre_native_ffi_resource_loading_method_get_type(void) G_GNUC_CONST;
  * The priority of a resource request.
  *
  * See `mln_resource_priority` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RESOURCE_PRIORITY_REGULAR = 0,
@@ -982,8 +953,7 @@ GType maplibre_native_ffi_resource_priority_get_type(void) G_GNUC_CONST;
  * The outcome of a resource request.
  *
  * See `mln_resource_response_status` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RESOURCE_RESPONSE_STATUS_OK = 0,
@@ -1004,8 +974,7 @@ GType maplibre_native_ffi_resource_response_status_get_type(void) G_GNUC_CONST;
  * Whether the library keeps a loaded resource in its cache.
  *
  * See `mln_resource_storage_policy` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RESOURCE_STORAGE_POLICY_PERMANENT = 0,
@@ -1024,8 +993,7 @@ GType maplibre_native_ffi_resource_storage_policy_get_type(void) G_GNUC_CONST;
  * Whether a request loads a resource for a map or an offline region.
  *
  * See `mln_resource_usage` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RESOURCE_USAGE_ONLINE = 0,
@@ -1071,8 +1039,7 @@ GType maplibre_native_ffi_resource_usage_get_type(void) G_GNUC_CONST;
  * An event type, as a bit in a set.
  *
  * See `mln_runtime_event_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_NONE = 0,
@@ -1119,8 +1086,7 @@ GType maplibre_native_ffi_runtime_event_flag_get_type(void) G_GNUC_CONST;
  * The kind of handle that raised an event.
  *
  * See `mln_runtime_event_source_type` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
@@ -1176,11 +1142,10 @@ GType maplibre_native_ffi_runtime_event_source_type_get_type(void) G_GNUC_CONST;
  * `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_LOADING_FINISHED`,
  * `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_IDLE`, and the render frame and render
  * map events. Offline region events come only for the regions and types that
- * `maplibre_native_ffi_runtime_set_offline_region_observed()` selects.
+ * `maplibre_native_ffi_runtime_set_offline_region_observed_async()` selects.
  *
  * See `mln_runtime_event_type` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -1232,8 +1197,7 @@ GType maplibre_native_ffi_runtime_event_type_get_type(void) G_GNUC_CONST;
  * The type of a style expression's result, or of the items of an array result.
  *
  * See `mln_style_expression_type_kind` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_STYLE_EXPRESSION_TYPE_VALUE = 0,
@@ -1265,8 +1229,7 @@ GType maplibre_native_ffi_style_expression_type_kind_get_type(
  * How an image stretches to fit text along one axis.
  *
  * See `mln_style_image_text_fit` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK = 0,
@@ -1286,8 +1249,7 @@ GType maplibre_native_ffi_style_image_text_fit_get_type(void) G_GNUC_CONST;
  * Whether a layer shows.
  *
  * See `mln_style_layer_visibility` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_STYLE_LAYER_VISIBILITY_VISIBLE = 0,
@@ -1306,8 +1268,7 @@ GType maplibre_native_ffi_style_layer_visibility_get_type(void) G_GNUC_CONST;
  * How a raster DEM tile encodes elevation in its colors.
  *
  * See `mln_style_raster_dem_encoding` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0,
@@ -1334,8 +1295,7 @@ GType maplibre_native_ffi_style_raster_dem_encoding_get_type(void) G_GNUC_CONST;
  * The type of a style source.
  *
  * See `mln_style_source_type` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_STYLE_SOURCE_TYPE_UNKNOWN = 0,
@@ -1362,8 +1322,7 @@ GType maplibre_native_ffi_style_source_type_get_type(void) G_GNUC_CONST;
  * Whether a tileset counts tile rows from the north (XYZ) or the south (TMS).
  *
  * See `mln_style_tile_scheme` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_STYLE_TILE_SCHEME_XYZ = 0,
@@ -1382,8 +1341,7 @@ GType maplibre_native_ffi_style_tile_scheme_get_type(void) G_GNUC_CONST;
  * The format of vector tiles.
  *
  * See `mln_style_vector_tile_encoding` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_STYLE_VECTOR_TILE_ENCODING_MVT = 0,
@@ -1406,8 +1364,7 @@ GType maplibre_native_ffi_style_vector_tile_encoding_get_type(
  * How the map picks the level of detail of its tiles.
  *
  * See `mln_tile_lod_mode` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_TILE_LOD_MODE_DEFAULT = 0,
@@ -1433,8 +1390,7 @@ GType maplibre_native_ffi_tile_lod_mode_get_type(void) G_GNUC_CONST;
  * A step in loading a tile.
  *
  * See `mln_tile_operation` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_TILE_OPERATION_REQUESTED_FROM_CACHE = 0,
@@ -1466,8 +1422,7 @@ GType maplibre_native_ffi_tile_operation_get_type(void) G_GNUC_CONST;
  * only the URL that equals it exactly.
  *
  * See `mln_url_match_flag` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_URL_MATCH_GLOB = 1,
@@ -1485,8 +1440,7 @@ GType maplibre_native_ffi_url_match_flag_get_type(void) G_GNUC_CONST;
  * The vertical direction of the image that the map renders.
  *
  * See `mln_viewport_mode` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_VIEWPORT_MODE_DEFAULT = 0,
@@ -1513,8 +1467,7 @@ GType maplibre_native_ffi_viewport_mode_get_type(void) G_GNUC_CONST;
  * side before you read it. You don't need to release it back.
  *
  * See `mln_vulkan_image_owner` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0,
@@ -1537,8 +1490,7 @@ GType maplibre_native_ffi_vulkan_image_owner_get_type(void) G_GNUC_CONST;
  * How a render session gets its WebGL context.
  *
  * See `mln_web_gl_context_kind` in the
- * [C API
- * reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_WEB_GL_CONTEXT_EXISTING = 0,

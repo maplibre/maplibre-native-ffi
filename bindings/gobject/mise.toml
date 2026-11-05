@@ -21,7 +21,14 @@ export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
 [tasks.test]
 description = "Test the GObject library against a native preset's install."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-run = [{ task = ":package", args = ["{{usage.preset}}"] }]
+run = [
+  { task = ":package", args = [
+    "{{usage.preset}}",
+  ] },
+  { task = ":suite", args = [
+    "{{usage.preset}}",
+  ] },
+]
 
 [tasks.api]
 description = "Generate the gi-docgen HTML API reference for the GObject library."

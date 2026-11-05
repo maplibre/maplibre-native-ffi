@@ -3,8 +3,9 @@
 
 async int run () {
 	try {
-		var options = new MaplibreNativeFfi.RuntimeOptions ();
-		options.set_asset_path (".");
+		var options = new MaplibreNativeFfi.RuntimeOptions () {
+			asset_path = ".",
+		};
 		var runtime = new MaplibreNativeFfi.Runtime.create (options);
 		yield runtime.release_async ();
 		try {

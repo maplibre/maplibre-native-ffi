@@ -27,6 +27,11 @@ const files: Record<string, Files> = {
     import: "default",
     eager: true,
   }),
+  gobject: import.meta.glob("../../bindings/gobject/tests/docsnippets/*.vala", {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  }),
   java: import.meta.glob(
     "../../bindings/kotlin/src/*/java/**/docsnippets/*Test.java",
     { query: "?raw", import: "default", eager: true },

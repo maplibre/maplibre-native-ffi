@@ -266,11 +266,13 @@
 /go/maplibre/generated_callbacks.h linguist-generated=true
 /gobject/src/maplibre-native-ffi-enums.c linguist-generated=true
 /gobject/src/maplibre-native-ffi-enums.h linguist-generated=true
+/gobject/src/maplibre-native-ffi-handles-private.h linguist-generated=true
 /gobject/src/maplibre-native-ffi-handles.c linguist-generated=true
 /gobject/src/maplibre-native-ffi-handles.h linguist-generated=true
 /gobject/src/maplibre-native-ffi-values-private.h linguist-generated=true
 /gobject/src/maplibre-native-ffi-values.c linguist-generated=true
 /gobject/src/maplibre-native-ffi-values.h linguist-generated=true
+/gobject/vapi/MaplibreNativeFfi-0.metadata linguist-generated=true
 /kotlin/src/androidMain/jni/mln_jni_generated.c linguist-generated=true
 /kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/GeneratedAndroidOperations.kt linguist-generated=true
 /kotlin/src/androidMain/kotlin/org/maplibre/nativeffi/internal/c/C.kt linguist-generated=true
