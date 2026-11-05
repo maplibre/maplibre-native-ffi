@@ -137,7 +137,17 @@ def gobject_links(api: Api, names: dict[str, str]) -> Link:
         "record": "struct",
     }
     pages: dict[str, str] = {}
+    # A property has no C name of its own, so it's keyed as the binding
+    # spells it: its type's C name, a colon, and its name.
+    ctypes = {
+        symbol["name"]: symbol["ctype"]
+        for symbol in index["symbols"]
+        if symbol["type"] in {"class", "record"} and "ctype" in symbol
+    }
     for symbol in index["symbols"]:
+        if symbol["type"] == "property" and symbol["type_name"] in ctypes:
+            page = f"property.{symbol['type_name']}.{symbol['name']}.html"
+            pages[f"{ctypes[symbol['type_name']]}:{symbol['name']}"] = page
         kind = symbol["type"]
         if "type_name" in symbol:
             page = f"{kind}.{symbol['type_name']}.{symbol['name']}.html"
