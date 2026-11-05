@@ -78,7 +78,7 @@ labels:
         "binding:*": ~
         binding:gobject:
           rules:
-            - if: { files: ["bindings/gobject/**"] }
+            - if: { files: ["bindings/gobject/**", "examples/gtk/**"] }
               then: apply
       guidance: >-
         Only for work specific to this binding. Work that several bindings pick
@@ -669,6 +669,19 @@ ci:
         - if:
             files:
               - examples/compose/**
+          then: apply
+    gtk:
+      covers: >-
+        Builds the GObject library and the GTK example for Linux x64 against the
+        archive that the Linux x64 Vulkan target built, so it runs that target.
+        It runs no app. Catches what breaks the example's Vala or its meson
+        build against GTK 4.14 and the installed VAPI: changes to the example,
+        and to the GObject library's render session, frame, and dmabuf API that
+        it calls.
+      rules:
+        - if:
+            files:
+              - examples/gtk/**
           then: apply
     ohpm:
       covers: >-

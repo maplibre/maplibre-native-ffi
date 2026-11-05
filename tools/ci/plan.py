@@ -144,6 +144,11 @@ JOBS = {
         "compose",
         lambda target: target.preset == "android-x64-egl",
     ),
+    # The GTK example builds against the Linux x64 Vulkan archive.
+    "gtk-linux": (
+        "gtk",
+        lambda target: target.preset == "linux-gnu-x64-vulkan",
+    ),
     # The ArkUI example packs its HARs from one addon.
     "arkui-hap": ("arkui", lambda target: target.preset == "ohos-x64-egl"),
     "swift-package": (

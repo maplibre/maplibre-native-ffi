@@ -1,0 +1,35 @@
+# The GTK example for Linux. Run it with `mise run //examples/gtk:run`. meson
+# comes from the root uv project. GTK, GLib, and Vala are system packages; see
+# .config/mise.linux.toml.
+
+# CI builds the app with this, without running it.
+[tasks.build]
+description = "Build the C library and the GObject library for a Linux preset, then build the GTK example against their install."
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}" {
+  choices "linux-gnu-x64-vulkan" "linux-gnu-x64-egl" "linux-gnu-arm64-vulkan" "linux-gnu-arm64-egl"
+}
+'''
+depends = [{ task = "//bindings/gobject:build", args = ["{{usage.preset}}"] }]
+run = '''
+install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/gtk-example"
+meson=(uv run --project "$MISE_MONOREPO_ROOT" --no-sync meson)
+setup=(setup "$build_dir" . --buildtype=release)
+if [[ -f "$build_dir/build.ninja" ]]; then
+  setup+=(--reconfigure)
+fi
+export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
+"${meson[@]}" "${setup[@]}"
+"${meson[@]}" compile -C "$build_dir"
+'''
+
+[tasks.run]
+description = "Build the GTK example for a Linux preset and run it."
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}" {
+  choices "linux-gnu-x64-vulkan" "linux-gnu-x64-egl" "linux-gnu-arm64-vulkan" "linux-gnu-arm64-egl"
+}
+'''
+depends = [{ task = "build", args = ["{{usage.preset}}"] }]
+run = '"$MISE_MONOREPO_ROOT/build/$usage_preset/gtk-example/maplibre-gtk-example"'

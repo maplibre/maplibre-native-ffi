@@ -14,7 +14,8 @@ glibc_floor = "2.17"
 glibc_floor_riscv64 = "2.27"
 glibc_floor_loongarch64 = "2.36"
 
-# GLib, gobject-introspection, Vala, and GJS build and test the GObject library.
+# GLib, gobject-introspection, Vala, and GJS build and test the GObject library,
+# and GTK builds its example.
 [bootstrap.packages]
 "apt:build-essential" = "latest"
 "apt:clang" = "latest"
@@ -26,6 +27,7 @@ glibc_floor_loongarch64 = "2.36"
 "apt:libgirepository1.0-dev" = "latest"
 "apt:libgles2-mesa-dev" = "latest"
 "apt:libglib2.0-dev" = "latest"
+"apt:libgtk-4-dev" = "latest"
 "apt:libicu-dev" = "latest"
 "apt:libncurses6" = "latest"
 "apt:libsqlite3-0" = "latest"
@@ -44,6 +46,7 @@ glibc_floor_loongarch64 = "2.36"
 "dnf:glib2-devel" = "latest"
 "dnf:glslang" = "latest"
 "dnf:gobject-introspection-devel" = "latest"
+"dnf:gtk4-devel" = "latest"
 "dnf:libglvnd-devel" = "latest"
 "dnf:libicu-devel" = "latest"
 "dnf:libwayland-client" = "latest"
