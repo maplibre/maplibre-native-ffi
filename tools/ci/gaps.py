@@ -58,6 +58,7 @@ BINDING_LABELS = {
     "dotnet": "C#",
     "dart": "Dart",
     "go": "Go",
+    "gobject": "GObject",
     # Kotlin's columns name what each ships: JARs for the JVM and Android, whose
     # AAR wraps one, and KLIBs for Kotlin/Native and Kotlin/Wasm.
     "kotlin-jvm": "Kotlin (JAR)",
