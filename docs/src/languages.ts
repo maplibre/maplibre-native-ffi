@@ -50,6 +50,16 @@ export const languages: Language[] = [
     logo: devicon("go/go-original"),
   },
   {
+    id: "gobject",
+    label: "GObject",
+    // GObject's snippets are in Vala, the language of the GTK apps that the
+    // library serves. Devicon has no GObject or GTK logo, so Vala's stands
+    // in.
+    lang: "vala",
+    title: "main.vala",
+    logo: devicon("vala/vala-original"),
+  },
+  {
     id: "java",
     label: "Java",
     lang: "java",
@@ -97,19 +107,6 @@ export const languages: Language[] = [
     lang: "zig",
     title: "main.zig",
     logo: devicon("zig/zig-original"),
-  },
-];
-
-/**
- * Libraries that have an install page and an API reference, but no guide
- * snippets yet, so the picker leaves them out.
- */
-export const libraries: Pick<Language, "id" | "label" | "logo">[] = [
-  {
-    id: "gobject",
-    label: "GObject",
-    // Devicon has no GObject or GTK logo, so Vala's stands in.
-    logo: devicon("vala/vala-original"),
   },
 ];
 

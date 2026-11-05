@@ -1,12 +1,12 @@
 ---
 // A grid of links to each language's install page, with its logo.
-import { languages, libraries } from "../languages";
+import { languages } from "../languages";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 ---
 
 <ul class="language-cards not-content">
-  {[...languages, ...libraries].map(({ id, label, logo }) => (
+  {languages.map(({ id, label, logo }) => (
     <li>
       <a href={`${base}/install/${id}/`}>
         <img src={logo} alt="" data-logo={id} />
