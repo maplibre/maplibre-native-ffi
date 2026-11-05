@@ -1,6 +1,7 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
+import kotlin.jvm.JvmStatic
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
@@ -24,7 +25,22 @@ public data class HttpHeaderTransform(
   /** The first rule that matches a request adds its headers, and no other. */
   public val rules: List<HttpHeaderRule> = emptyList(),
   public val callback: HttpHeaderTransformCallback? = null,
-)
+) {
+  @PublishedApi
+  internal fun withRules(rules: List<HttpHeaderRule>): HttpHeaderTransform = copy(rules = rules)
+
+  @PublishedApi
+  internal fun withCallback(callback: HttpHeaderTransformCallback): HttpHeaderTransform =
+    copy(callback = callback)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): HttpHeaderTransform = HttpHeaderTransform()
+  }
+}
 
 /**
  * Sets the headers of an HTTP request before the library sends it.

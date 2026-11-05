@@ -1,6 +1,7 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
+import kotlin.jvm.JvmName
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
@@ -15,6 +16,7 @@ import org.maplibre.nativeffi.internal.memory.*
  * See `mln_c_version` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
+@JvmName("cVersion")
 public fun cVersion(): UInt = nativeUncheckedCall {
   val raw = C.mln_c_version()
   raw.toUInt()

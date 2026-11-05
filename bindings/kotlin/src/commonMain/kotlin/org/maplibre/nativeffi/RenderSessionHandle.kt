@@ -1,7 +1,7 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
-import kotlin.jvm.JvmInline
+import kotlin.jvm.JvmName
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
@@ -32,6 +32,7 @@ private constructor(
     HandleState("RenderSessionHandle", handle, GeneratedOwnerDisposal::renderSession)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /** The native handle value. It stays readable after release. */
+  @get:JvmName("getId")
   public val id: ULong
     get() = binding.handle.toULong()
 
@@ -255,6 +256,7 @@ private constructor(
    *   `sourceId`, or the source has no cluster `clusterId`.
    * - `Status.INVALID_ARGUMENT` when the source isn't a GeoJSON source with clustering turned on.
    */
+  @JvmName("getClusterChildren")
   public fun getClusterChildren(sourceId: String, clusterId: UInt): Deferred<String> =
     nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(
@@ -285,8 +287,24 @@ private constructor(
    *   `sourceId`, or the source has no cluster `clusterId`.
    * - `Status.INVALID_ARGUMENT` when the source isn't a GeoJSON source with clustering turned on.
    */
+  @JvmSynthetic
   public fun getClusterExpansionZoom(sourceId: String, clusterId: UInt): Deferred<UInt> =
     nativeSubmit(this, binding, { result -> readU32(CompletionBridge.value(result)) }) {
+      check(
+        C.mln_render_session_get_cluster_expansion_zoom(
+          handle,
+          view(sourceId),
+          clusterId.toInt(),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  @PublishedApi
+  @JvmName("getClusterExpansionZoom")
+  internal fun getClusterExpansionZoomForJava(sourceId: String, clusterId: Int): Deferred<Int> =
+    nativeSubmit(this, binding, { result -> readU32(CompletionBridge.value(result)).toInt() }) {
       check(
         C.mln_render_session_get_cluster_expansion_zoom(
           handle,
@@ -316,6 +334,7 @@ private constructor(
    *   `sourceId`, or the source has no cluster `clusterId`.
    * - `Status.INVALID_ARGUMENT` when the source isn't a GeoJSON source with clustering turned on.
    */
+  @JvmName("getClusterLeaves")
   public fun getClusterLeaves(
     sourceId: String,
     clusterId: UInt,
@@ -661,7 +680,7 @@ private constructor(
    * the command, and native logs a command that fails as a warning.
    */
   public val discarding: RenderSessionDiscarding
-    get() = RenderSessionDiscarding(this)
+    get() = RenderSessionDiscarding.wrap(this)
 
   override fun toString(): String =
     "RenderSessionHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
@@ -678,9 +697,8 @@ private constructor(
 }
 
 /** The commands of a [RenderSessionHandle] that drop their completions. */
-@JvmInline
-public value class RenderSessionDiscarding
-internal constructor(internal val owner: RenderSessionHandle) {
+public class RenderSessionDiscarding
+private constructor(@get:JvmSynthetic internal val owner: RenderSessionHandle) {
   @get:JvmSynthetic
   internal val binding
     get() = owner.binding
@@ -692,4 +710,11 @@ internal constructor(internal val owner: RenderSessionHandle) {
         C.mln_render_session_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic),
       )
     }
+
+  internal companion object {
+    /** Creates the discarding view of `owner`. */
+    @JvmSynthetic
+    internal fun wrap(owner: RenderSessionHandle): RenderSessionDiscarding =
+      RenderSessionDiscarding(owner)
+  }
 }

@@ -217,7 +217,7 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
             ),
             kotlin: (
                 "public val texture: ULong get() { bindingScope?.ensureActive(); return storedTexture }",
-                "  public val width: UInt,",
+                '@get:JvmName("getWidth") public val width: UInt,',
             ),
         }
         for emitter, (lent, plain) in expected.items():

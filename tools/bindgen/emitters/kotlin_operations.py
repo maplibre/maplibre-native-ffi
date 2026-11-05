@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from ..semantic import output_member
+from . import kotlin_java as java
 from .kotlin_values import Unsupported, identifier, is_text, name, owner_name
 
 EXECUTIONS = {
@@ -344,8 +345,9 @@ PUBLIC_FROM_CARRIER = {
 }
 
 
-def completion_decode(value, values):
-    """The decode lambda body for a completion result at `result`."""
+def completion_decode(value, values, convert=lambda expression: expression):
+    """The decode lambda for a completion result at `result`, whose decoded
+    value [convert] maps."""
     bare = replace(value, nullable=False)
     if value.kind == "array":
         element = value.element
@@ -365,7 +367,7 @@ def completion_decode(value, values):
             else "CompletionBridge.valueCount(result) == 0uL"
         )
         expression = f"if ({absent}) null else {expression}"
-    return "{ result -> " + expression + " }"
+    return "{ result -> " + convert(expression) + " }"
 
 
 def operation(plan, values, native, *, discard=False):
@@ -394,11 +396,21 @@ def operation(plan, values, native, *, discard=False):
     method, params, _inputs, result, result_type = signature(plan, values)
     arguments = call_arguments(plan, values) + ["completion"]
     body = encodings(plan) + native.checked(plan.function, arguments)
-    head = f"  public fun {method}({declaration(params)}): Deferred<{result_type}> ="
+    types = [typ for _, typ in params]
+    # Java can't read an unsigned value that a Deferred boxes, so it calls a
+    # twin that decodes the signed value instead.
+    twin = (
+        not discard
+        and result is not None
+        and values.java
+        and java.unsigned(result_type)
+    )
+    annotation = "@JvmSynthetic " if twin else values.jvm_name(method, types)
+    head = f"  {annotation}public fun {method}({declaration(params)}): Deferred<{result_type}> ="
     owners = "owner, binding" if discard else receiver_arguments(plan)
     callbacks = ", bindingCallbacks" if plan.registrations else ""
     if discard:
-        head = f"  public fun {method}({declaration(params)}): Unit ="
+        head = f"  {annotation}public fun {method}({declaration(params)}): Unit ="
         helper = f"nativeDiscard({owners}{callbacks})"
     elif plan.execution == "command":
         helper = f"nativeCommand({owners}{callbacks})"
@@ -408,7 +420,29 @@ def operation(plan, values, native, *, discard=False):
         helper = (
             f"nativeSubmit({owners}, {completion_decode(result, values)}{callbacks})"
         )
-    return f"{head} {helper} {{ {body} }}\n"
+    source = f"{head} {helper} {{ {body} }}\n"
+    if twin:
+        if not any(java.unsigned(typ) for typ in types):
+            # The twin would take the Kotlin form's JVM name.
+            raise ValueError(
+                f"{method}: an unsigned result needs an unsigned parameter"
+            )
+        decode = completion_decode(
+            result,
+            values,
+            lambda expression: java.to_java(
+                f"({expression})" if " " in expression else expression, result_type
+            ),
+        )
+        # The body converts each parameter to its signed carrier, which the
+        # twin's parameters already are.
+        signed = [(local, java.signed(typ)) for local, typ in params]
+        source += (
+            f'  @PublishedApi @JvmName("{method}") internal fun {method}ForJava({declaration(signed)}): '
+            f"Deferred<{java.signed(result_type)}> = "
+            f"nativeSubmit({owners}, {decode}{callbacks}) {{ {body} }}\n"
+        )
+    return source
 
 
 def immediate(plan, values, native):
@@ -438,7 +472,8 @@ def immediate(plan, values, native):
     # The ABI version check reads the C version, so reading it skips the check.
     helper = "nativeUncheckedCall" if plan.unchecked else call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
-    return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
+    annotation = values.jvm_name(method, [*(typ for _, typ in params), result_type])
+    return f"  {annotation}public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
 
 def caller_sized_text(plan, values, native, text):
@@ -492,7 +527,8 @@ def caller_sized_text(plan, values, native, text):
     # The ABI version check reads the C version, so reading it skips the check.
     helper = "nativeUncheckedCall" if plan.unchecked else call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
-    return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
+    annotation = values.jvm_name(method, [typ for _, typ in params])
+    return f"  {annotation}public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
 
 def multiple_outputs(plan, values, native):
@@ -509,7 +545,8 @@ def multiple_outputs(plan, values, native):
     # The ABI version check reads the C version, so reading it skips the check.
     helper = "nativeUncheckedCall" if plan.unchecked else call_helper(plan)
     body = encodings(plan) + "; ".join(setup)
-    return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
+    annotation = values.jvm_name(method, [typ for _, typ in params])
+    return f"  {annotation}public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
 
 def drain(plan, values, native):
@@ -534,7 +571,8 @@ def drain(plan, values, native):
         f"drain(batch, {{ {release} }}) {{ {decoded.replace('{out}', 'out')} }} "
         "else emptyList()"
     )
-    head = f"  public fun {method}({declaration(params)}): {result_type} ="
+    annotation = values.jvm_name(method, [typ for _, typ in params])
+    head = f"  {annotation}public fun {method}({declaration(params)}): {result_type} ="
     return f"{head} {call_helper(plan)} {{ {encodings(plan)}{body} }}\n"
 
 
@@ -588,7 +626,8 @@ def owned(plan, values, native):
         )
     else:
         returns = f"Deferred<{result_type}>" if plan.completion else result_type
-    head = f"  public fun {method}({declaration(params)}): {returns} ="
+    annotation = values.jvm_name(method, [typ for _, typ in params])
+    head = f"  {annotation}public fun {method}({declaration(params)}): {returns} ="
     arguments = call_arguments(plan, values)
     owners = receiver_arguments(plan)
     arguments.append("out")
@@ -646,7 +685,7 @@ def thread_start(plan, values, native, head, arguments, create, handle):
     call = native.call(plan.function, [*arguments, "diagnostic"])
     adopted = f"adopt(out, {disposal(handle)}) {create}"
     body = f"val out = {values.storage(slot)}; threadStart {{ diagnostic -> {call} }}; {adopted}"
-    head = head.replace("  public fun ", "  public suspend fun ", 1)
+    head = head.replace("public fun ", "public suspend fun ", 1)
     drop = f"{{ it.{disposal_method(handle)}() }}"
     return f"{head} nativeThreadStart({drop}) {{ {encodings(plan)}{body} }}\n"
 
@@ -667,6 +706,7 @@ def lifecycle(plan, values, native):
         )
         arguments[receiver_index] = "holder"
     parameters = declaration(params)
+    annotation = values.jvm_name(method, [typ for _, typ in params])
 
     def body(*completion):
         call = native.checked(plan.function, [*arguments, *completion])
@@ -674,9 +714,9 @@ def lifecycle(plan, values, native):
 
     if not plan.completion:
         consume = "nativeClose" if plan.release else "nativeAnswer"
-        return f"  public fun {method}({parameters}): Unit = {consume}(this, binding) {{ {body()} }}\n"
+        return f"  {annotation}public fun {method}({parameters}): Unit = {consume}(this, binding) {{ {body()} }}\n"
     return (
-        f"  public fun {method}({parameters}): Deferred<Unit> = "
+        f"  {annotation}public fun {method}({parameters}): Deferred<Unit> = "
         f"nativeRetire(this, binding) {{ {body('completion')} }}\n"
     )
 

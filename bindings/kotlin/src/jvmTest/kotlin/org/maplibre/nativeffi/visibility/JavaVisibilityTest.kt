@@ -16,6 +16,7 @@ import kotlin.metadata.KmClass
 import kotlin.metadata.KmDeclarationContainer
 import kotlin.metadata.Visibility
 import kotlin.metadata.declaresDefaultValue
+import kotlin.metadata.isData
 import kotlin.metadata.isSecondary
 import kotlin.metadata.jvm.KotlinClassMetadata
 import kotlin.metadata.jvm.fieldSignature
@@ -54,6 +55,20 @@ class JavaVisibilityTest {
       "Java can call these members, but other Kotlin modules can't. Mark an internal member " +
         "@JvmSynthetic, make a constructor private behind an internal factory, or mark a member " +
         "that only Java calls @PublishedApi.",
+    )
+  }
+
+  /**
+   * Java passes an `int` for a u32 and a `long` for a u64. A member whose unsigned type mangles its
+   * JVM name, or that Java sees as a boxed `kotlin.UInt`, needs `@JvmName` or a Java form of the
+   * same name and arity, and a constructor that Java can't call needs a static factory.
+   */
+  @Test
+  fun javaCanCallEveryPublicMember() {
+    assertEquals(
+      emptyList(),
+      bindingClasses().values.flatMap { it.unusable() }.sorted(),
+      "Kotlin callers can call these members, but Java can't, and they have no Java form.",
     )
   }
 }
@@ -206,6 +221,50 @@ private class BindingClass(val model: ClassModel, private val classes: Map<Strin
     }
   }
 
+  /** The members that other Kotlin modules can call, but that Java can't call in any form. */
+  fun unusable(): List<String> {
+    if (!javaVisible || !kotlinVisible) return emptyList()
+    val container = container ?: return emptyList()
+    val name = internalName.replace('/', '.')
+    val methods = model.methods().associateBy { it.signature() }
+    // A Java form shares the name, without its mangled suffix, and the arity.
+    fun hasJavaForm(method: MethodModel) =
+      model.methods().any {
+        it.usable() &&
+          it.methodName().stringValue() == method.methodName().stringValue().substringBefore('-') &&
+          it.arity() == method.arity()
+      }
+    // A static factory returns the class.
+    val hasFactory =
+      model.methods().any {
+        it.usable() &&
+          AccessFlag.STATIC in it.flags().flags() &&
+          it.methodType().stringValue().endsWith(")L$internalName;")
+      }
+    val result = mutableListOf<String>()
+    fun check(signature: Any?, kind: String) {
+      val method = signature?.let { methods[it.toString()] } ?: return
+      val usable = method.usable() || hasJavaForm(method)
+      if (!usable) result += "$name.$signature ($kind)"
+    }
+    kmClass?.constructors?.forEach { constructor ->
+      if (!constructor.visibility.published) return@forEach
+      val method = constructor.signature?.let { methods[it.toString()] } ?: return@forEach
+      if (!method.usable() && !hasFactory) result += "$name.${constructor.signature} (constructor)"
+    }
+    // A data class's component and copy functions have Java forms of their own: its getters, and
+    // its factory and `withX` copies.
+    val data = kmClass?.isData == true
+    container.functions.forEach { function ->
+      val kotlinOnly = data && (function.name == "copy" || function.name.matches(COMPONENT))
+      if (function.visibility.published && !kotlinOnly) check(function.signature, "function")
+    }
+    container.properties.forEach { property ->
+      if (property.visibility.published) check(property.getterSignature, "property")
+    }
+    return result
+  }
+
   private fun publishedApi(signature: Any?): Boolean =
     signature != null &&
       model.methods().any {
@@ -219,6 +278,19 @@ private val Visibility.published: Boolean
   get() = this == Visibility.PUBLIC || this == Visibility.PROTECTED
 
 private fun MethodModel.signature() = methodName().stringValue() + methodType().stringValue()
+
+private val COMPONENT = Regex("component\\d+")
+private val BOXED_UNSIGNED = Regex("Lkotlin/U(Byte|Short|Int|Long);")
+
+/** Whether Java can call this method and pass and read its values. */
+private fun MethodModel.usable(): Boolean {
+  val generic = findAttribute(Attributes.signature()).map { it.signature().stringValue() }
+  return javaCallable() &&
+    !BOXED_UNSIGNED.containsMatchIn(methodType().stringValue()) &&
+    !generic.map(BOXED_UNSIGNED::containsMatchIn).orElse(false)
+}
+
+private fun MethodModel.arity() = methodTypeSymbol().parameterCount()
 
 private fun MethodModel.invisibleAnnotations(): List<String> =
   findAttribute(Attributes.runtimeInvisibleAnnotations())
