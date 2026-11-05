@@ -14,6 +14,13 @@
 #define PROPERTY_FLAGS \
   (G_PARAM_READWRITE | G_PARAM_EXPLICIT_NOTIFY | G_PARAM_STATIC_STRINGS)
 
+// Whether a struct's member has the offset and the size of the C record's.
+#define SAME_MEMBER(type, record, member)                      \
+  G_STATIC_ASSERT(                                             \
+    offsetof(type, member) == offsetof(record, member) &&      \
+    sizeof(((type*)0)->member) == sizeof(((record*)0)->member) \
+  )
+
 G_STATIC_ASSERT(
   MAPLIBRE_NATIVE_FFI_DIAGNOSTIC_MESSAGE_CAPACITY ==
   MLN_DIAGNOSTIC_MESSAGE_CAPACITY
@@ -46,42 +53,18 @@ void maplibre_native_ffi_unit_bezier_free(MaplibreNativeFfiUnitBezier* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_unit_bezier_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_unit_bezier_copy(
-    (const MaplibreNativeFfiUnitBezier*)self
-  );
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiUnitBezier) == sizeof(mln_unit_bezier));
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x1);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y1);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x2);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y2);
 
 void maplibre_native_ffi_unit_bezier_to_native(
   const MaplibreNativeFfiUnitBezier* self, mln_unit_bezier* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->x1 = (double)(self->x1);
-  out->y1 = (double)(self->y1);
-  out->x2 = (double)(self->x2);
-  out->y2 = (double)(self->y2);
-}
-
-void maplibre_native_ffi_unit_bezier_read(
-  MaplibreNativeFfiUnitBezier* out, const mln_unit_bezier* in
-) {
-  out->x1 = (gdouble)(in->x1);
-  out->y1 = (gdouble)(in->y1);
-  out->x2 = (gdouble)(in->x2);
-  out->y2 = (gdouble)(in->y2);
-}
-
-MaplibreNativeFfiUnitBezier* maplibre_native_ffi_unit_bezier_from_native(
-  const mln_unit_bezier* in
-) {
-  MaplibreNativeFfiUnitBezier* self = g_new0(MaplibreNativeFfiUnitBezier, 1);
-  maplibre_native_ffi_unit_bezier_read(self, in);
-  return self;
+  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiCameraTransitionHandler {
@@ -136,15 +119,6 @@ void maplibre_native_ffi_camera_transition_handler_set_callback(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-gpointer maplibre_native_ffi_camera_transition_handler_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_camera_transition_handler_copy(
-    (const MaplibreNativeFfiCameraTransitionHandler*)self
-  );
-}
-
 static void camera_transition_handler_callback_trampoline(
   void* user_data, const mln_camera_transition_end* end
 ) {
@@ -173,16 +147,6 @@ void maplibre_native_ffi_camera_transition_handler_to_native(
                       ? camera_transition_handler_callback_trampoline
                       : NULL;
   }
-}
-
-MaplibreNativeFfiCameraTransitionHandler*
-maplibre_native_ffi_camera_transition_handler_from_native(
-  const mln_camera_transition_handler* in
-) {
-  MaplibreNativeFfiCameraTransitionHandler* self =
-    maplibre_native_ffi_camera_transition_handler_new();
-  (void)in;
-  return self;
 }
 
 struct _MaplibreNativeFfiAnimationOptions {
@@ -554,36 +518,6 @@ void maplibre_native_ffi_animation_options_to_native(
     );
 }
 
-MaplibreNativeFfiAnimationOptions*
-maplibre_native_ffi_animation_options_from_native(
-  const mln_animation_options* in
-) {
-  MaplibreNativeFfiAnimationOptions* self =
-    maplibre_native_ffi_animation_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_ANIMATION_OPTION_DURATION) != 0) {
-    self->duration_ms = (gdouble)(in->duration_ms);
-  }
-  if ((in->fields & MLN_ANIMATION_OPTION_VELOCITY) != 0) {
-    self->velocity = (gdouble)(in->velocity);
-  }
-  if ((in->fields & MLN_ANIMATION_OPTION_MIN_ZOOM) != 0) {
-    self->min_zoom = (gdouble)(in->min_zoom);
-  }
-  if ((in->fields & MLN_ANIMATION_OPTION_EASING) != 0) {
-    maplibre_native_ffi_unit_bezier_read(&self->easing, &in->easing);
-  }
-  if ((in->fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0) {
-    self->transition_id = (guint64)(in->transition_id);
-  }
-  g_clear_pointer(
-    &self->end_handler, maplibre_native_ffi_camera_transition_handler_free
-  );
-  self->end_handler =
-    maplibre_native_ffi_camera_transition_handler_from_native(&in->end_handler);
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiLatLng, maplibre_native_ffi_lat_lng,
   maplibre_native_ffi_lat_lng_copy, maplibre_native_ffi_lat_lng_free
@@ -600,28 +534,22 @@ void maplibre_native_ffi_lat_lng_free(MaplibreNativeFfiLatLng* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_lat_lng_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_lat_lng_copy((const MaplibreNativeFfiLatLng*)self);
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiLatLng) == sizeof(mln_lat_lng));
+SAME_MEMBER(MaplibreNativeFfiLatLng, mln_lat_lng, latitude);
+SAME_MEMBER(MaplibreNativeFfiLatLng, mln_lat_lng, longitude);
 
 void maplibre_native_ffi_lat_lng_to_native(
   const MaplibreNativeFfiLatLng* self, mln_lat_lng* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->latitude = (double)(self->latitude);
-  out->longitude = (double)(self->longitude);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_lat_lng_read(
   MaplibreNativeFfiLatLng* out, const mln_lat_lng* in
 ) {
-  out->latitude = (gdouble)(in->latitude);
-  out->longitude = (gdouble)(in->longitude);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiLatLng* maplibre_native_ffi_lat_lng_from_native(
@@ -651,34 +579,24 @@ void maplibre_native_ffi_lat_lng_bounds_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_lat_lng_bounds_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_lat_lng_bounds_copy(
-    (const MaplibreNativeFfiLatLngBounds*)self
-  );
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiLatLngBounds) == sizeof(mln_lat_lng_bounds)
+);
+SAME_MEMBER(MaplibreNativeFfiLatLngBounds, mln_lat_lng_bounds, southwest);
+SAME_MEMBER(MaplibreNativeFfiLatLngBounds, mln_lat_lng_bounds, northeast);
 
 void maplibre_native_ffi_lat_lng_bounds_to_native(
   const MaplibreNativeFfiLatLngBounds* self, mln_lat_lng_bounds* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  maplibre_native_ffi_lat_lng_to_native(
-    &self->southwest, &out->southwest, call
-  );
-  maplibre_native_ffi_lat_lng_to_native(
-    &self->northeast, &out->northeast, call
-  );
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_lat_lng_bounds_read(
   MaplibreNativeFfiLatLngBounds* out, const mln_lat_lng_bounds* in
 ) {
-  maplibre_native_ffi_lat_lng_read(&out->southwest, &in->southwest);
-  maplibre_native_ffi_lat_lng_read(&out->northeast, &in->northeast);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiLatLngBounds* maplibre_native_ffi_lat_lng_bounds_from_native(
@@ -958,19 +876,6 @@ void maplibre_native_ffi_bound_options_set_max_pitch(
     );
 }
 
-MaplibreNativeFfiBoundOptions* maplibre_native_ffi_bound_options_copy(
-  const MaplibreNativeFfiBoundOptions* self
-) {
-  MaplibreNativeFfiBoundOptions* copy = maplibre_native_ffi_bound_options_new();
-  copy->fields = self->fields;
-  copy->bounds = self->bounds;
-  copy->min_zoom = self->min_zoom;
-  copy->max_zoom = self->max_zoom;
-  copy->min_pitch = self->min_pitch;
-  copy->max_pitch = self->max_pitch;
-  return copy;
-}
-
 void maplibre_native_ffi_bound_options_to_native(
   const MaplibreNativeFfiBoundOptions* self, mln_bound_options* out,
   MaplibreNativeFfiCall* call
@@ -985,29 +890,6 @@ void maplibre_native_ffi_bound_options_to_native(
   out->max_zoom = (double)(self->max_zoom);
   out->min_pitch = (double)(self->min_pitch);
   out->max_pitch = (double)(self->max_pitch);
-}
-
-MaplibreNativeFfiBoundOptions* maplibre_native_ffi_bound_options_from_native(
-  const mln_bound_options* in
-) {
-  MaplibreNativeFfiBoundOptions* self = maplibre_native_ffi_bound_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_BOUND_OPTION_BOUNDS) != 0) {
-    maplibre_native_ffi_lat_lng_bounds_read(&self->bounds, &in->bounds);
-  }
-  if ((in->fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0) {
-    self->min_zoom = (gdouble)(in->min_zoom);
-  }
-  if ((in->fields & MLN_BOUND_OPTION_MAX_ZOOM) != 0) {
-    self->max_zoom = (gdouble)(in->max_zoom);
-  }
-  if ((in->fields & MLN_BOUND_OPTION_MIN_PITCH) != 0) {
-    self->min_pitch = (gdouble)(in->min_pitch);
-  }
-  if ((in->fields & MLN_BOUND_OPTION_MAX_PITCH) != 0) {
-    self->max_pitch = (gdouble)(in->max_pitch);
-  }
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -1026,34 +908,24 @@ void maplibre_native_ffi_edge_insets_free(MaplibreNativeFfiEdgeInsets* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_edge_insets_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_edge_insets_copy(
-    (const MaplibreNativeFfiEdgeInsets*)self
-  );
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiEdgeInsets) == sizeof(mln_edge_insets));
+SAME_MEMBER(MaplibreNativeFfiEdgeInsets, mln_edge_insets, top);
+SAME_MEMBER(MaplibreNativeFfiEdgeInsets, mln_edge_insets, left);
+SAME_MEMBER(MaplibreNativeFfiEdgeInsets, mln_edge_insets, bottom);
+SAME_MEMBER(MaplibreNativeFfiEdgeInsets, mln_edge_insets, right);
 
 void maplibre_native_ffi_edge_insets_to_native(
   const MaplibreNativeFfiEdgeInsets* self, mln_edge_insets* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->top = (double)(self->top);
-  out->left = (double)(self->left);
-  out->bottom = (double)(self->bottom);
-  out->right = (double)(self->right);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_edge_insets_read(
   MaplibreNativeFfiEdgeInsets* out, const mln_edge_insets* in
 ) {
-  out->top = (gdouble)(in->top);
-  out->left = (gdouble)(in->left);
-  out->bottom = (gdouble)(in->bottom);
-  out->right = (gdouble)(in->right);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiEdgeInsets* maplibre_native_ffi_edge_insets_from_native(
@@ -1101,42 +973,28 @@ MaplibreNativeFfiCameraOptions* maplibre_native_ffi_camera_to_options(
   return options;
 }
 
-gpointer maplibre_native_ffi_camera_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_camera_copy((const MaplibreNativeFfiCamera*)self);
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiCamera) == sizeof(mln_camera));
+SAME_MEMBER(MaplibreNativeFfiCamera, mln_camera, center);
+SAME_MEMBER(MaplibreNativeFfiCamera, mln_camera, center_altitude);
+SAME_MEMBER(MaplibreNativeFfiCamera, mln_camera, padding);
+SAME_MEMBER(MaplibreNativeFfiCamera, mln_camera, zoom);
+SAME_MEMBER(MaplibreNativeFfiCamera, mln_camera, bearing);
+SAME_MEMBER(MaplibreNativeFfiCamera, mln_camera, pitch);
+SAME_MEMBER(MaplibreNativeFfiCamera, mln_camera, roll);
+SAME_MEMBER(MaplibreNativeFfiCamera, mln_camera, field_of_view);
 
 void maplibre_native_ffi_camera_to_native(
   const MaplibreNativeFfiCamera* self, mln_camera* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  maplibre_native_ffi_lat_lng_to_native(&self->center, &out->center, call);
-  out->center_altitude = (double)(self->center_altitude);
-  maplibre_native_ffi_edge_insets_to_native(
-    &self->padding, &out->padding, call
-  );
-  out->zoom = (double)(self->zoom);
-  out->bearing = (double)(self->bearing);
-  out->pitch = (double)(self->pitch);
-  out->roll = (double)(self->roll);
-  out->field_of_view = (double)(self->field_of_view);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_camera_read(
   MaplibreNativeFfiCamera* out, const mln_camera* in
 ) {
-  maplibre_native_ffi_lat_lng_read(&out->center, &in->center);
-  out->center_altitude = (gdouble)(in->center_altitude);
-  maplibre_native_ffi_edge_insets_read(&out->padding, &in->padding);
-  out->zoom = (gdouble)(in->zoom);
-  out->bearing = (gdouble)(in->bearing);
-  out->pitch = (gdouble)(in->pitch);
-  out->roll = (gdouble)(in->roll);
-  out->field_of_view = (gdouble)(in->field_of_view);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiCamera* maplibre_native_ffi_camera_from_native(
@@ -1163,31 +1021,6 @@ void maplibre_native_ffi_camera_bounds_free(
   MaplibreNativeFfiCameraBounds* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_camera_bounds_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_camera_bounds_copy(
-    (const MaplibreNativeFfiCameraBounds*)self
-  );
-}
-
-void maplibre_native_ffi_camera_bounds_to_native(
-  const MaplibreNativeFfiCameraBounds* self, mln_camera_bounds* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  maplibre_native_ffi_lat_lng_bounds_to_native(
-    &self->bounds, &out->bounds, call
-  );
-  out->unbounded = (self->unbounded) != FALSE;
-  out->min_zoom = (double)(self->min_zoom);
-  out->max_zoom = (double)(self->max_zoom);
-  out->min_pitch = (double)(self->min_pitch);
-  out->max_pitch = (double)(self->max_pitch);
 }
 
 void maplibre_native_ffi_camera_bounds_read(
@@ -1235,21 +1068,24 @@ gpointer maplibre_native_ffi_screen_point_copy_func(
   );
 }
 
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiScreenPoint) == sizeof(mln_screen_point)
+);
+SAME_MEMBER(MaplibreNativeFfiScreenPoint, mln_screen_point, x);
+SAME_MEMBER(MaplibreNativeFfiScreenPoint, mln_screen_point, y);
+
 void maplibre_native_ffi_screen_point_to_native(
   const MaplibreNativeFfiScreenPoint* self, mln_screen_point* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->x = (double)(self->x);
-  out->y = (double)(self->y);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_screen_point_read(
   MaplibreNativeFfiScreenPoint* out, const mln_screen_point* in
 ) {
-  out->x = (gdouble)(in->x);
-  out->y = (gdouble)(in->y);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiScreenPoint* maplibre_native_ffi_screen_point_from_native(
@@ -1603,25 +1439,6 @@ void maplibre_native_ffi_camera_delta_set_gesture_phase(
     );
 }
 
-MaplibreNativeFfiCameraDelta* maplibre_native_ffi_camera_delta_copy(
-  const MaplibreNativeFfiCameraDelta* self
-) {
-  MaplibreNativeFfiCameraDelta* copy = maplibre_native_ffi_camera_delta_new();
-  copy->fields = self->fields;
-  copy->offset = self->offset;
-  copy->scale = self->scale;
-  copy->bearing = self->bearing;
-  copy->pitch = self->pitch;
-  copy->anchor = self->anchor;
-  g_clear_object(&copy->animation);
-  copy->animation =
-    self->animation != NULL
-      ? maplibre_native_ffi_animation_options_copy(self->animation)
-      : NULL;
-  copy->gesture_phase = self->gesture_phase;
-  return copy;
-}
-
 void maplibre_native_ffi_camera_delta_to_native(
   const MaplibreNativeFfiCameraDelta* self, mln_camera_delta* out,
   MaplibreNativeFfiCall* call
@@ -1639,33 +1456,6 @@ void maplibre_native_ffi_camera_delta_to_native(
       self->animation, &out->animation, call
     );
   out->gesture_phase = (mln_gesture_phase)(self->gesture_phase);
-}
-
-MaplibreNativeFfiCameraDelta* maplibre_native_ffi_camera_delta_from_native(
-  const mln_camera_delta* in
-) {
-  MaplibreNativeFfiCameraDelta* self = maplibre_native_ffi_camera_delta_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_CAMERA_DELTA_OFFSET) != 0) {
-    maplibre_native_ffi_screen_point_read(&self->offset, &in->offset);
-  }
-  if ((in->fields & MLN_CAMERA_DELTA_SCALE) != 0) {
-    self->scale = (gdouble)(in->scale);
-  }
-  if ((in->fields & MLN_CAMERA_DELTA_BEARING) != 0) {
-    self->bearing = (gdouble)(in->bearing);
-  }
-  if ((in->fields & MLN_CAMERA_DELTA_PITCH) != 0) {
-    self->pitch = (gdouble)(in->pitch);
-  }
-  if ((in->fields & MLN_CAMERA_DELTA_ANCHOR) != 0) {
-    maplibre_native_ffi_screen_point_read(&self->anchor, &in->anchor);
-  }
-  g_clear_object(&self->animation);
-  self->animation =
-    maplibre_native_ffi_animation_options_from_native(&in->animation);
-  self->gesture_phase = (MaplibreNativeFfiGesturePhase)(in->gesture_phase);
-  return self;
 }
 
 struct _MaplibreNativeFfiCameraFitOptions {
@@ -1891,25 +1681,6 @@ void maplibre_native_ffi_camera_fit_options_to_native(
   out->pitch = (double)(self->pitch);
 }
 
-MaplibreNativeFfiCameraFitOptions*
-maplibre_native_ffi_camera_fit_options_from_native(
-  const mln_camera_fit_options* in
-) {
-  MaplibreNativeFfiCameraFitOptions* self =
-    maplibre_native_ffi_camera_fit_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_CAMERA_FIT_OPTION_PADDING) != 0) {
-    maplibre_native_ffi_edge_insets_read(&self->padding, &in->padding);
-  }
-  if ((in->fields & MLN_CAMERA_FIT_OPTION_BEARING) != 0) {
-    self->bearing = (gdouble)(in->bearing);
-  }
-  if ((in->fields & MLN_CAMERA_FIT_OPTION_PITCH) != 0) {
-    self->pitch = (gdouble)(in->pitch);
-  }
-  return self;
-}
-
 struct _MaplibreNativeFfiCameraFitUpdate {
   MaplibreNativeFfiCameraUpdateMode mode;
   MaplibreNativeFfiCameraFitOptions* fit;
@@ -2010,15 +1781,6 @@ void maplibre_native_ffi_camera_fit_update_set_animation(
   if (previous != NULL) g_object_unref(previous);
 }
 
-gpointer maplibre_native_ffi_camera_fit_update_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_camera_fit_update_copy(
-    (const MaplibreNativeFfiCameraFitUpdate*)self
-  );
-}
-
 void maplibre_native_ffi_camera_fit_update_to_native(
   const MaplibreNativeFfiCameraFitUpdate* self, mln_camera_fit_update* out,
   MaplibreNativeFfiCall* call
@@ -2034,21 +1796,6 @@ void maplibre_native_ffi_camera_fit_update_to_native(
     maplibre_native_ffi_animation_options_to_native(
       self->animation, &out->animation, call
     );
-}
-
-MaplibreNativeFfiCameraFitUpdate*
-maplibre_native_ffi_camera_fit_update_from_native(
-  const mln_camera_fit_update* in
-) {
-  MaplibreNativeFfiCameraFitUpdate* self =
-    maplibre_native_ffi_camera_fit_update_new();
-  self->mode = (MaplibreNativeFfiCameraUpdateMode)(in->mode);
-  g_clear_object(&self->fit);
-  self->fit = maplibre_native_ffi_camera_fit_options_from_native(&in->fit);
-  g_clear_object(&self->animation);
-  self->animation =
-    maplibre_native_ffi_animation_options_from_native(&in->animation);
-  return self;
 }
 
 struct _MaplibreNativeFfiCameraOptions {
@@ -2582,30 +2329,20 @@ void maplibre_native_ffi_camera_query_result_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_camera_query_result_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_camera_query_result_copy(
-    (const MaplibreNativeFfiCameraQueryResult*)self
-  );
-}
-
-void maplibre_native_ffi_camera_query_result_to_native(
-  const MaplibreNativeFfiCameraQueryResult* self, mln_camera_query_result* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->generation = (uint64_t)(self->generation);
-  maplibre_native_ffi_camera_to_native(&self->camera, &out->camera, call);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiCameraQueryResult) == sizeof(mln_camera_query_result)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiCameraQueryResult, mln_camera_query_result, generation
+);
+SAME_MEMBER(
+  MaplibreNativeFfiCameraQueryResult, mln_camera_query_result, camera
+);
 
 void maplibre_native_ffi_camera_query_result_read(
   MaplibreNativeFfiCameraQueryResult* out, const mln_camera_query_result* in
 ) {
-  out->generation = (guint64)(in->generation);
-  maplibre_native_ffi_camera_read(&out->camera, &in->camera);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiCameraQueryResult*
@@ -2637,26 +2374,6 @@ void maplibre_native_ffi_camera_transition_end_free(
   MaplibreNativeFfiCameraTransitionEnd* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_camera_transition_end_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_camera_transition_end_copy(
-    (const MaplibreNativeFfiCameraTransitionEnd*)self
-  );
-}
-
-void maplibre_native_ffi_camera_transition_end_to_native(
-  const MaplibreNativeFfiCameraTransitionEnd* self,
-  mln_camera_transition_end* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->outcome = (mln_camera_transition_outcome)(self->outcome);
-  out->generation = (uint64_t)(self->generation);
 }
 
 void maplibre_native_ffi_camera_transition_end_read(
@@ -2784,15 +2501,6 @@ void maplibre_native_ffi_camera_update_set_gesture_phase(
   self->gesture_phase = value;
 }
 
-gpointer maplibre_native_ffi_camera_update_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_camera_update_copy(
-    (const MaplibreNativeFfiCameraUpdate*)self
-  );
-}
-
 void maplibre_native_ffi_camera_update_to_native(
   const MaplibreNativeFfiCameraUpdate* self, mln_camera_update* out,
   MaplibreNativeFfiCall* call
@@ -2809,20 +2517,6 @@ void maplibre_native_ffi_camera_update_to_native(
       self->animation, &out->animation, call
     );
   out->gesture_phase = (mln_gesture_phase)(self->gesture_phase);
-}
-
-MaplibreNativeFfiCameraUpdate* maplibre_native_ffi_camera_update_from_native(
-  const mln_camera_update* in
-) {
-  MaplibreNativeFfiCameraUpdate* self = maplibre_native_ffi_camera_update_new();
-  self->mode = (MaplibreNativeFfiCameraUpdateMode)(in->mode);
-  g_clear_object(&self->camera);
-  self->camera = maplibre_native_ffi_camera_options_from_native(&in->camera);
-  g_clear_object(&self->animation);
-  self->animation =
-    maplibre_native_ffi_animation_options_from_native(&in->animation);
-  self->gesture_phase = (MaplibreNativeFfiGesturePhase)(in->gesture_phase);
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -2844,32 +2538,25 @@ void maplibre_native_ffi_canonical_tile_id_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_canonical_tile_id_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_canonical_tile_id_copy(
-    (const MaplibreNativeFfiCanonicalTileId*)self
-  );
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiCanonicalTileId) == sizeof(mln_canonical_tile_id)
+);
+SAME_MEMBER(MaplibreNativeFfiCanonicalTileId, mln_canonical_tile_id, z);
+SAME_MEMBER(MaplibreNativeFfiCanonicalTileId, mln_canonical_tile_id, x);
+SAME_MEMBER(MaplibreNativeFfiCanonicalTileId, mln_canonical_tile_id, y);
 
 void maplibre_native_ffi_canonical_tile_id_to_native(
   const MaplibreNativeFfiCanonicalTileId* self, mln_canonical_tile_id* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->z = (uint32_t)(self->z);
-  out->x = (uint32_t)(self->x);
-  out->y = (uint32_t)(self->y);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_canonical_tile_id_read(
   MaplibreNativeFfiCanonicalTileId* out, const mln_canonical_tile_id* in
 ) {
-  out->z = (guint32)(in->z);
-  out->x = (guint32)(in->x);
-  out->y = (guint32)(in->y);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiCanonicalTileId*
@@ -3330,25 +3017,6 @@ void maplibre_native_ffi_custom_geometry_source_options_set_cancel_tile(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-MaplibreNativeFfiCustomGeometrySourceOptions*
-maplibre_native_ffi_custom_geometry_source_options_copy(
-  const MaplibreNativeFfiCustomGeometrySourceOptions* self
-) {
-  MaplibreNativeFfiCustomGeometrySourceOptions* copy =
-    maplibre_native_ffi_custom_geometry_source_options_new();
-  copy->fields = self->fields;
-  copy->min_zoom = self->min_zoom;
-  copy->max_zoom = self->max_zoom;
-  copy->tolerance = self->tolerance;
-  copy->tile_size = self->tile_size;
-  copy->buffer = self->buffer;
-  copy->clip = self->clip;
-  copy->wrap = self->wrap;
-  copy->fetch_tile = maplibre_native_ffi_closure_ref(self->fetch_tile);
-  copy->cancel_tile = maplibre_native_ffi_closure_ref(self->cancel_tile);
-  return copy;
-}
-
 static void custom_geometry_source_options_fetch_tile_trampoline(
   void* user_data, mln_map map, mln_buffer_view source_id,
   mln_canonical_tile_id tile_id
@@ -3415,37 +3083,6 @@ void maplibre_native_ffi_custom_geometry_source_options_to_native(
                          ? custom_geometry_source_options_cancel_tile_trampoline
                          : NULL;
   }
-}
-
-MaplibreNativeFfiCustomGeometrySourceOptions*
-maplibre_native_ffi_custom_geometry_source_options_from_native(
-  const mln_custom_geometry_source_options* in
-) {
-  MaplibreNativeFfiCustomGeometrySourceOptions* self =
-    maplibre_native_ffi_custom_geometry_source_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM) != 0) {
-    self->min_zoom = (gdouble)(in->min_zoom);
-  }
-  if ((in->fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM) != 0) {
-    self->max_zoom = (gdouble)(in->max_zoom);
-  }
-  if ((in->fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE) != 0) {
-    self->tolerance = (gdouble)(in->tolerance);
-  }
-  if ((in->fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE) != 0) {
-    self->tile_size = (guint32)(in->tile_size);
-  }
-  if ((in->fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER) != 0) {
-    self->buffer = (guint32)(in->buffer);
-  }
-  if ((in->fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP) != 0) {
-    self->clip = (in->clip) ? TRUE : FALSE;
-  }
-  if ((in->fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP) != 0) {
-    self->wrap = (in->wrap) ? TRUE : FALSE;
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiCustomVectorSourceOptions {
@@ -3656,20 +3293,6 @@ void maplibre_native_ffi_custom_vector_source_options_set_cancel_tile(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-MaplibreNativeFfiCustomVectorSourceOptions*
-maplibre_native_ffi_custom_vector_source_options_copy(
-  const MaplibreNativeFfiCustomVectorSourceOptions* self
-) {
-  MaplibreNativeFfiCustomVectorSourceOptions* copy =
-    maplibre_native_ffi_custom_vector_source_options_new();
-  copy->fields = self->fields;
-  copy->min_zoom = self->min_zoom;
-  copy->max_zoom = self->max_zoom;
-  copy->fetch_tile = maplibre_native_ffi_closure_ref(self->fetch_tile);
-  copy->cancel_tile = maplibre_native_ffi_closure_ref(self->cancel_tile);
-  return copy;
-}
-
 static void custom_vector_source_options_fetch_tile_trampoline(
   void* user_data, mln_map map, mln_buffer_view source_id,
   mln_canonical_tile_id tile_id
@@ -3733,22 +3356,6 @@ void maplibre_native_ffi_custom_vector_source_options_to_native(
   }
 }
 
-MaplibreNativeFfiCustomVectorSourceOptions*
-maplibre_native_ffi_custom_vector_source_options_from_native(
-  const mln_custom_vector_source_options* in
-) {
-  MaplibreNativeFfiCustomVectorSourceOptions* self =
-    maplibre_native_ffi_custom_vector_source_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM) != 0) {
-    self->min_zoom = (gdouble)(in->min_zoom);
-  }
-  if ((in->fields & MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM) != 0) {
-    self->max_zoom = (gdouble)(in->max_zoom);
-  }
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiDmaBufFormat, maplibre_native_ffi_dma_buf_format,
   maplibre_native_ffi_dma_buf_format_copy,
@@ -3777,30 +3384,18 @@ gpointer maplibre_native_ffi_dma_buf_format_copy_func(
   );
 }
 
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiDmaBufFormat) == sizeof(mln_dma_buf_format)
+);
+SAME_MEMBER(MaplibreNativeFfiDmaBufFormat, mln_dma_buf_format, fourcc);
+SAME_MEMBER(MaplibreNativeFfiDmaBufFormat, mln_dma_buf_format, modifier);
+
 void maplibre_native_ffi_dma_buf_format_to_native(
   const MaplibreNativeFfiDmaBufFormat* self, mln_dma_buf_format* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->fourcc = (uint32_t)(self->fourcc);
-  out->modifier = (uint64_t)(self->modifier);
-}
-
-void maplibre_native_ffi_dma_buf_format_read(
-  MaplibreNativeFfiDmaBufFormat* out, const mln_dma_buf_format* in
-) {
-  out->fourcc = (guint32)(in->fourcc);
-  out->modifier = (guint64)(in->modifier);
-}
-
-MaplibreNativeFfiDmaBufFormat* maplibre_native_ffi_dma_buf_format_from_native(
-  const mln_dma_buf_format* in
-) {
-  MaplibreNativeFfiDmaBufFormat* self =
-    g_new0(MaplibreNativeFfiDmaBufFormat, 1);
-  maplibre_native_ffi_dma_buf_format_read(self, in);
-  return self;
+  memcpy(out, self, sizeof *out);
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -3830,23 +3425,17 @@ gpointer maplibre_native_ffi_dma_buf_plane_copy_func(
   );
 }
 
-void maplibre_native_ffi_dma_buf_plane_to_native(
-  const MaplibreNativeFfiDmaBufPlane* self, mln_dma_buf_plane* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->fd = (int32_t)(self->fd);
-  out->offset = (uint32_t)(self->offset);
-  out->stride = (uint32_t)(self->stride);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiDmaBufPlane) == sizeof(mln_dma_buf_plane)
+);
+SAME_MEMBER(MaplibreNativeFfiDmaBufPlane, mln_dma_buf_plane, fd);
+SAME_MEMBER(MaplibreNativeFfiDmaBufPlane, mln_dma_buf_plane, offset);
+SAME_MEMBER(MaplibreNativeFfiDmaBufPlane, mln_dma_buf_plane, stride);
 
 void maplibre_native_ffi_dma_buf_plane_read(
   MaplibreNativeFfiDmaBufPlane* out, const mln_dma_buf_plane* in
 ) {
-  out->fd = (gint32)(in->fd);
-  out->offset = (guint32)(in->offset);
-  out->stride = (guint32)(in->stride);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiDmaBufPlane* maplibre_native_ffi_dma_buf_plane_from_native(
@@ -3955,40 +3544,6 @@ GPtrArray* maplibre_native_ffi_dma_buf_frame_get_planes(
   return self->planes;
 }
 
-gpointer maplibre_native_ffi_dma_buf_frame_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_dma_buf_frame_copy(
-    (const MaplibreNativeFfiDmaBufFrame*)self
-  );
-}
-
-void maplibre_native_ffi_dma_buf_frame_to_native(
-  const MaplibreNativeFfiDmaBufFrame* self, mln_dma_buf_frame* out,
-  MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-  out->scale_factor = (double)(self->scale_factor);
-  out->slot = (uint32_t)(self->slot);
-  out->fourcc = (uint32_t)(self->fourcc);
-  out->modifier = (uint64_t)(self->modifier);
-  if (self->planes != NULL && self->planes->len > 0) {
-    mln_dma_buf_plane* items =
-      maplibre_native_ffi_call_alloc(call, self->planes->len, sizeof *items);
-    for (guint index = 0; index < self->planes->len; index++) {
-      maplibre_native_ffi_dma_buf_plane_to_native(
-        self->planes->pdata[index], &items[index], call
-      );
-    }
-    out->planes = items;
-    out->plane_count = self->planes->len;
-  }
-}
-
 MaplibreNativeFfiDmaBufFrame* maplibre_native_ffi_dma_buf_frame_from_native(
   const mln_dma_buf_frame* in
 ) {
@@ -4029,38 +3584,18 @@ void maplibre_native_ffi_logical_size_free(MaplibreNativeFfiLogicalSize* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_logical_size_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_logical_size_copy(
-    (const MaplibreNativeFfiLogicalSize*)self
-  );
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiLogicalSize) == sizeof(mln_logical_size)
+);
+SAME_MEMBER(MaplibreNativeFfiLogicalSize, mln_logical_size, width);
+SAME_MEMBER(MaplibreNativeFfiLogicalSize, mln_logical_size, height);
 
 void maplibre_native_ffi_logical_size_to_native(
   const MaplibreNativeFfiLogicalSize* self, mln_logical_size* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-}
-
-void maplibre_native_ffi_logical_size_read(
-  MaplibreNativeFfiLogicalSize* out, const mln_logical_size* in
-) {
-  out->width = (guint32)(in->width);
-  out->height = (guint32)(in->height);
-}
-
-MaplibreNativeFfiLogicalSize* maplibre_native_ffi_logical_size_from_native(
-  const mln_logical_size* in
-) {
-  MaplibreNativeFfiLogicalSize* self = g_new0(MaplibreNativeFfiLogicalSize, 1);
-  maplibre_native_ffi_logical_size_read(self, in);
-  return self;
+  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiDmaBufRingDescriptor {
@@ -4168,15 +3703,6 @@ void maplibre_native_ffi_dma_buf_ring_descriptor_set_formats(
   if (previous != NULL) g_ptr_array_unref(previous);
 }
 
-gpointer maplibre_native_ffi_dma_buf_ring_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_dma_buf_ring_descriptor_copy(
-    (const MaplibreNativeFfiDmaBufRingDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_dma_buf_ring_descriptor_to_native(
   const MaplibreNativeFfiDmaBufRingDescriptor* self,
   mln_dma_buf_ring_descriptor* out, MaplibreNativeFfiCall* call
@@ -4198,28 +3724,6 @@ void maplibre_native_ffi_dma_buf_ring_descriptor_to_native(
     out->formats = items;
     out->format_count = self->formats->len;
   }
-}
-
-MaplibreNativeFfiDmaBufRingDescriptor*
-maplibre_native_ffi_dma_buf_ring_descriptor_from_native(
-  const mln_dma_buf_ring_descriptor* in
-) {
-  MaplibreNativeFfiDmaBufRingDescriptor* self =
-    maplibre_native_ffi_dma_buf_ring_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->buffer_count = (guint32)(in->buffer_count);
-  g_clear_pointer(&self->formats, g_ptr_array_unref);
-  self->formats = g_ptr_array_new_full(
-    (guint)in->format_count,
-    (GDestroyNotify)maplibre_native_ffi_dma_buf_format_free
-  );
-  for (size_t index = 0; index < in->format_count; index++) {
-    g_ptr_array_add(
-      self->formats,
-      maplibre_native_ffi_dma_buf_format_from_native(&in->formats[index])
-    );
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiEglContextDescriptor {
@@ -4332,15 +3836,6 @@ void maplibre_native_ffi_egl_context_descriptor_set_get_proc_address(
   self->get_proc_address = value;
 }
 
-gpointer maplibre_native_ffi_egl_context_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_egl_context_descriptor_copy(
-    (const MaplibreNativeFfiEglContextDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_egl_context_descriptor_to_native(
   const MaplibreNativeFfiEglContextDescriptor* self,
   mln_egl_context_descriptor* out, MaplibreNativeFfiCall* call
@@ -4352,20 +3847,6 @@ void maplibre_native_ffi_egl_context_descriptor_to_native(
   out->share_context = (void*)(self->share_context);
   out->client_api = (mln_open_gl_client_api)(self->client_api);
   out->get_proc_address = (void*)(self->get_proc_address);
-}
-
-MaplibreNativeFfiEglContextDescriptor*
-maplibre_native_ffi_egl_context_descriptor_from_native(
-  const mln_egl_context_descriptor* in
-) {
-  MaplibreNativeFfiEglContextDescriptor* self =
-    maplibre_native_ffi_egl_context_descriptor_new();
-  self->display = (gpointer)(in->display);
-  self->config = (gpointer)(in->config);
-  self->share_context = (gpointer)(in->share_context);
-  self->client_api = (MaplibreNativeFfiOpenGlClientApi)(in->client_api);
-  self->get_proc_address = (gpointer)(in->get_proc_address);
-  return self;
 }
 
 struct _MaplibreNativeFfiFeatureId {
@@ -4519,41 +4000,6 @@ void maplibre_native_ffi_feature_id_to_native(
     default:
       break;
   }
-}
-
-MaplibreNativeFfiFeatureId* maplibre_native_ffi_feature_id_from_native(
-  const mln_feature_id* in
-) {
-  gint64 tag = (gint64)in->type;
-  const mln_feature_id_data* data = &in->data;
-  MaplibreNativeFfiFeatureId* self = g_new0(MaplibreNativeFfiFeatureId, 1);
-  self->tag = tag;
-  switch (tag) {
-    case MLN_FEATURE_ID_TYPE_STRING:
-      self->string_value = maplibre_native_ffi_text_new(data->string_value);
-      break;
-    case MLN_FEATURE_ID_TYPE_UINT:
-      self->uint_value = (guint64)(data->uint_value);
-      break;
-    case MLN_FEATURE_ID_TYPE_INT:
-      self->int_value = (gint64)(data->int_value);
-      break;
-    case MLN_FEATURE_ID_TYPE_DOUBLE:
-      self->double_value = (gdouble)(data->double_value);
-      break;
-    default:
-      break;
-  }
-  return self;
-}
-
-gpointer maplibre_native_ffi_feature_id_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_feature_id_copy(
-    (const MaplibreNativeFfiFeatureId*)self
-  );
 }
 
 struct _MaplibreNativeFfiFeatureStateSelector {
@@ -4796,25 +4242,6 @@ void maplibre_native_ffi_feature_state_selector_set_state_key(
     );
 }
 
-MaplibreNativeFfiFeatureStateSelector*
-maplibre_native_ffi_feature_state_selector_copy(
-  const MaplibreNativeFfiFeatureStateSelector* self
-) {
-  MaplibreNativeFfiFeatureStateSelector* copy =
-    maplibre_native_ffi_feature_state_selector_new();
-  copy->fields = self->fields;
-  g_free(copy->source_id);
-  copy->source_id = g_strdup(self->source_id);
-  g_free(copy->source_layer_id);
-  copy->source_layer_id = g_strdup(self->source_layer_id);
-  copy->feature_id = self->feature_id != NULL
-                       ? maplibre_native_ffi_feature_id_copy(self->feature_id)
-                       : NULL;
-  g_free(copy->state_key);
-  copy->state_key = g_strdup(self->state_key);
-  return copy;
-}
-
 void maplibre_native_ffi_feature_state_selector_to_native(
   const MaplibreNativeFfiFeatureStateSelector* self,
   mln_feature_state_selector* out, MaplibreNativeFfiCall* call
@@ -4829,27 +4256,6 @@ void maplibre_native_ffi_feature_state_selector_to_native(
       self->feature_id, &out->feature_id, call
     );
   out->state_key = maplibre_native_ffi_text_view(self->state_key);
-}
-
-MaplibreNativeFfiFeatureStateSelector*
-maplibre_native_ffi_feature_state_selector_from_native(
-  const mln_feature_state_selector* in
-) {
-  MaplibreNativeFfiFeatureStateSelector* self =
-    maplibre_native_ffi_feature_state_selector_new();
-  self->fields = (guint64)in->fields;
-  g_free(self->source_id);
-  self->source_id = maplibre_native_ffi_text_new(in->source_id);
-  g_free(self->source_layer_id);
-  self->source_layer_id = maplibre_native_ffi_text_new(in->source_layer_id);
-  if ((in->fields & MLN_FEATURE_STATE_SELECTOR_FEATURE_ID) != 0) {
-    g_clear_pointer(&self->feature_id, maplibre_native_ffi_feature_id_free);
-    self->feature_id =
-      maplibre_native_ffi_feature_id_from_native(&in->feature_id);
-  }
-  g_free(self->state_key);
-  self->state_key = maplibre_native_ffi_text_new(in->state_key);
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -4868,15 +4274,6 @@ void maplibre_native_ffi_frame_demand_free(MaplibreNativeFfiFrameDemand* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_frame_demand_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_frame_demand_copy(
-    (const MaplibreNativeFfiFrameDemand*)self
-  );
-}
-
 void maplibre_native_ffi_frame_demand_to_native(
   const MaplibreNativeFfiFrameDemand* self, mln_frame_demand* out,
   MaplibreNativeFfiCall* call
@@ -4886,21 +4283,6 @@ void maplibre_native_ffi_frame_demand_to_native(
   out->size = sizeof *out;
   out->flags = (mln_frame_demand_flags)(self->flags);
   out->token = (uint64_t)(self->token);
-}
-
-void maplibre_native_ffi_frame_demand_read(
-  MaplibreNativeFfiFrameDemand* out, const mln_frame_demand* in
-) {
-  out->flags = (MaplibreNativeFfiFrameDemandFlag)(in->flags);
-  out->token = (guint64)(in->token);
-}
-
-MaplibreNativeFfiFrameDemand* maplibre_native_ffi_frame_demand_from_native(
-  const mln_frame_demand* in
-) {
-  MaplibreNativeFfiFrameDemand* self = g_new0(MaplibreNativeFfiFrameDemand, 1);
-  maplibre_native_ffi_frame_demand_read(self, in);
-  return self;
 }
 
 struct _MaplibreNativeFfiFramePacerOptions {
@@ -5013,17 +4395,6 @@ void maplibre_native_ffi_frame_pacer_options_set_maximum_frames_per_second(
     );
 }
 
-MaplibreNativeFfiFramePacerOptions*
-maplibre_native_ffi_frame_pacer_options_copy(
-  const MaplibreNativeFfiFramePacerOptions* self
-) {
-  MaplibreNativeFfiFramePacerOptions* copy =
-    maplibre_native_ffi_frame_pacer_options_new();
-  copy->fields = self->fields;
-  copy->maximum_frames_per_second = self->maximum_frames_per_second;
-  return copy;
-}
-
 void maplibre_native_ffi_frame_pacer_options_to_native(
   const MaplibreNativeFfiFramePacerOptions* self, mln_frame_pacer_options* out,
   MaplibreNativeFfiCall* call
@@ -5033,19 +4404,6 @@ void maplibre_native_ffi_frame_pacer_options_to_native(
   out->size = sizeof *out;
   out->fields = (mln_frame_pacer_option_fields)self->fields;
   out->maximum_frames_per_second = (uint32_t)(self->maximum_frames_per_second);
-}
-
-MaplibreNativeFfiFramePacerOptions*
-maplibre_native_ffi_frame_pacer_options_from_native(
-  const mln_frame_pacer_options* in
-) {
-  MaplibreNativeFfiFramePacerOptions* self =
-    maplibre_native_ffi_frame_pacer_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND) != 0) {
-    self->maximum_frames_per_second = (guint32)(in->maximum_frames_per_second);
-  }
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -5064,27 +4422,22 @@ void maplibre_native_ffi_vec3_free(MaplibreNativeFfiVec3* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_vec3_copy_func(gconstpointer self, gpointer data) {
-  (void)data;
-  return maplibre_native_ffi_vec3_copy((const MaplibreNativeFfiVec3*)self);
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiVec3) == sizeof(mln_vec3));
+SAME_MEMBER(MaplibreNativeFfiVec3, mln_vec3, x);
+SAME_MEMBER(MaplibreNativeFfiVec3, mln_vec3, y);
+SAME_MEMBER(MaplibreNativeFfiVec3, mln_vec3, z);
 
 void maplibre_native_ffi_vec3_to_native(
   const MaplibreNativeFfiVec3* self, mln_vec3* out, MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->x = (double)(self->x);
-  out->y = (double)(self->y);
-  out->z = (double)(self->z);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_vec3_read(
   MaplibreNativeFfiVec3* out, const mln_vec3* in
 ) {
-  out->x = (gdouble)(in->x);
-  out->y = (gdouble)(in->y);
-  out->z = (gdouble)(in->z);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiVec3* maplibre_native_ffi_vec3_from_native(
@@ -5111,34 +4464,24 @@ void maplibre_native_ffi_quaternion_free(MaplibreNativeFfiQuaternion* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_quaternion_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_quaternion_copy(
-    (const MaplibreNativeFfiQuaternion*)self
-  );
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiQuaternion) == sizeof(mln_quaternion));
+SAME_MEMBER(MaplibreNativeFfiQuaternion, mln_quaternion, x);
+SAME_MEMBER(MaplibreNativeFfiQuaternion, mln_quaternion, y);
+SAME_MEMBER(MaplibreNativeFfiQuaternion, mln_quaternion, z);
+SAME_MEMBER(MaplibreNativeFfiQuaternion, mln_quaternion, w);
 
 void maplibre_native_ffi_quaternion_to_native(
   const MaplibreNativeFfiQuaternion* self, mln_quaternion* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->x = (double)(self->x);
-  out->y = (double)(self->y);
-  out->z = (double)(self->z);
-  out->w = (double)(self->w);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_quaternion_read(
   MaplibreNativeFfiQuaternion* out, const mln_quaternion* in
 ) {
-  out->x = (gdouble)(in->x);
-  out->y = (gdouble)(in->y);
-  out->z = (gdouble)(in->z);
-  out->w = (gdouble)(in->w);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiQuaternion* maplibre_native_ffi_quaternion_from_native(
@@ -5165,32 +4508,14 @@ void maplibre_native_ffi_free_camera_free(MaplibreNativeFfiFreeCamera* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_free_camera_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_free_camera_copy(
-    (const MaplibreNativeFfiFreeCamera*)self
-  );
-}
-
-void maplibre_native_ffi_free_camera_to_native(
-  const MaplibreNativeFfiFreeCamera* self, mln_free_camera* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  maplibre_native_ffi_vec3_to_native(&self->position, &out->position, call);
-  maplibre_native_ffi_quaternion_to_native(
-    &self->orientation, &out->orientation, call
-  );
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiFreeCamera) == sizeof(mln_free_camera));
+SAME_MEMBER(MaplibreNativeFfiFreeCamera, mln_free_camera, position);
+SAME_MEMBER(MaplibreNativeFfiFreeCamera, mln_free_camera, orientation);
 
 void maplibre_native_ffi_free_camera_read(
   MaplibreNativeFfiFreeCamera* out, const mln_free_camera* in
 ) {
-  maplibre_native_ffi_vec3_read(&out->position, &in->position);
-  maplibre_native_ffi_quaternion_read(&out->orientation, &in->orientation);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiFreeCamera* maplibre_native_ffi_free_camera_from_native(
@@ -5359,18 +4684,6 @@ void maplibre_native_ffi_free_camera_options_set_orientation(
     );
 }
 
-MaplibreNativeFfiFreeCameraOptions*
-maplibre_native_ffi_free_camera_options_copy(
-  const MaplibreNativeFfiFreeCameraOptions* self
-) {
-  MaplibreNativeFfiFreeCameraOptions* copy =
-    maplibre_native_ffi_free_camera_options_new();
-  copy->fields = self->fields;
-  copy->position = self->position;
-  copy->orientation = self->orientation;
-  return copy;
-}
-
 void maplibre_native_ffi_free_camera_options_to_native(
   const MaplibreNativeFfiFreeCameraOptions* self, mln_free_camera_options* out,
   MaplibreNativeFfiCall* call
@@ -5382,22 +4695,6 @@ void maplibre_native_ffi_free_camera_options_to_native(
   maplibre_native_ffi_quaternion_to_native(
     &self->orientation, &out->orientation, call
   );
-}
-
-MaplibreNativeFfiFreeCameraOptions*
-maplibre_native_ffi_free_camera_options_from_native(
-  const mln_free_camera_options* in
-) {
-  MaplibreNativeFfiFreeCameraOptions* self =
-    maplibre_native_ffi_free_camera_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_FREE_CAMERA_OPTION_POSITION) != 0) {
-    maplibre_native_ffi_vec3_read(&self->position, &in->position);
-  }
-  if ((in->fields & MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0) {
-    maplibre_native_ffi_quaternion_read(&self->orientation, &in->orientation);
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiGeoJsonSourceOptions {
@@ -6019,15 +5316,6 @@ void maplibre_native_ffi_gpu_sync_free(MaplibreNativeFfiGpuSync* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_gpu_sync_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_gpu_sync_copy(
-    (const MaplibreNativeFfiGpuSync*)self
-  );
-}
-
 void maplibre_native_ffi_gpu_sync_to_native(
   const MaplibreNativeFfiGpuSync* self, mln_gpu_sync* out,
   MaplibreNativeFfiCall* call
@@ -6139,17 +5427,6 @@ void maplibre_native_ffi_http_header_to_native(
   memset(out, 0, sizeof *out);
   out->name = maplibre_native_ffi_text_view(self->name);
   out->value = maplibre_native_ffi_text_view(self->value);
-}
-
-MaplibreNativeFfiHttpHeader* maplibre_native_ffi_http_header_from_native(
-  const mln_http_header* in
-) {
-  MaplibreNativeFfiHttpHeader* self = maplibre_native_ffi_http_header_new();
-  g_free(self->name);
-  self->name = maplibre_native_ffi_text_new(in->name);
-  g_free(self->value);
-  self->value = maplibre_native_ffi_text_new(in->value);
-  return self;
 }
 
 struct _MaplibreNativeFfiHttpHeaderRule {
@@ -6305,30 +5582,6 @@ void maplibre_native_ffi_http_header_rule_to_native(
   }
 }
 
-MaplibreNativeFfiHttpHeaderRule*
-maplibre_native_ffi_http_header_rule_from_native(
-  const mln_http_header_rule* in
-) {
-  MaplibreNativeFfiHttpHeaderRule* self =
-    maplibre_native_ffi_http_header_rule_new();
-  self->kinds = (MaplibreNativeFfiResourceKindFlag)(in->kinds);
-  self->flags = (MaplibreNativeFfiUrlMatchFlag)(in->flags);
-  g_free(self->url);
-  self->url = maplibre_native_ffi_text_new(in->url);
-  g_clear_pointer(&self->headers, g_ptr_array_unref);
-  self->headers = g_ptr_array_new_full(
-    (guint)in->header_count,
-    (GDestroyNotify)maplibre_native_ffi_http_header_free
-  );
-  for (size_t index = 0; index < in->header_count; index++) {
-    g_ptr_array_add(
-      self->headers,
-      maplibre_native_ffi_http_header_from_native(&in->headers[index])
-    );
-  }
-  return self;
-}
-
 struct _MaplibreNativeFfiHttpHeaderTransform {
   GPtrArray* rules;
 };
@@ -6402,15 +5655,6 @@ void maplibre_native_ffi_http_header_transform_set_rules(
   if (previous != NULL) g_ptr_array_unref(previous);
 }
 
-gpointer maplibre_native_ffi_http_header_transform_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_http_header_transform_copy(
-    (const MaplibreNativeFfiHttpHeaderTransform*)self
-  );
-}
-
 void maplibre_native_ffi_http_header_transform_to_native(
   const MaplibreNativeFfiHttpHeaderTransform* self,
   mln_http_header_transform* out, MaplibreNativeFfiCall* call
@@ -6428,26 +5672,6 @@ void maplibre_native_ffi_http_header_transform_to_native(
     out->rules = items;
     out->rule_count = self->rules->len;
   }
-}
-
-MaplibreNativeFfiHttpHeaderTransform*
-maplibre_native_ffi_http_header_transform_from_native(
-  const mln_http_header_transform* in
-) {
-  MaplibreNativeFfiHttpHeaderTransform* self =
-    maplibre_native_ffi_http_header_transform_new();
-  g_clear_pointer(&self->rules, g_ptr_array_unref);
-  self->rules = g_ptr_array_new_full(
-    (guint)in->rule_count,
-    (GDestroyNotify)maplibre_native_ffi_http_header_rule_free
-  );
-  for (size_t index = 0; index < in->rule_count; index++) {
-    g_ptr_array_add(
-      self->rules,
-      maplibre_native_ffi_http_header_rule_from_native(&in->rules[index])
-    );
-  }
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -6468,34 +5692,26 @@ void maplibre_native_ffi_image_content_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_image_content_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_image_content_copy(
-    (const MaplibreNativeFfiImageContent*)self
-  );
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiImageContent) == sizeof(mln_image_content)
+);
+SAME_MEMBER(MaplibreNativeFfiImageContent, mln_image_content, left);
+SAME_MEMBER(MaplibreNativeFfiImageContent, mln_image_content, top);
+SAME_MEMBER(MaplibreNativeFfiImageContent, mln_image_content, right);
+SAME_MEMBER(MaplibreNativeFfiImageContent, mln_image_content, bottom);
 
 void maplibre_native_ffi_image_content_to_native(
   const MaplibreNativeFfiImageContent* self, mln_image_content* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->left = (float)(self->left);
-  out->top = (float)(self->top);
-  out->right = (float)(self->right);
-  out->bottom = (float)(self->bottom);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_image_content_read(
   MaplibreNativeFfiImageContent* out, const mln_image_content* in
 ) {
-  out->left = (gfloat)(in->left);
-  out->top = (gfloat)(in->top);
-  out->right = (gfloat)(in->right);
-  out->bottom = (gfloat)(in->bottom);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiImageContent* maplibre_native_ffi_image_content_from_native(
@@ -6534,21 +5750,24 @@ gpointer maplibre_native_ffi_image_stretch_copy_func(
   );
 }
 
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiImageStretch) == sizeof(mln_image_stretch)
+);
+SAME_MEMBER(MaplibreNativeFfiImageStretch, mln_image_stretch, from);
+SAME_MEMBER(MaplibreNativeFfiImageStretch, mln_image_stretch, to);
+
 void maplibre_native_ffi_image_stretch_to_native(
   const MaplibreNativeFfiImageStretch* self, mln_image_stretch* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->from = (float)(self->from);
-  out->to = (float)(self->to);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_image_stretch_read(
   MaplibreNativeFfiImageStretch* out, const mln_image_stretch* in
 ) {
-  out->from = (gfloat)(in->from);
-  out->to = (gfloat)(in->to);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiImageStretch* maplibre_native_ffi_image_stretch_from_native(
@@ -6632,29 +5851,6 @@ gpointer maplibre_native_ffi_io_surface_frame_get_surface(
   return self->surface;
 }
 
-gpointer maplibre_native_ffi_io_surface_frame_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_io_surface_frame_copy(
-    (const MaplibreNativeFfiIoSurfaceFrame*)self
-  );
-}
-
-void maplibre_native_ffi_io_surface_frame_to_native(
-  const MaplibreNativeFfiIoSurfaceFrame* self, mln_io_surface_frame* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-  out->scale_factor = (double)(self->scale_factor);
-  out->slot = (uint32_t)(self->slot);
-  out->surface = (void*)(self->surface);
-}
-
 MaplibreNativeFfiIoSurfaceFrame*
 maplibre_native_ffi_io_surface_frame_from_native(
   const mln_io_surface_frame* in
@@ -6717,15 +5913,6 @@ void maplibre_native_ffi_metal_context_descriptor_set_device(
   self->device = value;
 }
 
-gpointer maplibre_native_ffi_metal_context_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_metal_context_descriptor_copy(
-    (const MaplibreNativeFfiMetalContextDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_metal_context_descriptor_to_native(
   const MaplibreNativeFfiMetalContextDescriptor* self,
   mln_metal_context_descriptor* out, MaplibreNativeFfiCall* call
@@ -6733,16 +5920,6 @@ void maplibre_native_ffi_metal_context_descriptor_to_native(
   (void)call;
   memset(out, 0, sizeof *out);
   out->device = (void*)(self->device);
-}
-
-MaplibreNativeFfiMetalContextDescriptor*
-maplibre_native_ffi_metal_context_descriptor_from_native(
-  const mln_metal_context_descriptor* in
-) {
-  MaplibreNativeFfiMetalContextDescriptor* self =
-    maplibre_native_ffi_metal_context_descriptor_new();
-  self->device = (gpointer)(in->device);
-  return self;
 }
 
 struct _MaplibreNativeFfiIoSurfaceRingDescriptor {
@@ -6841,15 +6018,6 @@ void maplibre_native_ffi_io_surface_ring_descriptor_set_context(
     maplibre_native_ffi_metal_context_descriptor_free(previous);
 }
 
-gpointer maplibre_native_ffi_io_surface_ring_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_io_surface_ring_descriptor_copy(
-    (const MaplibreNativeFfiIoSurfaceRingDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_io_surface_ring_descriptor_to_native(
   const MaplibreNativeFfiIoSurfaceRingDescriptor* self,
   mln_io_surface_ring_descriptor* out, MaplibreNativeFfiCall* call
@@ -6864,22 +6032,6 @@ void maplibre_native_ffi_io_surface_ring_descriptor_to_native(
     maplibre_native_ffi_metal_context_descriptor_to_native(
       self->context, &out->context, call
     );
-}
-
-MaplibreNativeFfiIoSurfaceRingDescriptor*
-maplibre_native_ffi_io_surface_ring_descriptor_from_native(
-  const mln_io_surface_ring_descriptor* in
-) {
-  MaplibreNativeFfiIoSurfaceRingDescriptor* self =
-    maplibre_native_ffi_io_surface_ring_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->buffer_count = (guint32)(in->buffer_count);
-  g_clear_pointer(
-    &self->context, maplibre_native_ffi_metal_context_descriptor_free
-  );
-  self->context =
-    maplibre_native_ffi_metal_context_descriptor_from_native(&in->context);
-  return self;
 }
 
 struct _MaplibreNativeFfiLogHandler {
@@ -6941,15 +6093,6 @@ void maplibre_native_ffi_log_handler_set_callback(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-gpointer maplibre_native_ffi_log_handler_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_log_handler_copy(
-    (const MaplibreNativeFfiLogHandler*)self
-  );
-}
-
 static void log_handler_callback_trampoline(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
@@ -6984,15 +6127,6 @@ void maplibre_native_ffi_log_handler_to_native(
   }
 }
 
-MaplibreNativeFfiLogHandler* maplibre_native_ffi_log_handler_from_native(
-  const mln_log_handler* in
-) {
-  MaplibreNativeFfiLogHandler* self = maplibre_native_ffi_log_handler_new();
-  self->platform_severities =
-    (MaplibreNativeFfiLogSeverityFlag)(in->platform_severities);
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiLogicalExtent, maplibre_native_ffi_logical_extent,
   maplibre_native_ffi_logical_extent_copy,
@@ -7012,32 +6146,25 @@ void maplibre_native_ffi_logical_extent_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_logical_extent_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_logical_extent_copy(
-    (const MaplibreNativeFfiLogicalExtent*)self
-  );
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiLogicalExtent) == sizeof(mln_logical_extent)
+);
+SAME_MEMBER(MaplibreNativeFfiLogicalExtent, mln_logical_extent, width);
+SAME_MEMBER(MaplibreNativeFfiLogicalExtent, mln_logical_extent, height);
+SAME_MEMBER(MaplibreNativeFfiLogicalExtent, mln_logical_extent, scale_factor);
 
 void maplibre_native_ffi_logical_extent_to_native(
   const MaplibreNativeFfiLogicalExtent* self, mln_logical_extent* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-  out->scale_factor = (double)(self->scale_factor);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_logical_extent_read(
   MaplibreNativeFfiLogicalExtent* out, const mln_logical_extent* in
 ) {
-  out->width = (guint32)(in->width);
-  out->height = (guint32)(in->height);
-  out->scale_factor = (gdouble)(in->scale_factor);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiLogicalExtent* maplibre_native_ffi_logical_extent_from_native(
@@ -7298,19 +6425,6 @@ void maplibre_native_ffi_map_options_set_tile_cache_enabled(
     );
 }
 
-MaplibreNativeFfiMapOptions* maplibre_native_ffi_map_options_copy(
-  const MaplibreNativeFfiMapOptions* self
-) {
-  MaplibreNativeFfiMapOptions* copy = maplibre_native_ffi_map_options_new();
-  copy->fields = self->fields;
-  copy->initial_extent = self->initial_extent;
-  copy->map_mode = self->map_mode;
-  copy->fast_pfor_enabled = self->fast_pfor_enabled;
-  copy->event_mask = self->event_mask;
-  copy->tile_cache_enabled = self->tile_cache_enabled;
-  return copy;
-}
-
 void maplibre_native_ffi_map_options_to_native(
   const MaplibreNativeFfiMapOptions* self, mln_map_options* out,
   MaplibreNativeFfiCall* call
@@ -7325,25 +6439,6 @@ void maplibre_native_ffi_map_options_to_native(
   out->fast_pfor_enabled = (self->fast_pfor_enabled) != FALSE;
   out->event_mask = (mln_runtime_event_flags)(self->event_mask);
   out->tile_cache_enabled = (self->tile_cache_enabled) != FALSE;
-}
-
-MaplibreNativeFfiMapOptions* maplibre_native_ffi_map_options_from_native(
-  const mln_map_options* in
-) {
-  MaplibreNativeFfiMapOptions* self = maplibre_native_ffi_map_options_new();
-  self->fields = (guint64)in->fields;
-  maplibre_native_ffi_logical_extent_read(
-    &self->initial_extent, &in->initial_extent
-  );
-  self->map_mode = (MaplibreNativeFfiMapMode)(in->map_mode);
-  self->fast_pfor_enabled = (in->fast_pfor_enabled) ? TRUE : FALSE;
-  if ((in->fields & MLN_MAP_OPTION_EVENT_MASK) != 0) {
-    self->event_mask = (MaplibreNativeFfiRuntimeEventFlag)(in->event_mask);
-  }
-  if ((in->fields & MLN_MAP_OPTION_TILE_CACHE_ENABLED) != 0) {
-    self->tile_cache_enabled = (in->tile_cache_enabled) ? TRUE : FALSE;
-  }
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -7365,25 +6460,6 @@ void maplibre_native_ffi_map_projection_camera_result_free(
   MaplibreNativeFfiMapProjectionCameraResult* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_map_projection_camera_result_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_map_projection_camera_result_copy(
-    (const MaplibreNativeFfiMapProjectionCameraResult*)self
-  );
-}
-
-void maplibre_native_ffi_map_projection_camera_result_to_native(
-  const MaplibreNativeFfiMapProjectionCameraResult* self,
-  mln_map_projection_camera_result* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  maplibre_native_ffi_camera_to_native(&self->camera, &out->camera, call);
 }
 
 void maplibre_native_ffi_map_projection_camera_result_read(
@@ -7422,38 +6498,28 @@ void maplibre_native_ffi_map_tile_settings_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_map_tile_settings_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_map_tile_settings_copy(
-    (const MaplibreNativeFfiMapTileSettings*)self
-  );
-}
-
-void maplibre_native_ffi_map_tile_settings_to_native(
-  const MaplibreNativeFfiMapTileSettings* self, mln_map_tile_settings* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->prefetch_zoom_delta = (uint32_t)(self->prefetch_zoom_delta);
-  out->lod_min_radius = (double)(self->lod_min_radius);
-  out->lod_scale = (double)(self->lod_scale);
-  out->lod_pitch_threshold = (double)(self->lod_pitch_threshold);
-  out->lod_zoom_shift = (double)(self->lod_zoom_shift);
-  out->lod_mode = (mln_tile_lod_mode)(self->lod_mode);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiMapTileSettings) == sizeof(mln_map_tile_settings)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiMapTileSettings, mln_map_tile_settings, prefetch_zoom_delta
+);
+SAME_MEMBER(
+  MaplibreNativeFfiMapTileSettings, mln_map_tile_settings, lod_min_radius
+);
+SAME_MEMBER(MaplibreNativeFfiMapTileSettings, mln_map_tile_settings, lod_scale);
+SAME_MEMBER(
+  MaplibreNativeFfiMapTileSettings, mln_map_tile_settings, lod_pitch_threshold
+);
+SAME_MEMBER(
+  MaplibreNativeFfiMapTileSettings, mln_map_tile_settings, lod_zoom_shift
+);
+SAME_MEMBER(MaplibreNativeFfiMapTileSettings, mln_map_tile_settings, lod_mode);
 
 void maplibre_native_ffi_map_tile_settings_read(
   MaplibreNativeFfiMapTileSettings* out, const mln_map_tile_settings* in
 ) {
-  out->prefetch_zoom_delta = (guint32)(in->prefetch_zoom_delta);
-  out->lod_min_radius = (gdouble)(in->lod_min_radius);
-  out->lod_scale = (gdouble)(in->lod_scale);
-  out->lod_pitch_threshold = (gdouble)(in->lod_pitch_threshold);
-  out->lod_zoom_shift = (gdouble)(in->lod_zoom_shift);
-  out->lod_mode = (MaplibreNativeFfiTileLodMode)(in->lod_mode);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiMapTileSettings*
@@ -7483,15 +6549,6 @@ void maplibre_native_ffi_projection_mode_free(
   MaplibreNativeFfiProjectionMode* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_projection_mode_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_projection_mode_copy(
-    (const MaplibreNativeFfiProjectionMode*)self
-  );
 }
 
 void maplibre_native_ffi_projection_mode_to_native(
@@ -7537,39 +6594,26 @@ void maplibre_native_ffi_map_viewport_free(MaplibreNativeFfiMapViewport* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_map_viewport_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_map_viewport_copy(
-    (const MaplibreNativeFfiMapViewport*)self
-  );
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiMapViewport) == sizeof(mln_map_viewport)
+);
+SAME_MEMBER(MaplibreNativeFfiMapViewport, mln_map_viewport, north_orientation);
+SAME_MEMBER(MaplibreNativeFfiMapViewport, mln_map_viewport, constrain_mode);
+SAME_MEMBER(MaplibreNativeFfiMapViewport, mln_map_viewport, viewport_mode);
+SAME_MEMBER(MaplibreNativeFfiMapViewport, mln_map_viewport, frustum_offset);
 
 void maplibre_native_ffi_map_viewport_to_native(
   const MaplibreNativeFfiMapViewport* self, mln_map_viewport* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->north_orientation = (mln_north_orientation)(self->north_orientation);
-  out->constrain_mode = (mln_constrain_mode)(self->constrain_mode);
-  out->viewport_mode = (mln_viewport_mode)(self->viewport_mode);
-  maplibre_native_ffi_edge_insets_to_native(
-    &self->frustum_offset, &out->frustum_offset, call
-  );
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_map_viewport_read(
   MaplibreNativeFfiMapViewport* out, const mln_map_viewport* in
 ) {
-  out->north_orientation =
-    (MaplibreNativeFfiNorthOrientation)(in->north_orientation);
-  out->constrain_mode = (MaplibreNativeFfiConstrainMode)(in->constrain_mode);
-  out->viewport_mode = (MaplibreNativeFfiViewportMode)(in->viewport_mode);
-  maplibre_native_ffi_edge_insets_read(
-    &out->frustum_offset, &in->frustum_offset
-  );
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiMapViewport* maplibre_native_ffi_map_viewport_from_native(
@@ -7594,15 +6638,6 @@ MaplibreNativeFfiMapView* maplibre_native_ffi_map_view_copy(
 
 void maplibre_native_ffi_map_view_free(MaplibreNativeFfiMapView* self) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_map_view_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_map_view_copy(
-    (const MaplibreNativeFfiMapView*)self
-  );
 }
 
 void maplibre_native_ffi_map_view_to_native(
@@ -7657,44 +6692,6 @@ MaplibreNativeFfiMapSnapshot* maplibre_native_ffi_map_snapshot_copy(
 
 void maplibre_native_ffi_map_snapshot_free(MaplibreNativeFfiMapSnapshot* self) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_map_snapshot_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_map_snapshot_copy(
-    (const MaplibreNativeFfiMapSnapshot*)self
-  );
-}
-
-void maplibre_native_ffi_map_snapshot_to_native(
-  const MaplibreNativeFfiMapSnapshot* self, mln_map_snapshot* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->debug_flags = (mln_map_debug_flags)(self->debug_flags);
-  out->generation = (uint64_t)(self->generation);
-  out->fully_loaded = (self->fully_loaded) != FALSE;
-  out->rendering_stats_view_enabled =
-    (self->rendering_stats_view_enabled) != FALSE;
-  out->gesture_in_progress = (self->gesture_in_progress) != FALSE;
-  out->transition_in_progress = (self->transition_in_progress) != FALSE;
-  out->event_mask = (mln_runtime_event_flags)(self->event_mask);
-  out->latest_render_update_generation =
-    (uint64_t)(self->latest_render_update_generation);
-  maplibre_native_ffi_map_tile_settings_to_native(
-    &self->tile, &out->tile, call
-  );
-  maplibre_native_ffi_camera_bounds_to_native(
-    &self->bounds, &out->bounds, call
-  );
-  maplibre_native_ffi_free_camera_to_native(
-    &self->free_camera, &out->free_camera, call
-  );
-  maplibre_native_ffi_map_view_to_native(&self->view, &out->view, call);
 }
 
 void maplibre_native_ffi_map_snapshot_read(
@@ -8052,21 +7049,6 @@ void maplibre_native_ffi_map_tile_options_set_lod_mode(
     );
 }
 
-MaplibreNativeFfiMapTileOptions* maplibre_native_ffi_map_tile_options_copy(
-  const MaplibreNativeFfiMapTileOptions* self
-) {
-  MaplibreNativeFfiMapTileOptions* copy =
-    maplibre_native_ffi_map_tile_options_new();
-  copy->fields = self->fields;
-  copy->prefetch_zoom_delta = self->prefetch_zoom_delta;
-  copy->lod_min_radius = self->lod_min_radius;
-  copy->lod_scale = self->lod_scale;
-  copy->lod_pitch_threshold = self->lod_pitch_threshold;
-  copy->lod_zoom_shift = self->lod_zoom_shift;
-  copy->lod_mode = self->lod_mode;
-  return copy;
-}
-
 void maplibre_native_ffi_map_tile_options_to_native(
   const MaplibreNativeFfiMapTileOptions* self, mln_map_tile_options* out,
   MaplibreNativeFfiCall* call
@@ -8081,34 +7063,6 @@ void maplibre_native_ffi_map_tile_options_to_native(
   out->lod_pitch_threshold = (double)(self->lod_pitch_threshold);
   out->lod_zoom_shift = (double)(self->lod_zoom_shift);
   out->lod_mode = (mln_tile_lod_mode)(self->lod_mode);
-}
-
-MaplibreNativeFfiMapTileOptions*
-maplibre_native_ffi_map_tile_options_from_native(
-  const mln_map_tile_options* in
-) {
-  MaplibreNativeFfiMapTileOptions* self =
-    maplibre_native_ffi_map_tile_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0) {
-    self->prefetch_zoom_delta = (guint32)(in->prefetch_zoom_delta);
-  }
-  if ((in->fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0) {
-    self->lod_min_radius = (gdouble)(in->lod_min_radius);
-  }
-  if ((in->fields & MLN_MAP_TILE_OPTION_LOD_SCALE) != 0) {
-    self->lod_scale = (gdouble)(in->lod_scale);
-  }
-  if ((in->fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0) {
-    self->lod_pitch_threshold = (gdouble)(in->lod_pitch_threshold);
-  }
-  if ((in->fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0) {
-    self->lod_zoom_shift = (gdouble)(in->lod_zoom_shift);
-  }
-  if ((in->fields & MLN_MAP_TILE_OPTION_LOD_MODE) != 0) {
-    self->lod_mode = (MaplibreNativeFfiTileLodMode)(in->lod_mode);
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiMapViewportOptions {
@@ -8382,20 +7336,6 @@ void maplibre_native_ffi_map_viewport_options_set_frustum_offset(
     );
 }
 
-MaplibreNativeFfiMapViewportOptions*
-maplibre_native_ffi_map_viewport_options_copy(
-  const MaplibreNativeFfiMapViewportOptions* self
-) {
-  MaplibreNativeFfiMapViewportOptions* copy =
-    maplibre_native_ffi_map_viewport_options_new();
-  copy->fields = self->fields;
-  copy->north_orientation = self->north_orientation;
-  copy->constrain_mode = self->constrain_mode;
-  copy->viewport_mode = self->viewport_mode;
-  copy->frustum_offset = self->frustum_offset;
-  return copy;
-}
-
 void maplibre_native_ffi_map_viewport_options_to_native(
   const MaplibreNativeFfiMapViewportOptions* self,
   mln_map_viewport_options* out, MaplibreNativeFfiCall* call
@@ -8409,31 +7349,6 @@ void maplibre_native_ffi_map_viewport_options_to_native(
   maplibre_native_ffi_edge_insets_to_native(
     &self->frustum_offset, &out->frustum_offset, call
   );
-}
-
-MaplibreNativeFfiMapViewportOptions*
-maplibre_native_ffi_map_viewport_options_from_native(
-  const mln_map_viewport_options* in
-) {
-  MaplibreNativeFfiMapViewportOptions* self =
-    maplibre_native_ffi_map_viewport_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0) {
-    self->north_orientation =
-      (MaplibreNativeFfiNorthOrientation)(in->north_orientation);
-  }
-  if ((in->fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0) {
-    self->constrain_mode = (MaplibreNativeFfiConstrainMode)(in->constrain_mode);
-  }
-  if ((in->fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0) {
-    self->viewport_mode = (MaplibreNativeFfiViewportMode)(in->viewport_mode);
-  }
-  if ((in->fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0) {
-    maplibre_native_ffi_edge_insets_read(
-      &self->frustum_offset, &in->frustum_offset
-    );
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiMetalBorrowedTexture {
@@ -8500,16 +7415,6 @@ void maplibre_native_ffi_metal_borrowed_texture_to_native(
   (void)call;
   memset(out, 0, sizeof *out);
   out->texture = (void*)(self->texture);
-}
-
-MaplibreNativeFfiMetalBorrowedTexture*
-maplibre_native_ffi_metal_borrowed_texture_from_native(
-  const mln_metal_borrowed_texture* in
-) {
-  MaplibreNativeFfiMetalBorrowedTexture* self =
-    maplibre_native_ffi_metal_borrowed_texture_new();
-  self->texture = (gpointer)(in->texture);
-  return self;
 }
 
 struct _MaplibreNativeFfiMetalBorrowedTextureDescriptor {
@@ -8655,15 +7560,6 @@ void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_command_queue(
   self->command_queue = value;
 }
 
-gpointer maplibre_native_ffi_metal_borrowed_texture_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_metal_borrowed_texture_descriptor_copy(
-    (const MaplibreNativeFfiMetalBorrowedTextureDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_metal_borrowed_texture_descriptor_to_native(
   const MaplibreNativeFfiMetalBorrowedTextureDescriptor* self,
   mln_metal_borrowed_texture_descriptor* out, MaplibreNativeFfiCall* call
@@ -8687,31 +7583,6 @@ void maplibre_native_ffi_metal_borrowed_texture_descriptor_to_native(
     out->texture_count = self->textures->len;
   }
   out->command_queue = (void*)(self->command_queue);
-}
-
-MaplibreNativeFfiMetalBorrowedTextureDescriptor*
-maplibre_native_ffi_metal_borrowed_texture_descriptor_from_native(
-  const mln_metal_borrowed_texture_descriptor* in
-) {
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self =
-    maplibre_native_ffi_metal_borrowed_texture_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->physical_width = (guint32)(in->physical_width);
-  self->physical_height = (guint32)(in->physical_height);
-  g_clear_pointer(&self->textures, g_ptr_array_unref);
-  self->textures = g_ptr_array_new_full(
-    (guint)in->texture_count,
-    (GDestroyNotify)maplibre_native_ffi_metal_borrowed_texture_free
-  );
-  for (size_t index = 0; index < in->texture_count; index++) {
-    g_ptr_array_add(
-      self->textures, maplibre_native_ffi_metal_borrowed_texture_from_native(
-                        &in->textures[index]
-                      )
-    );
-  }
-  self->command_queue = (gpointer)(in->command_queue);
-  return self;
 }
 
 struct _MaplibreNativeFfiMetalBorrowedTextureReplacement {
@@ -8841,15 +7712,6 @@ void maplibre_native_ffi_metal_borrowed_texture_replacement_set_textures(
   if (previous != NULL) g_ptr_array_unref(previous);
 }
 
-gpointer maplibre_native_ffi_metal_borrowed_texture_replacement_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_metal_borrowed_texture_replacement_copy(
-    (const MaplibreNativeFfiMetalBorrowedTextureReplacement*)self
-  );
-}
-
 void maplibre_native_ffi_metal_borrowed_texture_replacement_to_native(
   const MaplibreNativeFfiMetalBorrowedTextureReplacement* self,
   mln_metal_borrowed_texture_replacement* out, MaplibreNativeFfiCall* call
@@ -8872,30 +7734,6 @@ void maplibre_native_ffi_metal_borrowed_texture_replacement_to_native(
     out->textures = items;
     out->texture_count = self->textures->len;
   }
-}
-
-MaplibreNativeFfiMetalBorrowedTextureReplacement*
-maplibre_native_ffi_metal_borrowed_texture_replacement_from_native(
-  const mln_metal_borrowed_texture_replacement* in
-) {
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self =
-    maplibre_native_ffi_metal_borrowed_texture_replacement_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->physical_width = (guint32)(in->physical_width);
-  self->physical_height = (guint32)(in->physical_height);
-  g_clear_pointer(&self->textures, g_ptr_array_unref);
-  self->textures = g_ptr_array_new_full(
-    (guint)in->texture_count,
-    (GDestroyNotify)maplibre_native_ffi_metal_borrowed_texture_free
-  );
-  for (size_t index = 0; index < in->texture_count; index++) {
-    g_ptr_array_add(
-      self->textures, maplibre_native_ffi_metal_borrowed_texture_from_native(
-                        &in->textures[index]
-                      )
-    );
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiMetalSurfaceDescriptor {
@@ -8993,15 +7831,6 @@ void maplibre_native_ffi_metal_surface_descriptor_set_layer(
   self->layer = value;
 }
 
-gpointer maplibre_native_ffi_metal_surface_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_metal_surface_descriptor_copy(
-    (const MaplibreNativeFfiMetalSurfaceDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_metal_surface_descriptor_to_native(
   const MaplibreNativeFfiMetalSurfaceDescriptor* self,
   mln_metal_surface_descriptor* out, MaplibreNativeFfiCall* call
@@ -9016,22 +7845,6 @@ void maplibre_native_ffi_metal_surface_descriptor_to_native(
       self->context, &out->context, call
     );
   out->layer = (void*)(self->layer);
-}
-
-MaplibreNativeFfiMetalSurfaceDescriptor*
-maplibre_native_ffi_metal_surface_descriptor_from_native(
-  const mln_metal_surface_descriptor* in
-) {
-  MaplibreNativeFfiMetalSurfaceDescriptor* self =
-    maplibre_native_ffi_metal_surface_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  g_clear_pointer(
-    &self->context, maplibre_native_ffi_metal_context_descriptor_free
-  );
-  self->context =
-    maplibre_native_ffi_metal_context_descriptor_from_native(&in->context);
-  self->layer = (gpointer)(in->layer);
-  return self;
 }
 
 struct _MaplibreNativeFfiMetalSurfaceReplacement {
@@ -9101,15 +7914,6 @@ void maplibre_native_ffi_metal_surface_replacement_set_layer(
   self->layer = value;
 }
 
-gpointer maplibre_native_ffi_metal_surface_replacement_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_metal_surface_replacement_copy(
-    (const MaplibreNativeFfiMetalSurfaceReplacement*)self
-  );
-}
-
 void maplibre_native_ffi_metal_surface_replacement_to_native(
   const MaplibreNativeFfiMetalSurfaceReplacement* self,
   mln_metal_surface_replacement* out, MaplibreNativeFfiCall* call
@@ -9120,17 +7924,6 @@ void maplibre_native_ffi_metal_surface_replacement_to_native(
     &self->logical_size, &out->logical_size, call
   );
   out->layer = (void*)(self->layer);
-}
-
-MaplibreNativeFfiMetalSurfaceReplacement*
-maplibre_native_ffi_metal_surface_replacement_from_native(
-  const mln_metal_surface_replacement* in
-) {
-  MaplibreNativeFfiMetalSurfaceReplacement* self =
-    maplibre_native_ffi_metal_surface_replacement_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->layer = (gpointer)(in->layer);
-  return self;
 }
 
 struct _MaplibreNativeFfiMetalTextureFrame {
@@ -9220,31 +8013,6 @@ guint64 maplibre_native_ffi_metal_texture_frame_get_pixel_format(
 ) {
   g_return_val_if_fail(self != NULL, 0);
   return self->pixel_format;
-}
-
-gpointer maplibre_native_ffi_metal_texture_frame_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_metal_texture_frame_copy(
-    (const MaplibreNativeFfiMetalTextureFrame*)self
-  );
-}
-
-void maplibre_native_ffi_metal_texture_frame_to_native(
-  const MaplibreNativeFfiMetalTextureFrame* self, mln_metal_texture_frame* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-  out->scale_factor = (double)(self->scale_factor);
-  out->slot = (uint32_t)(self->slot);
-  out->texture = (void*)(self->texture);
-  out->device = (void*)(self->device);
-  out->pixel_format = (uint64_t)(self->pixel_format);
 }
 
 MaplibreNativeFfiMetalTextureFrame*
@@ -9397,15 +8165,6 @@ void maplibre_native_ffi_offline_geometry_region_definition_set_include_ideograp
 ) {
   g_return_if_fail(self != NULL);
   self->include_ideographs = value;
-}
-
-gpointer maplibre_native_ffi_offline_geometry_region_definition_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_offline_geometry_region_definition_copy(
-    (const MaplibreNativeFfiOfflineGeometryRegionDefinition*)self
-  );
 }
 
 void maplibre_native_ffi_offline_geometry_region_definition_to_native(
@@ -9572,15 +8331,6 @@ void maplibre_native_ffi_offline_tile_pyramid_region_definition_set_include_ideo
 ) {
   g_return_if_fail(self != NULL);
   self->include_ideographs = value;
-}
-
-gpointer maplibre_native_ffi_offline_tile_pyramid_region_definition_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_offline_tile_pyramid_region_definition_copy(
-    (const MaplibreNativeFfiOfflineTilePyramidRegionDefinition*)self
-  );
 }
 
 void maplibre_native_ffi_offline_tile_pyramid_region_definition_to_native(
@@ -9789,15 +8539,6 @@ maplibre_native_ffi_offline_region_definition_from_native(
   return self;
 }
 
-gpointer maplibre_native_ffi_offline_region_definition_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_offline_region_definition_copy(
-    (const MaplibreNativeFfiOfflineRegionDefinition*)self
-  );
-}
-
 struct _MaplibreNativeFfiOfflineRegionInfo {
   gint64 id;
   MaplibreNativeFfiOfflineRegionDefinition* definition;
@@ -9865,33 +8606,6 @@ GBytes* maplibre_native_ffi_offline_region_info_get_metadata(
   return self->metadata;
 }
 
-gpointer maplibre_native_ffi_offline_region_info_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_offline_region_info_copy(
-    (const MaplibreNativeFfiOfflineRegionInfo*)self
-  );
-}
-
-void maplibre_native_ffi_offline_region_info_to_native(
-  const MaplibreNativeFfiOfflineRegionInfo* self, mln_offline_region_info* out,
-  MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->id = (mln_offline_region_id)(self->id);
-  if (self->definition != NULL)
-    maplibre_native_ffi_offline_region_definition_to_native(
-      self->definition, &out->definition, call
-    );
-  {
-    mln_buffer_view metadata_view =
-      maplibre_native_ffi_bytes_view(self->metadata);
-    out->metadata = metadata_view.data;
-    out->metadata_size = metadata_view.size;
-  }
-}
-
 MaplibreNativeFfiOfflineRegionInfo*
 maplibre_native_ffi_offline_region_info_from_native(
   const mln_offline_region_info* in
@@ -9929,34 +8643,6 @@ void maplibre_native_ffi_offline_region_status_free(
   MaplibreNativeFfiOfflineRegionStatus* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_offline_region_status_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_offline_region_status_copy(
-    (const MaplibreNativeFfiOfflineRegionStatus*)self
-  );
-}
-
-void maplibre_native_ffi_offline_region_status_to_native(
-  const MaplibreNativeFfiOfflineRegionStatus* self,
-  mln_offline_region_status* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->download_state =
-    (mln_offline_region_download_state)(self->download_state);
-  out->completed_resource_count = (uint64_t)(self->completed_resource_count);
-  out->completed_resource_size = (uint64_t)(self->completed_resource_size);
-  out->completed_tile_count = (uint64_t)(self->completed_tile_count);
-  out->required_tile_count = (uint64_t)(self->required_tile_count);
-  out->completed_tile_size = (uint64_t)(self->completed_tile_size);
-  out->required_resource_count = (uint64_t)(self->required_resource_count);
-  out->required_resource_count_is_precise =
-    (self->required_resource_count_is_precise) != FALSE;
-  out->complete = (self->complete) != FALSE;
 }
 
 void maplibre_native_ffi_offline_region_status_read(
@@ -10006,15 +8692,6 @@ void maplibre_native_ffi_offscreen_descriptor_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_offscreen_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_offscreen_descriptor_copy(
-    (const MaplibreNativeFfiOffscreenDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_offscreen_descriptor_to_native(
   const MaplibreNativeFfiOffscreenDescriptor* self,
   mln_offscreen_descriptor* out, MaplibreNativeFfiCall* call
@@ -10025,22 +8702,6 @@ void maplibre_native_ffi_offscreen_descriptor_to_native(
   maplibre_native_ffi_logical_size_to_native(
     &self->logical_size, &out->logical_size, call
   );
-}
-
-void maplibre_native_ffi_offscreen_descriptor_read(
-  MaplibreNativeFfiOffscreenDescriptor* out, const mln_offscreen_descriptor* in
-) {
-  maplibre_native_ffi_logical_size_read(&out->logical_size, &in->logical_size);
-}
-
-MaplibreNativeFfiOffscreenDescriptor*
-maplibre_native_ffi_offscreen_descriptor_from_native(
-  const mln_offscreen_descriptor* in
-) {
-  MaplibreNativeFfiOffscreenDescriptor* self =
-    g_new0(MaplibreNativeFfiOffscreenDescriptor, 1);
-  maplibre_native_ffi_offscreen_descriptor_read(self, in);
-  return self;
 }
 
 struct _MaplibreNativeFfiOffscreenDeviceOptions {
@@ -10255,19 +8916,6 @@ void maplibre_native_ffi_offscreen_device_options_set_client_api(
     );
 }
 
-MaplibreNativeFfiOffscreenDeviceOptions*
-maplibre_native_ffi_offscreen_device_options_copy(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self
-) {
-  MaplibreNativeFfiOffscreenDeviceOptions* copy =
-    maplibre_native_ffi_offscreen_device_options_new();
-  copy->fields = self->fields;
-  copy->adapter_index = self->adapter_index;
-  copy->single_context = self->single_context;
-  copy->client_api = self->client_api;
-  return copy;
-}
-
 void maplibre_native_ffi_offscreen_device_options_to_native(
   const MaplibreNativeFfiOffscreenDeviceOptions* self,
   mln_offscreen_device_options* out, MaplibreNativeFfiCall* call
@@ -10279,25 +8927,6 @@ void maplibre_native_ffi_offscreen_device_options_to_native(
   out->adapter_index = (uint32_t)(self->adapter_index);
   out->single_context = (self->single_context) != FALSE;
   out->client_api = (mln_open_gl_client_api)(self->client_api);
-}
-
-MaplibreNativeFfiOffscreenDeviceOptions*
-maplibre_native_ffi_offscreen_device_options_from_native(
-  const mln_offscreen_device_options* in
-) {
-  MaplibreNativeFfiOffscreenDeviceOptions* self =
-    maplibre_native_ffi_offscreen_device_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX) != 0) {
-    self->adapter_index = (guint32)(in->adapter_index);
-  }
-  if ((in->fields & MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT) != 0) {
-    self->single_context = (in->single_context) ? TRUE : FALSE;
-  }
-  if ((in->fields & MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API) != 0) {
-    self->client_api = (MaplibreNativeFfiOpenGlClientApi)(in->client_api);
-  }
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -10330,30 +8959,20 @@ gpointer maplibre_native_ffi_open_gl_borrowed_texture_copy_func(
   );
 }
 
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiOpenGlBorrowedTexture) ==
+  sizeof(mln_open_gl_borrowed_texture)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiOpenGlBorrowedTexture, mln_open_gl_borrowed_texture, texture
+);
+
 void maplibre_native_ffi_open_gl_borrowed_texture_to_native(
   const MaplibreNativeFfiOpenGlBorrowedTexture* self,
   mln_open_gl_borrowed_texture* out, MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->texture = (uint32_t)(self->texture);
-}
-
-void maplibre_native_ffi_open_gl_borrowed_texture_read(
-  MaplibreNativeFfiOpenGlBorrowedTexture* out,
-  const mln_open_gl_borrowed_texture* in
-) {
-  out->texture = (guint32)(in->texture);
-}
-
-MaplibreNativeFfiOpenGlBorrowedTexture*
-maplibre_native_ffi_open_gl_borrowed_texture_from_native(
-  const mln_open_gl_borrowed_texture* in
-) {
-  MaplibreNativeFfiOpenGlBorrowedTexture* self =
-    g_new0(MaplibreNativeFfiOpenGlBorrowedTexture, 1);
-  maplibre_native_ffi_open_gl_borrowed_texture_read(self, in);
-  return self;
+  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiWglContextDescriptor {
@@ -10434,15 +9053,6 @@ void maplibre_native_ffi_wgl_context_descriptor_set_get_proc_address(
   self->get_proc_address = value;
 }
 
-gpointer maplibre_native_ffi_wgl_context_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_wgl_context_descriptor_copy(
-    (const MaplibreNativeFfiWglContextDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_wgl_context_descriptor_to_native(
   const MaplibreNativeFfiWglContextDescriptor* self,
   mln_wgl_context_descriptor* out, MaplibreNativeFfiCall* call
@@ -10452,18 +9062,6 @@ void maplibre_native_ffi_wgl_context_descriptor_to_native(
   out->device_context = (void*)(self->device_context);
   out->share_context = (void*)(self->share_context);
   out->get_proc_address = (void*)(self->get_proc_address);
-}
-
-MaplibreNativeFfiWglContextDescriptor*
-maplibre_native_ffi_wgl_context_descriptor_from_native(
-  const mln_wgl_context_descriptor* in
-) {
-  MaplibreNativeFfiWglContextDescriptor* self =
-    maplibre_native_ffi_wgl_context_descriptor_new();
-  self->device_context = (gpointer)(in->device_context);
-  self->share_context = (gpointer)(in->share_context);
-  self->get_proc_address = (gpointer)(in->get_proc_address);
-  return self;
 }
 
 struct _MaplibreNativeFfiWebGlContextDescriptor {
@@ -10551,15 +9149,6 @@ void maplibre_native_ffi_web_gl_context_descriptor_set_canvas_selector(
   g_free(previous);
 }
 
-gpointer maplibre_native_ffi_web_gl_context_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_web_gl_context_descriptor_copy(
-    (const MaplibreNativeFfiWebGlContextDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_web_gl_context_descriptor_to_native(
   const MaplibreNativeFfiWebGlContextDescriptor* self,
   mln_web_gl_context_descriptor* out, MaplibreNativeFfiCall* call
@@ -10569,19 +9158,6 @@ void maplibre_native_ffi_web_gl_context_descriptor_to_native(
   out->kind = (mln_web_gl_context_kind)(self->kind);
   out->context = (int32_t)(self->context);
   out->canvas_selector = maplibre_native_ffi_text_view(self->canvas_selector);
-}
-
-MaplibreNativeFfiWebGlContextDescriptor*
-maplibre_native_ffi_web_gl_context_descriptor_from_native(
-  const mln_web_gl_context_descriptor* in
-) {
-  MaplibreNativeFfiWebGlContextDescriptor* self =
-    maplibre_native_ffi_web_gl_context_descriptor_new();
-  self->kind = (MaplibreNativeFfiWebGlContextKind)(in->kind);
-  self->context = (gint32)(in->context);
-  g_free(self->canvas_selector);
-  self->canvas_selector = maplibre_native_ffi_text_new(in->canvas_selector);
-  return self;
 }
 
 struct _MaplibreNativeFfiOpenGlContextDescriptorData {
@@ -10758,43 +9334,6 @@ void maplibre_native_ffi_open_gl_context_descriptor_data_to_native(
   }
 }
 
-MaplibreNativeFfiOpenGlContextDescriptorData*
-maplibre_native_ffi_open_gl_context_descriptor_data_from_native(
-  gint64 tag, const mln_open_gl_context_descriptor_data* in
-) {
-  const mln_open_gl_context_descriptor_data* data = in;
-  MaplibreNativeFfiOpenGlContextDescriptorData* self =
-    g_new0(MaplibreNativeFfiOpenGlContextDescriptorData, 1);
-  self->tag = tag;
-  switch (tag) {
-    case MLN_OPEN_GL_CONTEXT_PLATFORM_WGL:
-      self->wgl =
-        maplibre_native_ffi_wgl_context_descriptor_from_native(&data->wgl);
-      break;
-    case MLN_OPEN_GL_CONTEXT_PLATFORM_EGL:
-      self->egl =
-        maplibre_native_ffi_egl_context_descriptor_from_native(&data->egl);
-      break;
-    case MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL:
-      self->web_gl = maplibre_native_ffi_web_gl_context_descriptor_from_native(
-        &data->web_gl
-      );
-      break;
-    default:
-      break;
-  }
-  return self;
-}
-
-gpointer maplibre_native_ffi_open_gl_context_descriptor_data_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_open_gl_context_descriptor_data_copy(
-    (const MaplibreNativeFfiOpenGlContextDescriptorData*)self
-  );
-}
-
 struct _MaplibreNativeFfiOpenGlContextDescriptor {
   MaplibreNativeFfiOpenGlContextOwnership ownership;
   MaplibreNativeFfiOpenGlContextDescriptorData* data;
@@ -10876,15 +9415,6 @@ void maplibre_native_ffi_open_gl_context_descriptor_set_data(
     maplibre_native_ffi_open_gl_context_descriptor_data_free(previous);
 }
 
-gpointer maplibre_native_ffi_open_gl_context_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_open_gl_context_descriptor_copy(
-    (const MaplibreNativeFfiOpenGlContextDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_open_gl_context_descriptor_to_native(
   const MaplibreNativeFfiOpenGlContextDescriptor* self,
   mln_open_gl_context_descriptor* out, MaplibreNativeFfiCall* call
@@ -10895,22 +9425,6 @@ void maplibre_native_ffi_open_gl_context_descriptor_to_native(
     maplibre_native_ffi_open_gl_context_descriptor_data_to_native(
       self->data, &out->platform, &out->data, call
     );
-}
-
-MaplibreNativeFfiOpenGlContextDescriptor*
-maplibre_native_ffi_open_gl_context_descriptor_from_native(
-  const mln_open_gl_context_descriptor* in
-) {
-  MaplibreNativeFfiOpenGlContextDescriptor* self =
-    maplibre_native_ffi_open_gl_context_descriptor_new();
-  self->ownership = (MaplibreNativeFfiOpenGlContextOwnership)(in->ownership);
-  g_clear_pointer(
-    &self->data, maplibre_native_ffi_open_gl_context_descriptor_data_free
-  );
-  self->data = maplibre_native_ffi_open_gl_context_descriptor_data_from_native(
-    (gint64)in->platform, &in->data
-  );
-  return self;
 }
 
 struct _MaplibreNativeFfiOpenGlBorrowedTextureDescriptor {
@@ -11084,15 +9598,6 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_target(
   self->target = value;
 }
 
-gpointer maplibre_native_ffi_open_gl_borrowed_texture_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_open_gl_borrowed_texture_descriptor_copy(
-    (const MaplibreNativeFfiOpenGlBorrowedTextureDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_to_native(
   const MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self,
   mln_open_gl_borrowed_texture_descriptor* out, MaplibreNativeFfiCall* call
@@ -11120,36 +9625,6 @@ void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_to_native(
     out->texture_count = self->textures->len;
   }
   out->target = (uint32_t)(self->target);
-}
-
-MaplibreNativeFfiOpenGlBorrowedTextureDescriptor*
-maplibre_native_ffi_open_gl_borrowed_texture_descriptor_from_native(
-  const mln_open_gl_borrowed_texture_descriptor* in
-) {
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self =
-    maplibre_native_ffi_open_gl_borrowed_texture_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->physical_width = (guint32)(in->physical_width);
-  self->physical_height = (guint32)(in->physical_height);
-  g_clear_pointer(
-    &self->context, maplibre_native_ffi_open_gl_context_descriptor_free
-  );
-  self->context =
-    maplibre_native_ffi_open_gl_context_descriptor_from_native(&in->context);
-  g_clear_pointer(&self->textures, g_ptr_array_unref);
-  self->textures = g_ptr_array_new_full(
-    (guint)in->texture_count,
-    (GDestroyNotify)maplibre_native_ffi_open_gl_borrowed_texture_free
-  );
-  for (size_t index = 0; index < in->texture_count; index++) {
-    g_ptr_array_add(
-      self->textures, maplibre_native_ffi_open_gl_borrowed_texture_from_native(
-                        &in->textures[index]
-                      )
-    );
-  }
-  self->target = (guint32)(in->target);
-  return self;
 }
 
 struct _MaplibreNativeFfiOpenGlBorrowedTextureReplacement {
@@ -11280,15 +9755,6 @@ void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_textures(
   if (previous != NULL) g_ptr_array_unref(previous);
 }
 
-gpointer maplibre_native_ffi_open_gl_borrowed_texture_replacement_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_open_gl_borrowed_texture_replacement_copy(
-    (const MaplibreNativeFfiOpenGlBorrowedTextureReplacement*)self
-  );
-}
-
 void maplibre_native_ffi_open_gl_borrowed_texture_replacement_to_native(
   const MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self,
   mln_open_gl_borrowed_texture_replacement* out, MaplibreNativeFfiCall* call
@@ -11311,30 +9777,6 @@ void maplibre_native_ffi_open_gl_borrowed_texture_replacement_to_native(
     out->textures = items;
     out->texture_count = self->textures->len;
   }
-}
-
-MaplibreNativeFfiOpenGlBorrowedTextureReplacement*
-maplibre_native_ffi_open_gl_borrowed_texture_replacement_from_native(
-  const mln_open_gl_borrowed_texture_replacement* in
-) {
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self =
-    maplibre_native_ffi_open_gl_borrowed_texture_replacement_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->physical_width = (guint32)(in->physical_width);
-  self->physical_height = (guint32)(in->physical_height);
-  g_clear_pointer(&self->textures, g_ptr_array_unref);
-  self->textures = g_ptr_array_new_full(
-    (guint)in->texture_count,
-    (GDestroyNotify)maplibre_native_ffi_open_gl_borrowed_texture_free
-  );
-  for (size_t index = 0; index < in->texture_count; index++) {
-    g_ptr_array_add(
-      self->textures, maplibre_native_ffi_open_gl_borrowed_texture_from_native(
-                        &in->textures[index]
-                      )
-    );
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiOpenGlSurfaceDescriptor {
@@ -11433,15 +9875,6 @@ void maplibre_native_ffi_open_gl_surface_descriptor_set_surface(
   self->surface = value;
 }
 
-gpointer maplibre_native_ffi_open_gl_surface_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_open_gl_surface_descriptor_copy(
-    (const MaplibreNativeFfiOpenGlSurfaceDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_open_gl_surface_descriptor_to_native(
   const MaplibreNativeFfiOpenGlSurfaceDescriptor* self,
   mln_open_gl_surface_descriptor* out, MaplibreNativeFfiCall* call
@@ -11456,22 +9889,6 @@ void maplibre_native_ffi_open_gl_surface_descriptor_to_native(
       self->context, &out->context, call
     );
   out->surface = (void*)(self->surface);
-}
-
-MaplibreNativeFfiOpenGlSurfaceDescriptor*
-maplibre_native_ffi_open_gl_surface_descriptor_from_native(
-  const mln_open_gl_surface_descriptor* in
-) {
-  MaplibreNativeFfiOpenGlSurfaceDescriptor* self =
-    maplibre_native_ffi_open_gl_surface_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  g_clear_pointer(
-    &self->context, maplibre_native_ffi_open_gl_context_descriptor_free
-  );
-  self->context =
-    maplibre_native_ffi_open_gl_context_descriptor_from_native(&in->context);
-  self->surface = (gpointer)(in->surface);
-  return self;
 }
 
 struct _MaplibreNativeFfiOpenGlSurfaceReplacement {
@@ -11541,15 +9958,6 @@ void maplibre_native_ffi_open_gl_surface_replacement_set_surface(
   self->surface = value;
 }
 
-gpointer maplibre_native_ffi_open_gl_surface_replacement_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_open_gl_surface_replacement_copy(
-    (const MaplibreNativeFfiOpenGlSurfaceReplacement*)self
-  );
-}
-
 void maplibre_native_ffi_open_gl_surface_replacement_to_native(
   const MaplibreNativeFfiOpenGlSurfaceReplacement* self,
   mln_open_gl_surface_replacement* out, MaplibreNativeFfiCall* call
@@ -11560,17 +9968,6 @@ void maplibre_native_ffi_open_gl_surface_replacement_to_native(
     &self->logical_size, &out->logical_size, call
   );
   out->surface = (void*)(self->surface);
-}
-
-MaplibreNativeFfiOpenGlSurfaceReplacement*
-maplibre_native_ffi_open_gl_surface_replacement_from_native(
-  const mln_open_gl_surface_replacement* in
-) {
-  MaplibreNativeFfiOpenGlSurfaceReplacement* self =
-    maplibre_native_ffi_open_gl_surface_replacement_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->surface = (gpointer)(in->surface);
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -11592,30 +9989,6 @@ void maplibre_native_ffi_open_gl_texture_frame_free(
   MaplibreNativeFfiOpenGlTextureFrame* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_open_gl_texture_frame_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_open_gl_texture_frame_copy(
-    (const MaplibreNativeFfiOpenGlTextureFrame*)self
-  );
-}
-
-void maplibre_native_ffi_open_gl_texture_frame_to_native(
-  const MaplibreNativeFfiOpenGlTextureFrame* self,
-  mln_open_gl_texture_frame* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-  out->scale_factor = (double)(self->scale_factor);
-  out->slot = (uint32_t)(self->slot);
-  out->texture = (uint32_t)(self->texture);
-  out->target = (uint32_t)(self->target);
 }
 
 void maplibre_native_ffi_open_gl_texture_frame_read(
@@ -11737,15 +10110,6 @@ void maplibre_native_ffi_premultiplied_rgba8_image_set_pixels(
   if (previous != NULL) g_bytes_unref(previous);
 }
 
-gpointer maplibre_native_ffi_premultiplied_rgba8_image_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_premultiplied_rgba8_image_copy(
-    (const MaplibreNativeFfiPremultipliedRgba8Image*)self
-  );
-}
-
 void maplibre_native_ffi_premultiplied_rgba8_image_to_native(
   const MaplibreNativeFfiPremultipliedRgba8Image* self,
   mln_premultiplied_rgba8_image* out, MaplibreNativeFfiCall* call
@@ -11761,20 +10125,6 @@ void maplibre_native_ffi_premultiplied_rgba8_image_to_native(
     out->pixels = pixels_view.data;
     out->byte_length = pixels_view.size;
   }
-}
-
-MaplibreNativeFfiPremultipliedRgba8Image*
-maplibre_native_ffi_premultiplied_rgba8_image_from_native(
-  const mln_premultiplied_rgba8_image* in
-) {
-  MaplibreNativeFfiPremultipliedRgba8Image* self =
-    maplibre_native_ffi_premultiplied_rgba8_image_new();
-  self->width = (guint32)(in->width);
-  self->height = (guint32)(in->height);
-  self->stride = (guint32)(in->stride);
-  g_clear_pointer(&self->pixels, g_bytes_unref);
-  self->pixels = maplibre_native_ffi_bytes_new(in->pixels, in->byte_length);
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -11796,30 +10146,24 @@ void maplibre_native_ffi_projected_meters_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_projected_meters_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_projected_meters_copy(
-    (const MaplibreNativeFfiProjectedMeters*)self
-  );
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiProjectedMeters) == sizeof(mln_projected_meters)
+);
+SAME_MEMBER(MaplibreNativeFfiProjectedMeters, mln_projected_meters, northing);
+SAME_MEMBER(MaplibreNativeFfiProjectedMeters, mln_projected_meters, easting);
 
 void maplibre_native_ffi_projected_meters_to_native(
   const MaplibreNativeFfiProjectedMeters* self, mln_projected_meters* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->northing = (double)(self->northing);
-  out->easting = (double)(self->easting);
+  memcpy(out, self, sizeof *out);
 }
 
 void maplibre_native_ffi_projected_meters_read(
   MaplibreNativeFfiProjectedMeters* out, const mln_projected_meters* in
 ) {
-  out->northing = (gdouble)(in->northing);
-  out->easting = (gdouble)(in->easting);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiProjectedMeters*
@@ -12033,19 +10377,6 @@ void maplibre_native_ffi_projection_mode_options_set_y_skew(
     );
 }
 
-MaplibreNativeFfiProjectionModeOptions*
-maplibre_native_ffi_projection_mode_options_copy(
-  const MaplibreNativeFfiProjectionModeOptions* self
-) {
-  MaplibreNativeFfiProjectionModeOptions* copy =
-    maplibre_native_ffi_projection_mode_options_new();
-  copy->fields = self->fields;
-  copy->axonometric = self->axonometric;
-  copy->x_skew = self->x_skew;
-  copy->y_skew = self->y_skew;
-  return copy;
-}
-
 void maplibre_native_ffi_projection_mode_options_to_native(
   const MaplibreNativeFfiProjectionModeOptions* self,
   mln_projection_mode_options* out, MaplibreNativeFfiCall* call
@@ -12057,25 +10388,6 @@ void maplibre_native_ffi_projection_mode_options_to_native(
   out->axonometric = (self->axonometric) != FALSE;
   out->x_skew = (double)(self->x_skew);
   out->y_skew = (double)(self->y_skew);
-}
-
-MaplibreNativeFfiProjectionModeOptions*
-maplibre_native_ffi_projection_mode_options_from_native(
-  const mln_projection_mode_options* in
-) {
-  MaplibreNativeFfiProjectionModeOptions* self =
-    maplibre_native_ffi_projection_mode_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_PROJECTION_MODE_OPTION_AXONOMETRIC) != 0) {
-    self->axonometric = (in->axonometric) ? TRUE : FALSE;
-  }
-  if ((in->fields & MLN_PROJECTION_MODE_OPTION_X_SKEW) != 0) {
-    self->x_skew = (gdouble)(in->x_skew);
-  }
-  if ((in->fields & MLN_PROJECTION_MODE_OPTION_Y_SKEW) != 0) {
-    self->y_skew = (gdouble)(in->y_skew);
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiQueueLock {
@@ -12138,15 +10450,6 @@ void maplibre_native_ffi_queue_lock_set_unlock(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-gpointer maplibre_native_ffi_queue_lock_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_queue_lock_copy(
-    (const MaplibreNativeFfiQueueLock*)self
-  );
-}
-
 static void queue_lock_lock_trampoline(void* user_data) {
   MaplibreNativeFfiClosure* closure =
     maplibre_native_ffi_registration_closure(user_data, 0);
@@ -12179,14 +10482,6 @@ void maplibre_native_ffi_queue_lock_to_native(
   }
 }
 
-MaplibreNativeFfiQueueLock* maplibre_native_ffi_queue_lock_from_native(
-  const mln_queue_lock* in
-) {
-  MaplibreNativeFfiQueueLock* self = maplibre_native_ffi_queue_lock_new();
-  (void)in;
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiRenderAbandonResult,
   maplibre_native_ffi_render_abandon_result,
@@ -12206,27 +10501,6 @@ void maplibre_native_ffi_render_abandon_result_free(
   MaplibreNativeFfiRenderAbandonResult* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_render_abandon_result_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_render_abandon_result_copy(
-    (const MaplibreNativeFfiRenderAbandonResult*)self
-  );
-}
-
-void maplibre_native_ffi_render_abandon_result_to_native(
-  const MaplibreNativeFfiRenderAbandonResult* self,
-  mln_render_abandon_result* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->disposition = (mln_render_abandon_disposition)(self->disposition);
-  out->quarantined_resource_count =
-    (uint32_t)(self->quarantined_resource_count);
 }
 
 void maplibre_native_ffi_render_abandon_result_read(
@@ -12265,32 +10539,6 @@ void maplibre_native_ffi_render_frame_result_free(
   MaplibreNativeFfiRenderFrameResult* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_render_frame_result_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_render_frame_result_copy(
-    (const MaplibreNativeFfiRenderFrameResult*)self
-  );
-}
-
-void maplibre_native_ffi_render_frame_result_to_native(
-  const MaplibreNativeFfiRenderFrameResult* self, mln_render_frame_result* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->disposition = (mln_render_result)(self->disposition);
-  out->token = (uint64_t)(self->token);
-  out->map_update_generation = (uint64_t)(self->map_update_generation);
-  out->generation = (uint64_t)(self->generation);
-  out->frame_generation = (uint64_t)(self->frame_generation);
-  out->needs_repaint = (self->needs_repaint) != FALSE;
-  maplibre_native_ffi_map_view_to_native(&self->view, &out->view, call);
-  out->mode = (mln_render_mode)(self->mode);
 }
 
 void maplibre_native_ffi_render_frame_result_read(
@@ -12359,11 +10607,6 @@ void maplibre_native_ffi_wake_set_callback(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-gpointer maplibre_native_ffi_wake_copy_func(gconstpointer self, gpointer data) {
-  (void)data;
-  return maplibre_native_ffi_wake_copy((const MaplibreNativeFfiWake*)self);
-}
-
 static void wake_callback_trampoline(void* user_data) {
   MaplibreNativeFfiClosure* closure =
     maplibre_native_ffi_registration_closure(user_data, 0);
@@ -12384,14 +10627,6 @@ void maplibre_native_ffi_wake_to_native(
     out->release_user_data = maplibre_native_ffi_registration_release;
     out->callback = self->callback != NULL ? wake_callback_trampoline : NULL;
   }
-}
-
-MaplibreNativeFfiWake* maplibre_native_ffi_wake_from_native(
-  const mln_wake* in
-) {
-  MaplibreNativeFfiWake* self = maplibre_native_ffi_wake_new();
-  (void)in;
-  return self;
 }
 
 struct _MaplibreNativeFfiRenderSessionAttachOptions {
@@ -12563,15 +10798,6 @@ void maplibre_native_ffi_render_session_attach_options_set_queue_lock(
   if (previous != NULL) maplibre_native_ffi_queue_lock_free(previous);
 }
 
-gpointer maplibre_native_ffi_render_session_attach_options_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_render_session_attach_options_copy(
-    (const MaplibreNativeFfiRenderSessionAttachOptions*)self
-  );
-}
-
 void maplibre_native_ffi_render_session_attach_options_to_native(
   const MaplibreNativeFfiRenderSessionAttachOptions* self,
   mln_render_session_attach_options* out, MaplibreNativeFfiCall* call
@@ -12599,28 +10825,6 @@ void maplibre_native_ffi_render_session_attach_options_to_native(
     );
 }
 
-MaplibreNativeFfiRenderSessionAttachOptions*
-maplibre_native_ffi_render_session_attach_options_from_native(
-  const mln_render_session_attach_options* in
-) {
-  MaplibreNativeFfiRenderSessionAttachOptions* self =
-    maplibre_native_ffi_render_session_attach_options_new();
-  self->driver = (MaplibreNativeFfiRenderDriverKind)(in->driver);
-  self->producer_sync_kinds =
-    (MaplibreNativeFfiGpuSyncKindFlag)(in->producer_sync_kinds);
-  g_clear_pointer(&self->frame_wake, maplibre_native_ffi_wake_free);
-  self->frame_wake = maplibre_native_ffi_wake_from_native(&in->frame_wake);
-  g_clear_pointer(&self->redraw_wake, maplibre_native_ffi_wake_free);
-  self->redraw_wake = maplibre_native_ffi_wake_from_native(&in->redraw_wake);
-  g_clear_pointer(&self->driver_work_wake, maplibre_native_ffi_wake_free);
-  self->driver_work_wake =
-    maplibre_native_ffi_wake_from_native(&in->driver_work_wake);
-  g_clear_pointer(&self->queue_lock, maplibre_native_ffi_queue_lock_free);
-  self->queue_lock =
-    maplibre_native_ffi_queue_lock_from_native(&in->queue_lock);
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiRenderSessionCapabilities,
   maplibre_native_ffi_render_session_capabilities,
@@ -12640,30 +10844,6 @@ void maplibre_native_ffi_render_session_capabilities_free(
   MaplibreNativeFfiRenderSessionCapabilities* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_render_session_capabilities_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_render_session_capabilities_copy(
-    (const MaplibreNativeFfiRenderSessionCapabilities*)self
-  );
-}
-
-void maplibre_native_ffi_render_session_capabilities_to_native(
-  const MaplibreNativeFfiRenderSessionCapabilities* self,
-  mln_render_session_capabilities* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->driver = (mln_render_driver_kind)(self->driver);
-  out->texture_ring_depth = (uint32_t)(self->texture_ring_depth);
-  out->flags = (mln_render_session_capability_flags)(self->flags);
-  out->producer_sync_kind = (mln_gpu_sync_kind)(self->producer_sync_kind);
-  out->consumer_sync_kinds =
-    (mln_gpu_sync_kind_flags)(self->consumer_sync_kinds);
 }
 
 void maplibre_native_ffi_render_session_capabilities_read(
@@ -12708,33 +10888,6 @@ void maplibre_native_ffi_render_session_snapshot_free(
   MaplibreNativeFfiRenderSessionSnapshot* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_render_session_snapshot_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_render_session_snapshot_copy(
-    (const MaplibreNativeFfiRenderSessionSnapshot*)self
-  );
-}
-
-void maplibre_native_ffi_render_session_snapshot_to_native(
-  const MaplibreNativeFfiRenderSessionSnapshot* self,
-  mln_render_session_snapshot* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->state = (mln_render_session_state)(self->state);
-  maplibre_native_ffi_logical_extent_to_native(
-    &self->extent, &out->extent, call
-  );
-  out->generation = (uint64_t)(self->generation);
-  out->frame_generation = (uint64_t)(self->frame_generation);
-  out->acquired_frame_count = (uint32_t)(self->acquired_frame_count);
-  out->failure_status = (mln_status)(self->failure_status);
-  out->has_target = (self->has_target) != FALSE;
 }
 
 void maplibre_native_ffi_render_session_snapshot_read(
@@ -12845,28 +10998,6 @@ const char* maplibre_native_ffi_rendered_feature_get_state(
 ) {
   g_return_val_if_fail(self != NULL, NULL);
   return self->state;
-}
-
-gpointer maplibre_native_ffi_rendered_feature_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_rendered_feature_copy(
-    (const MaplibreNativeFfiRenderedFeature*)self
-  );
-}
-
-void maplibre_native_ffi_rendered_feature_to_native(
-  const MaplibreNativeFfiRenderedFeature* self, mln_rendered_feature* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->feature = maplibre_native_ffi_text_view(self->feature);
-  out->layer_id = maplibre_native_ffi_text_view(self->layer_id);
-  out->source_id = maplibre_native_ffi_text_view(self->source_id);
-  out->source_layer_id = maplibre_native_ffi_text_view(self->source_layer_id);
-  out->state = maplibre_native_ffi_text_view(self->state);
 }
 
 MaplibreNativeFfiRenderedFeature*
@@ -13058,20 +11189,6 @@ void maplibre_native_ffi_rendered_feature_query_options_set_filter(
     );
 }
 
-MaplibreNativeFfiRenderedFeatureQueryOptions*
-maplibre_native_ffi_rendered_feature_query_options_copy(
-  const MaplibreNativeFfiRenderedFeatureQueryOptions* self
-) {
-  MaplibreNativeFfiRenderedFeatureQueryOptions* copy =
-    maplibre_native_ffi_rendered_feature_query_options_new();
-  copy->fields = self->fields;
-  g_strfreev(copy->layer_ids);
-  copy->layer_ids = g_strdupv(self->layer_ids);
-  g_free(copy->filter);
-  copy->filter = g_strdup(self->filter);
-  return copy;
-}
-
 void maplibre_native_ffi_rendered_feature_query_options_to_native(
   const MaplibreNativeFfiRenderedFeatureQueryOptions* self,
   mln_rendered_feature_query_options* out, MaplibreNativeFfiCall* call
@@ -13092,26 +11209,6 @@ void maplibre_native_ffi_rendered_feature_query_options_to_native(
   out->filter = maplibre_native_ffi_text_view(self->filter);
 }
 
-MaplibreNativeFfiRenderedFeatureQueryOptions*
-maplibre_native_ffi_rendered_feature_query_options_from_native(
-  const mln_rendered_feature_query_options* in
-) {
-  MaplibreNativeFfiRenderedFeatureQueryOptions* self =
-    maplibre_native_ffi_rendered_feature_query_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS) != 0) {
-    g_strfreev(self->layer_ids);
-    self->layer_ids = g_new0(char*, in->layer_id_count + 1);
-    for (size_t index = 0; index < in->layer_id_count; index++) {
-      self->layer_ids[index] =
-        maplibre_native_ffi_text_new(in->layer_ids[index]);
-    }
-  }
-  g_free(self->filter);
-  self->filter = maplibre_native_ffi_text_new(in->filter);
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiScreenBox, maplibre_native_ffi_screen_box,
   maplibre_native_ffi_screen_box_copy, maplibre_native_ffi_screen_box_free
@@ -13128,38 +11225,16 @@ void maplibre_native_ffi_screen_box_free(MaplibreNativeFfiScreenBox* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_screen_box_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_screen_box_copy(
-    (const MaplibreNativeFfiScreenBox*)self
-  );
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiScreenBox) == sizeof(mln_screen_box));
+SAME_MEMBER(MaplibreNativeFfiScreenBox, mln_screen_box, min);
+SAME_MEMBER(MaplibreNativeFfiScreenBox, mln_screen_box, max);
 
 void maplibre_native_ffi_screen_box_to_native(
   const MaplibreNativeFfiScreenBox* self, mln_screen_box* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  maplibre_native_ffi_screen_point_to_native(&self->min, &out->min, call);
-  maplibre_native_ffi_screen_point_to_native(&self->max, &out->max, call);
-}
-
-void maplibre_native_ffi_screen_box_read(
-  MaplibreNativeFfiScreenBox* out, const mln_screen_box* in
-) {
-  maplibre_native_ffi_screen_point_read(&out->min, &in->min);
-  maplibre_native_ffi_screen_point_read(&out->max, &in->max);
-}
-
-MaplibreNativeFfiScreenBox* maplibre_native_ffi_screen_box_from_native(
-  const mln_screen_box* in
-) {
-  MaplibreNativeFfiScreenBox* self = g_new0(MaplibreNativeFfiScreenBox, 1);
-  maplibre_native_ffi_screen_box_read(self, in);
-  return self;
+  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiScreenLineString {
@@ -13233,15 +11308,6 @@ void maplibre_native_ffi_screen_line_string_set_points(
   if (previous != NULL) g_ptr_array_unref(previous);
 }
 
-gpointer maplibre_native_ffi_screen_line_string_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_screen_line_string_copy(
-    (const MaplibreNativeFfiScreenLineString*)self
-  );
-}
-
 void maplibre_native_ffi_screen_line_string_to_native(
   const MaplibreNativeFfiScreenLineString* self, mln_screen_line_string* out,
   MaplibreNativeFfiCall* call
@@ -13258,26 +11324,6 @@ void maplibre_native_ffi_screen_line_string_to_native(
     out->points = items;
     out->point_count = self->points->len;
   }
-}
-
-MaplibreNativeFfiScreenLineString*
-maplibre_native_ffi_screen_line_string_from_native(
-  const mln_screen_line_string* in
-) {
-  MaplibreNativeFfiScreenLineString* self =
-    maplibre_native_ffi_screen_line_string_new();
-  g_clear_pointer(&self->points, g_ptr_array_unref);
-  self->points = g_ptr_array_new_full(
-    (guint)in->point_count,
-    (GDestroyNotify)maplibre_native_ffi_screen_point_free
-  );
-  for (size_t index = 0; index < in->point_count; index++) {
-    g_ptr_array_add(
-      self->points,
-      maplibre_native_ffi_screen_point_from_native(&in->points[index])
-    );
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiRenderedQueryGeometry {
@@ -13435,41 +11481,6 @@ void maplibre_native_ffi_rendered_query_geometry_to_native(
   }
 }
 
-MaplibreNativeFfiRenderedQueryGeometry*
-maplibre_native_ffi_rendered_query_geometry_from_native(
-  const mln_rendered_query_geometry* in
-) {
-  gint64 tag = (gint64)in->type;
-  const mln_rendered_query_geometry_data* data = &in->data;
-  MaplibreNativeFfiRenderedQueryGeometry* self =
-    g_new0(MaplibreNativeFfiRenderedQueryGeometry, 1);
-  self->tag = tag;
-  switch (tag) {
-    case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT:
-      maplibre_native_ffi_screen_point_read(&self->point, &data->point);
-      break;
-    case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX:
-      maplibre_native_ffi_screen_box_read(&self->box, &data->box);
-      break;
-    case MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING:
-      self->line_string =
-        maplibre_native_ffi_screen_line_string_from_native(&data->line_string);
-      break;
-    default:
-      break;
-  }
-  return self;
-}
-
-gpointer maplibre_native_ffi_rendered_query_geometry_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_rendered_query_geometry_copy(
-    (const MaplibreNativeFfiRenderedQueryGeometry*)self
-  );
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiRenderingStats, maplibre_native_ffi_rendering_stats,
   maplibre_native_ffi_rendering_stats_copy,
@@ -13489,36 +11500,27 @@ void maplibre_native_ffi_rendering_stats_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_rendering_stats_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_rendering_stats_copy(
-    (const MaplibreNativeFfiRenderingStats*)self
-  );
-}
-
-void maplibre_native_ffi_rendering_stats_to_native(
-  const MaplibreNativeFfiRenderingStats* self, mln_rendering_stats* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->encoding_time_ms = (double)(self->encoding_time_ms);
-  out->rendering_time_ms = (double)(self->rendering_time_ms);
-  out->frame_count = (int64_t)(self->frame_count);
-  out->draw_call_count = (int64_t)(self->draw_call_count);
-  out->total_draw_call_count = (int64_t)(self->total_draw_call_count);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiRenderingStats) == sizeof(mln_rendering_stats)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRenderingStats, mln_rendering_stats, encoding_time_ms
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRenderingStats, mln_rendering_stats, rendering_time_ms
+);
+SAME_MEMBER(MaplibreNativeFfiRenderingStats, mln_rendering_stats, frame_count);
+SAME_MEMBER(
+  MaplibreNativeFfiRenderingStats, mln_rendering_stats, draw_call_count
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRenderingStats, mln_rendering_stats, total_draw_call_count
+);
 
 void maplibre_native_ffi_rendering_stats_read(
   MaplibreNativeFfiRenderingStats* out, const mln_rendering_stats* in
 ) {
-  out->encoding_time_ms = (gdouble)(in->encoding_time_ms);
-  out->rendering_time_ms = (gdouble)(in->rendering_time_ms);
-  out->frame_count = (gint64)(in->frame_count);
-  out->draw_call_count = (gint64)(in->draw_call_count);
-  out->total_draw_call_count = (gint64)(in->total_draw_call_count);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiRenderingStats*
@@ -13630,18 +11632,6 @@ void maplibre_native_ffi_resource_route_to_native(
   out->url = maplibre_native_ffi_text_view(self->url);
 }
 
-MaplibreNativeFfiResourceRoute* maplibre_native_ffi_resource_route_from_native(
-  const mln_resource_route* in
-) {
-  MaplibreNativeFfiResourceRoute* self =
-    maplibre_native_ffi_resource_route_new();
-  self->kinds = (MaplibreNativeFfiResourceKindFlag)(in->kinds);
-  self->flags = (MaplibreNativeFfiUrlMatchFlag)(in->flags);
-  g_free(self->url);
-  self->url = maplibre_native_ffi_text_new(in->url);
-  return self;
-}
-
 struct _MaplibreNativeFfiResourceProvider {
   GPtrArray* routes;
   MaplibreNativeFfiClosure* callback;
@@ -13731,15 +11721,6 @@ void maplibre_native_ffi_resource_provider_set_callback(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-gpointer maplibre_native_ffi_resource_provider_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_resource_provider_copy(
-    (const MaplibreNativeFfiResourceProvider*)self
-  );
-}
-
 static void resource_provider_callback_trampoline(
   void* user_data, const mln_resource_request_info* request,
   mln_resource_request handle
@@ -13785,26 +11766,6 @@ void maplibre_native_ffi_resource_provider_to_native(
   }
 }
 
-MaplibreNativeFfiResourceProvider*
-maplibre_native_ffi_resource_provider_from_native(
-  const mln_resource_provider* in
-) {
-  MaplibreNativeFfiResourceProvider* self =
-    maplibre_native_ffi_resource_provider_new();
-  g_clear_pointer(&self->routes, g_ptr_array_unref);
-  self->routes = g_ptr_array_new_full(
-    (guint)in->route_count,
-    (GDestroyNotify)maplibre_native_ffi_resource_route_free
-  );
-  for (size_t index = 0; index < in->route_count; index++) {
-    g_ptr_array_add(
-      self->routes,
-      maplibre_native_ffi_resource_route_from_native(&in->routes[index])
-    );
-  }
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiResourceRange, maplibre_native_ffi_resource_range,
   maplibre_native_ffi_resource_range_copy,
@@ -13824,30 +11785,16 @@ void maplibre_native_ffi_resource_range_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_resource_range_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_resource_range_copy(
-    (const MaplibreNativeFfiResourceRange*)self
-  );
-}
-
-void maplibre_native_ffi_resource_range_to_native(
-  const MaplibreNativeFfiResourceRange* self, mln_resource_range* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->start = (uint64_t)(self->start);
-  out->end = (uint64_t)(self->end);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiResourceRange) == sizeof(mln_resource_range)
+);
+SAME_MEMBER(MaplibreNativeFfiResourceRange, mln_resource_range, start);
+SAME_MEMBER(MaplibreNativeFfiResourceRange, mln_resource_range, end);
 
 void maplibre_native_ffi_resource_range_read(
   MaplibreNativeFfiResourceRange* out, const mln_resource_range* in
 ) {
-  out->start = (guint64)(in->start);
-  out->end = (guint64)(in->end);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiResourceRange* maplibre_native_ffi_resource_range_from_native(
@@ -13911,15 +11858,6 @@ void maplibre_native_ffi_resource_request_cancel_handler_set_callback(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-gpointer maplibre_native_ffi_resource_request_cancel_handler_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_resource_request_cancel_handler_copy(
-    (const MaplibreNativeFfiResourceRequestCancelHandler*)self
-  );
-}
-
 static void resource_request_cancel_handler_callback_trampoline(
   void* user_data, mln_resource_request handle
 ) {
@@ -13946,16 +11884,6 @@ void maplibre_native_ffi_resource_request_cancel_handler_to_native(
                       ? resource_request_cancel_handler_callback_trampoline
                       : NULL;
   }
-}
-
-MaplibreNativeFfiResourceRequestCancelHandler*
-maplibre_native_ffi_resource_request_cancel_handler_from_native(
-  const mln_resource_request_cancel_handler* in
-) {
-  MaplibreNativeFfiResourceRequestCancelHandler* self =
-    maplibre_native_ffi_resource_request_cancel_handler_new();
-  (void)in;
-  return self;
 }
 
 struct _MaplibreNativeFfiResourceRequestInfo {
@@ -14125,41 +12053,6 @@ GBytes* maplibre_native_ffi_resource_request_info_get_prior_data(
 ) {
   g_return_val_if_fail(self != NULL, NULL);
   return self->prior_data;
-}
-
-gpointer maplibre_native_ffi_resource_request_info_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_resource_request_info_copy(
-    (const MaplibreNativeFfiResourceRequestInfo*)self
-  );
-}
-
-void maplibre_native_ffi_resource_request_info_to_native(
-  const MaplibreNativeFfiResourceRequestInfo* self,
-  mln_resource_request_info* out, MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->fields = (mln_resource_request_fields)self->fields;
-  out->requested_url = maplibre_native_ffi_text_view(self->requested_url);
-  out->resolved_url = maplibre_native_ffi_text_view(self->resolved_url);
-  out->kind = (mln_resource_kind)(self->kind);
-  out->loading_method = (mln_resource_loading_method)(self->loading_method);
-  out->priority = (mln_resource_priority)(self->priority);
-  out->usage = (mln_resource_usage)(self->usage);
-  out->storage_policy = (mln_resource_storage_policy)(self->storage_policy);
-  maplibre_native_ffi_resource_range_to_native(&self->range, &out->range, call);
-  out->prior_modified_unix_ms = (int64_t)(self->prior_modified_unix_ms);
-  out->prior_expires_unix_ms = (int64_t)(self->prior_expires_unix_ms);
-  out->prior_etag = maplibre_native_ffi_text_view(self->prior_etag);
-  {
-    mln_buffer_view prior_data_view =
-      maplibre_native_ffi_bytes_view(self->prior_data);
-    out->prior_data = prior_data_view.data;
-    out->prior_data_size = prior_data_view.size;
-  }
 }
 
 MaplibreNativeFfiResourceRequestInfo*
@@ -14615,26 +12508,6 @@ void maplibre_native_ffi_resource_response_set_retry_after_unix_ms(
     );
 }
 
-MaplibreNativeFfiResourceResponse* maplibre_native_ffi_resource_response_copy(
-  const MaplibreNativeFfiResourceResponse* self
-) {
-  MaplibreNativeFfiResourceResponse* copy =
-    maplibre_native_ffi_resource_response_new();
-  copy->fields = self->fields;
-  copy->status = self->status;
-  copy->error_reason = self->error_reason;
-  copy->bytes = self->bytes != NULL ? g_bytes_ref(self->bytes) : NULL;
-  g_free(copy->error_message);
-  copy->error_message = g_strdup(self->error_message);
-  copy->must_revalidate = self->must_revalidate;
-  copy->modified_unix_ms = self->modified_unix_ms;
-  copy->expires_unix_ms = self->expires_unix_ms;
-  g_free(copy->etag);
-  copy->etag = g_strdup(self->etag);
-  copy->retry_after_unix_ms = self->retry_after_unix_ms;
-  return copy;
-}
-
 void maplibre_native_ffi_resource_response_to_native(
   const MaplibreNativeFfiResourceResponse* self, mln_resource_response* out,
   MaplibreNativeFfiCall* call
@@ -14656,34 +12529,6 @@ void maplibre_native_ffi_resource_response_to_native(
   out->expires_unix_ms = (int64_t)(self->expires_unix_ms);
   out->etag = maplibre_native_ffi_text_view(self->etag);
   out->retry_after_unix_ms = (int64_t)(self->retry_after_unix_ms);
-}
-
-MaplibreNativeFfiResourceResponse*
-maplibre_native_ffi_resource_response_from_native(
-  const mln_resource_response* in
-) {
-  MaplibreNativeFfiResourceResponse* self =
-    maplibre_native_ffi_resource_response_new();
-  self->fields = (guint64)in->fields;
-  self->status = (MaplibreNativeFfiResourceResponseStatus)(in->status);
-  self->error_reason = (MaplibreNativeFfiResourceErrorReason)(in->error_reason);
-  g_clear_pointer(&self->bytes, g_bytes_unref);
-  self->bytes = maplibre_native_ffi_bytes_new(in->bytes, in->byte_count);
-  g_free(self->error_message);
-  self->error_message = maplibre_native_ffi_text_new(in->error_message);
-  self->must_revalidate = (in->must_revalidate) ? TRUE : FALSE;
-  if ((in->fields & MLN_RESOURCE_RESPONSE_MODIFIED) != 0) {
-    self->modified_unix_ms = (gint64)(in->modified_unix_ms);
-  }
-  if ((in->fields & MLN_RESOURCE_RESPONSE_EXPIRES) != 0) {
-    self->expires_unix_ms = (gint64)(in->expires_unix_ms);
-  }
-  g_free(self->etag);
-  self->etag = maplibre_native_ffi_text_new(in->etag);
-  if ((in->fields & MLN_RESOURCE_RESPONSE_RETRY_AFTER) != 0) {
-    self->retry_after_unix_ms = (gint64)(in->retry_after_unix_ms);
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiUrlQueryParameter {
@@ -14776,19 +12621,6 @@ void maplibre_native_ffi_url_query_parameter_to_native(
   memset(out, 0, sizeof *out);
   out->name = maplibre_native_ffi_text_view(self->name);
   out->value = maplibre_native_ffi_text_view(self->value);
-}
-
-MaplibreNativeFfiUrlQueryParameter*
-maplibre_native_ffi_url_query_parameter_from_native(
-  const mln_url_query_parameter* in
-) {
-  MaplibreNativeFfiUrlQueryParameter* self =
-    maplibre_native_ffi_url_query_parameter_new();
-  g_free(self->name);
-  self->name = maplibre_native_ffi_text_new(in->name);
-  g_free(self->value);
-  self->value = maplibre_native_ffi_text_new(in->value);
-  return self;
 }
 
 struct _MaplibreNativeFfiResourceTransformRule {
@@ -14953,31 +12785,6 @@ void maplibre_native_ffi_resource_transform_rule_to_native(
   }
 }
 
-MaplibreNativeFfiResourceTransformRule*
-maplibre_native_ffi_resource_transform_rule_from_native(
-  const mln_resource_transform_rule* in
-) {
-  MaplibreNativeFfiResourceTransformRule* self =
-    maplibre_native_ffi_resource_transform_rule_new();
-  self->kinds = (MaplibreNativeFfiResourceKindFlag)(in->kinds);
-  self->flags = (MaplibreNativeFfiUrlMatchFlag)(in->flags);
-  g_free(self->url);
-  self->url = maplibre_native_ffi_text_new(in->url);
-  g_clear_pointer(&self->parameters, g_ptr_array_unref);
-  self->parameters = g_ptr_array_new_full(
-    (guint)in->parameter_count,
-    (GDestroyNotify)maplibre_native_ffi_url_query_parameter_free
-  );
-  for (size_t index = 0; index < in->parameter_count; index++) {
-    g_ptr_array_add(
-      self->parameters, maplibre_native_ffi_url_query_parameter_from_native(
-                          &in->parameters[index]
-                        )
-    );
-  }
-  return self;
-}
-
 struct _MaplibreNativeFfiResourceTransform {
   GPtrArray* rules;
   MaplibreNativeFfiClosure* callback;
@@ -15071,15 +12878,6 @@ void maplibre_native_ffi_resource_transform_set_callback(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-gpointer maplibre_native_ffi_resource_transform_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_resource_transform_copy(
-    (const MaplibreNativeFfiResourceTransform*)self
-  );
-}
-
 static void resource_transform_callback_trampoline(
   void* user_data, mln_resource_kind kind, mln_buffer_view url,
   mln_resource_transform_request request
@@ -15124,26 +12922,6 @@ void maplibre_native_ffi_resource_transform_to_native(
     out->callback =
       self->callback != NULL ? resource_transform_callback_trampoline : NULL;
   }
-}
-
-MaplibreNativeFfiResourceTransform*
-maplibre_native_ffi_resource_transform_from_native(
-  const mln_resource_transform* in
-) {
-  MaplibreNativeFfiResourceTransform* self =
-    maplibre_native_ffi_resource_transform_new();
-  g_clear_pointer(&self->rules, g_ptr_array_unref);
-  self->rules = g_ptr_array_new_full(
-    (guint)in->rule_count,
-    (GDestroyNotify)maplibre_native_ffi_resource_transform_rule_free
-  );
-  for (size_t index = 0; index < in->rule_count; index++) {
-    g_ptr_array_add(
-      self->rules,
-      maplibre_native_ffi_resource_transform_rule_from_native(&in->rules[index])
-    );
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiResourceTransformError {
@@ -15348,20 +13126,6 @@ void maplibre_native_ffi_resource_transform_error_set_retry_after_unix_ms(
     );
 }
 
-MaplibreNativeFfiResourceTransformError*
-maplibre_native_ffi_resource_transform_error_copy(
-  const MaplibreNativeFfiResourceTransformError* self
-) {
-  MaplibreNativeFfiResourceTransformError* copy =
-    maplibre_native_ffi_resource_transform_error_new();
-  copy->fields = self->fields;
-  copy->reason = self->reason;
-  g_free(copy->message);
-  copy->message = g_strdup(self->message);
-  copy->retry_after_unix_ms = self->retry_after_unix_ms;
-  return copy;
-}
-
 void maplibre_native_ffi_resource_transform_error_to_native(
   const MaplibreNativeFfiResourceTransformError* self,
   mln_resource_transform_error* out, MaplibreNativeFfiCall* call
@@ -15373,22 +13137,6 @@ void maplibre_native_ffi_resource_transform_error_to_native(
   out->reason = (mln_resource_error_reason)(self->reason);
   out->message = maplibre_native_ffi_text_view(self->message);
   out->retry_after_unix_ms = (int64_t)(self->retry_after_unix_ms);
-}
-
-MaplibreNativeFfiResourceTransformError*
-maplibre_native_ffi_resource_transform_error_from_native(
-  const mln_resource_transform_error* in
-) {
-  MaplibreNativeFfiResourceTransformError* self =
-    maplibre_native_ffi_resource_transform_error_new();
-  self->fields = (guint64)in->fields;
-  self->reason = (MaplibreNativeFfiResourceErrorReason)(in->reason);
-  g_free(self->message);
-  self->message = maplibre_native_ffi_text_new(in->message);
-  if ((in->fields & MLN_RESOURCE_TRANSFORM_ERROR_RETRY_AFTER) != 0) {
-    self->retry_after_unix_ms = (gint64)(in->retry_after_unix_ms);
-  }
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -15412,29 +13160,20 @@ void maplibre_native_ffi_runtime_event_camera_change_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_runtime_event_camera_change_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_camera_change_copy(
-    (const MaplibreNativeFfiRuntimeEventCameraChange*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_camera_change_to_native(
-  const MaplibreNativeFfiRuntimeEventCameraChange* self,
-  mln_runtime_event_camera_change* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->mode = (mln_camera_change_mode)(self->mode);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiRuntimeEventCameraChange) ==
+  sizeof(mln_runtime_event_camera_change)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRuntimeEventCameraChange, mln_runtime_event_camera_change,
+  mode
+);
 
 void maplibre_native_ffi_runtime_event_camera_change_read(
   MaplibreNativeFfiRuntimeEventCameraChange* out,
   const mln_runtime_event_camera_change* in
 ) {
-  out->mode = (MaplibreNativeFfiCameraChangeMode)(in->mode);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiRuntimeEventCameraChange*
@@ -15468,29 +13207,20 @@ void maplibre_native_ffi_runtime_event_loading_failed_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_runtime_event_loading_failed_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_loading_failed_copy(
-    (const MaplibreNativeFfiRuntimeEventLoadingFailed*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_loading_failed_to_native(
-  const MaplibreNativeFfiRuntimeEventLoadingFailed* self,
-  mln_runtime_event_loading_failed* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->error = (mln_map_load_error)(self->error);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiRuntimeEventLoadingFailed) ==
+  sizeof(mln_runtime_event_loading_failed)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRuntimeEventLoadingFailed, mln_runtime_event_loading_failed,
+  error
+);
 
 void maplibre_native_ffi_runtime_event_loading_failed_read(
   MaplibreNativeFfiRuntimeEventLoadingFailed* out,
   const mln_runtime_event_loading_failed* in
 ) {
-  out->error = (MaplibreNativeFfiMapLoadError)(in->error);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiRuntimeEventLoadingFailed*
@@ -15522,29 +13252,6 @@ void maplibre_native_ffi_runtime_event_render_frame_free(
   MaplibreNativeFfiRuntimeEventRenderFrame* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_runtime_event_render_frame_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_render_frame_copy(
-    (const MaplibreNativeFfiRuntimeEventRenderFrame*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_render_frame_to_native(
-  const MaplibreNativeFfiRuntimeEventRenderFrame* self,
-  mln_runtime_event_render_frame* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->mode = (mln_render_mode)(self->mode);
-  out->needs_repaint = (self->needs_repaint) != FALSE;
-  out->placement_changed = (self->placement_changed) != FALSE;
-  maplibre_native_ffi_rendering_stats_to_native(
-    &self->stats, &out->stats, call
-  );
 }
 
 void maplibre_native_ffi_runtime_event_render_frame_read(
@@ -15611,24 +13318,6 @@ const char* maplibre_native_ffi_runtime_event_style_image_get_image_id(
   return self->image_id;
 }
 
-gpointer maplibre_native_ffi_runtime_event_style_image_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_style_image_copy(
-    (const MaplibreNativeFfiRuntimeEventStyleImage*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_style_image_to_native(
-  const MaplibreNativeFfiRuntimeEventStyleImage* self,
-  mln_runtime_event_style_image* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->image_id = maplibre_native_ffi_text_view(self->image_id);
-}
-
 MaplibreNativeFfiRuntimeEventStyleImage*
 maplibre_native_ffi_runtime_event_style_image_from_native(
   const mln_runtime_event_style_image* in
@@ -15656,34 +13345,17 @@ void maplibre_native_ffi_tile_id_free(MaplibreNativeFfiTileId* self) {
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_tile_id_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_tile_id_copy((const MaplibreNativeFfiTileId*)self);
-}
-
-void maplibre_native_ffi_tile_id_to_native(
-  const MaplibreNativeFfiTileId* self, mln_tile_id* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->overscaled_z = (uint32_t)(self->overscaled_z);
-  out->wrap = (int32_t)(self->wrap);
-  out->canonical_z = (uint32_t)(self->canonical_z);
-  out->canonical_x = (uint32_t)(self->canonical_x);
-  out->canonical_y = (uint32_t)(self->canonical_y);
-}
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiTileId) == sizeof(mln_tile_id));
+SAME_MEMBER(MaplibreNativeFfiTileId, mln_tile_id, overscaled_z);
+SAME_MEMBER(MaplibreNativeFfiTileId, mln_tile_id, wrap);
+SAME_MEMBER(MaplibreNativeFfiTileId, mln_tile_id, canonical_z);
+SAME_MEMBER(MaplibreNativeFfiTileId, mln_tile_id, canonical_x);
+SAME_MEMBER(MaplibreNativeFfiTileId, mln_tile_id, canonical_y);
 
 void maplibre_native_ffi_tile_id_read(
   MaplibreNativeFfiTileId* out, const mln_tile_id* in
 ) {
-  out->overscaled_z = (guint32)(in->overscaled_z);
-  out->wrap = (gint32)(in->wrap);
-  out->canonical_z = (guint32)(in->canonical_z);
-  out->canonical_x = (guint32)(in->canonical_x);
-  out->canonical_y = (guint32)(in->canonical_y);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiTileId* maplibre_native_ffi_tile_id_from_native(
@@ -15756,25 +13428,6 @@ maplibre_native_ffi_runtime_event_tile_action_get_tile_id(
   return (MaplibreNativeFfiTileId*)&self->tile_id;
 }
 
-gpointer maplibre_native_ffi_runtime_event_tile_action_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_tile_action_copy(
-    (const MaplibreNativeFfiRuntimeEventTileAction*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_tile_action_to_native(
-  const MaplibreNativeFfiRuntimeEventTileAction* self,
-  mln_runtime_event_tile_action* out, MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->source_id = maplibre_native_ffi_text_view(self->source_id);
-  out->operation = (mln_tile_operation)(self->operation);
-  maplibre_native_ffi_tile_id_to_native(&self->tile_id, &out->tile_id, call);
-}
-
 MaplibreNativeFfiRuntimeEventTileAction*
 maplibre_native_ffi_runtime_event_tile_action_from_native(
   const mln_runtime_event_tile_action* in
@@ -15833,24 +13486,6 @@ const char* maplibre_native_ffi_runtime_event_source_changed_get_source_id(
   return self->source_id;
 }
 
-gpointer maplibre_native_ffi_runtime_event_source_changed_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_source_changed_copy(
-    (const MaplibreNativeFfiRuntimeEventSourceChanged*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_source_changed_to_native(
-  const MaplibreNativeFfiRuntimeEventSourceChanged* self,
-  mln_runtime_event_source_changed* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->source_id = maplibre_native_ffi_text_view(self->source_id);
-}
-
 MaplibreNativeFfiRuntimeEventSourceChanged*
 maplibre_native_ffi_runtime_event_source_changed_from_native(
   const mln_runtime_event_source_changed* in
@@ -15881,27 +13516,6 @@ void maplibre_native_ffi_runtime_event_offline_region_status_free(
   MaplibreNativeFfiRuntimeEventOfflineRegionStatus* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_runtime_event_offline_region_status_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_offline_region_status_copy(
-    (const MaplibreNativeFfiRuntimeEventOfflineRegionStatus*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_offline_region_status_to_native(
-  const MaplibreNativeFfiRuntimeEventOfflineRegionStatus* self,
-  mln_runtime_event_offline_region_status* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->region_id = (mln_offline_region_id)(self->region_id);
-  maplibre_native_ffi_offline_region_status_to_native(
-    &self->status, &out->status, call
-  );
 }
 
 void maplibre_native_ffi_runtime_event_offline_region_status_read(
@@ -15943,33 +13557,24 @@ void maplibre_native_ffi_runtime_event_offline_region_response_error_free(
   g_free(self);
 }
 
-gpointer
-maplibre_native_ffi_runtime_event_offline_region_response_error_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_offline_region_response_error_copy(
-    (const MaplibreNativeFfiRuntimeEventOfflineRegionResponseError*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_offline_region_response_error_to_native(
-  const MaplibreNativeFfiRuntimeEventOfflineRegionResponseError* self,
-  mln_runtime_event_offline_region_response_error* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->region_id = (mln_offline_region_id)(self->region_id);
-  out->reason = (mln_resource_error_reason)(self->reason);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiRuntimeEventOfflineRegionResponseError) ==
+  sizeof(mln_runtime_event_offline_region_response_error)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRuntimeEventOfflineRegionResponseError,
+  mln_runtime_event_offline_region_response_error, region_id
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRuntimeEventOfflineRegionResponseError,
+  mln_runtime_event_offline_region_response_error, reason
+);
 
 void maplibre_native_ffi_runtime_event_offline_region_response_error_read(
   MaplibreNativeFfiRuntimeEventOfflineRegionResponseError* out,
   const mln_runtime_event_offline_region_response_error* in
 ) {
-  out->region_id = (gint64)(in->region_id);
-  out->reason = (MaplibreNativeFfiResourceErrorReason)(in->reason);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiRuntimeEventOfflineRegionResponseError*
@@ -16005,33 +13610,24 @@ void maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_free(
   g_free(self);
 }
 
-gpointer
-maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_copy(
-    (const MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_to_native(
-  const MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit* self,
-  mln_runtime_event_offline_region_tile_count_limit* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->region_id = (mln_offline_region_id)(self->region_id);
-  out->limit = (uint64_t)(self->limit);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit) ==
+  sizeof(mln_runtime_event_offline_region_tile_count_limit)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit,
+  mln_runtime_event_offline_region_tile_count_limit, region_id
+);
+SAME_MEMBER(
+  MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit,
+  mln_runtime_event_offline_region_tile_count_limit, limit
+);
 
 void maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_read(
   MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit* out,
   const mln_runtime_event_offline_region_tile_count_limit* in
 ) {
-  out->region_id = (gint64)(in->region_id);
-  out->limit = (guint64)(in->limit);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit*
@@ -16113,35 +13709,6 @@ gboolean maplibre_native_ffi_runtime_event_glyphs_get_font_face(
   return self->font_face;
 }
 
-gpointer maplibre_native_ffi_runtime_event_glyphs_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_glyphs_copy(
-    (const MaplibreNativeFfiRuntimeEventGlyphs*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_glyphs_to_native(
-  const MaplibreNativeFfiRuntimeEventGlyphs* self,
-  mln_runtime_event_glyphs* out, MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  if (self->font_stack != NULL && self->font_stack[0] != NULL) {
-    guint count = g_strv_length(self->font_stack);
-    mln_buffer_view* items =
-      maplibre_native_ffi_call_alloc(call, count, sizeof *items);
-    for (guint index = 0; index < count; index++) {
-      items[index] = maplibre_native_ffi_text_view(self->font_stack[index]);
-    }
-    out->font_stack = items;
-    out->font_count = count;
-  }
-  out->first = (uint32_t)(self->first);
-  out->last = (uint32_t)(self->last);
-  out->font_face = (self->font_face) != FALSE;
-}
-
 MaplibreNativeFfiRuntimeEventGlyphs*
 maplibre_native_ffi_runtime_event_glyphs_from_native(
   const mln_runtime_event_glyphs* in
@@ -16212,25 +13779,6 @@ const char* maplibre_native_ffi_runtime_event_sprite_get_url(
 ) {
   g_return_val_if_fail(self != NULL, NULL);
   return self->url;
-}
-
-gpointer maplibre_native_ffi_runtime_event_sprite_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_sprite_copy(
-    (const MaplibreNativeFfiRuntimeEventSprite*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_sprite_to_native(
-  const MaplibreNativeFfiRuntimeEventSprite* self,
-  mln_runtime_event_sprite* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->id = maplibre_native_ffi_text_view(self->id);
-  out->url = maplibre_native_ffi_text_view(self->url);
 }
 
 MaplibreNativeFfiRuntimeEventSprite*
@@ -16526,82 +14074,6 @@ gboolean maplibre_native_ffi_runtime_event_payload_is_none(
   return self->tag == MLN_RUNTIME_EVENT_PAYLOAD_NONE;
 }
 
-void maplibre_native_ffi_runtime_event_payload_to_native(
-  const MaplibreNativeFfiRuntimeEventPayload* self,
-  mln_runtime_event_payload_type* out_tag, mln_runtime_event_payload* out,
-  MaplibreNativeFfiCall* call
-) {
-  mln_runtime_event_payload* data = out;
-  memset(data, 0, sizeof *data);
-  *out_tag = (mln_runtime_event_payload_type)self->tag;
-  switch (self->tag) {
-    case MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE:
-      maplibre_native_ffi_runtime_event_camera_change_to_native(
-        &self->camera_change, &data->camera_change, call
-      );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_LOADING_FAILED:
-      maplibre_native_ffi_runtime_event_loading_failed_to_native(
-        &self->loading_failed, &data->loading_failed, call
-      );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME:
-      maplibre_native_ffi_runtime_event_render_frame_to_native(
-        &self->render_frame, &data->render_frame, call
-      );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE:
-      if (self->style_image != NULL)
-        maplibre_native_ffi_runtime_event_style_image_to_native(
-          self->style_image, &data->style_image, call
-        );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION:
-      if (self->tile_action != NULL)
-        maplibre_native_ffi_runtime_event_tile_action_to_native(
-          self->tile_action, &data->tile_action, call
-        );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED:
-      if (self->source_changed != NULL)
-        maplibre_native_ffi_runtime_event_source_changed_to_native(
-          self->source_changed, &data->source_changed, call
-        );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS:
-      maplibre_native_ffi_runtime_event_offline_region_status_to_native(
-        &self->offline_region_status, &data->offline_region_status, call
-      );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR:
-      maplibre_native_ffi_runtime_event_offline_region_response_error_to_native(
-        &self->offline_region_response_error,
-        &data->offline_region_response_error, call
-      );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
-      maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_to_native(
-        &self->offline_region_tile_count_limit,
-        &data->offline_region_tile_count_limit, call
-      );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS:
-      if (self->glyphs != NULL)
-        maplibre_native_ffi_runtime_event_glyphs_to_native(
-          self->glyphs, &data->glyphs, call
-        );
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_SPRITE:
-      if (self->sprite != NULL)
-        maplibre_native_ffi_runtime_event_sprite_to_native(
-          self->sprite, &data->sprite, call
-        );
-      break;
-    default:
-      break;
-  }
-}
-
 MaplibreNativeFfiRuntimeEventPayload*
 maplibre_native_ffi_runtime_event_payload_from_native(
   gint64 tag, const mln_runtime_event_payload* in
@@ -16673,15 +14145,6 @@ maplibre_native_ffi_runtime_event_payload_from_native(
       break;
   }
   return self;
-}
-
-gpointer maplibre_native_ffi_runtime_event_payload_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_payload_copy(
-    (const MaplibreNativeFfiRuntimeEventPayload*)self
-  );
 }
 
 struct _MaplibreNativeFfiRuntimeEvent {
@@ -16776,31 +14239,6 @@ maplibre_native_ffi_runtime_event_get_payload(
   return self->payload;
 }
 
-gpointer maplibre_native_ffi_runtime_event_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_copy(
-    (const MaplibreNativeFfiRuntimeEvent*)self
-  );
-}
-
-void maplibre_native_ffi_runtime_event_to_native(
-  const MaplibreNativeFfiRuntimeEvent* self, mln_runtime_event* out,
-  MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->type = (mln_runtime_event_type)(self->type);
-  out->source_type = (mln_runtime_event_source_type)(self->source_type);
-  out->source = (uint64_t)(self->source);
-  out->generation = (uint64_t)(self->generation);
-  out->message = maplibre_native_ffi_text_view(self->message);
-  if (self->payload != NULL)
-    maplibre_native_ffi_runtime_event_payload_to_native(
-      self->payload, &out->payload_type, &out->payload, call
-    );
-}
-
 MaplibreNativeFfiRuntimeEvent* maplibre_native_ffi_runtime_event_from_native(
   const mln_runtime_event* in
 ) {
@@ -16872,15 +14310,6 @@ void maplibre_native_ffi_runtime_event_handler_set_callback(
   maplibre_native_ffi_closure_unref(previous);
 }
 
-gpointer maplibre_native_ffi_runtime_event_handler_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_event_handler_copy(
-    (const MaplibreNativeFfiRuntimeEventHandler*)self
-  );
-}
-
 static void runtime_event_handler_callback_trampoline(
   void* user_data, const mln_event_batch_view* events
 ) {
@@ -16920,16 +14349,6 @@ void maplibre_native_ffi_runtime_event_handler_to_native(
     out->callback =
       self->callback != NULL ? runtime_event_handler_callback_trampoline : NULL;
   }
-}
-
-MaplibreNativeFfiRuntimeEventHandler*
-maplibre_native_ffi_runtime_event_handler_from_native(
-  const mln_runtime_event_handler* in
-) {
-  MaplibreNativeFfiRuntimeEventHandler* self =
-    maplibre_native_ffi_runtime_event_handler_new();
-  (void)in;
-  return self;
 }
 
 struct _MaplibreNativeFfiRuntimeOptions {
@@ -17002,15 +14421,6 @@ void maplibre_native_ffi_runtime_options_set_cache_path(
   g_free(previous);
 }
 
-gpointer maplibre_native_ffi_runtime_options_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_runtime_options_copy(
-    (const MaplibreNativeFfiRuntimeOptions*)self
-  );
-}
-
 void maplibre_native_ffi_runtime_options_to_native(
   const MaplibreNativeFfiRuntimeOptions* self, mln_runtime_options* out,
   MaplibreNativeFfiCall* call
@@ -17020,17 +14430,6 @@ void maplibre_native_ffi_runtime_options_to_native(
   out->size = sizeof *out;
   out->asset_path = maplibre_native_ffi_text_view(self->asset_path);
   out->cache_path = maplibre_native_ffi_text_view(self->cache_path);
-}
-
-MaplibreNativeFfiRuntimeOptions*
-maplibre_native_ffi_runtime_options_from_native(const mln_runtime_options* in) {
-  MaplibreNativeFfiRuntimeOptions* self =
-    maplibre_native_ffi_runtime_options_new();
-  g_free(self->asset_path);
-  self->asset_path = maplibre_native_ffi_text_new(in->asset_path);
-  g_free(self->cache_path);
-  self->cache_path = maplibre_native_ffi_text_new(in->cache_path);
-  return self;
 }
 
 struct _MaplibreNativeFfiSourceFeature {
@@ -17083,25 +14482,6 @@ const char* maplibre_native_ffi_source_feature_get_source_layer_id(
 ) {
   g_return_val_if_fail(self != NULL, NULL);
   return self->source_layer_id;
-}
-
-gpointer maplibre_native_ffi_source_feature_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_source_feature_copy(
-    (const MaplibreNativeFfiSourceFeature*)self
-  );
-}
-
-void maplibre_native_ffi_source_feature_to_native(
-  const MaplibreNativeFfiSourceFeature* self, mln_source_feature* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->feature = maplibre_native_ffi_text_view(self->feature);
-  out->source_layer_id = maplibre_native_ffi_text_view(self->source_layer_id);
 }
 
 MaplibreNativeFfiSourceFeature* maplibre_native_ffi_source_feature_from_native(
@@ -17287,20 +14667,6 @@ void maplibre_native_ffi_source_feature_query_options_set_filter(
     );
 }
 
-MaplibreNativeFfiSourceFeatureQueryOptions*
-maplibre_native_ffi_source_feature_query_options_copy(
-  const MaplibreNativeFfiSourceFeatureQueryOptions* self
-) {
-  MaplibreNativeFfiSourceFeatureQueryOptions* copy =
-    maplibre_native_ffi_source_feature_query_options_new();
-  copy->fields = self->fields;
-  g_strfreev(copy->source_layer_ids);
-  copy->source_layer_ids = g_strdupv(self->source_layer_ids);
-  g_free(copy->filter);
-  copy->filter = g_strdup(self->filter);
-  return copy;
-}
-
 void maplibre_native_ffi_source_feature_query_options_to_native(
   const MaplibreNativeFfiSourceFeatureQueryOptions* self,
   mln_source_feature_query_options* out, MaplibreNativeFfiCall* call
@@ -17322,26 +14688,6 @@ void maplibre_native_ffi_source_feature_query_options_to_native(
   out->filter = maplibre_native_ffi_text_view(self->filter);
 }
 
-MaplibreNativeFfiSourceFeatureQueryOptions*
-maplibre_native_ffi_source_feature_query_options_from_native(
-  const mln_source_feature_query_options* in
-) {
-  MaplibreNativeFfiSourceFeatureQueryOptions* self =
-    maplibre_native_ffi_source_feature_query_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS) != 0) {
-    g_strfreev(self->source_layer_ids);
-    self->source_layer_ids = g_new0(char*, in->source_layer_id_count + 1);
-    for (size_t index = 0; index < in->source_layer_id_count; index++) {
-      self->source_layer_ids[index] =
-        maplibre_native_ffi_text_new(in->source_layer_ids[index]);
-    }
-  }
-  g_free(self->filter);
-  self->filter = maplibre_native_ffi_text_new(in->filter);
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiStyleExpressionInfo,
   maplibre_native_ffi_style_expression_info,
@@ -17361,26 +14707,6 @@ void maplibre_native_ffi_style_expression_info_free(
   MaplibreNativeFfiStyleExpressionInfo* self
 ) {
   g_free(self);
-}
-
-gpointer maplibre_native_ffi_style_expression_info_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_style_expression_info_copy(
-    (const MaplibreNativeFfiStyleExpressionInfo*)self
-  );
-}
-
-void maplibre_native_ffi_style_expression_info_to_native(
-  const MaplibreNativeFfiStyleExpressionInfo* self,
-  mln_style_expression_info* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->is_feature_constant = (self->is_feature_constant) != FALSE;
-  out->is_zoom_constant = (self->is_zoom_constant) != FALSE;
 }
 
 void maplibre_native_ffi_style_expression_info_read(
@@ -17778,27 +15104,6 @@ void maplibre_native_ffi_style_expression_inputs_set_available_images(
     );
 }
 
-MaplibreNativeFfiStyleExpressionInputs*
-maplibre_native_ffi_style_expression_inputs_copy(
-  const MaplibreNativeFfiStyleExpressionInputs* self
-) {
-  MaplibreNativeFfiStyleExpressionInputs* copy =
-    maplibre_native_ffi_style_expression_inputs_new();
-  copy->fields = self->fields;
-  copy->zoom = self->zoom;
-  copy->color_ramp_parameter = self->color_ramp_parameter;
-  g_free(copy->feature);
-  copy->feature = g_strdup(self->feature);
-  g_free(copy->feature_state);
-  copy->feature_state = g_strdup(self->feature_state);
-  g_free(copy->global_state);
-  copy->global_state = g_strdup(self->global_state);
-  copy->canonical_tile_id = self->canonical_tile_id;
-  g_strfreev(copy->available_images);
-  copy->available_images = g_strdupv(self->available_images);
-  return copy;
-}
-
 void maplibre_native_ffi_style_expression_inputs_to_native(
   const MaplibreNativeFfiStyleExpressionInputs* self,
   mln_style_expression_inputs* out, MaplibreNativeFfiCall* call
@@ -17827,39 +15132,6 @@ void maplibre_native_ffi_style_expression_inputs_to_native(
   }
 }
 
-MaplibreNativeFfiStyleExpressionInputs*
-maplibre_native_ffi_style_expression_inputs_from_native(
-  const mln_style_expression_inputs* in
-) {
-  MaplibreNativeFfiStyleExpressionInputs* self =
-    maplibre_native_ffi_style_expression_inputs_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_STYLE_EXPRESSION_INPUT_ZOOM) != 0) {
-    self->zoom = (gdouble)(in->zoom);
-  }
-  if ((in->fields & MLN_STYLE_EXPRESSION_INPUT_COLOR_RAMP_PARAMETER) != 0) {
-    self->color_ramp_parameter = (gdouble)(in->color_ramp_parameter);
-  }
-  g_free(self->feature);
-  self->feature = maplibre_native_ffi_text_new(in->feature);
-  g_free(self->feature_state);
-  self->feature_state = maplibre_native_ffi_text_new(in->feature_state);
-  g_free(self->global_state);
-  self->global_state = maplibre_native_ffi_text_new(in->global_state);
-  if ((in->fields & MLN_STYLE_EXPRESSION_INPUT_CANONICAL_TILE_ID) != 0) {
-    maplibre_native_ffi_canonical_tile_id_read(
-      &self->canonical_tile_id, &in->canonical_tile_id
-    );
-  }
-  g_strfreev(self->available_images);
-  self->available_images = g_new0(char*, in->available_image_count + 1);
-  for (size_t index = 0; index < in->available_image_count; index++) {
-    self->available_images[index] =
-      maplibre_native_ffi_text_new(in->available_images[index]);
-  }
-  return self;
-}
-
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiStyleExpressionType,
   maplibre_native_ffi_style_expression_type,
@@ -17881,42 +15153,26 @@ void maplibre_native_ffi_style_expression_type_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_style_expression_type_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_style_expression_type_copy(
-    (const MaplibreNativeFfiStyleExpressionType*)self
-  );
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiStyleExpressionType) ==
+  sizeof(mln_style_expression_type)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiStyleExpressionType, mln_style_expression_type, kind
+);
+SAME_MEMBER(
+  MaplibreNativeFfiStyleExpressionType, mln_style_expression_type, item_kind
+);
+SAME_MEMBER(
+  MaplibreNativeFfiStyleExpressionType, mln_style_expression_type, item_count
+);
 
 void maplibre_native_ffi_style_expression_type_to_native(
   const MaplibreNativeFfiStyleExpressionType* self,
   mln_style_expression_type* out, MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->kind = (mln_style_expression_type_kind)(self->kind);
-  out->item_kind = (mln_style_expression_type_kind)(self->item_kind);
-  out->item_count = (uint32_t)(self->item_count);
-}
-
-void maplibre_native_ffi_style_expression_type_read(
-  MaplibreNativeFfiStyleExpressionType* out, const mln_style_expression_type* in
-) {
-  out->kind = (MaplibreNativeFfiStyleExpressionTypeKind)(in->kind);
-  out->item_kind = (MaplibreNativeFfiStyleExpressionTypeKind)(in->item_kind);
-  out->item_count = (guint32)(in->item_count);
-}
-
-MaplibreNativeFfiStyleExpressionType*
-maplibre_native_ffi_style_expression_type_from_native(
-  const mln_style_expression_type* in
-) {
-  MaplibreNativeFfiStyleExpressionType* self =
-    g_new0(MaplibreNativeFfiStyleExpressionType, 1);
-  maplibre_native_ffi_style_expression_type_read(self, in);
-  return self;
+  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiStyleExpressionOptions {
@@ -18037,17 +15293,6 @@ void maplibre_native_ffi_style_expression_options_set_expected_type(
     );
 }
 
-MaplibreNativeFfiStyleExpressionOptions*
-maplibre_native_ffi_style_expression_options_copy(
-  const MaplibreNativeFfiStyleExpressionOptions* self
-) {
-  MaplibreNativeFfiStyleExpressionOptions* copy =
-    maplibre_native_ffi_style_expression_options_new();
-  copy->fields = self->fields;
-  copy->expected_type = self->expected_type;
-  return copy;
-}
-
 void maplibre_native_ffi_style_expression_options_to_native(
   const MaplibreNativeFfiStyleExpressionOptions* self,
   mln_style_expression_options* out, MaplibreNativeFfiCall* call
@@ -18058,21 +15303,6 @@ void maplibre_native_ffi_style_expression_options_to_native(
   maplibre_native_ffi_style_expression_type_to_native(
     &self->expected_type, &out->expected_type, call
   );
-}
-
-MaplibreNativeFfiStyleExpressionOptions*
-maplibre_native_ffi_style_expression_options_from_native(
-  const mln_style_expression_options* in
-) {
-  MaplibreNativeFfiStyleExpressionOptions* self =
-    maplibre_native_ffi_style_expression_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_STYLE_EXPRESSION_OPTION_EXPECTED_TYPE) != 0) {
-    maplibre_native_ffi_style_expression_type_read(
-      &self->expected_type, &in->expected_type
-    );
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiStyleImageInfo {
@@ -18247,56 +15477,6 @@ gboolean maplibre_native_ffi_style_image_info_get_keep_unused(
 ) {
   g_return_val_if_fail(self != NULL, FALSE);
   return self->keep_unused;
-}
-
-gpointer maplibre_native_ffi_style_image_info_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_style_image_info_copy(
-    (const MaplibreNativeFfiStyleImageInfo*)self
-  );
-}
-
-void maplibre_native_ffi_style_image_info_to_native(
-  const MaplibreNativeFfiStyleImageInfo* self, mln_style_image_info* out,
-  MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->fields = (mln_style_image_info_fields)self->fields;
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-  out->pixels = maplibre_native_ffi_bytes_view(self->pixels);
-  if (self->stretch_x != NULL && self->stretch_x->len > 0) {
-    mln_image_stretch* items =
-      maplibre_native_ffi_call_alloc(call, self->stretch_x->len, sizeof *items);
-    for (guint index = 0; index < self->stretch_x->len; index++) {
-      maplibre_native_ffi_image_stretch_to_native(
-        self->stretch_x->pdata[index], &items[index], call
-      );
-    }
-    out->stretch_x = items;
-    out->stretch_x_count = self->stretch_x->len;
-  }
-  if (self->stretch_y != NULL && self->stretch_y->len > 0) {
-    mln_image_stretch* items =
-      maplibre_native_ffi_call_alloc(call, self->stretch_y->len, sizeof *items);
-    for (guint index = 0; index < self->stretch_y->len; index++) {
-      maplibre_native_ffi_image_stretch_to_native(
-        self->stretch_y->pdata[index], &items[index], call
-      );
-    }
-    out->stretch_y = items;
-    out->stretch_y_count = self->stretch_y->len;
-  }
-  maplibre_native_ffi_image_content_to_native(
-    &self->content, &out->content, call
-  );
-  out->text_fit_width = (mln_style_image_text_fit)(self->text_fit_width);
-  out->text_fit_height = (mln_style_image_text_fit)(self->text_fit_height);
-  out->pixel_ratio = (float)(self->pixel_ratio);
-  out->sdf = (self->sdf) != FALSE;
-  out->keep_unused = (self->keep_unused) != FALSE;
 }
 
 MaplibreNativeFfiStyleImageInfo*
@@ -18769,44 +15949,6 @@ void maplibre_native_ffi_style_image_options_set_keep_unused(
     );
 }
 
-MaplibreNativeFfiStyleImageOptions*
-maplibre_native_ffi_style_image_options_copy(
-  const MaplibreNativeFfiStyleImageOptions* self
-) {
-  MaplibreNativeFfiStyleImageOptions* copy =
-    maplibre_native_ffi_style_image_options_new();
-  copy->fields = self->fields;
-  g_clear_pointer(&copy->stretch_x, g_ptr_array_unref);
-  copy->stretch_x =
-    self->stretch_x != NULL
-      ? g_ptr_array_copy(
-          self->stretch_x, maplibre_native_ffi_image_stretch_copy_func, NULL
-        )
-      : NULL;
-  if (copy->stretch_x != NULL)
-    g_ptr_array_set_free_func(
-      copy->stretch_x, (GDestroyNotify)maplibre_native_ffi_image_stretch_free
-    );
-  g_clear_pointer(&copy->stretch_y, g_ptr_array_unref);
-  copy->stretch_y =
-    self->stretch_y != NULL
-      ? g_ptr_array_copy(
-          self->stretch_y, maplibre_native_ffi_image_stretch_copy_func, NULL
-        )
-      : NULL;
-  if (copy->stretch_y != NULL)
-    g_ptr_array_set_free_func(
-      copy->stretch_y, (GDestroyNotify)maplibre_native_ffi_image_stretch_free
-    );
-  copy->content = self->content;
-  copy->text_fit_width = self->text_fit_width;
-  copy->text_fit_height = self->text_fit_height;
-  copy->pixel_ratio = self->pixel_ratio;
-  copy->sdf = self->sdf;
-  copy->keep_unused = self->keep_unused;
-  return copy;
-}
-
 void maplibre_native_ffi_style_image_options_to_native(
   const MaplibreNativeFfiStyleImageOptions* self, mln_style_image_options* out,
   MaplibreNativeFfiCall* call
@@ -18844,62 +15986,6 @@ void maplibre_native_ffi_style_image_options_to_native(
   out->pixel_ratio = (float)(self->pixel_ratio);
   out->sdf = (self->sdf) != FALSE;
   out->keep_unused = (self->keep_unused) != FALSE;
-}
-
-MaplibreNativeFfiStyleImageOptions*
-maplibre_native_ffi_style_image_options_from_native(
-  const mln_style_image_options* in
-) {
-  MaplibreNativeFfiStyleImageOptions* self =
-    maplibre_native_ffi_style_image_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_STYLE_IMAGE_OPTION_STRETCH_X) != 0) {
-    g_clear_pointer(&self->stretch_x, g_ptr_array_unref);
-    self->stretch_x = g_ptr_array_new_full(
-      (guint)in->stretch_x_count,
-      (GDestroyNotify)maplibre_native_ffi_image_stretch_free
-    );
-    for (size_t index = 0; index < in->stretch_x_count; index++) {
-      g_ptr_array_add(
-        self->stretch_x,
-        maplibre_native_ffi_image_stretch_from_native(&in->stretch_x[index])
-      );
-    }
-  }
-  if ((in->fields & MLN_STYLE_IMAGE_OPTION_STRETCH_Y) != 0) {
-    g_clear_pointer(&self->stretch_y, g_ptr_array_unref);
-    self->stretch_y = g_ptr_array_new_full(
-      (guint)in->stretch_y_count,
-      (GDestroyNotify)maplibre_native_ffi_image_stretch_free
-    );
-    for (size_t index = 0; index < in->stretch_y_count; index++) {
-      g_ptr_array_add(
-        self->stretch_y,
-        maplibre_native_ffi_image_stretch_from_native(&in->stretch_y[index])
-      );
-    }
-  }
-  if ((in->fields & MLN_STYLE_IMAGE_OPTION_CONTENT) != 0) {
-    maplibre_native_ffi_image_content_read(&self->content, &in->content);
-  }
-  if ((in->fields & MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH) != 0) {
-    self->text_fit_width =
-      (MaplibreNativeFfiStyleImageTextFit)(in->text_fit_width);
-  }
-  if ((in->fields & MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT) != 0) {
-    self->text_fit_height =
-      (MaplibreNativeFfiStyleImageTextFit)(in->text_fit_height);
-  }
-  if ((in->fields & MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) != 0) {
-    self->pixel_ratio = (gfloat)(in->pixel_ratio);
-  }
-  if ((in->fields & MLN_STYLE_IMAGE_OPTION_SDF) != 0) {
-    self->sdf = (in->sdf) ? TRUE : FALSE;
-  }
-  if ((in->fields & MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED) != 0) {
-    self->keep_unused = (in->keep_unused) ? TRUE : FALSE;
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiStyleLayerInfo {
@@ -19003,30 +16089,6 @@ maplibre_native_ffi_style_layer_info_get_visibility(
   return self->visibility;
 }
 
-gpointer maplibre_native_ffi_style_layer_info_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_style_layer_info_copy(
-    (const MaplibreNativeFfiStyleLayerInfo*)self
-  );
-}
-
-void maplibre_native_ffi_style_layer_info_to_native(
-  const MaplibreNativeFfiStyleLayerInfo* self, mln_style_layer_info* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->id = maplibre_native_ffi_text_view(self->id);
-  out->type = maplibre_native_ffi_text_view(self->type);
-  out->source_id = maplibre_native_ffi_text_view(self->source_id);
-  out->source_layer = maplibre_native_ffi_text_view(self->source_layer);
-  out->min_zoom = (double)(self->min_zoom);
-  out->max_zoom = (double)(self->max_zoom);
-  out->visibility = (mln_style_layer_visibility)(self->visibility);
-}
-
 MaplibreNativeFfiStyleLayerInfo*
 maplibre_native_ffi_style_layer_info_from_native(
   const mln_style_layer_info* in
@@ -19114,35 +16176,6 @@ maplibre_native_ffi_style_source_tile_info_get_scheme(
 ) {
   g_return_val_if_fail(self != NULL, (MaplibreNativeFfiStyleTileScheme)0);
   return self->scheme;
-}
-
-gpointer maplibre_native_ffi_style_source_tile_info_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_style_source_tile_info_copy(
-    (const MaplibreNativeFfiStyleSourceTileInfo*)self
-  );
-}
-
-void maplibre_native_ffi_style_source_tile_info_to_native(
-  const MaplibreNativeFfiStyleSourceTileInfo* self,
-  mln_style_source_tile_info* out, MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  if (self->tile_urls != NULL && self->tile_urls[0] != NULL) {
-    guint count = g_strv_length(self->tile_urls);
-    mln_buffer_view* items =
-      maplibre_native_ffi_call_alloc(call, count, sizeof *items);
-    for (guint index = 0; index < count; index++) {
-      items[index] = maplibre_native_ffi_text_view(self->tile_urls[index]);
-    }
-    out->tile_urls = items;
-    out->tile_url_count = count;
-  }
-  out->min_zoom = (double)(self->min_zoom);
-  out->max_zoom = (double)(self->max_zoom);
-  out->scheme = (mln_style_tile_scheme)(self->scheme);
 }
 
 MaplibreNativeFfiStyleSourceTileInfo*
@@ -19355,43 +16388,6 @@ gboolean maplibre_native_ffi_style_source_info_has_geo_json(
 ) {
   g_return_val_if_fail(self != NULL, FALSE);
   return (self->fields & MLN_STYLE_SOURCE_INFO_GEO_JSON) != 0;
-}
-
-gpointer maplibre_native_ffi_style_source_info_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_style_source_info_copy(
-    (const MaplibreNativeFfiStyleSourceInfo*)self
-  );
-}
-
-void maplibre_native_ffi_style_source_info_to_native(
-  const MaplibreNativeFfiStyleSourceInfo* self, mln_style_source_info* out,
-  MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->fields = (mln_style_source_info_fields)self->fields;
-  out->id = maplibre_native_ffi_text_view(self->id);
-  out->type = (mln_style_source_type)(self->type);
-  out->is_volatile = (self->is_volatile) != FALSE;
-  out->attribution = maplibre_native_ffi_text_view(self->attribution);
-  out->url = maplibre_native_ffi_text_view(self->url);
-  if (self->tile_json != NULL)
-    maplibre_native_ffi_style_source_tile_info_to_native(
-      self->tile_json, &out->tile_json, call
-    );
-  maplibre_native_ffi_lat_lng_bounds_to_native(
-    &self->bounds, &out->bounds, call
-  );
-  out->tile_size = (uint32_t)(self->tile_size);
-  out->vector_encoding =
-    (mln_style_vector_tile_encoding)(self->vector_encoding);
-  out->raster_encoding = (mln_style_raster_dem_encoding)(self->raster_encoding);
-  if (self->geo_json != NULL)
-    maplibre_native_ffi_geo_json_source_options_to_native(
-      self->geo_json, &out->geo_json, call
-    );
 }
 
 MaplibreNativeFfiStyleSourceInfo*
@@ -19651,19 +16647,6 @@ void maplibre_native_ffi_style_transition_options_set_enable_placement_transitio
     );
 }
 
-MaplibreNativeFfiStyleTransitionOptions*
-maplibre_native_ffi_style_transition_options_copy(
-  const MaplibreNativeFfiStyleTransitionOptions* self
-) {
-  MaplibreNativeFfiStyleTransitionOptions* copy =
-    maplibre_native_ffi_style_transition_options_new();
-  copy->fields = self->fields;
-  copy->duration_ms = self->duration_ms;
-  copy->delay_ms = self->delay_ms;
-  copy->enable_placement_transitions = self->enable_placement_transitions;
-  return copy;
-}
-
 void maplibre_native_ffi_style_transition_options_to_native(
   const MaplibreNativeFfiStyleTransitionOptions* self,
   mln_style_transition_options* out, MaplibreNativeFfiCall* call
@@ -19719,34 +16702,20 @@ void maplibre_native_ffi_texture_image_info_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_texture_image_info_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_texture_image_info_copy(
-    (const MaplibreNativeFfiTextureImageInfo*)self
-  );
-}
-
-void maplibre_native_ffi_texture_image_info_to_native(
-  const MaplibreNativeFfiTextureImageInfo* self, mln_texture_image_info* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-  out->stride = (uint32_t)(self->stride);
-  out->byte_length = (size_t)(self->byte_length);
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiTextureImageInfo) == sizeof(mln_texture_image_info)
+);
+SAME_MEMBER(MaplibreNativeFfiTextureImageInfo, mln_texture_image_info, width);
+SAME_MEMBER(MaplibreNativeFfiTextureImageInfo, mln_texture_image_info, height);
+SAME_MEMBER(MaplibreNativeFfiTextureImageInfo, mln_texture_image_info, stride);
+SAME_MEMBER(
+  MaplibreNativeFfiTextureImageInfo, mln_texture_image_info, byte_length
+);
 
 void maplibre_native_ffi_texture_image_info_read(
   MaplibreNativeFfiTextureImageInfo* out, const mln_texture_image_info* in
 ) {
-  out->width = (guint32)(in->width);
-  out->height = (guint32)(in->height);
-  out->stride = (guint32)(in->stride);
-  out->byte_length = (gsize)(in->byte_length);
+  memcpy(out, in, sizeof *out);
 }
 
 MaplibreNativeFfiTextureImageInfo*
@@ -19811,26 +16780,6 @@ maplibre_native_ffi_texture_readback_result_get_info(
   return (MaplibreNativeFfiTextureImageInfo*)&self->info;
 }
 
-gpointer maplibre_native_ffi_texture_readback_result_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_texture_readback_result_copy(
-    (const MaplibreNativeFfiTextureReadbackResult*)self
-  );
-}
-
-void maplibre_native_ffi_texture_readback_result_to_native(
-  const MaplibreNativeFfiTextureReadbackResult* self,
-  mln_texture_readback_result* out, MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->data = maplibre_native_ffi_bytes_view(self->data);
-  maplibre_native_ffi_texture_image_info_to_native(
-    &self->info, &out->info, call
-  );
-}
-
 MaplibreNativeFfiTextureReadbackResult*
 maplibre_native_ffi_texture_readback_result_from_native(
   const mln_texture_readback_result* in
@@ -19873,32 +16822,24 @@ gpointer maplibre_native_ffi_vulkan_borrowed_texture_copy_func(
   );
 }
 
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiVulkanBorrowedTexture) ==
+  sizeof(mln_vulkan_borrowed_texture)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiVulkanBorrowedTexture, mln_vulkan_borrowed_texture, image
+);
+SAME_MEMBER(
+  MaplibreNativeFfiVulkanBorrowedTexture, mln_vulkan_borrowed_texture,
+  image_view
+);
+
 void maplibre_native_ffi_vulkan_borrowed_texture_to_native(
   const MaplibreNativeFfiVulkanBorrowedTexture* self,
   mln_vulkan_borrowed_texture* out, MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->image = (mln_vulkan_non_dispatchable_handle)(self->image);
-  out->image_view = (mln_vulkan_non_dispatchable_handle)(self->image_view);
-}
-
-void maplibre_native_ffi_vulkan_borrowed_texture_read(
-  MaplibreNativeFfiVulkanBorrowedTexture* out,
-  const mln_vulkan_borrowed_texture* in
-) {
-  out->image = (guint64)(in->image);
-  out->image_view = (guint64)(in->image_view);
-}
-
-MaplibreNativeFfiVulkanBorrowedTexture*
-maplibre_native_ffi_vulkan_borrowed_texture_from_native(
-  const mln_vulkan_borrowed_texture* in
-) {
-  MaplibreNativeFfiVulkanBorrowedTexture* self =
-    g_new0(MaplibreNativeFfiVulkanBorrowedTexture, 1);
-  maplibre_native_ffi_vulkan_borrowed_texture_read(self, in);
-  return self;
+  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiVulkanContextDescriptor {
@@ -20040,15 +16981,6 @@ void maplibre_native_ffi_vulkan_context_descriptor_set_get_device_proc_addr(
 ) {
   g_return_if_fail(self != NULL);
   self->get_device_proc_addr = value;
-}
-
-gpointer maplibre_native_ffi_vulkan_context_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_vulkan_context_descriptor_copy(
-    (const MaplibreNativeFfiVulkanContextDescriptor*)self
-  );
 }
 
 void maplibre_native_ffi_vulkan_context_descriptor_to_native(
@@ -20287,15 +17219,6 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_owner(
   self->owner = value;
 }
 
-gpointer maplibre_native_ffi_vulkan_borrowed_texture_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_vulkan_borrowed_texture_descriptor_copy(
-    (const MaplibreNativeFfiVulkanBorrowedTextureDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_to_native(
   const MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self,
   mln_vulkan_borrowed_texture_descriptor* out, MaplibreNativeFfiCall* call
@@ -20325,38 +17248,6 @@ void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_to_native(
   out->format = (uint32_t)(self->format);
   out->final_layout = (uint32_t)(self->final_layout);
   out->owner = (mln_vulkan_image_owner)(self->owner);
-}
-
-MaplibreNativeFfiVulkanBorrowedTextureDescriptor*
-maplibre_native_ffi_vulkan_borrowed_texture_descriptor_from_native(
-  const mln_vulkan_borrowed_texture_descriptor* in
-) {
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self =
-    maplibre_native_ffi_vulkan_borrowed_texture_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->physical_width = (guint32)(in->physical_width);
-  self->physical_height = (guint32)(in->physical_height);
-  g_clear_pointer(
-    &self->context, maplibre_native_ffi_vulkan_context_descriptor_free
-  );
-  self->context =
-    maplibre_native_ffi_vulkan_context_descriptor_from_native(&in->context);
-  g_clear_pointer(&self->textures, g_ptr_array_unref);
-  self->textures = g_ptr_array_new_full(
-    (guint)in->texture_count,
-    (GDestroyNotify)maplibre_native_ffi_vulkan_borrowed_texture_free
-  );
-  for (size_t index = 0; index < in->texture_count; index++) {
-    g_ptr_array_add(
-      self->textures, maplibre_native_ffi_vulkan_borrowed_texture_from_native(
-                        &in->textures[index]
-                      )
-    );
-  }
-  self->format = (guint32)(in->format);
-  self->final_layout = (guint32)(in->final_layout);
-  self->owner = (MaplibreNativeFfiVulkanImageOwner)(in->owner);
-  return self;
 }
 
 struct _MaplibreNativeFfiVulkanBorrowedTextureReplacement {
@@ -20486,15 +17377,6 @@ void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_textures(
   if (previous != NULL) g_ptr_array_unref(previous);
 }
 
-gpointer maplibre_native_ffi_vulkan_borrowed_texture_replacement_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_vulkan_borrowed_texture_replacement_copy(
-    (const MaplibreNativeFfiVulkanBorrowedTextureReplacement*)self
-  );
-}
-
 void maplibre_native_ffi_vulkan_borrowed_texture_replacement_to_native(
   const MaplibreNativeFfiVulkanBorrowedTextureReplacement* self,
   mln_vulkan_borrowed_texture_replacement* out, MaplibreNativeFfiCall* call
@@ -20517,30 +17399,6 @@ void maplibre_native_ffi_vulkan_borrowed_texture_replacement_to_native(
     out->textures = items;
     out->texture_count = self->textures->len;
   }
-}
-
-MaplibreNativeFfiVulkanBorrowedTextureReplacement*
-maplibre_native_ffi_vulkan_borrowed_texture_replacement_from_native(
-  const mln_vulkan_borrowed_texture_replacement* in
-) {
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self =
-    maplibre_native_ffi_vulkan_borrowed_texture_replacement_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->physical_width = (guint32)(in->physical_width);
-  self->physical_height = (guint32)(in->physical_height);
-  g_clear_pointer(&self->textures, g_ptr_array_unref);
-  self->textures = g_ptr_array_new_full(
-    (guint)in->texture_count,
-    (GDestroyNotify)maplibre_native_ffi_vulkan_borrowed_texture_free
-  );
-  for (size_t index = 0; index < in->texture_count; index++) {
-    g_ptr_array_add(
-      self->textures, maplibre_native_ffi_vulkan_borrowed_texture_from_native(
-                        &in->textures[index]
-                      )
-    );
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiVulkanDeviceContextResult {
@@ -20592,27 +17450,6 @@ maplibre_native_ffi_vulkan_device_context_result_get_context(
 ) {
   g_return_val_if_fail(self != NULL, NULL);
   return self->context;
-}
-
-gpointer maplibre_native_ffi_vulkan_device_context_result_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_vulkan_device_context_result_copy(
-    (const MaplibreNativeFfiVulkanDeviceContextResult*)self
-  );
-}
-
-void maplibre_native_ffi_vulkan_device_context_result_to_native(
-  const MaplibreNativeFfiVulkanDeviceContextResult* self,
-  mln_vulkan_device_context_result* out, MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  if (self->context != NULL)
-    maplibre_native_ffi_vulkan_context_descriptor_to_native(
-      self->context, &out->context, call
-    );
 }
 
 MaplibreNativeFfiVulkanDeviceContextResult*
@@ -20848,21 +17685,6 @@ void maplibre_native_ffi_vulkan_device_options_set_device_luid(
     );
 }
 
-MaplibreNativeFfiVulkanDeviceOptions*
-maplibre_native_ffi_vulkan_device_options_copy(
-  const MaplibreNativeFfiVulkanDeviceOptions* self
-) {
-  MaplibreNativeFfiVulkanDeviceOptions* copy =
-    maplibre_native_ffi_vulkan_device_options_new();
-  copy->fields = self->fields;
-  copy->presentation = self->presentation;
-  copy->device_uuid =
-    self->device_uuid != NULL ? g_bytes_ref(self->device_uuid) : NULL;
-  copy->device_luid =
-    self->device_luid != NULL ? g_bytes_ref(self->device_luid) : NULL;
-  return copy;
-}
-
 void maplibre_native_ffi_vulkan_device_options_to_native(
   const MaplibreNativeFfiVulkanDeviceOptions* self,
   mln_vulkan_device_options* out, MaplibreNativeFfiCall* call
@@ -20874,29 +17696,6 @@ void maplibre_native_ffi_vulkan_device_options_to_native(
   out->presentation = (self->presentation) != FALSE;
   out->device_uuid = maplibre_native_ffi_bytes_view(self->device_uuid);
   out->device_luid = maplibre_native_ffi_bytes_view(self->device_luid);
-}
-
-MaplibreNativeFfiVulkanDeviceOptions*
-maplibre_native_ffi_vulkan_device_options_from_native(
-  const mln_vulkan_device_options* in
-) {
-  MaplibreNativeFfiVulkanDeviceOptions* self =
-    maplibre_native_ffi_vulkan_device_options_new();
-  self->fields = (guint64)in->fields;
-  if ((in->fields & MLN_VULKAN_DEVICE_OPTION_PRESENTATION) != 0) {
-    self->presentation = (in->presentation) ? TRUE : FALSE;
-  }
-  if ((in->fields & MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID) != 0) {
-    g_clear_pointer(&self->device_uuid, g_bytes_unref);
-    self->device_uuid =
-      maplibre_native_ffi_bytes_new(in->device_uuid.data, in->device_uuid.size);
-  }
-  if ((in->fields & MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID) != 0) {
-    g_clear_pointer(&self->device_luid, g_bytes_unref);
-    self->device_luid =
-      maplibre_native_ffi_bytes_new(in->device_luid.data, in->device_luid.size);
-  }
-  return self;
 }
 
 struct _MaplibreNativeFfiVulkanSurfaceDescriptor {
@@ -20995,15 +17794,6 @@ void maplibre_native_ffi_vulkan_surface_descriptor_set_surface(
   self->surface = value;
 }
 
-gpointer maplibre_native_ffi_vulkan_surface_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_vulkan_surface_descriptor_copy(
-    (const MaplibreNativeFfiVulkanSurfaceDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_vulkan_surface_descriptor_to_native(
   const MaplibreNativeFfiVulkanSurfaceDescriptor* self,
   mln_vulkan_surface_descriptor* out, MaplibreNativeFfiCall* call
@@ -21018,22 +17808,6 @@ void maplibre_native_ffi_vulkan_surface_descriptor_to_native(
       self->context, &out->context, call
     );
   out->surface = (mln_vulkan_non_dispatchable_handle)(self->surface);
-}
-
-MaplibreNativeFfiVulkanSurfaceDescriptor*
-maplibre_native_ffi_vulkan_surface_descriptor_from_native(
-  const mln_vulkan_surface_descriptor* in
-) {
-  MaplibreNativeFfiVulkanSurfaceDescriptor* self =
-    maplibre_native_ffi_vulkan_surface_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  g_clear_pointer(
-    &self->context, maplibre_native_ffi_vulkan_context_descriptor_free
-  );
-  self->context =
-    maplibre_native_ffi_vulkan_context_descriptor_from_native(&in->context);
-  self->surface = (guint64)(in->surface);
-  return self;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -21057,15 +17831,6 @@ void maplibre_native_ffi_vulkan_surface_replacement_free(
   g_free(self);
 }
 
-gpointer maplibre_native_ffi_vulkan_surface_replacement_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_vulkan_surface_replacement_copy(
-    (const MaplibreNativeFfiVulkanSurfaceReplacement*)self
-  );
-}
-
 void maplibre_native_ffi_vulkan_surface_replacement_to_native(
   const MaplibreNativeFfiVulkanSurfaceReplacement* self,
   mln_vulkan_surface_replacement* out, MaplibreNativeFfiCall* call
@@ -21077,24 +17842,6 @@ void maplibre_native_ffi_vulkan_surface_replacement_to_native(
     &self->logical_size, &out->logical_size, call
   );
   out->surface = (mln_vulkan_non_dispatchable_handle)(self->surface);
-}
-
-void maplibre_native_ffi_vulkan_surface_replacement_read(
-  MaplibreNativeFfiVulkanSurfaceReplacement* out,
-  const mln_vulkan_surface_replacement* in
-) {
-  maplibre_native_ffi_logical_size_read(&out->logical_size, &in->logical_size);
-  out->surface = (guint64)(in->surface);
-}
-
-MaplibreNativeFfiVulkanSurfaceReplacement*
-maplibre_native_ffi_vulkan_surface_replacement_from_native(
-  const mln_vulkan_surface_replacement* in
-) {
-  MaplibreNativeFfiVulkanSurfaceReplacement* self =
-    g_new0(MaplibreNativeFfiVulkanSurfaceReplacement, 1);
-  maplibre_native_ffi_vulkan_surface_replacement_read(self, in);
-  return self;
 }
 
 struct _MaplibreNativeFfiVulkanTextureFrame {
@@ -21201,33 +17948,6 @@ guint32 maplibre_native_ffi_vulkan_texture_frame_get_layout(
   return self->layout;
 }
 
-gpointer maplibre_native_ffi_vulkan_texture_frame_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_vulkan_texture_frame_copy(
-    (const MaplibreNativeFfiVulkanTextureFrame*)self
-  );
-}
-
-void maplibre_native_ffi_vulkan_texture_frame_to_native(
-  const MaplibreNativeFfiVulkanTextureFrame* self,
-  mln_vulkan_texture_frame* out, MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->size = sizeof *out;
-  out->width = (uint32_t)(self->width);
-  out->height = (uint32_t)(self->height);
-  out->scale_factor = (double)(self->scale_factor);
-  out->slot = (uint32_t)(self->slot);
-  out->image = (mln_vulkan_non_dispatchable_handle)(self->image);
-  out->image_view = (mln_vulkan_non_dispatchable_handle)(self->image_view);
-  out->device = (void*)(self->device);
-  out->format = (uint32_t)(self->format);
-  out->layout = (uint32_t)(self->layout);
-}
-
 MaplibreNativeFfiVulkanTextureFrame*
 maplibre_native_ffi_vulkan_texture_frame_from_native(
   const mln_vulkan_texture_frame* in
@@ -21328,15 +18048,6 @@ void maplibre_native_ffi_wayland_surface_descriptor_set_surface(
   self->surface = value;
 }
 
-gpointer maplibre_native_ffi_wayland_surface_descriptor_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_wayland_surface_descriptor_copy(
-    (const MaplibreNativeFfiWaylandSurfaceDescriptor*)self
-  );
-}
-
 void maplibre_native_ffi_wayland_surface_descriptor_to_native(
   const MaplibreNativeFfiWaylandSurfaceDescriptor* self,
   mln_wayland_surface_descriptor* out, MaplibreNativeFfiCall* call
@@ -21348,18 +18059,6 @@ void maplibre_native_ffi_wayland_surface_descriptor_to_native(
   );
   out->display = (void*)(self->display);
   out->surface = (void*)(self->surface);
-}
-
-MaplibreNativeFfiWaylandSurfaceDescriptor*
-maplibre_native_ffi_wayland_surface_descriptor_from_native(
-  const mln_wayland_surface_descriptor* in
-) {
-  MaplibreNativeFfiWaylandSurfaceDescriptor* self =
-    maplibre_native_ffi_wayland_surface_descriptor_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->display = (gpointer)(in->display);
-  self->surface = (gpointer)(in->surface);
-  return self;
 }
 
 struct _MaplibreNativeFfiWaylandSurfaceReplacement {
@@ -21429,15 +18128,6 @@ void maplibre_native_ffi_wayland_surface_replacement_set_surface(
   self->surface = value;
 }
 
-gpointer maplibre_native_ffi_wayland_surface_replacement_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_wayland_surface_replacement_copy(
-    (const MaplibreNativeFfiWaylandSurfaceReplacement*)self
-  );
-}
-
 void maplibre_native_ffi_wayland_surface_replacement_to_native(
   const MaplibreNativeFfiWaylandSurfaceReplacement* self,
   mln_wayland_surface_replacement* out, MaplibreNativeFfiCall* call
@@ -21448,15 +18138,4 @@ void maplibre_native_ffi_wayland_surface_replacement_to_native(
     &self->logical_size, &out->logical_size, call
   );
   out->surface = (void*)(self->surface);
-}
-
-MaplibreNativeFfiWaylandSurfaceReplacement*
-maplibre_native_ffi_wayland_surface_replacement_from_native(
-  const mln_wayland_surface_replacement* in
-) {
-  MaplibreNativeFfiWaylandSurfaceReplacement* self =
-    maplibre_native_ffi_wayland_surface_replacement_new();
-  maplibre_native_ffi_logical_size_read(&self->logical_size, &in->logical_size);
-  self->surface = (gpointer)(in->surface);
-  return self;
 }

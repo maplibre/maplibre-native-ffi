@@ -1058,14 +1058,6 @@ void maplibre_native_ffi_map_add_image_source_image_async(
     &async_, self, maplibre_native_ffi_map_add_image_source_image_async,
     callback, user_data, TRUE
   );
-  mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &async_.call, coordinate_count, sizeof *coordinates_native_
-  );
-  for (gsize index = 0; index < (gsize)coordinate_count; index++) {
-    maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &async_.call
-    );
-  }
   mln_premultiplied_rgba8_image image_native_;
   maplibre_native_ffi_premultiplied_rgba8_image_to_native(
     image, &image_native_, &async_.call
@@ -1076,9 +1068,9 @@ void maplibre_native_ffi_map_add_image_source_image_async(
       ))
     return;
   mln_status status_ = mln_map_add_image_source_image(
-    self->handle, maplibre_native_ffi_text_view(source_id), coordinates_native_,
-    (size_t)(coordinate_count), &image_native_, async_.completion_argument,
-    &async_.diagnostic
+    self->handle, maplibre_native_ffi_text_view(source_id),
+    (const mln_lat_lng*)coordinates, (size_t)(coordinate_count), &image_native_,
+    async_.completion_argument, &async_.diagnostic
   );
   maplibre_native_ffi_async_end(&async_, status_);
 }
@@ -1796,14 +1788,6 @@ void maplibre_native_ffi_map_camera_for_lat_lngs_async(
     &async_, self, maplibre_native_ffi_map_camera_for_lat_lngs_async, callback,
     user_data, FALSE
   );
-  mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &async_.call, coordinate_count, sizeof *coordinates_native_
-  );
-  for (gsize index = 0; index < (gsize)coordinate_count; index++) {
-    maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &async_.call
-    );
-  }
   mln_camera_fit_options fit_options_native_;
   if (fit_options != NULL)
     maplibre_native_ffi_camera_fit_options_to_native(
@@ -1815,7 +1799,7 @@ void maplibre_native_ffi_map_camera_for_lat_lngs_async(
       ))
     return;
   mln_status status_ = mln_map_camera_for_lat_lngs(
-    self->handle, coordinates_native_, (size_t)(coordinate_count),
+    self->handle, (const mln_lat_lng*)coordinates, (size_t)(coordinate_count),
     (fit_options != NULL ? &fit_options_native_ : NULL),
     async_.completion_argument, &async_.diagnostic
   );
@@ -2045,14 +2029,6 @@ void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
     &async_, self, maplibre_native_ffi_map_fit_camera_to_lat_lngs_async,
     callback, user_data, TRUE
   );
-  mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &async_.call, coordinate_count, sizeof *coordinates_native_
-  );
-  for (gsize index = 0; index < (gsize)coordinate_count; index++) {
-    maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &async_.call
-    );
-  }
   mln_camera_fit_update update_native_;
   maplibre_native_ffi_camera_fit_update_to_native(
     update, &update_native_, &async_.call
@@ -2063,7 +2039,7 @@ void maplibre_native_ffi_map_fit_camera_to_lat_lngs_async(
       ))
     return;
   mln_status status_ = mln_map_fit_camera_to_lat_lngs(
-    self->handle, coordinates_native_, (size_t)(coordinate_count),
+    self->handle, (const mln_lat_lng*)coordinates, (size_t)(coordinate_count),
     &update_native_, async_.completion_argument, &async_.diagnostic
   );
   maplibre_native_ffi_async_end(&async_, status_);
@@ -3431,22 +3407,15 @@ void maplibre_native_ffi_map_set_image_source_coordinates_async(
     &async_, self, maplibre_native_ffi_map_set_image_source_coordinates_async,
     callback, user_data, TRUE
   );
-  mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &async_.call, coordinate_count, sizeof *coordinates_native_
-  );
-  for (gsize index = 0; index < (gsize)coordinate_count; index++) {
-    maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &async_.call
-    );
-  }
   if (!maplibre_native_ffi_async_begin(
         &async_, maplibre_native_ffi_command_decode,
         (GDestroyNotify)maplibre_native_ffi_command_completion_free
       ))
     return;
   mln_status status_ = mln_map_set_image_source_coordinates(
-    self->handle, maplibre_native_ffi_text_view(source_id), coordinates_native_,
-    (size_t)(coordinate_count), async_.completion_argument, &async_.diagnostic
+    self->handle, maplibre_native_ffi_text_view(source_id),
+    (const mln_lat_lng*)coordinates, (size_t)(coordinate_count),
+    async_.completion_argument, &async_.diagnostic
   );
   maplibre_native_ffi_async_end(&async_, status_);
 }
@@ -4135,13 +4104,6 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
-  mln_screen_point* points_native_ =
-    maplibre_native_ffi_call_alloc(&call_, point_count, sizeof *points_native_);
-  for (gsize index = 0; index < (gsize)point_count; index++) {
-    maplibre_native_ffi_screen_point_to_native(
-      &points[index], &points_native_[index], &call_
-    );
-  }
   gsize out_coordinates_count_ = (gsize)((size_t)(point_count));
   mln_lat_lng* out_coordinates_ = maplibre_native_ffi_call_alloc(
     &call_, out_coordinates_count_, sizeof *out_coordinates_
@@ -4149,8 +4111,8 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_projection_lat_lngs_for_pixels(
-    self->handle, points_native_, (size_t)(point_count), out_coordinates_,
-    &diagnostic_
+    self->handle, (const mln_screen_point*)points, (size_t)(point_count),
+    out_coordinates_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
     maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
@@ -4178,13 +4140,6 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels_unwrapped(
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
-  mln_screen_point* points_native_ =
-    maplibre_native_ffi_call_alloc(&call_, point_count, sizeof *points_native_);
-  for (gsize index = 0; index < (gsize)point_count; index++) {
-    maplibre_native_ffi_screen_point_to_native(
-      &points[index], &points_native_[index], &call_
-    );
-  }
   gsize out_coordinates_count_ = (gsize)((size_t)(point_count));
   mln_lat_lng* out_coordinates_ = maplibre_native_ffi_call_alloc(
     &call_, out_coordinates_count_, sizeof *out_coordinates_
@@ -4192,8 +4147,8 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels_unwrapped(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_projection_lat_lngs_for_pixels_unwrapped(
-    self->handle, points_native_, (size_t)(point_count), out_coordinates_,
-    &diagnostic_
+    self->handle, (const mln_screen_point*)points, (size_t)(point_count),
+    out_coordinates_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
     maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
@@ -4260,14 +4215,6 @@ GPtrArray* maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
   MaplibreNativeFfiCall call_;
   maplibre_native_ffi_call_init(&call_);
-  mln_lat_lng* coordinates_native_ = maplibre_native_ffi_call_alloc(
-    &call_, coordinate_count, sizeof *coordinates_native_
-  );
-  for (gsize index = 0; index < (gsize)coordinate_count; index++) {
-    maplibre_native_ffi_lat_lng_to_native(
-      &coordinates[index], &coordinates_native_[index], &call_
-    );
-  }
   gsize out_points_count_ = (gsize)((size_t)(coordinate_count));
   mln_screen_point* out_points_ = maplibre_native_ffi_call_alloc(
     &call_, out_points_count_, sizeof *out_points_
@@ -4275,8 +4222,8 @@ GPtrArray* maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
   if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_map_projection_pixels_for_lat_lngs(
-    self->handle, coordinates_native_, (size_t)(coordinate_count), out_points_,
-    &diagnostic_
+    self->handle, (const mln_lat_lng*)coordinates, (size_t)(coordinate_count),
+    out_points_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
     maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);

@@ -523,8 +523,8 @@ class Emitter:
         native = parameter.name
         nullable = " (nullable)" if value.nullable else ""
         local = f"{name}_native_"
-        call.uses_call = True
         if values.text(element) and element.buffer_form == "view":
+            call.uses_call = True
             call.parameters.append(("const char* const*", name))
             call.annotations[name] = f"(array zero-terminated=1){nullable}: the texts"
             count = f"{name}_count_"
@@ -558,12 +558,19 @@ class Emitter:
             )
             call.parameters.append((count_type, count))
             call.annotations[name] = f"(array length={count}){nullable}: the items"
+            if values.same_layout(element):
+                # Native code reads the items where they are.
+                call.arguments[native] = f"(const {element.native}*){name}"
+                call.arguments[length.name] = values.to_c(length.value, count)
+                return
+            call.uses_call = True
             call.setup += (
                 f"  {element.native}* {local} = maplibre_native_ffi_call_alloc(&{CALL}, {count}, sizeof *{local});\n"
                 f"  for (gsize index = 0; index < (gsize){count}; index++) {{\n"
                 f"    {prefix}_to_native({item}, &{local}[index], &{CALL});\n  }}\n"
             )
         elif element.kind in {"scalar", "enum"}:
+            call.uses_call = True
             call.parameters.append((f"const {values.gtype(element)}*", name))
             call.parameters.append((count_type, count))
             call.annotations[name] = f"(array length={count}){nullable}: the items"
@@ -1707,6 +1714,7 @@ def render(emitter: Emitter) -> dict[str, str]:
         + '#include "maplibre-native-ffi-private.h"\n'
         + '#include "maplibre-native-ffi-values-private.h"\n\n'
         + gobject_values.PROPERTY_FLAGS_DEFINITION
+        + gobject_values.SAME_MEMBER_DEFINITION
         + constants_source
         + "\n"
         + values_source,

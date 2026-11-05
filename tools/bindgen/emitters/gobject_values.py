@@ -18,6 +18,7 @@ hands over, and copies from a C record that native code lends.
 
 from __future__ import annotations
 
+import functools
 import re
 import textwrap
 from dataclasses import dataclass, field
@@ -93,6 +94,16 @@ SCALAR_PROPERTIES = {
     "gint64": ("int64", "G_MININT64", "G_MAXINT64"),
     "guint64": ("uint64", "0", "G_MAXUINT64"),
 }
+# Asserts that a member of a plain struct has the offset and size of the C
+# record's, which `same_layout` relies on.
+SAME_MEMBER_DEFINITION = (
+    "// Whether a struct's member has the offset and the size of the C record's.\n"
+    "#define SAME_MEMBER(type, record, member) \\\n"
+    "  G_STATIC_ASSERT( \\\n"
+    "    offsetof(type, member) == offsetof(record, member) && \\\n"
+    "    sizeof(((type*)0)->member) == sizeof(((record*)0)->member) \\\n"
+    "  )\n\n"
+)
 UNSET = (
     "A member that a `has_` method reports on is unset until its property or"
     " setter sets it."
@@ -404,6 +415,66 @@ class Values:
             return f"{type_name(value.native)}*"
         return f"const {type_name(value.native)}*"
 
+    # Conversions. A type has only the conversions that the library calls.
+
+    def reached(self, roots) -> frozenset[str]:
+        """The records and unions that `roots` hold, with `roots`."""
+        found: set[str] = set()
+        stack = [r for r in roots if r in self.bound.values]
+        while stack:
+            native = stack.pop()
+            if native in found:
+                continue
+            found.add(native)
+            for member in self.record(native).fields:
+                inner = member.value
+                if inner.kind in {"array", "reference"} and inner.element is not None:
+                    inner = inner.element
+                if (
+                    inner.kind in {"record", "union"}
+                    and inner.native in self.bound.values
+                ):
+                    stack.append(inner.native)
+        return frozenset(found)
+
+    @functools.cached_property
+    def written(self) -> frozenset[str]:
+        """The types that native code takes as input."""
+        return self.reached(self.bound.inputs)
+
+    @functools.cached_property
+    def returned(self) -> frozenset[str]:
+        """The types that the library copies from native code."""
+        return self.reached(self.bound.returned)
+
+    @functools.cached_property
+    def held(self) -> frozenset[str]:
+        """The types that a used record holds as a member, which the record
+        copies, and the elements of its arrays, which it copies through a
+        `GCopyFunc`."""
+        found: set[str] = set()
+        for value in self.used.values():
+            fields = list(value.fields)
+            if value.kind == "record" and value.union_member:
+                fields += list(value.union_member.value.fields)
+            for member in fields:
+                inner = member.value
+                if inner.kind == "array" and inner.element is not None:
+                    found.add(f"{inner.element.native}[]")
+                elif inner.kind in {"record", "union"}:
+                    found.add(inner.native)
+        return frozenset(found)
+
+    def writes(self, value: ValuePlan) -> bool:
+        return value.native in self.written
+
+    def reads(self, value: ValuePlan) -> bool:
+        return value.native in self.returned
+
+    def arrayed(self, value: ValuePlan) -> bool:
+        """Whether a type is the element of a record's array."""
+        return f"{value.native}[]" in self.held
+
     # Use.
 
     def use(self, value: ValuePlan | None) -> None:
@@ -457,6 +528,44 @@ class Values:
                 raise Unsupported(f"GObject: scalar {carrier} has no GLib type")
             return scalar
         raise Unsupported(f"GObject: {value.kind} {value.native} is not a plain value")
+
+    def same_layout(self, value: ValuePlan) -> bool:
+        """Whether a plain struct has its C record's layout: the same members
+        in the same order, of the same sizes, and no size member. It converts
+        by copy, which static assertions check."""
+        if value.kind != "record" or not self.transparent(value):
+            return False
+        record = self.record(value.native)
+        if not record.fields:
+            return False
+        for member in record.fields:
+            inner = member.value
+            if member.role == "size" or not member.public:
+                return False
+            if inner.kind == "record":
+                if not self.same_layout(inner):
+                    return False
+            elif inner.kind == "enum":
+                underlying = inner.enum_underlying
+                if underlying is None or without_const(underlying.spelling) not in {
+                    "int32_t",
+                    "uint32_t",
+                }:
+                    return False
+            elif inner.kind != "scalar" or self.boolean(inner):
+                return False
+        return True
+
+    def layout_asserts(self, value: ValuePlan) -> str:
+        name, native = type_name(value.native), value.native
+        return (
+            f"G_STATIC_ASSERT(sizeof({name}) == sizeof({native}));\n"
+            + "".join(
+                f"SAME_MEMBER({name}, {native}, {member.name});\n"
+                for member in value.fields
+            )
+            + "\n"
+        )
 
     def boolean(self, value: ValuePlan) -> bool:
         return value.kind == "scalar" and (
@@ -979,26 +1088,37 @@ class Values:
             symbol_name(value.native),
             value.native,
         )
+        out = ""
         if value.kind == "union":
             tag = self.tag_type(value)
-            return (
-                f"G_GNUC_INTERNAL void {prefix}_to_native(\n"
-                f"  const {name}* self, {tag}* out_tag, {native}* out,\n"
-                "  MaplibreNativeFfiCall* call\n);\n"
-                f"G_GNUC_INTERNAL {name}* {prefix}_from_native(\n"
-                f"  gint64 tag, const {native}* in\n);\n"
-            )
-        out = (
-            f"G_GNUC_INTERNAL void {prefix}_to_native(\n"
-            f"  const {name}* self, {native}* out, MaplibreNativeFfiCall* call\n);\n"
-            f"G_GNUC_INTERNAL {name}* {prefix}_from_native(const {native}* in);\n"
-            f"G_GNUC_INTERNAL gpointer {prefix}_copy_func(gconstpointer self, gpointer data);\n"
-        )
-        if self.transparent(value):
-            out += f"G_GNUC_INTERNAL void {prefix}_read({name}* out, const {native}* in);\n"
+            if self.writes(value):
+                out += (
+                    f"G_GNUC_INTERNAL void {prefix}_to_native(\n"
+                    f"  const {name}* self, {tag}* out_tag, {native}* out,\n"
+                    "  MaplibreNativeFfiCall* call\n);\n"
+                )
+            if self.reads(value):
+                out += (
+                    f"G_GNUC_INTERNAL {name}* {prefix}_from_native(\n"
+                    f"  gint64 tag, const {native}* in\n);\n"
+                )
+        else:
+            if self.writes(value):
+                out += (
+                    f"G_GNUC_INTERNAL void {prefix}_to_native(\n"
+                    f"  const {name}* self, {native}* out, MaplibreNativeFfiCall* call\n);\n"
+                )
+            if self.reads(value):
+                out += f"G_GNUC_INTERNAL {name}* {prefix}_from_native(const {native}* in);\n"
+            if self.reads(value) and self.transparent(value):
+                out += f"G_GNUC_INTERNAL void {prefix}_read({name}* out, const {native}* in);\n"
+        if self.arrayed(value):
+            out += f"G_GNUC_INTERNAL gpointer {prefix}_copy_func(gconstpointer self, gpointer data);\n"
         return out
 
     def copy_func(self, value: ValuePlan) -> str:
+        if not self.arrayed(value):
+            return ""
         name, prefix = type_name(value.native), symbol_name(value.native)
         return (
             f"gpointer {prefix}_copy_func(gconstpointer self, gpointer data) {{\n"
@@ -1046,29 +1166,45 @@ class Values:
         )
         source += "".join(f.definition() for f in functions)
         source += self.copy_func(value)
-        source += (
-            f"void {prefix}_to_native(\n  const {name}* self, {native}* out, MaplibreNativeFfiCall* call\n) {{\n"
-            "  (void)call;\n  memset(out, 0, sizeof *out);\n"
-            + self.size_line(value, "out")
-            + "".join(
-                self.write(value, member, f"self->{member.name}", "out")
-                for member in members
+        same = self.same_layout(value)
+        if same and (self.writes(value) or self.reads(value)):
+            source += self.layout_asserts(value)
+        if self.writes(value):
+            source += (
+                f"void {prefix}_to_native(\n  const {name}* self, {native}* out, MaplibreNativeFfiCall* call\n) {{\n"
+                "  (void)call;\n"
+                + (
+                    "  memcpy(out, self, sizeof *out);\n"
+                    if same
+                    else "  memset(out, 0, sizeof *out);\n"
+                    + self.size_line(value, "out")
+                    + "".join(
+                        self.write(value, member, f"self->{member.name}", "out")
+                        for member in members
+                    )
+                )
+                + "}\n\n"
             )
-            + "}\n\n"
-        )
-        source += (
-            f"void {prefix}_read({name}* out, const {native}* in) {{\n"
-            + "".join(
-                self.read(value, member, "in", f"out->{member.name}", free=False)
-                for member in members
+        if self.reads(value):
+            source += (
+                f"void {prefix}_read({name}* out, const {native}* in) {{\n"
+                + (
+                    "  memcpy(out, in, sizeof *out);\n"
+                    if same
+                    else "".join(
+                        self.read(
+                            value, member, "in", f"out->{member.name}", free=False
+                        )
+                        for member in members
+                    )
+                )
+                + "}\n\n"
             )
-            + "}\n\n"
-        )
-        source += (
-            f"{name}* {prefix}_from_native(const {native}* in) {{\n"
-            f"  {name}* self = g_new0({name}, 1);\n"
-            f"  {prefix}_read(self, in);\n  return self;\n}}\n\n"
-        )
+            source += (
+                f"{name}* {prefix}_from_native(const {native}* in) {{\n"
+                f"  {name}* self = g_new0({name}, 1);\n"
+                f"  {prefix}_read(self, in);\n  return self;\n}}\n\n"
+            )
         return header, source, self.private_prototypes(value)
 
     def size_line(self, value: ValuePlan, out: str) -> str:
@@ -1133,12 +1269,14 @@ class Values:
         )
         source += "".join(f.definition() for f in functions)
         source += self.copy_func(value)
-        source += "".join(
-            self.trampoline(value, member, index)
-            for index, member in enumerate(callbacks)
-        )
-        source += self.opaque_to_native(value, data, callbacks)
-        source += self.from_native(value, data)
+        if self.writes(value):
+            source += "".join(
+                self.trampoline(value, member, index)
+                for index, member in enumerate(callbacks)
+            )
+            source += self.opaque_to_native(value, data, callbacks)
+        if self.reads(value):
+            source += self.from_native(value, data)
         return header, source, self.private_prototypes(value)
 
     # Option bags.
@@ -1457,19 +1595,18 @@ class Values:
             for m in callbacks
         )
         copy += "  return copy;\n}\n\n"
-        source += copy
-        source += "".join(
-            self.trampoline(value, member, index)
-            for index, member in enumerate(callbacks)
-        )
-        source += self.opaque_to_native(value, data, callbacks)
-        source += self.from_native(value, data)
-        private = (
-            f"G_GNUC_INTERNAL void {prefix}_to_native(\n"
-            f"  const {name}* self, {native}* out, MaplibreNativeFfiCall* call\n);\n"
-            f"G_GNUC_INTERNAL {name}* {prefix}_from_native(const {native}* in);\n"
-            f"G_GNUC_INTERNAL {name}* {prefix}_copy(const {name}* self);\n"
-        )
+        private = self.private_prototypes(value)
+        if native in self.held:
+            source += copy
+            private += f"G_GNUC_INTERNAL {name}* {prefix}_copy(const {name}* self);\n"
+        if self.writes(value):
+            source += "".join(
+                self.trampoline(value, member, index)
+                for index, member in enumerate(callbacks)
+            )
+            source += self.opaque_to_native(value, data, callbacks)
+        if self.reads(value):
+            source += self.from_native(value, data)
         return header, source, private
 
     def from_native(self, value: ValuePlan, data: list[FieldPlan]) -> str:
@@ -1893,49 +2030,50 @@ class Values:
         read = f"  switch (tag) {{\n{read}  default:\n    break;\n  }}\n"
         union_native = union.native
         uses_call = any(v.value.kind in {"record", "union", "array"} for v in variants)
+        writes, reads = self.writes(value), self.reads(value)
         if value is union:
             tag = self.tag_type(union)
-            source += (
-                f"void {prefix}_to_native(\n  const {name}* self, {tag}* out_tag, {native}* out,\n"
-                "  MaplibreNativeFfiCall* call\n) {\n"
-                + ("" if uses_call else "  (void)call;\n")
-                + f"  {native}* data = out;\n  memset(data, 0, sizeof *data);\n"
-                f"  *out_tag = ({tag})self->tag;\n" + write + "}\n\n"
-            )
-            source += (
-                f"{name}* {prefix}_from_native(gint64 tag, const {native}* in) {{\n"
-                f"  const {native}* data = in;\n"
-                f"  {name}* self = g_new0({name}, 1);\n  self->tag = tag;\n"
-                + read
-                + "  return self;\n}\n\n"
-            )
+            if writes:
+                source += (
+                    f"void {prefix}_to_native(\n  const {name}* self, {tag}* out_tag, {native}* out,\n"
+                    "  MaplibreNativeFfiCall* call\n) {\n"
+                    + ("" if uses_call else "  (void)call;\n")
+                    + f"  {native}* data = out;\n  memset(data, 0, sizeof *data);\n"
+                    f"  *out_tag = ({tag})self->tag;\n" + write + "}\n\n"
+                )
+            if reads:
+                source += (
+                    f"{name}* {prefix}_from_native(gint64 tag, const {native}* in) {{\n"
+                    f"  const {native}* data = in;\n"
+                    f"  {name}* self = g_new0({name}, 1);\n  self->tag = tag;\n"
+                    + read
+                    + "  return self;\n}\n\n"
+                )
         else:
             tag_field = self.tag_field(value, union)
             member = value.union_member
             assert tag_field is not None and member is not None
             tag = without_const(ctype(tag_field.value))
-            source += (
-                f"void {prefix}_to_native(\n  const {name}* self, {native}* out, MaplibreNativeFfiCall* call\n) {{\n"
-                + ("" if uses_call else "  (void)call;\n")
-                + "  memset(out, 0, sizeof *out);\n"
-                + self.size_line(value, "out")
-                + f"  out->{tag_field.name} = ({tag})self->tag;\n"
-                f"  {union_native}* data = &out->{member.name};\n" + write + "}\n\n"
-            )
-            source += (
-                f"{name}* {prefix}_from_native(const {native}* in) {{\n"
-                f"  gint64 tag = (gint64)in->{tag_field.name};\n"
-                f"  const {union_native}* data = &in->{member.name};\n"
-                f"  {name}* self = g_new0({name}, 1);\n  self->tag = tag;\n"
-                + read
-                + "  return self;\n}\n\n"
-            )
-            source += self.copy_func(value)
-        private = self.private_prototypes(value)
-        if value is union:
-            private += f"G_GNUC_INTERNAL gpointer {prefix}_copy_func(gconstpointer self, gpointer data);\n"
-            source += self.copy_func(value)
-        return header, source, private
+            if writes:
+                source += (
+                    f"void {prefix}_to_native(\n  const {name}* self, {native}* out, MaplibreNativeFfiCall* call\n) {{\n"
+                    + ("" if uses_call else "  (void)call;\n")
+                    + "  memset(out, 0, sizeof *out);\n"
+                    + self.size_line(value, "out")
+                    + f"  out->{tag_field.name} = ({tag})self->tag;\n"
+                    f"  {union_native}* data = &out->{member.name};\n" + write + "}\n\n"
+                )
+            if reads:
+                source += (
+                    f"{name}* {prefix}_from_native(const {native}* in) {{\n"
+                    f"  gint64 tag = (gint64)in->{tag_field.name};\n"
+                    f"  const {union_native}* data = &in->{member.name};\n"
+                    f"  {name}* self = g_new0({name}, 1);\n  self->tag = tag;\n"
+                    + read
+                    + "  return self;\n}\n\n"
+                )
+        source += self.copy_func(value)
+        return header, source, self.private_prototypes(value)
 
     # Callbacks.
 
