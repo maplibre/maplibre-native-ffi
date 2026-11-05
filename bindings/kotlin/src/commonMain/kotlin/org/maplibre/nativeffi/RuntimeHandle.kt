@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
@@ -52,7 +51,7 @@ private constructor(
    * See `mln_runtime_clear_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun clearEventHandler(): Deferred<CommandCompletion> =
+  public fun clearEventHandler(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_runtime_clear_event_handler(handle, completion, diagnostic))
     }
@@ -63,7 +62,7 @@ private constructor(
    * See `mln_runtime_clear_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun clearHttpHeaderTransform(): Deferred<CommandCompletion> =
+  public fun clearHttpHeaderTransform(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_runtime_clear_http_header_transform(handle, completion, diagnostic))
     }
@@ -74,7 +73,7 @@ private constructor(
    * See `mln_runtime_clear_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun clearResourceProvider(): Deferred<CommandCompletion> =
+  public fun clearResourceProvider(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_runtime_clear_resource_provider(handle, completion, diagnostic))
     }
@@ -85,7 +84,7 @@ private constructor(
    * See `mln_runtime_clear_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun clearResourceTransform(): Deferred<CommandCompletion> =
+  public fun clearResourceTransform(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_runtime_clear_resource_transform(handle, completion, diagnostic))
     }
@@ -121,7 +120,7 @@ private constructor(
   public fun createOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,
-  ): Deferred<OfflineRegionInfo> =
+  ): Completion<OfflineRegionInfo> =
     nativeSubmit(
       this,
       binding,
@@ -149,7 +148,7 @@ private constructor(
    *
    * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
-  public fun deleteOfflineRegion(regionId: Long): Deferred<Unit> =
+  public fun deleteOfflineRegion(regionId: Long): Completion<Unit> =
     nativeUnit(this, binding) {
       check(C.mln_runtime_delete_offline_region(handle, regionId, completion, diagnostic))
     }
@@ -173,7 +172,7 @@ private constructor(
    * See `mln_runtime_get_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getOfflineRegion(regionId: Long): Deferred<OfflineRegionInfo?> =
+  public fun getOfflineRegion(regionId: Long): Completion<OfflineRegionInfo?> =
     nativeSubmit(
       this,
       binding,
@@ -199,7 +198,7 @@ private constructor(
    *
    * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
-  public fun getOfflineRegionStatus(regionId: Long): Deferred<OfflineRegionStatus> =
+  public fun getOfflineRegionStatus(regionId: Long): Completion<OfflineRegionStatus> =
     nativeSubmit(
       this,
       binding,
@@ -224,7 +223,7 @@ private constructor(
    *
    * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
-  public fun invalidateOfflineRegion(regionId: Long): Deferred<Unit> =
+  public fun invalidateOfflineRegion(regionId: Long): Completion<Unit> =
     nativeUnit(this, binding) {
       check(C.mln_runtime_invalidate_offline_region(handle, regionId, completion, diagnostic))
     }
@@ -235,7 +234,7 @@ private constructor(
    * See `mln_runtime_list_offline_regions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun listOfflineRegions(): Deferred<List<OfflineRegionInfo>> =
+  public fun listOfflineRegions(): Completion<List<OfflineRegionInfo>> =
     nativeSubmit(
       this,
       binding,
@@ -268,7 +267,7 @@ private constructor(
    * - `Status.NATIVE_ERROR` when the merge would exceed the tile limit that
    *   `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED` describes.
    */
-  public fun mergeOfflineRegions(sideDatabasePath: String): Deferred<List<OfflineRegionInfo>> =
+  public fun mergeOfflineRegions(sideDatabasePath: String): Completion<List<OfflineRegionInfo>> =
     nativeSubmit(
       this,
       binding,
@@ -296,7 +295,7 @@ private constructor(
    * See `mln_runtime_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public override fun release(): Deferred<Unit> =
+  public override fun release(): Completion<Unit> =
     nativeRetire(this, binding) { check(C.mln_runtime_release(handle, completion, diagnostic)) }
 
   /**
@@ -305,7 +304,7 @@ private constructor(
    * See `mln_runtime_run_cache_database_operation` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun runCacheDatabaseOperation(operation: CacheDatabaseOperation): Deferred<Unit> =
+  public fun runCacheDatabaseOperation(operation: CacheDatabaseOperation): Completion<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_runtime_run_cache_database_operation(
@@ -325,7 +324,7 @@ private constructor(
    * See `mln_runtime_set_event_handler` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun setEventHandler(handler: RuntimeEventHandler): Deferred<CommandCompletion> =
+  public fun setEventHandler(handler: RuntimeEventHandler): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_event_handler(
@@ -346,7 +345,7 @@ private constructor(
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
   @JvmName("setMaximumAmbientCacheSize")
-  public fun setMaximumAmbientCacheSize(size: ULong): Deferred<Unit> =
+  public fun setMaximumAmbientCacheSize(size: ULong): Completion<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_runtime_set_maximum_ambient_cache_size(handle, size.toLong(), completion, diagnostic),
@@ -369,7 +368,7 @@ private constructor(
   public fun setOfflineRegionDownloadState(
     regionId: Long,
     state: OfflineRegionDownloadState,
-  ): Deferred<Unit> =
+  ): Completion<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_runtime_set_offline_region_download_state(
@@ -396,7 +395,7 @@ private constructor(
    *
    * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
    */
-  public fun setOfflineRegionObserved(regionId: Long, events: RuntimeEventFlag): Deferred<Unit> =
+  public fun setOfflineRegionObserved(regionId: Long, events: RuntimeEventFlag): Completion<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_runtime_set_offline_region_observed(
@@ -419,7 +418,7 @@ private constructor(
    * See `mln_runtime_set_resource_provider` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun setResourceProvider(provider: ResourceProvider): Deferred<CommandCompletion> =
+  public fun setResourceProvider(provider: ResourceProvider): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_resource_provider(
@@ -439,7 +438,7 @@ private constructor(
    * See `mln_runtime_set_resource_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun setResourceTransform(transform: ResourceTransform): Deferred<CommandCompletion> =
+  public fun setResourceTransform(transform: ResourceTransform): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_runtime_set_resource_transform(
@@ -464,7 +463,7 @@ private constructor(
   public fun updateOfflineRegionMetadata(
     regionId: Long,
     metadata: ByteArray,
-  ): Deferred<OfflineRegionInfo> =
+  ): Completion<OfflineRegionInfo> =
     nativeSubmit(
       this,
       binding,
@@ -499,21 +498,23 @@ private constructor(
      * A runtime holds maps and the resource loading, cache, and offline regions that they share. In
      * a browser, create runtimes on a Web Worker, not on the main thread.
      *
-     * Suspends until the call's thread starts. On the JVM, Android, and Kotlin/Native the call
-     * waits on the calling thread, which it blocks until then. On Kotlin/Wasm it runs on a thread
-     * of its own, so the page can call it. Cancellation does not interrupt the wait: a caller
-     * cancelled meanwhile receives the cancellation, and the binding disposes the result.
+     * The result completes once the call's thread starts. On the JVM, Android, and Kotlin/Native
+     * the call waits on the calling thread, which it blocks until then, and returns a completed
+     * result. On Kotlin/Wasm it runs on a thread of its own, so the page can call it.
      *
      * See `mln_runtime_create` in the
      * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
      */
-    public suspend fun create(options: RuntimeOptions? = null): RuntimeHandle =
-      nativeThreadStart({ it.dispose() }) {
+    public fun create(options: RuntimeOptions? = null): Completion<RuntimeHandle> =
+      nativeThreadStart {
         val out = allocate(8, w(8, 8, 4))
-        threadStart { diagnostic ->
-          C.mln_runtime_create(options?.let { writeRuntimeOptions(it) } ?: 0L, out, diagnostic)
+        threadStart(
+          { diagnostic ->
+            C.mln_runtime_create(options?.let { writeRuntimeOptions(it) } ?: 0L, out, diagnostic)
+          },
+        ) {
+          adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle.wrap(it) }
         }
-        adopt(out, GeneratedOwnerDisposal::runtime) { RuntimeHandle.wrap(it) }
       }
 
     /** Creates the owner of `handle`. */

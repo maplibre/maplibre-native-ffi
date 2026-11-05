@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmStatic
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.c.UpcallStubs
@@ -141,7 +140,7 @@ public fun HttpHeaderTransformResponse.setHeader(name: String, value: String): U
  */
 public fun RuntimeHandle.setHttpHeaderTransform(
   transform: HttpHeaderTransform,
-): Deferred<CommandCompletion> =
+): Completion<CommandCompletion> =
   nativeCommand(this, binding, bindingCallbacks) {
     check(
       C.mln_runtime_set_http_header_transform(

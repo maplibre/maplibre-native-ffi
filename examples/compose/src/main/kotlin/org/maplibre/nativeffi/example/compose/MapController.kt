@@ -13,10 +13,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import java.util.concurrent.CountDownLatch
+import java.util.concurrent.CompletionException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -25,6 +24,7 @@ import kotlinx.coroutines.launch
 import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraUpdate
 import org.maplibre.nativeffi.CameraUpdateMode
+import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.LogicalSize
@@ -78,7 +78,7 @@ class MapController(application: Application) : AndroidViewModel(application) {
   // Target changes run one at a time, in the order the view reports them.
   private var targets: Job? = null
   // The session's release, once the view model is cleared.
-  private var released: Deferred<Unit>? = null
+  private var released: Completion<Unit>? = null
 
   init {
     viewModelScope.launch {
@@ -161,7 +161,7 @@ class MapController(application: Application) : AndroidViewModel(application) {
 
   private suspend fun start() {
     showStatus("Loading the library…")
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create().await()
     this.runtime = runtime
     val size = size ?: LogicalSize(1u, 1u)
     val map =
@@ -293,15 +293,12 @@ class MapController(application: Application) : AndroidViewModel(application) {
 
 private class MapError(message: String) : Exception(message)
 
-// Blocks the calling thread until the deferred completes, and returns its failure. It waits
+// Blocks the calling thread until the result completes, and returns its failure. It waits
 // without a dispatcher, so it doesn't depend on the main thread's event loop.
-private fun Deferred<*>.waitBlocking(): Throwable? {
-  val done = CountDownLatch(1)
-  var failure: Throwable? = null
-  invokeOnCompletion { cause ->
-    failure = cause
-    done.countDown()
+private fun Completion<*>.waitBlocking(): Throwable? =
+  try {
+    join()
+    null
+  } catch (error: CompletionException) {
+    error.cause ?: error
   }
-  done.await()
-  return failure
-}

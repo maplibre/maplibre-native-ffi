@@ -1,7 +1,6 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -491,7 +490,7 @@ public fun MapHandle.attachWin32Window(
  */
 public fun RenderSessionHandle.setMetalBorrowedTextureTarget(
   replacement: MetalBorrowedTextureReplacement,
-): Deferred<Unit> =
+): Completion<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_metal_borrowed_texture_target(
@@ -515,7 +514,7 @@ public fun RenderSessionHandle.setMetalBorrowedTextureTarget(
  */
 public fun RenderSessionHandle.setMetalSurfaceTarget(
   replacement: MetalSurfaceReplacement,
-): Deferred<Unit> =
+): Completion<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_metal_surface_target(
@@ -545,7 +544,7 @@ public fun RenderSessionHandle.setMetalSurfaceTarget(
  */
 public fun RenderSessionHandle.setWaylandSurfaceTarget(
   replacement: WaylandSurfaceReplacement,
-): Deferred<Unit> =
+): Completion<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_wayland_surface_target(
@@ -579,7 +578,7 @@ public fun RenderSessionHandle.setWaylandSurfaceTarget(
  */
 public fun RenderSessionHandle.setWin32WindowTarget(
   replacement: Win32WindowReplacement,
-): Deferred<Unit> =
+): Completion<Unit> =
   nativeUnit(this, binding) {
     check(
       C.mln_render_session_set_win32_window_target(

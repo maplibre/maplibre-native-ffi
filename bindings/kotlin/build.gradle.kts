@@ -299,7 +299,7 @@ kotlin {
   }
 
   sourceSets {
-    // Deferred is part of the public binding surface.
+    // Completion.asDeferred() and await() put Deferred and suspension in the public API.
     commonMain.dependencies { api(libs.coroutines) }
 
     named("androidDeviceTest") {

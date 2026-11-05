@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi
 
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
@@ -11,7 +10,7 @@ public interface AsyncReleasable {
    * MaplibreException when native refuses the release, such as while a child is live, and leaves
    * the owner live for a retry. A release after native accepted one reports the handle released.
    */
-  public fun release(): Deferred<Unit>
+  public fun release(): Completion<Unit>
 
   /** Whether a release or dispose has ended the handle. */
   public val isClosed: Boolean
@@ -22,7 +21,8 @@ public interface AsyncReleasable {
  * [block] already released or disposed is left as it is. A release failure propagates, or, when
  * [block] throws, is added to its throwable as suppressed, as with `use`.
  *
- * `use` can't suspend, so it calls `close`, which disposes the owner without waiting.
+ * `use` can't suspend, so it calls `close`, which disposes the owner without waiting. From Java,
+ * release in a `finally` block instead and wait with `release().join()`.
  */
 public suspend inline fun <T : AsyncReleasable, R> T.useReleasing(block: suspend (T) -> R): R {
   var failure: Throwable? = null

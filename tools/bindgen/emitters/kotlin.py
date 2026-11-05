@@ -134,7 +134,6 @@ WASM_EXPORTS = "wasm/mln_kw_exports.txt"
 OPERATION_IMPORTS = """\
 import kotlin.jvm.JvmName
 import kotlin.jvm.JvmStatic
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.c.UpcallStubs
@@ -150,11 +149,10 @@ SYNTHETIC_IMPORT = "import org.maplibre.nativeffi.internal.JvmSynthetic\n"
 # What a call that waits for a thread to start does on each target, which the C
 # reference cannot say.
 THREAD_START_NOTE = (
-    "Suspends until the call's thread starts. On the JVM, Android, and "
-    "Kotlin/Native the call waits on the calling thread, which it blocks until "
-    "then. On Kotlin/Wasm it runs on a thread of its own, so the page can call "
-    "it. Cancellation does not interrupt the wait: a caller cancelled meanwhile "
-    "receives the cancellation, and the binding disposes the result."
+    "The result completes once the call's thread starts. On the JVM, Android, "
+    "and Kotlin/Native the call waits on the calling thread, which it blocks "
+    "until then, and returns a completed result. On Kotlin/Wasm it runs on a "
+    "thread of its own, so the page can call it."
 )
 
 
@@ -386,15 +384,15 @@ def extension(source: str, receiver: str) -> str:
     if source.rstrip("\n").count("\n"):
         raise ValueError(f"an extension declares one method: {source[:40]}")
     annotation, source = annotations(source)
-    for head in ("public suspend fun ", "public fun "):
-        if source.startswith(head):
-            rest = source[len(head) :]
-            generics = ""
-            if rest.startswith("<"):
-                generics, rest = rest.split("> ", 1)
-                generics += "> "
-            return annotation + head + generics + receiver + "." + rest
-    raise ValueError(f"not a member method: {source[:40]}")
+    head = "public fun "
+    if not source.startswith(head):
+        raise ValueError(f"not a member method: {source[:40]}")
+    rest = source[len(head) :]
+    generics = ""
+    if rest.startswith("<"):
+        generics, rest = rest.split("> ", 1)
+        generics += "> "
+    return annotation + head + generics + receiver + "." + rest
 
 
 def platform_extension(source: str, receiver: str, method: str) -> str:

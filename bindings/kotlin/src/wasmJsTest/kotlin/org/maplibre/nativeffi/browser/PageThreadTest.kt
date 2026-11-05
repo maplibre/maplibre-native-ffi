@@ -7,8 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.async
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.RuntimeHandle
@@ -28,16 +26,16 @@ class PageThreadTest {
 
     // The page refuses mln_runtime_create, so a runtime that arrives came from a thread that the
     // binding started, and the page yields while that thread starts.
-    val creation =
-      async(start = CoroutineStart.UNDISPATCHED) {
-        RuntimeHandle.create(RuntimeOptions())
-      }
-    assertFalse(creation.isCompleted, "runtime creation returned before its thread could start")
+    val creation = RuntimeHandle.create(RuntimeOptions()).asDeferred()
+    assertFalse(creation.isCompleted, "runtime creation completed before its thread could start")
     val runtime = creation.awaitWithin("the runtime")
 
     // Native queues the map's readiness for the page, which drains it only after it yields.
     val map = runtime.createMap(smallMapOptions())
-    assertFalse(map.ready.isCompleted, "the map was ready inside the call that created it")
+    assertFalse(
+      map.ready.asDeferred().isCompleted,
+      "the map was ready inside the call that created it",
+    )
     map.ready.awaitWithin("the map")
 
     map.release().awaitWithin("the map release")
@@ -52,28 +50,13 @@ class PageThreadTest {
       val workers = TestSupport.allWorkers()
       // The creation's thread needs a Worker that the page creates, and that Worker starts only
       // after the page yields, so a call that waited for the start would never return.
-      val creation =
-        async(start = CoroutineStart.UNDISPATCHED) {
-          RuntimeHandle.create(RuntimeOptions())
-        }
-      assertFalse(creation.isCompleted, "runtime creation returned before the page yielded")
+      val creation = RuntimeHandle.create(RuntimeOptions()).asDeferred()
+      assertFalse(creation.isCompleted, "runtime creation completed before the page yielded")
       val runtime = creation.awaitWithin("the runtime")
       assertTrue(TestSupport.allWorkers() > workers, "the creation started no new Worker")
       runtime
     }
     runtime.release().awaitWithin("the runtime release")
-  }
-
-  @Test
-  fun aCancelledCreationResumesOnceTheRuntimeArrives() = runSuspendTest {
-    val creation =
-      async(start = CoroutineStart.UNDISPATCHED) {
-        RuntimeHandle.create(RuntimeOptions())
-      }
-    creation.cancel()
-    // The creation's thread still runs, so the caller resumes once its runtime arrives.
-    creation.join()
-    assertTrue(creation.isCancelled)
   }
 
   @Test

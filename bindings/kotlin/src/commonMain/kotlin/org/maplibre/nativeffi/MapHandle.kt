@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
@@ -25,7 +24,7 @@ private constructor(
    * Completes once the map is ready, and fails with a [MaplibreException] when it fails to become
    * ready. The map takes calls before then.
    */
-  public val ready: Deferred<Unit>,
+  public val ready: Completion<Unit>,
   borrowed: Boolean,
 ) : AsyncReleasable, AutoCloseable {
   @get:JvmSynthetic
@@ -70,7 +69,7 @@ private constructor(
   public fun addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_map_add_custom_geometry_source(
@@ -97,7 +96,7 @@ private constructor(
   public fun addCustomVectorSource(
     sourceId: String,
     options: CustomVectorSourceOptions,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_map_add_custom_vector_source(
@@ -127,7 +126,7 @@ private constructor(
   public fun addGeoJsonSourceData(
     sourceId: String,
     data: GeoJsonSourceDataHandle,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_add_geo_json_source_data(
@@ -157,7 +156,7 @@ private constructor(
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_add_image_source_image(
@@ -192,7 +191,7 @@ private constructor(
   public fun addStyleLayerJson(
     layerJson: String,
     beforeLayerId: String? = null,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_add_style_layer_json(
@@ -218,7 +217,10 @@ private constructor(
    * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun addStyleSourceJson(sourceId: String, sourceJson: String): Deferred<CommandCompletion> =
+  public fun addStyleSourceJson(
+    sourceId: String,
+    sourceJson: String,
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_add_style_source_json(
@@ -243,7 +245,7 @@ private constructor(
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> =
+  public fun applyCameraDelta(delta: CameraDelta): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic))
     }
@@ -366,7 +368,7 @@ private constructor(
    * See `mln_map_begin_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun beginCommandGroup(): Deferred<CommandCompletion> =
+  public fun beginCommandGroup(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_begin_command_group(handle, completion, diagnostic))
     }
@@ -388,7 +390,7 @@ private constructor(
   public fun cameraForGeometry(
     geometry: String,
     fitOptions: CameraFitOptions? = null,
-  ): Deferred<CameraOptions> =
+  ): Completion<CameraOptions> =
     nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_camera_for_geometry(
@@ -417,7 +419,7 @@ private constructor(
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions? = null,
-  ): Deferred<CameraOptions> =
+  ): Completion<CameraOptions> =
     nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_camera_for_lat_lng_bounds(
@@ -446,7 +448,7 @@ private constructor(
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions? = null,
-  ): Deferred<CameraOptions> =
+  ): Completion<CameraOptions> =
     nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_camera_for_lat_lngs(
@@ -468,7 +470,7 @@ private constructor(
    * See `mln_map_cancel_camera_transitions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun cancelCameraTransitions(): Deferred<CommandCompletion> =
+  public fun cancelCameraTransitions(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_cancel_camera_transitions(handle, completion, diagnostic))
     }
@@ -483,7 +485,7 @@ private constructor(
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   @JvmName("cancelCameraTransitionsWithId")
-  public fun cancelCameraTransitionsWithId(transitionId: ULong): Deferred<CommandCompletion> =
+  public fun cancelCameraTransitionsWithId(transitionId: ULong): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_cancel_camera_transitions_with_id(
@@ -512,7 +514,7 @@ private constructor(
    * See `mln_map_dump_debug_logs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun dumpDebugLogs(): Deferred<CommandCompletion> =
+  public fun dumpDebugLogs(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_dump_debug_logs(handle, completion, diagnostic))
     }
@@ -523,7 +525,7 @@ private constructor(
    * See `mln_map_end_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun endCommandGroup(): Deferred<CommandCompletion> =
+  public fun endCommandGroup(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_end_command_group(handle, completion, diagnostic))
     }
@@ -546,7 +548,7 @@ private constructor(
   public fun fitCameraToGeometry(
     geometry: String,
     update: CameraFitUpdate,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_map_fit_camera_to_geometry(
@@ -577,7 +579,7 @@ private constructor(
   public fun fitCameraToLatLngBounds(
     bounds: LatLngBounds,
     update: CameraFitUpdate,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_map_fit_camera_to_lat_lng_bounds(
@@ -608,7 +610,7 @@ private constructor(
   public fun fitCameraToLatLngs(
     coordinates: List<LatLng>,
     update: CameraFitUpdate,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(
         C.mln_map_fit_camera_to_lat_lngs(
@@ -630,7 +632,7 @@ private constructor(
    * See `mln_map_get_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun getCamera(): Deferred<CameraQueryResult> =
+  public fun getCamera(): Completion<CameraQueryResult> =
     nativeSubmit(
       this,
       binding,
@@ -647,7 +649,7 @@ private constructor(
    * See `mln_map_get_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getFeatureState(selector: FeatureStateSelector): Deferred<String> =
+  public fun getFeatureState(selector: FeatureStateSelector): Completion<String> =
     nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_get_feature_state(
@@ -665,7 +667,7 @@ private constructor(
    * See `mln_map_get_global_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getGlobalState(): Deferred<String> =
+  public fun getGlobalState(): Completion<String> =
     nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(C.mln_map_get_global_state(handle, completion, diagnostic))
     }
@@ -681,7 +683,7 @@ private constructor(
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
    */
-  public fun getImageSourceCoordinates(sourceId: String): Deferred<List<LatLng>> =
+  public fun getImageSourceCoordinates(sourceId: String): Completion<List<LatLng>> =
     nativeSubmit(
       this,
       binding,
@@ -707,7 +709,7 @@ private constructor(
    * See `mln_map_get_loaded_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getLoadedStyleJson(): Deferred<String> =
+  public fun getLoadedStyleJson(): Completion<String> =
     nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(C.mln_map_get_loaded_style_json(handle, completion, diagnostic))
     }
@@ -736,7 +738,7 @@ private constructor(
    * See `mln_map_get_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleImage(imageId: String): Deferred<StyleImageInfo?> =
+  public fun getStyleImage(imageId: String): Completion<StyleImageInfo?> =
     nativeSubmit(
       this,
       binding,
@@ -756,7 +758,7 @@ private constructor(
    * See `mln_map_get_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLayer(layerId: String): Deferred<StyleLayerInfo?> =
+  public fun getStyleLayer(layerId: String): Completion<StyleLayerInfo?> =
     nativeSubmit(
       this,
       binding,
@@ -777,7 +779,7 @@ private constructor(
    * See `mln_map_get_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLayerJson(layerId: String): Deferred<String?> =
+  public fun getStyleLayerJson(layerId: String): Completion<String?> =
     nativeSubmit(
       this,
       binding,
@@ -801,7 +803,7 @@ private constructor(
    *
    * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
    */
-  public fun getStyleLayerProperty(layerId: String, propertyName: String): Deferred<String?> =
+  public fun getStyleLayerProperty(layerId: String, propertyName: String): Completion<String?> =
     nativeSubmit(
       this,
       binding,
@@ -829,7 +831,7 @@ private constructor(
    * See `mln_map_get_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLightProperty(propertyName: String): Deferred<String?> =
+  public fun getStyleLightProperty(propertyName: String): Completion<String?> =
     nativeSubmit(
       this,
       binding,
@@ -849,7 +851,7 @@ private constructor(
    * See `mln_map_get_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleSource(sourceId: String): Deferred<StyleSourceInfo?> =
+  public fun getStyleSource(sourceId: String): Completion<StyleSourceInfo?> =
     nativeSubmit(
       this,
       binding,
@@ -867,7 +869,7 @@ private constructor(
    * See `mln_map_get_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleTransitionOptions(): Deferred<StyleTransitionOptions> =
+  public fun getStyleTransitionOptions(): Completion<StyleTransitionOptions> =
     nativeSubmit(
       this,
       binding,
@@ -884,7 +886,7 @@ private constructor(
    * See `mln_map_get_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getStyleUrl(): Deferred<String> =
+  public fun getStyleUrl(): Completion<String> =
     nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(C.mln_map_get_style_url(handle, completion, diagnostic))
     }
@@ -903,7 +905,7 @@ private constructor(
   public fun invalidateCustomGeometrySourceRegion(
     sourceId: String,
     bounds: LatLngBounds,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_invalidate_custom_geometry_source_region(
@@ -930,7 +932,7 @@ private constructor(
   public fun invalidateCustomGeometrySourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_invalidate_custom_geometry_source_tile(
@@ -957,7 +959,7 @@ private constructor(
   public fun invalidateCustomVectorSourceRegion(
     sourceId: String,
     bounds: LatLngBounds,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_invalidate_custom_vector_source_region(
@@ -984,7 +986,7 @@ private constructor(
   public fun invalidateCustomVectorSourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_invalidate_custom_vector_source_tile(
@@ -1006,7 +1008,7 @@ private constructor(
    * See `mln_map_lat_lng_bounds_for_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun latLngBoundsForCamera(camera: CameraOptions): Deferred<LatLngBounds> =
+  public fun latLngBoundsForCamera(camera: CameraOptions): Completion<LatLngBounds> =
     nativeSubmit(this, binding, { result -> readLatLngBounds(CompletionBridge.value(result)) }) {
       check(
         C.mln_map_lat_lng_bounds_for_camera(
@@ -1024,7 +1026,7 @@ private constructor(
    * See `mln_map_list_style_layers` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun listStyleLayers(): Deferred<List<StyleLayerInfo>> =
+  public fun listStyleLayers(): Completion<List<StyleLayerInfo>> =
     nativeSubmit(
       this,
       binding,
@@ -1048,7 +1050,7 @@ private constructor(
    * See `mln_map_list_style_sources` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun listStyleSources(): Deferred<List<StyleSourceInfo>> =
+  public fun listStyleSources(): Completion<List<StyleSourceInfo>> =
     nativeSubmit(
       this,
       binding,
@@ -1081,7 +1083,7 @@ private constructor(
   public fun moveStyleLayer(
     layerId: String,
     beforeLayerId: String? = null,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_move_style_layer(
@@ -1102,7 +1104,7 @@ private constructor(
    * See `mln_map_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public override fun release(): Deferred<Unit> =
+  public override fun release(): Completion<Unit> =
     nativeRetire(this, binding) { check(C.mln_map_release(handle, completion, diagnostic)) }
 
   /**
@@ -1111,7 +1113,7 @@ private constructor(
    * See `mln_map_remove_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun removeFeatureState(selector: FeatureStateSelector): Deferred<CommandCompletion> =
+  public fun removeFeatureState(selector: FeatureStateSelector): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_remove_feature_state(
@@ -1134,7 +1136,7 @@ private constructor(
    * - `Status.NOT_FOUND` when the style has no image named `imageId`.
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun removeStyleImage(imageId: String): Deferred<CommandCompletion> =
+  public fun removeStyleImage(imageId: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic))
     }
@@ -1150,7 +1152,7 @@ private constructor(
    * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> =
+  public fun removeStyleLayer(layerId: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic))
     }
@@ -1167,7 +1169,7 @@ private constructor(
    * - `Status.INVALID_STATE` when a layer still uses the source, or while the style isn't loaded,
    *   as `MapHandle.setStyleUrl()` describes.
    */
-  public fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> =
+  public fun removeStyleSource(sourceId: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic))
     }
@@ -1178,7 +1180,7 @@ private constructor(
    * See `mln_map_request_repaint` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun requestRepaint(): Deferred<CommandCompletion> =
+  public fun requestRepaint(): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_request_repaint(handle, completion, diagnostic))
     }
@@ -1196,7 +1198,7 @@ private constructor(
    * - `Status.CANCELLED` when the map is released before the image is done.
    * - `Status.NATIVE_ERROR` when the style or a resource that the image needs fails to load.
    */
-  public fun requestStillImage(): Deferred<Unit> =
+  public fun requestStillImage(): Completion<Unit> =
     nativeUnit(this, binding) {
       check(C.mln_map_request_still_image(handle, completion, diagnostic))
     }
@@ -1215,7 +1217,7 @@ private constructor(
    * - `Status.INVALID_STATE` when the map has a render session.
    * - `Status.INVALID_STATE` when a render session attached to the map before the resize applied.
    */
-  public fun resize(logicalSize: LogicalSize): Deferred<CommandCompletion> =
+  public fun resize(logicalSize: LogicalSize): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic))
     }
@@ -1229,7 +1231,7 @@ private constructor(
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setBounds(options: BoundOptions): Deferred<CommandCompletion> =
+  public fun setBounds(options: BoundOptions): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic))
     }
@@ -1252,7 +1254,7 @@ private constructor(
     sourceId: String,
     tileId: CanonicalTileId,
     data: String,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_custom_geometry_source_tile_data(
@@ -1281,7 +1283,7 @@ private constructor(
     sourceId: String,
     tileId: CanonicalTileId,
     message: String,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_custom_geometry_source_tile_error(
@@ -1314,7 +1316,7 @@ private constructor(
     tileId: CanonicalTileId,
     encoding: StyleVectorTileEncoding,
     data: ByteArray,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_custom_vector_source_tile_data(
@@ -1344,7 +1346,7 @@ private constructor(
     sourceId: String,
     tileId: CanonicalTileId,
     message: String,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_custom_vector_source_tile_error(
@@ -1366,7 +1368,7 @@ private constructor(
    * See `mln_map_set_debug_flags` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setDebugFlags(flags: MapDebugFlag): Deferred<CommandCompletion> =
+  public fun setDebugFlags(flags: MapDebugFlag): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic))
     }
@@ -1377,7 +1379,7 @@ private constructor(
    * See `mln_map_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun setEventMask(mask: RuntimeEventFlag): Deferred<CommandCompletion> =
+  public fun setEventMask(mask: RuntimeEventFlag): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
     }
@@ -1394,7 +1396,7 @@ private constructor(
   public fun setFeatureState(
     selector: FeatureStateSelector,
     state: String,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_feature_state(
@@ -1416,7 +1418,7 @@ private constructor(
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion> =
+  public fun setFreeCameraOptions(options: FreeCameraOptions): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_free_camera_options(
@@ -1447,7 +1449,7 @@ private constructor(
   public fun setGeoJsonSourceData(
     sourceId: String,
     data: GeoJsonSourceDataHandle,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_geo_json_source_data(
@@ -1479,7 +1481,7 @@ private constructor(
   public fun setGeoJsonSourceSynchronousTiling(
     sourceId: String,
     enabled: Boolean,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_geo_json_source_synchronous_tiling(
@@ -1504,7 +1506,7 @@ private constructor(
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source.
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
+  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_geo_json_source_url(
@@ -1531,7 +1533,7 @@ private constructor(
   public fun setGlobalStateProperty(
     propertyName: String,
     value: String,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_global_state_property(
@@ -1561,7 +1563,7 @@ private constructor(
   public fun setImageSourceCoordinates(
     sourceId: String,
     coordinates: List<LatLng>,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_image_source_coordinates(
@@ -1590,7 +1592,7 @@ private constructor(
   public fun setImageSourceImage(
     sourceId: String,
     image: PremultipliedRgba8Image,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_image_source_image(
@@ -1615,7 +1617,7 @@ private constructor(
    * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
+  public fun setImageSourceUrl(sourceId: String, url: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic),
@@ -1631,7 +1633,7 @@ private constructor(
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setProjectionMode(options: ProjectionModeOptions): Deferred<CommandCompletion> =
+  public fun setProjectionMode(options: ProjectionModeOptions): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_projection_mode(
@@ -1649,7 +1651,7 @@ private constructor(
    * See `mln_map_set_rendering_stats_view_enabled` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setRenderingStatsViewEnabled(enabled: Boolean): Deferred<CommandCompletion> =
+  public fun setRenderingStatsViewEnabled(enabled: Boolean): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
     }
@@ -1668,7 +1670,7 @@ private constructor(
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions? = null,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_image(
@@ -1696,7 +1698,7 @@ private constructor(
    *
    * - `Status.NATIVE_ERROR` when `json` isn't a valid style. The map keeps its current style.
    */
-  public fun setStyleJson(json: String): Deferred<CommandCompletion> =
+  public fun setStyleJson(json: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
     }
@@ -1721,7 +1723,7 @@ private constructor(
     layerId: String,
     propertyName: String,
     value: String,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_layer_property(
@@ -1746,7 +1748,7 @@ private constructor(
    *
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun setStyleLightJson(lightJson: String): Deferred<CommandCompletion> =
+  public fun setStyleLightJson(lightJson: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
     }
@@ -1764,7 +1766,7 @@ private constructor(
   public fun setStyleLightProperty(
     propertyName: String,
     value: String,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_light_property(
@@ -1793,7 +1795,7 @@ private constructor(
   public fun setStyleSourceVolatile(
     sourceId: String,
     isVolatile: Boolean,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_source_volatile(
@@ -1818,7 +1820,7 @@ private constructor(
    */
   public fun setStyleTransitionOptions(
     options: StyleTransitionOptions,
-  ): Deferred<CommandCompletion> =
+  ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_style_transition_options(
@@ -1850,7 +1852,7 @@ private constructor(
    * - `Status.CANCELLED` when the map is released, or this function or `MapHandle.setStyleJson()`
    *   loads another style, before the style document parses.
    */
-  public fun setStyleUrl(url: String): Deferred<CommandCompletion> =
+  public fun setStyleUrl(url: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic))
     }
@@ -1863,7 +1865,7 @@ private constructor(
    * See `mln_map_set_tile_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setTileOptions(options: MapTileOptions): Deferred<CommandCompletion> =
+  public fun setTileOptions(options: MapTileOptions): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic),
@@ -1878,7 +1880,7 @@ private constructor(
    * See `mln_map_set_viewport_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setViewportOptions(options: MapViewportOptions): Deferred<CommandCompletion> =
+  public fun setViewportOptions(options: MapViewportOptions): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_viewport_options(
@@ -1901,7 +1903,7 @@ private constructor(
    * See `mln_map_update_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> =
+  public fun updateCamera(update: CameraUpdate): Completion<CommandCompletion> =
     nativeCommand(this, binding, bindingCallbacks) {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
     }
@@ -1922,7 +1924,7 @@ private constructor(
     internal fun wrap(
       handle: Long,
       parent: RuntimeHandle?,
-      ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit),
+      ready: Completion<Unit> = Completion.completed(Unit),
       borrowed: Boolean = false,
     ): MapHandle = MapHandle(handle, parent, ready, borrowed)
   }

@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
@@ -25,7 +24,7 @@ private constructor(
    * Completes once the session is ready, and fails with a [MaplibreException] when it fails to
    * become ready. The session takes calls before then.
    */
-  public val ready: Deferred<Unit>,
+  public val ready: Completion<Unit>,
 ) : AsyncReleasable, AutoCloseable {
   @get:JvmSynthetic
   internal val binding =
@@ -111,7 +110,7 @@ private constructor(
    *
    * - `Status.TARGET_LOST` when the session loses its target before the barrier runs.
    */
-  public fun barrier(): Deferred<Unit> =
+  public fun barrier(): Completion<Unit> =
     nativeUnit(this, binding) {
       check(C.mln_render_session_barrier(handle, completion, diagnostic))
     }
@@ -127,7 +126,7 @@ private constructor(
    *
    * - `Status.TARGET_LOST` when the session loses its target before the work runs.
    */
-  public fun clearData(): Deferred<Unit> =
+  public fun clearData(): Completion<Unit> =
     nativeUnit(this, binding) {
       check(C.mln_render_session_clear_data(handle, completion, diagnostic))
     }
@@ -169,7 +168,7 @@ private constructor(
    *
    * - `Status.TARGET_LOST` when the session loses its target before the detach runs.
    */
-  public fun detach(): Deferred<Unit> =
+  public fun detach(): Completion<Unit> =
     nativeUnit(this, binding) { check(C.mln_render_session_detach(handle, completion, diagnostic)) }
 
   /**
@@ -215,7 +214,7 @@ private constructor(
    *
    * - `Status.TARGET_LOST` when the session loses its target before the work runs.
    */
-  public fun dumpDebugLogs(): Deferred<Unit> =
+  public fun dumpDebugLogs(): Completion<Unit> =
     nativeUnit(this, binding) {
       check(C.mln_render_session_dump_debug_logs(handle, completion, diagnostic))
     }
@@ -257,7 +256,7 @@ private constructor(
    * - `Status.INVALID_ARGUMENT` when the source isn't a GeoJSON source with clustering turned on.
    */
   @JvmName("getClusterChildren")
-  public fun getClusterChildren(sourceId: String, clusterId: UInt): Deferred<String> =
+  public fun getClusterChildren(sourceId: String, clusterId: UInt): Completion<String> =
     nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(
         C.mln_render_session_get_cluster_children(
@@ -288,7 +287,7 @@ private constructor(
    * - `Status.INVALID_ARGUMENT` when the source isn't a GeoJSON source with clustering turned on.
    */
   @JvmSynthetic
-  public fun getClusterExpansionZoom(sourceId: String, clusterId: UInt): Deferred<UInt> =
+  public fun getClusterExpansionZoom(sourceId: String, clusterId: UInt): Completion<UInt> =
     nativeSubmit(this, binding, { result -> readU32(CompletionBridge.value(result)) }) {
       check(
         C.mln_render_session_get_cluster_expansion_zoom(
@@ -303,7 +302,7 @@ private constructor(
 
   @PublishedApi
   @JvmName("getClusterExpansionZoom")
-  internal fun getClusterExpansionZoomForJava(sourceId: String, clusterId: Int): Deferred<Int> =
+  internal fun getClusterExpansionZoomForJava(sourceId: String, clusterId: Int): Completion<Int> =
     nativeSubmit(this, binding, { result -> readU32(CompletionBridge.value(result)).toInt() }) {
       check(
         C.mln_render_session_get_cluster_expansion_zoom(
@@ -340,7 +339,7 @@ private constructor(
     clusterId: UInt,
     limit: UInt,
     offset: UInt,
-  ): Deferred<String> =
+  ): Completion<String> =
     nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
       check(
         C.mln_render_session_get_cluster_leaves(
@@ -412,7 +411,7 @@ private constructor(
   public fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions? = null,
-  ): Deferred<List<RenderedFeature>> =
+  ): Completion<List<RenderedFeature>> =
     nativeSubmit(
       this,
       binding,
@@ -450,7 +449,7 @@ private constructor(
   public fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions? = null,
-  ): Deferred<List<SourceFeature>> =
+  ): Completion<List<SourceFeature>> =
     nativeSubmit(
       this,
       binding,
@@ -489,7 +488,7 @@ private constructor(
    * - `Status.INVALID_STATE` when the session hasn't rendered a frame since it attached, resized,
    *   or changed its target.
    */
-  public fun readTexture(): Deferred<TextureReadbackResult> =
+  public fun readTexture(): Completion<TextureReadbackResult> =
     nativeSubmit(
       this,
       binding,
@@ -508,7 +507,7 @@ private constructor(
    *
    * - `Status.TARGET_LOST` when the session loses its target before the work runs.
    */
-  public fun reduceMemoryUse(): Deferred<Unit> =
+  public fun reduceMemoryUse(): Completion<Unit> =
     nativeUnit(this, binding) {
       check(C.mln_render_session_reduce_memory_use(handle, completion, diagnostic))
     }
@@ -534,7 +533,7 @@ private constructor(
    * - `Status.INVALID_STATE` while you hold one of the session's acquired frames. Release or
    *   discard them first.
    */
-  public override fun release(): Deferred<Unit> =
+  public override fun release(): Completion<Unit> =
     nativeRetire(this, binding) {
       check(C.mln_render_session_release(handle, completion, diagnostic))
     }
@@ -557,7 +556,7 @@ private constructor(
    * - `Status.UNSUPPORTED` when the target is a WebGL canvas.
    * - `Status.TARGET_LOST` when the session loses its target before the release runs.
    */
-  public fun releaseTarget(): Deferred<Unit> =
+  public fun releaseTarget(): Completion<Unit> =
     nativeUnit(this, binding) {
       check(C.mln_render_session_release_target(handle, completion, diagnostic))
     }
@@ -576,7 +575,7 @@ private constructor(
    *   the new size instead.
    * - `Status.TARGET_LOST` when the session loses its target before the resize applies.
    */
-  public fun resize(logicalSize: LogicalSize): Deferred<CommandCompletion> =
+  public fun resize(logicalSize: LogicalSize): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_render_session_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic),
@@ -641,7 +640,7 @@ private constructor(
    */
   public fun setOpenGlBorrowedTextureTarget(
     replacement: OpenGlBorrowedTextureReplacement,
-  ): Deferred<Unit> =
+  ): Completion<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_open_gl_borrowed_texture_target(
@@ -663,7 +662,7 @@ private constructor(
    * See `mln_render_session_set_open_gl_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  public fun setOpenGlSurfaceTarget(replacement: OpenGlSurfaceReplacement): Deferred<Unit> =
+  public fun setOpenGlSurfaceTarget(replacement: OpenGlSurfaceReplacement): Completion<Unit> =
     nativeUnit(this, binding) {
       check(
         C.mln_render_session_set_open_gl_surface_target(
@@ -691,7 +690,7 @@ private constructor(
     internal fun wrap(
       handle: Long,
       parent: MapHandle,
-      ready: Deferred<Unit> = kotlinx.coroutines.CompletableDeferred(Unit),
+      ready: Completion<Unit> = Completion.completed(Unit),
     ): RenderSessionHandle = RenderSessionHandle(handle, parent, ready)
   }
 }

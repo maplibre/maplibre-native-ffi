@@ -255,7 +255,7 @@ class KotlinLayoutTests(unittest.TestCase):
         outputs = emitted(kotlin, parse(RELEASE_AND_DISPOSE))
         owner = outputs[f"{GENERATED}/LeaseHandle.kt"]
         self.assertIn(
-            "public override fun release(): Deferred<Unit> = nativeRetire(this, binding) "
+            "public override fun release(): Completion<Unit> = nativeRetire(this, binding) "
             "{ check(C.mln_lease_release(handle, completion, diagnostic)) }",
             owner,
         )
@@ -362,7 +362,7 @@ class KotlinLayoutTests(unittest.TestCase):
         runtime = outputs[f"{GENERATED}/RuntimeHandle.kt"]
         self.assertIn("  public companion object {\n", runtime)
         self.assertIn(
-            "public suspend fun create(options: RuntimeOptions? = null): RuntimeHandle =",
+            "public fun create(options: RuntimeOptions? = null): Completion<RuntimeHandle> =",
             runtime.split("public companion object {")[1],
         )
         api = outputs[f"{GENERATED}/GeneratedGlobals.kt"]

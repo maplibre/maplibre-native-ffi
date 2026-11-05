@@ -33,9 +33,14 @@ internal inline fun assertFailsWithStatus(status: Status, block: () -> Unit): Ma
   assertFailsWith<MaplibreException> { block() }.also { assertEquals(status, it.status) }
 
 /** Awaits this deferred, failing the test when it does not complete within [WAIT_TIMEOUT]. */
-internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T =
+internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T = within(what) { await() }
+
+/** Awaits this result, failing the test when it does not complete within [WAIT_TIMEOUT]. */
+internal suspend fun <T> Completion<T>.awaitWithin(what: String): T = within(what) { await() }
+
+private suspend fun <T> within(what: String, wait: suspend () -> T): T =
   try {
-    withTimeout(WAIT_TIMEOUT) { await() }
+    withTimeout(WAIT_TIMEOUT) { wait() }
   } catch (timeout: TimeoutCancellationException) {
     throw AssertionError("timed out waiting for $what", timeout)
   }
@@ -121,7 +126,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
       block: suspend RuntimeFixture.() -> T,
     ): T {
       val events = Channel<RuntimeEvent>(Channel.UNLIMITED)
-      val runtime = RuntimeHandle.create(options)
+      val runtime = RuntimeHandle.create(options).awaitWithin("the runtime")
       val fixture = RuntimeFixture(runtime, events)
       return runThenRelease(listOf(runtime)) {
         runtime

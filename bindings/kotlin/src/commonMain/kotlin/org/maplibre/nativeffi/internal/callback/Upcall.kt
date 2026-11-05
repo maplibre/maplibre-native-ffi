@@ -6,13 +6,14 @@ import org.maplibre.nativeffi.MaplibreException
  * Runs [block] for an upcall of the C [callback] type, which native cannot receive an exception
  * from. Returns [failure] and reports the exception if [block] throws.
  */
-internal inline fun <T> contain(callback: String, failure: T, block: () -> T): T =
+internal inline fun <T> contain(callback: String, failure: T, block: () -> T): T = delivering {
   try {
     block()
   } catch (error: Throwable) {
     reportCallbackFailure(callback, error)
     failure
   }
+}
 
 /**
  * Runs the host callback of the registration that [token] roots, for an upcall of the C [callback]
@@ -44,7 +45,7 @@ internal inline fun <reified V : Any> statusUpcall(
   token: Long,
   failure: Int,
   block: (V) -> Int,
-): Int =
+): Int = delivering {
   try {
     val root = CallbackRoots.get(token) ?: return failure
     val value = root.value as? V ?: return failure
@@ -54,3 +55,4 @@ internal inline fun <reified V : Any> statusUpcall(
     if (status == null) reportCallbackFailure(callback, error)
     status ?: failure
   }
+}

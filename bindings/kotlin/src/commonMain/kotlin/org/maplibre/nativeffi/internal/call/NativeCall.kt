@@ -1,10 +1,7 @@
 package org.maplibre.nativeffi.internal.call
 
-import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 import org.maplibre.nativeffi.CommandCompletion
+import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
@@ -47,13 +44,25 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
   }
 
   /**
-   * Runs [call], a C call that returns once a native thread that it starts is running, and checks
-   * its status like [check]. The call writes a diagnostic of its own, because other calls run while
-   * Kotlin/Wasm waits for it.
+   * Runs [call], a C call that returns once a native thread that it starts is running. Once it
+   * returns, the result fails with the status error, as [check] would throw it, or completes with
+   * what [adopt] returns, and this call's memory is freed. The call writes a diagnostic of its own,
+   * because other calls run while Kotlin/Wasm waits for it.
    */
-  suspend fun threadStart(call: (diagnostic: Long) -> Int) {
+  fun <T> threadStart(call: (diagnostic: Long) -> Int, adopt: () -> T): Completion<T> {
     val diagnostic = sized(DiagnosticLayout.SIZEOF, DiagnosticLayout.ALIGNOF)
-    checkStatus(ThreadStart.run { call(diagnostic) }) { NativeDiagnostics.message(diagnostic) }
+    val result = Completion.pending<T>()
+    ThreadStart.run({ call(diagnostic) }) { status ->
+      try {
+        checkStatus(status) { NativeDiagnostics.message(diagnostic) }
+        result.succeed(adopt())
+      } catch (failure: Throwable) {
+        result.fail(failure)
+      } finally {
+        close()
+      }
+    }
+    return result
   }
 
   /**
@@ -114,7 +123,7 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
   fun <O> attach(
     submit: (out: Long, completion: Long) -> Int,
     dispose: (Long) -> Unit,
-    create: (Long, Deferred<Unit>) -> O,
+    create: (Long, Completion<Unit>) -> O,
     callbacks: ((O) -> CallbackOwner)?,
     drop: (O) -> Unit,
   ): O {
@@ -199,24 +208,18 @@ internal inline fun <T> nativeUncheckedCall(body: () -> T): T {
 }
 
 /**
- * Runs a call that suspends until a native thread that it starts is running. The wait does not
- * cancel, so a caller cancelled meanwhile releases the owner that the call created through [drop],
- * and receives the cancellation.
+ * Runs a call whose result arrives once a native thread that it starts is running. [body] ends with
+ * [NativeCall.threadStart], which frees the call's memory once the thread start returns.
  */
-internal suspend fun <T> nativeThreadStart(drop: (T) -> Unit, body: suspend NativeCall.() -> T): T {
+internal fun <T> nativeThreadStart(body: NativeCall.() -> Completion<T>): Completion<T> {
   ensureNativeLibrary()
-  val result = NativeCall(0L).use { it.body() }
+  val call = NativeCall(0L)
   try {
-    currentCoroutineContext().ensureActive()
-  } catch (cancelled: CancellationException) {
-    try {
-      drop(result)
-    } catch (cleanup: Throwable) {
-      cancelled.addSuppressed(cleanup)
-    }
-    throw cancelled
+    return call.body()
+  } catch (failure: Throwable) {
+    call.close()
+    throw failure
   }
-  return result
 }
 
 /**
@@ -232,7 +235,7 @@ internal fun <T> nativeSubmit(
   decode: (Long) -> T,
   callbacks: CallbackOwner? = null,
   body: NativeCall.() -> Unit,
-): Deferred<T> =
+): Completion<T> =
   receive(owner, state) { handle ->
     NativeCall(handle).use { call ->
       CompletionBridge.submit(call, decode) { completion -> run(call, completion, callbacks, body) }
@@ -244,7 +247,7 @@ internal fun nativeUnit(
   state: HandleState?,
   callbacks: CallbackOwner? = null,
   body: NativeCall.() -> Unit,
-): Deferred<Unit> =
+): Completion<Unit> =
   receive(owner, state) { handle ->
     NativeCall(handle).use { call ->
       CompletionBridge.unit(call) { completion -> run(call, completion, callbacks, body) }
@@ -253,14 +256,14 @@ internal fun nativeUnit(
 
 /**
  * Submits an ordered command. A rejected submission throws; a failed or cancelled command completes
- * its `Deferred` exceptionally.
+ * its [Completion] exceptionally.
  */
 internal fun nativeCommand(
   owner: Any?,
   state: HandleState?,
   callbacks: CallbackOwner? = null,
   body: NativeCall.() -> Unit,
-): Deferred<CommandCompletion> =
+): Completion<CommandCompletion> =
   receive(owner, state) { handle ->
     NativeCall(handle).use { call ->
       CompletionBridge.command(call) { completion -> run(call, completion, callbacks, body) }
@@ -326,7 +329,7 @@ internal fun nativeRetire(
   owner: Any,
   state: HandleState,
   body: NativeCall.() -> Unit,
-): Deferred<Unit> =
+): Completion<Unit> =
   try {
     state.release {
       NativeCall(state.handle).use { call ->

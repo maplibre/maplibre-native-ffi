@@ -26,7 +26,7 @@ import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
-/** How a native completion reaches Kotlin as a Deferred. */
+/** How a native completion reaches Kotlin as a Completion. */
 class CompletionTest {
   @Test
   fun aDiscardedCommandIsFencedAndSynchronousRejectionThrows() = runSuspendTest {
@@ -53,7 +53,7 @@ class CompletionTest {
       val seenAtCompletion = CompletableDeferred<List<RuntimeEventType>>()
       val style = map.setStyleJson(EMPTY_STYLE_JSON)
       // The handler runs inside native's completion, after the callbacks for the command's events.
-      style.invokeOnCompletion {
+      style.asDeferred().invokeOnCompletion {
         seenAtCompletion.complete(generateSequence { events.tryReceive().getOrNull() }.toList())
       }
       style.await()
@@ -62,7 +62,7 @@ class CompletionTest {
   }
 
   @Test
-  fun aFailedCommandFailsItsDeferredWithItsStatusAndGeneration() = runSuspendTest {
+  fun aFailedCommandFailsItsCompletionWithItsStatusAndGeneration() = runSuspendTest {
     withMap {
       loadStyle()
       val failure =
@@ -87,9 +87,10 @@ class CompletionTest {
         waiter.cancelAndJoin()
         assertTrue(waiter.isCancelled)
       }
-      // Neither the timeout nor the cancelled wait touched the operation, which the map's release
-      // ends instead.
-      assertTrue(still.isActive)
+      still.asDeferred().cancel()
+      // Neither the timeout, the cancelled wait, nor the cancelled Deferred touched the operation,
+      // which the map's release ends instead.
+      assertTrue(still.asDeferred().isActive)
 
       map.release().await()
       val failure = assertFailsWith<MaplibreException> { still.await() }

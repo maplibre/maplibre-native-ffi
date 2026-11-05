@@ -5,7 +5,7 @@ import kotlin.system.exitProcess
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
@@ -91,12 +91,12 @@ object RenderSessionExitProbe {
    * that callback, and never returns. A submission that completes before its handler is registered
    * runs the handler inline on this thread, outside any callback, so it does not count.
    */
-  private fun exitInsideCompletion(submit: () -> Deferred<Unit>): Nothing {
+  private fun exitInsideCompletion(submit: () -> Completion<Unit>): Nothing {
     val submitter = Thread.currentThread()
     while (true) {
       var completedInline = false
       val completion = submit()
-      completion.invokeOnCompletion {
+      completion.whenComplete { _, _ ->
         if (Thread.currentThread() === submitter) {
           completedInline = true
         } else {

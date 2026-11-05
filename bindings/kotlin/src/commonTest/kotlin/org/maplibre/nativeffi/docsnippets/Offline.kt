@@ -29,8 +29,9 @@ private suspend fun offline() {
   // #region cache-file
   val runtime =
     RuntimeHandle.create(
-      RuntimeOptions(cachePath = "maplibre-cache.db"),
-    )
+        RuntimeOptions(cachePath = "maplibre-cache.db"),
+      )
+      .await()
   // #endregion cache-file
 
   // #region progress
