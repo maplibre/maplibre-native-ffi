@@ -23,12 +23,6 @@ run({
     if (gpu === undefined) {
       throw new Error("This browser doesn't support WebGPU. Try WebGL.");
     }
-    // The library waits for WebGPU's asynchronous calls through JSPI.
-    if (!("Suspending" in WebAssembly)) {
-      throw new Error(
-        "This browser doesn't support JSPI, which the WebGPU backend needs. Try WebGL.",
-      );
-    }
     const adapter = await gpu.requestAdapter();
     if (adapter === null) {
       throw new Error("This browser found no WebGPU adapter. Try WebGL.");

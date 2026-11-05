@@ -69,33 +69,15 @@ set(MLN_FFI_EMSCRIPTEN_STACK_SIZE "1MB"
 # a browser build.
 add_compile_options(-pthread)
 
-# WebGPU is asynchronous in a browser and MapLibre calls it synchronously, so
-# the emdawnwebgpu port implements emwgpuWaitAny by suspending the calling
-# thread. Emscripten offers two mechanisms for that, and the choice reaches
-# further than it looks: it decides the exception model and whether a thread
-# that waits on WebGPU can be joined.
-#
-# JSPI suspends in the VM. Nothing rewrites the module, so native Wasm
-# exceptions stay available, and emscripten's pthread glue awaits the entry
-# point, which is what marks a suspended thread exited so pthread_join returns.
-#
-# Asyncify instead rewrites the module through wasm-opt, which costs size and
-# speed, aborts outright over a module built with native exception handling
-# (only at -O2 and above, where wasm-opt runs at all, so an unoptimised link is
-# not evidence either way), and cannot carry a pthread entry point across a
-# suspension: invokeEntryPoint decides whether to exit the moment the entry
-# yields, which a suspension does immediately, and skips the exit because
-# Asyncify holds a runtime keepalive right then. Nothing ever reports the
-# thread as exited.
-#
-# So the browser WebGPU build selects JSPI, which restricts it to Chrome 137
-# and Firefox 139 or newer -- Safari has not shipped JSPI. WebGL suspends
-# nothing and is unaffected.
+# WebGPU is asynchronous in a browser. Nothing in the library waits on it: a
+# WebGPU offscreen session's core worker requests its device and reads back
+# from callbacks that its event loop runs, as a WebGL one runs from its event
+# loop, and a caller-driven session reports through the same callbacks. So
+# nothing suspends, and the module needs neither JSPI nor Asyncify, which
+# keeps the build in browsers without JSPI, such as Safari. MapLibre's own
+# suspension option defaults to Asyncify, so the build clears it.
 if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
-  set(MLN_WEBGPU_EMDAWN_SUSPEND "-sJSPI"
-      CACHE
-        STRING
-        "Emscripten suspension link option for emdawnwebgpu (-sASYNCIFY=1 or -sJSPI)"
-  )
+  set(MLN_WEBGPU_EMDAWN_SUSPEND ""
+      CACHE INTERNAL "No suspension: the library never waits on WebGPU")
 endif()
 add_compile_options(-fwasm-exceptions)

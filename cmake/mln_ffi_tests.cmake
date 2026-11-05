@@ -293,6 +293,13 @@ function(mln_native_configure_browser_page target)
       # needs the module to exit rather than keep its runtime alive.
       "-sEXIT_RUNTIME=1"
       "SHELL:--embed-file ${MLN_NATIVE_TESTS_DIR}/fixtures@/fixtures")
+  # The suite stands in for a WebGPU host, and as written it waits in place:
+  # for its own device, for buffer maps, and for sessions whose results arrive
+  # on its event loop. So it suspends through JSPI. The library never does,
+  # and links without it.
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+    target_link_options(${target} PRIVATE "-sJSPI")
+  endif()
 endfunction()
 
 # Registers one browser page run. The runner's timeout sits below the entry's,

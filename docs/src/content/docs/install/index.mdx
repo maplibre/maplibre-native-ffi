@@ -44,11 +44,6 @@ on Cloudflare Pages and
 Vercel. GitHub Pages can't set headers, but a service worker such as
 [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) can add them.
 
-The WebGPU backend also needs JSPI, which lets it wait for the browser's
-asynchronous WebGPU calls. Not every browser supports JSPI yet; see
-[WebAssembly features](https://webassembly.org/features/). Where it's missing,
-use the OpenGL backend, which renders with WebGL and doesn't need it.
-
 ## macOS
 
 macOS has neither Vulkan nor EGL. To use the Vulkan or OpenGL backend there,

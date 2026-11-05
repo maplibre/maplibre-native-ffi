@@ -78,8 +78,8 @@ static MLN_TEST_THREAD_LOCAL bool thread_webgpu_attempted;
 
 static bool create_webgpu_device(webgpu_state* state) {
   // Timed waits have to be asked for up front, or wgpuInstanceWaitAny rejects
-  // every non-zero timeout. The instance feature needs Asyncify, which the
-  // emdawnwebgpu port enables; without it wgpuCreateInstance returns NULL.
+  // every non-zero timeout. The instance feature needs JSPI, which this suite
+  // links; without it wgpuCreateInstance returns NULL.
   static const WGPUInstanceFeatureName timed_wait_any[] = {
     WGPUInstanceFeatureName_TimedWaitAny,
   };

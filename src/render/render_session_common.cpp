@@ -24,7 +24,7 @@
 #if !defined(_WIN32)
 #include <unistd.h>
 #endif
-#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+#if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
 #endif
 
@@ -1260,7 +1260,7 @@ auto core_worker_step(
               gpu_report_needed_locked(*session));
     };
     if (wait) {
-      session->worker_condition.wait_on_core_worker(lock, ready);
+      session->worker_condition.wait(lock, ready);
     } else if (!ready()) {
 #if defined(__EMSCRIPTEN__)
       seen = session->worker_condition.notifications();
@@ -1310,11 +1310,12 @@ auto core_worker_step(
   return CoreWorkerStep::RanWork;
 }
 
-#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+#if defined(__EMSCRIPTEN__)
 // Runs one pass of a core worker that yields to its event loop, and schedules
 // the next. Each pass is its own event loop task, after which the browser
 // presents what the pass drew. When the worker is done, nothing is scheduled,
-// and the thread exits once this task ends.
+// and the thread exits once this task ends and the browser settles the
+// requests of this thread that hold it, such as a WebGPU device's loss.
 void core_worker_task(void* opaque) {
   auto* session =
     static_cast<std::shared_ptr<mln_render_session_object>*>(opaque);
@@ -1329,6 +1330,11 @@ void core_worker_task(void* opaque) {
       );
       return;
     case CoreWorkerStep::Stop:
+      // A worker that stops before its attach runs still holds what it
+      // prepared for it. A WebGPU device keeps the thread alive until it is
+      // destroyed, and only this thread may destroy it, so it goes now
+      // rather than with the session, which outlives the thread.
+      (*session)->initialize_backend = {};
       delete session;
       return;
   }
@@ -1338,11 +1344,18 @@ void core_worker_task(void* opaque) {
 auto run_core_worker(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
-#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+#if defined(__EMSCRIPTEN__)
   if (session->core_worker_yields_to_event_loop) {
     // The task holds its own reference, since this call's ends when it
     // returns to the event loop.
-    core_worker_task(new std::shared_ptr<mln_render_session_object>{session});
+    auto* task = new std::shared_ptr<mln_render_session_object>{session};
+    // Taken out of the session, so what it holds goes once it is done
+    // rather than with the session, which outlives the thread.
+    auto prepare = std::exchange(session->prepare_core_worker, {});
+    if (prepare)
+      prepare([task]() { core_worker_task(task); });
+    else
+      core_worker_task(task);
     return;
   }
 #endif

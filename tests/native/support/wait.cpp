@@ -13,7 +13,7 @@
 
 #include "harness.h"
 
-// Only the browser WebGPU preset links JSPI, and only its waits need the event
+// Only the browser WebGPU suite links JSPI, and only its waits need the event
 // loop to run.
 #if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 #define MLN_TEST_AWAIT_ON_EVENT_LOOP 1
