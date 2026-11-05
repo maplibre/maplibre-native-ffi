@@ -1215,9 +1215,14 @@ export class MapHandle extends Owner {
    * default display, and `device` must be null. Attach with
    * `RenderDriverKind.coreWorker`.
    *
-   * Before the platform destroys the window, such as in
+   * When the platform destroys the window, such as in
    * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
-   * `RenderSessionHandle.releaseTarget()` and wait for that to complete.
+   * `RenderSessionHandle.releaseTarget()`, or give the session a new window
+   * with `RenderSessionHandle.setAndroidSurfaceTarget()`, without waiting for
+   * that to complete. The session keeps its own reference to the window and
+   * stays usable for the next window. A frame to the destroyed window finishes
+   * with `RenderResult.targetNotReady`, or with `RenderResult.rendered` if the
+   * window went away while the frame was presenting.
    *
    * See `mln_map_attach_android_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
@@ -1592,9 +1597,14 @@ export class MapHandle extends Owner {
    * default display, and `device` must be null. Attach with
    * `RenderDriverKind.coreWorker`.
    *
-   * Before the platform destroys the window, such as in an `XComponent`'s
+   * When the platform destroys the window, such as in an `XComponent`'s
    * `onSurfaceDestroyed` callback, release the target with
-   * `RenderSessionHandle.releaseTarget()` and wait for that to complete.
+   * `RenderSessionHandle.releaseTarget()`, or give the session a new window
+   * with `RenderSessionHandle.setOhosSurfaceTarget()`, without waiting for that
+   * to complete. The session keeps its own reference to the window and stays
+   * usable for the next window. A frame to the destroyed window finishes with
+   * `RenderResult.targetNotReady`, or with `RenderResult.rendered` if the
+   * window went away while the frame was presenting.
    *
    * See `mln_map_attach_ohos_surface` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
@@ -5184,7 +5194,9 @@ export class RenderSessionHandle extends Owner {
    * to the background. Release every acquired frame first. Frame demands that
    * are still pending, and later ones until you give the session a new target,
    * finish with `RenderResult.targetNotReady`. Once the release completes, you
-   * can destroy the old target.
+   * can destroy the old target. An Android or OpenHarmony window can go away
+   * sooner, as `MapHandle.attachAndroidSurface()` and
+   * `MapHandle.attachOhosSurface()` say.
    *
    * See `mln_render_session_release_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

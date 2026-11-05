@@ -92,9 +92,14 @@ typedef struct mln_android_surface_replacement {
  * default display, and `device` must be null. Attach with
  * MLN_RENDER_DRIVER_CORE_WORKER.
  *
- * Before the platform destroys the window, such as in
+ * When the platform destroys the window, such as in
  * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
- * mln_render_session_release_target() and wait for that to complete.
+ * mln_render_session_release_target(), or give the session a new window with
+ * mln_render_session_set_android_surface_target(), without waiting for that to
+ * complete. The session keeps its own reference to the window and stays
+ * usable for the next window. A frame to the destroyed window finishes with
+ * MLN_RENDER_RESULT_TARGET_NOT_READY, or with MLN_RENDER_RESULT_RENDERED if the
+ * window went away while the frame was presenting.
  *
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when `surface` has no window, such as after

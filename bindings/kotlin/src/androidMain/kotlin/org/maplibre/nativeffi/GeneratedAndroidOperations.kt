@@ -126,8 +126,12 @@ public fun MapHandle.attachAndroidHardwareBufferRing(
  * creates. An OpenGL build uses an EGL context on the default display, and `device` must be null.
  * Attach with `RenderDriverKind.CORE_WORKER`.
  *
- * Before the platform destroys the window, such as in `SurfaceHolder.Callback.surfaceDestroyed`,
- * release the target with `RenderSessionHandle.releaseTarget()` and wait for that to complete.
+ * When the platform destroys the window, such as in `SurfaceHolder.Callback.surfaceDestroyed`,
+ * release the target with `RenderSessionHandle.releaseTarget()`, or give the session a new window
+ * with `RenderSessionHandle.setAndroidSurfaceTarget()`, without waiting for that to complete. The
+ * session keeps its own reference to the window and stays usable for the next window. A frame to
+ * the destroyed window finishes with `RenderResult.TARGET_NOT_READY`, or with
+ * `RenderResult.RENDERED` if the window went away while the frame was presenting.
  *
  * See `mln_map_attach_android_surface` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).

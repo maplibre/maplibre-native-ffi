@@ -54,14 +54,14 @@ surface on the instance of the context from
 On Android, attach the window itself with
 [](api:mln_map_attach_android_surface), by its `ANativeWindow` or its Java
 `Surface`, and the library creates the graphics context. Replace the window with
-[](api:mln_render_session_set_android_surface_target). Release it before
-`surfaceDestroyed` returns, as [Handle a lost surface](#handle-a-lost-surface)
+[](api:mln_render_session_set_android_surface_target). Release it when
+`surfaceDestroyed` runs, as [Handle a lost surface](#handle-a-lost-surface)
 shows.
 
 On OpenHarmony, attach an `XComponent`'s window the same way with
 [](api:mln_map_attach_ohos_surface), by its `OHNativeWindow` or its surface ID,
 and replace it with [](api:mln_render_session_set_ohos_surface_target). Release
-it before the component's `onSurfaceDestroyed` returns.
+it when the component's `onSurfaceDestroyed` runs.
 
 On Linux and FreeBSD, attach a Wayland `wl_surface` and its `wl_display` the
 same way with [](api:mln_map_attach_wayland_surface), and replace it with
@@ -139,10 +139,13 @@ Platforms can take the surface away, for example when your app goes to the
 background. Rather than releasing the session, release its target, so the map
 keeps its tiles and renderer state for when the surface comes back.
 
-Release the target with [](api:mln_render_session_release_target) before the
-platform destroys the surface. The session doesn't call the redraw wake while it
-has no target. When the platform gives you a surface again, set it and its size
-as the session's target, and the redraw wake asks for a frame again.
+Release the target with [](api:mln_render_session_release_target) before you
+destroy the surface. On Android and OpenHarmony, the platform destroys the
+window, so release the target when it does. You don't need to wait for the
+release to complete, because the session keeps its own reference to the window.
+The session doesn't call the redraw wake while it has no target. When the
+platform gives you a surface again, set it and its size as the session's target,
+and the redraw wake asks for a frame again.
 
 <Snippet page="window" region="lost-surface" />
 

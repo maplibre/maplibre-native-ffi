@@ -673,7 +673,8 @@ final class RenderResult extends _Enum {
   static const noUpdate = RenderResult.fromRawValue(1);
 
   /// The target couldn't take a frame, such as while a window is hidden or
-  /// after `RenderSessionHandle.releaseTarget()`. Demand a frame again later.
+  /// destroyed, or after `RenderSessionHandle.releaseTarget()`. Demand a frame
+  /// again later.
   static const targetNotReady = RenderResult.fromRawValue(2);
 
   /// A later demand with the same flags replaced this one.

@@ -92,9 +92,14 @@ func (receiver *MapHandle) AttachDmaBufRing(descriptor DmaBufRingDescriptor, dev
 // that the library creates. An OpenGL build uses an EGL context on the default
 // display, and device must be null. Attach with RenderDriverKindCoreWorker.
 //
-// Before the platform destroys the window, such as in an XComponent's
+// When the platform destroys the window, such as in an XComponent's
 // onSurfaceDestroyed callback, release the target with
-// RenderSessionHandle.ReleaseTarget() and wait for that to complete.
+// RenderSessionHandle.ReleaseTarget(), or give the session a new window with
+// RenderSessionHandle.SetOhosSurfaceTarget(), without waiting for that to
+// complete. The session keeps its own reference to the window and stays usable
+// for the next window. A frame to the destroyed window finishes with
+// RenderResultTargetNotReady, or with RenderResultRendered if the window went
+// away while the frame was presenting.
 //
 // See mln_map_attach_ohos_surface in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html

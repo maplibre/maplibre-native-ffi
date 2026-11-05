@@ -392,10 +392,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// is null, with a device that the library creates. An OpenGL build uses an
     /// EGL context on the default display, and <c>device</c> must be null.
     /// Attach with <c>RenderDriverKind.CoreWorker</c>.</para>
-    /// <para>Before the platform destroys the window, such as in
+    /// <para>When the platform destroys the window, such as in
     /// <c>SurfaceHolder.Callback.surfaceDestroyed</c>, release the target with
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c> and wait for that to
-    /// complete.</para>
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, or give the session a
+    /// new window with
+    /// <c>RenderSessionHandle.SetAndroidSurfaceTargetAsync()</c>, without
+    /// waiting for that to complete. The session keeps its own reference to the
+    /// window and stays usable for the next window. A frame to the destroyed
+    /// window finishes with <c>RenderResult.TargetNotReady</c>, or with
+    /// <c>RenderResult.Rendered</c> if the window went away while the frame was
+    /// presenting.</para>
     /// <para>See <c>mln_map_attach_android_surface</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>

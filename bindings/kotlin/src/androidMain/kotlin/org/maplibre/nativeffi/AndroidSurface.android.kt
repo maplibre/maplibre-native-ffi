@@ -10,9 +10,8 @@ import org.maplibre.nativeffi.internal.lifecycle.*
  * Creates a session that presents the map to [surface]'s window, with a graphics context that the
  * library creates.
  *
- * Works as the [attachAndroidSurface] that takes an [AndroidSurfaceDescriptor] does. Before the
- * platform destroys [surface], such as in `SurfaceHolder.Callback.surfaceDestroyed`, release the
- * target with [RenderSessionHandle.releaseTarget] and wait for that to complete.
+ * Works as the [attachAndroidSurface] that takes an [AndroidSurfaceDescriptor] does, including when
+ * the platform destroys [surface].
  *
  * Errors:
  * - `Status.INVALID_ARGUMENT` when [surface] has no window, such as after the platform destroyed

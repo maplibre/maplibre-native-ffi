@@ -38,10 +38,3 @@ OpenHarmony SDK's tools instead, and packs and signs the HAP with
 `tools/ohos/pack-hap`, as the TypeScript binding's ArkTS suite does. ets-loader
 compiles the pages with its webpack configuration, which doesn't rewrite
 `@kit.*` imports. The example imports the `@ohos.*` modules instead.
-
-## Limits
-
-ArkTS can't make `onSurfaceDestroyed` wait for `releaseTarget()` to complete,
-which the C API asks for. The controller starts the release there, and it
-completes later. Going to the background doesn't destroy the surface, so this
-matters only when the component goes away.

@@ -196,7 +196,8 @@ public struct RenderResult: RawRepresentable, CustomStringConvertible,
   /// The map had nothing new to draw.
   public static let noUpdate: RenderResult = .init(rawValue: 1)
   /// The target couldn't take a frame, such as while a window is hidden or
-  /// after `RenderSessionHandle.releaseTarget()`. Demand a frame again later.
+  /// destroyed, or after `RenderSessionHandle.releaseTarget()`. Demand a frame
+  /// again later.
   public static let targetNotReady: RenderResult = .init(rawValue: 2)
   /// A later demand with the same flags replaced this one.
   public static let superseded: RenderResult = .init(rawValue: 3)

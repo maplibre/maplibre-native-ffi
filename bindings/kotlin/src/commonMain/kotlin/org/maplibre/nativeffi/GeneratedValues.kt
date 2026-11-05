@@ -860,7 +860,7 @@ public value class RenderResult(public val rawValue: UInt) {
     /** The map had nothing new to draw. */
     public val NO_UPDATE: RenderResult = RenderResult(1u)
     /**
-     * The target couldn't take a frame, such as while a window is hidden or after
+     * The target couldn't take a frame, such as while a window is hidden or destroyed, or after
      * `RenderSessionHandle.releaseTarget()`. Demand a frame again later.
      */
     public val TARGET_NOT_READY: RenderResult = RenderResult(2u)

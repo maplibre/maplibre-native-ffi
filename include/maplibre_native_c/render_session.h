@@ -28,7 +28,8 @@ typedef enum mln_render_result : uint32_t {
   MLN_RENDER_RESULT_NO_UPDATE = 1,
   /**
    * The target couldn't take a frame, such as while a window is hidden or
-   * after mln_render_session_release_target(). Demand a frame again later.
+   * destroyed, or after mln_render_session_release_target(). Demand a frame
+   * again later.
    */
   MLN_RENDER_RESULT_TARGET_NOT_READY = 2,
   /** A later demand with the same flags replaced this one. */
@@ -421,7 +422,9 @@ MLN_API mln_status mln_render_session_resize(
  * the background. Release every acquired frame first. Frame demands that are
  * still pending, and later ones until you give the session a new target,
  * finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release completes,
- * you can destroy the old target.
+ * you can destroy the old target. An Android or OpenHarmony window can go away
+ * sooner, as mln_map_attach_android_surface() and mln_map_attach_ohos_surface()
+ * say.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into Android
