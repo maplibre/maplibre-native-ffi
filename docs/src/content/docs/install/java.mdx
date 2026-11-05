@@ -50,4 +50,5 @@ these differences:
   `MaplibreNative`, as in `MaplibreNative.setLogCallback(handler)`. An extension
   takes its receiver first, as in `MaplibreNative.getHardwareBuffer(frame)` on
   Android.
-- To release a handle, call `release().join()` in a `finally` block.
+- To release a handle, call `release()` in a `finally` block. A runtime, map, or
+  render session returns a `Completion` there, which `join()` waits for.
