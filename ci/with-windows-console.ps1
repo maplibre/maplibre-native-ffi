@@ -39,7 +39,7 @@ $psexec = Join-Path $toolsDirectory "PsExec64.exe"
 if (-not (Test-Path $psexec)) {
   $archive = Join-Path $env:RUNNER_TEMP "windows-console-pstools.zip"
   Invoke-WebRequest "https://download.sysinternals.com/files/PSTools.zip" -OutFile $archive
-  $expectedHash = "C26C6BA44997E650A733DF257C8FEB83898D3FAEF2D2E391869D107E40863553"
+  $expectedHash = "740AC6FB1131E51E3698615388143E2A43FF45D65B8169BE20EA8A40AAA6EFB3"
   if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $expectedHash) {
     throw "PSTools archive hash mismatch"
   }
