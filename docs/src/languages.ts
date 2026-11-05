@@ -100,6 +100,19 @@ export const languages: Language[] = [
   },
 ];
 
+/**
+ * Libraries that have an install page and an API reference, but no guide
+ * snippets yet, so the picker leaves them out.
+ */
+export const libraries: Pick<Language, "id" | "label" | "logo">[] = [
+  {
+    id: "gobject",
+    label: "GObject",
+    // Devicon has no GObject or GTK logo, so Vala's stands in.
+    logo: devicon("vala/vala-original"),
+  },
+];
+
 /** The language a reader sees until they pick one. */
 export const defaultLanguage = "c";
 
