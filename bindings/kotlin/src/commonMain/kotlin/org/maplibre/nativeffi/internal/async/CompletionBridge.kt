@@ -43,7 +43,7 @@ internal object CompletionBridge {
         } else {
           deferred.completeExceptionally(
             MaplibreException(
-              Status(status),
+              Status.of(status),
               diagnostic(result),
               readU64(result + CompletionResultLayout.GENERATION),
             ),

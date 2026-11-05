@@ -595,7 +595,7 @@ def callback_argument(parameter, values):
         return values.decode(value, local)
     if value.kind == "enum":
         _suffix, typ = values.accessor(value)
-        return f"{name(value.native)}({local}{PUBLIC_FROM_CARRIER[typ]})"
+        return f"{name(value.native)}.of({local}{PUBLIC_FROM_CARRIER[typ]})"
     if value.kind == "scalar":
         return local + PUBLIC_FROM_CARRIER[values.scalar(value)[0]]
     if value.kind == "native_pointer":

@@ -9,6 +9,6 @@ import org.maplibre.nativeffi.Status
  */
 internal inline fun checkStatus(status: Int, diagnostic: () -> String) {
   if (status != Status.OK.rawValue) {
-    throw MaplibreException(Status(status), diagnostic())
+    throw MaplibreException(Status.of(status), diagnostic())
   }
 }

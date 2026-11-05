@@ -130,7 +130,7 @@ public fun getNetworkStatus(): NetworkStatus =
   nativeCall(null, null) {
     val out = allocate(4, 4)
     check(C.mln_network_get_status(out, diagnostic))
-    NetworkStatus(readU32(out))
+    NetworkStatus.of(readU32(out))
   }
 
 /**
@@ -155,7 +155,7 @@ public fun setNetworkStatus(status: NetworkStatus): Unit =
 public fun openGlSupportedContextProviderMask(): OpenGlContextProviderFlag =
   nativeCall(null, null) {
     val raw = C.mln_open_gl_supported_context_provider_mask()
-    OpenGlContextProviderFlag(raw.toUInt())
+    OpenGlContextProviderFlag.of(raw.toUInt())
   }
 
 /**
@@ -196,5 +196,5 @@ public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters =
 public fun supportedRenderBackendMask(): RenderBackendFlag =
   nativeCall(null, null) {
     val raw = C.mln_supported_render_backend_mask()
-    RenderBackendFlag(raw.toUInt())
+    RenderBackendFlag.of(raw.toUInt())
   }

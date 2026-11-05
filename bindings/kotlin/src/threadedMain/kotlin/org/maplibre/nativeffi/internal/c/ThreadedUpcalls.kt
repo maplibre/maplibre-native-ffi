@@ -18,7 +18,7 @@ internal object ThreadedUpcalls {
       val invoke = value.callback ?: return@statusUpcall -5
       withCallbackScope { scope ->
         invoke(
-          ResourceKind(kind.toUInt()),
+          ResourceKind.of(kind.toUInt()),
           readViewString(url),
           HttpHeaderTransformResponse.wrap(outResponse, scope),
         )
