@@ -810,12 +810,17 @@ class Emitter:
             if registration.accepted_unless:
                 accepted += f" && !{registration.accepted_unless}_"
         consumes = self.consumes(plan)
+        end = f"  maplibre_native_ffi_call_end(&{CALL}, {accepted});\n" + consumes[1]
         body += consumes[0]
-        body += f"  maplibre_native_ffi_call_end(&{CALL}, {accepted});\n"
-        body += consumes[1]
+        # The outputs live in the call's storage, so they're copied before the
+        # call ends.
         if throws:
-            body += f"  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return {failing};\n"
-        body += convert
+            body += (
+                "  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {\n"
+                + textwrap.indent(end, "  ")
+                + f"    return {failing};\n  }}\n"
+            )
+        body += convert + end
         if returns != "void":
             body += f"  return {expression};\n"
         doc = self.doc_lines(plan.name)
@@ -961,7 +966,10 @@ class Emitter:
             # A released handle no longer belongs to the object, and a dispose
             # can't report a failure.
             "  if (handle != MLN_HANDLE_NULL) {\n"
-            f"    (void){plan.name}(handle, NULL);\n  }}\n",
+            f"    (void){plan.name}(handle, NULL);\n"
+            # Calls such as a caller-driven session's driver service still
+            # reach a disposed handle until its teardown finishes.
+            "    self->released_handle = handle;\n  }\n",
             doc=self.doc_lines(
                 plan.name,
                 (

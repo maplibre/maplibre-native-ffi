@@ -510,8 +510,11 @@ gboolean maplibre_native_ffi_acquired_frame_discard(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_acquired_frame_discard(self->handle, &diagnostic_);
   if (status_ == MLN_STATUS_OK) self->handle = MLN_HANDLE_NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -540,8 +543,11 @@ MaplibreNativeFfiDmaBufFrame* maplibre_native_ffi_acquired_frame_get_dma_buf(
     }
     mln_acquired_frame_view_end(scope_);
   }
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return value_;
 }
 #endif
@@ -573,8 +579,11 @@ maplibre_native_ffi_acquired_frame_get_io_surface(
     }
     mln_acquired_frame_view_end(scope_);
   }
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return value_;
 }
 #endif
@@ -606,8 +615,11 @@ maplibre_native_ffi_acquired_frame_get_metal_texture(
     }
     mln_acquired_frame_view_end(scope_);
   }
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return value_;
 }
 #endif
@@ -639,8 +651,11 @@ maplibre_native_ffi_acquired_frame_get_open_gl_texture(
     }
     mln_acquired_frame_view_end(scope_);
   }
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return value_;
 }
 
@@ -669,8 +684,11 @@ MaplibreNativeFfiGpuSync* maplibre_native_ffi_acquired_frame_get_producer_sync(
     }
     mln_acquired_frame_view_end(scope_);
   }
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return value_;
 }
 
@@ -689,8 +707,11 @@ maplibre_native_ffi_acquired_frame_get_result(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_acquired_frame_get_result(self->handle, &out_result_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_render_frame_result_from_native(&out_result_);
 }
 
@@ -721,8 +742,11 @@ maplibre_native_ffi_acquired_frame_get_vulkan_texture(
     }
     mln_acquired_frame_view_end(scope_);
   }
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return value_;
 }
 
@@ -745,8 +769,11 @@ gboolean maplibre_native_ffi_acquired_frame_release(
     self->handle, &consumer_completion_native_, &diagnostic_
   );
   if (status_ == MLN_STATUS_OK) self->handle = MLN_HANDLE_NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -894,8 +921,11 @@ maplibre_native_ffi_geo_json_source_data_create(
     maplibre_native_ffi_text_view(data),
     (options != NULL ? &options_native_ : NULL), &out_data_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_geo_json_source_data_wrap(
     out_data_, NULL, FALSE, NULL
   );
@@ -2292,6 +2322,7 @@ void maplibre_native_ffi_map_dispose(MaplibreNativeFfiMap* self) {
   self->handle = MLN_HANDLE_NULL;
   if (handle != MLN_HANDLE_NULL) {
     (void)mln_map_dispose(handle, NULL);
+    self->released_handle = handle;
   }
 }
 
@@ -2909,8 +2940,11 @@ MaplibreNativeFfiMapSnapshot* maplibre_native_ffi_map_get_snapshot(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_map_get_snapshot(self->handle, &out_snapshot_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_map_snapshot_from_native(&out_snapshot_);
 }
 
@@ -6284,8 +6318,11 @@ MaplibreNativeFfiMapProjection* maplibre_native_ffi_map_projection_create(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_map_projection_create(&view_native_, &out_projection_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_map_projection_wrap(
     out_projection_, NULL, FALSE, NULL
   );
@@ -6306,8 +6343,11 @@ maplibre_native_ffi_map_projection_get_camera(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_map_projection_get_camera(self->handle, &out_result_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_map_projection_camera_result_from_native(
     &out_result_
   );
@@ -6331,8 +6371,11 @@ MaplibreNativeFfiLatLng* maplibre_native_ffi_map_projection_lat_lng_for_pixel(
   mln_status status_ = mln_map_projection_lat_lng_for_pixel(
     self->handle, point_native_, &out_coordinate_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_lat_lng_from_native(&out_coordinate_);
 }
 
@@ -6355,8 +6398,11 @@ maplibre_native_ffi_map_projection_lat_lng_for_pixel_unwrapped(
   mln_status status_ = mln_map_projection_lat_lng_for_pixel_unwrapped(
     self->handle, point_native_, &out_coordinate_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_lat_lng_from_native(&out_coordinate_);
 }
 
@@ -6385,8 +6431,10 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
     self->handle, points_native_, (size_t)(point_count), out_coordinates_,
     &diagnostic_
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   GPtrArray* out_coordinates_items_ = g_ptr_array_new_full(
     (guint)out_coordinates_count_,
     (GDestroyNotify)maplibre_native_ffi_lat_lng_free
@@ -6397,6 +6445,7 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
       maplibre_native_ffi_lat_lng_from_native(&out_coordinates_[index])
     );
   }
+  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return out_coordinates_items_;
 }
 
@@ -6425,8 +6474,10 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels_unwrapped(
     self->handle, points_native_, (size_t)(point_count), out_coordinates_,
     &diagnostic_
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   GPtrArray* out_coordinates_items_ = g_ptr_array_new_full(
     (guint)out_coordinates_count_,
     (GDestroyNotify)maplibre_native_ffi_lat_lng_free
@@ -6437,6 +6488,7 @@ GPtrArray* maplibre_native_ffi_map_projection_lat_lngs_for_pixels_unwrapped(
       maplibre_native_ffi_lat_lng_from_native(&out_coordinates_[index])
     );
   }
+  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return out_coordinates_items_;
 }
 
@@ -6453,8 +6505,11 @@ gdouble maplibre_native_ffi_map_projection_meters_per_pixel_at_latitude(
   mln_status status_ = mln_map_projection_meters_per_pixel_at_latitude(
     self->handle, (double)(latitude), &out_meters_per_pixel_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return 0;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return 0;
   return (gdouble)(out_meters_per_pixel_);
 }
 
@@ -6479,8 +6534,11 @@ maplibre_native_ffi_map_projection_pixel_for_lat_lng(
   mln_status status_ = mln_map_projection_pixel_for_lat_lng(
     self->handle, coordinate_native_, &out_point_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_screen_point_from_native(&out_point_);
 }
 
@@ -6511,8 +6569,10 @@ GPtrArray* maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
     self->handle, coordinates_native_, (size_t)(coordinate_count), out_points_,
     &diagnostic_
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   GPtrArray* out_points_items_ = g_ptr_array_new_full(
     (guint)out_points_count_,
     (GDestroyNotify)maplibre_native_ffi_screen_point_free
@@ -6523,6 +6583,7 @@ GPtrArray* maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
       maplibre_native_ffi_screen_point_from_native(&out_points_[index])
     );
   }
+  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return out_points_items_;
 }
 
@@ -6553,8 +6614,11 @@ gboolean maplibre_native_ffi_map_projection_set_camera(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_map_projection_set_camera(self->handle, &camera_native_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -6633,8 +6697,11 @@ MaplibreNativeFfiOffscreenDevice* maplibre_native_ffi_offscreen_device_create(
   mln_status status_ = mln_offscreen_device_create(
     (options != NULL ? &options_native_ : NULL), &out_device_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_offscreen_device_wrap(
     out_device_, NULL, FALSE, NULL
   );
@@ -6723,8 +6790,11 @@ maplibre_native_ffi_render_session_abandon(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_render_session_abandon(self->handle, &out_result_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_render_abandon_result_from_native(&out_result_);
 }
 
@@ -6741,8 +6811,11 @@ maplibre_native_ffi_render_session_acquire_frame(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_render_session_acquire_frame(self->handle, &out_frame_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return (
     out_frame_ != MLN_HANDLE_NULL
       ? maplibre_native_ffi_acquired_frame_wrap(out_frame_, self, FALSE, NULL)
@@ -6876,8 +6949,11 @@ gboolean maplibre_native_ffi_render_session_demand_frame(
   mln_status status_ = mln_render_session_demand_frame(
     self->handle, &demand_native_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -6941,6 +7017,7 @@ void maplibre_native_ffi_render_session_dispose(
   self->handle = MLN_HANDLE_NULL;
   if (handle != MLN_HANDLE_NULL) {
     (void)mln_render_session_dispose(handle, NULL);
+    self->released_handle = handle;
   }
 }
 
@@ -7049,8 +7126,11 @@ maplibre_native_ffi_render_session_get_capabilities(
   mln_status status_ = mln_render_session_get_capabilities(
     self->handle, &out_capabilities_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_render_session_capabilities_from_native(
     &out_capabilities_
   );
@@ -7257,8 +7337,11 @@ char* maplibre_native_ffi_render_session_get_failure(
   char* text_value_ =
     status_ == MLN_STATUS_OK ? g_strndup(text_, length_) : NULL;
   g_free(text_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return text_value_;
 }
 
@@ -7277,8 +7360,11 @@ maplibre_native_ffi_render_session_get_snapshot(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_render_session_get_snapshot(self->handle, &out_snapshot_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_render_session_snapshot_from_native(
     &out_snapshot_
   );
@@ -7725,8 +7811,11 @@ gboolean maplibre_native_ffi_render_session_service_driver_work(
     (self->handle != MLN_HANDLE_NULL ? self->handle : self->released_handle),
     &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -7744,8 +7833,11 @@ gboolean maplibre_native_ffi_render_session_set_frame_pacer(
     self->handle, (pacer != NULL ? pacer->handle : MLN_HANDLE_NULL),
     &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -8290,9 +8382,13 @@ gboolean maplibre_native_ffi_resource_request_complete(
   );
   mln_resource_request consumed_ = self->handle;
   self->handle = MLN_HANDLE_NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    if (status_ != MLN_STATUS_OK) mln_resource_request_release(consumed_);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ != MLN_STATUS_OK) mln_resource_request_release(consumed_);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -8309,8 +8405,11 @@ gboolean maplibre_native_ffi_resource_request_is_cancelled(
   mln_status status_ = mln_resource_request_is_cancelled(
     self->handle, &out_cancelled_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return (out_cancelled_) ? TRUE : FALSE;
 }
 
@@ -8327,9 +8426,13 @@ gboolean maplibre_native_ffi_resource_request_pass_through(
     mln_resource_request_pass_through(self->handle, &diagnostic_);
   mln_resource_request consumed_ = self->handle;
   self->handle = MLN_HANDLE_NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    if (status_ != MLN_STATUS_OK) mln_resource_request_release(consumed_);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ != MLN_STATUS_OK) mln_resource_request_release(consumed_);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -8364,10 +8467,15 @@ gboolean maplibre_native_ffi_resource_request_set_cancel_callback(
   mln_status status_ = mln_resource_request_set_cancel_callback(
     self->handle, &handler_native_, &out_cancelled_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(
+      &call_, status_ == MLN_STATUS_OK && !out_cancelled_
+    );
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(
     &call_, status_ == MLN_STATUS_OK && !out_cancelled_
   );
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return (out_cancelled_) ? TRUE : FALSE;
 }
 
@@ -8449,10 +8557,15 @@ gboolean maplibre_native_ffi_resource_transform_request_complete(
   );
   mln_resource_transform_request consumed_ = self->handle;
   self->handle = MLN_HANDLE_NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    if (status_ != MLN_STATUS_OK)
+      mln_resource_transform_request_release(consumed_);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ != MLN_STATUS_OK)
     mln_resource_transform_request_release(consumed_);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -8478,10 +8591,15 @@ gboolean maplibre_native_ffi_resource_transform_request_fail(
   );
   mln_resource_transform_request consumed_ = self->handle;
   self->handle = MLN_HANDLE_NULL;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    if (status_ != MLN_STATUS_OK)
+      mln_resource_transform_request_release(consumed_);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   if (status_ != MLN_STATUS_OK)
     mln_resource_transform_request_release(consumed_);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -8802,8 +8920,11 @@ MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(
   mln_status status_ = mln_runtime_create(
     (options != NULL ? &options_native_ : NULL), &out_runtime_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_runtime_wrap(out_runtime_, NULL, FALSE, NULL);
 }
 
@@ -8971,6 +9092,7 @@ void maplibre_native_ffi_runtime_dispose(MaplibreNativeFfiRuntime* self) {
   self->handle = MLN_HANDLE_NULL;
   if (handle != MLN_HANDLE_NULL) {
     (void)mln_runtime_dispose(handle, NULL);
+    self->released_handle = handle;
   }
 }
 
@@ -9955,8 +10077,11 @@ MaplibreNativeFfiStyleExpression* maplibre_native_ffi_style_expression_create(
     maplibre_native_ffi_text_view(expression),
     (options != NULL ? &options_native_ : NULL), &out_expression_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_style_expression_wrap(
     out_expression_, NULL, FALSE, NULL
   );
@@ -9993,8 +10118,11 @@ char* maplibre_native_ffi_style_expression_evaluate(
   char* text_value_ =
     status_ == MLN_STATUS_OK ? g_strndup(text_, length_) : NULL;
   g_free(text_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return text_value_;
 }
 
@@ -10013,8 +10141,11 @@ maplibre_native_ffi_style_expression_get_info(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_style_expression_get_info(self->handle, &out_info_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_style_expression_info_from_native(&out_info_);
 }
 
@@ -10103,8 +10234,11 @@ MaplibreNativeFfiVulkanDevice* maplibre_native_ffi_vulkan_device_create(
   mln_status status_ = mln_vulkan_device_create(
     (options != NULL ? &options_native_ : NULL), &out_device_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_vulkan_device_wrap(out_device_, NULL, FALSE, NULL);
 }
 
@@ -10123,8 +10257,11 @@ maplibre_native_ffi_vulkan_device_get_context(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_vulkan_device_get_context(self->handle, &out_result_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_vulkan_device_context_result_from_native(
     &out_result_
   );
@@ -10160,8 +10297,11 @@ MaplibreNativeFfiFramePacer* maplibre_native_ffi_apple_frame_pacer_create(
   mln_status status_ = mln_apple_frame_pacer_create(
     (options != NULL ? &options_native_ : NULL), &out_pacer_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_frame_pacer_wrap(out_pacer_, NULL, FALSE, NULL);
 }
 #endif
@@ -10198,8 +10338,11 @@ MaplibreNativeFfiCameraOptions* maplibre_native_ffi_camera_for_tile(
   mln_status status_ = mln_camera_for_tile(
     tile_native_, logical_size_native_, &out_camera_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_camera_options_from_native(&out_camera_);
 }
 
@@ -10221,8 +10364,11 @@ MaplibreNativeFfiLatLng* maplibre_native_ffi_lat_lng_for_projected_meters(
   mln_status status_ = mln_lat_lng_for_projected_meters(
     meters_native_, &out_coordinate_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_lat_lng_from_native(&out_coordinate_);
 }
 
@@ -10233,8 +10379,11 @@ gboolean maplibre_native_ffi_clear_log_callback(GError** error) {
   if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_log_clear_callback(&diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -10249,8 +10398,11 @@ gboolean maplibre_native_ffi_set_log_async_severity_mask(
   mln_status status_ = mln_log_set_async_severity_mask(
     (mln_log_severity_flags)(mask), &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -10266,8 +10418,11 @@ gboolean maplibre_native_ffi_set_log_callback(
   if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_log_set_callback(&handler_native_, &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -10288,10 +10443,13 @@ gboolean maplibre_native_ffi_logical_extent_physical_size(
   mln_status status_ = mln_logical_extent_physical_size(
     extent_native_, &out_width_, &out_height_, &diagnostic_
   );
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   if (out_width != NULL) *out_width = (guint32)(out_width_);
   if (out_height != NULL) *out_height = (guint32)(out_height_);
+  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
 }
 
@@ -10308,9 +10466,11 @@ MaplibreNativeFfiNetworkStatus maplibre_native_ffi_get_network_status(
     return (MaplibreNativeFfiNetworkStatus)0;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ = mln_network_get_status(&out_status_, &diagnostic_);
-  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error))
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return (MaplibreNativeFfiNetworkStatus)0;
+  }
+  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return (MaplibreNativeFfiNetworkStatus)(out_status_);
 }
 
@@ -10324,8 +10484,11 @@ gboolean maplibre_native_ffi_set_network_status(
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
   mln_status status_ =
     mln_network_set_status((mln_network_status)(status), &diagnostic_);
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return FALSE;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return FALSE;
   return TRUE;
 }
 
@@ -10369,8 +10532,11 @@ maplibre_native_ffi_projected_meters_for_lat_lng(
   mln_status status_ = mln_projected_meters_for_lat_lng(
     coordinate_native_, &out_meters_, &diagnostic_
   );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
   maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) return NULL;
   return maplibre_native_ffi_projected_meters_from_native(&out_meters_);
 }
 

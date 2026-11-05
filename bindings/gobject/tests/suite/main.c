@@ -299,6 +299,50 @@ static void a_record_reaches_native_and_comes_back(void) {
   release_runtime(runtime);
 }
 
+static void a_bulk_projection_returns_every_result(void) {
+  MaplibreNativeFfiRuntime* runtime = create_runtime();
+  MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 64);
+  g_autoptr(GError) error = NULL;
+  g_autoptr(MaplibreNativeFfiMapSnapshot) snapshot =
+    maplibre_native_ffi_map_get_snapshot(map, &error);
+  g_assert_no_error(error);
+  g_autoptr(MaplibreNativeFfiMapProjection) projection =
+    maplibre_native_ffi_map_projection_create(&snapshot->view, &error);
+  g_assert_no_error(error);
+
+  const MaplibreNativeFfiLatLng coordinates[] = {
+    {.latitude = 10, .longitude = 20}, {.latitude = -30, .longitude = 40}
+  };
+  g_autoptr(GPtrArray) points =
+    maplibre_native_ffi_map_projection_pixels_for_lat_lngs(
+      projection, coordinates, G_N_ELEMENTS(coordinates), &error
+    );
+  g_assert_no_error(error);
+  g_assert_cmpuint(points->len, ==, G_N_ELEMENTS(coordinates));
+  MaplibreNativeFfiScreenPoint pixels[G_N_ELEMENTS(coordinates)];
+  for (guint index = 0; index < points->len; index++) {
+    pixels[index] = *(MaplibreNativeFfiScreenPoint*)points->pdata[index];
+  }
+  g_autoptr(GPtrArray) found =
+    maplibre_native_ffi_map_projection_lat_lngs_for_pixels(
+      projection, pixels, G_N_ELEMENTS(pixels), &error
+    );
+  g_assert_no_error(error);
+  g_assert_cmpuint(found->len, ==, G_N_ELEMENTS(coordinates));
+  for (guint index = 0; index < found->len; index++) {
+    const MaplibreNativeFfiLatLng* coordinate = found->pdata[index];
+    g_assert_cmpfloat_with_epsilon(
+      coordinate->latitude, coordinates[index].latitude, 1e-6
+    );
+    g_assert_cmpfloat_with_epsilon(
+      coordinate->longitude, coordinates[index].longitude, 1e-6
+    );
+  }
+  g_clear_object(&projection);
+  release_map(map);
+  release_runtime(runtime);
+}
+
 static void caller_sized_text_returns_all_of_a_long_result(void) {
   GString* text = g_string_new(NULL);
   for (int index = 0; index < 600; index++) g_string_append_c(text, 'a');
@@ -924,6 +968,37 @@ static void a_borrowed_texture_session_lends_its_frames(void) {
   release_target(&target);
 }
 
+static void a_disposed_session_takes_driver_work_until_it_ends(void) {
+  if (!backend_supported(MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_OPEN_GL)) {
+    g_test_skip("this build has no session driven by the caller");
+    return;
+  }
+  Target target = {.thread = g_thread_self()};
+  target.runtime = create_runtime();
+  target.map = create_map(target.runtime, 0, 32, 16);
+  attach_borrowed(&target, MLN_TEST_GRAPHICS_BACKEND_EGL);
+  MaplibreNativeFfiRenderSession* session = g_steal_pointer(&target.session);
+  maplibre_native_ffi_render_session_dispose(session);
+  // The disposal finishes in driver work on this thread.
+  g_autoptr(GError) error = NULL;
+  g_assert_true(
+    maplibre_native_ffi_render_session_service_driver_work(session, &error)
+  );
+  g_assert_no_error(error);
+  while (
+    maplibre_native_ffi_render_session_service_driver_work(session, &error)) {
+    g_main_context_iteration(NULL, FALSE);
+  }
+  g_assert_error(
+    error, MAPLIBRE_NATIVE_FFI_ERROR, MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE
+  );
+  g_object_unref(session);
+  release_map(target.map);
+  release_runtime(target.runtime);
+  mln_test_graphics_texture_destroy(target.texture);
+  mln_test_graphics_destroy(target.graphics);
+}
+
 int main(int argc, char** argv) {
   g_test_init(&argc, &argv, NULL);
   g_test_add_func(
@@ -951,6 +1026,10 @@ int main(int argc, char** argv) {
   g_test_add_func(
     "/values/a-record-reaches-native-and-comes-back",
     a_record_reaches_native_and_comes_back
+  );
+  g_test_add_func(
+    "/values/a-bulk-projection-returns-every-result",
+    a_bulk_projection_returns_every_result
   );
   g_test_add_func(
     "/values/caller-sized-text-returns-all-of-a-long-result",
@@ -981,6 +1060,10 @@ int main(int argc, char** argv) {
   g_test_add_func(
     "/render/a-borrowed-texture-session-lends-its-frames",
     a_borrowed_texture_session_lends_its_frames
+  );
+  g_test_add_func(
+    "/render/a-disposed-session-takes-driver-work-until-it-ends",
+    a_disposed_session_takes_driver_work_until_it_ends
   );
   return g_test_run();
 }
