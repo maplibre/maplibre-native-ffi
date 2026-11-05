@@ -142,6 +142,55 @@ static void expect_red_buffer(
   TEST_ASSERT_EQUAL_HEX8(0xff, pixel[3]);
 }
 
+// A fill over the northern hemisphere, which covers the top half of a view
+// centered on 0,0 at zoom 0.
+static const char north_fill_style_json[] =
+  "{\"version\":8,\"sources\":{\"north\":{\"type\":\"geojson\",\"data\":"
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Polygon\","
+  "\"coordinates\":[[[-170,0],[170,0],[170,80],[-170,80],[-170,0]]]},"
+  "\"properties\":{}}}},"
+  "\"layers\":[{\"id\":\"bg\",\"type\":\"background\","
+  "\"paint\":{\"background-color\":\"#ff0000\"}},"
+  "{\"id\":\"north\",\"type\":\"fill\",\"source\":\"north\","
+  "\"paint\":{\"fill-color\":\"#0000ff\"}}]}";
+
+// Expects the fill of north_fill_style_json in the top half of the frame's
+// buffer, which a host takes as starting with the top row, and the background
+// in its bottom half.
+static void expect_north_up_buffer(
+  const hardware_buffer_functions* functions, mln_acquired_frame frame
+) {
+  wait_for_producer(frame);
+  AHardwareBuffer* buffer = frame_buffer(frame).buffer;
+  AHardwareBuffer_Desc description = {0};
+  functions->describe(buffer, &description);
+  void* data = NULL;
+  TEST_ASSERT_EQUAL_INT(
+    0, functions->lock(
+         buffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, -1, NULL, &data
+       )
+  );
+  uint8_t top[4] = {0};
+  uint8_t bottom[4] = {0};
+  const size_t column = description.width / 2;
+  const size_t top_row = description.height / 4;
+  const size_t bottom_row = description.height - 1 - top_row;
+  memcpy(
+    top, (const uint8_t*)data + (top_row * description.stride + column) * 4,
+    sizeof(top)
+  );
+  memcpy(
+    bottom,
+    (const uint8_t*)data + (bottom_row * description.stride + column) * 4,
+    sizeof(bottom)
+  );
+  TEST_ASSERT_EQUAL_INT(0, functions->unlock(buffer, NULL));
+  static const uint8_t blue[4] = {0x00, 0x00, 0xff, 0xff};
+  static const uint8_t red[4] = {0xff, 0x00, 0x00, 0xff};
+  TEST_ASSERT_EQUAL_HEX8_ARRAY(blue, top, 4);
+  TEST_ASSERT_EQUAL_HEX8_ARRAY(red, bottom, 4);
+}
+
 // Expects the frame's buffer to have the size in pixels of `logical_width` by
 // `logical_height`.
 static void expect_buffer_size(
@@ -219,6 +268,27 @@ static void a_frame_renders_into_a_buffer_that_the_host_reads(void) {
     frame = mln_test_render_and_acquire(&fixture, 1);
     expect_buffer_size(&functions, frame, ring_width, ring_height);
     expect_red_buffer(&functions, frame);
+    release_frame(&frame);
+  }
+  release_frame(&frame);
+  release_session(&fixture);
+  destroy_map_and_runtime(map, runtime);
+}
+
+static void a_frame_has_the_maps_top_as_its_first_row(void) {
+  const hardware_buffer_functions functions = load_functions();
+  const mln_runtime runtime = mln_test_create_runtime();
+  const mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  if (TEST_PROTECT()) {
+    mln_test_load_style_and_wait(
+      map, MLN_BUFFER_LITERAL(north_fill_style_json)
+    );
+    attach(map, &fixture);
+    mln_test_render_until_idle(runtime, map, &fixture);
+    frame = mln_test_render_and_acquire(&fixture, 1);
+    expect_north_up_buffer(&functions, frame);
     release_frame(&frame);
   }
   release_frame(&frame);
@@ -365,6 +435,7 @@ static void a_hardware_buffer_ring_takes_the_host_queue_lock(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_frame_renders_into_a_buffer_that_the_host_reads);
+  RUN_TEST(a_frame_has_the_maps_top_as_its_first_row);
   RUN_TEST(a_held_frame_keeps_its_buffer);
   RUN_TEST(a_resize_gives_the_ring_buffers_of_the_new_size);
   RUN_TEST(a_hardware_buffer_ring_rejects_the_callers_graphics_thread);
