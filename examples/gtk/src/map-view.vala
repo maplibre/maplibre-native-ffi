@@ -188,15 +188,7 @@ namespace Example {
 				Gtk.Orientation.HORIZONTAL, -1,
 				out minimum, out natural, out minimum_baseline, out natural_baseline
 			);
-			// An OpenGL build of the library renders the rows of its dmabufs
-			// from the bottom up, so the widget shows them flipped.
-			Gsk.Transform? transform = null;
-			if (RenderBackendFlag.OPEN_GL in supported_render_backend_mask ()) {
-				transform = new Gsk.Transform ()
-					.translate (Graphene.Point () { x = 0, y = height })
-					.scale (1, -1);
-			}
-			offload.allocate (width, height, baseline, transform);
+			offload.allocate (width, height, baseline, null);
 			size = LogicalSize () {
 				width = (uint32) int.max (1, width),
 				height = (uint32) int.max (1, height),
