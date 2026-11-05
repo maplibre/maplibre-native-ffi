@@ -43,6 +43,7 @@ from .. import async_hosts, docs
 from ..model import CType
 from ..protocol import COMPLETION
 from ..semantic import required_callbacks
+from . import kotlin_java as java
 from .kotlin_values import Unsupported, doc, identifier, name, owner_class
 
 # The split lowerings: the threaded targets' forms, and Kotlin/Wasm's.
@@ -295,20 +296,26 @@ def declaration(value, values):
     members = sorted(
         values.members(value), key=lambda member: member[2].value.kind == "callback"
     )
+    typed = []
     for member, typ, field in members:
         default = values.member_default(field, typ)
+        typed.append((member, typ, default))
         defaults.append(f"{member}: {typ}" + (f" = {default}" if default else ""))
         parameters.append(
             doc(values.bound, f"{value.native}.{field.name}", "  ")
-            + f"  public val {member}: {typ}"
+            + f"  {java.property_annotation(member, typ) if values.java else ''}public val {member}: {typ}"
             + ("" if accepts_native(value, values) or not default else f" = {default}")
         )
     if not accepts_native(value, values):
+        body, companion = java.record(public, typed) if values.java else ([], [])
         return (
             f"{declaration_doc(value, values)}public data class {public}(\n"
             + ",\n".join(parameters)
             + "\n)"
+            + java.class_body(body, companion)
         )
+    if any(java.unsigned(typ) for _, typ, _ in typed):
+        raise ValueError(f"{public}: a native registration takes no unsigned member")
     # The private member holds a native registration, which only the threaded
     # factory creates, so the public constructor leaves it null. It is private
     # because Java would see an internal one, and its component function, as
@@ -316,6 +323,17 @@ def declaration(value, values):
     nulls = "".join("null, " for _ in members)
     members = ", ".join(member for member, _typ, _field in members)
     parameters.append("  private val nativeRegistration: NativeRegistration?")
+    # Java gets no constructor without parameters from a secondary one whose
+    # parameters all have defaults.
+    empty = (
+        "  /** A registration that does nothing, for Java, which can't leave out the "
+        "constructor's arguments. */\n"
+        "  @PublishedApi internal constructor() : this("
+        + "".join(f"{default}, " for _, _, default in typed)
+        + "null)\n\n"
+        if values.java and all(default is not None for _, _, default in typed)
+        else ""
+    )
     return (
         f"{declaration_doc(value, values)}@ConsistentCopyVisibility\n"
         f"public data class {public} private constructor(\n"
@@ -323,7 +341,8 @@ def declaration(value, values):
         + "\n) {\n"
         f"  /** A registration of Kotlin callbacks. */\n"
         f"  public constructor({', '.join(defaults)}) : this({members}, null)\n\n"
-        f"  @get:JvmSynthetic internal val {NATIVE_MEMBER}: NativeRegistration?\n"
+        + empty
+        + f"  @get:JvmSynthetic internal val {NATIVE_MEMBER}: NativeRegistration?\n"
         "    get() = nativeRegistration\n\n"
         "  public companion object {\n"
         "    /** A registration of native functions, which only `native` creates. */\n"
@@ -1051,8 +1070,9 @@ def operation(plan, values, native):
         arguments = call_arguments(plan, values)
         index = [p.name for p in plan.inputs].index(plan.scoped_receiver)
         arguments[index] = "handle"
+        annotation = values.jvm_name(method_name(plan), [typ for _, typ in params])
         return (
-            f"  public fun {method_name(plan)}({declaration(params)}): Unit = "
+            f"  {annotation}public fun {method_name(plan)}({declaration(params)}): Unit = "
             "nativeRespond(bindingScope, bindingAddress) "
             f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
         )
@@ -1114,8 +1134,9 @@ def immediate_registration(plan, values, native):
         )
     else:
         body = f"{native.checked(plan.function, arguments)}; accept({owner})"
+    annotation = values.jvm_name(method_name(plan), [typ for _, typ in params])
     return (
-        f"  public fun {method_name(plan)}({declaration(params)}): "
+        f"  {annotation}public fun {method_name(plan)}({declaration(params)}): "
         f"{'Boolean' if declined else 'Unit'} = "
         f"nativeCall({receiver_arguments(plan)}) "
         f"{{ {encodings(plan)}{body} }}\n"

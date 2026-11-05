@@ -1,6 +1,7 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
+import kotlin.jvm.JvmName
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -21,6 +22,7 @@ private constructor(
   internal val binding = HandleState("FramePacerHandle", handle, GeneratedOwnerDisposal::framePacer)
   @Suppress("unused") private val cleanup = disposeWhenUnreachable(this, binding)
   /** The native handle value. It stays readable after release. */
+  @get:JvmName("getId")
   public val id: ULong
     get() = binding.handle.toULong()
 

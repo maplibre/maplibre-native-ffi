@@ -1,7 +1,7 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
-import kotlin.jvm.JvmInline
+import kotlin.jvm.JvmName
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
@@ -28,6 +28,7 @@ private constructor(
    * The native handle value, which runtime events report as their source. It stays readable after
    * release, so events drained later still match this handle.
    */
+  @get:JvmName("getId")
   public val id: ULong
     get() = binding.handle.toULong()
 
@@ -344,6 +345,7 @@ private constructor(
    * See `mln_runtime_set_maximum_ambient_cache_size` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
+  @JvmName("setMaximumAmbientCacheSize")
   public fun setMaximumAmbientCacheSize(size: ULong): Deferred<Unit> =
     nativeUnit(this, binding) {
       check(
@@ -485,7 +487,7 @@ private constructor(
    * the command, and native logs a command that fails as a warning.
    */
   public val discarding: RuntimeDiscarding
-    get() = RuntimeDiscarding(this)
+    get() = RuntimeDiscarding.wrap(this)
 
   override fun toString(): String =
     "RuntimeHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
@@ -520,8 +522,8 @@ private constructor(
 }
 
 /** The commands of a [RuntimeHandle] that drop their completions. */
-@JvmInline
-public value class RuntimeDiscarding internal constructor(internal val owner: RuntimeHandle) {
+public class RuntimeDiscarding
+private constructor(@get:JvmSynthetic internal val owner: RuntimeHandle) {
   @get:JvmSynthetic
   internal val binding
     get() = owner.binding
@@ -592,4 +594,10 @@ public value class RuntimeDiscarding internal constructor(internal val owner: Ru
         ),
       )
     }
+
+  internal companion object {
+    /** Creates the discarding view of `owner`. */
+    @JvmSynthetic
+    internal fun wrap(owner: RuntimeHandle): RuntimeDiscarding = RuntimeDiscarding(owner)
+  }
 }

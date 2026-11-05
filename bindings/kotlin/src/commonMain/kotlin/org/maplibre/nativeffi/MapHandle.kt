@@ -1,7 +1,7 @@
 // Generated from handle ownership plans by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi
 
-import kotlin.jvm.JvmInline
+import kotlin.jvm.JvmName
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
@@ -36,6 +36,7 @@ private constructor(
    * The native handle value, which runtime events report as their source. It stays readable after
    * release, so events drained later still match this handle.
    */
+  @get:JvmName("getId")
   public val id: ULong
     get() = binding.handle.toULong()
 
@@ -481,6 +482,7 @@ private constructor(
    * See `mln_map_cancel_camera_transitions_with_id` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
+  @JvmName("cancelCameraTransitionsWithId")
   public fun cancelCameraTransitionsWithId(transitionId: ULong): Deferred<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -1909,7 +1911,7 @@ private constructor(
    * the command, and native logs a command that fails as a warning.
    */
   public val discarding: MapDiscarding
-    get() = MapDiscarding(this)
+    get() = MapDiscarding.wrap(this)
 
   override fun toString(): String =
     "MapHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
@@ -1927,8 +1929,7 @@ private constructor(
 }
 
 /** The commands of a [MapHandle] that drop their completions. */
-@JvmInline
-public value class MapDiscarding internal constructor(internal val owner: MapHandle) {
+public class MapDiscarding private constructor(@get:JvmSynthetic internal val owner: MapHandle) {
   @get:JvmSynthetic
   internal val binding
     get() = owner.binding
@@ -2046,6 +2047,7 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
     }
 
   /** [MapHandle.cancelCameraTransitionsWithId] without its completion. */
+  @JvmName("cancelCameraTransitionsWithId")
   public fun cancelCameraTransitionsWithId(transitionId: ULong): Unit =
     nativeDiscard(owner, binding) {
       check(
@@ -2580,4 +2582,9 @@ public value class MapDiscarding internal constructor(internal val owner: MapHan
     nativeDiscard(owner, binding, bindingCallbacks) {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
     }
+
+  internal companion object {
+    /** Creates the discarding view of `owner`. */
+    @JvmSynthetic internal fun wrap(owner: MapHandle): MapDiscarding = MapDiscarding(owner)
+  }
 }

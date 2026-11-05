@@ -318,6 +318,43 @@ class KotlinLayoutTests(unittest.TestCase):
             outputs[f"{GENERATED}/GeneratedGlobals.kt"],
         )
 
+    def test_java_passes_signed_carriers_and_sets_options_with_copies(self):
+        values = emitted(kotlin, real_api())[f"{GENERATED}/GeneratedValues.kt"]
+
+        def record(name):
+            return values.split(f"public data class {name}(")[1].split("\n}")[0]
+
+        # Java can't call a constructor that takes an unsigned member.
+        size = record("LogicalSize")
+        self.assertIn('@get:JvmName("getWidth") public val width: UInt = 0u', size)
+        self.assertIn(
+            "@JvmStatic @PublishedApi internal fun of(width: Int, height: Int): "
+            "LogicalSize = LogicalSize(width = width.toUInt(), height = height.toUInt())",
+            size,
+        )
+        # Java sets an option with a copy, and reads a nullable unsigned one
+        # through a twin.
+        animation = record("AnimationOptions")
+        self.assertIn(
+            "@get:JvmSynthetic public val transitionId: ULong? = null", animation
+        )
+        self.assertIn(
+            '@PublishedApi @JvmName("getTransitionId") internal fun '
+            "transitionIdForJava(): Long? = transitionId?.toLong()",
+            animation,
+        )
+        self.assertIn(
+            "@PublishedApi internal fun withTransitionId(transitionId: Long): "
+            "AnimationOptions = copy(transitionId = transitionId.toULong())",
+            animation,
+        )
+        # Options start from the members without defaults.
+        self.assertIn(
+            "internal fun of(initialExtent: LogicalExtent): MapOptions = "
+            "MapOptions(initialExtent = initialExtent)",
+            record("MapOptions"),
+        )
+
     def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
         self,
     ):

@@ -158,7 +158,7 @@ def owner(bound, native, plans, factories, members, imports):
             else "   * The native handle value. It stays readable after release.\n"
         )
         + "   */\n"
-        "  public val id: ULong get() = binding.handle.toULong()",
+        '  @get:JvmName("getId") public val id: ULong get() = binding.handle.toULong()',
         "  /** Whether a release, dispose, or discard has ended the handle. */\n"
         + (
             "  public override val isClosed: Boolean"

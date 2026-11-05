@@ -3369,11 +3369,11 @@ public class WebGlContextKind(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
  */
 public class AndroidHardwareBufferFrame(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
   /** The buffer's index in the ring. */
-  public val slot: UInt,
+  @get:JvmName("getSlot") public val slot: UInt,
   /** The `AHardwareBuffer*`. */
   buffer: NativePointer,
 ) {
@@ -3384,6 +3384,26 @@ public class AndroidHardwareBufferFrame(
       bindingScope?.ensureActive()
       return storedBuffer
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      buffer: NativePointer,
+    ): AndroidHardwareBufferFrame =
+      AndroidHardwareBufferFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        buffer = buffer,
+      )
+  }
 }
 
 /**
@@ -3398,10 +3418,18 @@ public data class DmaBufPlane(
    */
   public val fd: Int,
   /** The bytes from the start of the dmabuf to the plane's first byte. */
-  public val offset: UInt,
+  @get:JvmName("getOffset") public val offset: UInt,
   /** The bytes from the start of one row to the start of the next. */
-  public val stride: UInt,
-)
+  @get:JvmName("getStride") public val stride: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(fd: Int, offset: Int, stride: Int): DmaBufPlane =
+      DmaBufPlane(fd = fd, offset = offset.toUInt(), stride = stride.toUInt())
+  }
+}
 
 /**
  * The dmabuf of an acquired frame.
@@ -3410,13 +3438,13 @@ public data class DmaBufPlane(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
  */
 public class DmaBufFrame(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
   /** The buffer's index in the ring. */
-  public val slot: UInt,
-  public val fourcc: UInt,
-  public val modifier: ULong,
+  @get:JvmName("getSlot") public val slot: UInt,
+  @get:JvmName("getFourcc") public val fourcc: UInt,
+  @get:JvmName("getModifier") public val modifier: ULong,
   /**
    * The buffer's planes, in the order that its fourcc and modifier define. Import all of them, as
    * EGL_EXT_image_dma_buf_import_modifiers planes 0 and up, or with one
@@ -3431,6 +3459,30 @@ public class DmaBufFrame(
       bindingScope?.ensureActive()
       return storedPlanes
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      fourcc: Int,
+      modifier: Long,
+      planes: List<DmaBufPlane>,
+    ): DmaBufFrame =
+      DmaBufFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        fourcc = fourcc.toUInt(),
+        modifier = modifier.toULong(),
+        planes = planes,
+      )
+  }
 }
 
 /**
@@ -3440,13 +3492,13 @@ public class DmaBufFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
  */
 public class DxgiSharedTextureFrame(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
   /** The texture's index in the ring. */
-  public val slot: UInt,
+  @get:JvmName("getSlot") public val slot: UInt,
   /** The texture's `DXGI_FORMAT`. */
-  public val format: UInt,
+  @get:JvmName("getFormat") public val format: UInt,
   /** The texture's shared NT `HANDLE`. */
   handle: NativePointer,
 ) {
@@ -3457,6 +3509,28 @@ public class DxgiSharedTextureFrame(
       bindingScope?.ensureActive()
       return storedHandle
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      format: Int,
+      handle: NativePointer,
+    ): DxgiSharedTextureFrame =
+      DxgiSharedTextureFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        format = format.toUInt(),
+        handle = handle,
+      )
+  }
 }
 
 /**
@@ -3466,11 +3540,11 @@ public class DxgiSharedTextureFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
  */
 public class IoSurfaceFrame(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
   /** The surface's index in the ring. */
-  public val slot: UInt,
+  @get:JvmName("getSlot") public val slot: UInt,
   /** The `IOSurfaceRef`. */
   surface: NativePointer,
 ) {
@@ -3481,6 +3555,26 @@ public class IoSurfaceFrame(
       bindingScope?.ensureActive()
       return storedSurface
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      surface: NativePointer,
+    ): IoSurfaceFrame =
+      IoSurfaceFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        surface = surface,
+      )
+  }
 }
 
 /**
@@ -3490,17 +3584,17 @@ public class IoSurfaceFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class MetalTextureFrame(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
   /** The texture's index in the descriptor's `textures`. */
-  public val slot: UInt,
+  @get:JvmName("getSlot") public val slot: UInt,
   /** The MTLTexture. */
   texture: NativePointer,
   /** The texture's MTLDevice. */
   device: NativePointer,
   /** The texture's MTLPixelFormat. */
-  public val pixelFormat: ULong,
+  @get:JvmName("getPixelFormat") public val pixelFormat: ULong,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: NativePointer = texture
@@ -3516,6 +3610,30 @@ public class MetalTextureFrame(
       bindingScope?.ensureActive()
       return storedDevice
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      texture: NativePointer,
+      device: NativePointer,
+      pixelFormat: Long,
+    ): MetalTextureFrame =
+      MetalTextureFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        texture = texture,
+        device = device,
+        pixelFormat = pixelFormat.toULong(),
+      )
+  }
 }
 
 /**
@@ -3525,21 +3643,44 @@ public class MetalTextureFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class OpenGlTextureFrame(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
   /** The texture's index in the descriptor's `textures`. */
-  public val slot: UInt,
+  @get:JvmName("getSlot") public val slot: UInt,
   texture: UInt,
-  public val target: UInt,
+  @get:JvmName("getTarget") public val target: UInt,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: UInt = texture
+  @get:JvmName("getTexture")
   public val texture: UInt
     get() {
       bindingScope?.ensureActive()
       return storedTexture
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      texture: Int,
+      target: Int,
+    ): OpenGlTextureFrame =
+      OpenGlTextureFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        texture = texture.toUInt(),
+        target = target.toUInt(),
+      )
+  }
 }
 
 /**
@@ -3552,15 +3693,24 @@ public class GpuSync(
   public val kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
   /** The object to wait on, for the kinds that name one. */
   handle: ULong = 0uL,
-  public val value: ULong = 0uL,
+  @get:JvmName("getValue") public val value: ULong = 0uL,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedHandle: ULong = handle
+  @get:JvmName("getHandle")
   public val handle: ULong
     get() {
       bindingScope?.ensureActive()
       return storedHandle
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(kind: GpuSyncKind, handle: Long, value: Long): GpuSync =
+      GpuSync(kind = kind, handle = handle.toULong(), value = value.toULong())
+  }
 }
 
 /**
@@ -3572,7 +3722,19 @@ public class GpuSync(
 public data class LatLng(
   public val latitude: Double = 0.0,
   public val longitude: Double = 0.0,
-)
+) {
+  @PublishedApi internal fun withLatitude(latitude: Double): LatLng = copy(latitude = latitude)
+
+  @PublishedApi internal fun withLongitude(longitude: Double): LatLng = copy(longitude = longitude)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): LatLng = LatLng()
+  }
+}
 
 /**
  * Distances in logical pixels from each edge of the map.
@@ -3585,7 +3747,23 @@ public data class EdgeInsets(
   public val left: Double = 0.0,
   public val bottom: Double = 0.0,
   public val right: Double = 0.0,
-)
+) {
+  @PublishedApi internal fun withTop(top: Double): EdgeInsets = copy(top = top)
+
+  @PublishedApi internal fun withLeft(left: Double): EdgeInsets = copy(left = left)
+
+  @PublishedApi internal fun withBottom(bottom: Double): EdgeInsets = copy(bottom = bottom)
+
+  @PublishedApi internal fun withRight(right: Double): EdgeInsets = copy(right = right)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): EdgeInsets = EdgeInsets()
+  }
+}
 
 /**
  * A map's whole camera.
@@ -3621,6 +3799,33 @@ public data class Camera(
       roll = roll,
       fieldOfView = fieldOfView,
     )
+
+  @PublishedApi internal fun withCenter(center: LatLng): Camera = copy(center = center)
+
+  @PublishedApi
+  internal fun withCenterAltitude(centerAltitude: Double): Camera =
+    copy(centerAltitude = centerAltitude)
+
+  @PublishedApi internal fun withPadding(padding: EdgeInsets): Camera = copy(padding = padding)
+
+  @PublishedApi internal fun withZoom(zoom: Double): Camera = copy(zoom = zoom)
+
+  @PublishedApi internal fun withBearing(bearing: Double): Camera = copy(bearing = bearing)
+
+  @PublishedApi internal fun withPitch(pitch: Double): Camera = copy(pitch = pitch)
+
+  @PublishedApi internal fun withRoll(roll: Double): Camera = copy(roll = roll)
+
+  @PublishedApi
+  internal fun withFieldOfView(fieldOfView: Double): Camera = copy(fieldOfView = fieldOfView)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): Camera = Camera()
+  }
 }
 
 /**
@@ -3632,7 +3837,19 @@ public data class Camera(
 public data class ScreenPoint(
   public val x: Double = 0.0,
   public val y: Double = 0.0,
-)
+) {
+  @PublishedApi internal fun withX(x: Double): ScreenPoint = copy(x = x)
+
+  @PublishedApi internal fun withY(y: Double): ScreenPoint = copy(y = y)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ScreenPoint = ScreenPoint()
+  }
+}
 
 /**
  * A camera, with only the members that `fields` selects.
@@ -3660,7 +3877,37 @@ public data class CameraOptions(
   public val roll: Double? = null,
   /** The vertical field of view, in degrees. */
   public val fieldOfView: Double? = null,
-)
+) {
+  @PublishedApi internal fun withCenter(center: LatLng): CameraOptions = copy(center = center)
+
+  @PublishedApi
+  internal fun withCenterAltitude(centerAltitude: Double): CameraOptions =
+    copy(centerAltitude = centerAltitude)
+
+  @PublishedApi
+  internal fun withPadding(padding: EdgeInsets): CameraOptions = copy(padding = padding)
+
+  @PublishedApi internal fun withAnchor(anchor: ScreenPoint): CameraOptions = copy(anchor = anchor)
+
+  @PublishedApi internal fun withZoom(zoom: Double): CameraOptions = copy(zoom = zoom)
+
+  @PublishedApi internal fun withBearing(bearing: Double): CameraOptions = copy(bearing = bearing)
+
+  @PublishedApi internal fun withPitch(pitch: Double): CameraOptions = copy(pitch = pitch)
+
+  @PublishedApi internal fun withRoll(roll: Double): CameraOptions = copy(roll = roll)
+
+  @PublishedApi
+  internal fun withFieldOfView(fieldOfView: Double): CameraOptions = copy(fieldOfView = fieldOfView)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): CameraOptions = CameraOptions()
+  }
+}
 
 /**
  * A size in logical pixels, and the physical pixels in each logical pixel.
@@ -3669,10 +3916,31 @@ public data class CameraOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class LogicalExtent(
-  public val width: UInt = 0u,
-  public val height: UInt = 0u,
+  @get:JvmName("getWidth") public val width: UInt = 0u,
+  @get:JvmName("getHeight") public val height: UInt = 0u,
   public val scaleFactor: Double = 0.0,
-)
+) {
+  @PublishedApi internal fun withWidth(width: Int): LogicalExtent = copy(width = width.toUInt())
+
+  @PublishedApi internal fun withHeight(height: Int): LogicalExtent = copy(height = height.toUInt())
+
+  @PublishedApi
+  internal fun withScaleFactor(scaleFactor: Double): LogicalExtent = copy(scaleFactor = scaleFactor)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): LogicalExtent = LogicalExtent()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(width: Int, height: Int, scaleFactor: Double): LogicalExtent =
+      LogicalExtent(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor)
+  }
+}
 
 /**
  * A map's whole projection mode.
@@ -3686,7 +3954,23 @@ public data class ProjectionMode(
   public val axonometric: Boolean = false,
   public val xSkew: Double = 0.0,
   public val ySkew: Double = 0.0,
-)
+) {
+  @PublishedApi
+  internal fun withAxonometric(axonometric: Boolean): ProjectionMode =
+    copy(axonometric = axonometric)
+
+  @PublishedApi internal fun withXSkew(xSkew: Double): ProjectionMode = copy(xSkew = xSkew)
+
+  @PublishedApi internal fun withYSkew(ySkew: Double): ProjectionMode = copy(ySkew = ySkew)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ProjectionMode = ProjectionMode()
+  }
+}
 
 /**
  * A map's whole viewport.
@@ -3701,7 +3985,31 @@ public data class MapViewport(
   public val constrainMode: ConstrainMode = ConstrainMode.NONE,
   public val viewportMode: ViewportMode = ViewportMode.DEFAULT,
   public val frustumOffset: EdgeInsets = EdgeInsets(),
-)
+) {
+  @PublishedApi
+  internal fun withNorthOrientation(northOrientation: NorthOrientation): MapViewport =
+    copy(northOrientation = northOrientation)
+
+  @PublishedApi
+  internal fun withConstrainMode(constrainMode: ConstrainMode): MapViewport =
+    copy(constrainMode = constrainMode)
+
+  @PublishedApi
+  internal fun withViewportMode(viewportMode: ViewportMode): MapViewport =
+    copy(viewportMode = viewportMode)
+
+  @PublishedApi
+  internal fun withFrustumOffset(frustumOffset: EdgeInsets): MapViewport =
+    copy(frustumOffset = frustumOffset)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MapViewport = MapViewport()
+  }
+}
 
 /**
  * One view of a map: its camera, size, and projection.
@@ -3714,7 +4022,26 @@ public data class MapView(
   public val extent: LogicalExtent = LogicalExtent(),
   public val projectionMode: ProjectionMode = ProjectionMode(),
   public val viewport: MapViewport = MapViewport(),
-)
+) {
+  @PublishedApi internal fun withCamera(camera: Camera): MapView = copy(camera = camera)
+
+  @PublishedApi internal fun withExtent(extent: LogicalExtent): MapView = copy(extent = extent)
+
+  @PublishedApi
+  internal fun withProjectionMode(projectionMode: ProjectionMode): MapView =
+    copy(projectionMode = projectionMode)
+
+  @PublishedApi
+  internal fun withViewport(viewport: MapViewport): MapView = copy(viewport = viewport)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MapView = MapView()
+  }
+}
 
 /**
  * How one frame demand finished.
@@ -3724,19 +4051,45 @@ public data class MapView(
  */
 public data class RenderFrameResult(
   public val disposition: RenderResult,
-  public val token: ULong,
+  @get:JvmName("getToken") public val token: ULong,
   /**
    * The map update that a rendered frame shows. The frame includes a command's change when this is
    * at least the command's `CommandCompletion.renderUpdateGeneration`.
    */
-  public val mapUpdateGeneration: ULong,
-  public val generation: ULong,
-  public val frameGeneration: ULong,
+  @get:JvmName("getMapUpdateGeneration") public val mapUpdateGeneration: ULong,
+  @get:JvmName("getGeneration") public val generation: ULong,
+  @get:JvmName("getFrameGeneration") public val frameGeneration: ULong,
   public val needsRepaint: Boolean,
   /** The camera and extent that a rendered frame shows. */
   public val view: MapView,
   public val mode: RenderMode,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      disposition: RenderResult,
+      token: Long,
+      mapUpdateGeneration: Long,
+      generation: Long,
+      frameGeneration: Long,
+      needsRepaint: Boolean,
+      view: MapView,
+      mode: RenderMode,
+    ): RenderFrameResult =
+      RenderFrameResult(
+        disposition = disposition,
+        token = token.toULong(),
+        mapUpdateGeneration = mapUpdateGeneration.toULong(),
+        generation = generation.toULong(),
+        frameGeneration = frameGeneration.toULong(),
+        needsRepaint = needsRepaint,
+        view = view,
+        mode = mode,
+      )
+  }
+}
 
 /**
  * The Vulkan image of an acquired frame.
@@ -3745,11 +4098,11 @@ public data class RenderFrameResult(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class VulkanTextureFrame(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
   /** The image's index in the descriptor's `textures`. */
-  public val slot: UInt,
+  @get:JvmName("getSlot") public val slot: UInt,
   /** The VkImage. */
   image: ULong,
   /** The VkImageView. */
@@ -3757,12 +4110,13 @@ public class VulkanTextureFrame(
   /** The image's VkDevice. */
   device: NativePointer,
   /** The image's VkFormat. */
-  public val format: UInt,
+  @get:JvmName("getFormat") public val format: UInt,
   /** The VkImageLayout that the frame left the image in. */
-  public val layout: UInt,
+  @get:JvmName("getLayout") public val layout: UInt,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedImage: ULong = image
+  @get:JvmName("getImage")
   public val image: ULong
     get() {
       bindingScope?.ensureActive()
@@ -3770,6 +4124,7 @@ public class VulkanTextureFrame(
     }
 
   private val storedImageView: ULong = imageView
+  @get:JvmName("getImageView")
   public val imageView: ULong
     get() {
       bindingScope?.ensureActive()
@@ -3782,6 +4137,34 @@ public class VulkanTextureFrame(
       bindingScope?.ensureActive()
       return storedDevice
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      image: Long,
+      imageView: Long,
+      device: NativePointer,
+      format: Int,
+      layout: Int,
+    ): VulkanTextureFrame =
+      VulkanTextureFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        image = image.toULong(),
+        imageView = imageView.toULong(),
+        device = device,
+        format = format.toUInt(),
+        layout = layout.toUInt(),
+      )
+  }
 }
 
 /**
@@ -3791,11 +4174,11 @@ public class VulkanTextureFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class WebGpuTextureFrame(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
   /** The texture's index in the descriptor's `textures`. */
-  public val slot: UInt,
+  @get:JvmName("getSlot") public val slot: UInt,
   /** The WGPUTexture. */
   texture: NativePointer,
   /** The WGPUTextureView. */
@@ -3803,7 +4186,7 @@ public class WebGpuTextureFrame(
   /** The texture's WGPUDevice. */
   device: NativePointer,
   /** The texture's WGPUTextureFormat. */
-  public val format: UInt,
+  @get:JvmName("getFormat") public val format: UInt,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: NativePointer = texture
@@ -3826,6 +4209,32 @@ public class WebGpuTextureFrame(
       bindingScope?.ensureActive()
       return storedDevice
     }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      texture: NativePointer,
+      textureView: NativePointer,
+      device: NativePointer,
+      format: Int,
+    ): WebGpuTextureFrame =
+      WebGpuTextureFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        texture = texture,
+        textureView = textureView,
+        device = device,
+        format = format.toUInt(),
+      )
+  }
 }
 
 /**
@@ -3839,8 +4248,24 @@ public data class FramePacerOptions(
    * The most frames per second that the pacer demands, greater than zero. The pacer skips display
    * refreshes to stay within it. By default, it can demand frames at every refresh.
    */
-  public val maximumFramesPerSecond: UInt? = null,
-)
+  @get:JvmSynthetic public val maximumFramesPerSecond: UInt? = null,
+) {
+  @PublishedApi
+  @JvmName("getMaximumFramesPerSecond")
+  internal fun maximumFramesPerSecondForJava(): Int? = maximumFramesPerSecond?.toInt()
+
+  @PublishedApi
+  internal fun withMaximumFramesPerSecond(maximumFramesPerSecond: Int): FramePacerOptions =
+    copy(maximumFramesPerSecond = maximumFramesPerSecond.toUInt())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): FramePacerOptions = FramePacerOptions()
+  }
+}
 
 /**
  * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
@@ -3849,10 +4274,30 @@ public data class FramePacerOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class CanonicalTileId(
-  public val z: UInt = 0u,
-  public val x: UInt = 0u,
-  public val y: UInt = 0u,
-)
+  @get:JvmName("getZ") public val z: UInt = 0u,
+  @get:JvmName("getX") public val x: UInt = 0u,
+  @get:JvmName("getY") public val y: UInt = 0u,
+) {
+  @PublishedApi internal fun withZ(z: Int): CanonicalTileId = copy(z = z.toUInt())
+
+  @PublishedApi internal fun withX(x: Int): CanonicalTileId = copy(x = x.toUInt())
+
+  @PublishedApi internal fun withY(y: Int): CanonicalTileId = copy(y = y.toUInt())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): CanonicalTileId = CanonicalTileId()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(z: Int, x: Int, y: Int): CanonicalTileId =
+      CanonicalTileId(z = z.toUInt(), x = x.toUInt(), y = y.toUInt())
+  }
+}
 
 /**
  * A size in logical pixels, which the map's scale factor turns into pixels.
@@ -3861,9 +4306,27 @@ public data class CanonicalTileId(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class LogicalSize(
-  public val width: UInt = 0u,
-  public val height: UInt = 0u,
-)
+  @get:JvmName("getWidth") public val width: UInt = 0u,
+  @get:JvmName("getHeight") public val height: UInt = 0u,
+) {
+  @PublishedApi internal fun withWidth(width: Int): LogicalSize = copy(width = width.toUInt())
+
+  @PublishedApi internal fun withHeight(height: Int): LogicalSize = copy(height = height.toUInt())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): LogicalSize = LogicalSize()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(width: Int, height: Int): LogicalSize =
+      LogicalSize(width = width.toUInt(), height = height.toUInt())
+  }
+}
 
 /**
  * Options for a GeoJSON
@@ -3882,13 +4345,66 @@ public data class GeoJsonSourceOptions(
   public val clusterMaxZoom: Double? = null,
   /** The `clusterProperties` object, or empty for none. */
   public val clusterProperties: String = "",
-  public val buffer: UInt? = null,
-  public val clusterRadius: UInt? = null,
+  @get:JvmSynthetic public val buffer: UInt? = null,
+  @get:JvmSynthetic public val clusterRadius: UInt? = null,
   /** At most 4294967295 on a 32-bit target. */
-  public val clusterMinPoints: ULong? = null,
+  @get:JvmSynthetic public val clusterMinPoints: ULong? = null,
   public val lineMetrics: Boolean? = null,
   public val cluster: Boolean? = null,
-)
+) {
+  @PublishedApi @JvmName("getBuffer") internal fun bufferForJava(): Int? = buffer?.toInt()
+
+  @PublishedApi
+  @JvmName("getClusterRadius")
+  internal fun clusterRadiusForJava(): Int? = clusterRadius?.toInt()
+
+  @PublishedApi
+  @JvmName("getClusterMinPoints")
+  internal fun clusterMinPointsForJava(): Long? = clusterMinPoints?.toLong()
+
+  @PublishedApi
+  internal fun withMinZoom(minZoom: Double): GeoJsonSourceOptions = copy(minZoom = minZoom)
+
+  @PublishedApi
+  internal fun withMaxZoom(maxZoom: Double): GeoJsonSourceOptions = copy(maxZoom = maxZoom)
+
+  @PublishedApi
+  internal fun withTolerance(tolerance: Double): GeoJsonSourceOptions = copy(tolerance = tolerance)
+
+  @PublishedApi
+  internal fun withClusterMaxZoom(clusterMaxZoom: Double): GeoJsonSourceOptions =
+    copy(clusterMaxZoom = clusterMaxZoom)
+
+  @PublishedApi
+  internal fun withClusterProperties(clusterProperties: String): GeoJsonSourceOptions =
+    copy(clusterProperties = clusterProperties)
+
+  @PublishedApi
+  internal fun withBuffer(buffer: Int): GeoJsonSourceOptions = copy(buffer = buffer.toUInt())
+
+  @PublishedApi
+  internal fun withClusterRadius(clusterRadius: Int): GeoJsonSourceOptions =
+    copy(clusterRadius = clusterRadius.toUInt())
+
+  @PublishedApi
+  internal fun withClusterMinPoints(clusterMinPoints: Long): GeoJsonSourceOptions =
+    copy(clusterMinPoints = clusterMinPoints.toULong())
+
+  @PublishedApi
+  internal fun withLineMetrics(lineMetrics: Boolean): GeoJsonSourceOptions =
+    copy(lineMetrics = lineMetrics)
+
+  @PublishedApi
+  internal fun withCluster(cluster: Boolean): GeoJsonSourceOptions = copy(cluster = cluster)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GeoJsonSourceOptions = GeoJsonSourceOptions()
+  }
+}
 
 /**
  * A point in the Web Mercator projection, in meters.
@@ -3899,7 +4415,20 @@ public data class GeoJsonSourceOptions(
 public data class ProjectedMeters(
   public val northing: Double = 0.0,
   public val easting: Double = 0.0,
-)
+) {
+  @PublishedApi
+  internal fun withNorthing(northing: Double): ProjectedMeters = copy(northing = northing)
+
+  @PublishedApi internal fun withEasting(easting: Double): ProjectedMeters = copy(easting = easting)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ProjectedMeters = ProjectedMeters()
+  }
+}
 
 /**
  * Options for `OffscreenDeviceHandle.create()`.
@@ -3909,7 +4438,7 @@ public data class ProjectedMeters(
  */
 public data class OffscreenDeviceOptions(
   /** The GPU to use, as an index into the platform's list of GPUs. */
-  public val adapterIndex: UInt? = null,
+  @get:JvmSynthetic public val adapterIndex: UInt? = null,
   /**
    * Whether the device's sessions take turns in one OpenGL context instead of having one each. Only
    * an EGL device reads it.
@@ -3922,7 +4451,31 @@ public data class OffscreenDeviceOptions(
    * its default. Other devices take neither.
    */
   public val clientApi: OpenGlClientApi? = null,
-)
+) {
+  @PublishedApi
+  @JvmName("getAdapterIndex")
+  internal fun adapterIndexForJava(): Int? = adapterIndex?.toInt()
+
+  @PublishedApi
+  internal fun withAdapterIndex(adapterIndex: Int): OffscreenDeviceOptions =
+    copy(adapterIndex = adapterIndex.toUInt())
+
+  @PublishedApi
+  internal fun withSingleContext(singleContext: Boolean): OffscreenDeviceOptions =
+    copy(singleContext = singleContext)
+
+  @PublishedApi
+  internal fun withClientApi(clientApi: OpenGlClientApi): OffscreenDeviceOptions =
+    copy(clientApi = clientApi)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): OffscreenDeviceOptions = OffscreenDeviceOptions()
+  }
+}
 
 /**
  * Options for `RuntimeHandle.create()`.
@@ -3941,7 +4494,21 @@ public data class RuntimeOptions(
    * memory.
    */
   public val cachePath: String = "",
-)
+) {
+  @PublishedApi
+  internal fun withAssetPath(assetPath: String): RuntimeOptions = copy(assetPath = assetPath)
+
+  @PublishedApi
+  internal fun withCachePath(cachePath: String): RuntimeOptions = copy(cachePath = cachePath)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): RuntimeOptions = RuntimeOptions()
+  }
+}
 
 /**
  * The type of a style expression's result.
@@ -3957,8 +4524,37 @@ public data class StyleExpressionType(
    */
   public val itemKind: StyleExpressionTypeKind = StyleExpressionTypeKind.VALUE,
   /** The length of an array, or 0 for any length. */
-  public val itemCount: UInt = 0u,
-)
+  @get:JvmName("getItemCount") public val itemCount: UInt = 0u,
+) {
+  @PublishedApi
+  internal fun withKind(kind: StyleExpressionTypeKind): StyleExpressionType = copy(kind = kind)
+
+  @PublishedApi
+  internal fun withItemKind(itemKind: StyleExpressionTypeKind): StyleExpressionType =
+    copy(itemKind = itemKind)
+
+  @PublishedApi
+  internal fun withItemCount(itemCount: Int): StyleExpressionType =
+    copy(itemCount = itemCount.toUInt())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): StyleExpressionType = StyleExpressionType()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      kind: StyleExpressionTypeKind,
+      itemKind: StyleExpressionTypeKind,
+      itemCount: Int,
+    ): StyleExpressionType =
+      StyleExpressionType(kind = kind, itemKind = itemKind, itemCount = itemCount.toUInt())
+  }
+}
 
 /**
  * Options for parsing a style expression.
@@ -3969,7 +4565,19 @@ public data class StyleExpressionType(
 public data class StyleExpressionOptions(
   /** The type that the result must have. */
   public val expectedType: StyleExpressionType? = null,
-)
+) {
+  @PublishedApi
+  internal fun withExpectedType(expectedType: StyleExpressionType): StyleExpressionOptions =
+    copy(expectedType = expectedType)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): StyleExpressionOptions = StyleExpressionOptions()
+  }
+}
 
 /**
  * Options for `VulkanDeviceHandle.create()`.
@@ -3998,6 +4606,26 @@ public data class VulkanDeviceOptions(
       other is VulkanDeviceOptions && contentFields().contentDeepEquals(other.contentFields())
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+  @PublishedApi
+  internal fun withPresentation(presentation: Boolean): VulkanDeviceOptions =
+    copy(presentation = presentation)
+
+  @PublishedApi
+  internal fun withDeviceUuid(deviceUuid: ByteArray): VulkanDeviceOptions =
+    copy(deviceUuid = deviceUuid)
+
+  @PublishedApi
+  internal fun withDeviceLuid(deviceLuid: ByteArray): VulkanDeviceOptions =
+    copy(deviceLuid = deviceLuid)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): VulkanDeviceOptions = VulkanDeviceOptions()
+  }
 }
 
 /**
@@ -4007,13 +4635,13 @@ public data class VulkanDeviceOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class PremultipliedRgba8Image(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   /**
    * The number of bytes from the start of one row to the start of the next, at least `width`
    * &#42; 4.
    */
-  public val stride: UInt,
+  @get:JvmName("getStride") public val stride: UInt,
   /** The rows of pixels, `stride` bytes apart, from the top row down. */
   public val pixels: ByteArray,
 ) {
@@ -4024,6 +4652,24 @@ public data class PremultipliedRgba8Image(
       other is PremultipliedRgba8Image && contentFields().contentDeepEquals(other.contentFields())
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      stride: Int,
+      pixels: ByteArray,
+    ): PremultipliedRgba8Image =
+      PremultipliedRgba8Image(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        stride = stride.toUInt(),
+        pixels = pixels,
+      )
+  }
 }
 
 /**
@@ -4039,7 +4685,23 @@ public data class UnitBezier(
   public val y1: Double = 0.0,
   public val x2: Double = 0.0,
   public val y2: Double = 0.0,
-)
+) {
+  @PublishedApi internal fun withX1(x1: Double): UnitBezier = copy(x1 = x1)
+
+  @PublishedApi internal fun withY1(y1: Double): UnitBezier = copy(y1 = y1)
+
+  @PublishedApi internal fun withX2(x2: Double): UnitBezier = copy(x2 = x2)
+
+  @PublishedApi internal fun withY2(y2: Double): UnitBezier = copy(y2 = y2)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): UnitBezier = UnitBezier()
+  }
+}
 
 /**
  * The end of a camera change.
@@ -4053,8 +4715,16 @@ public data class CameraTransitionEnd(
    * The generation of the first map snapshot that shows where the change left the camera, or 0 when
    * the map closed first.
    */
-  public val generation: ULong,
-)
+  @get:JvmName("getGeneration") public val generation: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(outcome: CameraTransitionOutcome, generation: Long): CameraTransitionEnd =
+      CameraTransitionEnd(outcome = outcome, generation = generation.toULong())
+  }
+}
 
 /**
  * How a camera change animates.
@@ -4073,9 +4743,41 @@ public data class AnimationOptions(
    * An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change by. Several changes
    * can share one.
    */
-  public val transitionId: ULong? = null,
+  @get:JvmSynthetic public val transitionId: ULong? = null,
   public val endHandler: CameraTransitionHandler = CameraTransitionHandler(),
-)
+) {
+  @PublishedApi
+  @JvmName("getTransitionId")
+  internal fun transitionIdForJava(): Long? = transitionId?.toLong()
+
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): AnimationOptions = copy(durationMs = durationMs)
+
+  @PublishedApi
+  internal fun withVelocity(velocity: Double): AnimationOptions = copy(velocity = velocity)
+
+  @PublishedApi
+  internal fun withMinZoom(minZoom: Double): AnimationOptions = copy(minZoom = minZoom)
+
+  @PublishedApi
+  internal fun withEasing(easing: UnitBezier): AnimationOptions = copy(easing = easing)
+
+  @PublishedApi
+  internal fun withTransitionId(transitionId: Long): AnimationOptions =
+    copy(transitionId = transitionId.toULong())
+
+  @PublishedApi
+  internal fun withEndHandler(endHandler: CameraTransitionHandler): AnimationOptions =
+    copy(endHandler = endHandler)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): AnimationOptions = AnimationOptions()
+  }
+}
 
 /**
  * A change to the camera from where it is now, for gestures.
@@ -4099,7 +4801,32 @@ public data class CameraDelta(
   public val anchor: ScreenPoint? = null,
   public val animation: AnimationOptions = AnimationOptions(),
   public val gesturePhase: GesturePhase = GesturePhase.NONE,
-)
+) {
+  @PublishedApi internal fun withOffset(offset: ScreenPoint): CameraDelta = copy(offset = offset)
+
+  @PublishedApi internal fun withScale(scale: Double): CameraDelta = copy(scale = scale)
+
+  @PublishedApi internal fun withBearing(bearing: Double): CameraDelta = copy(bearing = bearing)
+
+  @PublishedApi internal fun withPitch(pitch: Double): CameraDelta = copy(pitch = pitch)
+
+  @PublishedApi internal fun withAnchor(anchor: ScreenPoint): CameraDelta = copy(anchor = anchor)
+
+  @PublishedApi
+  internal fun withAnimation(animation: AnimationOptions): CameraDelta = copy(animation = animation)
+
+  @PublishedApi
+  internal fun withGesturePhase(gesturePhase: GesturePhase): CameraDelta =
+    copy(gesturePhase = gesturePhase)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): CameraDelta = CameraDelta()
+  }
+}
 
 /**
  * A ring of Android hardware buffers that the library allocates, for
@@ -4116,13 +4843,48 @@ public data class CameraDelta(
 public data class AndroidHardwareBufferRingDescriptor(
   public val logicalSize: LogicalSize,
   /** How many buffers the ring has, from 1 to 8. */
-  public val bufferCount: UInt,
+  @get:JvmName("getBufferCount") public val bufferCount: UInt,
   /**
    * More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
    * AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
    */
-  public val usage: ULong = 0uL,
-)
+  @get:JvmName("getUsage") public val usage: ULong = 0uL,
+) {
+  @PublishedApi
+  internal fun withUsage(usage: Long): AndroidHardwareBufferRingDescriptor =
+    copy(usage = usage.toULong())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      bufferCount: Int,
+    ): AndroidHardwareBufferRingDescriptor =
+      AndroidHardwareBufferRingDescriptor(
+        logicalSize = logicalSize,
+        bufferCount = bufferCount.toUInt(),
+      )
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      bufferCount: Int,
+      usage: Long,
+    ): AndroidHardwareBufferRingDescriptor =
+      AndroidHardwareBufferRingDescriptor(
+        logicalSize = logicalSize,
+        bufferCount = bufferCount.toUInt(),
+        usage = usage.toULong(),
+      )
+  }
+}
 
 /**
  * Options for attaching a render session to a map.
@@ -4167,7 +4929,39 @@ public data class RenderSessionAttachOptions(
   public val driverWorkWake: Wake = Wake(),
   /** Your lock on the Vulkan queue, when you submit to it yourself. */
   public val queueLock: QueueLock = QueueLock(),
-)
+) {
+  @PublishedApi
+  internal fun withProducerSyncKinds(
+    producerSyncKinds: GpuSyncKindFlag,
+  ): RenderSessionAttachOptions = copy(producerSyncKinds = producerSyncKinds)
+
+  @PublishedApi
+  internal fun withFrameWake(frameWake: Wake): RenderSessionAttachOptions =
+    copy(frameWake = frameWake)
+
+  @PublishedApi
+  internal fun withRedrawWake(redrawWake: Wake): RenderSessionAttachOptions =
+    copy(redrawWake = redrawWake)
+
+  @PublishedApi
+  internal fun withDriverWorkWake(driverWorkWake: Wake): RenderSessionAttachOptions =
+    copy(driverWorkWake = driverWorkWake)
+
+  @PublishedApi
+  internal fun withQueueLock(queueLock: QueueLock): RenderSessionAttachOptions =
+    copy(queueLock = queueLock)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(driver: RenderDriverKind): RenderSessionAttachOptions =
+      RenderSessionAttachOptions(driver = driver)
+  }
+}
 
 /**
  * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
@@ -4196,10 +4990,29 @@ public data class AndroidSurfaceDescriptor(
  */
 public data class DmaBufFormat(
   /** A DRM fourcc code, such as DRM_FORMAT_ABGR8888. */
-  public val fourcc: UInt = 0u,
+  @get:JvmName("getFourcc") public val fourcc: UInt = 0u,
   /** A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR. */
-  public val modifier: ULong = 0uL,
-)
+  @get:JvmName("getModifier") public val modifier: ULong = 0uL,
+) {
+  @PublishedApi internal fun withFourcc(fourcc: Int): DmaBufFormat = copy(fourcc = fourcc.toUInt())
+
+  @PublishedApi
+  internal fun withModifier(modifier: Long): DmaBufFormat = copy(modifier = modifier.toULong())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): DmaBufFormat = DmaBufFormat()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(fourcc: Int, modifier: Long): DmaBufFormat =
+      DmaBufFormat(fourcc = fourcc.toUInt(), modifier = modifier.toULong())
+  }
+}
 
 /**
  * A ring of dmabufs that the library allocates, for `MapHandle.attachDmaBufRing()`.
@@ -4215,13 +5028,29 @@ public data class DmaBufFormat(
 public data class DmaBufRingDescriptor(
   public val logicalSize: LogicalSize,
   /** How many buffers the ring has, from 1 to 8. */
-  public val bufferCount: UInt,
+  @get:JvmName("getBufferCount") public val bufferCount: UInt,
   /**
    * The formats and modifiers that your reader imports, most preferred first, such as those that
    * eglQueryDmaBufModifiersEXT() reports.
    */
   public val formats: List<DmaBufFormat>,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      bufferCount: Int,
+      formats: List<DmaBufFormat>,
+    ): DmaBufRingDescriptor =
+      DmaBufRingDescriptor(
+        logicalSize = logicalSize,
+        bufferCount = bufferCount.toUInt(),
+        formats = formats,
+      )
+  }
+}
 
 /**
  * A ring of DXGI shared textures that the library allocates, for
@@ -4237,8 +5066,19 @@ public data class DmaBufRingDescriptor(
 public data class DxgiSharedTextureRingDescriptor(
   public val logicalSize: LogicalSize,
   /** How many textures the ring has, from 1 to 8. */
-  public val textureCount: UInt,
-)
+  @get:JvmName("getTextureCount") public val textureCount: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(logicalSize: LogicalSize, textureCount: Int): DxgiSharedTextureRingDescriptor =
+      DxgiSharedTextureRingDescriptor(
+        logicalSize = logicalSize,
+        textureCount = textureCount.toUInt(),
+      )
+  }
+}
 
 /**
  * The Metal device that a render session uses.
@@ -4263,10 +5103,26 @@ public data class MetalContextDescriptor(
 public data class IoSurfaceRingDescriptor(
   public val logicalSize: LogicalSize,
   /** How many surfaces the ring has, from 1 to 8. */
-  public val bufferCount: UInt,
+  @get:JvmName("getBufferCount") public val bufferCount: UInt,
   /** The MTLDevice to render with. A null device picks the system's default. */
   public val context: MetalContextDescriptor,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      bufferCount: Int,
+      context: MetalContextDescriptor,
+    ): IoSurfaceRingDescriptor =
+      IoSurfaceRingDescriptor(
+        logicalSize = logicalSize,
+        bufferCount = bufferCount.toUInt(),
+        context = context,
+      )
+  }
+}
 
 /**
  * A Metal texture of a borrowed ring.
@@ -4295,15 +5151,35 @@ public data class MetalBorrowedTexture(
  */
 public data class MetalBorrowedTextureDescriptor(
   public val logicalSize: LogicalSize,
-  public val physicalWidth: UInt,
-  public val physicalHeight: UInt,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val textures: List<MetalBorrowedTexture>,
   /**
    * Your MTLCommandQueue on the textures' device, or null for a queue of the session's own. With
    * your queue, frames can use `GpuSyncKind.QUEUE_ORDER`.
    */
   public val commandQueue: NativePointer,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<MetalBorrowedTexture>,
+      commandQueue: NativePointer,
+    ): MetalBorrowedTextureDescriptor =
+      MetalBorrowedTextureDescriptor(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        commandQueue = commandQueue,
+      )
+  }
+}
 
 /**
  * A Metal layer to render to, for `MapHandle.attachMetalSurface()`.
@@ -4366,7 +5242,32 @@ public data class EglContextDescriptor(
   public val clientApi: OpenGlClientApi = OpenGlClientApi.UNSPECIFIED,
   /** Your `eglGetProcAddress`, or null to use the system's. */
   public val getProcAddress: NativePointer,
-)
+) {
+  @PublishedApi
+  internal fun withClientApi(clientApi: OpenGlClientApi): EglContextDescriptor =
+    copy(clientApi = clientApi)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      display: NativePointer,
+      config: NativePointer,
+      shareContext: NativePointer,
+      getProcAddress: NativePointer,
+    ): EglContextDescriptor =
+      EglContextDescriptor(
+        display = display,
+        config = config,
+        shareContext = shareContext,
+        getProcAddress = getProcAddress,
+      )
+  }
+}
 
 /**
  * The WebGL context or canvas that a render session uses.
@@ -4380,7 +5281,25 @@ public data class WebGlContextDescriptor(
   public val context: Int = 0,
   /** The canvas's CSS selector, for a transferred canvas. */
   public val canvasSelector: String = "",
-)
+) {
+  @PublishedApi
+  internal fun withKind(kind: WebGlContextKind): WebGlContextDescriptor = copy(kind = kind)
+
+  @PublishedApi
+  internal fun withContext(context: Int): WebGlContextDescriptor = copy(context = context)
+
+  @PublishedApi
+  internal fun withCanvasSelector(canvasSelector: String): WebGlContextDescriptor =
+    copy(canvasSelector = canvasSelector)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): WebGlContextDescriptor = WebGlContextDescriptor()
+  }
+}
 
 /**
  * The WGL, EGL, or WebGL part of an OpenGL context descriptor.
@@ -4408,7 +5327,22 @@ public sealed interface OpenGlContextDescriptorData {
 public data class OpenGlContextDescriptor(
   public val ownership: OpenGlContextOwnership = OpenGlContextOwnership.SHARED,
   public val data: OpenGlContextDescriptorData,
-)
+) {
+  @PublishedApi
+  internal fun withOwnership(ownership: OpenGlContextOwnership): OpenGlContextDescriptor =
+    copy(ownership = ownership)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(data: OpenGlContextDescriptorData): OpenGlContextDescriptor =
+      OpenGlContextDescriptor(data = data)
+  }
+}
 
 /**
  * An OpenGL texture of a borrowed ring.
@@ -4418,8 +5352,16 @@ public data class OpenGlContextDescriptor(
  */
 public data class OpenGlBorrowedTexture(
   /** Your texture name. */
-  public val texture: UInt,
-)
+  @get:JvmName("getTexture") public val texture: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(texture: Int): OpenGlBorrowedTexture =
+      OpenGlBorrowedTexture(texture = texture.toUInt())
+  }
+}
 
 /**
  * A ring of your OpenGL textures, for `MapHandle.attachOpenGlBorrowedTexture()`.
@@ -4437,13 +5379,35 @@ public data class OpenGlBorrowedTexture(
  */
 public data class OpenGlBorrowedTextureDescriptor(
   public val logicalSize: LogicalSize,
-  public val physicalWidth: UInt,
-  public val physicalHeight: UInt,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val context: OpenGlContextDescriptor,
   public val textures: List<OpenGlBorrowedTexture>,
   /** The textures' target. It must be GL_TEXTURE_2D. */
-  public val target: UInt,
-)
+  @get:JvmName("getTarget") public val target: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      context: OpenGlContextDescriptor,
+      textures: List<OpenGlBorrowedTexture>,
+      target: Int,
+    ): OpenGlBorrowedTextureDescriptor =
+      OpenGlBorrowedTextureDescriptor(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        context = context,
+        textures = textures,
+        target = target.toUInt(),
+      )
+  }
+}
 
 /**
  * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
@@ -4482,12 +5446,64 @@ public data class VulkanContextDescriptor(
    * set `RenderSessionAttachOptions.queueLock`.
    */
   public val graphicsQueue: NativePointer,
-  public val graphicsQueueFamilyIndex: UInt = 0u,
+  @get:JvmName("getGraphicsQueueFamilyIndex") public val graphicsQueueFamilyIndex: UInt = 0u,
   /** Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's. */
   public val getInstanceProcAddr: NativePointer,
   /** Your `vkGetDeviceProcAddr`, or null to look it up from the instance. */
   public val getDeviceProcAddr: NativePointer,
-)
+) {
+  @PublishedApi
+  internal fun withGraphicsQueueFamilyIndex(
+    graphicsQueueFamilyIndex: Int,
+  ): VulkanContextDescriptor = copy(graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      instance: NativePointer,
+      physicalDevice: NativePointer,
+      device: NativePointer,
+      graphicsQueue: NativePointer,
+      getInstanceProcAddr: NativePointer,
+      getDeviceProcAddr: NativePointer,
+    ): VulkanContextDescriptor =
+      VulkanContextDescriptor(
+        instance = instance,
+        physicalDevice = physicalDevice,
+        device = device,
+        graphicsQueue = graphicsQueue,
+        getInstanceProcAddr = getInstanceProcAddr,
+        getDeviceProcAddr = getDeviceProcAddr,
+      )
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      instance: NativePointer,
+      physicalDevice: NativePointer,
+      device: NativePointer,
+      graphicsQueue: NativePointer,
+      graphicsQueueFamilyIndex: Int,
+      getInstanceProcAddr: NativePointer,
+      getDeviceProcAddr: NativePointer,
+    ): VulkanContextDescriptor =
+      VulkanContextDescriptor(
+        instance = instance,
+        physicalDevice = physicalDevice,
+        device = device,
+        graphicsQueue = graphicsQueue,
+        graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt(),
+        getInstanceProcAddr = getInstanceProcAddr,
+        getDeviceProcAddr = getDeviceProcAddr,
+      )
+  }
+}
 
 /**
  * A Vulkan image of a borrowed ring.
@@ -4497,10 +5513,18 @@ public data class VulkanContextDescriptor(
  */
 public data class VulkanBorrowedTexture(
   /** Your VkImage. */
-  public val image: ULong,
+  @get:JvmName("getImage") public val image: ULong,
   /** A 2D VkImageView of `image` with one mip level and one layer. */
-  public val imageView: ULong,
-)
+  @get:JvmName("getImageView") public val imageView: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(image: Long, imageView: Long): VulkanBorrowedTexture =
+      VulkanBorrowedTexture(image = image.toULong(), imageView = imageView.toULong())
+  }
+}
 
 /**
  * A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
@@ -4518,16 +5542,71 @@ public data class VulkanBorrowedTexture(
  */
 public data class VulkanBorrowedTextureDescriptor(
   public val logicalSize: LogicalSize,
-  public val physicalWidth: UInt,
-  public val physicalHeight: UInt,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val context: VulkanContextDescriptor,
   public val textures: List<VulkanBorrowedTexture>,
   /** The images' VkFormat. */
-  public val format: UInt,
+  @get:JvmName("getFormat") public val format: UInt,
   /** The VkImageLayout that each frame leaves its image in. */
-  public val finalLayout: UInt,
+  @get:JvmName("getFinalLayout") public val finalLayout: UInt,
   public val owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE,
-)
+) {
+  @PublishedApi
+  internal fun withOwner(owner: VulkanImageOwner): VulkanBorrowedTextureDescriptor =
+    copy(owner = owner)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      context: VulkanContextDescriptor,
+      textures: List<VulkanBorrowedTexture>,
+      format: Int,
+      finalLayout: Int,
+    ): VulkanBorrowedTextureDescriptor =
+      VulkanBorrowedTextureDescriptor(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        context = context,
+        textures = textures,
+        format = format.toUInt(),
+        finalLayout = finalLayout.toUInt(),
+      )
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      context: VulkanContextDescriptor,
+      textures: List<VulkanBorrowedTexture>,
+      format: Int,
+      finalLayout: Int,
+      owner: VulkanImageOwner,
+    ): VulkanBorrowedTextureDescriptor =
+      VulkanBorrowedTextureDescriptor(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        context = context,
+        textures = textures,
+        format = format.toUInt(),
+        finalLayout = finalLayout.toUInt(),
+        owner = owner,
+      )
+  }
+}
 
 /**
  * A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()`.
@@ -4544,8 +5623,24 @@ public data class VulkanSurfaceDescriptor(
   public val logicalSize: LogicalSize,
   public val context: VulkanContextDescriptor,
   /** Your VkSurfaceKHR. */
-  public val surface: ULong,
-)
+  @get:JvmName("getSurface") public val surface: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      context: VulkanContextDescriptor,
+      surface: Long,
+    ): VulkanSurfaceDescriptor =
+      VulkanSurfaceDescriptor(
+        logicalSize = logicalSize,
+        context = context,
+        surface = surface.toULong(),
+      )
+  }
+}
 
 /**
  * A Wayland surface to present to, for `MapHandle.attachWaylandSurface()`.
@@ -4606,13 +5701,35 @@ public data class WebGpuBorrowedTexture(
  */
 public data class WebGpuBorrowedTextureDescriptor(
   public val logicalSize: LogicalSize,
-  public val physicalWidth: UInt,
-  public val physicalHeight: UInt,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val context: WebGpuContextDescriptor,
   public val textures: List<WebGpuBorrowedTexture>,
   /** The textures' WGPUTextureFormat. */
-  public val format: UInt,
-)
+  @get:JvmName("getFormat") public val format: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      context: WebGpuContextDescriptor,
+      textures: List<WebGpuBorrowedTexture>,
+      format: Int,
+    ): WebGpuBorrowedTextureDescriptor =
+      WebGpuBorrowedTextureDescriptor(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        context = context,
+        textures = textures,
+        format = format.toUInt(),
+      )
+  }
+}
 
 /**
  * A WebGPU surface to present to, for `MapHandle.attachWebGpuSurface()`.
@@ -4629,8 +5746,26 @@ public data class WebGpuSurfaceDescriptor(
   /** Your WGPUSurface. */
   public val surface: NativePointer,
   /** The WGPUTextureFormat to configure the surface with. */
-  public val format: UInt,
-)
+  @get:JvmName("getFormat") public val format: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      context: WebGpuContextDescriptor,
+      surface: NativePointer,
+      format: Int,
+    ): WebGpuSurfaceDescriptor =
+      WebGpuSurfaceDescriptor(
+        logicalSize = logicalSize,
+        context = context,
+        surface = surface,
+        format = format.toUInt(),
+      )
+  }
+}
 
 /**
  * A Win32 window to present to, for `MapHandle.attachWin32Window()`.
@@ -4660,7 +5795,23 @@ public data class CameraFitOptions(
   public val bearing: Double? = null,
   /** The tilt toward the horizon, in degrees. */
   public val pitch: Double? = null,
-)
+) {
+  @PublishedApi
+  internal fun withPadding(padding: EdgeInsets): CameraFitOptions = copy(padding = padding)
+
+  @PublishedApi
+  internal fun withBearing(bearing: Double): CameraFitOptions = copy(bearing = bearing)
+
+  @PublishedApi internal fun withPitch(pitch: Double): CameraFitOptions = copy(pitch = pitch)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): CameraFitOptions = CameraFitOptions()
+  }
+}
 
 /**
  * A rectangle of coordinates, from its southwest to its northeast corner.
@@ -4671,7 +5822,21 @@ public data class CameraFitOptions(
 public data class LatLngBounds(
   public val southwest: LatLng = LatLng(),
   public val northeast: LatLng = LatLng(),
-)
+) {
+  @PublishedApi
+  internal fun withSouthwest(southwest: LatLng): LatLngBounds = copy(southwest = southwest)
+
+  @PublishedApi
+  internal fun withNortheast(northeast: LatLng): LatLngBounds = copy(northeast = northeast)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): LatLngBounds = LatLngBounds()
+  }
+}
 
 /**
  * A camera change that fits an area, for `MapHandle.fitCameraToLatLngBounds()` and the other fit
@@ -4686,7 +5851,23 @@ public data class CameraFitUpdate(
   public val mode: CameraUpdateMode = CameraUpdateMode.JUMP,
   public val fit: CameraFitOptions = CameraFitOptions(),
   public val animation: AnimationOptions = AnimationOptions(),
-)
+) {
+  @PublishedApi internal fun withMode(mode: CameraUpdateMode): CameraFitUpdate = copy(mode = mode)
+
+  @PublishedApi internal fun withFit(fit: CameraFitOptions): CameraFitUpdate = copy(fit = fit)
+
+  @PublishedApi
+  internal fun withAnimation(animation: AnimationOptions): CameraFitUpdate =
+    copy(animation = animation)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): CameraFitUpdate = CameraFitUpdate()
+  }
+}
 
 /**
  * A map's camera, with the snapshot generation that it matches.
@@ -4695,9 +5876,17 @@ public data class CameraFitUpdate(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraQueryResult(
-  public val generation: ULong,
+  @get:JvmName("getGeneration") public val generation: ULong,
   public val camera: Camera,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(generation: Long, camera: Camera): CameraQueryResult =
+      CameraQueryResult(generation = generation.toULong(), camera = camera)
+  }
+}
 
 /**
  * The ID of a feature in a source, as the source's data gives it.
@@ -4711,7 +5900,14 @@ public data class CameraQueryResult(
 public sealed interface FeatureId {
   public data class StringValue(public val value: String) : FeatureId
 
-  public data class UintValue(public val value: ULong) : FeatureId
+  public data class UintValue(@get:JvmName("getValue") public val value: ULong) : FeatureId {
+    public companion object {
+      /** Creates a value, for Java, which can't call the constructor. */
+      @JvmStatic
+      @PublishedApi
+      internal fun of(value: Long): UintValue = UintValue(value = value.toULong())
+    }
+  }
 
   public data class IntValue(public val value: Long) : FeatureId
 
@@ -4739,7 +5935,29 @@ public data class FeatureStateSelector(
    * every key.
    */
   public val stateKey: String = "",
-)
+) {
+  @PublishedApi
+  internal fun withSourceLayerId(sourceLayerId: String): FeatureStateSelector =
+    copy(sourceLayerId = sourceLayerId)
+
+  @PublishedApi
+  internal fun withFeatureId(featureId: FeatureId): FeatureStateSelector =
+    copy(featureId = featureId)
+
+  @PublishedApi
+  internal fun withStateKey(stateKey: String): FeatureStateSelector = copy(stateKey = stateKey)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(sourceId: String): FeatureStateSelector =
+      FeatureStateSelector(sourceId = sourceId)
+  }
+}
 
 /**
  * All the settings for how a map picks the tiles to load.
@@ -4750,14 +5968,36 @@ public data class FeatureStateSelector(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MapTileSettings(
-  public val prefetchZoomDelta: UInt,
+  @get:JvmName("getPrefetchZoomDelta") public val prefetchZoomDelta: UInt,
   public val lodMinRadius: Double,
   public val lodScale: Double,
   /** The pitch, in degrees, above which the map lowers the detail. */
   public val lodPitchThreshold: Double,
   public val lodZoomShift: Double,
   public val lodMode: TileLodMode,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      prefetchZoomDelta: Int,
+      lodMinRadius: Double,
+      lodScale: Double,
+      lodPitchThreshold: Double,
+      lodZoomShift: Double,
+      lodMode: TileLodMode,
+    ): MapTileSettings =
+      MapTileSettings(
+        prefetchZoomDelta = prefetchZoomDelta.toUInt(),
+        lodMinRadius = lodMinRadius,
+        lodScale = lodScale,
+        lodPitchThreshold = lodPitchThreshold,
+        lodZoomShift = lodZoomShift,
+        lodMode = lodMode,
+      )
+  }
+}
 
 /**
  * All the limits on a map's camera.
@@ -4793,7 +6033,21 @@ public data class Vec3(
   public val x: Double = 0.0,
   public val y: Double = 0.0,
   public val z: Double = 0.0,
-)
+) {
+  @PublishedApi internal fun withX(x: Double): Vec3 = copy(x = x)
+
+  @PublishedApi internal fun withY(y: Double): Vec3 = copy(y = y)
+
+  @PublishedApi internal fun withZ(z: Double): Vec3 = copy(z = z)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): Vec3 = Vec3()
+  }
+}
 
 /**
  * A rotation, as a quaternion.
@@ -4806,7 +6060,23 @@ public data class Quaternion(
   public val y: Double = 0.0,
   public val z: Double = 0.0,
   public val w: Double = 0.0,
-)
+) {
+  @PublishedApi internal fun withX(x: Double): Quaternion = copy(x = x)
+
+  @PublishedApi internal fun withY(y: Double): Quaternion = copy(y = y)
+
+  @PublishedApi internal fun withZ(z: Double): Quaternion = copy(z = z)
+
+  @PublishedApi internal fun withW(w: Double): Quaternion = copy(w = w)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): Quaternion = Quaternion()
+  }
+}
 
 /**
  * A map camera's whole position and orientation in three dimensions.
@@ -4830,7 +6100,7 @@ public data class FreeCamera(
 public data class MapSnapshot(
   public val debugFlags: MapDebugFlag,
   /** Grows with each change to the map's state. */
-  public val generation: ULong,
+  @get:JvmName("getGeneration") public val generation: ULong,
   /** Whether the style and every resource that the view needs have loaded. */
   public val fullyLoaded: Boolean,
   public val renderingStatsViewEnabled: Boolean,
@@ -4838,12 +6108,46 @@ public data class MapSnapshot(
   public val transitionInProgress: Boolean,
   public val eventMask: RuntimeEventFlag,
   /** Counts the render updates that the map has made for its render session. */
-  public val latestRenderUpdateGeneration: ULong,
+  @get:JvmName("getLatestRenderUpdateGeneration") public val latestRenderUpdateGeneration: ULong,
   public val tile: MapTileSettings,
   public val bounds: CameraBounds,
   public val freeCamera: FreeCamera,
   public val view: MapView,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      debugFlags: MapDebugFlag,
+      generation: Long,
+      fullyLoaded: Boolean,
+      renderingStatsViewEnabled: Boolean,
+      gestureInProgress: Boolean,
+      transitionInProgress: Boolean,
+      eventMask: RuntimeEventFlag,
+      latestRenderUpdateGeneration: Long,
+      tile: MapTileSettings,
+      bounds: CameraBounds,
+      freeCamera: FreeCamera,
+      view: MapView,
+    ): MapSnapshot =
+      MapSnapshot(
+        debugFlags = debugFlags,
+        generation = generation.toULong(),
+        fullyLoaded = fullyLoaded,
+        renderingStatsViewEnabled = renderingStatsViewEnabled,
+        gestureInProgress = gestureInProgress,
+        transitionInProgress = transitionInProgress,
+        eventMask = eventMask,
+        latestRenderUpdateGeneration = latestRenderUpdateGeneration.toULong(),
+        tile = tile,
+        bounds = bounds,
+        freeCamera = freeCamera,
+        view = view,
+      )
+  }
+}
 
 /**
  * A range of image pixels, from `from` to `to`, that stretches to fit text.
@@ -4854,7 +6158,19 @@ public data class MapSnapshot(
 public data class ImageStretch(
   public val from: Float = 0f,
   public val to: Float = 0f,
-)
+) {
+  @PublishedApi internal fun withFrom(from: Float): ImageStretch = copy(from = from)
+
+  @PublishedApi internal fun withTo(to: Float): ImageStretch = copy(to = to)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ImageStretch = ImageStretch()
+  }
+}
 
 /**
  * The area of an image, in image pixels, that text fits inside.
@@ -4867,7 +6183,23 @@ public data class ImageContent(
   public val top: Float = 0f,
   public val right: Float = 0f,
   public val bottom: Float = 0f,
-)
+) {
+  @PublishedApi internal fun withLeft(left: Float): ImageContent = copy(left = left)
+
+  @PublishedApi internal fun withTop(top: Float): ImageContent = copy(top = top)
+
+  @PublishedApi internal fun withRight(right: Float): ImageContent = copy(right = right)
+
+  @PublishedApi internal fun withBottom(bottom: Float): ImageContent = copy(bottom = bottom)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ImageContent = ImageContent()
+  }
+}
 
 /**
  * An image in the map's style.
@@ -4876,8 +6208,8 @@ public data class ImageContent(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleImageInfo(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   /** The premultiplied RGBA pixels, in rows of `width` &#42; 4 bytes, from the top row down. */
   public val pixels: ByteArray,
   public val stretchX: List<ImageStretch>,
@@ -4909,6 +6241,38 @@ public data class StyleImageInfo(
       other is StyleImageInfo && contentFields().contentDeepEquals(other.contentFields())
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      pixels: ByteArray,
+      stretchX: List<ImageStretch>,
+      stretchY: List<ImageStretch>,
+      content: ImageContent?,
+      textFitWidth: StyleImageTextFit?,
+      textFitHeight: StyleImageTextFit?,
+      pixelRatio: Float,
+      sdf: Boolean,
+      keepUnused: Boolean,
+    ): StyleImageInfo =
+      StyleImageInfo(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        pixels = pixels,
+        stretchX = stretchX,
+        stretchY = stretchY,
+        content = content,
+        textFitWidth = textFitWidth,
+        textFitHeight = textFitHeight,
+        pixelRatio = pixelRatio,
+        sdf = sdf,
+        keepUnused = keepUnused,
+      )
+  }
 }
 
 /**
@@ -4964,7 +6328,7 @@ public data class StyleSourceInfo(
   /** The tiles that the style lists in the source itself, instead of at a URL. */
   public val tileJson: StyleSourceTileInfo?,
   public val bounds: LatLngBounds?,
-  public val tileSize: UInt?,
+  @get:JvmSynthetic public val tileSize: UInt?,
   public val vectorEncoding: StyleVectorTileEncoding?,
   public val rasterEncoding: StyleRasterDemEncoding?,
   /**
@@ -4972,7 +6336,41 @@ public data class StyleSourceInfo(
    * source's data.
    */
   public val geoJson: GeoJsonSourceOptions?,
-)
+) {
+  @PublishedApi @JvmName("getTileSize") internal fun tileSizeForJava(): Int? = tileSize?.toInt()
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      id: String,
+      type: StyleSourceType,
+      isVolatile: Boolean,
+      attribution: String,
+      url: String,
+      tileJson: StyleSourceTileInfo?,
+      bounds: LatLngBounds?,
+      tileSize: Int?,
+      vectorEncoding: StyleVectorTileEncoding?,
+      rasterEncoding: StyleRasterDemEncoding?,
+      geoJson: GeoJsonSourceOptions?,
+    ): StyleSourceInfo =
+      StyleSourceInfo(
+        id = id,
+        type = type,
+        isVolatile = isVolatile,
+        attribution = attribution,
+        url = url,
+        tileJson = tileJson,
+        bounds = bounds,
+        tileSize = tileSize?.toUInt(),
+        vectorEncoding = vectorEncoding,
+        rasterEncoding = rasterEncoding,
+        geoJson = geoJson,
+      )
+  }
+}
 
 /**
  * The default &#91;transition&#93;(https://maplibre.org/maplibre-style-spec/transition/) for
@@ -4986,7 +6384,27 @@ public data class StyleTransitionOptions(
   public val delayMs: Double? = null,
   /** Whether symbols fade in and out as the map places them. */
   public val enablePlacementTransitions: Boolean? = null,
-)
+) {
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): StyleTransitionOptions =
+    copy(durationMs = durationMs)
+
+  @PublishedApi
+  internal fun withDelayMs(delayMs: Double): StyleTransitionOptions = copy(delayMs = delayMs)
+
+  @PublishedApi
+  internal fun withEnablePlacementTransitions(
+    enablePlacementTransitions: Boolean,
+  ): StyleTransitionOptions = copy(enablePlacementTransitions = enablePlacementTransitions)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): StyleTransitionOptions = StyleTransitionOptions()
+  }
+}
 
 /**
  * Limits on the camera, for `MapHandle.setBounds()`.
@@ -5005,7 +6423,30 @@ public data class BoundOptions(
   public val maxPitch: Double? = null,
   /** Removes the area that limits the camera's center. */
   public val unbounded: Boolean = false,
-)
+) {
+  @PublishedApi internal fun withBounds(bounds: LatLngBounds): BoundOptions = copy(bounds = bounds)
+
+  @PublishedApi internal fun withMinZoom(minZoom: Double): BoundOptions = copy(minZoom = minZoom)
+
+  @PublishedApi internal fun withMaxZoom(maxZoom: Double): BoundOptions = copy(maxZoom = maxZoom)
+
+  @PublishedApi
+  internal fun withMinPitch(minPitch: Double): BoundOptions = copy(minPitch = minPitch)
+
+  @PublishedApi
+  internal fun withMaxPitch(maxPitch: Double): BoundOptions = copy(maxPitch = maxPitch)
+
+  @PublishedApi
+  internal fun withUnbounded(unbounded: Boolean): BoundOptions = copy(unbounded = unbounded)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): BoundOptions = BoundOptions()
+  }
+}
 
 /**
  * The camera's position and orientation in three dimensions.
@@ -5022,7 +6463,22 @@ public data class FreeCameraOptions(
   public val position: Vec3? = null,
   /** The camera's rotation from looking straight down with north at the top of the screen. */
   public val orientation: Quaternion? = null,
-)
+) {
+  @PublishedApi
+  internal fun withPosition(position: Vec3): FreeCameraOptions = copy(position = position)
+
+  @PublishedApi
+  internal fun withOrientation(orientation: Quaternion): FreeCameraOptions =
+    copy(orientation = orientation)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): FreeCameraOptions = FreeCameraOptions()
+  }
+}
 
 /**
  * Settings that skew the map or draw it without perspective.
@@ -5035,7 +6491,23 @@ public data class ProjectionModeOptions(
   public val axonometric: Boolean? = null,
   public val xSkew: Double? = null,
   public val ySkew: Double? = null,
-)
+) {
+  @PublishedApi
+  internal fun withAxonometric(axonometric: Boolean): ProjectionModeOptions =
+    copy(axonometric = axonometric)
+
+  @PublishedApi internal fun withXSkew(xSkew: Double): ProjectionModeOptions = copy(xSkew = xSkew)
+
+  @PublishedApi internal fun withYSkew(ySkew: Double): ProjectionModeOptions = copy(ySkew = ySkew)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ProjectionModeOptions = ProjectionModeOptions()
+  }
+}
 
 /**
  * Options for a style image, as the
@@ -5059,7 +6531,43 @@ public data class StyleImageOptions(
    * for through `RuntimeEventType.MAP_STYLE_IMAGE_MISSING`.
    */
   public val keepUnused: Boolean? = null,
-)
+) {
+  @PublishedApi
+  internal fun withStretchX(stretchX: List<ImageStretch>): StyleImageOptions =
+    copy(stretchX = stretchX)
+
+  @PublishedApi
+  internal fun withStretchY(stretchY: List<ImageStretch>): StyleImageOptions =
+    copy(stretchY = stretchY)
+
+  @PublishedApi
+  internal fun withContent(content: ImageContent): StyleImageOptions = copy(content = content)
+
+  @PublishedApi
+  internal fun withTextFitWidth(textFitWidth: StyleImageTextFit): StyleImageOptions =
+    copy(textFitWidth = textFitWidth)
+
+  @PublishedApi
+  internal fun withTextFitHeight(textFitHeight: StyleImageTextFit): StyleImageOptions =
+    copy(textFitHeight = textFitHeight)
+
+  @PublishedApi
+  internal fun withPixelRatio(pixelRatio: Float): StyleImageOptions = copy(pixelRatio = pixelRatio)
+
+  @PublishedApi internal fun withSdf(sdf: Boolean): StyleImageOptions = copy(sdf = sdf)
+
+  @PublishedApi
+  internal fun withKeepUnused(keepUnused: Boolean): StyleImageOptions =
+    copy(keepUnused = keepUnused)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): StyleImageOptions = StyleImageOptions()
+  }
+}
 
 /**
  * How the map picks the tiles to load.
@@ -5075,7 +6583,7 @@ public data class MapTileOptions(
    * How many zoom levels lower the map also loads tiles for, so it can show a coarse map while the
    * current tiles load. 0 loads only the current tiles.
    */
-  public val prefetchZoomDelta: UInt? = null,
+  @get:JvmSynthetic public val prefetchZoomDelta: UInt? = null,
   /** The radius around the view point, in tiles, that keeps full detail. */
   public val lodMinRadius: Double? = null,
   /** Scales the distance to the view point. Above 1 lowers the detail. */
@@ -5086,7 +6594,41 @@ public data class MapTileOptions(
   public val lodZoomShift: Double? = null,
   /** `TileLodMode.DISTANCE` ignores `lod_min_radius`. */
   public val lodMode: TileLodMode? = null,
-)
+) {
+  @PublishedApi
+  @JvmName("getPrefetchZoomDelta")
+  internal fun prefetchZoomDeltaForJava(): Int? = prefetchZoomDelta?.toInt()
+
+  @PublishedApi
+  internal fun withPrefetchZoomDelta(prefetchZoomDelta: Int): MapTileOptions =
+    copy(prefetchZoomDelta = prefetchZoomDelta.toUInt())
+
+  @PublishedApi
+  internal fun withLodMinRadius(lodMinRadius: Double): MapTileOptions =
+    copy(lodMinRadius = lodMinRadius)
+
+  @PublishedApi
+  internal fun withLodScale(lodScale: Double): MapTileOptions = copy(lodScale = lodScale)
+
+  @PublishedApi
+  internal fun withLodPitchThreshold(lodPitchThreshold: Double): MapTileOptions =
+    copy(lodPitchThreshold = lodPitchThreshold)
+
+  @PublishedApi
+  internal fun withLodZoomShift(lodZoomShift: Double): MapTileOptions =
+    copy(lodZoomShift = lodZoomShift)
+
+  @PublishedApi
+  internal fun withLodMode(lodMode: TileLodMode): MapTileOptions = copy(lodMode = lodMode)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MapTileOptions = MapTileOptions()
+  }
+}
 
 /**
  * How the map orients and constrains its view.
@@ -5099,7 +6641,31 @@ public data class MapViewportOptions(
   public val constrainMode: ConstrainMode? = null,
   public val viewportMode: ViewportMode? = null,
   public val frustumOffset: EdgeInsets? = null,
-)
+) {
+  @PublishedApi
+  internal fun withNorthOrientation(northOrientation: NorthOrientation): MapViewportOptions =
+    copy(northOrientation = northOrientation)
+
+  @PublishedApi
+  internal fun withConstrainMode(constrainMode: ConstrainMode): MapViewportOptions =
+    copy(constrainMode = constrainMode)
+
+  @PublishedApi
+  internal fun withViewportMode(viewportMode: ViewportMode): MapViewportOptions =
+    copy(viewportMode = viewportMode)
+
+  @PublishedApi
+  internal fun withFrustumOffset(frustumOffset: EdgeInsets): MapViewportOptions =
+    copy(frustumOffset = frustumOffset)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MapViewportOptions = MapViewportOptions()
+  }
+}
 
 /**
  * A camera change for `MapHandle.updateCamera()`.
@@ -5115,7 +6681,27 @@ public data class CameraUpdate(
   public val camera: CameraOptions = CameraOptions(),
   public val animation: AnimationOptions = AnimationOptions(),
   public val gesturePhase: GesturePhase = GesturePhase.NONE,
-)
+) {
+  @PublishedApi internal fun withMode(mode: CameraUpdateMode): CameraUpdate = copy(mode = mode)
+
+  @PublishedApi internal fun withCamera(camera: CameraOptions): CameraUpdate = copy(camera = camera)
+
+  @PublishedApi
+  internal fun withAnimation(animation: AnimationOptions): CameraUpdate =
+    copy(animation = animation)
+
+  @PublishedApi
+  internal fun withGesturePhase(gesturePhase: GesturePhase): CameraUpdate =
+    copy(gesturePhase = gesturePhase)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): CameraUpdate = CameraUpdate()
+  }
+}
 
 /**
  * A projection's camera, as `MapProjectionHandle.getCamera()` reports it.
@@ -5135,8 +6721,22 @@ public data class MapProjectionCameraResult(
  */
 public data class RenderAbandonResult(
   public val disposition: RenderAbandonDisposition,
-  public val quarantinedResourceCount: UInt,
-)
+  @get:JvmName("getQuarantinedResourceCount") public val quarantinedResourceCount: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      disposition: RenderAbandonDisposition,
+      quarantinedResourceCount: Int,
+    ): RenderAbandonResult =
+      RenderAbandonResult(
+        disposition = disposition,
+        quarantinedResourceCount = quarantinedResourceCount.toUInt(),
+      )
+  }
+}
 
 /**
  * A demand for one frame.
@@ -5147,8 +6747,26 @@ public data class RenderAbandonResult(
 public data class FrameDemand(
   public val flags: FrameDemandFlag = FrameDemandFlag.NONE,
   /** A value of your choice that the demand's frame result carries. */
-  public val token: ULong = 0uL,
-)
+  @get:JvmName("getToken") public val token: ULong = 0uL,
+) {
+  @PublishedApi internal fun withFlags(flags: FrameDemandFlag): FrameDemand = copy(flags = flags)
+
+  @PublishedApi internal fun withToken(token: Long): FrameDemand = copy(token = token.toULong())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): FrameDemand = FrameDemand()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(flags: FrameDemandFlag, token: Long): FrameDemand =
+      FrameDemand(flags = flags, token = token.toULong())
+  }
+}
 
 /**
  * What an attached render session supports.
@@ -5159,7 +6777,7 @@ public data class FrameDemand(
 public data class RenderSessionCapabilities(
   public val driver: RenderDriverKind,
   /** How many textures the session's texture ring has. */
-  public val textureRingDepth: UInt,
+  @get:JvmName("getTextureRingDepth") public val textureRingDepth: UInt,
   public val flags: RenderSessionCapabilityFlag,
   /** The kind of `GpuSync` that `AcquiredFrameHandle.withProducerSync()` reports. */
   public val producerSyncKind: GpuSyncKind,
@@ -5168,7 +6786,27 @@ public data class RenderSessionCapabilities(
    * and on what the device supports.
    */
   public val consumerSyncKinds: GpuSyncKindFlag,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      driver: RenderDriverKind,
+      textureRingDepth: Int,
+      flags: RenderSessionCapabilityFlag,
+      producerSyncKind: GpuSyncKind,
+      consumerSyncKinds: GpuSyncKindFlag,
+    ): RenderSessionCapabilities =
+      RenderSessionCapabilities(
+        driver = driver,
+        textureRingDepth = textureRingDepth.toUInt(),
+        flags = flags,
+        producerSyncKind = producerSyncKind,
+        consumerSyncKinds = consumerSyncKinds,
+      )
+  }
+}
 
 /**
  * The state of a render session at one moment.
@@ -5180,9 +6818,9 @@ public data class RenderSessionSnapshot(
   public val state: RenderSessionState,
   /** The target's logical size, and the map's scale factor. */
   public val extent: LogicalExtent,
-  public val generation: ULong,
-  public val frameGeneration: ULong,
-  public val acquiredFrameCount: UInt,
+  @get:JvmName("getGeneration") public val generation: ULong,
+  @get:JvmName("getFrameGeneration") public val frameGeneration: ULong,
+  @get:JvmName("getAcquiredFrameCount") public val acquiredFrameCount: UInt,
   /**
    * `Status.OK` until the session fails. Then `Status.TARGET_LOST` when it failed because it lost
    * its target, or `Status.NATIVE_ERROR` when it failed for another reason.
@@ -5193,7 +6831,31 @@ public data class RenderSessionSnapshot(
    * `RenderSessionHandle.releaseTarget()` completes until you give the session a new target.
    */
   public val hasTarget: Boolean,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      state: RenderSessionState,
+      extent: LogicalExtent,
+      generation: Long,
+      frameGeneration: Long,
+      acquiredFrameCount: Int,
+      failureStatus: Status,
+      hasTarget: Boolean,
+    ): RenderSessionSnapshot =
+      RenderSessionSnapshot(
+        state = state,
+        extent = extent,
+        generation = generation.toULong(),
+        frameGeneration = frameGeneration.toULong(),
+        acquiredFrameCount = acquiredFrameCount.toUInt(),
+        failureStatus = failureStatus,
+        hasTarget = hasTarget,
+      )
+  }
+}
 
 /**
  * A rectangle of the screen, from its `min` corner to its `max` corner.
@@ -5204,7 +6866,19 @@ public data class RenderSessionSnapshot(
 public data class ScreenBox(
   public val min: ScreenPoint = ScreenPoint(),
   public val max: ScreenPoint = ScreenPoint(),
-)
+) {
+  @PublishedApi internal fun withMin(min: ScreenPoint): ScreenBox = copy(min = min)
+
+  @PublishedApi internal fun withMax(max: ScreenPoint): ScreenBox = copy(max = max)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ScreenBox = ScreenBox()
+  }
+}
 
 /**
  * A line through points on the screen.
@@ -5214,7 +6888,18 @@ public data class ScreenBox(
  */
 public data class ScreenLineString(
   public val points: List<ScreenPoint> = emptyList(),
-)
+) {
+  @PublishedApi
+  internal fun withPoints(points: List<ScreenPoint>): ScreenLineString = copy(points = points)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ScreenLineString = ScreenLineString()
+  }
+}
 
 /**
  * The screen area that a rendered feature query covers.
@@ -5244,7 +6929,24 @@ public data class RenderedFeatureQueryOptions(
    * must match. Empty matches every feature.
    */
   public val filter: String = "",
-)
+) {
+  @PublishedApi
+  internal fun withLayerIds(layerIds: List<String>): RenderedFeatureQueryOptions =
+    copy(layerIds = layerIds)
+
+  @PublishedApi
+  internal fun withFilter(filter: String): RenderedFeatureQueryOptions = copy(filter = filter)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(): RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
+  }
+}
 
 /**
  * A feature that a rendered feature query found.
@@ -5281,7 +6983,24 @@ public data class SourceFeatureQueryOptions(
    * must match. Empty matches every feature.
    */
   public val filter: String = "",
-)
+) {
+  @PublishedApi
+  internal fun withSourceLayerIds(sourceLayerIds: List<String>): SourceFeatureQueryOptions =
+    copy(sourceLayerIds = sourceLayerIds)
+
+  @PublishedApi
+  internal fun withFilter(filter: String): SourceFeatureQueryOptions = copy(filter = filter)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(): SourceFeatureQueryOptions = SourceFeatureQueryOptions()
+  }
+}
 
 /**
  * A feature that a source feature query found.
@@ -5303,12 +7022,25 @@ public data class SourceFeature(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class TextureImageInfo(
-  public val width: UInt,
-  public val height: UInt,
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
   /** The bytes from the start of one row to the start of the next. */
-  public val stride: UInt,
-  public val byteLength: ULong,
-)
+  @get:JvmName("getStride") public val stride: UInt,
+  @get:JvmName("getByteLength") public val byteLength: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(width: Int, height: Int, stride: Int, byteLength: Long): TextureImageInfo =
+      TextureImageInfo(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        stride = stride.toUInt(),
+        byteLength = byteLength.toULong(),
+      )
+  }
+}
 
 /**
  * The pixels that `RenderSessionHandle.readTexture()` reads.
@@ -5362,10 +7094,28 @@ public data class AndroidSurfaceReplacement(
  */
 public data class MetalBorrowedTextureReplacement(
   public val logicalSize: LogicalSize,
-  public val physicalWidth: UInt,
-  public val physicalHeight: UInt,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val textures: List<MetalBorrowedTexture>,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<MetalBorrowedTexture>,
+    ): MetalBorrowedTextureReplacement =
+      MetalBorrowedTextureReplacement(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+      )
+  }
+}
 
 /**
  * A new Metal layer for `RenderSessionHandle.setMetalSurfaceTarget()`.
@@ -5396,10 +7146,28 @@ public data class MetalSurfaceReplacement(
  */
 public data class OpenGlBorrowedTextureReplacement(
   public val logicalSize: LogicalSize,
-  public val physicalWidth: UInt,
-  public val physicalHeight: UInt,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val textures: List<OpenGlBorrowedTexture>,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<OpenGlBorrowedTexture>,
+    ): OpenGlBorrowedTextureReplacement =
+      OpenGlBorrowedTextureReplacement(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+      )
+  }
+}
 
 /**
  * A new OpenGL surface for `RenderSessionHandle.setOpenGlSurfaceTarget()`.
@@ -5430,10 +7198,28 @@ public data class OpenGlSurfaceReplacement(
  */
 public data class VulkanBorrowedTextureReplacement(
   public val logicalSize: LogicalSize,
-  public val physicalWidth: UInt,
-  public val physicalHeight: UInt,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val textures: List<VulkanBorrowedTexture>,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<VulkanBorrowedTexture>,
+    ): VulkanBorrowedTextureReplacement =
+      VulkanBorrowedTextureReplacement(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+      )
+  }
+}
 
 /**
  * A new Vulkan surface for `RenderSessionHandle.setVulkanSurfaceTarget()`.
@@ -5449,8 +7235,16 @@ public data class VulkanBorrowedTextureReplacement(
 public data class VulkanSurfaceReplacement(
   public val logicalSize: LogicalSize,
   /** Your VkSurfaceKHR. */
-  public val surface: ULong,
-)
+  @get:JvmName("getSurface") public val surface: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(logicalSize: LogicalSize, surface: Long): VulkanSurfaceReplacement =
+      VulkanSurfaceReplacement(logicalSize = logicalSize, surface = surface.toULong())
+  }
+}
 
 /**
  * A new Wayland surface for `RenderSessionHandle.setWaylandSurfaceTarget()`.
@@ -5477,10 +7271,28 @@ public data class WaylandSurfaceReplacement(
  */
 public data class WebGpuBorrowedTextureReplacement(
   public val logicalSize: LogicalSize,
-  public val physicalWidth: UInt,
-  public val physicalHeight: UInt,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val textures: List<WebGpuBorrowedTexture>,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<WebGpuBorrowedTexture>,
+    ): WebGpuBorrowedTextureReplacement =
+      WebGpuBorrowedTextureReplacement(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+      )
+  }
+}
 
 /**
  * A new WebGPU surface for `RenderSessionHandle.setWebGpuSurfaceTarget()`.
@@ -5551,6 +7363,45 @@ public data class ResourceResponse(
       other is ResourceResponse && contentFields().contentDeepEquals(other.contentFields())
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+  @PublishedApi
+  internal fun withStatus(status: ResourceResponseStatus): ResourceResponse = copy(status = status)
+
+  @PublishedApi
+  internal fun withErrorReason(errorReason: ResourceErrorReason): ResourceResponse =
+    copy(errorReason = errorReason)
+
+  @PublishedApi internal fun withBytes(bytes: ByteArray): ResourceResponse = copy(bytes = bytes)
+
+  @PublishedApi
+  internal fun withErrorMessage(errorMessage: String): ResourceResponse =
+    copy(errorMessage = errorMessage)
+
+  @PublishedApi
+  internal fun withMustRevalidate(mustRevalidate: Boolean): ResourceResponse =
+    copy(mustRevalidate = mustRevalidate)
+
+  @PublishedApi
+  internal fun withModifiedUnixMs(modifiedUnixMs: Long): ResourceResponse =
+    copy(modifiedUnixMs = modifiedUnixMs)
+
+  @PublishedApi
+  internal fun withExpiresUnixMs(expiresUnixMs: Long): ResourceResponse =
+    copy(expiresUnixMs = expiresUnixMs)
+
+  @PublishedApi internal fun withEtag(etag: String): ResourceResponse = copy(etag = etag)
+
+  @PublishedApi
+  internal fun withRetryAfterUnixMs(retryAfterUnixMs: Long): ResourceResponse =
+    copy(retryAfterUnixMs = retryAfterUnixMs)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ResourceResponse = ResourceResponse()
+  }
 }
 
 /**
@@ -5564,7 +7415,26 @@ public data class ResourceTransformError(
   public val message: String = "",
   /** When to retry, for `ResourceErrorReason.RATE_LIMIT`. */
   public val retryAfterUnixMs: Long? = null,
-)
+) {
+  @PublishedApi
+  internal fun withReason(reason: ResourceErrorReason): ResourceTransformError =
+    copy(reason = reason)
+
+  @PublishedApi
+  internal fun withMessage(message: String): ResourceTransformError = copy(message = message)
+
+  @PublishedApi
+  internal fun withRetryAfterUnixMs(retryAfterUnixMs: Long): ResourceTransformError =
+    copy(retryAfterUnixMs = retryAfterUnixMs)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ResourceTransformError = ResourceTransformError()
+  }
+}
 
 /**
  * Options for `RuntimeHandle.createMap()`.
@@ -5591,7 +7461,31 @@ public data class MapOptions(
    * loading. Without it, the map keeps them.
    */
   public val tileCacheEnabled: Boolean? = null,
-)
+) {
+  @PublishedApi internal fun withMapMode(mapMode: MapMode): MapOptions = copy(mapMode = mapMode)
+
+  @PublishedApi
+  internal fun withFastPforEnabled(fastPforEnabled: Boolean): MapOptions =
+    copy(fastPforEnabled = fastPforEnabled)
+
+  @PublishedApi
+  internal fun withEventMask(eventMask: RuntimeEventFlag): MapOptions = copy(eventMask = eventMask)
+
+  @PublishedApi
+  internal fun withTileCacheEnabled(tileCacheEnabled: Boolean): MapOptions =
+    copy(tileCacheEnabled = tileCacheEnabled)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(initialExtent: LogicalExtent): MapOptions =
+      MapOptions(initialExtent = initialExtent)
+  }
+}
 
 /**
  * An offline region that covers a rectangle of the map.
@@ -5613,7 +7507,42 @@ public data class OfflineTilePyramidRegionDefinition(
   public val pixelRatio: Float = 0f,
   /** Whether the region holds the glyphs of CJK ideographs. */
   public val includeIdeographs: Boolean = false,
-)
+) {
+  @PublishedApi
+  internal fun withStyleUrl(styleUrl: String): OfflineTilePyramidRegionDefinition =
+    copy(styleUrl = styleUrl)
+
+  @PublishedApi
+  internal fun withBounds(bounds: LatLngBounds): OfflineTilePyramidRegionDefinition =
+    copy(bounds = bounds)
+
+  @PublishedApi
+  internal fun withMinZoom(minZoom: Double): OfflineTilePyramidRegionDefinition =
+    copy(minZoom = minZoom)
+
+  @PublishedApi
+  internal fun withMaxZoom(maxZoom: Double): OfflineTilePyramidRegionDefinition =
+    copy(maxZoom = maxZoom)
+
+  @PublishedApi
+  internal fun withPixelRatio(pixelRatio: Float): OfflineTilePyramidRegionDefinition =
+    copy(pixelRatio = pixelRatio)
+
+  @PublishedApi
+  internal fun withIncludeIdeographs(
+    includeIdeographs: Boolean,
+  ): OfflineTilePyramidRegionDefinition = copy(includeIdeographs = includeIdeographs)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(): OfflineTilePyramidRegionDefinition = OfflineTilePyramidRegionDefinition()
+  }
+}
 
 /**
  * An offline region that covers a GeoJSON geometry.
@@ -5630,7 +7559,38 @@ public data class OfflineGeometryRegionDefinition(
   public val maxZoom: Double = 0.0,
   public val pixelRatio: Float = 0f,
   public val includeIdeographs: Boolean = false,
-)
+) {
+  @PublishedApi
+  internal fun withStyleUrl(styleUrl: String): OfflineGeometryRegionDefinition =
+    copy(styleUrl = styleUrl)
+
+  @PublishedApi
+  internal fun withMinZoom(minZoom: Double): OfflineGeometryRegionDefinition =
+    copy(minZoom = minZoom)
+
+  @PublishedApi
+  internal fun withMaxZoom(maxZoom: Double): OfflineGeometryRegionDefinition =
+    copy(maxZoom = maxZoom)
+
+  @PublishedApi
+  internal fun withPixelRatio(pixelRatio: Float): OfflineGeometryRegionDefinition =
+    copy(pixelRatio = pixelRatio)
+
+  @PublishedApi
+  internal fun withIncludeIdeographs(includeIdeographs: Boolean): OfflineGeometryRegionDefinition =
+    copy(includeIdeographs = includeIdeographs)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(geometry: String): OfflineGeometryRegionDefinition =
+      OfflineGeometryRegionDefinition(geometry = geometry)
+  }
+}
 
 /**
  * The area, zoom range, and style that an offline region covers.
@@ -5645,14 +7605,24 @@ public sealed interface OfflineRegionDefinition {
   public data class Geometry(public val value: OfflineGeometryRegionDefinition) :
     OfflineRegionDefinition
 
-  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    OfflineRegionDefinition {
+  public data class Unknown(
+    @get:JvmName("getTag") public val tag: UInt,
+    public val bytes: ByteArray,
+  ) : OfflineRegionDefinition {
     private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
 
     override fun equals(other: Any?): Boolean =
       this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
 
     override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+    public companion object {
+      /** Creates a value, for Java, which can't call the constructor. */
+      @JvmStatic
+      @PublishedApi
+      internal fun of(tag: Int, bytes: ByteArray): Unknown =
+        Unknown(tag = tag.toUInt(), bytes = bytes)
+    }
   }
 }
 
@@ -5685,22 +7655,50 @@ public data class OfflineRegionInfo(
 public data class OfflineRegionStatus(
   public val downloadState: OfflineRegionDownloadState,
   /** The resources downloaded so far, tiles included. */
-  public val completedResourceCount: ULong,
+  @get:JvmName("getCompletedResourceCount") public val completedResourceCount: ULong,
   /** The size of the downloaded resources in bytes, tiles included. */
-  public val completedResourceSize: ULong,
-  public val completedTileCount: ULong,
-  public val requiredTileCount: ULong,
+  @get:JvmName("getCompletedResourceSize") public val completedResourceSize: ULong,
+  @get:JvmName("getCompletedTileCount") public val completedTileCount: ULong,
+  @get:JvmName("getRequiredTileCount") public val requiredTileCount: ULong,
   /** The size of the downloaded tiles in bytes. */
-  public val completedTileSize: ULong,
+  @get:JvmName("getCompletedTileSize") public val completedTileSize: ULong,
   /**
    * The resources that the region needs, tiles included. Until `required_resource_count_is_precise`
    * is true, this is only a lower bound.
    */
-  public val requiredResourceCount: ULong,
+  @get:JvmName("getRequiredResourceCount") public val requiredResourceCount: ULong,
   public val requiredResourceCountIsPrecise: Boolean,
   /** Whether the region has downloaded every resource it needs. */
   public val complete: Boolean,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      downloadState: OfflineRegionDownloadState,
+      completedResourceCount: Long,
+      completedResourceSize: Long,
+      completedTileCount: Long,
+      requiredTileCount: Long,
+      completedTileSize: Long,
+      requiredResourceCount: Long,
+      requiredResourceCountIsPrecise: Boolean,
+      complete: Boolean,
+    ): OfflineRegionStatus =
+      OfflineRegionStatus(
+        downloadState = downloadState,
+        completedResourceCount = completedResourceCount.toULong(),
+        completedResourceSize = completedResourceSize.toULong(),
+        completedTileCount = completedTileCount.toULong(),
+        requiredTileCount = requiredTileCount.toULong(),
+        completedTileSize = completedTileSize.toULong(),
+        requiredResourceCount = requiredResourceCount.toULong(),
+        requiredResourceCountIsPrecise = requiredResourceCountIsPrecise,
+        complete = complete,
+      )
+  }
+}
 
 /**
  * The details of `RuntimeEventType.MAP_CAMERA_WILL_CHANGE` and
@@ -5777,12 +7775,32 @@ public data class RuntimeEventStyleImage(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class TileId(
-  public val overscaledZ: UInt,
+  @get:JvmName("getOverscaledZ") public val overscaledZ: UInt,
   public val wrap: Int,
-  public val canonicalZ: UInt,
-  public val canonicalX: UInt,
-  public val canonicalY: UInt,
-)
+  @get:JvmName("getCanonicalZ") public val canonicalZ: UInt,
+  @get:JvmName("getCanonicalX") public val canonicalX: UInt,
+  @get:JvmName("getCanonicalY") public val canonicalY: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      overscaledZ: Int,
+      wrap: Int,
+      canonicalZ: Int,
+      canonicalX: Int,
+      canonicalY: Int,
+    ): TileId =
+      TileId(
+        overscaledZ = overscaledZ.toUInt(),
+        wrap = wrap,
+        canonicalZ = canonicalZ.toUInt(),
+        canonicalX = canonicalX.toUInt(),
+        canonicalY = canonicalY.toUInt(),
+      )
+  }
+}
 
 /**
  * The details of `RuntimeEventType.MAP_TILE_ACTION`.
@@ -5838,8 +7856,16 @@ public data class RuntimeEventOfflineRegionResponseError(
 public data class RuntimeEventOfflineRegionTileCountLimit(
   public val regionId: Long,
   /** The number of demo server tiles that the cache file's offline regions may hold together. */
-  public val limit: ULong,
-)
+  @get:JvmName("getLimit") public val limit: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(regionId: Long, limit: Long): RuntimeEventOfflineRegionTileCountLimit =
+      RuntimeEventOfflineRegionTileCountLimit(regionId = regionId, limit = limit.toULong())
+  }
+}
 
 /**
  * The details of a glyph event.
@@ -5852,10 +7878,28 @@ public data class RuntimeEventOfflineRegionTileCountLimit(
 public data class RuntimeEventGlyphs(
   /** The fonts that the glyphs come from, in order of preference. */
   public val fontStack: List<String>,
-  public val first: UInt,
-  public val last: UInt,
+  @get:JvmName("getFirst") public val first: UInt,
+  @get:JvmName("getLast") public val last: UInt,
   public val fontFace: Boolean,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      fontStack: List<String>,
+      first: Int,
+      last: Int,
+      fontFace: Boolean,
+    ): RuntimeEventGlyphs =
+      RuntimeEventGlyphs(
+        fontStack = fontStack,
+        first = first.toUInt(),
+        last = last.toUInt(),
+        fontFace = fontFace,
+      )
+  }
+}
 
 /**
  * The details of a sprite event.
@@ -5906,14 +7950,24 @@ public sealed interface RuntimeEventPayload {
 
   public data object None : RuntimeEventPayload
 
-  public data class Unknown(public val tag: UInt, public val bytes: ByteArray) :
-    RuntimeEventPayload {
+  public data class Unknown(
+    @get:JvmName("getTag") public val tag: UInt,
+    public val bytes: ByteArray,
+  ) : RuntimeEventPayload {
     private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
 
     override fun equals(other: Any?): Boolean =
       this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
 
     override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+    public companion object {
+      /** Creates a value, for Java, which can't call the constructor. */
+      @JvmStatic
+      @PublishedApi
+      internal fun of(tag: Int, bytes: ByteArray): Unknown =
+        Unknown(tag = tag.toUInt(), bytes = bytes)
+    }
   }
 }
 
@@ -5927,16 +7981,38 @@ public data class RuntimeEvent(
   public val type: RuntimeEventType,
   public val sourceType: RuntimeEventSourceType,
   /** The runtime or map that raised the event, as `source_type` says. */
-  public val source: ULong,
+  @get:JvmName("getSource") public val source: ULong,
   /**
    * For a map event, a map snapshot with this generation or a later one includes what the event
    * reports. Zero for a runtime event.
    */
-  public val generation: ULong,
+  @get:JvmName("getGeneration") public val generation: ULong,
   /** The error's text for an event that reports a failure, or empty. */
   public val message: String,
   public val payload: RuntimeEventPayload,
-)
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      type: RuntimeEventType,
+      sourceType: RuntimeEventSourceType,
+      source: Long,
+      generation: Long,
+      message: String,
+      payload: RuntimeEventPayload,
+    ): RuntimeEvent =
+      RuntimeEvent(
+        type = type,
+        sourceType = sourceType,
+        source = source.toULong(),
+        generation = generation.toULong(),
+        message = message,
+        payload = payload,
+      )
+  }
+}
 
 /**
  * An HTTP header.
@@ -5949,7 +8025,17 @@ public data class RuntimeEvent(
 public data class HttpHeader(
   public val name: String,
   public val value: String = "",
-)
+) {
+  @PublishedApi internal fun withValue(value: String): HttpHeader = copy(value = value)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(name: String): HttpHeader = HttpHeader(name = name)
+  }
+}
 
 /**
  * Headers to add to the HTTP requests whose URL matches a pattern.
@@ -5963,7 +8049,25 @@ public data class HttpHeaderRule(
   public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
   public val url: String = "",
   public val headers: List<HttpHeader> = emptyList(),
-)
+) {
+  @PublishedApi
+  internal fun withKinds(kinds: ResourceKindFlag): HttpHeaderRule = copy(kinds = kinds)
+
+  @PublishedApi internal fun withFlags(flags: UrlMatchFlag): HttpHeaderRule = copy(flags = flags)
+
+  @PublishedApi internal fun withUrl(url: String): HttpHeaderRule = copy(url = url)
+
+  @PublishedApi
+  internal fun withHeaders(headers: List<HttpHeader>): HttpHeaderRule = copy(headers = headers)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): HttpHeaderRule = HttpHeaderRule()
+  }
+}
 
 /**
  * The bytes from `start` to `end` of a resource, both included.
@@ -5972,9 +8076,17 @@ public data class HttpHeaderRule(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceRange(
-  public val start: ULong,
-  public val end: ULong,
-)
+  @get:JvmName("getStart") public val start: ULong,
+  @get:JvmName("getEnd") public val end: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(start: Long, end: Long): ResourceRange =
+      ResourceRange(start = start.toULong(), end = end.toULong())
+  }
+}
 
 /**
  * A request that a resource provider serves.
@@ -6039,7 +8151,21 @@ public data class ResourceRoute(
   public val kinds: ResourceKindFlag = ResourceKindFlag.NONE,
   public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
   public val url: String = "",
-)
+) {
+  @PublishedApi internal fun withKinds(kinds: ResourceKindFlag): ResourceRoute = copy(kinds = kinds)
+
+  @PublishedApi internal fun withFlags(flags: UrlMatchFlag): ResourceRoute = copy(flags = flags)
+
+  @PublishedApi internal fun withUrl(url: String): ResourceRoute = copy(url = url)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ResourceRoute = ResourceRoute()
+  }
+}
 
 /**
  * A query parameter that a resource transform rule adds to a URL.
@@ -6053,7 +8179,19 @@ public data class ResourceRoute(
 public data class UrlQueryParameter(
   public val name: String,
   public val value: String = "",
-)
+) {
+  @PublishedApi internal fun withValue(value: String): UrlQueryParameter = copy(value = value)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(name: String): UrlQueryParameter = UrlQueryParameter(name = name)
+  }
+}
 
 /**
  * Query parameters to add to the URLs of requests that match a pattern.
@@ -6070,7 +8208,27 @@ public data class ResourceTransformRule(
   public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
   public val url: String = "",
   public val parameters: List<UrlQueryParameter> = emptyList(),
-)
+) {
+  @PublishedApi
+  internal fun withKinds(kinds: ResourceKindFlag): ResourceTransformRule = copy(kinds = kinds)
+
+  @PublishedApi
+  internal fun withFlags(flags: UrlMatchFlag): ResourceTransformRule = copy(flags = flags)
+
+  @PublishedApi internal fun withUrl(url: String): ResourceTransformRule = copy(url = url)
+
+  @PublishedApi
+  internal fun withParameters(parameters: List<UrlQueryParameter>): ResourceTransformRule =
+    copy(parameters = parameters)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ResourceTransformRule = ResourceTransformRule()
+  }
+}
 
 /**
  * The inputs that a style expression reads while it evaluates.
@@ -6095,7 +8253,40 @@ public data class StyleExpressionInputs(
   public val canonicalTileId: CanonicalTileId? = null,
   /** The IDs of the images that `image` treats as available. */
   public val availableImages: List<String> = emptyList(),
-)
+) {
+  @PublishedApi internal fun withZoom(zoom: Double): StyleExpressionInputs = copy(zoom = zoom)
+
+  @PublishedApi
+  internal fun withColorRampParameter(colorRampParameter: Double): StyleExpressionInputs =
+    copy(colorRampParameter = colorRampParameter)
+
+  @PublishedApi
+  internal fun withFeature(feature: String): StyleExpressionInputs = copy(feature = feature)
+
+  @PublishedApi
+  internal fun withFeatureState(featureState: String): StyleExpressionInputs =
+    copy(featureState = featureState)
+
+  @PublishedApi
+  internal fun withGlobalState(globalState: String): StyleExpressionInputs =
+    copy(globalState = globalState)
+
+  @PublishedApi
+  internal fun withCanonicalTileId(canonicalTileId: CanonicalTileId): StyleExpressionInputs =
+    copy(canonicalTileId = canonicalTileId)
+
+  @PublishedApi
+  internal fun withAvailableImages(availableImages: List<String>): StyleExpressionInputs =
+    copy(availableImages = availableImages)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): StyleExpressionInputs = StyleExpressionInputs()
+  }
+}
 
 /**
  * What a style expression's result depends on.
@@ -6121,9 +8312,17 @@ public data class VulkanDeviceContextResult(
 )
 
 public data class LogicalExtentPhysicalSizeResult(
-  public val width: UInt,
-  public val height: UInt,
-)
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(width: Int, height: Int): LogicalExtentPhysicalSizeResult =
+      LogicalExtentPhysicalSizeResult(width = width.toUInt(), height = height.toUInt())
+  }
+}
 
 /**
  * A log callback, for `setLogCallback()`.
@@ -6142,7 +8341,21 @@ public data class LogHandler(
    */
   public val platformSeverities: LogSeverityFlag = LogSeverityFlag.NONE,
   public val callback: LogCallback,
-)
+) {
+  @PublishedApi
+  internal fun withPlatformSeverities(platformSeverities: LogSeverityFlag): LogHandler =
+    copy(platformSeverities = platformSeverities)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(callback: LogCallback): LogHandler = LogHandler(callback = callback)
+  }
+}
 
 /**
  * Receives a log message.
@@ -6173,19 +8386,62 @@ public data class CustomGeometrySourceOptions(
   /** How far, in pixels, simplified geometry can stray from the original. */
   public val tolerance: Double? = null,
   /** The width of a tile in pixels, a power of two no larger than 8192. */
-  public val tileSize: UInt? = null,
+  @get:JvmSynthetic public val tileSize: UInt? = null,
   /**
    * The width in pixels of the margin around a tile that holds geometry from beyond its edges.
    * `buffer` times 8192 / `tile_size` must be at most 65535.
    */
-  public val buffer: UInt? = null,
+  @get:JvmSynthetic public val buffer: UInt? = null,
   /** Whether to cut geometry at the outer edge of a tile's margin. */
   public val clip: Boolean? = null,
   /** Whether to wrap geometry that crosses the antimeridian. */
   public val wrap: Boolean? = null,
   public val fetchTile: CustomSourceFetchTileCallback,
   public val cancelTile: CustomSourceCancelTileCallback? = null,
-)
+) {
+  @PublishedApi @JvmName("getTileSize") internal fun tileSizeForJava(): Int? = tileSize?.toInt()
+
+  @PublishedApi @JvmName("getBuffer") internal fun bufferForJava(): Int? = buffer?.toInt()
+
+  @PublishedApi
+  internal fun withMinZoom(minZoom: Double): CustomGeometrySourceOptions = copy(minZoom = minZoom)
+
+  @PublishedApi
+  internal fun withMaxZoom(maxZoom: Double): CustomGeometrySourceOptions = copy(maxZoom = maxZoom)
+
+  @PublishedApi
+  internal fun withTolerance(tolerance: Double): CustomGeometrySourceOptions =
+    copy(tolerance = tolerance)
+
+  @PublishedApi
+  internal fun withTileSize(tileSize: Int): CustomGeometrySourceOptions =
+    copy(tileSize = tileSize.toUInt())
+
+  @PublishedApi
+  internal fun withBuffer(buffer: Int): CustomGeometrySourceOptions = copy(buffer = buffer.toUInt())
+
+  @PublishedApi
+  internal fun withClip(clip: Boolean): CustomGeometrySourceOptions = copy(clip = clip)
+
+  @PublishedApi
+  internal fun withWrap(wrap: Boolean): CustomGeometrySourceOptions = copy(wrap = wrap)
+
+  @PublishedApi
+  internal fun withCancelTile(
+    cancelTile: CustomSourceCancelTileCallback,
+  ): CustomGeometrySourceOptions = copy(cancelTile = cancelTile)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(fetchTile: CustomSourceFetchTileCallback): CustomGeometrySourceOptions =
+      CustomGeometrySourceOptions(fetchTile = fetchTile)
+  }
+}
 
 /**
  * Asks for the data of a tile in a custom source.
@@ -6237,7 +8493,29 @@ public data class CustomVectorSourceOptions(
   public val maxZoom: Double? = null,
   public val fetchTile: CustomSourceFetchTileCallback,
   public val cancelTile: CustomSourceCancelTileCallback? = null,
-)
+) {
+  @PublishedApi
+  internal fun withMinZoom(minZoom: Double): CustomVectorSourceOptions = copy(minZoom = minZoom)
+
+  @PublishedApi
+  internal fun withMaxZoom(maxZoom: Double): CustomVectorSourceOptions = copy(maxZoom = maxZoom)
+
+  @PublishedApi
+  internal fun withCancelTile(
+    cancelTile: CustomSourceCancelTileCallback,
+  ): CustomVectorSourceOptions = copy(cancelTile = cancelTile)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(fetchTile: CustomSourceFetchTileCallback): CustomVectorSourceOptions =
+      CustomVectorSourceOptions(fetchTile = fetchTile)
+  }
+}
 
 /**
  * A callback for the end of a camera change, for `AnimationOptions`.
@@ -6250,7 +8528,19 @@ public data class CustomVectorSourceOptions(
  */
 public data class CameraTransitionHandler(
   public val callback: CameraTransitionEndCallback? = null,
-)
+) {
+  @PublishedApi
+  internal fun withCallback(callback: CameraTransitionEndCallback): CameraTransitionHandler =
+    copy(callback = callback)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): CameraTransitionHandler = CameraTransitionHandler()
+  }
+}
 
 /**
  * Receives the end of a camera change.
@@ -6288,6 +8578,11 @@ private constructor(
 ) {
   /** A registration of Kotlin callbacks. */
   public constructor(callback: WakeCallback? = null) : this(callback, null)
+
+  /**
+   * A registration that does nothing, for Java, which can't leave out the constructor's arguments.
+   */
+  @PublishedApi internal constructor() : this(null, null)
 
   @get:JvmSynthetic
   internal val bindingNative: NativeRegistration?
@@ -6342,6 +8637,11 @@ private constructor(
     lock: QueueLockCallback? = null,
     unlock: QueueLockCallback? = null,
   ) : this(lock, unlock, null)
+
+  /**
+   * A registration that does nothing, for Java, which can't leave out the constructor's arguments.
+   */
+  @PublishedApi internal constructor() : this(null, null, null)
 
   @get:JvmSynthetic
   internal val bindingNative: NativeRegistration?
@@ -6432,7 +8732,21 @@ public data class ResourceProvider(
   /** The requests that the provider serves. Without routes, it serves every network request. */
   public val routes: List<ResourceRoute> = emptyList(),
   public val callback: ResourceProviderCallback,
-)
+) {
+  @PublishedApi
+  internal fun withRoutes(routes: List<ResourceRoute>): ResourceProvider = copy(routes = routes)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(callback: ResourceProviderCallback): ResourceProvider =
+      ResourceProvider(callback = callback)
+  }
+}
 
 /**
  * Serves a network request in place of the library.
@@ -6468,7 +8782,23 @@ public data class ResourceTransform(
    */
   public val rules: List<ResourceTransformRule> = emptyList(),
   public val callback: ResourceTransformCallback? = null,
-)
+) {
+  @PublishedApi
+  internal fun withRules(rules: List<ResourceTransformRule>): ResourceTransform =
+    copy(rules = rules)
+
+  @PublishedApi
+  internal fun withCallback(callback: ResourceTransformCallback): ResourceTransform =
+    copy(callback = callback)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ResourceTransform = ResourceTransform()
+  }
+}
 
 /**
  * Rewrites the URL of a network request before the library sends it.

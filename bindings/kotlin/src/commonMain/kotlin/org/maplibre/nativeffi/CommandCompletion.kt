@@ -1,5 +1,8 @@
 package org.maplibre.nativeffi
 
+import kotlin.jvm.JvmName
+import kotlin.jvm.JvmStatic
+
 /**
  * The generations that one committed ordered command published.
  *
@@ -17,7 +20,15 @@ package org.maplibre.nativeffi
  */
 public data class CommandCompletion(
   /** Map snapshot generation that a map command published, or zero for a runtime command. */
-  public val generation: ULong,
+  @get:JvmName("getGeneration") public val generation: ULong,
   /** The first map render update that includes the command, or zero when [generation] is zero. */
-  public val renderUpdateGeneration: ULong,
-)
+  @get:JvmName("getRenderUpdateGeneration") public val renderUpdateGeneration: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(generation: Long, renderUpdateGeneration: Long): CommandCompletion =
+      CommandCompletion(generation.toULong(), renderUpdateGeneration.toULong())
+  }
+}

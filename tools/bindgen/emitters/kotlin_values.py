@@ -14,6 +14,7 @@ from .. import docs
 from ..model import Unsupported
 from ..names import camel, pascal
 from ..semantic import conversion_doc, enum_member_prefix, required_callbacks
+from . import kotlin_java as java
 from .kotlin_abi import DATA_MODELS, Abi, LayoutError, width_expression
 
 SCALARS = {
@@ -136,23 +137,21 @@ def literal(number, typ):
 
 
 def content_equality(public, members):
-    """The class body that makes a data class compare its ByteArray members by content.
+    """The class body lines that make a data class compare its ByteArray members by content.
 
     A data class compares an array member by identity, so a class with one replaces the equals and
     hashCode that the compiler derives. A deep array comparison keeps the derived semantics for
     every other member, including the total order of floating-point values. Other classes keep the
-    derived members and get no body.
+    derived members and get no lines.
     """
     if not any(typ.rstrip("?") == "ByteArray" for _, typ in members):
-        return ""
+        return []
     names = ", ".join(member for member, _ in members)
-    return (
-        " {\n"
-        f"  private fun contentFields(): Array<Any?> = arrayOf({names})\n"
-        f"  override fun equals(other: Any?): Boolean = this === other || other is {public} && contentFields().contentDeepEquals(other.contentFields())\n"
-        "  override fun hashCode(): Int = contentFields().contentDeepHashCode()\n"
-        "}"
-    )
+    return [
+        f"  private fun contentFields(): Array<Any?> = arrayOf({names})",
+        f"  override fun equals(other: Any?): Boolean = this === other || other is {public} && contentFields().contentDeepEquals(other.contentFields())",
+        "  override fun hashCode(): Int = contentFields().contentDeepHashCode()",
+    ]
 
 
 class Values:
@@ -174,6 +173,21 @@ class Values:
         self.split_writers = {"threaded": {}, "async": {}}
         # The discarding forms of each split lowering's commands, by C name.
         self.split_discards: dict[str, dict[str, tuple[str, str | None]]] = {}
+        # Whether every source set of the operation in progress can name the
+        # `kotlin.jvm` annotations that the forms Java calls need.
+        self.jvm_placement = True
+
+    @property
+    def java(self):
+        """Whether the declarations in progress need the forms that Java calls."""
+        from .kotlin_callbacks import ASYNC
+
+        return self.jvm_placement and self.split != ASYNC
+
+    def jvm_name(self, method, types):
+        """The `@JvmName` that keeps a function's JVM name, if an unsigned type
+        in [types] would mangle it."""
+        return java.function_annotation(method, types) if self.java else ""
 
     def needs_registration(self, value):
         return bool(
@@ -472,15 +486,26 @@ class Values:
                 )
             args = []
             typed = []
+            # Each member's name, type, and default, which Java's forms take.
+            defaults = []
             # A record that only the library creates takes every field, so a
             # field that C appends reaches each caller that fabricates one.
             required = self.output_only(value)
+            scoped = value.native in self.views
             for member, typ, field in self.members(value):
                 typed.append((member, typ))
                 default = self.member_default(field, typ, required)
+                defaults.append((member, typ, default))
+                # A view's scoped member is a constructor parameter, whose
+                # getter is declared in the body.
+                annotation = (
+                    ""
+                    if scoped and field.scoped
+                    else java.property_annotation(member, typ)
+                )
                 args.append(
                     doc(self.bound, f"{value.native}.{field.name}", "  ")
-                    + f"  public val {member}: {typ}"
+                    + f"  {annotation}public val {member}: {typ}"
                     + (" = " + default if default is not None else "")
                 )
             args.extend(
@@ -491,7 +516,11 @@ class Values:
             typed.extend(
                 (self.flag_name(value, flag), "Boolean") for flag in value.mask_flags
             )
-            if value.native in self.views:
+            defaults.extend(
+                (self.flag_name(value, flag), "Boolean", None if required else "false")
+                for flag in value.mask_flags
+            )
+            if scoped:
                 # A view's scope guards only what its owner lends; a copy of
                 # any other member stays readable after the scope ends.
                 members = self.members(value)
@@ -500,44 +529,62 @@ class Values:
                     for arg, (_, _, field) in zip(args, members, strict=False)
                 ] + args[len(members) :]
                 getters = [
-                    f"  private val stored{pascal(member.strip('`'))}: {typ} = {member}\n  public val {member}: {typ} get() {{ bindingScope?.ensureActive(); return stored{pascal(member.strip('`'))} }}"
+                    f"  private val stored{pascal(member.strip('`'))}: {typ} = {member}\n  {java.property_annotation(member, typ)}public val {member}: {typ} get() {{ bindingScope?.ensureActive(); return stored{pascal(member.strip('`'))} }}"
                     for member, typ, field in members
                     if field.scoped
                 ]
+                if any(default == "null" for _, _, default in defaults):
+                    raise ValueError(f"{public}: a view has no copy for Java's options")
+                twins, companion = java.record(public, defaults, copyable=False)
                 result.append(
                     f"{doc(self.bound, value.native)}public class {public}(\n"
                     + ",\n".join(args)
-                    + "\n) {\n  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null\n"
-                    + "\n".join(getters)
-                    + "\n}"
+                    + "\n)"
+                    + java.class_body(
+                        [
+                            "  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null",
+                            *getters,
+                            *twins,
+                        ],
+                        companion,
+                    )
                 )
             else:
+                body, companion = java.record(public, defaults)
                 result.append(
                     f"{doc(self.bound, value.native)}public data class {public}(\n"
                     + ",\n".join(args)
                     + "\n)"
-                    + (
-                        self.to_options(value)
-                        if value.options
-                        else content_equality(public, typed)
+                    + java.class_body(
+                        [
+                            *(
+                                self.to_options(value)
+                                if value.options
+                                else content_equality(public, typed)
+                            ),
+                            *body,
+                        ],
+                        companion,
                     )
                 )
         for public, fields in self.multiple.items():
+            typed = [(field, self.public(value)) for field, value in fields]
+            body, companion = java.record(
+                public, [(field, typ, None) for field, typ in typed]
+            )
             result.append(
                 f"public data class {public}(\n"
                 + ",\n".join(
-                    f"  public val {field}: {self.public(value)}"
-                    for field, value in fields
+                    f"  {java.property_annotation(field, typ)}public val {field}: {typ}"
+                    for field, typ in typed
                 )
                 + "\n)"
-                + content_equality(
-                    public, [(field, self.public(value)) for field, value in fields]
-                )
+                + java.class_body([*content_equality(public, typed), *body], companion)
             )
         return "\n".join(result) + "\n" + kotlin_callbacks.common(self)
 
     def to_options(self, value):
-        """The class body that converts a complete record to its option bag."""
+        """The class body lines that convert a complete record to its option bag."""
         bag = self.bound.values[value.options]
         held = {field.name: member for member, _, field in self.members(value)}
         arguments = ", ".join(
@@ -545,12 +592,10 @@ class Values:
             for member, _, field in self.members(bag)
             if field.name in held
         )
-        return (
-            " {\n"
-            + doc(self.bound, conversion_doc(value.native), "  ")
-            + f"  public fun toOptions(): {name(bag.native)} = {name(bag.native)}({arguments})\n"
-            + "}"
-        )
+        return [
+            doc(self.bound, conversion_doc(value.native), "  ")
+            + f"  public fun toOptions(): {name(bag.native)} = {name(bag.native)}({arguments})"
+        ]
 
     def union_name(self, record, field):
         if record.union_member:
@@ -558,9 +603,24 @@ class Values:
         return name(record.native) + pascal(field.name)
 
     def union_declaration(self, public, union, documentation):
+        def variant(declaration, typed):
+            members = ", ".join(
+                f"{java.property_annotation(member, typ)}public val {member}: {typ}"
+                for member, typ in typed
+            )
+            body, companion = java.record(
+                declaration, [(member, typ, None) for member, typ in typed]
+            )
+            return (
+                f"  public data class {declaration}({members}): {public}"
+                + java.class_body(
+                    [*content_equality(declaration, typed), *body], companion
+                )
+            )
+
         variants = [
-            f"{doc(self.bound, f'{union.native}.{v.name}', '  ')}  public data class {variant_name(v)}(public val value: {self.public(v.value)}): {public}"
-            + content_equality(variant_name(v), [("value", self.public(v.value))])
+            doc(self.bound, f"{union.native}.{v.name}", "  ")
+            + variant(variant_name(v), [("value", self.public(v.value))])
             for v in union.fields
         ]
         if union.empty_variant:
@@ -568,8 +628,7 @@ class Values:
         # Only a union that native returns can hold a tag this binding does not know.
         if union.native in self.bound.returned:
             variants.append(
-                f"  public data class Unknown(public val tag: UInt, public val bytes: ByteArray): {public}"
-                + content_equality("Unknown", [("tag", "UInt"), ("bytes", "ByteArray")])
+                variant("Unknown", [("tag", "UInt"), ("bytes", "ByteArray")])
             )
         return (
             f"{documentation}public sealed interface {public} {{\n"

@@ -12,6 +12,7 @@ the shared code uses (see kotlin_native).
 """
 
 import dataclasses
+import re
 
 from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api, served
@@ -108,6 +109,15 @@ def placement(plan) -> list[str] | None:
     return None if platforms is None else source_sets(platforms)
 
 
+def java_placement(plan) -> bool:
+    """Whether every source set of [plan] can declare the forms that Java calls.
+
+    Kotlin/Wasm's source set can't name `kotlin.jvm` annotations, which are
+    optional expectations.
+    """
+    return "wasmJsMain" not in (placement(plan) or [])
+
+
 # The C functions that handwritten functions own, on the targets that can call
 # them, so the generated API leaves them out. Their native declarations stay,
 # because those functions call them. Each maps to the function a host calls.
@@ -122,7 +132,8 @@ WASM_GLUE = "wasm/mln_kw_generated.c"
 WASM_EXPORTS = "wasm/mln_kw_exports.txt"
 
 OPERATION_IMPORTS = """\
-import kotlin.jvm.JvmInline
+import kotlin.jvm.JvmName
+import kotlin.jvm.JvmStatic
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
@@ -313,6 +324,7 @@ def lowered(api: Api | BoundApi):
             lowerings = list(SPLIT)
         else:
             lowerings = [None]
+        values.jvm_placement = java_placement(plan)
         try:
             for lowering in lowerings:
                 values.split = lowering
@@ -334,6 +346,7 @@ def lowered(api: Api | BoundApi):
             unsupported[function.name] = f"{function.location}: {error}"
         finally:
             values.split = None
+            values.jvm_placement = True
     for handwritten in HANDWRITTEN:
         bodies.pop(handwritten, None)
     functions = [
@@ -358,17 +371,29 @@ def callback_owner(bound, receiver):
     )
 
 
+def annotations(source: str) -> tuple[str, str]:
+    """A member method's leading annotations, such as `@JvmName("x") `, and the
+    rest of its source without its indent."""
+    match = re.match(r"  ((?:@\w+(?:\([^)]*\))? )*)", source)
+    if match is None:
+        raise ValueError(f"not a member method: {source[:40]}")
+    return match.group(1), source[match.end() :]
+
+
 def extension(source: str, receiver: str) -> str:
     """A member method's source as an extension of [receiver], which a split or
     platform source set declares."""
+    if source.rstrip("\n").count("\n"):
+        raise ValueError(f"an extension declares one method: {source[:40]}")
+    annotation, source = annotations(source)
     for head in ("public suspend fun ", "public fun "):
-        if source.startswith("  " + head):
-            rest = source[len(head) + 2 :]
+        if source.startswith(head):
+            rest = source[len(head) :]
             generics = ""
             if rest.startswith("<"):
                 generics, rest = rest.split("> ", 1)
                 generics += "> "
-            return head + generics + receiver + "." + rest
+            return annotation + head + generics + receiver + "." + rest
     raise ValueError(f"not a member method: {source[:40]}")
 
 
@@ -390,9 +415,10 @@ def delivery_functions(bound):
 def top_level(source: str) -> str:
     """A member method's source as a top-level function of the package, which
     is how the binding declares a process global."""
-    if not source.startswith("  public "):
+    if not annotations(source)[1].startswith("public "):
         raise ValueError(f"not a member method: {source[:40]}")
-    return source[2:]
+    # A method's Java twin follows it.
+    return "".join(line.removeprefix("  ") for line in source.splitlines(True))
 
 
 def companion(bound, plan) -> str:
@@ -446,12 +472,14 @@ def lower(api: Api | BoundApi) -> Lowered:
                 and plan.completion
                 and plan.completion.discardable
             ):
+                values.jvm_placement = java_placement(plan)
+                try:
+                    discard = operation(plan, values, native, discard=True)
+                finally:
+                    values.jvm_placement = True
                 extensions.append(
                     f"/** [{owner_name(bound.handles[receiver])}.{method}] without its completion. */\n"
-                    + extension(
-                        operation(plan, values, native, discard=True),
-                        f"{family}Discarding",
-                    )
+                    + extension(discard, f"{family}Discarding")
                 )
             for name in sets:
                 platform_extensions.setdefault(name, []).extend(extensions)
@@ -501,11 +529,13 @@ def lower(api: Api | BoundApi) -> Lowered:
                 "   * This handle's commands without their completions. A discarding call returns once native\n"
                 "   * accepts the command, and native logs a command that fails as a warning.\n"
                 "   */\n"
-                f"  public val discarding: {view} get() = {view}(this)\n"
+                f"  public val discarding: {view} get() = {view}.wrap(this)\n"
             )
+            # A plain class rather than a value class, which would mangle the
+            # JVM name of each member that takes or returns one.
             trailer = (
                 f"\n/** The commands of a [{class_name}] that drop their completions. */\n"
-                f"@JvmInline\npublic value class {view} internal constructor(internal val owner: {class_name}) {{\n"
+                f"public class {view} private constructor(@get:JvmSynthetic internal val owner: {class_name}) {{\n"
                 f"  @get:JvmSynthetic internal val binding get() = owner.binding\n"
                 + (
                     "  @get:JvmSynthetic internal val bindingCallbacks get() = owner.bindingCallbacks\n"
@@ -517,7 +547,12 @@ def lower(api: Api | BoundApi) -> Lowered:
                     + operation(p, values, native, discard=True)
                     for p in commands
                 )
-                + "}\n"
+                # Java can read an internal companion, but can't call its members.
+                + "  internal companion object {\n"
+                f"    /** Creates the discarding view of `owner`. */\n"
+                f"    @JvmSynthetic internal fun wrap(owner: {class_name}): {view} = {view}(owner)\n"
+                "  }\n"
+                "}\n"
             )
         members[receiver] = (body, trailer)
     for name, extensions in sorted(platform_extensions.items()):
