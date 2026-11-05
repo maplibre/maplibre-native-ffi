@@ -24,7 +24,7 @@ description = "Test the GObject library against a native preset's install."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = '''
 case "$usage_preset" in
-  linux-musl-*) exec mise run :_test-device "$usage_preset" ;;
+  linux-musl-* | freebsd-*) exec mise run :_test-device "$usage_preset" ;;
   *) exec mise run :_test-host "$usage_preset" ;;
 esac
 '''
@@ -41,12 +41,18 @@ run = [
   ] },
 ]
 
-# Alpine builds the library against its own GLib and runs the programs there.
+# Alpine and the FreeBSD virtual machine build the library against their own
+# GLib and run the programs there.
 [tasks._test-device]
 hide = true
 extends = "ffi:preset"
 run = '''
 install="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+if [[ "$usage_preset" == freebsd-* ]]; then
+  host=$("$MISE_MONOREPO_ROOT/tools/devices/freebsd-host")
+  ssh -o BatchMode=yes "$host" \
+    pkg install --yes --quiet bash gjs glib gobject-introspection meson pkgconf vala >&2
+fi
 MLN_FFI_DEVICE_INSTALL="$install" MLN_FFI_DEVICE_TIMEOUT=600 exec "$MISE_MONOREPO_ROOT/tools/devices/run" \
   sh "$PWD/scripts/test-from-source.sh" "$install"
 '''

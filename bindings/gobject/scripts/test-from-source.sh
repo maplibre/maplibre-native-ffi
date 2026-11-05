@@ -1,8 +1,9 @@
 #!/bin/sh
 # Builds the library against this system's GLib, gobject-introspection, Vala,
 # and GJS, then runs the package and suite programs against it, for a target
-# whose system runs its tests: Alpine for musl. The repository may mount
-# read-only, so the library installs into a scratch copy of the native install.
+# whose system runs its tests: Alpine for musl, and the virtual machine for
+# FreeBSD, which has installed them. The repository may mount read-only, so the
+# library installs into a scratch copy of the native install.
 #
 #   test-from-source.sh <native-install>
 set -eu
