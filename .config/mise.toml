@@ -177,13 +177,7 @@ auto = true
 run = "tools/deps/sync-submodules"
 
 [hooks]
-# The OpenHarmony SDK plugin lives in the repository, and mise resolves a plugin
-# from its own directory. Refresh its checkout-dependent symlink before mise
-# inspects installed tool environments. The SDK remains opt-in through mise.ohos.toml.
-postinstall = [
-  "mise plugins link --force ohos-sdk .mise/plugins/ohos-sdk",
-  "hk install --mise --quiet",
-]
+postinstall = ["hk install --mise --quiet"]
 
 [task_templates."ffi:preset"]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
