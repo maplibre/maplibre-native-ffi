@@ -323,6 +323,20 @@ cargo test --locked -p maplibre-native-ffi-platform --lib
 ctest --test-dir "$build_dir" -C Release --output-on-failure --no-tests=error --timeout 300 --parallel
 '''
 
+# The C API benchmarks, in benchmarks/. `mise run bench -- --help` and
+# `mise run bench:compare -- --help` list the options.
+[tasks.bench]
+description = "Build and run the C API benchmarks for a preset, writing a report under build/bench/runs."
+run = 'MLN_BENCH_HOST_PRESET="{{vars.host_native_preset}}" python3 benchmarks/bench.py run "$@"'
+
+[tasks."bench:compare"]
+description = "Compare the C API benchmarks of two sides, such as a base ref and the working tree, run interleaved."
+run = 'MLN_BENCH_HOST_PRESET="{{vars.host_native_preset}}" python3 benchmarks/bench.py compare "$@"'
+
+[tasks."bench:fixtures"]
+description = "Download the benchmarks' pinned fixtures into build/bench/fixtures."
+run = "python3 benchmarks/bench.py fixtures"
+
 [tasks.check-exports]
 description = "Check that an installed native library exports exactly the public C API."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'

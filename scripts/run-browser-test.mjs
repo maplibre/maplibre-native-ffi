@@ -2,7 +2,7 @@
 //
 // Usage: node scripts/run-browser-test.mjs <page.html|module.js>
 //        [--timeout-seconds N] [--render-backend NAME] [--browser-arg FLAG]...
-//        [--module-arg ARG]...
+//        [--module-arg ARG]... [--print-output] [--hardware-gpu]
 //
 // Backend-specific browser flags live here for both C and Rust suites. Module
 // arguments reach a module page through its worker and an emcc page through its
@@ -10,6 +10,10 @@
 //
 // The browser is slower than a native run, so the page gets the timeout scale
 // the native suite stretches its waits by: MLN_TEST_TIMEOUT_SCALE, or 3.
+//
+// --print-output prints the page's output when it passes too, and
+// --hardware-gpu renders on the host's GPU instead of in software, for the
+// benchmarks.
 
 import { spawn } from "node:child_process";
 import { createReadStream, existsSync, statSync, writeFileSync } from "node:fs";
@@ -55,6 +59,23 @@ const BACKEND_BROWSER_ARGS = {
   opengl: ["--enable-unsafe-swiftshader"],
 };
 
+// With --hardware-gpu: the host's GPU, through Vulkan on Linux, whatever the
+// GPU blocklist says, and SwiftShader only where the host has no GPU. These
+// replace the flags above, which a later --browser-arg can't override.
+const HARDWARE_BROWSER_ARGS = {
+  webgpu:
+    process.platform === "darwin"
+      ? ["--enable-unsafe-webgpu"]
+      : [
+          "--enable-unsafe-webgpu",
+          "--enable-features=Vulkan",
+          "--use-angle=vulkan",
+          "--ignore-gpu-blocklist",
+          "--enable-unsafe-swiftshader",
+        ],
+  opengl: ["--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"],
+};
+
 function fail(message) {
   console.error(`error: ${message}`);
   process.exit(2);
@@ -70,6 +91,8 @@ if (!existsSync(targetPath)) fail(`test target does not exist: ${targetPath}`);
 let timeoutSeconds = 600;
 const extraBrowserArgs = [];
 const moduleArgs = [];
+const printOutput = rest.includes("--print-output");
+const hardwareGpu = rest.includes("--hardware-gpu");
 for (let i = 0; i < rest.length; i += 1) {
   if (rest[i] === "--timeout-seconds") timeoutSeconds = Number(rest[i + 1]);
   if (rest[i] === "--browser-arg") extraBrowserArgs.push(rest[i + 1]);
@@ -78,7 +101,9 @@ for (let i = 0; i < rest.length; i += 1) {
     const backend = rest[i + 1];
     if (!(backend in BACKEND_BROWSER_ARGS))
       fail(`no browser flags are known for the ${backend} backend`);
-    extraBrowserArgs.push(...BACKEND_BROWSER_ARGS[backend]);
+    extraBrowserArgs.push(
+      ...(hardwareGpu ? HARDWARE_BROWSER_ARGS : BACKEND_BROWSER_ARGS)[backend],
+    );
   }
 }
 
@@ -375,6 +400,11 @@ if (!browserExited) {
 await rm(profile, { recursive: true, force: true, maxRetries: 5 });
 
 // Chromium's logging already carried the console through as the suite ran, so
-// the collected output only gets reprinted when it is the failure report.
-if (result.status !== 0 && result.output) console.log(result.output);
+// the collected output only gets reprinted when it is the failure report, or
+// when the caller asked for it. process.exit drops what Node hasn't yet written
+// to a full pipe, so the exit waits for the write.
+if ((result.status !== 0 || printOutput) && result.output)
+  await new Promise((resolve) =>
+    process.stdout.write(`${result.output}\n`, resolve),
+  );
 process.exit(result.status === 0 ? 0 : 1);

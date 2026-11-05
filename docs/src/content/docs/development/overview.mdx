@@ -95,6 +95,25 @@ These presets build on any Linux host, and their tests run under QEMU. Install
 Docker, then run `bash scripts/setup-qemu.sh` to install and register the
 emulators. Run it again after a reboot.
 
+## Benchmarks
+
+`mise run bench` measures what the C API costs its callers: CPU time,
+allocations, memory, latency, and frame pacing. It runs the cases in
+`benchmarks/`, whose comments say what each one times. The first run downloads
+pinned map data into `build/bench/fixtures`, and no case uses the network.
+
+`mise run bench:compare <ref>` compares the working tree with a Git ref, or
+another build of this repository, such as one with other CMake options. A change
+gets a verdict only when it's over 5% and unlikely to be noise. The comparison
+also reports how much the last frames of the two sides differ, so a side that's
+faster because it draws less shows up. `mise run bench -- --help` and
+`mise run bench:compare -- --help` list the options.
+
+Compare on an idle machine. To see how much your machine's numbers vary, compare
+a commit with itself, which should give no verdicts. Pass a preset and the same
+`-E` as for the tests to run on another target. Emulators and software
+rasterizers don't show what a device costs.
+
 ## Change the engine
 
 Each patch in `patches/maplibre-native/` is a change we also send upstream.
