@@ -1,0 +1,51 @@
+---
+title: Java
+description: Use the Kotlin library from Java, on the JVM or Android.
+sidebar:
+  attrs:
+    data-logo: java
+---
+
+## Install
+
+Java uses the [Kotlin](/maplibre-native-ffi/install/kotlin/) library's JVM and
+Android packages from Maven Central.
+
+On the JVM, add the binding's JVM package, and a runtime for each platform that
+your application runs on, as the Kotlin page's JVM section describes:
+
+```kotlin title="build.gradle.kts"
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-jvm:{{version}}")
+  runtimeOnly("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan-jvm:{{version}}:natives-linux-x64")
+}
+```
+
+Start Java with `--enable-native-access=ALL-UNNAMED`.
+
+On Android, add `maplibre-native-ffi` and a runtime, as the Kotlin page's
+Android section shows. Call `NativeLibrary_androidKt.initAndroid(context)` once
+before you create a runtime.
+
+## From Java
+
+The binding's API reference is the Kotlin one. Java sees the same classes, with
+these differences:
+
+- An asynchronous call returns a `Completion`, which is a `CompletableFuture`.
+  Wait for it with `join()`, or chain a stage such as `thenRun()`. Inside a
+  callback from the library, `join()` and `get()` throw an
+  `IllegalStateException` until the result arrives, so chain a stage there
+  instead.
+- A record with a member that has a default also has a factory, `of(...)`, which
+  takes the members that have none. Each `withX(...)` returns a copy that sets
+  one more member, as in `CameraOptions.of().withZoom(3.0)`.
+- An unsigned value is an `int` or a `long` with the same bits, as in
+  `map.cancelCameraTransitionsWithId(long)`. A record with an unsigned member,
+  such as `LogicalExtent`, is created with `of(...)`.
+- An enum's constants are static fields, such as `CameraUpdateMode.FLY`.
+  `X.of(int)` gives the value for a raw number, and each `X_VALUE` constant is a
+  raw number to `switch` on.
+- Functions outside a class, such as `setLogCallback`, are static methods of
+  their file's class, such as `GeneratedGlobalsKt`.
+- To release a handle, call `release().join()` in a `finally` block.

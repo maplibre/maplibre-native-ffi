@@ -2,6 +2,7 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
+import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -66,6 +67,7 @@ private constructor(
      *   out of range, or when `options` turns on clustering and `data` isn't a feature collection
      *   of points.
      */
+    @JvmStatic
     public fun create(
       data: String,
       options: GeoJsonSourceOptions? = null,

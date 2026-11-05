@@ -2,6 +2,7 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
+import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -111,6 +112,7 @@ private constructor(
      * - `Status.INVALID_ARGUMENT` when `expression` isn't a valid expression, or its result can't
      *   have the expected type.
      */
+    @JvmStatic
     public fun create(
       expression: String,
       options: StyleExpressionOptions? = null,

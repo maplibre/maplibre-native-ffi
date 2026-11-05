@@ -436,8 +436,11 @@ def lower(api: Api | BoundApi) -> Lowered:
             continue
         plan = bound.operations_by_name[function.name]
         if plan.factory and not placement(plan):
+            # Java calls a common factory on the owner's class, as it calls
+            # a record's `of`.
+            annotation, source = annotations(rendered[plan.name])
             factories.setdefault(plan.factory, []).append(
-                operation_doc(bound, plan, "  ") + rendered[plan.name]
+                operation_doc(bound, plan, "  ") + f"  {annotation}@JvmStatic {source}"
             )
             continue
         receiver = receiver_value(plan).native if plan.receiver else None

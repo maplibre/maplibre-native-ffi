@@ -50,6 +50,13 @@ export const languages: Language[] = [
     logo: devicon("go/go-original"),
   },
   {
+    id: "java",
+    label: "Java",
+    lang: "java",
+    title: "Main.java",
+    logo: devicon("java/java-original"),
+  },
+  {
     id: "kotlin",
     label: "Kotlin",
     lang: "kotlin",

@@ -1,7 +1,7 @@
 /**
  * Each language's snippet files, beside its tests, where its build compiles
- * them. A file is named after the page it serves: `create_a_map.c` or
- * `CreateAMap.kt` for `create-a-map`.
+ * them. A file is named after the page it serves: `create_a_map.c`,
+ * `CreateAMap.kt`, or `CreateAMapTest.java` for `create-a-map`.
  */
 
 type Files = Record<string, string>;
@@ -27,6 +27,10 @@ const files: Record<string, Files> = {
     import: "default",
     eager: true,
   }),
+  java: import.meta.glob(
+    "../../bindings/kotlin/src/*/java/**/docsnippets/*Test.java",
+    { query: "?raw", import: "default", eager: true },
+  ),
   kotlin: import.meta.glob(
     "../../bindings/kotlin/src/*/kotlin/**/docsnippets/*.kt",
     { query: "?raw", import: "default", eager: true },
