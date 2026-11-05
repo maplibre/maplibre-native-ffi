@@ -1744,10 +1744,10 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
             handle = bound.handles[receiver]
             if plan.name == handle.release and handle.release_waits:
                 return f"{symbol_name(receiver)}_release_async"
-            if plan.name == handle.dispose:
+            # A handle whose one teardown is both its release and its dispose
+            # names it as its release.
+            if plan.name == handle.dispose and handle.dispose != handle.release:
                 return f"{symbol_name(receiver)}_dispose"
-            if plan.name == handle.discard:
-                return None
         if plan.completion is not None and plan.shape != "attach":
             return f"{method_name(plan)}_async"
         return method_name(plan)

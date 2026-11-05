@@ -4946,7 +4946,7 @@ guint64 maplibre_native_ffi_resource_request_get_id(
  *
  * A failed answer fails the request with
  * `MAPLIBRE_NATIVE_FFI_RESOURCE_ERROR_REASON_OTHER`, as
- * `maplibre_native_ffi_resource_request_dispose()` does.
+ * `maplibre_native_ffi_resource_request_release()` does.
  *
  * See `mln_resource_request_complete` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -4984,7 +4984,7 @@ gboolean maplibre_native_ffi_resource_request_is_cancelled(
  *
  * A failed call fails the request with
  * `MAPLIBRE_NATIVE_FFI_RESOURCE_ERROR_REASON_OTHER`, as
- * `maplibre_native_ffi_resource_request_dispose()` does.
+ * `maplibre_native_ffi_resource_request_release()` does.
  *
  * See `mln_resource_request_pass_through` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5072,7 +5072,7 @@ guint64 maplibre_native_ffi_resource_transform_request_get_id(
  *
  * `url` must not be empty. A failed answer fails the request with
  * `MAPLIBRE_NATIVE_FFI_RESOURCE_ERROR_REASON_OTHER`, as
- * `maplibre_native_ffi_resource_transform_request_dispose()` does.
+ * `maplibre_native_ffi_resource_transform_request_release()` does.
  *
  * See `mln_resource_transform_request_complete` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5093,7 +5093,7 @@ gboolean maplibre_native_ffi_resource_transform_request_complete(
  * `MAPLIBRE_NATIVE_FFI_RESOURCE_ERROR_REASON_CONNECTION`, and the retry calls
  * the transform again. When this call fails, the request fails with
  * `MAPLIBRE_NATIVE_FFI_RESOURCE_ERROR_REASON_OTHER`, as
- * `maplibre_native_ffi_resource_transform_request_dispose()` does.
+ * `maplibre_native_ffi_resource_transform_request_release()` does.
  *
  * See `mln_resource_transform_request_fail` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
