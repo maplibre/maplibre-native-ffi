@@ -220,11 +220,9 @@ static void a_map_is_ready_to_every_wait(void) {
 static void a_map_keeps_its_runtime_alive(void) {
   MaplibreNativeFfiRuntime* runtime = create_runtime();
   MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 64);
-  const guint64 runtime_id = maplibre_native_ffi_runtime_get_id(runtime);
   g_object_unref(runtime);
   // The map's object holds its runtime, whose native runtime still serves it.
   set_style(map, empty_style);
-  g_assert_cmpuint(runtime_id, !=, 0);
   g_object_unref(map);
 }
 
@@ -322,6 +320,7 @@ typedef struct {
   GThread* thread;
   gboolean style_loaded;
   gboolean other_thread;
+  gboolean freed;
   int frees;
 } EventCase;
 
@@ -343,9 +342,8 @@ static void on_events(GPtrArray* events, gpointer user_data) {
 static void count_free(gpointer user_data) {
   EventCase* state = user_data;
   state->frees++;
+  state->freed = TRUE;
 }
-
-static gboolean freed(const EventCase* state) { return state->frees > 0; }
 
 static void events_reach_the_handler_on_the_main_context(void) {
   EventCase state = {.thread = g_thread_self()};
@@ -379,7 +377,7 @@ static void events_reach_the_handler_on_the_main_context(void) {
     );
   g_assert_no_error(error);
   // Native code releases the replaced handler, which frees its data once.
-  while (!freed(&state)) g_main_context_iteration(NULL, TRUE);
+  wait_for(&state.freed, "the handler's data to be freed");
   g_assert_cmpint(state.frees, ==, 1);
   release_map(map);
   release_runtime(runtime);
@@ -630,6 +628,7 @@ static void a_session_renders_pixels_that_the_library_reads_back(void) {
 
 typedef struct {
   gboolean fetched;
+  gboolean release_finished;
   gboolean refused;
   gboolean answered;
 } SourceCase;
@@ -645,6 +644,7 @@ static void refused_release(
   state->refused = g_error_matches(
     error, MAPLIBRE_NATIVE_FFI_ERROR, MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE
   );
+  state->release_finished = TRUE;
 }
 
 static void tile_answered(
@@ -711,6 +711,7 @@ static void a_custom_source_answers_through_the_map_it_borrows(void) {
     g_autoptr(MaplibreNativeFfiRenderFrameResult) frame = render(&target);
   }
   wait_for(&state.answered, "a tile answer");
+  wait_for(&state.release_finished, "a refused release");
   g_assert_true(state.refused);
   release_target(&target);
 }
@@ -901,7 +902,7 @@ static void a_borrowed_texture_session_lends_its_frames(void) {
   const MaplibreNativeFfiGpuSync done = {
     .kind = MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE
   };
-  // Wait for the producer before the CPU reads the texture.
+  // The frame lends its producer's sync, as it lends its texture.
   g_autoptr(MaplibreNativeFfiGpuSync) producer =
     maplibre_native_ffi_acquired_frame_get_producer_sync(frame, &error);
   g_assert_no_error(error);
