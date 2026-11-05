@@ -609,6 +609,7 @@ ci:
         - if:
             files:
               - tools/release/python_release.py
+              - .github/workflows/_python-wheels.yml
           then: apply
     npm:
       covers: >-

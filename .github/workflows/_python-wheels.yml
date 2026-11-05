@@ -48,11 +48,15 @@ jobs:
           run-id: ${{ inputs.run_id }}
           pattern: python-runtime-*-${{ env.PACKAGE_SHA }}
           path: build/python-runtimes
+      # This job installs only Python and uv, then runs the release tasks with
+      # --no-deps, so sync the root lock (including the dev-group wheel pin)
+      # before stamping. Stamping changes pyproject.toml, so nothing after it
+      # may sync uv.lock.
+      - run: uv sync --locked --no-install-workspace
       - name: Version the packages
         run: >-
           mise run --no-deps //bindings/python:prepare-release
           "$PACKAGE_VERSION" "$GITHUB_WORKSPACE/build/python-runtimes"
-      # Stamping changes pyproject.toml, so nothing after it may sync uv.lock.
       - run: mise run --no-deps //bindings/python:build-api
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
