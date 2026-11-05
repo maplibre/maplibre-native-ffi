@@ -125,9 +125,9 @@ function(mln_ffi_configure_platform_dependencies target)
     EXCLUDE_FROM_ALL)
   fetchcontent_declare(
     mln_ffi_libuv_source
-    URL "https://dist.libuv.org/dist/v1.48.0/libuv-v1.48.0.tar.gz"
+    URL "https://dist.libuv.org/dist/v1.53.0/libuv-v1.53.0.tar.gz"
     URL_HASH
-      "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
+      "SHA256=cb0d6dd2128d5a95bd242c6cc982a24fe608fa93da57b6b4ec763b0018c53e64"
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
   mln_ffi_add_component(
@@ -146,7 +146,7 @@ function(mln_ffi_configure_platform_dependencies target)
     https://github.com/libuv/libuv
     MIT
     VERSION
-    1.48.0
+    1.53.0
     NOTICES
     "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
     libuv.txt
