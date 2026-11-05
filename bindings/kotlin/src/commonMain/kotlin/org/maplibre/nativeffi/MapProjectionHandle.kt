@@ -2,6 +2,7 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
+import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -218,6 +219,7 @@ private constructor(
      * See `mln_map_projection_create` in the
      * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
      */
+    @JvmStatic
     public fun create(view: MapView): MapProjectionHandle =
       nativeCall(null, null) {
         val out = allocate(8, w(8, 8, 4))

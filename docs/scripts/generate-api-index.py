@@ -290,6 +290,10 @@ def main() -> None:
     for native in elsewhere(api):
         for language in links:
             index[native].setdefault(language, index[native]["c"])
+    # Java calls the Kotlin binding, so its readers see the Kotlin reference.
+    for entries in index.values():
+        if "kotlin" in entries:
+            entries["java"] = entries["kotlin"]
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")
 

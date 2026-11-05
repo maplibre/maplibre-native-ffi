@@ -2,6 +2,7 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
+import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -68,6 +69,7 @@ private constructor(
      * - `Status.NATIVE_ERROR` when `adapter_index` names no GPU, or the platform can't create the
      *   device.
      */
+    @JvmStatic
     public fun create(options: OffscreenDeviceOptions? = null): OffscreenDeviceHandle =
       nativeCall(null, null) {
         val out = allocate(8, w(8, 8, 4))

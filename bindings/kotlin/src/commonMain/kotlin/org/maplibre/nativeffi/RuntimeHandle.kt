@@ -2,6 +2,7 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
+import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
@@ -505,6 +506,7 @@ private constructor(
      * See `mln_runtime_create` in the
      * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
      */
+    @JvmStatic
     public fun create(options: RuntimeOptions? = null): Completion<RuntimeHandle> =
       nativeThreadStart {
         val out = allocate(8, w(8, 8, 4))

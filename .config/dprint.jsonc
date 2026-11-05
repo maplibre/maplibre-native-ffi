@@ -54,7 +54,10 @@
     "lineWidth": 100,
     "overrides": [{ "files": "**/docsnippets/**", "lineWidth": 70 }],
   },
-  "googleJavaFormat": { "lineWidth": 100 },
+  "googleJavaFormat": {
+    "lineWidth": 100,
+    "overrides": [{ "files": "**/docsnippets/**", "lineWidth": 70 }],
+  },
   "csharpier": {
     // Bindgen formats the C# it generates as `*.g.cs`.
     "includeGenerated": true,
