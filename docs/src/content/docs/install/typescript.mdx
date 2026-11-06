@@ -107,18 +107,6 @@ import { RuntimeHandle } from "@maplibre/native-ffi";
 const runtime = await RuntimeHandle.create();
 ```
 
-ArkTS adds these rules:
-
-- ArkUI has a built-in `Camera` component, so ets-loader rejects
-  `import { Camera }`. Import it under another name, such as
-  `import { Camera as CameraPosition }`.
-- JSON parameters take a value, not text. `JSON.parse` a style that you hold as
-  a string first.
-- Strict ArkTS rejects an object literal for an `unknown` parameter. Pass a
-  `Record<string, Object>` variable instead.
-- In an idle app, `setTimeout` polling can stall, because OpenHarmony can miss a
-  timer's wakeup. Wait on frame callbacks or events instead.
-
 ## Use your own build
 
 npm has no snapshots. To try `main`, pack the packages for your preset in a

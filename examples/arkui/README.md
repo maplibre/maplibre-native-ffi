@@ -43,8 +43,6 @@ limits:
 
 - It doesn't rewrite `@kit.*` imports, so the example imports the `@ohos.*`
   modules instead.
-- It doesn't compile imported `@ComponentV2` structs, source HARs, or sources in
-  `oh_modules`.
 - Its `tsconfig.esm.json` lacks `NodeContainer`, `ContentSlot`, `SymbolGlyph`,
   `FolderStack`, and `MovingPhotoView`.
 - Its `components/common_attrs.json` lacks `layoutGravity`.
