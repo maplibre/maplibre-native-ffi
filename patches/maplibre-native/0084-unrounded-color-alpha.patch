@@ -1,0 +1,126 @@
+Keeps a color's alpha unrounded in Color::toArray. It rounded alpha to two
+decimal places, so to-rgba, Color::serialize, and the style property getters
+read #ff000080's alpha 0.502 as 0.5, and a color read and set again changed.
+GL JS's to-rgba returns alpha as is. Color::stringify, which backs to-string
+and style JSON, now matches GL JS's Color.toString: whole channels and alpha as
+is. Before, it wrote unrounded channels and rounded alpha.
+(https://github.com/maplibre/maplibre-native-ffi/issues/1707)
+Upstream: not proposed
+
+diff --git a/metrics/integration/expression-tests/to-rgba/alpha-unrounded/test.json b/metrics/integration/expression-tests/to-rgba/alpha-unrounded/test.json
+new file mode 100644
+index 0000000..b17d73f
+--- /dev/null
++++ b/metrics/integration/expression-tests/to-rgba/alpha-unrounded/test.json
+@@ -0,0 +1,14 @@
++{
++  "expression": ["to-rgba", ["to-color", "#00000080"]],
++  "inputs": [[{}, {}]],
++  "expected": {
++    "compiled": {
++      "result": "success",
++      "isFeatureConstant": true,
++      "isZoomConstant": true,
++      "type": "array<number, 4>"
++    },
++    "outputs": [[0, 0, 0, 0.5019607843137255]],
++    "serialized": ["literal", [0, 0, 0, 0.5019607843137255]]
++  }
++}
+diff --git a/metrics/integration/expression-tests/to-string/color-alpha/test.json b/metrics/integration/expression-tests/to-string/color-alpha/test.json
+new file mode 100644
+index 0000000..43a30d2
+--- /dev/null
++++ b/metrics/integration/expression-tests/to-string/color-alpha/test.json
+@@ -0,0 +1,14 @@
++{
++  "expression": ["to-string", ["rgba", 255, 0, 0, 0.125]],
++  "inputs": [[{}, {}]],
++  "expected": {
++    "compiled": {
++      "result": "success",
++      "isFeatureConstant": true,
++      "isZoomConstant": true,
++      "type": "string"
++    },
++    "outputs": ["rgba(255,0,0,0.125)"],
++    "serialized": "rgba(255,0,0,0.125)"
++  }
++}
+diff --git a/src/mln/util/color.cpp b/src/mln/util/color.cpp
+index 132336c..4d676d4 100644
+--- a/src/mln/util/color.cpp
++++ b/src/mln/util/color.cpp
+@@ -173,8 +173,12 @@ std::optional<Color> Color::parse(const std::string& s) {
+ }
+ 
+ std::string Color::stringify() const {
+-    std::array<double, 4> array = toArray();
+-    return "rgba(" + util::toString(array[0]) + "," + util::toString(array[1]) + "," + util::toString(array[2]) + "," +
++    // Match GL JS's Color.toString: whole channels, alpha as is.
++    const auto array = toArray();
++    const auto channel = [](double value) {
++        return util::toString(std::floor(value + 0.5));
++    };
++    return "rgba(" + channel(array[0]) + "," + channel(array[1]) + "," + channel(array[2]) + "," +
+            util::toString(array[3]) + ")";
+ }
+ 
+@@ -199,7 +203,7 @@ std::array<double, 4> Color::toArray() const {
+             r * 255 / a,
+             g * 255 / a,
+             b * 255 / a,
+-            floor(a * 100 + .5) / 100 // round to 2 decimal places
++            a,
+         }};
+     }
+ }
+diff --git a/src/mln/util/color.rs.cpp b/src/mln/util/color.rs.cpp
+index dbf2331..d76dad0 100644
+--- a/src/mln/util/color.rs.cpp
++++ b/src/mln/util/color.rs.cpp
+@@ -21,8 +21,12 @@ std::optional<Color> Color::parse(const std::string& s) {
+ }
+ 
+ std::string Color::stringify() const {
+-    std::array<double, 4> array = toArray();
+-    return "rgba(" + util::toString(array[0]) + "," + util::toString(array[1]) + "," + util::toString(array[2]) + "," +
++    // Match GL JS's Color.toString: whole channels, alpha as is.
++    const auto array = toArray();
++    const auto channel = [](double value) {
++        return util::toString(std::floor(value + 0.5));
++    };
++    return "rgba(" + channel(array[0]) + "," + channel(array[1]) + "," + channel(array[2]) + "," +
+            util::toString(array[3]) + ")";
+ }
+ 
+@@ -34,7 +38,7 @@ std::array<double, 4> Color::toArray() const {
+             r * 255 / a,
+             g * 255 / a,
+             b * 255 / a,
+-            floor(a * 100 + .5) / 100 // round to 2 decimal places
++            a,
+         }};
+     }
+ }
+diff --git a/test/util/color.test.cpp b/test/util/color.test.cpp
+index 8bb17bf..b086422 100644
+--- a/test/util/color.test.cpp
++++ b/test/util/color.test.cpp
+@@ -125,3 +125,16 @@ TEST(ColorInterpolate, RgbIsTheExistingInterpolation) {
+     const Color mixed = Color::interpolate(red, Color::blue(), 0.5, ColorSpace::RGB);
+     expectColor(mixed, 0.25f, 0.0f, 0.5f, 0.75f);
+ }
++
++TEST(Color, ToArrayKeepsAlpha) {
++    const auto color = Color::parse("#ff000080");
++    ASSERT_TRUE(color.has_value());
++    EXPECT_DOUBLE_EQ(128.0f / 255, color->toArray()[3]);
++}
++
++// Expected strings come from GL JS's Color.toString (maplibre-gl-style-spec).
++TEST(Color, Stringify) {
++    EXPECT_EQ("rgba(255,0,0,0.125)", Color::parse("rgba(255,0,0,0.125)")->stringify());
++    EXPECT_EQ("rgba(128,0,0,1)", Color(0.5f, 0.0f, 0.0f, 1.0f).stringify());
++    EXPECT_EQ("rgba(0,0,0,0)", Color(0.0f, 0.0f, 0.0f, 0.0f).stringify());
++}
