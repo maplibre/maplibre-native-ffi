@@ -6157,8 +6157,10 @@ final class RuntimeOptions extends _Value {
   /// directory, or the app's assets on Android.
   final String assetPath;
 
-  /// The cache database file, which holds the ambient cache and offline
-  /// regions. Empty keeps them in memory.
+  /// The path of the cache database file, which holds the ambient cache and
+  /// offline regions. The library creates the file if it doesn't exist, so its
+  /// directory must be writable. A relative path is relative to the working
+  /// directory. Empty keeps the cache in memory.
   final String cachePath;
 
   /// A copy of this value with the given members replaced.

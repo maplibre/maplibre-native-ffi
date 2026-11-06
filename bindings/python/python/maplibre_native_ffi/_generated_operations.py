@@ -3006,6 +3006,11 @@ class _RuntimeHandleOperations(GeneratedOperations):
 
         See `mln_runtime_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the cache database file that
+          `options` names can't be opened or created.
         """
         return _adopt_value(
             _native._RuntimeHandle.create(options), "RuntimeHandle", None

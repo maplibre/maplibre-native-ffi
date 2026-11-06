@@ -151,6 +151,12 @@ public sealed unsafe partial class RuntimeHandle
     /// not on the main thread.</para>
     /// <para>See <c>mln_runtime_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the cache database
+    /// file that <c>options</c> names can't be opened or
+    /// created.</description></item>
+    /// </list>
     /// </remarks>
     public static RuntimeHandle Create(RuntimeOptions? options = null)
     {

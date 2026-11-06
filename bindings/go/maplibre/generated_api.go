@@ -5189,8 +5189,10 @@ type RuntimeOptions struct {
 	// The directory that asset:// URLs load from. Empty uses the working directory,
 	// or the app's assets on Android.
 	AssetPath string
-	// The cache database file, which holds the ambient cache and offline regions.
-	// Empty keeps them in memory.
+	// The path of the cache database file, which holds the ambient cache and
+	// offline regions. The library creates the file if it doesn't exist, so its
+	// directory must be writable. A relative path is relative to the working
+	// directory. Empty keeps the cache in memory.
 	CachePath string
 }
 
@@ -9477,6 +9479,10 @@ func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[CommandCompleti
 //
 // See mln_runtime_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when the cache database file that options names
+//     can't be opened or created.
 func NewRuntime(options *RuntimeOptions) (*RuntimeHandle, error) {
 	var outRuntime C.mln_runtime
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
