@@ -1,0 +1,763 @@
+Adds gesture momentum to the transform, so that SDKs on top of the engine
+stop each building their own engine for fling, friction, and bearing snap
+(https://github.com/maplibre/maplibre-native-ffi/issues/1705). A momentum
+moves the camera from where it stands on each frame, so other commands can
+change the fields that it leaves alone, and it pans in short screen steps,
+so a fling travels evenly at any pitch.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 03ad5ae..27026fe 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -294,6 +294,7 @@ list(APPEND INCLUDE_FILES
+     ${PROJECT_SOURCE_DIR}/include/mln/layermanager/symbol_layer_factory.hpp
+     ${PROJECT_SOURCE_DIR}/include/mln/map/bound_options.hpp
+     ${PROJECT_SOURCE_DIR}/include/mln/map/camera.hpp
++    ${PROJECT_SOURCE_DIR}/include/mln/map/camera_momentum.hpp
+     ${PROJECT_SOURCE_DIR}/include/mln/map/change.hpp
+     ${PROJECT_SOURCE_DIR}/include/mln/map/map_observer.hpp
+     ${PROJECT_SOURCE_DIR}/include/mln/map/map_options.hpp
+diff --git a/bazel/core.bzl b/bazel/core.bzl
+index e72aacd..2646f15 100644
+--- a/bazel/core.bzl
++++ b/bazel/core.bzl
+@@ -692,6 +692,7 @@ MLN_CORE_HEADERS = [
+     "include/mln/layermanager/symbol_layer_factory.hpp",
+     "include/mln/map/bound_options.hpp",
+     "include/mln/map/camera.hpp",
++    "include/mln/map/camera_momentum.hpp",
+     "include/mln/map/change.hpp",
+     "include/mln/map/map.hpp",
+     "include/mln/map/map_observer.hpp",
+diff --git a/include/mln/map/camera_momentum.hpp b/include/mln/map/camera_momentum.hpp
+new file mode 100644
+index 0000000..1bd0820
+--- /dev/null
++++ b/include/mln/map/camera_momentum.hpp
+@@ -0,0 +1,99 @@
++#pragma once
++
++#include <mln/util/chrono.hpp>
++#include <mln/util/geo.hpp>
++
++#include <cstdint>
++#include <functional>
++#include <optional>
++
++namespace mln {
++
++/** How the travel of one momentum component slows over its duration. */
++struct MomentumCurve {
++    Duration duration = Duration::zero();
++
++    /** Travel follows 1 - (1 - t / duration)^exponent. Must be at least 1. */
++    double exponent = 2.0;
++
++    /** When set, travel instead follows an exponential decay at this rate per
++        second: (1 - e^(-rate t)) / (1 - e^(-rate duration)). */
++    std::optional<double> decayRate;
++
++    /** The share of the total travel covered after `elapsed`, from 0 to 1. */
++    double progress(Duration elapsed) const;
++
++    /** The rate at which progress grows after `elapsed`, per second. */
++    double rate(Duration elapsed) const;
++};
++
++/** How fast each component of a momentum moves, in its own unit per second. */
++struct MomentumVelocity {
++    /** Logical pixels per second that the map's content moves on screen. */
++    ScreenCoordinate pan{0, 0};
++    /** Zoom levels per second. */
++    double zoom = 0;
++    /** Degrees per second. */
++    double bearing = 0;
++    /** Degrees per second. */
++    double pitch = 0;
++};
++
++/** How a momentum ended. */
++struct MomentumEnd {
++    /** The speed of the components that were still moving when the momentum
++        was cancelled, as of the last frame that moved the camera. A momentum
++        that ran to its end reports zero. */
++    MomentumVelocity velocity;
++    /** Whether another command took a field that a moving part needed, which
++        stopped that part early. */
++    bool replaced = false;
++};
++
++/** Where the bearing settles once the rest of a momentum ends normally. */
++struct BearingSnap {
++    /** Equally spaced bearings to settle on, starting at `targetOffset`
++        degrees. */
++    uint32_t targetCount = 1;
++    double targetOffset = 0;
++    /** The largest distance, in degrees, from which the bearing settles. */
++    double tolerance = 7;
++    Duration duration = Duration::zero();
++};
++
++/** Camera motion that continues a gesture after its last contact lifts.
++
++    Each component moves its total over its own curve, applied every frame
++    relative to the camera as it stands, so other commands can change the
++    fields that the momentum leaves alone. A command that sets a field stops
++    the components that move it. Pan moves the map's content on screen in
++    short steps, so it travels its distance at any pitch. */
++struct CameraMomentum {
++    /** The screen distance, in logical pixels, that the content moves. */
++    std::optional<ScreenCoordinate> pan;
++    MomentumCurve panCurve;
++
++    /** Zoom levels to add. */
++    std::optional<double> zoom;
++    MomentumCurve zoomCurve;
++    /** The screen point that the zoom keeps in place. */
++    std::optional<ScreenCoordinate> zoomAnchor;
++
++    /** Degrees to add to the bearing. */
++    std::optional<double> bearing;
++    MomentumCurve bearingCurve;
++    /** The screen point that the rotation keeps in place. */
++    std::optional<ScreenCoordinate> bearingAnchor;
++
++    /** Degrees to add to the pitch. */
++    std::optional<double> pitch;
++    MomentumCurve pitchCurve;
++
++    std::optional<BearingSnap> bearingSnap;
++
++    /** Called once when the momentum ends, just before
++        AnimationOptions::transitionFinishFn. */
++    std::function<void(const MomentumEnd&)> finishFn;
++};
++
++} // namespace mln
+diff --git a/include/mln/map/map.hpp b/include/mln/map/map.hpp
+index 052ede8..f171f55 100644
+--- a/include/mln/map/map.hpp
++++ b/include/mln/map/map.hpp
+@@ -27,6 +27,7 @@ namespace mln {
+ 
+ class RendererFrontend;
+ class TransformState;
++struct CameraMomentum;
+ 
+ namespace style {
+ class Image;
+@@ -67,6 +68,9 @@ public:
+     /// `transitionId`, and leaves the others running. Requests an update only
+     /// when a command ended.
+     void cancelTransitions(uint64_t transitionId);
++    /// Continues a gesture with momentum, which moves the camera on each frame
++    /// until its components end. See CameraMomentum.
++    void startMomentum(const CameraMomentum&, const AnimationOptions& = {});
+     void setGestureInProgress(bool);
+     bool isGestureInProgress() const;
+     bool isRotating() const;
+diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
+index 3e01d9a..77fe561 100644
+--- a/src/mln/map/map.cpp
++++ b/src/mln/map/map.cpp
+@@ -125,6 +125,12 @@ void Map::cancelTransitions(uint64_t transitionId) {
+     if (impl->transform.cancelTransitions(transitionId)) impl->onUpdate();
+ }
+ 
++void Map::startMomentum(const CameraMomentum& momentum, const AnimationOptions& animation) {
++    impl->cameraMutated = true;
++    impl->transform.startMomentum(momentum, animation);
++    impl->onUpdate();
++}
++
+ void Map::setGestureInProgress(bool inProgress) {
+     impl->transform.setGestureInProgress(inProgress);
+     impl->onUpdate();
+diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
+index e2bb728..d839f6d 100644
+--- a/src/mln/map/transform.cpp
++++ b/src/mln/map/transform.cpp
+@@ -13,6 +13,8 @@
+ #include <mln/util/platform.hpp>
+ 
+ #include <algorithm>
++#include <array>
++#include <iterator>
+ #include <cstdio>
+ #include <utility>
+ #include <numbers>
+@@ -550,6 +552,95 @@ ProjectionMode Transform::getProjectionMode() const {
+         .withYSkew(state.getYSkew());
+ }
+ 
++// MARK: - Momentum
++
++double MomentumCurve::progress(Duration elapsed) const {
++    if (duration <= Duration::zero() || elapsed >= duration) return 1.0;
++    if (elapsed <= Duration::zero()) return 0.0;
++    const double t = std::chrono::duration<double>(elapsed).count();
++    const double total = std::chrono::duration<double>(duration).count();
++    if (decayRate) return std::expm1(-*decayRate * t) / std::expm1(-*decayRate * total);
++    return 1.0 - std::pow(1.0 - t / total, exponent);
++}
++
++double MomentumCurve::rate(Duration elapsed) const {
++    if (duration <= Duration::zero() || elapsed >= duration) return 0.0;
++    const double t = std::max(0.0, std::chrono::duration<double>(elapsed).count());
++    const double total = std::chrono::duration<double>(duration).count();
++    if (decayRate) return *decayRate * std::exp(-*decayRate * t) / -std::expm1(-*decayRate * total);
++    return exponent * std::pow(1.0 - t / total, exponent - 1.0) / total;
++}
++
++struct Transform::MomentumState {
++    struct Component {
++        // The fields that this component needs to keep moving.
++        uint16_t fields = 0;
++        MomentumCurve curve;
++        // The share of the total already applied.
++        double applied = 0;
++        bool moving = false;
++    };
++
++    CameraMomentum options;
++    Component pan;
++    Component zoom;
++    Component bearing;
++    Component pitch;
++    // Whether the bearing may still settle once the components end.
++    bool snapPending = false;
++    // The bearing change that the settling makes, while it runs, and when it
++    // started.
++    std::optional<double> snapDelta;
++    Duration snapStart = Duration::zero();
++    double snapApplied = 0;
++    // Whether another command took a field that a moving part needed.
++    bool replaced = false;
++    // When the last frame applied the momentum, from its start.
++    Duration elapsed = Duration::zero();
++
++    std::array<Component*, 4> components() { return {&pan, &zoom, &bearing, &pitch}; }
++
++    // Stops the parts that lost a field they need, and returns the fields that
++    // the rest still need.
++    uint16_t retain(uint16_t owned) {
++        uint16_t needed = 0;
++        for (auto* component : components()) {
++            if (!component->moving) continue;
++            if ((component->fields & owned) != component->fields) {
++                component->moving = false;
++                replaced = true;
++                continue;
++            }
++            needed |= component->fields;
++        }
++        if (snapPending || snapDelta) {
++            if (owned & Bearing) {
++                needed |= Bearing;
++            } else {
++                if (snapDelta) replaced = true;
++                snapPending = false;
++                snapDelta.reset();
++            }
++        }
++        return needed;
++    }
++
++    // Reports the speed as of the last frame, which left the camera where it
++    // stands.
++    MomentumEnd end() const {
++        MomentumEnd result;
++        result.replaced = replaced;
++        if (pan.moving) {
++            const double rate = pan.curve.rate(elapsed);
++            result.velocity.pan = {options.pan->x * rate, options.pan->y * rate};
++        }
++        if (zoom.moving) result.velocity.zoom = *options.zoom * zoom.curve.rate(elapsed);
++        if (bearing.moving) result.velocity.bearing = *options.bearing * bearing.curve.rate(elapsed);
++        if (pitch.moving) result.velocity.pitch = *options.pitch * pitch.curve.rate(elapsed);
++        return result;
++    }
++};
++
+ // MARK: - Transition
+ 
+ uint16_t Transform::cameraFields(const CameraOptions& camera) {
+@@ -588,14 +679,7 @@ void Transform::startTransition(const CameraOptions& camera,
+     transition->duration = latestTransitionDuration = transition->fields ? duration : Duration::zero();
+     transition->frame = frame;
+ 
+-    std::vector<std::shared_ptr<Transition>> finished;
+-    for (auto& active : transitions) {
+-        auto replaced = transition->fields;
+-        if (active->coupledFields & replaced) replaced |= active->coupledFields;
+-        active->fields &= ~replaced;
+-        if (!active->fields) finished.push_back(active);
+-    }
+-    std::erase_if(transitions, [](const auto& active) { return !active->fields; });
++    auto finished = releaseFields(transition->fields);
+     transitions.push_back(transition);
+     updateMovementFlags();
+     finishTransitions(finished);
+@@ -620,6 +704,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
+     camera.center = getLatLng(LatLng::Unwrapped);
+ 
+     for (const auto& transition : active) {
++        if (transition->momentum) continue;
+         const double t = transition->duration == Duration::zero()
+                              ? 1.0
+                              : std::clamp(std::chrono::duration<double>(now - transition->start) /
+@@ -670,6 +755,9 @@ void Transform::updateMovementFlags() {
+ 
+ void Transform::finishTransitions(const std::vector<std::shared_ptr<Transition>>& finished) {
+     for (const auto& transition : finished) {
++        if (transition->momentum && transition->momentum->options.finishFn) {
++            transition->momentum->options.finishFn(transition->momentum->end());
++        }
+         if (transition->animation.transitionFinishFn) transition->animation.transitionFinishFn();
+         // This notification ends a command, not necessarily all camera motion.
+         observer.onCameraDidChange(transition->duration != Duration::zero() ? MapObserver::CameraChangeMode::Animated
+@@ -693,11 +781,17 @@ void Transform::updateTransitions(const TimePoint& now) {
+     } guard{updatingTransitions};
+ 
+     const auto active = transitions;
+-    applyTransitions(active, now);
++    std::vector<std::shared_ptr<Transition>> absolute;
++    std::copy_if(
++        active.begin(), active.end(), std::back_inserter(absolute), [](const auto& item) { return !item->momentum; });
++    if (!absolute.empty()) applyTransitions(absolute, now);
++    for (const auto& transition : active) {
++        if (transition->momentum) advanceMomentum(*transition, now);
++    }
+ 
+     std::vector<std::shared_ptr<Transition>> finished;
+     for (const auto& transition : active) {
+-        if (now - transition->start >= transition->duration) {
++        if (now - transition->start >= transition->duration || !transition->fields) {
+             std::erase(transitions, transition);
+             finished.push_back(transition);
+         }
+@@ -706,7 +800,7 @@ void Transform::updateTransitions(const TimePoint& now) {
+ 
+     for (const auto& transition : active) {
+         if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) continue;
+-        if (transition->animation.transitionFrameFn) {
++        if (transition->animation.transitionFrameFn && transition->duration != Duration::zero()) {
+             const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
+                                             std::chrono::duration<double>(transition->duration),
+                                         0.0,
+@@ -719,6 +813,178 @@ void Transform::updateTransitions(const TimePoint& now) {
+     finishTransitions(finished);
+ }
+ 
++std::vector<std::shared_ptr<Transform::Transition>> Transform::releaseFields(uint16_t fields) {
++    std::vector<std::shared_ptr<Transition>> finished;
++    for (auto& active : transitions) {
++        auto replaced = fields;
++        if (active->coupledFields & replaced) replaced |= active->coupledFields;
++        active->fields &= ~replaced;
++        if (active->momentum) active->fields = active->momentum->retain(active->fields);
++        if (!active->fields) finished.push_back(active);
++    }
++    std::erase_if(transitions, [](const auto& active) { return !active->fields; });
++    return finished;
++}
++
++void Transform::startMomentum(const CameraMomentum& options, const AnimationOptions& animation) {
++    auto momentum = std::make_shared<MomentumState>();
++    momentum->options = options;
++    uint16_t moving = 0;
++    Duration motion = Duration::zero();
++    const auto add = [&](MomentumState::Component& component, bool present, uint16_t fields, const MomentumCurve& curve) {
++        if (!present) return;
++        component = {.fields = fields, .curve = curve, .applied = 0, .moving = true};
++        moving |= fields;
++        motion = std::max(motion, curve.duration);
++    };
++    add(momentum->pan, options.pan.has_value(), Center, options.panCurve);
++    add(momentum->zoom, options.zoom.has_value(), Zoom | (options.zoomAnchor ? Center : 0), options.zoomCurve);
++    add(momentum->bearing,
++        options.bearing.has_value(),
++        Bearing | (options.bearingAnchor ? Center : 0),
++        options.bearingCurve);
++    add(momentum->pitch, options.pitch.has_value(), Pitch, options.pitchCurve);
++    momentum->snapPending = options.bearingSnap.has_value();
++
++    auto transition = std::make_shared<Transition>(animation);
++    transition->fields = moving | (momentum->snapPending ? Bearing : 0);
++    transition->coupledFields = 0;
++    transition->movingFields = moving;
++    transition->momentum = momentum;
++    transition->start = latestTransitionStart = Clock::now();
++    transition->duration = latestTransitionDuration = motion;
++
++    auto finished = releaseFields(transition->fields);
++    if (transition->fields) transitions.push_back(transition);
++    updateMovementFlags();
++    finishTransitions(finished);
++    if (!transition->fields) {
++        finishTransitions({transition});
++        return;
++    }
++
++    // Finish callbacks may replace or cancel the momentum.
++    if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) return;
++    observer.onCameraWillChange(MapObserver::CameraChangeMode::Animated);
++}
++
++void Transform::advanceMomentum(Transition& transition, const TimePoint& now) {
++    auto& momentum = *transition.momentum;
++    const auto elapsed = now - transition.start;
++    momentum.elapsed = elapsed;
++    const auto& options = momentum.options;
++
++    const auto advance = [&](MomentumState::Component& component) -> double {
++        if (!component.moving) return 0.0;
++        const double progress = component.curve.progress(elapsed);
++        const double fraction = progress - component.applied;
++        component.applied = progress;
++        if (progress >= 1.0) component.moving = false;
++        return fraction;
++    };
++    if (const double fraction = advance(momentum.pan); fraction != 0.0) {
++        stepPan({options.pan->x * fraction, options.pan->y * fraction});
++    }
++    if (const double fraction = advance(momentum.zoom); fraction != 0.0) {
++        stepZoom(*options.zoom * fraction, options.zoomAnchor);
++    }
++    if (const double fraction = advance(momentum.bearing); fraction != 0.0) {
++        stepBearing(*options.bearing * fraction, options.bearingAnchor);
++    }
++    if (const double fraction = advance(momentum.pitch); fraction != 0.0) {
++        stepPitch(*options.pitch * fraction);
++    }
++
++    // The bearing settles once no part moves, which can be before the motion's
++    // planned end when commands replaced its parts.
++    const auto components = momentum.components();
++    const bool moving = std::any_of(
++        components.begin(), components.end(), [](const auto* component) { return component->moving; });
++    if (momentum.snapPending && !moving) {
++        momentum.snapPending = false;
++        const auto& snap = *options.bearingSnap;
++        const double bearing = -util::rad2deg(state.getBearing());
++        const double spacing = 360.0 / std::max<uint32_t>(snap.targetCount, 1);
++        const double target = snap.targetOffset + std::round((bearing - snap.targetOffset) / spacing) * spacing;
++        const double delta = target - bearing - 360.0 * std::floor((target - bearing + 180.0) / 360.0);
++        if (delta != 0.0 && std::abs(delta) <= snap.tolerance) {
++            momentum.snapDelta = delta;
++            momentum.snapStart = elapsed;
++            transition.duration = elapsed + snap.duration;
++            transition.movingFields |= Bearing;
++        }
++    }
++    if (momentum.snapDelta) {
++        const auto& snap = *options.bearingSnap;
++        const double t = snap.duration == Duration::zero()
++                             ? 1.0
++                             : std::clamp(std::chrono::duration<double>(elapsed - momentum.snapStart) /
++                                              std::chrono::duration<double>(snap.duration),
++                                          0.0,
++                                          1.0);
++        const double eased = t >= 1.0 ? 1.0 : util::DEFAULT_TRANSITION_EASE.solve(t, 0.001);
++        const double fraction = eased - momentum.snapApplied;
++        momentum.snapApplied = eased;
++        if (fraction != 0.0) stepBearing(*momentum.snapDelta * fraction, std::nullopt);
++        if (t >= 1.0) momentum.snapDelta.reset();
++    }
++
++    // Parts that ran to their end give up their fields.
++    transition.fields = momentum.retain(transition.fields);
++}
++
++void Transform::stepPan(const ScreenCoordinate& offset) {
++    // Each step moves the content no farther than a drag moves it in one
++    // event, so the travel on screen stays even at high pitch.
++    constexpr double maxStep = 16.0;
++    const double distance = std::hypot(offset.x, offset.y);
++    if (!(distance > 0.0)) return;
++    const double steps = std::ceil(distance / maxStep);
++    const ScreenCoordinate step{offset.x / steps, offset.y / steps};
++    const bool bounded = state.getLatLngBounds() != LatLngBounds();
++    for (double i = 0; i < steps; ++i) {
++        const ScreenCoordinate point =
++            state.getEdgeInsets().getCenter(state.getSize().width, state.getSize().height) - step;
++        const LatLng unwrapped = screenCoordinateToLatLng(point, LatLng::Unwrapped);
++        CameraOptions camera = CameraOptions().withCenter(bounded ? unwrapped : unwrapped.wrapped());
++        double zoom = state.getZoom();
++        state.constrainCameraAndZoomToBounds(camera, zoom);
++        state.setLatLngZoom(*camera.center, zoom);
++    }
++}
++
++void Transform::stepZoom(double zoom, const std::optional<ScreenCoordinate>& anchor) {
++    std::optional<ScreenCoordinate> point;
++    LatLng anchorLatLng;
++    if (anchor) {
++        point = ScreenCoordinate{anchor->x, state.getSize().height - anchor->y};
++        anchorLatLng = state.screenCoordinateToLatLng(*point);
++    }
++    double target = util::clamp(state.getZoom() + zoom, state.getMinZoom(), state.getMaxZoom());
++    CameraOptions camera = CameraOptions().withCenter(getLatLng(LatLng::Unwrapped));
++    state.constrainCameraAndZoomToBounds(camera, target);
++    state.setLatLngZoom(*camera.center, target);
++    if (point) state.moveLatLng(anchorLatLng, *point);
++}
++
++void Transform::stepBearing(double bearing, const std::optional<ScreenCoordinate>& anchor) {
++    std::optional<ScreenCoordinate> point;
++    LatLng anchorLatLng;
++    if (anchor) {
++        point = ScreenCoordinate{anchor->x, state.getSize().height - anchor->y};
++        anchorLatLng = state.screenCoordinateToLatLng(*point);
++    }
++    constexpr double pi = std::numbers::pi;
++    state.setBearing(util::wrap(state.getBearing() - util::deg2rad(bearing), -pi, pi));
++    if (point) state.moveLatLng(anchorLatLng, *point);
++}
++
++void Transform::stepPitch(double pitch) {
++    state.setPitch(util::clamp(state.getPitch() + util::deg2rad(pitch),
++                               state.getMinPitch(),
++                               getMaxPitchForEdgeInsets(state.getEdgeInsets())));
++}
++
+ void Transform::cancelTransitions() {
+     auto finished = std::exchange(transitions, {});
+     updateMovementFlags();
+diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
+index f767342..60f1e42 100644
+--- a/src/mln/map/transform.hpp
++++ b/src/mln/map/transform.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <mln/map/camera.hpp>
++#include <mln/map/camera_momentum.hpp>
+ #include <mln/map/projection_mode.hpp>
+ #include <mln/map/map_observer.hpp>
+ #include <mln/map/mode.hpp>
+@@ -120,6 +121,9 @@ public:
+     TimePoint getLatestTransitionStart() const { return latestTransitionStart; }
+     Duration getLatestTransitionDuration() const { return latestTransitionDuration; }
+     void cancelTransitions();
++    /** Continues a gesture with momentum. The momentum replaces the running
++        animations of the fields that it moves, as a camera command does. */
++    void startMomentum(const CameraMomentum&, const AnimationOptions& = {});
+     // Cancels the commands whose AnimationOptions::transitionId equals
+     // `transitionId`, leaves the others running, and returns whether any
+     // command ended.
+@@ -166,6 +170,7 @@ private:
+         Roll = 1 << 6,
+         Fov = 1 << 7
+     };
++    struct MomentumState;
+     struct Transition {
+         explicit Transition(const AnimationOptions& options)
+             : animation(options) {}
+@@ -182,9 +187,21 @@ private:
+         std::function<CameraOptions(double)> frame;
+         std::optional<ScreenCoordinate> anchor;
+         LatLng anchorLatLng;
++        // Set for a momentum, which moves the camera relative to where it
++        // stands instead of through `frame`.
++        std::shared_ptr<MomentumState> momentum;
+     };
+     static uint16_t cameraFields(const CameraOptions&);
++    // Takes `fields` from the running transitions, and returns the ones left
++    // with no fields, which the caller finishes.
++    std::vector<std::shared_ptr<Transition>> releaseFields(uint16_t fields);
+     void applyTransitions(const std::vector<std::shared_ptr<Transition>>&, const TimePoint&);
++    void advanceMomentum(Transition&, const TimePoint&);
++    // Momentum steps, applied to the state as it stands.
++    void stepPan(const ScreenCoordinate& offset);
++    void stepZoom(double zoom, const std::optional<ScreenCoordinate>& anchor);
++    void stepBearing(double bearing, const std::optional<ScreenCoordinate>& anchor);
++    void stepPitch(double pitch);
+     void updateMovementFlags();
+     void finishTransitions(const std::vector<std::shared_ptr<Transition>>&);
+ 
+diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
+index c15ea59..b97620b 100644
+--- a/test/map/transform.test.cpp
++++ b/test/map/transform.test.cpp
+@@ -1619,3 +1619,180 @@ TEST(Transform, FlyDurationRange) {
+     EXPECT_DOUBLE_EQ(1.0, transform.getZoom());
+     EXPECT_FALSE(transform.inTransition());
+ }
++
++TEST(Transform, MomentumMovesEachPartOnItsCurve) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 20}).withZoom(8).withPitch(10));
++    const LatLng center = transform.getLatLng();
++
++    CameraMomentum momentum;
++    momentum.pan = ScreenCoordinate{100, 0};
++    momentum.panCurve.duration = Seconds(1);
++    momentum.zoom = 1.0;
++    momentum.zoomCurve.duration = Seconds(1);
++    momentum.zoomCurve.exponent = 4;
++    momentum.bearing = 10.0;
++    momentum.bearingCurve.duration = Seconds(1);
++    momentum.bearingCurve.decayRate = 3.0;
++    momentum.pitch = 5.0;
++    momentum.pitchCurve.duration = Milliseconds(500);
++    unsigned finished = 0;
++    std::optional<MomentumEnd> ended;
++    momentum.finishFn = [&](const MomentumEnd& end) { ended = end; };
++    AnimationOptions animation;
++    animation.transitionFinishFn = [&] {
++        ++finished;
++    };
++    transform.startMomentum(momentum, animation);
++    const auto start = transform.getLatestTransitionStart();
++    EXPECT_TRUE(transform.inTransition());
++
++    transform.updateTransitions(start + Milliseconds(500));
++    const double bearingShare = std::expm1(-1.5) / std::expm1(-3.0);
++    EXPECT_NEAR(transform.getZoom(), 8 + 0.9375, 1e-9);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 10 * bearingShare, 1e-9);
++    EXPECT_NEAR(util::rad2deg(transform.getPitch()), 15, 1e-9);
++    EXPECT_EQ(finished, 0u);
++
++    transform.updateTransitions(start + Seconds(1));
++    EXPECT_NEAR(transform.getZoom(), 9, 1e-9);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 10, 1e-9);
++    EXPECT_EQ(finished, 1u);
++    ASSERT_TRUE(ended);
++    EXPECT_FALSE(ended->replaced);
++    EXPECT_EQ(ended->velocity.pan.x, 0);
++    EXPECT_FALSE(transform.inTransition());
++    EXPECT_NE(transform.getLatLng().longitude(), center.longitude());
++}
++
++TEST(Transform, MomentumPansItsDistanceOnScreen) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 20}).withZoom(8));
++    const LatLng center = transform.getLatLng();
++    CameraMomentum momentum;
++    momentum.pan = ScreenCoordinate{120, -50};
++    momentum.panCurve.duration = Seconds(1);
++    transform.startMomentum(momentum);
++    const auto start = transform.getLatestTransitionStart();
++    transform.updateTransitions(start + Milliseconds(500));
++    auto point = transform.latLngToScreenCoordinate(center);
++    EXPECT_NEAR(point.x, 500 + 120 * 0.75, 1e-6);
++    EXPECT_NEAR(point.y, 500 - 50 * 0.75, 1e-6);
++    transform.updateTransitions(start + Seconds(1));
++    point = transform.latLngToScreenCoordinate(center);
++    EXPECT_NEAR(point.x, 620, 1e-6);
++    EXPECT_NEAR(point.y, 450, 1e-6);
++}
++
++TEST(Transform, MomentumReportsItsSpeedWhenCancelled) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    CameraMomentum momentum;
++    momentum.pan = ScreenCoordinate{100, 0};
++    momentum.panCurve.duration = Seconds(1);
++    momentum.zoom = 1.0;
++    momentum.zoomCurve.duration = Seconds(1);
++    std::optional<MomentumEnd> ended;
++    momentum.finishFn = [&](const MomentumEnd& end) { ended = end; };
++    transform.startMomentum(momentum);
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(500));
++    transform.cancelTransitions();
++    ASSERT_TRUE(ended);
++    EXPECT_FALSE(ended->replaced);
++    // Halfway through, a power-2 curve moves at its average speed.
++    EXPECT_NEAR(ended->velocity.pan.x, 100, 1e-9);
++    EXPECT_EQ(ended->velocity.pan.y, 0);
++    EXPECT_NEAR(ended->velocity.zoom, 1, 1e-9);
++    EXPECT_FALSE(transform.inTransition());
++}
++
++TEST(Transform, MomentumPartsGiveWayToCommands) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withZoom(8));
++    CameraMomentum momentum;
++    momentum.pan = ScreenCoordinate{100, 0};
++    momentum.panCurve.duration = Seconds(1);
++    momentum.zoom = 1.0;
++    momentum.zoomCurve.duration = Seconds(1);
++    std::optional<MomentumEnd> ended;
++    momentum.finishFn = [&](const MomentumEnd& end) { ended = end; };
++    transform.startMomentum(momentum);
++    const auto start = transform.getLatestTransitionStart();
++    EXPECT_TRUE(transform.isPanning());
++    EXPECT_TRUE(transform.isScaling());
++
++    transform.jumpTo(CameraOptions().withZoom(3));
++    EXPECT_FALSE(ended);
++    EXPECT_TRUE(transform.isPanning());
++    EXPECT_FALSE(transform.isScaling());
++    const auto before = transform.getLatLng();
++    transform.updateTransitions(start + Milliseconds(500));
++    EXPECT_NEAR(transform.getZoom(), 3, 1e-9);
++    EXPECT_NE(transform.getLatLng().longitude(), before.longitude());
++
++    transform.updateTransitions(start + Seconds(1));
++    ASSERT_TRUE(ended);
++    EXPECT_TRUE(ended->replaced);
++    EXPECT_FALSE(transform.inTransition());
++}
++
++TEST(Transform, MomentumSettlesTheBearingAfterItsMotion) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withBearing(84));
++    CameraMomentum momentum;
++    momentum.bearing = 4.0;
++    momentum.bearingCurve.duration = Milliseconds(100);
++    momentum.bearingSnap = BearingSnap{.targetCount = 4, .targetOffset = 0, .tolerance = 7, .duration = Milliseconds(200)};
++    unsigned finished = 0;
++    AnimationOptions animation;
++    animation.transitionFinishFn = [&] {
++        ++finished;
++    };
++    transform.startMomentum(momentum, animation);
++    const auto start = transform.getLatestTransitionStart();
++    transform.updateTransitions(start + Milliseconds(100));
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 88, 1e-9);
++    EXPECT_EQ(finished, 0u);
++    EXPECT_TRUE(transform.isRotating());
++    transform.updateTransitions(start + Milliseconds(300));
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 90, 1e-9);
++    EXPECT_EQ(finished, 1u);
++
++    // Outside the tolerance, the bearing stays.
++    transform.jumpTo(CameraOptions().withBearing(30));
++    CameraMomentum snapOnly;
++    snapOnly.bearingSnap = BearingSnap{.targetCount = 1, .targetOffset = 0, .tolerance = 7, .duration = Milliseconds(200)};
++    transform.startMomentum(snapOnly, animation);
++    transform.updateTransitions(transform.getLatestTransitionStart());
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 30, 1e-9);
++    EXPECT_EQ(finished, 2u);
++    EXPECT_FALSE(transform.inTransition());
++}
++
++TEST(Transform, MomentumSettlesOnceCommandsStopItsMotion) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withBearing(85));
++    CameraMomentum momentum;
++    momentum.pan = ScreenCoordinate{100, 0};
++    momentum.panCurve.duration = Seconds(10);
++    momentum.bearingSnap = BearingSnap{.targetCount = 4, .targetOffset = 0, .tolerance = 7, .duration = Milliseconds(200)};
++    unsigned finished = 0;
++    AnimationOptions animation;
++    animation.transitionFinishFn = [&] {
++        ++finished;
++    };
++    transform.startMomentum(momentum, animation);
++    const auto start = transform.getLatestTransitionStart();
++    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 20}));
++    transform.updateTransitions(start + Milliseconds(100));
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 85, 1e-9);
++    transform.updateTransitions(start + Milliseconds(300));
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 90, 1e-9);
++    EXPECT_EQ(finished, 1u);
++    EXPECT_FALSE(transform.inTransition());
++}

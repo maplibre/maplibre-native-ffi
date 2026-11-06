@@ -792,6 +792,39 @@ napi_value mln_ts_read_camera_transition_end(
         mln_ts_u64(env, (uint64_t)(source->generation))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "velocity",
+        mln_ts_read_camera_velocity(
+          env, &(source->velocity), sizeof(source->velocity)
+        )
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_camera_velocity(
+  napi_env env, const mln_camera_velocity* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "pan",
+        mln_ts_read_screen_point(env, &(source->pan), sizeof(source->pan))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "zoom", mln_ts_number(env, (double)(source->zoom))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "bearing", mln_ts_number(env, (double)(source->bearing))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "pitch", mln_ts_number(env, (double)(source->pitch))
+      ))
+    return NULL;
   return result;
 }
 
@@ -2155,6 +2188,10 @@ napi_value mln_ts_read_runtime_event_camera_change(
         env, result, "mode", mln_ts_number(env, (double)(source->mode))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "source", mln_ts_number(env, (double)(source->source))
+      ))
+    return NULL;
   return result;
 }
 
@@ -3341,6 +3378,56 @@ bool mln_ts_write_animation_options(
   return true;
 }
 
+bool mln_ts_write_bearing_snap(
+  mln_ts_call* call, napi_value value, mln_bearing_snap* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "targetCount", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "targetCount");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->target_count = (uint32_t)number;
+    }
+    out->fields |= MLN_BEARING_SNAP_TARGET_COUNT;
+  }
+  if (!mln_ts_member(call, value, "targetOffset", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "targetOffset");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->target_offset = (double)number;
+    }
+    out->fields |= MLN_BEARING_SNAP_TARGET_OFFSET;
+  }
+  if (!mln_ts_member(call, value, "tolerance", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "tolerance");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->tolerance = (double)number;
+    }
+    out->fields |= MLN_BEARING_SNAP_TOLERANCE;
+  }
+  if (!mln_ts_member(call, value, "durationMs", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "durationMs");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->duration_ms = (double)number;
+    }
+    out->fields |= MLN_BEARING_SNAP_DURATION_MS;
+  }
+  return true;
+}
+
 bool mln_ts_write_bound_options(
   mln_ts_call* call, napi_value value, mln_bound_options* out, const char* path
 ) {
@@ -3521,6 +3608,15 @@ bool mln_ts_write_camera_delta(
     if (!mln_ts_write_screen_point(call, member, &out->anchor, child))
       return false;
     out->fields |= MLN_CAMERA_DELTA_ANCHOR;
+  }
+  if (!mln_ts_member(call, value, "momentum", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "momentum");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->momentum, 0, sizeof out->momentum);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_gesture_momentum(call, member, &out->momentum, child))
+      return false;
+    out->fields |= MLN_CAMERA_DELTA_MOMENTUM;
   }
   if (!mln_ts_member(call, value, "animation", &member)) return false;
   mln_ts_path(child, sizeof child, path, "animation");
@@ -4408,6 +4504,124 @@ bool mln_ts_write_geo_json_source_options(
       out->cluster = flag;
     }
     out->fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
+  }
+  return true;
+}
+
+bool mln_ts_write_gesture_momentum(
+  mln_ts_call* call, napi_value value, mln_gesture_momentum* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "panVelocity", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "panVelocity");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->pan_velocity, 0, sizeof out->pan_velocity);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_screen_point(call, member, &out->pan_velocity, child))
+      return false;
+    out->fields |= MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
+  }
+  if (!mln_ts_member(call, value, "zoomVelocity", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "zoomVelocity");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->zoom_velocity = (double)number;
+    }
+    out->fields |= MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY;
+  }
+  if (!mln_ts_member(call, value, "bearingVelocity", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "bearingVelocity");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->bearing_velocity = (double)number;
+    }
+    out->fields |= MLN_GESTURE_MOMENTUM_BEARING_VELOCITY;
+  }
+  if (!mln_ts_member(call, value, "pitchVelocity", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "pitchVelocity");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->pitch_velocity = (double)number;
+    }
+    out->fields |= MLN_GESTURE_MOMENTUM_PITCH_VELOCITY;
+  }
+  if (!mln_ts_member(call, value, "zoomAnchor", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "zoomAnchor");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->zoom_anchor, 0, sizeof out->zoom_anchor);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_screen_point(call, member, &out->zoom_anchor, child))
+      return false;
+    out->fields |= MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR;
+  }
+  if (!mln_ts_member(call, value, "bearingAnchor", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "bearingAnchor");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->bearing_anchor, 0, sizeof out->bearing_anchor);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_screen_point(call, member, &out->bearing_anchor, child))
+      return false;
+    out->fields |= MLN_GESTURE_MOMENTUM_BEARING_ANCHOR;
+  }
+  if (!mln_ts_member(call, value, "pan", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "pan");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->pan, 0, sizeof out->pan);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_momentum_options(call, member, &out->pan, child))
+      return false;
+  }
+  if (!mln_ts_member(call, value, "zoom", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "zoom");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->zoom, 0, sizeof out->zoom);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_momentum_options(call, member, &out->zoom, child))
+      return false;
+  }
+  if (!mln_ts_member(call, value, "bearing", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "bearing");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->bearing, 0, sizeof out->bearing);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_momentum_options(call, member, &out->bearing, child))
+      return false;
+  }
+  if (!mln_ts_member(call, value, "pitch", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "pitch");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->pitch, 0, sizeof out->pitch);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_momentum_options(call, member, &out->pitch, child))
+      return false;
+  }
+  if (!mln_ts_member(call, value, "panFollowsZoom", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "panFollowsZoom");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->pan_follows_zoom = flag;
+    }
+    out->fields |= MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM;
+  }
+  if (!mln_ts_member(call, value, "bearingSnap", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "bearingSnap");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->bearing_snap, 0, sizeof out->bearing_snap);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_bearing_snap(call, member, &out->bearing_snap, child))
+      return false;
+    out->fields |= MLN_GESTURE_MOMENTUM_BEARING_SNAP;
   }
   return true;
 }
@@ -5527,6 +5741,137 @@ bool mln_ts_write_metal_surface_replacement(
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, member, &number, child)) return false;
     out->layer = (void*)(uintptr_t)number;
+  }
+  return true;
+}
+
+bool mln_ts_write_momentum_options(
+  mln_ts_call* call, napi_value value, mln_momentum_options* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "decay", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "decay");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->decay = (mln_momentum_decay)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_DECAY;
+  }
+  if (!mln_ts_member(call, value, "speedScale", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "speedScale");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->speed_scale = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_SPEED_SCALE;
+  }
+  if (!mln_ts_member(call, value, "minSpeed", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "minSpeed");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->min_speed = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_MIN_SPEED;
+  }
+  if (!mln_ts_member(call, value, "maxSpeed", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "maxSpeed");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->max_speed = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_MAX_SPEED;
+  }
+  if (!mln_ts_member(call, value, "exponent", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "exponent");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->exponent = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_EXPONENT;
+  }
+  if (!mln_ts_member(call, value, "baseDurationMs", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "baseDurationMs");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->base_duration_ms = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_BASE_DURATION_MS;
+  }
+  if (!mln_ts_member(call, value, "durationMsPerSpeed", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "durationMsPerSpeed");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->duration_ms_per_speed = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED;
+  }
+  if (!mln_ts_member(call, value, "decayRate", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "decayRate");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->decay_rate = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_DECAY_RATE;
+  }
+  if (!mln_ts_member(call, value, "stopSpeed", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "stopSpeed");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->stop_speed = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_STOP_SPEED;
+  }
+  if (!mln_ts_member(call, value, "durationScale", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "durationScale");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->duration_scale = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_DURATION_SCALE;
+  }
+  if (!mln_ts_member(call, value, "maxDurationMs", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "maxDurationMs");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->max_duration_ms = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_MAX_DURATION_MS;
+  }
+  if (!mln_ts_member(call, value, "maxDistance", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "maxDistance");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->max_distance = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_OPTION_MAX_DISTANCE;
   }
   return true;
 }

@@ -590,7 +590,7 @@ static void delta_undersized(void* descriptor) {
   ((mln_camera_delta*)descriptor)->size -= 1;
 }
 static void delta_unknown_field(void* descriptor) {
-  ((mln_camera_delta*)descriptor)->fields = MLN_CAMERA_DELTA_ANCHOR << 1U;
+  ((mln_camera_delta*)descriptor)->fields = MLN_CAMERA_DELTA_MOMENTUM << 1U;
 }
 static void delta_bad_gesture(void* descriptor) {
   ((mln_camera_delta*)descriptor)->gesture_phase = MLN_GESTURE_PHASE_CANCEL + 1;
@@ -631,6 +631,64 @@ static void delta_animated_anchored_pan(void* descriptor) {
   delta->animation.duration_ms = 300.0;
 }
 
+static void delta_momentum_outside_end(void* descriptor) {
+  mln_camera_delta* delta = descriptor;
+  delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
+  delta->gesture_phase = MLN_GESTURE_PHASE_UPDATE;
+}
+static void delta_momentum_with_duration(void* descriptor) {
+  mln_camera_delta* delta = descriptor;
+  delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
+  delta->gesture_phase = MLN_GESTURE_PHASE_END;
+  delta->animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  delta->animation.duration_ms = 300.0;
+}
+static void delta_momentum_infinite_velocity(void* descriptor) {
+  mln_camera_delta* delta = descriptor;
+  delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
+  delta->gesture_phase = MLN_GESTURE_PHASE_END;
+  delta->momentum.fields = MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY;
+  delta->momentum.zoom_velocity = INFINITY;
+}
+static void delta_momentum_negative_option(void* descriptor) {
+  mln_camera_delta* delta = descriptor;
+  delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
+  delta->gesture_phase = MLN_GESTURE_PHASE_END;
+  delta->momentum.pan.fields = MLN_MOMENTUM_OPTION_MIN_SPEED;
+  delta->momentum.pan.min_speed = -1.0;
+}
+static void delta_momentum_small_exponent(void* descriptor) {
+  mln_camera_delta* delta = descriptor;
+  delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
+  delta->gesture_phase = MLN_GESTURE_PHASE_END;
+  delta->momentum.zoom.fields = MLN_MOMENTUM_OPTION_EXPONENT;
+  delta->momentum.zoom.exponent = 0.5;
+}
+static void delta_momentum_exponential_without_rate(void* descriptor) {
+  mln_camera_delta* delta = descriptor;
+  delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
+  delta->gesture_phase = MLN_GESTURE_PHASE_END;
+  delta->momentum.pitch.fields = MLN_MOMENTUM_OPTION_DECAY;
+  delta->momentum.pitch.decay = MLN_MOMENTUM_DECAY_EXPONENTIAL;
+}
+static void delta_momentum_snap_without_targets(void* descriptor) {
+  mln_camera_delta* delta = descriptor;
+  delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
+  delta->gesture_phase = MLN_GESTURE_PHASE_END;
+  delta->momentum.fields = MLN_GESTURE_MOMENTUM_BEARING_SNAP;
+  delta->momentum.bearing_snap.fields = MLN_BEARING_SNAP_TARGET_COUNT;
+  delta->momentum.bearing_snap.target_count = 0;
+}
+static void delta_momentum_unselected_garbage(void* descriptor) {
+  mln_camera_delta* delta = descriptor;
+  delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
+  delta->gesture_phase = MLN_GESTURE_PHASE_END;
+  delta->momentum.pan_velocity.x = NAN;
+  delta->momentum.zoom_anchor.y = INFINITY;
+  delta->momentum.zoom.min_speed = -1.0;
+  delta->momentum.bearing_snap.tolerance = 360.0;
+}
+
 static const mln_test_validation_case delta_cases[] = {
   {"undersized", delta_undersized, MLN_STATUS_INVALID_ARGUMENT, "valid size"},
   {"unknown field", delta_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
@@ -649,6 +707,22 @@ static const mln_test_validation_case delta_cases[] = {
    "requires scale, bearing, or pitch"},
   {"animated anchored pan", delta_animated_anchored_pan,
    MLN_STATUS_INVALID_ARGUMENT, "only in an immediate delta"},
+  {"momentum outside the end phase", delta_momentum_outside_end,
+   MLN_STATUS_INVALID_ARGUMENT, "end phase carries momentum"},
+  {"momentum with a duration", delta_momentum_with_duration,
+   MLN_STATUS_INVALID_ARGUMENT, "sets only the transition ID"},
+  {"infinite momentum velocity", delta_momentum_infinite_velocity,
+   MLN_STATUS_INVALID_ARGUMENT, "velocities must be finite"},
+  {"negative momentum option", delta_momentum_negative_option,
+   MLN_STATUS_INVALID_ARGUMENT, "finite and not negative"},
+  {"momentum exponent below 1", delta_momentum_small_exponent,
+   MLN_STATUS_INVALID_ARGUMENT, "exponent of at least 1"},
+  {"exponential decay without a rate", delta_momentum_exponential_without_rate,
+   MLN_STATUS_INVALID_ARGUMENT, "positive decay_rate and stop_speed"},
+  {"bearing snap without targets", delta_momentum_snap_without_targets,
+   MLN_STATUS_INVALID_ARGUMENT, "needs a target"},
+  {"unselected momentum fields stay unread", delta_momentum_unselected_garbage,
+   MLN_STATUS_OK, NULL},
 };
 
 static mln_camera_options finish_camera_query(mln_test_completion* query) {

@@ -134,6 +134,35 @@ export interface AnimationOptions {
 }
 
 /**
+ * Where the bearing settles after a gesture that changed it.
+ *
+ * The targets are `target_count` bearings spaced evenly around the circle,
+ * starting at `target_offset`. The bearing eases to the nearest one when it is
+ * within `tolerance` of it, and otherwise stays where it is.
+ *
+ * See `mln_bearing_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface BearingSnap {
+  /**
+   * At least 1. Defaults to 1.
+   */
+  targetCount?: number;
+  /**
+   * In degrees. Defaults to 0, north.
+   */
+  targetOffset?: number;
+  /**
+   * In degrees, from 0 to 180. Defaults to 7.
+   */
+  tolerance?: number;
+  /**
+   * Defaults to 300.
+   */
+  durationMs?: number;
+}
+
+/**
  * Limits on the camera, for `MapHandle.setBounds()`.
  *
  * See `mln_bound_options` in the
@@ -295,6 +324,32 @@ export type CameraChangeMode =
   | (number & {});
 
 /**
+ * What moved the camera.
+ *
+ * See `mln_camera_change_source` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export const CameraChangeSource = {
+  /**
+   * A camera command outside a gesture, or the map itself, as when a resize
+   * keeps the camera within its bounds.
+   */
+  command: 0,
+  /**
+   * A camera command with a gesture phase.
+   */
+  gesture: 1,
+  /**
+   * The momentum and bearing snap that a gesture's end started.
+   */
+  momentum: 2,
+} as const;
+/** One of the CameraChangeSource values, or a value this binding does not know. */
+export type CameraChangeSource =
+  | (typeof CameraChangeSource)[keyof typeof CameraChangeSource]
+  | (number & {});
+
+/**
  * A change to the camera from where it is now, for gestures.
  *
  * See `mln_camera_delta` in the
@@ -323,6 +378,11 @@ export interface CameraDelta {
    * duration.
    */
   anchor?: ScreenPoint;
+  /**
+   * How the gesture keeps moving after this delta. Only a delta in the
+   * `GesturePhase.end` phase carries it.
+   */
+  momentum?: GestureMomentum;
   animation?: AnimationOptions;
   gesturePhase?: GesturePhase;
 }
@@ -429,6 +489,11 @@ export interface CameraTransitionEnd {
    * the camera, or 0 when the map closed first.
    */
   readonly generation: bigint;
+  /**
+   * How fast a gesture's momentum still moved when it was cancelled, so that
+   * the next gesture can carry it on. Zero for every other end.
+   */
+  readonly velocity: CameraVelocity;
 }
 
 /**
@@ -528,6 +593,32 @@ export const CameraUpdateMode = {
 export type CameraUpdateMode =
   | (typeof CameraUpdateMode)[keyof typeof CameraUpdateMode]
   | (number & {});
+
+/**
+ * How fast each part of a camera change moves.
+ *
+ * See `mln_camera_velocity` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface CameraVelocity {
+  /**
+   * How fast the map's content moves on the screen, in logical pixels per
+   * second.
+   */
+  readonly pan: ScreenPoint;
+  /**
+   * In zoom levels per second.
+   */
+  readonly zoom: number;
+  /**
+   * In degrees per second.
+   */
+  readonly bearing: number;
+  /**
+   * In degrees per second.
+   */
+  readonly pitch: number;
+}
 
 /**
  * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
@@ -964,6 +1055,70 @@ export interface GeoJsonSourceOptions {
   clusterMinPoints?: bigint;
   lineMetrics?: boolean;
   cluster?: boolean;
+}
+
+/**
+ * How a gesture keeps moving the camera after its last contact lifts.
+ *
+ * A part moves only when its velocity is set, and each part slows on its own
+ * clock. The parts' defaults are:
+ *
+ * | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | -------
+ * | -------- | ----------- | ------- | ------------ | --------------- | | pan |
+ * 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0 | max 600
+ * ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 | 1 | 300 |
+ * 0 | min speed 5 |
+ *
+ * Every part defaults to `MomentumDecay.power`, and the zoom moves at most 2.5
+ * levels.
+ *
+ * See `mln_gesture_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface GestureMomentum {
+  /**
+   * How fast the map's content moved on the screen at release, in logical
+   * pixels per second.
+   */
+  panVelocity?: ScreenPoint;
+  /**
+   * In zoom levels per second.
+   */
+  zoomVelocity?: number;
+  /**
+   * In degrees per second.
+   */
+  bearingVelocity?: number;
+  /**
+   * In degrees per second.
+   */
+  pitchVelocity?: number;
+  /**
+   * The screen point that the zoom keeps in place. Without one, the zoom keeps
+   * the center of the view in place.
+   */
+  zoomAnchor?: ScreenPoint;
+  /**
+   * The screen point that the rotation keeps in place. Without one, the
+   * rotation turns around the center of the view.
+   */
+  bearingAnchor?: ScreenPoint;
+  pan?: MomentumOptions;
+  zoom?: MomentumOptions;
+  bearing?: MomentumOptions;
+  pitch?: MomentumOptions;
+  /**
+   * When pan and zoom momentum both start, the pan slows over the zoom's
+   * duration and curve, starts no faster, and moves no farther than it would
+   * alone. Defaults to true.
+   */
+  panFollowsZoom?: boolean;
+  /**
+   * Where the bearing settles after a gesture that changed it, once the rest of
+   * the momentum ends. Without momentum, it settles at once. Without this, the
+   * bearing stays where the gesture leaves it.
+   */
+  bearingSnap?: BearingSnap;
 }
 
 /**
@@ -1694,6 +1849,90 @@ export interface MetalTextureFrame {
    * The texture's MTLPixelFormat.
    */
   readonly pixelFormat: bigint;
+}
+
+/**
+ * How a part of a gesture's momentum slows to a stop.
+ *
+ * See `mln_momentum_decay` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export const MomentumDecay = {
+  /**
+   * The share of the distance traveled is 1 - (1 - t)^`exponent`, where t goes
+   * from 0 to 1 over the momentum's duration. An exponent of 2 slows at a
+   * constant rate.
+   */
+  power: 0,
+  /**
+   * The speed falls to e^-`decay_rate` of itself each second, until it drops
+   * below `stop_speed`.
+   */
+  exponential: 1,
+} as const;
+/** One of the MomentumDecay values, or a value this binding does not know. */
+export type MomentumDecay =
+  | (typeof MomentumDecay)[keyof typeof MomentumDecay]
+  | (number & {});
+
+/**
+ * How one part of a gesture keeps moving after its release.
+ *
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom
+ * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
+ * set takes the part's default, which `GestureMomentum` lists. Every setting is
+ * finite and not negative.
+ *
+ * See `mln_momentum_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface MomentumOptions {
+  decay?: MomentumDecay;
+  /**
+   * The momentum starts at this multiple of the release speed.
+   */
+  speedScale?: number;
+  /**
+   * A slower release starts no momentum.
+   */
+  minSpeed?: number;
+  /**
+   * A faster release counts as this speed.
+   */
+  maxSpeed?: number;
+  /**
+   * For `MomentumDecay.power`. At least 1.
+   */
+  exponent?: number;
+  /**
+   * For `MomentumDecay.power`, the duration is `base_duration_ms` plus
+   * `duration_ms_per_speed` times the release speed.
+   */
+  baseDurationMs?: number;
+  durationMsPerSpeed?: number;
+  /**
+   * Required for `MomentumDecay.exponential`, and positive.
+   */
+  decayRate?: number;
+  /**
+   * Required for `MomentumDecay.exponential`, and positive.
+   */
+  stopSpeed?: number;
+  /**
+   * Stretches the momentum in time without changing its starting speed, so it
+   * also scales the distance. 0 starts no momentum. A host can pass its
+   * platform's animation duration scale here.
+   */
+  durationScale?: number;
+  /**
+   * The longest duration, after `duration_scale` applies.
+   */
+  maxDurationMs?: number;
+  /**
+   * The farthest the momentum moves. A momentum that would move farther slows
+   * faster over the same duration.
+   */
+  maxDistance?: number;
 }
 
 /**
@@ -2992,6 +3231,7 @@ export interface RuntimeEvent {
  */
 export interface RuntimeEventCameraChange {
   readonly mode: CameraChangeMode;
+  readonly source: CameraChangeSource;
 }
 
 /**

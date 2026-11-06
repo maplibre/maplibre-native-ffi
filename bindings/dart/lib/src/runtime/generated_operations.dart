@@ -708,6 +708,136 @@ Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   return result;
 }
 
+Pointer<raw.mln_momentum_options> _writeMomentumOptions(
+  MomentumOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_momentum_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_momentum_options>();
+  if (value.decay != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DECAY;
+    result.ref.decay = value.decay!.rawValue;
+  }
+  if (value.speedScale != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_SPEED_SCALE;
+    result.ref.speed_scale = value.speedScale!;
+  }
+  if (value.minSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MIN_SPEED;
+    result.ref.min_speed = value.minSpeed!;
+  }
+  if (value.maxSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MAX_SPEED;
+    result.ref.max_speed = value.maxSpeed!;
+  }
+  if (value.exponent != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_EXPONENT;
+    result.ref.exponent = value.exponent!;
+  }
+  if (value.baseDurationMs != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_BASE_DURATION_MS;
+    result.ref.base_duration_ms = value.baseDurationMs!;
+  }
+  if (value.durationMsPerSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED;
+    result.ref.duration_ms_per_speed = value.durationMsPerSpeed!;
+  }
+  if (value.decayRate != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DECAY_RATE;
+    result.ref.decay_rate = value.decayRate!;
+  }
+  if (value.stopSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_STOP_SPEED;
+    result.ref.stop_speed = value.stopSpeed!;
+  }
+  if (value.durationScale != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DURATION_SCALE;
+    result.ref.duration_scale = value.durationScale!;
+  }
+  if (value.maxDurationMs != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MAX_DURATION_MS;
+    result.ref.max_duration_ms = value.maxDurationMs!;
+  }
+  if (value.maxDistance != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MAX_DISTANCE;
+    result.ref.max_distance = value.maxDistance!;
+  }
+  return result;
+}
+
+Pointer<raw.mln_bearing_snap> _writeBearingSnap(
+  BearingSnap value,
+  Allocator arena, {
+  Pointer<raw.mln_bearing_snap>? into,
+}) {
+  final result = into ?? arena<raw.mln_bearing_snap>();
+  if (value.targetCount != null) {
+    result.ref.fields |= raw.MLN_BEARING_SNAP_TARGET_COUNT;
+    result.ref.target_count = _nativeInteger(value.targetCount!, 0, 4294967295);
+  }
+  if (value.targetOffset != null) {
+    result.ref.fields |= raw.MLN_BEARING_SNAP_TARGET_OFFSET;
+    result.ref.target_offset = value.targetOffset!;
+  }
+  if (value.tolerance != null) {
+    result.ref.fields |= raw.MLN_BEARING_SNAP_TOLERANCE;
+    result.ref.tolerance = value.tolerance!;
+  }
+  if (value.durationMs != null) {
+    result.ref.fields |= raw.MLN_BEARING_SNAP_DURATION_MS;
+    result.ref.duration_ms = value.durationMs!;
+  }
+  return result;
+}
+
+Pointer<raw.mln_gesture_momentum> _writeGestureMomentum(
+  GestureMomentum value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_momentum>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_momentum>();
+  if (value.panVelocity != null) {
+    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
+    result.ref.pan_velocity = _writeScreenPoint(value.panVelocity!, arena).ref;
+  }
+  if (value.zoomVelocity != null) {
+    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY;
+    result.ref.zoom_velocity = value.zoomVelocity!;
+  }
+  if (value.bearingVelocity != null) {
+    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_VELOCITY;
+    result.ref.bearing_velocity = value.bearingVelocity!;
+  }
+  if (value.pitchVelocity != null) {
+    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_PITCH_VELOCITY;
+    result.ref.pitch_velocity = value.pitchVelocity!;
+  }
+  if (value.zoomAnchor != null) {
+    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR;
+    result.ref.zoom_anchor = _writeScreenPoint(value.zoomAnchor!, arena).ref;
+  }
+  if (value.bearingAnchor != null) {
+    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_ANCHOR;
+    result.ref.bearing_anchor = _writeScreenPoint(
+      value.bearingAnchor!,
+      arena,
+    ).ref;
+  }
+  result.ref.pan = _writeMomentumOptions(value.pan, arena).ref;
+  result.ref.zoom = _writeMomentumOptions(value.zoom, arena).ref;
+  result.ref.bearing = _writeMomentumOptions(value.bearing, arena).ref;
+  result.ref.pitch = _writeMomentumOptions(value.pitch, arena).ref;
+  if (value.panFollowsZoom != null) {
+    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM;
+    result.ref.pan_follows_zoom = value.panFollowsZoom!;
+  }
+  if (value.bearingSnap != null) {
+    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_SNAP;
+    result.ref.bearing_snap = _writeBearingSnap(value.bearingSnap!, arena).ref;
+  }
+  return result;
+}
+
 Pointer<raw.mln_unit_bezier> _writeUnitBezier(
   UnitBezier value,
   Allocator arena, {
@@ -721,11 +851,20 @@ Pointer<raw.mln_unit_bezier> _writeUnitBezier(
   return result;
 }
 
+CameraVelocity _readCameraVelocity(raw.mln_camera_velocity source) =>
+    CameraVelocity(
+      pan: _readScreenPoint(source.pan),
+      zoom: source.zoom,
+      bearing: source.bearing,
+      pitch: source.pitch,
+    );
+
 CameraTransitionEnd _readCameraTransitionEnd(
   raw.mln_camera_transition_end source,
 ) => CameraTransitionEnd(
   outcome: CameraTransitionOutcome.fromRawValue(source.outcome),
   generation: source.generation,
+  velocity: _readCameraVelocity(source.velocity),
 );
 
 final raw.mln_camera_transition_end_callback
@@ -835,6 +974,10 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   if (value.anchor != null) {
     result.ref.fields |= raw.MLN_CAMERA_DELTA_ANCHOR;
     result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
+  }
+  if (value.momentum != null) {
+    result.ref.fields |= raw.MLN_CAMERA_DELTA_MOMENTUM;
+    result.ref.momentum = _writeGestureMomentum(value.momentum!, arena).ref;
   }
   result.ref.animation = _writeAnimationOptions(
     value.animation,
@@ -2574,7 +2717,10 @@ OfflineRegionStatus _readOfflineRegionStatus(
 
 RuntimeEventCameraChange _readRuntimeEventCameraChange(
   raw.mln_runtime_event_camera_change source,
-) => RuntimeEventCameraChange(mode: CameraChangeMode.fromRawValue(source.mode));
+) => RuntimeEventCameraChange(
+  mode: CameraChangeMode.fromRawValue(source.mode),
+  source: CameraChangeSource.fromRawValue(source.source),
+);
 
 RuntimeEventLoadingFailed _readRuntimeEventLoadingFailed(
   raw.mln_runtime_event_loading_failed source,
@@ -4872,6 +5018,18 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// A delta that replaces an animated one starts from where that animation
   /// left the camera, so the rest of the replaced change never happens. To
   /// reach an exact camera, use `MapHandle.updateCamera()`.
+  ///
+  /// A delta in the end phase can carry momentum, which keeps the camera moving
+  /// from the release velocities on each rendered frame. The gesture then lasts
+  /// until the momentum and any bearing snap end: the snapshot keeps
+  /// `gesture_in_progress` set, and camera events report
+  /// `CameraChangeSource.momentum`. The end handler in `animation` runs when
+  /// the gesture ends, and `animation` sets no other field except
+  /// `transition_id`. A delta in the begin phase,
+  /// `MapHandle.cancelCameraTransitions()`, or a cancellation by that ID stops
+  /// the momentum, and a later command that sets a field stops the parts of the
+  /// momentum that move it. The pan moves the map's content its distance on the
+  /// screen at any pitch.
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

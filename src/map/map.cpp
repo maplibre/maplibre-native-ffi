@@ -33,6 +33,7 @@
 #include <mln/gfx/rendering_stats.hpp>
 #include <mln/map/bound_options.hpp>
 #include <mln/map/camera.hpp>
+#include <mln/map/camera_momentum.hpp>
 #include <mln/map/map.hpp>
 #include <mln/map/map_observer.hpp>
 #include <mln/map/map_options.hpp>
@@ -285,11 +286,13 @@ auto to_c_camera_change_mode(mln::MapObserver::CameraChangeMode mode)
   return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
 }
 
-auto camera_change_payload(mln::MapObserver::CameraChangeMode mode)
-  -> mln_runtime_event_payload {
+auto camera_change_payload(
+  mln::MapObserver::CameraChangeMode mode, mln_camera_change_source source
+) -> mln_runtime_event_payload {
   auto payload = mln::core::zeroed_event_payload();
-  payload.camera_change =
-    mln_runtime_event_camera_change{.mode = to_c_camera_change_mode(mode)};
+  payload.camera_change = mln_runtime_event_camera_change{
+    .mode = to_c_camera_change_mode(mode), .source = source
+  };
   return payload;
 }
 
@@ -457,7 +460,8 @@ class CameraTransitionEnd final {
   }
 
   auto deliver(
-    mln_camera_transition_outcome outcome, uint64_t generation
+    mln_camera_transition_outcome outcome, uint64_t generation,
+    mln_camera_velocity velocity = {}
   ) noexcept -> void {
     if (!owned_.exchange(false, std::memory_order_acq_rel)) return;
     if (process_exiting()) return;
@@ -465,6 +469,7 @@ class CameraTransitionEnd final {
       .size = sizeof(mln_camera_transition_end),
       .outcome = outcome,
       .generation = generation,
+      .velocity = velocity,
     };
     try {
       handler_.callback(handler_.user_data, &end);
@@ -551,7 +556,7 @@ auto queue_held_map_events(MapEventState& events, uint64_t generation) -> void {
 // map close already reported records nothing.
 auto end_camera_command(
   MapEventState& events, const std::shared_ptr<CameraTransitionEnd>& end,
-  mln_camera_transition_outcome outcome
+  mln_camera_transition_outcome outcome, mln_camera_velocity velocity = {}
 ) noexcept -> void {
   auto& running = events.running_transition_ends;
   const auto found = std::find(running.begin(), running.end(), end);
@@ -559,11 +564,13 @@ auto end_camera_command(
   running.erase(found);
   try {
     events.ended_transitions.push_back(
-      EndedCameraTransition{.end = end, .outcome = outcome}
+      EndedCameraTransition{
+        .end = end, .outcome = outcome, .velocity = velocity
+      }
     );
   } catch (...) {
     // The handler must still run exactly once.
-    end->deliver(outcome, events.published_generation);
+    end->deliver(outcome, events.published_generation, velocity);
   }
 }
 
@@ -573,7 +580,9 @@ auto deliver_ended_transitions(
   MapEventState& events, uint64_t generation
 ) noexcept -> void {
   auto ended = std::exchange(events.ended_transitions, {});
-  for (const auto& item : ended) item.end->deliver(item.outcome, generation);
+  for (const auto& item : ended) {
+    item.end->deliver(item.outcome, generation, item.velocity);
+  }
 }
 
 struct EndedTransitionDelivery {
@@ -588,7 +597,9 @@ struct EndedTransitionDelivery {
   ~EndedTransitionDelivery() { deliver(); }
 
   auto deliver() noexcept -> void {
-    for (const auto& item : ended) item.end->deliver(item.outcome, generation);
+    for (const auto& item : ended) {
+      item.end->deliver(item.outcome, generation, item.velocity);
+    }
     ended.clear();
   }
 };
@@ -694,7 +705,8 @@ class HeadlessObserver final : public mln::MapObserver {
     // The camera has not moved yet, so the latest snapshot is current.
     queue_current(
       MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, {},
-      MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE, camera_change_payload(mode)
+      MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE,
+      camera_change_payload(mode, event_state_->command_source)
     );
   }
 
@@ -725,6 +737,8 @@ class HeadlessObserver final : public mln::MapObserver {
     }
     if (const auto map = event_state_->owner.lock())
       map->snapshot_camera_dirty = true;
+    const auto source = std::exchange(events.finishing_source, std::nullopt)
+                          .value_or(events.command_source);
     const auto did_change = selected(MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE);
     const auto ended =
       !events.in_transaction() && !events.ended_transitions.empty();
@@ -733,7 +747,8 @@ class HeadlessObserver final : public mln::MapObserver {
     if (did_change) {
       queue_map_event(
         events, generation, MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
-        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE, camera_change_payload(mode)
+        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE,
+        camera_change_payload(mode, source)
       );
     }
     if (ended) post_ended_transitions(events, generation);
@@ -2274,6 +2289,8 @@ struct CommandTransitions {
   uint32_t remaining = 0;
   bool cancelled = false;
   bool replaced = false;
+  // How fast a cancelled momentum still moved.
+  mln_camera_velocity velocity{};
 
   CommandTransitions(
     std::shared_ptr<mln::core::MapEventState> events,
@@ -2317,14 +2334,21 @@ struct CommandTransitions {
     } else if (replaced) {
       outcome = MLN_CAMERA_TRANSITION_OUTCOME_REPLACED;
     }
-    mln::core::end_camera_command(*event_state, end, outcome);
+    mln::core::end_camera_command(*event_state, end, outcome, velocity);
   }
 };
 
+// Every MapLibre transition that a camera command starts finishes through
+// this, so that the camera change that ends it reports the command's source.
 struct CommandTransitionFinish {
+  std::shared_ptr<mln::core::MapEventState> event_state;
   std::shared_ptr<CommandTransitions> command;
+  mln_camera_change_source source = MLN_CAMERA_CHANGE_SOURCE_COMMAND;
 
-  auto operator()() const -> void { command->finish(); }
+  auto operator()() const -> void {
+    event_state->finishing_source = source;
+    if (command != nullptr) command->finish();
+  }
 };
 
 // Copies the command's end handler, or leaves out a disabled one.
@@ -2401,15 +2425,17 @@ auto to_native_animation(
   const std::shared_ptr<mln::core::MapEventState>& event_state,
   const mln_animation_options& animation,
   const std::shared_ptr<mln::core::CameraTransitionEnd>& end,
-  uint32_t transitions = 1
+  uint32_t transitions = 1,
+  mln_camera_change_source source = MLN_CAMERA_CHANGE_SOURCE_COMMAND,
+  std::shared_ptr<CommandTransitions>* out_command = nullptr
 ) -> mln::AnimationOptions {
   auto result = mln::AnimationOptions{};
   if ((animation.fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
     result.transitionId = animation.transition_id;
   }
+  auto command = std::shared_ptr<CommandTransitions>{};
   if (end != nullptr) {
     event_state->running_transition_ends.push_back(end);
-    auto command = std::shared_ptr<CommandTransitions>{};
     try {
       command = std::make_shared<CommandTransitions>(
         event_state, end, result.transitionId, transitions
@@ -2420,8 +2446,11 @@ auto to_native_animation(
       );
       throw;
     }
-    result.transitionFinishFn = CommandTransitionFinish{std::move(command)};
   }
+  if (out_command != nullptr) *out_command = command;
+  result.transitionFinishFn = CommandTransitionFinish{
+    .event_state = event_state, .command = std::move(command), .source = source
+  };
   if ((animation.fields & MLN_ANIMATION_OPTION_DURATION) != 0U) {
     result.duration = duration_from_milliseconds(animation.duration_ms);
   }
@@ -4610,21 +4639,65 @@ auto cancel_all_camera_transitions(MapObject& live) -> void {
   live.map->cancelTransitions();
 }
 
+// Sets the source that a camera command's changes report while it runs. A
+// finish callback that the command calls itself sets a source that no change
+// consumes, so the scope also clears that.
+class CameraSourceScope final {
+ public:
+  CameraSourceScope(
+    MapEventState& events, mln_camera_change_source source
+  ) noexcept
+      : events_(events),
+        previous_(std::exchange(events.command_source, source)) {}
+  CameraSourceScope(const CameraSourceScope&) = delete;
+  CameraSourceScope(CameraSourceScope&&) = delete;
+  auto operator=(const CameraSourceScope&) -> CameraSourceScope& = delete;
+  auto operator=(CameraSourceScope&&) -> CameraSourceScope& = delete;
+  ~CameraSourceScope() {
+    events_.command_source = previous_;
+    events_.finishing_source.reset();
+  }
+
+ private:
+  MapEventState& events_;
+  mln_camera_change_source previous_;
+};
+
+auto gesture_source(mln_gesture_phase phase) -> mln_camera_change_source {
+  return phase == MLN_GESTURE_PHASE_NONE ? MLN_CAMERA_CHANGE_SOURCE_COMMAND
+                                         : MLN_CAMERA_CHANGE_SOURCE_GESTURE;
+}
+
 // BEGIN cancels running transitions, and BEGIN and UPDATE mark the gesture,
 // before the camera write, so MapLibre applies its gesture rules to that write.
+// The first phase after a gesture ended starts a new one, which a momentum
+// from an earlier gesture no longer ends.
 auto apply_gesture_phase_before(MapObject& live, mln_gesture_phase phase)
   -> void {
+  auto& events = *live.event_state;
+  if (
+    phase != MLN_GESTURE_PHASE_NONE &&
+    (phase == MLN_GESTURE_PHASE_BEGIN || !events.gesture_active)
+  ) {
+    events.gesture_serial += 1;
+    events.gesture_changed_bearing = false;
+  }
   if (phase == MLN_GESTURE_PHASE_BEGIN) cancel_all_camera_transitions(live);
   if (phase == MLN_GESTURE_PHASE_BEGIN || phase == MLN_GESTURE_PHASE_UPDATE) {
+    events.gesture_active = true;
     live.map->setGestureInProgress(true);
   }
 }
 
-auto apply_gesture_phase_after(MapObject& live, mln_gesture_phase phase)
-  -> void {
+// A gesture whose end starts momentum stays in progress until the momentum
+// ends.
+auto apply_gesture_phase_after(
+  MapObject& live, mln_gesture_phase phase, bool momentum = false
+) -> void {
   if (phase == MLN_GESTURE_PHASE_CANCEL) cancel_all_camera_transitions(live);
   if (phase == MLN_GESTURE_PHASE_END || phase == MLN_GESTURE_PHASE_CANCEL) {
-    live.map->setGestureInProgress(false);
+    live.event_state->gesture_active = false;
+    if (!momentum) live.map->setGestureInProgress(false);
   }
 }
 
@@ -4637,11 +4710,18 @@ auto move_camera(
   const mln_animation_options& options, mln_gesture_phase gesture_phase,
   const std::shared_ptr<CameraTransitionEnd>& end, Target&& target
 ) -> mln_status {
-  const auto animation = to_native_animation(live.event_state, options, end);
+  const auto source =
+    CameraSourceScope{*live.event_state, gesture_source(gesture_phase)};
+  const auto animation = to_native_animation(
+    live.event_state, options, end, 1, gesture_source(gesture_phase)
+  );
   auto camera = mln::CameraOptions{};
   const auto status = std::invoke(std::forward<Target>(target), camera);
   if (status != MLN_STATUS_OK) return status;
   apply_gesture_phase_before(live, gesture_phase);
+  if (gesture_phase != MLN_GESTURE_PHASE_NONE && camera.bearing) {
+    live.event_state->gesture_changed_bearing = true;
+  }
   {
     const auto replacing = TransitionReplacementScope{*live.event_state, end};
     switch (mode) {
@@ -4715,6 +4795,351 @@ constexpr auto camera_delta_anchored_fields =
   static_cast<uint32_t>(MLN_CAMERA_DELTA_SCALE) | MLN_CAMERA_DELTA_BEARING |
   MLN_CAMERA_DELTA_PITCH;
 
+// The settings of one part of a gesture's momentum, with every default
+// applied.
+struct MomentumSettings {
+  mln_momentum_decay decay = MLN_MOMENTUM_DECAY_POWER;
+  double speed_scale = 1.0;
+  double min_speed = 0.0;
+  double max_speed = std::numeric_limits<double>::infinity();
+  double exponent = 4.0;
+  double base_duration_ms = 0.0;
+  double duration_ms_per_speed = 0.0;
+  double decay_rate = 0.0;
+  double stop_speed = 0.0;
+  double duration_scale = 1.0;
+  double max_duration_ms = std::numeric_limits<double>::infinity();
+  double max_distance = std::numeric_limits<double>::infinity();
+};
+
+// The defaults follow MapLibre Compose, which took the pan's from the MapLibre
+// Android SDK.
+constexpr auto pan_momentum_defaults = MomentumSettings{
+  .speed_scale = 0.56,
+  .min_speed = 250.0,
+  .exponent = 2.0,
+  .base_duration_ms = 150.0,
+  .duration_ms_per_speed = 1.0 / 10.5,
+};
+constexpr auto zoom_momentum_defaults = MomentumSettings{
+  .base_duration_ms = 600.0,
+  .max_duration_ms = 600.0,
+  .max_distance = 2.5,
+};
+constexpr auto bearing_momentum_defaults = MomentumSettings{
+  .base_duration_ms = 600.0,
+  .max_duration_ms = 600.0,
+};
+constexpr auto pitch_momentum_defaults = MomentumSettings{
+  .min_speed = 5.0,
+  .base_duration_ms = 300.0,
+};
+
+auto resolve_momentum_settings(
+  const mln_momentum_options& options, MomentumSettings settings,
+  std::string_view part
+) -> std::optional<MomentumSettings> {
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_MOMENTUM_OPTION_DECAY) |
+    MLN_MOMENTUM_OPTION_SPEED_SCALE | MLN_MOMENTUM_OPTION_MIN_SPEED |
+    MLN_MOMENTUM_OPTION_MAX_SPEED | MLN_MOMENTUM_OPTION_EXPONENT |
+    MLN_MOMENTUM_OPTION_BASE_DURATION_MS |
+    MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED | MLN_MOMENTUM_OPTION_DECAY_RATE |
+    MLN_MOMENTUM_OPTION_STOP_SPEED | MLN_MOMENTUM_OPTION_DURATION_SCALE |
+    MLN_MOMENTUM_OPTION_MAX_DURATION_MS | MLN_MOMENTUM_OPTION_MAX_DISTANCE;
+  const auto fields = options.fields;
+  const auto fail = [part](std::string_view problem) {
+    const auto message = std::string{"momentum options for "} +
+                         std::string{part} + " " + std::string{problem};
+    set_thread_error(message.c_str());
+    return std::nullopt;
+  };
+  if ((fields & ~known_fields) != 0U) return fail("contain unknown bits");
+  if ((fields & MLN_MOMENTUM_OPTION_DECAY) != 0U) {
+    if (options.decay > MLN_MOMENTUM_DECAY_EXPONENTIAL) {
+      return fail("have an invalid decay");
+    }
+    settings.decay = options.decay;
+  }
+  const auto take = [&](uint32_t bit, double value, double& out) -> bool {
+    if ((fields & bit) == 0U) return true;
+    if (!std::isfinite(value) || value < 0.0) return false;
+    out = value;
+    return true;
+  };
+  if (
+    !take(
+      MLN_MOMENTUM_OPTION_SPEED_SCALE, options.speed_scale, settings.speed_scale
+    ) ||
+    !take(
+      MLN_MOMENTUM_OPTION_MIN_SPEED, options.min_speed, settings.min_speed
+    ) ||
+    !take(
+      MLN_MOMENTUM_OPTION_MAX_SPEED, options.max_speed, settings.max_speed
+    ) ||
+    !take(MLN_MOMENTUM_OPTION_EXPONENT, options.exponent, settings.exponent) ||
+    !take(
+      MLN_MOMENTUM_OPTION_BASE_DURATION_MS, options.base_duration_ms,
+      settings.base_duration_ms
+    ) ||
+    !take(
+      MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED, options.duration_ms_per_speed,
+      settings.duration_ms_per_speed
+    ) ||
+    !take(
+      MLN_MOMENTUM_OPTION_DECAY_RATE, options.decay_rate, settings.decay_rate
+    ) ||
+    !take(
+      MLN_MOMENTUM_OPTION_STOP_SPEED, options.stop_speed, settings.stop_speed
+    ) ||
+    !take(
+      MLN_MOMENTUM_OPTION_DURATION_SCALE, options.duration_scale,
+      settings.duration_scale
+    ) ||
+    !take(
+      MLN_MOMENTUM_OPTION_MAX_DURATION_MS, options.max_duration_ms,
+      settings.max_duration_ms
+    ) ||
+    !take(
+      MLN_MOMENTUM_OPTION_MAX_DISTANCE, options.max_distance,
+      settings.max_distance
+    )
+  ) {
+    return fail("must be finite and not negative");
+  }
+  if (settings.exponent < 1.0) return fail("need an exponent of at least 1");
+  if (
+    settings.decay == MLN_MOMENTUM_DECAY_EXPONENTIAL &&
+    ((fields & MLN_MOMENTUM_OPTION_DECAY_RATE) == 0U ||
+     (fields & MLN_MOMENTUM_OPTION_STOP_SPEED) == 0U ||
+     settings.decay_rate <= 0.0 || settings.stop_speed <= 0.0)
+  ) {
+    return fail("need a positive decay_rate and stop_speed");
+  }
+  return settings;
+}
+
+// How one part of a momentum moves: its distance in its unit, its curve, and
+// the share of the distance per second that it starts at.
+struct MomentumPlan {
+  double distance = 0.0;
+  mln::MomentumCurve curve;
+  double start_rate = 0.0;
+};
+
+// Plans the part for a release at `speed`, or returns nothing when the part
+// doesn't move.
+auto plan_momentum(double speed, const MomentumSettings& settings)
+  -> std::optional<MomentumPlan> {
+  if (!(speed > 0.0) || speed < settings.min_speed) return std::nullopt;
+  const auto release = std::min(speed, settings.max_speed);
+  const auto start = settings.speed_scale * release;
+  if (!(start > 0.0) || !(settings.duration_scale > 0.0)) return std::nullopt;
+  auto plan = MomentumPlan{};
+  auto milliseconds = 0.0;
+  if (settings.decay == MLN_MOMENTUM_DECAY_POWER) {
+    milliseconds = std::min(
+      (settings.base_duration_ms + settings.duration_ms_per_speed * release) *
+        settings.duration_scale,
+      settings.max_duration_ms
+    );
+    if (!(milliseconds > 0.0)) return std::nullopt;
+    const auto seconds = milliseconds / 1000.0;
+    plan.distance = start * seconds / settings.exponent;
+    plan.curve.exponent = settings.exponent;
+    plan.start_rate = settings.exponent / seconds;
+  } else {
+    if (start <= settings.stop_speed) return std::nullopt;
+    const auto rate = settings.decay_rate / settings.duration_scale;
+    milliseconds = std::min(
+      std::log(start / settings.stop_speed) / rate * 1000.0,
+      settings.max_duration_ms
+    );
+    if (!(milliseconds > 0.0)) return std::nullopt;
+    const auto covered = -std::expm1(-rate * milliseconds / 1000.0);
+    plan.distance = start * covered / rate;
+    plan.curve.decayRate = rate;
+    plan.start_rate = rate / covered;
+  }
+  plan.distance = std::min(plan.distance, settings.max_distance);
+  if (!(plan.distance > 0.0) || !is_native_duration_ms(milliseconds)) {
+    return std::nullopt;
+  }
+  plan.curve.duration = duration_from_milliseconds(milliseconds);
+  return plan;
+}
+
+auto validate_bearing_snap(const mln_bearing_snap& snap)
+  -> std::optional<mln::BearingSnap> {
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_BEARING_SNAP_TARGET_COUNT) |
+    MLN_BEARING_SNAP_TARGET_OFFSET | MLN_BEARING_SNAP_TOLERANCE |
+    MLN_BEARING_SNAP_DURATION_MS;
+  if ((snap.fields & ~known_fields) != 0U) {
+    set_thread_error("mln_bearing_snap.fields contains unknown bits");
+    return std::nullopt;
+  }
+  auto result = mln::BearingSnap{};
+  auto duration_ms = 300.0;
+  if ((snap.fields & MLN_BEARING_SNAP_TARGET_COUNT) != 0U) {
+    result.targetCount = snap.target_count;
+  }
+  if ((snap.fields & MLN_BEARING_SNAP_TARGET_OFFSET) != 0U) {
+    result.targetOffset = snap.target_offset;
+  }
+  if ((snap.fields & MLN_BEARING_SNAP_TOLERANCE) != 0U) {
+    result.tolerance = snap.tolerance;
+  }
+  if ((snap.fields & MLN_BEARING_SNAP_DURATION_MS) != 0U) {
+    duration_ms = snap.duration_ms;
+  }
+  if (
+    result.targetCount == 0 || !std::isfinite(result.targetOffset) ||
+    !(result.tolerance >= 0.0 && result.tolerance <= 180.0) ||
+    !is_native_duration_ms(duration_ms)
+  ) {
+    set_thread_error(
+      "a bearing snap needs a target, a finite offset, a tolerance from 0 to "
+      "180, and a duration in the native range"
+    );
+    return std::nullopt;
+  }
+  result.duration = duration_from_milliseconds(duration_ms);
+  return result;
+}
+
+// The change that `snap` makes to `bearing`, or zero when the bearing stays.
+// MapLibre Native's momentum settles with the same rule.
+auto bearing_snap_delta(double bearing, const mln::BearingSnap& snap)
+  -> double {
+  const auto spacing = 360.0 / snap.targetCount;
+  const auto target =
+    snap.targetOffset +
+    std::round((bearing - snap.targetOffset) / spacing) * spacing;
+  const auto delta =
+    target - bearing - 360.0 * std::floor((target - bearing + 180.0) / 360.0);
+  return std::abs(delta) <= snap.tolerance ? delta : 0.0;
+}
+
+// Plans a gesture's momentum on the caller's thread, so that invalid input
+// fails the call. The plan leaves out finishFn, which the worker sets.
+auto plan_gesture_momentum(const mln_gesture_momentum& momentum)
+  -> std::optional<mln::CameraMomentum> {
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_GESTURE_MOMENTUM_PAN_VELOCITY) |
+    MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY | MLN_GESTURE_MOMENTUM_BEARING_VELOCITY |
+    MLN_GESTURE_MOMENTUM_PITCH_VELOCITY | MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR |
+    MLN_GESTURE_MOMENTUM_BEARING_ANCHOR |
+    MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM | MLN_GESTURE_MOMENTUM_BEARING_SNAP;
+  const auto fields = momentum.fields;
+  if ((fields & ~known_fields) != 0U) {
+    set_thread_error("mln_gesture_momentum.fields contains unknown bits");
+    return std::nullopt;
+  }
+  const auto has = [fields](uint32_t bit) { return (fields & bit) != 0U; };
+  if (
+    (has(MLN_GESTURE_MOMENTUM_PAN_VELOCITY) &&
+     validate_screen_point(momentum.pan_velocity) != MLN_STATUS_OK) ||
+    (has(MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY) &&
+     !std::isfinite(momentum.zoom_velocity)) ||
+    (has(MLN_GESTURE_MOMENTUM_BEARING_VELOCITY) &&
+     !std::isfinite(momentum.bearing_velocity)) ||
+    (has(MLN_GESTURE_MOMENTUM_PITCH_VELOCITY) &&
+     !std::isfinite(momentum.pitch_velocity))
+  ) {
+    set_thread_error("gesture momentum velocities must be finite");
+    return std::nullopt;
+  }
+  if (
+    (has(MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR) &&
+     validate_screen_point(momentum.zoom_anchor) != MLN_STATUS_OK) ||
+    (has(MLN_GESTURE_MOMENTUM_BEARING_ANCHOR) &&
+     validate_screen_point(momentum.bearing_anchor) != MLN_STATUS_OK)
+  ) {
+    return std::nullopt;
+  }
+  const auto pan =
+    resolve_momentum_settings(momentum.pan, pan_momentum_defaults, "pan");
+  if (!pan) return std::nullopt;
+  const auto zoom =
+    resolve_momentum_settings(momentum.zoom, zoom_momentum_defaults, "zoom");
+  if (!zoom) return std::nullopt;
+  const auto bearing = resolve_momentum_settings(
+    momentum.bearing, bearing_momentum_defaults, "bearing"
+  );
+  if (!bearing) return std::nullopt;
+  const auto pitch =
+    resolve_momentum_settings(momentum.pitch, pitch_momentum_defaults, "pitch");
+  if (!pitch) return std::nullopt;
+
+  auto result = mln::CameraMomentum{};
+  if (has(MLN_GESTURE_MOMENTUM_BEARING_SNAP)) {
+    result.bearingSnap = validate_bearing_snap(momentum.bearing_snap);
+    if (!result.bearingSnap) return std::nullopt;
+  }
+
+  const auto signed_plan = [](
+                             double velocity, const MomentumSettings& settings
+                           ) -> std::optional<std::pair<double, MomentumPlan>> {
+    const auto plan = plan_momentum(std::abs(velocity), settings);
+    if (!plan) return std::nullopt;
+    return std::pair{velocity < 0.0 ? -1.0 : 1.0, *plan};
+  };
+  auto pan_plan = std::optional<MomentumPlan>{};
+  auto pan_speed = 0.0;
+  if (has(MLN_GESTURE_MOMENTUM_PAN_VELOCITY)) {
+    pan_speed = std::hypot(momentum.pan_velocity.x, momentum.pan_velocity.y);
+    pan_plan = plan_momentum(pan_speed, *pan);
+  }
+  auto zoom_plan = std::optional<std::pair<double, MomentumPlan>>{};
+  if (has(MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY)) {
+    zoom_plan = signed_plan(momentum.zoom_velocity, *zoom);
+  }
+  if (
+    pan_plan && zoom_plan &&
+    (!has(MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM) || momentum.pan_follows_zoom)
+  ) {
+    // Keep the pan's starting speed on the zoom's curve, without moving it
+    // farther than it would move alone.
+    const auto& zoom_curve = zoom_plan->second;
+    const auto start_speed = pan_plan->distance * pan_plan->start_rate;
+    pan_plan->distance =
+      std::min(pan_plan->distance, start_speed / zoom_curve.start_rate);
+    pan_plan->curve = zoom_curve.curve;
+    pan_plan->start_rate = zoom_curve.start_rate;
+  }
+  if (pan_plan) {
+    const auto scale = pan_plan->distance / pan_speed;
+    result.pan = mln::ScreenCoordinate{
+      momentum.pan_velocity.x * scale, momentum.pan_velocity.y * scale
+    };
+    result.panCurve = pan_plan->curve;
+  }
+  if (zoom_plan) {
+    result.zoom = zoom_plan->first * zoom_plan->second.distance;
+    result.zoomCurve = zoom_plan->second.curve;
+    if (has(MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR)) {
+      result.zoomAnchor = to_native_screen_point(momentum.zoom_anchor);
+    }
+  }
+  if (has(MLN_GESTURE_MOMENTUM_BEARING_VELOCITY)) {
+    if (const auto plan = signed_plan(momentum.bearing_velocity, *bearing)) {
+      result.bearing = plan->first * plan->second.distance;
+      result.bearingCurve = plan->second.curve;
+      if (has(MLN_GESTURE_MOMENTUM_BEARING_ANCHOR)) {
+        result.bearingAnchor = to_native_screen_point(momentum.bearing_anchor);
+      }
+    }
+  }
+  if (has(MLN_GESTURE_MOMENTUM_PITCH_VELOCITY)) {
+    if (const auto plan = signed_plan(momentum.pitch_velocity, *pitch)) {
+      result.pitch = plan->first * plan->second.distance;
+      result.pitchCurve = plan->second.curve;
+    }
+  }
+  return result;
+}
+
 auto validate_camera_delta(const mln_camera_delta* delta) -> mln_status {
   if (delta == nullptr || delta->size < sizeof(mln_camera_delta)) {
     set_thread_error("camera delta must have a valid size");
@@ -4722,7 +5147,8 @@ auto validate_camera_delta(const mln_camera_delta* delta) -> mln_status {
   }
   constexpr auto known_fields = static_cast<uint32_t>(MLN_CAMERA_DELTA_OFFSET) |
                                 camera_delta_anchored_fields |
-                                MLN_CAMERA_DELTA_ANCHOR;
+                                MLN_CAMERA_DELTA_ANCHOR |
+                                MLN_CAMERA_DELTA_MOMENTUM;
   const auto fields = delta->fields;
   if ((fields & ~known_fields) != 0U) {
     set_thread_error("mln_camera_delta.fields contains unknown bits");
@@ -4767,6 +5193,19 @@ auto validate_camera_delta(const mln_camera_delta* delta) -> mln_status {
   const auto& animation = delta->animation;
   const auto animation_status = validate_animation_options(&animation);
   if (animation_status != MLN_STATUS_OK) return animation_status;
+  if ((fields & MLN_CAMERA_DELTA_MOMENTUM) != 0U) {
+    if (delta->gesture_phase != MLN_GESTURE_PHASE_END) {
+      set_thread_error("only a camera delta in the end phase carries momentum");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if ((animation.fields & ~MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
+      set_thread_error(
+        "a camera delta with momentum sets only the transition ID and end "
+        "handler of its animation"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
   // An anchored ease couples center with its fields, so an animated one would
   // replace the animated pan. An immediate pan has already applied when the
   // ease reads the camera.
@@ -4806,6 +5245,62 @@ auto camera_delta_target(const mln::Map& map, const mln_camera_delta& delta)
   return camera;
 }
 
+// Converts a native momentum velocity.
+auto from_native_momentum_velocity(const mln::MomentumVelocity& velocity)
+  -> mln_camera_velocity {
+  return mln_camera_velocity{
+    .pan = {.x = velocity.pan.x, .y = velocity.pan.y},
+    .zoom = velocity.zoom,
+    .bearing = velocity.bearing,
+    .pitch = velocity.pitch,
+  };
+}
+
+// Starts the momentum that a gesture's end carries, when any part of it moves
+// or its bearing settles, and returns whether it started. The gesture stays in
+// progress until the momentum ends, unless another gesture started first.
+auto start_gesture_momentum(
+  MapObject& live, mln::CameraMomentum momentum,
+  const mln::AnimationOptions& animation,
+  const std::shared_ptr<CommandTransitions>& command,
+  const std::shared_ptr<CameraTransitionEnd>& end
+) -> bool {
+  auto& events = *live.event_state;
+  if (momentum.bearingSnap && !events.gesture_changed_bearing) {
+    momentum.bearingSnap.reset();
+  }
+  const auto moves =
+    momentum.pan || momentum.zoom || momentum.bearing || momentum.pitch;
+  if (
+    !moves && momentum.bearingSnap &&
+    bearing_snap_delta(
+      live.map->getCameraOptions().bearing.value_or(0.0), *momentum.bearingSnap
+    ) == 0.0
+  ) {
+    momentum.bearingSnap.reset();
+  }
+  if (!moves && !momentum.bearingSnap) return false;
+  momentum.finishFn = [event_state = live.event_state, command,
+                       serial =
+                         events.gesture_serial](const mln::MomentumEnd& ended) {
+    if (command != nullptr) {
+      command->velocity = from_native_momentum_velocity(ended.velocity);
+      if (ended.replaced) command->replaced = true;
+    }
+    if (event_state->gesture_serial != serial || event_state->gesture_active) {
+      return;
+    }
+    if (const auto owner = event_state->owner.lock(); owner && owner->map) {
+      owner->map->setGestureInProgress(false);
+    }
+  };
+  const auto source =
+    CameraSourceScope{events, MLN_CAMERA_CHANGE_SOURCE_MOMENTUM};
+  const auto replacing = TransitionReplacementScope{events, end};
+  live.map->startMomentum(momentum, animation);
+  return true;
+}
+
 }  // namespace
 
 auto map_apply_camera_delta(
@@ -4814,42 +5309,72 @@ auto map_apply_camera_delta(
   const auto delta_status = validate_camera_delta(delta);
   if (delta_status != MLN_STATUS_OK) return delta_status;
   const auto copied = *delta;
+  auto momentum = std::optional<mln::CameraMomentum>{};
+  if ((copied.fields & MLN_CAMERA_DELTA_MOMENTUM) != 0U) {
+    momentum = plan_gesture_momentum(copied.momentum);
+    if (!momentum) return MLN_STATUS_INVALID_ARGUMENT;
+  }
   return submit_with_transition_end(
     copied.animation, [&](const auto& end) -> mln_status {
       return submit_camera_command(
         map,
-        [copied, end](MapObject& live) -> void {
+        [copied, momentum, end](MapObject& live) -> void {
           // The pan and the scale, bearing, and pitch change are separate
           // MapLibre transitions, because an explicit center overrides an
           // anchor. The ease reads the camera after the pan, so an immediate
           // pan moves the camera that the anchor refers to. The transaction
           // around this work publishes both in one snapshot and announces one
-          // render update for them.
+          // render update for them. With momentum, the command's end is the
+          // momentum's, and the delta's own changes, which can't animate,
+          // apply before it starts.
+          const auto source_kind = gesture_source(copied.gesture_phase);
+          const auto source = CameraSourceScope{*live.event_state, source_kind};
           const auto pans = (copied.fields & MLN_CAMERA_DELTA_OFFSET) != 0U;
           const auto eases =
             (copied.fields & camera_delta_anchored_fields) != 0U;
           const auto transitions =
             static_cast<uint32_t>(pans) + static_cast<uint32_t>(eases);
+          auto command = std::shared_ptr<CommandTransitions>{};
           const auto animation = to_native_animation(
-            live.event_state, copied.animation, end, std::max(transitions, 1U)
+            live.event_state, copied.animation, end,
+            momentum ? 1U : std::max(transitions, 1U),
+            momentum ? MLN_CAMERA_CHANGE_SOURCE_MOMENTUM : source_kind, &command
           );
+          const auto parts = momentum
+                               ? to_native_animation(
+                                   live.event_state, mln_animation_options{},
+                                   nullptr, 1, source_kind
+                                 )
+                               : animation;
           apply_gesture_phase_before(live, copied.gesture_phase);
+          if (
+            copied.gesture_phase != MLN_GESTURE_PHASE_NONE &&
+            (copied.fields & MLN_CAMERA_DELTA_BEARING) != 0U &&
+            copied.bearing != 0.0
+          ) {
+            live.event_state->gesture_changed_bearing = true;
+          }
           if (pans) {
             const auto replacing =
               TransitionReplacementScope{*live.event_state, end};
-            live.map->moveBy(to_native_screen_point(copied.offset), animation);
+            live.map->moveBy(to_native_screen_point(copied.offset), parts);
           }
           if (eases) {
             const auto replacing =
               TransitionReplacementScope{*live.event_state, end};
-            live.map->easeTo(camera_delta_target(*live.map, copied), animation);
+            live.map->easeTo(camera_delta_target(*live.map, copied), parts);
           }
-          // A delta without components starts no transition, so it ends its
-          // command here, as an empty camera update does.
-          if (transitions == 0 && animation.transitionFinishFn) {
+          auto continues = false;
+          if (momentum) {
+            continues =
+              start_gesture_momentum(live, *momentum, animation, command, end);
+            if (!continues) animation.transitionFinishFn();
+          } else if (transitions == 0) {
+            // A delta without components starts no transition, so it ends
+            // its command here, as an empty camera update does.
             animation.transitionFinishFn();
           }
-          apply_gesture_phase_after(live, copied.gesture_phase);
+          apply_gesture_phase_after(live, copied.gesture_phase, continues);
         },
         completion
       );

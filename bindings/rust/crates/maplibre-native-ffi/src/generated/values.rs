@@ -200,6 +200,49 @@ impl ToNative<sys::mln_animation_options> for AnimationOptions {
     }
 }
 
+/// Where the bearing settles after a gesture that changed it.
+///
+/// The targets are `target_count` bearings spaced evenly around the circle,
+/// starting at `target_offset`. The bearing eases to the nearest one when it is
+/// within `tolerance` of it, and otherwise stays where it is.
+///
+/// See `mln_bearing_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct BearingSnap {
+    /// At least 1. Defaults to 1.
+    pub target_count: Option<u32>,
+    /// In degrees. Defaults to 0, north.
+    pub target_offset: Option<f64>,
+    /// In degrees, from 0 to 180. Defaults to 7.
+    pub tolerance: Option<f64>,
+    /// Defaults to 300.
+    pub duration_ms: Option<f64>,
+}
+impl ToNative<sys::mln_bearing_snap> for BearingSnap {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_bearing_snap> {
+        let mut raw: sys::mln_bearing_snap = unsafe { std::mem::zeroed() };
+        raw.fields = 0;
+        if let Some(item) = &self.target_count {
+            raw.fields |= sys::MLN_BEARING_SNAP_TARGET_COUNT;
+            raw.target_count = *item;
+        }
+        if let Some(item) = &self.target_offset {
+            raw.fields |= sys::MLN_BEARING_SNAP_TARGET_OFFSET;
+            raw.target_offset = *item;
+        }
+        if let Some(item) = &self.tolerance {
+            raw.fields |= sys::MLN_BEARING_SNAP_TOLERANCE;
+            raw.tolerance = *item;
+        }
+        if let Some(item) = &self.duration_ms {
+            raw.fields |= sys::MLN_BEARING_SNAP_DURATION_MS;
+            raw.duration_ms = *item;
+        }
+        Ok(raw)
+    }
+}
+
 /// Limits on the camera, for `MapHandle::set_bounds()`.
 ///
 /// See `mln_bound_options` in the
@@ -413,6 +456,27 @@ impl Default for CameraChangeMode {
     }
 }
 
+native_enum! {
+/// What moved the camera.
+///
+/// See `mln_camera_change_source` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub enum CameraChangeSource: u32 {
+    /// A camera command outside a gesture, or the map itself, as when a resize
+    /// keeps the camera within its bounds.
+    Command = 0,
+    /// A camera command with a gesture phase.
+    Gesture = 1,
+    /// The momentum and bearing snap that a gesture's end started.
+    Momentum = 2,
+} Unknown
+}
+impl Default for CameraChangeSource {
+    fn default() -> Self {
+        Self::Command
+    }
+}
+
 /// A change to the camera from where it is now, for gestures.
 ///
 /// See `mln_camera_delta` in the
@@ -431,6 +495,9 @@ pub struct CameraDelta {
     /// needs one of them, and it combines with `offset` only in a delta without
     /// a duration.
     pub anchor: Option<ScreenPoint>,
+    /// How the gesture keeps moving after this delta. Only a delta in the
+    /// `GesturePhase::End` phase carries it.
+    pub momentum: Option<GestureMomentum>,
     pub animation: AnimationOptions,
     pub gesture_phase: GesturePhase,
 }
@@ -458,6 +525,10 @@ impl ToNative<sys::mln_camera_delta> for CameraDelta {
         if let Some(item) = &self.anchor {
             raw.fields |= sys::MLN_CAMERA_DELTA_ANCHOR;
             raw.anchor = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.momentum {
+            raw.fields |= sys::MLN_CAMERA_DELTA_MOMENTUM;
+            raw.momentum = to_native(&*item, arena)?;
         }
         raw.animation = to_native(&self.animation, arena)?;
         raw.gesture_phase = to_native(&self.gesture_phase, arena)?;
@@ -645,12 +716,16 @@ pub struct CameraTransitionEnd {
     /// The generation of the first map snapshot that shows where the change
     /// left the camera, or 0 when the map closed first.
     pub generation: u64,
+    /// How fast a gesture's momentum still moved when it was cancelled, so that
+    /// the next gesture can carry it on. Zero for every other end.
+    pub velocity: CameraVelocity,
 }
 impl FromNative<sys::mln_camera_transition_end> for CameraTransitionEnd {
     unsafe fn from_native(raw: sys::mln_camera_transition_end) -> Result<Self> {
         Ok(Self {
             outcome: CameraTransitionOutcome::from_raw(raw.outcome),
             generation: raw.generation,
+            velocity: unsafe { from_native(raw.velocity) }?,
         })
     }
 }
@@ -798,6 +873,33 @@ pub enum CameraUpdateMode: u32 {
 impl Default for CameraUpdateMode {
     fn default() -> Self {
         Self::Jump
+    }
+}
+
+/// How fast each part of a camera change moves.
+///
+/// See `mln_camera_velocity` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct CameraVelocity {
+    /// How fast the map's content moves on the screen, in logical pixels per
+    /// second.
+    pub pan: ScreenPoint,
+    /// In zoom levels per second.
+    pub zoom: f64,
+    /// In degrees per second.
+    pub bearing: f64,
+    /// In degrees per second.
+    pub pitch: f64,
+}
+impl FromNative<sys::mln_camera_velocity> for CameraVelocity {
+    unsafe fn from_native(raw: sys::mln_camera_velocity) -> Result<Self> {
+        Ok(Self {
+            pan: unsafe { from_native(raw.pan) }?,
+            zoom: raw.zoom,
+            bearing: raw.bearing,
+            pitch: raw.pitch,
+        })
     }
 }
 
@@ -1663,6 +1765,96 @@ impl FromNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions {
             cluster: (raw.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER != 0)
                 .then_some(raw.cluster),
         })
+    }
+}
+
+/// How a gesture keeps moving the camera after its last contact lifts.
+///
+/// A part moves only when its velocity is set, and each part slows on its own
+/// clock. The parts' defaults are:
+///
+/// | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | -------
+/// | -------- | ----------- | ------- | ------------ | --------------- | | pan
+/// | 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0 | max
+/// 600 ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 | 1 |
+/// 300 | 0 | min speed 5 |
+///
+/// Every part defaults to `MomentumDecay::Power`, and the zoom moves at most
+/// 2.5 levels.
+///
+/// See `mln_gesture_momentum` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct GestureMomentum {
+    /// How fast the map's content moved on the screen at release, in logical
+    /// pixels per second.
+    pub pan_velocity: Option<ScreenPoint>,
+    /// In zoom levels per second.
+    pub zoom_velocity: Option<f64>,
+    /// In degrees per second.
+    pub bearing_velocity: Option<f64>,
+    /// In degrees per second.
+    pub pitch_velocity: Option<f64>,
+    /// The screen point that the zoom keeps in place. Without one, the zoom
+    /// keeps the center of the view in place.
+    pub zoom_anchor: Option<ScreenPoint>,
+    /// The screen point that the rotation keeps in place. Without one, the
+    /// rotation turns around the center of the view.
+    pub bearing_anchor: Option<ScreenPoint>,
+    pub pan: MomentumOptions,
+    pub zoom: MomentumOptions,
+    pub bearing: MomentumOptions,
+    pub pitch: MomentumOptions,
+    /// When pan and zoom momentum both start, the pan slows over the zoom's
+    /// duration and curve, starts no faster, and moves no farther than it would
+    /// alone. Defaults to true.
+    pub pan_follows_zoom: Option<bool>,
+    /// Where the bearing settles after a gesture that changed it, once the rest
+    /// of the momentum ends. Without momentum, it settles at once. Without
+    /// this, the bearing stays where the gesture leaves it.
+    pub bearing_snap: Option<BearingSnap>,
+}
+impl ToNative<sys::mln_gesture_momentum> for GestureMomentum {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_gesture_momentum> {
+        let mut raw: sys::mln_gesture_momentum = unsafe { std::mem::zeroed() };
+        raw.fields = 0;
+        if let Some(item) = &self.pan_velocity {
+            raw.fields |= sys::MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
+            raw.pan_velocity = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.zoom_velocity {
+            raw.fields |= sys::MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY;
+            raw.zoom_velocity = *item;
+        }
+        if let Some(item) = &self.bearing_velocity {
+            raw.fields |= sys::MLN_GESTURE_MOMENTUM_BEARING_VELOCITY;
+            raw.bearing_velocity = *item;
+        }
+        if let Some(item) = &self.pitch_velocity {
+            raw.fields |= sys::MLN_GESTURE_MOMENTUM_PITCH_VELOCITY;
+            raw.pitch_velocity = *item;
+        }
+        if let Some(item) = &self.zoom_anchor {
+            raw.fields |= sys::MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR;
+            raw.zoom_anchor = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.bearing_anchor {
+            raw.fields |= sys::MLN_GESTURE_MOMENTUM_BEARING_ANCHOR;
+            raw.bearing_anchor = to_native(&*item, arena)?;
+        }
+        raw.pan = to_native(&self.pan, arena)?;
+        raw.zoom = to_native(&self.zoom, arena)?;
+        raw.bearing = to_native(&self.bearing, arena)?;
+        raw.pitch = to_native(&self.pitch, arena)?;
+        if let Some(item) = &self.pan_follows_zoom {
+            raw.fields |= sys::MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM;
+            raw.pan_follows_zoom = *item;
+        }
+        if let Some(item) = &self.bearing_snap {
+            raw.fields |= sys::MLN_GESTURE_MOMENTUM_BEARING_SNAP;
+            raw.bearing_snap = to_native(&*item, arena)?;
+        }
+        Ok(raw)
     }
 }
 
@@ -2958,6 +3150,121 @@ impl FromNative<sys::mln_metal_texture_frame> for MetalTextureFrame {
             device: raw.device,
             pixel_format: raw.pixel_format,
         })
+    }
+}
+
+native_enum! {
+/// How a part of a gesture's momentum slows to a stop.
+///
+/// See `mln_momentum_decay` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub enum MomentumDecay: u32 {
+    /// The share of the distance traveled is 1 - (1 - t)^`exponent`, where t
+    /// goes from 0 to 1 over the momentum's duration. An exponent of 2 slows at
+    /// a constant rate.
+    Power = 0,
+    /// The speed falls to e^-`decay_rate` of itself each second, until it drops
+    /// below `stop_speed`.
+    Exponential = 1,
+} Unknown
+}
+impl Default for MomentumDecay {
+    fn default() -> Self {
+        Self::Power
+    }
+}
+
+/// How one part of a gesture keeps moving after its release.
+///
+/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
+/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists. Every
+/// setting is finite and not negative.
+///
+/// See `mln_momentum_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MomentumOptions {
+    pub decay: Option<MomentumDecay>,
+    /// The momentum starts at this multiple of the release speed.
+    pub speed_scale: Option<f64>,
+    /// A slower release starts no momentum.
+    pub min_speed: Option<f64>,
+    /// A faster release counts as this speed.
+    pub max_speed: Option<f64>,
+    /// For `MomentumDecay::Power`. At least 1.
+    pub exponent: Option<f64>,
+    /// For `MomentumDecay::Power`, the duration is `base_duration_ms` plus
+    /// `duration_ms_per_speed` times the release speed.
+    pub base_duration_ms: Option<f64>,
+    pub duration_ms_per_speed: Option<f64>,
+    /// Required for `MomentumDecay::Exponential`, and positive.
+    pub decay_rate: Option<f64>,
+    /// Required for `MomentumDecay::Exponential`, and positive.
+    pub stop_speed: Option<f64>,
+    /// Stretches the momentum in time without changing its starting speed, so
+    /// it also scales the distance. 0 starts no momentum. A host can pass its
+    /// platform's animation duration scale here.
+    pub duration_scale: Option<f64>,
+    /// The longest duration, after `duration_scale` applies.
+    pub max_duration_ms: Option<f64>,
+    /// The farthest the momentum moves. A momentum that would move farther
+    /// slows faster over the same duration.
+    pub max_distance: Option<f64>,
+}
+impl ToNative<sys::mln_momentum_options> for MomentumOptions {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_momentum_options> {
+        let mut raw: sys::mln_momentum_options = unsafe { std::mem::zeroed() };
+        raw.fields = 0;
+        if let Some(item) = &self.decay {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_DECAY;
+            raw.decay = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.speed_scale {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_SPEED_SCALE;
+            raw.speed_scale = *item;
+        }
+        if let Some(item) = &self.min_speed {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_MIN_SPEED;
+            raw.min_speed = *item;
+        }
+        if let Some(item) = &self.max_speed {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_MAX_SPEED;
+            raw.max_speed = *item;
+        }
+        if let Some(item) = &self.exponent {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_EXPONENT;
+            raw.exponent = *item;
+        }
+        if let Some(item) = &self.base_duration_ms {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_BASE_DURATION_MS;
+            raw.base_duration_ms = *item;
+        }
+        if let Some(item) = &self.duration_ms_per_speed {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED;
+            raw.duration_ms_per_speed = *item;
+        }
+        if let Some(item) = &self.decay_rate {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_DECAY_RATE;
+            raw.decay_rate = *item;
+        }
+        if let Some(item) = &self.stop_speed {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_STOP_SPEED;
+            raw.stop_speed = *item;
+        }
+        if let Some(item) = &self.duration_scale {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_DURATION_SCALE;
+            raw.duration_scale = *item;
+        }
+        if let Some(item) = &self.max_duration_ms {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_MAX_DURATION_MS;
+            raw.max_duration_ms = *item;
+        }
+        if let Some(item) = &self.max_distance {
+            raw.fields |= sys::MLN_MOMENTUM_OPTION_MAX_DISTANCE;
+            raw.max_distance = *item;
+        }
+        Ok(raw)
     }
 }
 
@@ -4982,11 +5289,13 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventCameraChange {
     pub mode: CameraChangeMode,
+    pub source: CameraChangeSource,
 }
 impl FromNative<sys::mln_runtime_event_camera_change> for RuntimeEventCameraChange {
     unsafe fn from_native(raw: sys::mln_runtime_event_camera_change) -> Result<Self> {
         Ok(Self {
             mode: CameraChangeMode::from_raw(raw.mode),
+            source: CameraChangeSource::from_raw(raw.source),
         })
     }
 }

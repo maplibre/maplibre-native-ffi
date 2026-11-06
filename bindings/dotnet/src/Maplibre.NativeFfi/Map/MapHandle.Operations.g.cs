@@ -312,6 +312,17 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// animation left the camera, so the rest of the replaced change never
     /// happens. To reach an exact camera, use
     /// <c>MapHandle.UpdateCameraAsync()</c>.</para>
+    /// <para>A delta in the end phase can carry momentum, which keeps the
+    /// camera moving from the release velocities on each rendered frame. The
+    /// gesture then lasts until the momentum and any bearing snap end: the
+    /// snapshot keeps <c>gesture_in_progress</c> set, and camera events report
+    /// <c>CameraChangeSource.Momentum</c>. The end handler in <c>animation</c>
+    /// runs when the gesture ends, and <c>animation</c> sets no other field
+    /// except <c>transition_id</c>. A delta in the begin phase,
+    /// <c>MapHandle.CancelCameraTransitionsAsync()</c>, or a cancellation by
+    /// that ID stops the momentum, and a later command that sets a field stops
+    /// the parts of the momentum that move it. The pan moves the map's content
+    /// its distance on the screen at any pitch.</para>
     /// <para>See <c>mln_map_apply_camera_delta</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>

@@ -78,6 +78,15 @@ internal unsafe struct mln_animation_options
     public mln_camera_transition_handler end_handler;
 }
 
+internal unsafe struct mln_bearing_snap
+{
+    public mln_bearing_snap_field fields;
+    public uint target_count;
+    public double target_offset;
+    public double tolerance;
+    public double duration_ms;
+}
+
 internal unsafe struct mln_bound_options
 {
     public uint size;
@@ -126,6 +135,7 @@ internal unsafe struct mln_camera_delta
     public double bearing;
     public double pitch;
     public mln_screen_point anchor;
+    public mln_gesture_momentum momentum;
     public mln_animation_options animation;
     public mln_gesture_phase gesture_phase;
     public uint reserved;
@@ -174,6 +184,7 @@ internal unsafe struct mln_camera_transition_end
     public uint size;
     public mln_camera_transition_outcome outcome;
     public ulong generation;
+    public mln_camera_velocity velocity;
 }
 
 internal unsafe struct mln_camera_transition_handler
@@ -192,6 +203,14 @@ internal unsafe struct mln_camera_update
     public mln_animation_options animation;
     public mln_gesture_phase gesture_phase;
     public uint reserved;
+}
+
+internal unsafe struct mln_camera_velocity
+{
+    public mln_screen_point pan;
+    public double zoom;
+    public double bearing;
+    public double pitch;
 }
 
 internal unsafe struct mln_canonical_tile_id
@@ -437,6 +456,23 @@ internal unsafe struct mln_geo_json_source_options
     public ulong cluster_min_points;
     public byte line_metrics;
     public byte cluster;
+}
+
+internal unsafe struct mln_gesture_momentum
+{
+    public mln_gesture_momentum_field fields;
+    public mln_screen_point pan_velocity;
+    public double zoom_velocity;
+    public double bearing_velocity;
+    public double pitch_velocity;
+    public mln_screen_point zoom_anchor;
+    public mln_screen_point bearing_anchor;
+    public mln_momentum_options pan;
+    public mln_momentum_options zoom;
+    public mln_momentum_options bearing;
+    public mln_momentum_options pitch;
+    public byte pan_follows_zoom;
+    public mln_bearing_snap bearing_snap;
 }
 
 internal unsafe struct mln_gpu_sync
@@ -696,6 +732,23 @@ internal unsafe struct mln_metal_texture_frame
     public void* texture;
     public void* device;
     public ulong pixel_format;
+}
+
+internal unsafe struct mln_momentum_options
+{
+    public mln_momentum_option_field fields;
+    public mln_momentum_decay decay;
+    public double speed_scale;
+    public double min_speed;
+    public double max_speed;
+    public double exponent;
+    public double base_duration_ms;
+    public double duration_ms_per_speed;
+    public double decay_rate;
+    public double stop_speed;
+    public double duration_scale;
+    public double max_duration_ms;
+    public double max_distance;
 }
 
 internal unsafe struct mln_offline_geometry_region_definition
@@ -1139,6 +1192,7 @@ internal unsafe struct mln_runtime_event
 internal unsafe struct mln_runtime_event_camera_change
 {
     public mln_camera_change_mode mode;
+    public mln_camera_change_source source;
 }
 
 internal unsafe struct mln_runtime_event_glyphs
@@ -1657,6 +1711,14 @@ internal enum mln_animation_option_field : uint
     MLN_ANIMATION_OPTION_TRANSITION_ID = 16,
 }
 
+internal enum mln_bearing_snap_field : uint
+{
+    MLN_BEARING_SNAP_TARGET_COUNT = 1,
+    MLN_BEARING_SNAP_TARGET_OFFSET = 2,
+    MLN_BEARING_SNAP_TOLERANCE = 4,
+    MLN_BEARING_SNAP_DURATION_MS = 8,
+}
+
 internal enum mln_bound_option_field : uint
 {
     MLN_BOUND_OPTION_BOUNDS = 1,
@@ -1681,6 +1743,13 @@ internal enum mln_camera_change_mode : uint
     MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
 }
 
+internal enum mln_camera_change_source : uint
+{
+    MLN_CAMERA_CHANGE_SOURCE_COMMAND = 0,
+    MLN_CAMERA_CHANGE_SOURCE_GESTURE = 1,
+    MLN_CAMERA_CHANGE_SOURCE_MOMENTUM = 2,
+}
+
 internal enum mln_camera_delta_field : uint
 {
     MLN_CAMERA_DELTA_OFFSET = 1,
@@ -1688,6 +1757,7 @@ internal enum mln_camera_delta_field : uint
     MLN_CAMERA_DELTA_BEARING = 4,
     MLN_CAMERA_DELTA_PITCH = 8,
     MLN_CAMERA_DELTA_ANCHOR = 16,
+    MLN_CAMERA_DELTA_MOMENTUM = 32,
 }
 
 internal enum mln_camera_fit_option_field : uint
@@ -1791,6 +1861,18 @@ internal enum mln_geo_json_source_option_field : uint
     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64,
     MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 128,
     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256,
+}
+
+internal enum mln_gesture_momentum_field : uint
+{
+    MLN_GESTURE_MOMENTUM_PAN_VELOCITY = 1,
+    MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY = 2,
+    MLN_GESTURE_MOMENTUM_BEARING_VELOCITY = 4,
+    MLN_GESTURE_MOMENTUM_PITCH_VELOCITY = 8,
+    MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR = 16,
+    MLN_GESTURE_MOMENTUM_BEARING_ANCHOR = 32,
+    MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM = 64,
+    MLN_GESTURE_MOMENTUM_BEARING_SNAP = 128,
 }
 
 internal enum mln_gesture_phase : uint
@@ -1908,6 +1990,28 @@ internal enum mln_map_viewport_option_field : uint
     MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 2,
     MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4,
     MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8,
+}
+
+internal enum mln_momentum_decay : uint
+{
+    MLN_MOMENTUM_DECAY_POWER = 0,
+    MLN_MOMENTUM_DECAY_EXPONENTIAL = 1,
+}
+
+internal enum mln_momentum_option_field : uint
+{
+    MLN_MOMENTUM_OPTION_DECAY = 1,
+    MLN_MOMENTUM_OPTION_SPEED_SCALE = 2,
+    MLN_MOMENTUM_OPTION_MIN_SPEED = 4,
+    MLN_MOMENTUM_OPTION_MAX_SPEED = 8,
+    MLN_MOMENTUM_OPTION_EXPONENT = 16,
+    MLN_MOMENTUM_OPTION_BASE_DURATION_MS = 32,
+    MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED = 64,
+    MLN_MOMENTUM_OPTION_DECAY_RATE = 128,
+    MLN_MOMENTUM_OPTION_STOP_SPEED = 256,
+    MLN_MOMENTUM_OPTION_DURATION_SCALE = 512,
+    MLN_MOMENTUM_OPTION_MAX_DURATION_MS = 1024,
+    MLN_MOMENTUM_OPTION_MAX_DISTANCE = 2048,
 }
 
 internal enum mln_network_status : uint

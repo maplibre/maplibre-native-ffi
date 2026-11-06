@@ -119,6 +119,58 @@ public class CameraChangeMode(@get:JvmName("getRawValue") public val rawValue: U
 }
 
 /**
+ * What moved the camera.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_camera_change_source` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public class CameraChangeSource(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "COMMAND"
+      1u -> "GESTURE"
+      2u -> "MOMENTUM"
+      else -> "CameraChangeSource($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean =
+    other is CameraChangeSource && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /**
+     * A camera command outside a gesture, or the map itself, as when a resize keeps the camera
+     * within its bounds.
+     */
+    @JvmField public val COMMAND: CameraChangeSource = CameraChangeSource(COMMAND_VALUE)
+    /** The `rawValue` of [COMMAND]. */
+    public const val COMMAND_VALUE: UInt = 0u
+    /** A camera command with a gesture phase. */
+    @JvmField public val GESTURE: CameraChangeSource = CameraChangeSource(GESTURE_VALUE)
+    /** The `rawValue` of [GESTURE]. */
+    public const val GESTURE_VALUE: UInt = 1u
+    /** The momentum and bearing snap that a gesture's end started. */
+    @JvmField public val MOMENTUM: CameraChangeSource = CameraChangeSource(MOMENTUM_VALUE)
+    /** The `rawValue` of [MOMENTUM]. */
+    public const val MOMENTUM_VALUE: UInt = 2u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): CameraChangeSource =
+      when (rawValue) {
+        COMMAND_VALUE -> COMMAND
+        GESTURE_VALUE -> GESTURE
+        MOMENTUM_VALUE -> MOMENTUM
+        else -> CameraChangeSource(rawValue)
+      }
+  }
+}
+
+/**
  * How a camera change ended.
  *
  * A change that ends in more than one way reports `CameraTransitionOutcome.CANCELLED` if any of it
@@ -989,6 +1041,53 @@ public class MapMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
         STATIC_VALUE -> STATIC
         TILE_VALUE -> TILE
         else -> MapMode(rawValue)
+      }
+  }
+}
+
+/**
+ * How a part of a gesture's momentum slows to a stop.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_momentum_decay` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public class MomentumDecay(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "POWER"
+      1u -> "EXPONENTIAL"
+      else -> "MomentumDecay($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean = other is MomentumDecay && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /**
+     * The share of the distance traveled is 1 - (1 - t)^`exponent`, where t goes from 0 to 1 over
+     * the momentum's duration. An exponent of 2 slows at a constant rate.
+     */
+    @JvmField public val POWER: MomentumDecay = MomentumDecay(POWER_VALUE)
+    /** The `rawValue` of [POWER]. */
+    public const val POWER_VALUE: UInt = 0u
+    /**
+     * The speed falls to e^-`decay_rate` of itself each second, until it drops below `stop_speed`.
+     */
+    @JvmField public val EXPONENTIAL: MomentumDecay = MomentumDecay(EXPONENTIAL_VALUE)
+    /** The `rawValue` of [EXPONENTIAL]. */
+    public const val EXPONENTIAL_VALUE: UInt = 1u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): MomentumDecay =
+      when (rawValue) {
+        POWER_VALUE -> POWER
+        EXPONENTIAL_VALUE -> EXPONENTIAL
+        else -> MomentumDecay(rawValue)
       }
   }
 }
@@ -4699,6 +4798,247 @@ public data class PremultipliedRgba8Image(
 }
 
 /**
+ * How one part of a gesture keeps moving after its release.
+ *
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom levels for zoom, and
+ * degrees for bearing and pitch. A setting whose bit isn't set takes the part's default, which
+ * `GestureMomentum` lists. Every setting is finite and not negative.
+ *
+ * See `mln_momentum_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MomentumOptions(
+  public val decay: MomentumDecay? = null,
+  /** The momentum starts at this multiple of the release speed. */
+  public val speedScale: Double? = null,
+  /** A slower release starts no momentum. */
+  public val minSpeed: Double? = null,
+  /** A faster release counts as this speed. */
+  public val maxSpeed: Double? = null,
+  /** For `MomentumDecay.POWER`. At least 1. */
+  public val exponent: Double? = null,
+  /**
+   * For `MomentumDecay.POWER`, the duration is `base_duration_ms` plus `duration_ms_per_speed`
+   * times the release speed.
+   */
+  public val baseDurationMs: Double? = null,
+  public val durationMsPerSpeed: Double? = null,
+  /** Required for `MomentumDecay.EXPONENTIAL`, and positive. */
+  public val decayRate: Double? = null,
+  /** Required for `MomentumDecay.EXPONENTIAL`, and positive. */
+  public val stopSpeed: Double? = null,
+  /**
+   * Stretches the momentum in time without changing its starting speed, so it also scales the
+   * distance. 0 starts no momentum. A host can pass its platform's animation duration scale here.
+   */
+  public val durationScale: Double? = null,
+  /** The longest duration, after `duration_scale` applies. */
+  public val maxDurationMs: Double? = null,
+  /**
+   * The farthest the momentum moves. A momentum that would move farther slows faster over the same
+   * duration.
+   */
+  public val maxDistance: Double? = null,
+) {
+  @PublishedApi internal fun withDecay(decay: MomentumDecay): MomentumOptions = copy(decay = decay)
+
+  @PublishedApi
+  internal fun withSpeedScale(speedScale: Double): MomentumOptions = copy(speedScale = speedScale)
+
+  @PublishedApi
+  internal fun withMinSpeed(minSpeed: Double): MomentumOptions = copy(minSpeed = minSpeed)
+
+  @PublishedApi
+  internal fun withMaxSpeed(maxSpeed: Double): MomentumOptions = copy(maxSpeed = maxSpeed)
+
+  @PublishedApi
+  internal fun withExponent(exponent: Double): MomentumOptions = copy(exponent = exponent)
+
+  @PublishedApi
+  internal fun withBaseDurationMs(baseDurationMs: Double): MomentumOptions =
+    copy(baseDurationMs = baseDurationMs)
+
+  @PublishedApi
+  internal fun withDurationMsPerSpeed(durationMsPerSpeed: Double): MomentumOptions =
+    copy(durationMsPerSpeed = durationMsPerSpeed)
+
+  @PublishedApi
+  internal fun withDecayRate(decayRate: Double): MomentumOptions = copy(decayRate = decayRate)
+
+  @PublishedApi
+  internal fun withStopSpeed(stopSpeed: Double): MomentumOptions = copy(stopSpeed = stopSpeed)
+
+  @PublishedApi
+  internal fun withDurationScale(durationScale: Double): MomentumOptions =
+    copy(durationScale = durationScale)
+
+  @PublishedApi
+  internal fun withMaxDurationMs(maxDurationMs: Double): MomentumOptions =
+    copy(maxDurationMs = maxDurationMs)
+
+  @PublishedApi
+  internal fun withMaxDistance(maxDistance: Double): MomentumOptions =
+    copy(maxDistance = maxDistance)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MomentumOptions = MomentumOptions()
+  }
+}
+
+/**
+ * Where the bearing settles after a gesture that changed it.
+ *
+ * The targets are `target_count` bearings spaced evenly around the circle, starting at
+ * `target_offset`. The bearing eases to the nearest one when it is within `tolerance` of it, and
+ * otherwise stays where it is.
+ *
+ * See `mln_bearing_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class BearingSnap(
+  /** At least 1. Defaults to 1. */
+  @get:JvmSynthetic public val targetCount: UInt? = null,
+  /** In degrees. Defaults to 0, north. */
+  public val targetOffset: Double? = null,
+  /** In degrees, from 0 to 180. Defaults to 7. */
+  public val tolerance: Double? = null,
+  /** Defaults to 300. */
+  public val durationMs: Double? = null,
+) {
+  @PublishedApi
+  @JvmName("getTargetCount")
+  internal fun targetCountForJava(): Int? = targetCount?.toInt()
+
+  @PublishedApi
+  internal fun withTargetCount(targetCount: Int): BearingSnap =
+    copy(targetCount = targetCount.toUInt())
+
+  @PublishedApi
+  internal fun withTargetOffset(targetOffset: Double): BearingSnap =
+    copy(targetOffset = targetOffset)
+
+  @PublishedApi
+  internal fun withTolerance(tolerance: Double): BearingSnap = copy(tolerance = tolerance)
+
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): BearingSnap = copy(durationMs = durationMs)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): BearingSnap = BearingSnap()
+  }
+}
+
+/**
+ * How a gesture keeps moving the camera after its last contact lifts.
+ *
+ * A part moves only when its velocity is set, and each part slows on its own clock. The parts'
+ * defaults are:
+ *
+ * | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | ------- | -------- |
+ * ----------- | ------- | ------------ | --------------- | | pan | 2 | 0.56 | 150 | 1/10.5 | min
+ * speed 250 | | zoom | 4 | 1 | 600 | 0 | max 600 ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms
+ * | | pitch | 4 | 1 | 300 | 0 | min speed 5 |
+ *
+ * Every part defaults to `MomentumDecay.POWER`, and the zoom moves at most 2.5 levels.
+ *
+ * See `mln_gesture_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class GestureMomentum(
+  /** How fast the map's content moved on the screen at release, in logical pixels per second. */
+  public val panVelocity: ScreenPoint? = null,
+  /** In zoom levels per second. */
+  public val zoomVelocity: Double? = null,
+  /** In degrees per second. */
+  public val bearingVelocity: Double? = null,
+  /** In degrees per second. */
+  public val pitchVelocity: Double? = null,
+  /**
+   * The screen point that the zoom keeps in place. Without one, the zoom keeps the center of the
+   * view in place.
+   */
+  public val zoomAnchor: ScreenPoint? = null,
+  /**
+   * The screen point that the rotation keeps in place. Without one, the rotation turns around the
+   * center of the view.
+   */
+  public val bearingAnchor: ScreenPoint? = null,
+  public val pan: MomentumOptions = MomentumOptions(),
+  public val zoom: MomentumOptions = MomentumOptions(),
+  public val bearing: MomentumOptions = MomentumOptions(),
+  public val pitch: MomentumOptions = MomentumOptions(),
+  /**
+   * When pan and zoom momentum both start, the pan slows over the zoom's duration and curve, starts
+   * no faster, and moves no farther than it would alone. Defaults to true.
+   */
+  public val panFollowsZoom: Boolean? = null,
+  /**
+   * Where the bearing settles after a gesture that changed it, once the rest of the momentum ends.
+   * Without momentum, it settles at once. Without this, the bearing stays where the gesture leaves
+   * it.
+   */
+  public val bearingSnap: BearingSnap? = null,
+) {
+  @PublishedApi
+  internal fun withPanVelocity(panVelocity: ScreenPoint): GestureMomentum =
+    copy(panVelocity = panVelocity)
+
+  @PublishedApi
+  internal fun withZoomVelocity(zoomVelocity: Double): GestureMomentum =
+    copy(zoomVelocity = zoomVelocity)
+
+  @PublishedApi
+  internal fun withBearingVelocity(bearingVelocity: Double): GestureMomentum =
+    copy(bearingVelocity = bearingVelocity)
+
+  @PublishedApi
+  internal fun withPitchVelocity(pitchVelocity: Double): GestureMomentum =
+    copy(pitchVelocity = pitchVelocity)
+
+  @PublishedApi
+  internal fun withZoomAnchor(zoomAnchor: ScreenPoint): GestureMomentum =
+    copy(zoomAnchor = zoomAnchor)
+
+  @PublishedApi
+  internal fun withBearingAnchor(bearingAnchor: ScreenPoint): GestureMomentum =
+    copy(bearingAnchor = bearingAnchor)
+
+  @PublishedApi internal fun withPan(pan: MomentumOptions): GestureMomentum = copy(pan = pan)
+
+  @PublishedApi internal fun withZoom(zoom: MomentumOptions): GestureMomentum = copy(zoom = zoom)
+
+  @PublishedApi
+  internal fun withBearing(bearing: MomentumOptions): GestureMomentum = copy(bearing = bearing)
+
+  @PublishedApi
+  internal fun withPitch(pitch: MomentumOptions): GestureMomentum = copy(pitch = pitch)
+
+  @PublishedApi
+  internal fun withPanFollowsZoom(panFollowsZoom: Boolean): GestureMomentum =
+    copy(panFollowsZoom = panFollowsZoom)
+
+  @PublishedApi
+  internal fun withBearingSnap(bearingSnap: BearingSnap): GestureMomentum =
+    copy(bearingSnap = bearingSnap)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GestureMomentum = GestureMomentum()
+  }
+}
+
+/**
  * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`) and (`x2`, `y2`).
  *
  * `x1` and `x2` are between 0 and 1.
@@ -4730,6 +5070,23 @@ public data class UnitBezier(
 }
 
 /**
+ * How fast each part of a camera change moves.
+ *
+ * See `mln_camera_velocity` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraVelocity(
+  /** How fast the map's content moves on the screen, in logical pixels per second. */
+  public val pan: ScreenPoint,
+  /** In zoom levels per second. */
+  public val zoom: Double,
+  /** In degrees per second. */
+  public val bearing: Double,
+  /** In degrees per second. */
+  public val pitch: Double,
+)
+
+/**
  * The end of a camera change.
  *
  * See `mln_camera_transition_end` in the
@@ -4742,13 +5099,22 @@ public data class CameraTransitionEnd(
    * the map closed first.
    */
   @get:JvmName("getGeneration") public val generation: ULong,
+  /**
+   * How fast a gesture's momentum still moved when it was cancelled, so that the next gesture can
+   * carry it on. Zero for every other end.
+   */
+  public val velocity: CameraVelocity,
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
     @PublishedApi
-    internal fun of(outcome: CameraTransitionOutcome, generation: Long): CameraTransitionEnd =
-      CameraTransitionEnd(outcome = outcome, generation = generation.toULong())
+    internal fun of(
+      outcome: CameraTransitionOutcome,
+      generation: Long,
+      velocity: CameraVelocity,
+    ): CameraTransitionEnd =
+      CameraTransitionEnd(outcome = outcome, generation = generation.toULong(), velocity = velocity)
   }
 }
 
@@ -4825,6 +5191,11 @@ public data class CameraDelta(
    * it combines with `offset` only in a delta without a duration.
    */
   public val anchor: ScreenPoint? = null,
+  /**
+   * How the gesture keeps moving after this delta. Only a delta in the `GesturePhase.END` phase
+   * carries it.
+   */
+  public val momentum: GestureMomentum? = null,
   public val animation: AnimationOptions = AnimationOptions(),
   public val gesturePhase: GesturePhase = GesturePhase.NONE,
 ) {
@@ -4837,6 +5208,9 @@ public data class CameraDelta(
   @PublishedApi internal fun withPitch(pitch: Double): CameraDelta = copy(pitch = pitch)
 
   @PublishedApi internal fun withAnchor(anchor: ScreenPoint): CameraDelta = copy(anchor = anchor)
+
+  @PublishedApi
+  internal fun withMomentum(momentum: GestureMomentum): CameraDelta = copy(momentum = momentum)
 
   @PublishedApi
   internal fun withAnimation(animation: AnimationOptions): CameraDelta = copy(animation = animation)
@@ -7735,6 +8109,7 @@ public data class OfflineRegionStatus(
  */
 public data class RuntimeEventCameraChange(
   public val mode: CameraChangeMode,
+  public val source: CameraChangeSource,
 )
 
 /**

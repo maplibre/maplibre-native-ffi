@@ -61,6 +61,68 @@ public struct AnimationOptions: Sendable {
   }
 }
 
+/// Where the bearing settles after a gesture that changed it.
+///
+/// The targets are `target_count` bearings spaced evenly around the circle,
+/// starting at `target_offset`. The bearing eases to the nearest one when it is
+/// within `tolerance` of it, and otherwise stays where it is.
+///
+/// See `mln_bearing_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct BearingSnap: Equatable, Hashable, Sendable {
+  /// At least 1. Defaults to 1.
+  public var targetCount: UInt32?
+  /// In degrees. Defaults to 0, north.
+  public var targetOffset: Double?
+  /// In degrees, from 0 to 180. Defaults to 7.
+  public var tolerance: Double?
+  /// Defaults to 300.
+  public var durationMs: Double?
+  public init(
+    targetCount: UInt32? = nil,
+    targetOffset: Double? = nil,
+    tolerance: Double? = nil,
+    durationMs: Double? = nil
+  ) {
+    self.targetCount = targetCount
+    self.targetOffset = targetOffset
+    self.tolerance = tolerance
+    self.durationMs = durationMs
+  }
+
+  init(raw: mln_bearing_snap) {
+    targetCount = raw.fields & MLN_BEARING_SNAP_TARGET_COUNT.rawValue != 0 ? raw
+      .target_count : nil
+    targetOffset = raw.fields & MLN_BEARING_SNAP_TARGET_OFFSET
+      .rawValue != 0 ? raw.target_offset : nil
+    tolerance = raw.fields & MLN_BEARING_SNAP_TOLERANCE.rawValue != 0 ? raw
+      .tolerance : nil
+    durationMs = raw.fields & MLN_BEARING_SNAP_DURATION_MS.rawValue != 0 ? raw
+      .duration_ms : nil
+  }
+
+  func nativeValue() -> mln_bearing_snap {
+    var raw = mln_bearing_snap()
+    raw.fields = 0
+    if let item = targetCount {
+      raw.fields |= MLN_BEARING_SNAP_TARGET_COUNT.rawValue; raw
+        .target_count = item
+    }
+    if let item = targetOffset {
+      raw.fields |= MLN_BEARING_SNAP_TARGET_OFFSET.rawValue; raw
+        .target_offset = item
+    }
+    if let item = tolerance {
+      raw.fields |= MLN_BEARING_SNAP_TOLERANCE.rawValue; raw.tolerance = item
+    }
+    if let item = durationMs {
+      raw.fields |= MLN_BEARING_SNAP_DURATION_MS.rawValue; raw
+        .duration_ms = item
+    }
+    return raw
+  }
+}
+
 /// Limits on the camera, for `MapHandle.setBounds()`.
 ///
 /// See `mln_bound_options` in the
@@ -272,6 +334,9 @@ public struct CameraDelta: Sendable {
   /// needs one of them, and it combines with `offset` only in a delta without a
   /// duration.
   public var anchor: ScreenPoint?
+  /// How the gesture keeps moving after this delta. Only a delta in the
+  /// `GesturePhase.end` phase carries it.
+  public var momentum: GestureMomentum?
   public var animation: AnimationOptions
   public var gesturePhase: GesturePhase
   public init(
@@ -280,6 +345,7 @@ public struct CameraDelta: Sendable {
     bearing: Double? = nil,
     pitch: Double? = nil,
     anchor: ScreenPoint? = nil,
+    momentum: GestureMomentum? = nil,
     animation: AnimationOptions = .init(),
     gesturePhase: GesturePhase = .init(rawValue: 0)
   ) {
@@ -288,6 +354,7 @@ public struct CameraDelta: Sendable {
     self.bearing = bearing
     self.pitch = pitch
     self.anchor = anchor
+    self.momentum = momentum
     self.animation = animation
     self.gesturePhase = gesturePhase
   }
@@ -311,6 +378,10 @@ public struct CameraDelta: Sendable {
     }
     if let item = anchor {
       raw.fields |= MLN_CAMERA_DELTA_ANCHOR.rawValue; raw.anchor = item
+        .nativeValue()
+    }
+    if let item = momentum {
+      raw.fields |= MLN_CAMERA_DELTA_MOMENTUM.rawValue; raw.momentum = item
         .nativeValue()
     }
     raw.animation = try animation.nativeValue(arena: arena)
@@ -528,17 +599,23 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   /// The generation of the first map snapshot that shows where the change left
   /// the camera, or 0 when the map closed first.
   public var generation: UInt64
+  /// How fast a gesture's momentum still moved when it was cancelled, so that
+  /// the next gesture can carry it on. Zero for every other end.
+  public var velocity: CameraVelocity
   public init(
     outcome: CameraTransitionOutcome = .init(rawValue: 0),
-    generation: UInt64 = 0
+    generation: UInt64 = 0,
+    velocity: CameraVelocity = .init()
   ) {
     self.outcome = outcome
     self.generation = generation
+    self.velocity = velocity
   }
 
   init(raw: mln_camera_transition_end) {
     outcome = CameraTransitionOutcome(rawValue: raw.outcome.rawValue)
     generation = raw.generation
+    velocity = CameraVelocity(raw: raw.velocity)
   }
 }
 
@@ -700,6 +777,40 @@ public struct CameraUpdateMode: RawRepresentable, CustomStringConvertible,
     case 2: return "fly"
     default: return "CameraUpdateMode(\(rawValue))"
     }
+  }
+}
+
+/// How fast each part of a camera change moves.
+///
+/// See `mln_camera_velocity` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct CameraVelocity: Equatable, Hashable, Sendable {
+  /// How fast the map's content moves on the screen, in logical pixels per
+  /// second.
+  public var pan: ScreenPoint
+  /// In zoom levels per second.
+  public var zoom: Double
+  /// In degrees per second.
+  public var bearing: Double
+  /// In degrees per second.
+  public var pitch: Double
+  public init(
+    pan: ScreenPoint = .init(),
+    zoom: Double = 0,
+    bearing: Double = 0,
+    pitch: Double = 0
+  ) {
+    self.pan = pan
+    self.zoom = zoom
+    self.bearing = bearing
+    self.pitch = pitch
+  }
+
+  init(raw: mln_camera_velocity) {
+    pan = ScreenPoint(raw: raw.pan)
+    zoom = raw.zoom
+    bearing = raw.bearing
+    pitch = raw.pitch
   }
 }
 
@@ -899,6 +1010,144 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
     if let item = orientation {
       raw.fields |= MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue; raw
         .orientation = item.nativeValue()
+    }
+    return raw
+  }
+}
+
+/// How a gesture keeps moving the camera after its last contact lifts.
+///
+/// A part moves only when its velocity is set, and each part slows on its own
+/// clock. The parts' defaults are:
+///
+/// | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | -------
+/// | -------- | ----------- | ------- | ------------ | --------------- | | pan
+/// | 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0 | max
+/// 600 ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 | 1 |
+/// 300 | 0 | min speed 5 |
+///
+/// Every part defaults to `MomentumDecay.power`, and the zoom moves at most 2.5
+/// levels.
+///
+/// See `mln_gesture_momentum` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct GestureMomentum: Equatable, Hashable, Sendable {
+  /// How fast the map's content moved on the screen at release, in logical
+  /// pixels per second.
+  public var panVelocity: ScreenPoint?
+  /// In zoom levels per second.
+  public var zoomVelocity: Double?
+  /// In degrees per second.
+  public var bearingVelocity: Double?
+  /// In degrees per second.
+  public var pitchVelocity: Double?
+  /// The screen point that the zoom keeps in place. Without one, the zoom keeps
+  /// the center of the view in place.
+  public var zoomAnchor: ScreenPoint?
+  /// The screen point that the rotation keeps in place. Without one, the
+  /// rotation turns around the center of the view.
+  public var bearingAnchor: ScreenPoint?
+  public var pan: MomentumOptions
+  public var zoom: MomentumOptions
+  public var bearing: MomentumOptions
+  public var pitch: MomentumOptions
+  /// When pan and zoom momentum both start, the pan slows over the zoom's
+  /// duration and curve, starts no faster, and moves no farther than it would
+  /// alone. Defaults to true.
+  public var panFollowsZoom: Bool?
+  /// Where the bearing settles after a gesture that changed it, once the rest
+  /// of the momentum ends. Without momentum, it settles at once. Without this,
+  /// the bearing stays where the gesture leaves it.
+  public var bearingSnap: BearingSnap?
+  public init(
+    panVelocity: ScreenPoint? = nil,
+    zoomVelocity: Double? = nil,
+    bearingVelocity: Double? = nil,
+    pitchVelocity: Double? = nil,
+    zoomAnchor: ScreenPoint? = nil,
+    bearingAnchor: ScreenPoint? = nil,
+    pan: MomentumOptions = .init(),
+    zoom: MomentumOptions = .init(),
+    bearing: MomentumOptions = .init(),
+    pitch: MomentumOptions = .init(),
+    panFollowsZoom: Bool? = nil,
+    bearingSnap: BearingSnap? = nil
+  ) {
+    self.panVelocity = panVelocity
+    self.zoomVelocity = zoomVelocity
+    self.bearingVelocity = bearingVelocity
+    self.pitchVelocity = pitchVelocity
+    self.zoomAnchor = zoomAnchor
+    self.bearingAnchor = bearingAnchor
+    self.pan = pan
+    self.zoom = zoom
+    self.bearing = bearing
+    self.pitch = pitch
+    self.panFollowsZoom = panFollowsZoom
+    self.bearingSnap = bearingSnap
+  }
+
+  init(raw: mln_gesture_momentum) {
+    panVelocity = raw.fields & MLN_GESTURE_MOMENTUM_PAN_VELOCITY
+      .rawValue != 0 ? ScreenPoint(raw: raw.pan_velocity) : nil
+    zoomVelocity = raw.fields & MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY
+      .rawValue != 0 ? raw.zoom_velocity : nil
+    bearingVelocity = raw.fields & MLN_GESTURE_MOMENTUM_BEARING_VELOCITY
+      .rawValue != 0 ? raw.bearing_velocity : nil
+    pitchVelocity = raw.fields & MLN_GESTURE_MOMENTUM_PITCH_VELOCITY
+      .rawValue != 0 ? raw.pitch_velocity : nil
+    zoomAnchor = raw.fields & MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR
+      .rawValue != 0 ? ScreenPoint(raw: raw.zoom_anchor) : nil
+    bearingAnchor = raw.fields & MLN_GESTURE_MOMENTUM_BEARING_ANCHOR
+      .rawValue != 0 ? ScreenPoint(raw: raw.bearing_anchor) : nil
+    pan = MomentumOptions(raw: raw.pan)
+    zoom = MomentumOptions(raw: raw.zoom)
+    bearing = MomentumOptions(raw: raw.bearing)
+    pitch = MomentumOptions(raw: raw.pitch)
+    panFollowsZoom = raw.fields & MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM
+      .rawValue != 0 ? raw.pan_follows_zoom : nil
+    bearingSnap = raw.fields & MLN_GESTURE_MOMENTUM_BEARING_SNAP
+      .rawValue != 0 ? BearingSnap(raw: raw.bearing_snap) : nil
+  }
+
+  func nativeValue() -> mln_gesture_momentum {
+    var raw = mln_gesture_momentum()
+    raw.fields = 0
+    if let item = panVelocity {
+      raw.fields |= MLN_GESTURE_MOMENTUM_PAN_VELOCITY.rawValue; raw
+        .pan_velocity = item.nativeValue()
+    }
+    if let item = zoomVelocity {
+      raw.fields |= MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY.rawValue; raw
+        .zoom_velocity = item
+    }
+    if let item = bearingVelocity {
+      raw.fields |= MLN_GESTURE_MOMENTUM_BEARING_VELOCITY.rawValue; raw
+        .bearing_velocity = item
+    }
+    if let item = pitchVelocity {
+      raw.fields |= MLN_GESTURE_MOMENTUM_PITCH_VELOCITY.rawValue; raw
+        .pitch_velocity = item
+    }
+    if let item = zoomAnchor {
+      raw.fields |= MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR.rawValue; raw
+        .zoom_anchor = item.nativeValue()
+    }
+    if let item = bearingAnchor {
+      raw.fields |= MLN_GESTURE_MOMENTUM_BEARING_ANCHOR.rawValue; raw
+        .bearing_anchor = item.nativeValue()
+    }
+    raw.pan = pan.nativeValue()
+    raw.zoom = zoom.nativeValue()
+    raw.bearing = bearing.nativeValue()
+    raw.pitch = pitch.nativeValue()
+    if let item = panFollowsZoom {
+      raw.fields |= MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM.rawValue; raw
+        .pan_follows_zoom = item
+    }
+    if let item = bearingSnap {
+      raw.fields |= MLN_GESTURE_MOMENTUM_BEARING_SNAP.rawValue; raw
+        .bearing_snap = item.nativeValue()
     }
     return raw
   }
@@ -1479,6 +1728,179 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
     if let item = frustumOffset {
       raw.fields |= MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue; raw
         .frustum_offset = item.nativeValue()
+    }
+    return raw
+  }
+}
+
+/// How a part of a gesture's momentum slows to a stop.
+///
+/// See `mln_momentum_decay` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct MomentumDecay: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// The share of the distance traveled is 1 - (1 - t)^`exponent`, where t goes
+  /// from 0 to 1 over the momentum's duration. An exponent of 2 slows at a
+  /// constant rate.
+  public static let power: MomentumDecay = .init(rawValue: 0)
+  /// The speed falls to e^-`decay_rate` of itself each second, until it drops
+  /// below `stop_speed`.
+  public static let exponential: MomentumDecay = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "power"
+    case 1: return "exponential"
+    default: return "MomentumDecay(\(rawValue))"
+    }
+  }
+}
+
+/// How one part of a gesture keeps moving after its release.
+///
+/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
+/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists. Every
+/// setting is finite and not negative.
+///
+/// See `mln_momentum_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct MomentumOptions: Equatable, Hashable, Sendable {
+  public var decay: MomentumDecay?
+  /// The momentum starts at this multiple of the release speed.
+  public var speedScale: Double?
+  /// A slower release starts no momentum.
+  public var minSpeed: Double?
+  /// A faster release counts as this speed.
+  public var maxSpeed: Double?
+  /// For `MomentumDecay.power`. At least 1.
+  public var exponent: Double?
+  /// For `MomentumDecay.power`, the duration is `base_duration_ms` plus
+  /// `duration_ms_per_speed` times the release speed.
+  public var baseDurationMs: Double?
+  public var durationMsPerSpeed: Double?
+  /// Required for `MomentumDecay.exponential`, and positive.
+  public var decayRate: Double?
+  /// Required for `MomentumDecay.exponential`, and positive.
+  public var stopSpeed: Double?
+  /// Stretches the momentum in time without changing its starting speed, so it
+  /// also scales the distance. 0 starts no momentum. A host can pass its
+  /// platform's animation duration scale here.
+  public var durationScale: Double?
+  /// The longest duration, after `duration_scale` applies.
+  public var maxDurationMs: Double?
+  /// The farthest the momentum moves. A momentum that would move farther slows
+  /// faster over the same duration.
+  public var maxDistance: Double?
+  public init(
+    decay: MomentumDecay? = nil,
+    speedScale: Double? = nil,
+    minSpeed: Double? = nil,
+    maxSpeed: Double? = nil,
+    exponent: Double? = nil,
+    baseDurationMs: Double? = nil,
+    durationMsPerSpeed: Double? = nil,
+    decayRate: Double? = nil,
+    stopSpeed: Double? = nil,
+    durationScale: Double? = nil,
+    maxDurationMs: Double? = nil,
+    maxDistance: Double? = nil
+  ) {
+    self.decay = decay
+    self.speedScale = speedScale
+    self.minSpeed = minSpeed
+    self.maxSpeed = maxSpeed
+    self.exponent = exponent
+    self.baseDurationMs = baseDurationMs
+    self.durationMsPerSpeed = durationMsPerSpeed
+    self.decayRate = decayRate
+    self.stopSpeed = stopSpeed
+    self.durationScale = durationScale
+    self.maxDurationMs = maxDurationMs
+    self.maxDistance = maxDistance
+  }
+
+  init(raw: mln_momentum_options) {
+    decay = raw.fields & MLN_MOMENTUM_OPTION_DECAY
+      .rawValue != 0 ? MomentumDecay(rawValue: raw.decay.rawValue) : nil
+    speedScale = raw.fields & MLN_MOMENTUM_OPTION_SPEED_SCALE
+      .rawValue != 0 ? raw.speed_scale : nil
+    minSpeed = raw.fields & MLN_MOMENTUM_OPTION_MIN_SPEED.rawValue != 0 ? raw
+      .min_speed : nil
+    maxSpeed = raw.fields & MLN_MOMENTUM_OPTION_MAX_SPEED.rawValue != 0 ? raw
+      .max_speed : nil
+    exponent = raw.fields & MLN_MOMENTUM_OPTION_EXPONENT.rawValue != 0 ? raw
+      .exponent : nil
+    baseDurationMs = raw.fields & MLN_MOMENTUM_OPTION_BASE_DURATION_MS
+      .rawValue != 0 ? raw.base_duration_ms : nil
+    durationMsPerSpeed = raw.fields & MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED
+      .rawValue != 0 ? raw.duration_ms_per_speed : nil
+    decayRate = raw.fields & MLN_MOMENTUM_OPTION_DECAY_RATE.rawValue != 0 ? raw
+      .decay_rate : nil
+    stopSpeed = raw.fields & MLN_MOMENTUM_OPTION_STOP_SPEED.rawValue != 0 ? raw
+      .stop_speed : nil
+    durationScale = raw.fields & MLN_MOMENTUM_OPTION_DURATION_SCALE
+      .rawValue != 0 ? raw.duration_scale : nil
+    maxDurationMs = raw.fields & MLN_MOMENTUM_OPTION_MAX_DURATION_MS
+      .rawValue != 0 ? raw.max_duration_ms : nil
+    maxDistance = raw.fields & MLN_MOMENTUM_OPTION_MAX_DISTANCE
+      .rawValue != 0 ? raw.max_distance : nil
+  }
+
+  func nativeValue() -> mln_momentum_options {
+    var raw = mln_momentum_options()
+    raw.fields = 0
+    if let item = decay {
+      raw.fields |= MLN_MOMENTUM_OPTION_DECAY.rawValue; raw
+        .decay = mln_momentum_decay(rawValue: item.rawValue)
+    }
+    if let item = speedScale {
+      raw.fields |= MLN_MOMENTUM_OPTION_SPEED_SCALE.rawValue; raw
+        .speed_scale = item
+    }
+    if let item = minSpeed {
+      raw.fields |= MLN_MOMENTUM_OPTION_MIN_SPEED.rawValue; raw
+        .min_speed = item
+    }
+    if let item = maxSpeed {
+      raw.fields |= MLN_MOMENTUM_OPTION_MAX_SPEED.rawValue; raw
+        .max_speed = item
+    }
+    if let item = exponent {
+      raw.fields |= MLN_MOMENTUM_OPTION_EXPONENT.rawValue; raw.exponent = item
+    }
+    if let item = baseDurationMs {
+      raw.fields |= MLN_MOMENTUM_OPTION_BASE_DURATION_MS.rawValue; raw
+        .base_duration_ms = item
+    }
+    if let item = durationMsPerSpeed {
+      raw.fields |= MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED.rawValue; raw
+        .duration_ms_per_speed = item
+    }
+    if let item = decayRate {
+      raw.fields |= MLN_MOMENTUM_OPTION_DECAY_RATE.rawValue; raw
+        .decay_rate = item
+    }
+    if let item = stopSpeed {
+      raw.fields |= MLN_MOMENTUM_OPTION_STOP_SPEED.rawValue; raw
+        .stop_speed = item
+    }
+    if let item = durationScale {
+      raw.fields |= MLN_MOMENTUM_OPTION_DURATION_SCALE.rawValue; raw
+        .duration_scale = item
+    }
+    if let item = maxDurationMs {
+      raw.fields |= MLN_MOMENTUM_OPTION_MAX_DURATION_MS.rawValue; raw
+        .max_duration_ms = item
+    }
+    if let item = maxDistance {
+      raw.fields |= MLN_MOMENTUM_OPTION_MAX_DISTANCE.rawValue; raw
+        .max_distance = item
     }
     return raw
   }

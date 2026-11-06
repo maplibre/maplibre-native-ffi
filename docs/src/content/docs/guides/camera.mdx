@@ -74,7 +74,11 @@ the offset for a drag, or the scale and the pinch's center as the anchor for a
 pinch. When the gesture ends, send the end phase, or the cancel phase if the
 platform cancels it.
 
-For momentum after a gesture, send an update-phase delta on each display frame.
+To keep the camera moving after a fling, give the end-phase delta a momentum
+with the gesture's release velocities. The map slows each part of the motion on
+its own and keeps the gesture in progress until the momentum ends. A begin-phase
+delta stops it. The momentum's options set how fast it slows, so it can match
+your platform's scrolling.
 
 <Snippet page="camera" region="gesture" />
 

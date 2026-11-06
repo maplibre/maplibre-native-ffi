@@ -76,11 +76,29 @@ G_DECLARE_FINAL_TYPE(
   MaplibreNativeFfiAnimationOptions, maplibre_native_ffi_animation_options,
   MAPLIBRE_NATIVE_FFI, ANIMATION_OPTIONS, GObject
 )
+#define MAPLIBRE_NATIVE_FFI_TYPE_BEARING_SNAP \
+  (maplibre_native_ffi_bearing_snap_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiBearingSnap, maplibre_native_ffi_bearing_snap,
+  MAPLIBRE_NATIVE_FFI, BEARING_SNAP, GObject
+)
 #define MAPLIBRE_NATIVE_FFI_TYPE_BOUND_OPTIONS \
   (maplibre_native_ffi_bound_options_get_type())
 G_DECLARE_FINAL_TYPE(
   MaplibreNativeFfiBoundOptions, maplibre_native_ffi_bound_options,
   MAPLIBRE_NATIVE_FFI, BOUND_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_OPTIONS \
+  (maplibre_native_ffi_momentum_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiMomentumOptions, maplibre_native_ffi_momentum_options,
+  MAPLIBRE_NATIVE_FFI, MOMENTUM_OPTIONS, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_MOMENTUM \
+  (maplibre_native_ffi_gesture_momentum_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiGestureMomentum, maplibre_native_ffi_gesture_momentum,
+  MAPLIBRE_NATIVE_FFI, GESTURE_MOMENTUM, GObject
 )
 #define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_DELTA \
   (maplibre_native_ffi_camera_delta_get_type())
@@ -687,10 +705,32 @@ typedef struct {
 } MaplibreNativeFfiCameraQueryResult;
 
 /**
+ * MaplibreNativeFfiCameraVelocity:
+ * @pan: How fast the map's content moves on the screen, in logical pixels per
+ *   second.
+ * @zoom: In zoom levels per second.
+ * @bearing: In degrees per second.
+ * @pitch: In degrees per second.
+ *
+ * How fast each part of a camera change moves.
+ *
+ * See `mln_camera_velocity` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiScreenPoint pan;
+  gdouble zoom;
+  gdouble bearing;
+  gdouble pitch;
+} MaplibreNativeFfiCameraVelocity;
+
+/**
  * MaplibreNativeFfiCameraTransitionEnd:
  * @outcome: outcome
  * @generation: The generation of the first map snapshot that shows where the
  *   change left the camera, or 0 when the map closed first.
+ * @velocity: How fast a gesture's momentum still moved when it was cancelled,
+ *   so that the next gesture can carry it on. Zero for every other end.
  *
  * The end of a camera change.
  *
@@ -700,6 +740,7 @@ typedef struct {
 typedef struct {
   MaplibreNativeFfiCameraTransitionOutcome outcome;
   guint64 generation;
+  MaplibreNativeFfiCameraVelocity velocity;
 } MaplibreNativeFfiCameraTransitionEnd;
 
 /**
@@ -1290,6 +1331,7 @@ typedef struct {
 /**
  * MaplibreNativeFfiRuntimeEventCameraChange:
  * @mode: mode
+ * @source: source
  *
  * The details of `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE` and
  * `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE`.
@@ -1299,6 +1341,7 @@ typedef struct {
  */
 typedef struct {
   MaplibreNativeFfiCameraChangeMode mode;
+  MaplibreNativeFfiCameraChangeSource source;
 } MaplibreNativeFfiRuntimeEventCameraChange;
 
 /**
@@ -2014,6 +2057,174 @@ void maplibre_native_ffi_animation_options_set_end_handler(
   const MaplibreNativeFfiCameraTransitionHandler* value
 );
 
+/**
+ * MaplibreNativeFfiBearingSnap:
+ *
+ * Where the bearing settles after a gesture that changed it.
+ *
+ * The targets are `target_count` bearings spaced evenly around the circle,
+ * starting at `target_offset`. The bearing eases to the nearest one when it is
+ * within `tolerance` of it, and otherwise stays where it is.
+ *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
+ * See `mln_bearing_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+/**
+ * maplibre_native_ffi_bearing_snap_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiBearingSnap` whose members are zero, empty, or unset.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiBearingSnap* maplibre_native_ffi_bearing_snap_new(void);
+
+/**
+ * MaplibreNativeFfiBearingSnap:target-count: (setter set_target_count) (getter get_target_count)
+ *
+ * At least 1. Defaults to 1.
+ */
+/**
+ * maplibre_native_ffi_bearing_snap_get_target_count: (get-property target-count)
+ *
+ * Gets `MaplibreNativeFfiBearingSnap:target-count`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_bearing_snap_get_target_count(
+  MaplibreNativeFfiBearingSnap* self
+);
+
+/**
+ * maplibre_native_ffi_bearing_snap_has_target_count:
+ *
+ * Whether `MaplibreNativeFfiBearingSnap:target-count` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_bearing_snap_has_target_count(
+  MaplibreNativeFfiBearingSnap* self
+);
+
+/**
+ * maplibre_native_ffi_bearing_snap_set_target_count: (set-property target-count)
+ *
+ * Sets `MaplibreNativeFfiBearingSnap:target-count`.
+ */
+void maplibre_native_ffi_bearing_snap_set_target_count(
+  MaplibreNativeFfiBearingSnap* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiBearingSnap:target-offset: (setter set_target_offset) (getter get_target_offset)
+ *
+ * In degrees. Defaults to 0, north.
+ */
+/**
+ * maplibre_native_ffi_bearing_snap_get_target_offset: (get-property target-offset)
+ *
+ * Gets `MaplibreNativeFfiBearingSnap:target-offset`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_bearing_snap_get_target_offset(
+  MaplibreNativeFfiBearingSnap* self
+);
+
+/**
+ * maplibre_native_ffi_bearing_snap_has_target_offset:
+ *
+ * Whether `MaplibreNativeFfiBearingSnap:target-offset` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_bearing_snap_has_target_offset(
+  MaplibreNativeFfiBearingSnap* self
+);
+
+/**
+ * maplibre_native_ffi_bearing_snap_set_target_offset: (set-property target-offset)
+ *
+ * Sets `MaplibreNativeFfiBearingSnap:target-offset`.
+ */
+void maplibre_native_ffi_bearing_snap_set_target_offset(
+  MaplibreNativeFfiBearingSnap* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiBearingSnap:tolerance: (setter set_tolerance) (getter get_tolerance)
+ *
+ * In degrees, from 0 to 180. Defaults to 7.
+ */
+/**
+ * maplibre_native_ffi_bearing_snap_get_tolerance: (get-property tolerance)
+ *
+ * Gets `MaplibreNativeFfiBearingSnap:tolerance`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_bearing_snap_get_tolerance(
+  MaplibreNativeFfiBearingSnap* self
+);
+
+/**
+ * maplibre_native_ffi_bearing_snap_has_tolerance:
+ *
+ * Whether `MaplibreNativeFfiBearingSnap:tolerance` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_bearing_snap_has_tolerance(
+  MaplibreNativeFfiBearingSnap* self
+);
+
+/**
+ * maplibre_native_ffi_bearing_snap_set_tolerance: (set-property tolerance)
+ *
+ * Sets `MaplibreNativeFfiBearingSnap:tolerance`.
+ */
+void maplibre_native_ffi_bearing_snap_set_tolerance(
+  MaplibreNativeFfiBearingSnap* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiBearingSnap:duration-ms: (setter set_duration_ms) (getter get_duration_ms)
+ *
+ * Defaults to 300.
+ */
+/**
+ * maplibre_native_ffi_bearing_snap_get_duration_ms: (get-property duration-ms)
+ *
+ * Gets `MaplibreNativeFfiBearingSnap:duration-ms`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_bearing_snap_get_duration_ms(
+  MaplibreNativeFfiBearingSnap* self
+);
+
+/**
+ * maplibre_native_ffi_bearing_snap_has_duration_ms:
+ *
+ * Whether `MaplibreNativeFfiBearingSnap:duration-ms` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_bearing_snap_has_duration_ms(
+  MaplibreNativeFfiBearingSnap* self
+);
+
+/**
+ * maplibre_native_ffi_bearing_snap_set_duration_ms: (set-property duration-ms)
+ *
+ * Sets `MaplibreNativeFfiBearingSnap:duration-ms`.
+ */
+void maplibre_native_ffi_bearing_snap_set_duration_ms(
+  MaplibreNativeFfiBearingSnap* self, gdouble value
+);
+
 GType maplibre_native_ffi_lat_lng_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_LAT_LNG \
   (maplibre_native_ffi_lat_lng_get_type())
@@ -2394,6 +2605,919 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 )
 
 /**
+ * MaplibreNativeFfiMomentumOptions:
+ *
+ * How one part of a gesture keeps moving after its release.
+ *
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom
+ * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
+ * set takes the part's default, which `MaplibreNativeFfiGestureMomentum` lists.
+ * Every setting is finite and not negative.
+ *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
+ * See `mln_momentum_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+/**
+ * maplibre_native_ffi_momentum_options_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiMomentumOptions` whose members are zero, empty, or unset.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiMomentumOptions* maplibre_native_ffi_momentum_options_new(
+  void
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:decay: (setter set_decay) (getter get_decay)
+ *
+ * The `decay` member.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_decay: (get-property decay)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:decay`.
+ *
+ * Returns: the value
+ */
+MaplibreNativeFfiMomentumDecay maplibre_native_ffi_momentum_options_get_decay(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_decay:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:decay` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_decay(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_decay: (set-property decay)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:decay`.
+ */
+void maplibre_native_ffi_momentum_options_set_decay(
+  MaplibreNativeFfiMomentumOptions* self, MaplibreNativeFfiMomentumDecay value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:speed-scale: (setter set_speed_scale) (getter get_speed_scale)
+ *
+ * The momentum starts at this multiple of the release speed.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_speed_scale: (get-property speed-scale)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:speed-scale`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_speed_scale(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_speed_scale:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:speed-scale` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_speed_scale(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_speed_scale: (set-property speed-scale)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:speed-scale`.
+ */
+void maplibre_native_ffi_momentum_options_set_speed_scale(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:min-speed: (setter set_min_speed) (getter get_min_speed)
+ *
+ * A slower release starts no momentum.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_min_speed: (get-property min-speed)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:min-speed`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_min_speed(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_min_speed:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:min-speed` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_min_speed(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_min_speed: (set-property min-speed)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:min-speed`.
+ */
+void maplibre_native_ffi_momentum_options_set_min_speed(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:max-speed: (setter set_max_speed) (getter get_max_speed)
+ *
+ * A faster release counts as this speed.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_max_speed: (get-property max-speed)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:max-speed`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_max_speed(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_max_speed:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:max-speed` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_max_speed(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_max_speed: (set-property max-speed)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:max-speed`.
+ */
+void maplibre_native_ffi_momentum_options_set_max_speed(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:exponent: (setter set_exponent) (getter get_exponent)
+ *
+ * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_POWER`. At least 1.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_exponent: (get-property exponent)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:exponent`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_exponent(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_exponent:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:exponent` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_exponent(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_exponent: (set-property exponent)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:exponent`.
+ */
+void maplibre_native_ffi_momentum_options_set_exponent(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:base-duration-ms: (setter set_base_duration_ms) (getter get_base_duration_ms)
+ *
+ * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_POWER`, the duration is
+ * `base_duration_ms` plus `duration_ms_per_speed` times the release speed.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_base_duration_ms: (get-property base-duration-ms)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:base-duration-ms`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_base_duration_ms(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_base_duration_ms:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:base-duration-ms` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_base_duration_ms(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_base_duration_ms: (set-property base-duration-ms)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:base-duration-ms`.
+ */
+void maplibre_native_ffi_momentum_options_set_base_duration_ms(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:duration-ms-per-speed: (setter set_duration_ms_per_speed) (getter get_duration_ms_per_speed)
+ *
+ * The `duration_ms_per_speed` member.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_duration_ms_per_speed: (get-property duration-ms-per-speed)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:duration-ms-per-speed`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_duration_ms_per_speed(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_duration_ms_per_speed:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:duration-ms-per-speed` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_duration_ms_per_speed(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_duration_ms_per_speed: (set-property duration-ms-per-speed)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:duration-ms-per-speed`.
+ */
+void maplibre_native_ffi_momentum_options_set_duration_ms_per_speed(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:decay-rate: (setter set_decay_rate) (getter get_decay_rate)
+ *
+ * Required for `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_EXPONENTIAL`, and positive.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_decay_rate: (get-property decay-rate)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:decay-rate`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_decay_rate(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_decay_rate:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:decay-rate` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_decay_rate(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_decay_rate: (set-property decay-rate)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:decay-rate`.
+ */
+void maplibre_native_ffi_momentum_options_set_decay_rate(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:stop-speed: (setter set_stop_speed) (getter get_stop_speed)
+ *
+ * Required for `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_EXPONENTIAL`, and positive.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_stop_speed: (get-property stop-speed)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:stop-speed`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_stop_speed(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_stop_speed:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:stop-speed` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_stop_speed(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_stop_speed: (set-property stop-speed)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:stop-speed`.
+ */
+void maplibre_native_ffi_momentum_options_set_stop_speed(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:duration-scale: (setter set_duration_scale) (getter get_duration_scale)
+ *
+ * Stretches the momentum in time without changing its starting speed, so it
+ * also scales the distance. 0 starts no momentum. A host can pass its
+ * platform's animation duration scale here.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_duration_scale: (get-property duration-scale)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:duration-scale`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_duration_scale(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_duration_scale:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:duration-scale` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_duration_scale(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_duration_scale: (set-property duration-scale)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:duration-scale`.
+ */
+void maplibre_native_ffi_momentum_options_set_duration_scale(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:max-duration-ms: (setter set_max_duration_ms) (getter get_max_duration_ms)
+ *
+ * The longest duration, after `duration_scale` applies.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_max_duration_ms: (get-property max-duration-ms)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:max-duration-ms`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_max_duration_ms(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_max_duration_ms:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:max-duration-ms` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_max_duration_ms(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_max_duration_ms: (set-property max-duration-ms)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:max-duration-ms`.
+ */
+void maplibre_native_ffi_momentum_options_set_max_duration_ms(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumOptions:max-distance: (setter set_max_distance) (getter get_max_distance)
+ *
+ * The farthest the momentum moves. A momentum that would move farther slows
+ * faster over the same duration.
+ */
+/**
+ * maplibre_native_ffi_momentum_options_get_max_distance: (get-property max-distance)
+ *
+ * Gets `MaplibreNativeFfiMomentumOptions:max-distance`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_options_get_max_distance(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_has_max_distance:
+ *
+ * Whether `MaplibreNativeFfiMomentumOptions:max-distance` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_options_has_max_distance(
+  MaplibreNativeFfiMomentumOptions* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_options_set_max_distance: (set-property max-distance)
+ *
+ * Sets `MaplibreNativeFfiMomentumOptions:max-distance`.
+ */
+void maplibre_native_ffi_momentum_options_set_max_distance(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:
+ *
+ * How a gesture keeps moving the camera after its last contact lifts.
+ *
+ * A part moves only when its velocity is set, and each part slows on its own
+ * clock. The parts' defaults are:
+ *
+ * | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | -------
+ * | -------- | ----------- | ------- | ------------ | --------------- | | pan |
+ * 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0 | max 600
+ * ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 | 1 | 300 |
+ * 0 | min speed 5 |
+ *
+ * Every part defaults to `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_POWER`, and the
+ * zoom moves at most 2.5 levels.
+ *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
+ * See `mln_gesture_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiGestureMomentum` whose members are zero, empty, or unset.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_gesture_momentum_new(
+  void
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:pan-velocity: (setter set_pan_velocity) (getter get_pan_velocity)
+ *
+ * How fast the map's content moved on the screen at release, in logical pixels
+ * per second.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_pan_velocity: (get-property pan-velocity)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:pan-velocity`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiScreenPoint*
+maplibre_native_ffi_gesture_momentum_get_pan_velocity(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_has_pan_velocity:
+ *
+ * Whether `MaplibreNativeFfiGestureMomentum:pan-velocity` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gesture_momentum_has_pan_velocity(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_pan_velocity: (set-property pan-velocity)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:pan-velocity`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_pan_velocity(
+  MaplibreNativeFfiGestureMomentum* self,
+  const MaplibreNativeFfiScreenPoint* value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:zoom-velocity: (setter set_zoom_velocity) (getter get_zoom_velocity)
+ *
+ * In zoom levels per second.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_zoom_velocity: (get-property zoom-velocity)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:zoom-velocity`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_gesture_momentum_get_zoom_velocity(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_has_zoom_velocity:
+ *
+ * Whether `MaplibreNativeFfiGestureMomentum:zoom-velocity` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gesture_momentum_has_zoom_velocity(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_zoom_velocity: (set-property zoom-velocity)
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:zoom-velocity`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_zoom_velocity(
+  MaplibreNativeFfiGestureMomentum* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:bearing-velocity: (setter set_bearing_velocity) (getter get_bearing_velocity)
+ *
+ * In degrees per second.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_bearing_velocity: (get-property bearing-velocity)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:bearing-velocity`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_gesture_momentum_get_bearing_velocity(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_has_bearing_velocity:
+ *
+ * Whether `MaplibreNativeFfiGestureMomentum:bearing-velocity` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gesture_momentum_has_bearing_velocity(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_bearing_velocity: (set-property bearing-velocity)
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:bearing-velocity`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_bearing_velocity(
+  MaplibreNativeFfiGestureMomentum* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:pitch-velocity: (setter set_pitch_velocity) (getter get_pitch_velocity)
+ *
+ * In degrees per second.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_pitch_velocity: (get-property pitch-velocity)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:pitch-velocity`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_gesture_momentum_get_pitch_velocity(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_has_pitch_velocity:
+ *
+ * Whether `MaplibreNativeFfiGestureMomentum:pitch-velocity` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gesture_momentum_has_pitch_velocity(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_pitch_velocity: (set-property pitch-velocity)
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:pitch-velocity`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_pitch_velocity(
+  MaplibreNativeFfiGestureMomentum* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:zoom-anchor: (setter set_zoom_anchor) (getter get_zoom_anchor)
+ *
+ * The screen point that the zoom keeps in place. Without one, the zoom keeps
+ * the center of the view in place.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_zoom_anchor: (get-property zoom-anchor)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:zoom-anchor`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiScreenPoint*
+maplibre_native_ffi_gesture_momentum_get_zoom_anchor(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_has_zoom_anchor:
+ *
+ * Whether `MaplibreNativeFfiGestureMomentum:zoom-anchor` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gesture_momentum_has_zoom_anchor(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_zoom_anchor: (set-property zoom-anchor)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:zoom-anchor`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_zoom_anchor(
+  MaplibreNativeFfiGestureMomentum* self,
+  const MaplibreNativeFfiScreenPoint* value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:bearing-anchor: (setter set_bearing_anchor) (getter get_bearing_anchor)
+ *
+ * The screen point that the rotation keeps in place. Without one, the rotation
+ * turns around the center of the view.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_bearing_anchor: (get-property bearing-anchor)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:bearing-anchor`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiScreenPoint*
+maplibre_native_ffi_gesture_momentum_get_bearing_anchor(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_has_bearing_anchor:
+ *
+ * Whether `MaplibreNativeFfiGestureMomentum:bearing-anchor` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gesture_momentum_has_bearing_anchor(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_bearing_anchor: (set-property bearing-anchor)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:bearing-anchor`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_bearing_anchor(
+  MaplibreNativeFfiGestureMomentum* self,
+  const MaplibreNativeFfiScreenPoint* value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:pan: (setter set_pan) (getter get_pan)
+ *
+ * The `pan` member.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_pan: (get-property pan)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:pan`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMomentumOptions* maplibre_native_ffi_gesture_momentum_get_pan(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_pan: (set-property pan)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:pan`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_pan(
+  MaplibreNativeFfiGestureMomentum* self,
+  MaplibreNativeFfiMomentumOptions* value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:zoom: (setter set_zoom) (getter get_zoom)
+ *
+ * The `zoom` member.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_zoom: (get-property zoom)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:zoom`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMomentumOptions* maplibre_native_ffi_gesture_momentum_get_zoom(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_zoom: (set-property zoom)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:zoom`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_zoom(
+  MaplibreNativeFfiGestureMomentum* self,
+  MaplibreNativeFfiMomentumOptions* value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:bearing: (setter set_bearing) (getter get_bearing)
+ *
+ * The `bearing` member.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_bearing: (get-property bearing)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:bearing`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMomentumOptions*
+maplibre_native_ffi_gesture_momentum_get_bearing(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_bearing: (set-property bearing)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:bearing`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_bearing(
+  MaplibreNativeFfiGestureMomentum* self,
+  MaplibreNativeFfiMomentumOptions* value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:pitch: (setter set_pitch) (getter get_pitch)
+ *
+ * The `pitch` member.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_pitch: (get-property pitch)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:pitch`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMomentumOptions*
+maplibre_native_ffi_gesture_momentum_get_pitch(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_pitch: (set-property pitch)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:pitch`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_pitch(
+  MaplibreNativeFfiGestureMomentum* self,
+  MaplibreNativeFfiMomentumOptions* value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:pan-follows-zoom: (setter set_pan_follows_zoom) (getter get_pan_follows_zoom)
+ *
+ * When pan and zoom momentum both start, the pan slows over the zoom's duration
+ * and curve, starts no faster, and moves no farther than it would alone.
+ * Defaults to true.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_pan_follows_zoom: (get-property pan-follows-zoom)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:pan-follows-zoom`.
+ *
+ * Returns: the value
+ */
+gboolean maplibre_native_ffi_gesture_momentum_get_pan_follows_zoom(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_has_pan_follows_zoom:
+ *
+ * Whether `MaplibreNativeFfiGestureMomentum:pan-follows-zoom` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gesture_momentum_has_pan_follows_zoom(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_pan_follows_zoom: (set-property pan-follows-zoom)
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:pan-follows-zoom`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_pan_follows_zoom(
+  MaplibreNativeFfiGestureMomentum* self, gboolean value
+);
+
+/**
+ * MaplibreNativeFfiGestureMomentum:bearing-snap: (setter set_bearing_snap) (getter get_bearing_snap)
+ *
+ * Where the bearing settles after a gesture that changed it, once the rest of
+ * the momentum ends. Without momentum, it settles at once. Without this, the
+ * bearing stays where the gesture leaves it.
+ */
+/**
+ * maplibre_native_ffi_gesture_momentum_get_bearing_snap: (get-property bearing-snap)
+ *
+ * Gets `MaplibreNativeFfiGestureMomentum:bearing-snap`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiBearingSnap*
+maplibre_native_ffi_gesture_momentum_get_bearing_snap(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_has_bearing_snap:
+ *
+ * Whether `MaplibreNativeFfiGestureMomentum:bearing-snap` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gesture_momentum_has_bearing_snap(
+  MaplibreNativeFfiGestureMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_gesture_momentum_set_bearing_snap: (set-property bearing-snap)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGestureMomentum:bearing-snap`.
+ */
+void maplibre_native_ffi_gesture_momentum_set_bearing_snap(
+  MaplibreNativeFfiGestureMomentum* self, MaplibreNativeFfiBearingSnap* value
+);
+
+/**
  * MaplibreNativeFfiCameraDelta:
  *
  * A change to the camera from where it is now, for gestures.
@@ -2595,6 +3719,44 @@ gboolean maplibre_native_ffi_camera_delta_has_anchor(
  */
 void maplibre_native_ffi_camera_delta_set_anchor(
   MaplibreNativeFfiCameraDelta* self, const MaplibreNativeFfiScreenPoint* value
+);
+
+/**
+ * MaplibreNativeFfiCameraDelta:momentum: (setter set_momentum) (getter get_momentum)
+ *
+ * How the gesture keeps moving after this delta. Only a delta in the
+ * `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_END` phase carries it.
+ */
+/**
+ * maplibre_native_ffi_camera_delta_get_momentum: (get-property momentum)
+ *
+ * Gets `MaplibreNativeFfiCameraDelta:momentum`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_camera_delta_get_momentum(
+  MaplibreNativeFfiCameraDelta* self
+);
+
+/**
+ * maplibre_native_ffi_camera_delta_has_momentum:
+ *
+ * Whether `MaplibreNativeFfiCameraDelta:momentum` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_camera_delta_has_momentum(
+  MaplibreNativeFfiCameraDelta* self
+);
+
+/**
+ * maplibre_native_ffi_camera_delta_set_momentum: (set-property momentum)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiCameraDelta:momentum`.
+ */
+void maplibre_native_ffi_camera_delta_set_momentum(
+  MaplibreNativeFfiCameraDelta* self, MaplibreNativeFfiGestureMomentum* value
 );
 
 /**
@@ -3269,6 +4431,35 @@ void maplibre_native_ffi_camera_query_result_free(
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   MaplibreNativeFfiCameraQueryResult,
   maplibre_native_ffi_camera_query_result_free
+)
+
+GType maplibre_native_ffi_camera_velocity_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_VELOCITY \
+  (maplibre_native_ffi_camera_velocity_get_type())
+
+/**
+ * maplibre_native_ffi_camera_velocity_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiCameraVelocity* maplibre_native_ffi_camera_velocity_copy(
+  const MaplibreNativeFfiCameraVelocity* self
+);
+
+/**
+ * maplibre_native_ffi_camera_velocity_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_camera_velocity_free(
+  MaplibreNativeFfiCameraVelocity* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiCameraVelocity, maplibre_native_ffi_camera_velocity_free
 )
 
 GType maplibre_native_ffi_camera_transition_end_get_type(void) G_GNUC_CONST;

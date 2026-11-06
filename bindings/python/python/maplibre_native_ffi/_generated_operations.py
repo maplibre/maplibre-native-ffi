@@ -576,6 +576,18 @@ class _MapHandleOperations(GeneratedOperations):
         animation left the camera, so the rest of the replaced change never
         happens. To reach an exact camera, use `MapHandle.update_camera()`.
 
+        A delta in the end phase can carry momentum, which keeps the camera
+        moving from the release velocities on each rendered frame. The
+        gesture then lasts until the momentum and any bearing snap end: the
+        snapshot keeps `gesture_in_progress` set, and camera events report
+        `CameraChangeSource.MOMENTUM`. The end handler in `animation` runs
+        when the gesture ends, and `animation` sets no other field except
+        `transition_id`. A delta in the begin phase,
+        `MapHandle.cancel_camera_transitions()`, or a cancellation by that ID
+        stops the momentum, and a later command that sets a field stops the
+        parts of the momentum that move it. The pan moves the map's content
+        its distance on the screen at any pitch.
+
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
@@ -3770,6 +3782,18 @@ class MapHandleDiscarding:
         A delta that replaces an animated one starts from where that
         animation left the camera, so the rest of the replaced change never
         happens. To reach an exact camera, use `MapHandle.update_camera()`.
+
+        A delta in the end phase can carry momentum, which keeps the camera
+        moving from the release velocities on each rendered frame. The
+        gesture then lasts until the momentum and any bearing snap end: the
+        snapshot keeps `gesture_in_progress` set, and camera events report
+        `CameraChangeSource.MOMENTUM`. The end handler in `animation` runs
+        when the gesture ends, and `animation` sets no other field except
+        `transition_id`. A delta in the begin phase,
+        `MapHandle.cancel_camera_transitions()`, or a cancellation by that ID
+        stops the momentum, and a later command that sets a field stops the
+        parts of the momentum that move it. The pan moves the map's content
+        its distance on the screen at any pitch.
 
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

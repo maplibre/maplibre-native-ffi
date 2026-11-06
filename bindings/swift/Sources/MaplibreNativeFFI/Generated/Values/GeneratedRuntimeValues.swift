@@ -66,6 +66,35 @@ public struct CameraChangeMode: RawRepresentable, CustomStringConvertible,
   }
 }
 
+/// What moved the camera.
+///
+/// See `mln_camera_change_source` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct CameraChangeSource: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// A camera command outside a gesture, or the map itself, as when a resize
+  /// keeps the camera within its bounds.
+  public static let command: CameraChangeSource = .init(rawValue: 0)
+  /// A camera command with a gesture phase.
+  public static let gesture: CameraChangeSource = .init(rawValue: 1)
+  /// The momentum and bearing snap that a gesture's end started.
+  public static let momentum: CameraChangeSource = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "command"
+    case 1: return "gesture"
+    case 2: return "momentum"
+    default: return "CameraChangeSource(\(rawValue))"
+    }
+  }
+}
+
 /// An HTTP header.
 ///
 /// `name` follows the rules of `HttpHeaderTransformResponse.setHeader()`.
@@ -1211,12 +1240,18 @@ public typealias RuntimeEventCallback = @Sendable (_ events: [RuntimeEvent])
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventCameraChange: Equatable, Hashable, Sendable {
   public var mode: CameraChangeMode
-  public init(mode: CameraChangeMode = .init(rawValue: 0)) {
+  public var source: CameraChangeSource
+  public init(
+    mode: CameraChangeMode = .init(rawValue: 0),
+    source: CameraChangeSource = .init(rawValue: 0)
+  ) {
     self.mode = mode
+    self.source = source
   }
 
   init(raw: mln_runtime_event_camera_change) {
     mode = CameraChangeMode(rawValue: raw.mode.rawValue)
+    source = CameraChangeSource(rawValue: raw.source.rawValue)
   }
 }
 

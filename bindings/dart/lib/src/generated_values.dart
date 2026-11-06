@@ -54,6 +54,31 @@ final class CameraChangeMode extends _Enum {
   };
 }
 
+/// What moved the camera.
+///
+/// See `mln_camera_change_source` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class CameraChangeSource extends _Enum {
+  const CameraChangeSource.fromRawValue(super.rawValue);
+
+  /// A camera command outside a gesture, or the map itself, as when a resize
+  /// keeps the camera within its bounds.
+  static const command = CameraChangeSource.fromRawValue(0);
+
+  /// A camera command with a gesture phase.
+  static const gesture = CameraChangeSource.fromRawValue(1);
+
+  /// The momentum and bearing snap that a gesture's end started.
+  static const momentum = CameraChangeSource.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'CameraChangeSource.command',
+    1 => 'CameraChangeSource.gesture',
+    2 => 'CameraChangeSource.momentum',
+    _ => 'CameraChangeSource($rawValue)',
+  };
+}
+
 /// How a camera change ended.
 ///
 /// A change that ends in more than one way reports
@@ -461,6 +486,29 @@ final class MapMode extends _Enum {
     1 => 'MapMode.static',
     2 => 'MapMode.tile',
     _ => 'MapMode($rawValue)',
+  };
+}
+
+/// How a part of a gesture's momentum slows to a stop.
+///
+/// See `mln_momentum_decay` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class MomentumDecay extends _Enum {
+  const MomentumDecay.fromRawValue(super.rawValue);
+
+  /// The share of the distance traveled is 1 - (1 - t)^`exponent`, where t goes
+  /// from 0 to 1 over the momentum's duration. An exponent of 2 slows at a
+  /// constant rate.
+  static const power = MomentumDecay.fromRawValue(0);
+
+  /// The speed falls to e^-`decay_rate` of itself each second, until it drops
+  /// below `stop_speed`.
+  static const exponential = MomentumDecay.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'MomentumDecay.power',
+    1 => 'MomentumDecay.exponential',
+    _ => 'MomentumDecay($rawValue)',
   };
 }
 
@@ -2637,6 +2685,313 @@ final class PremultipliedRgba8Image extends _Value {
   ]);
 }
 
+/// How one part of a gesture keeps moving after its release.
+///
+/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
+/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists. Every
+/// setting is finite and not negative.
+///
+/// See `mln_momentum_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class MomentumOptions extends _Value {
+  const MomentumOptions({
+    this.decay,
+    this.speedScale,
+    this.minSpeed,
+    this.maxSpeed,
+    this.exponent,
+    this.baseDurationMs,
+    this.durationMsPerSpeed,
+    this.decayRate,
+    this.stopSpeed,
+    this.durationScale,
+    this.maxDurationMs,
+    this.maxDistance,
+  });
+  final MomentumDecay? decay;
+
+  /// The momentum starts at this multiple of the release speed.
+  final double? speedScale;
+
+  /// A slower release starts no momentum.
+  final double? minSpeed;
+
+  /// A faster release counts as this speed.
+  final double? maxSpeed;
+
+  /// For `MomentumDecay.power`. At least 1.
+  final double? exponent;
+
+  /// For `MomentumDecay.power`, the duration is `base_duration_ms` plus
+  /// `duration_ms_per_speed` times the release speed.
+  final double? baseDurationMs;
+  final double? durationMsPerSpeed;
+
+  /// Required for `MomentumDecay.exponential`, and positive.
+  final double? decayRate;
+
+  /// Required for `MomentumDecay.exponential`, and positive.
+  final double? stopSpeed;
+
+  /// Stretches the momentum in time without changing its starting speed, so it
+  /// also scales the distance. 0 starts no momentum. A host can pass its
+  /// platform's animation duration scale here.
+  final double? durationScale;
+
+  /// The longest duration, after `duration_scale` applies.
+  final double? maxDurationMs;
+
+  /// The farthest the momentum moves. A momentum that would move farther slows
+  /// faster over the same duration.
+  final double? maxDistance;
+
+  /// A copy of this value with the given members replaced.
+  MomentumOptions copyWith({
+    MomentumDecay? decay,
+    double? speedScale,
+    double? minSpeed,
+    double? maxSpeed,
+    double? exponent,
+    double? baseDurationMs,
+    double? durationMsPerSpeed,
+    double? decayRate,
+    double? stopSpeed,
+    double? durationScale,
+    double? maxDurationMs,
+    double? maxDistance,
+  }) => MomentumOptions(
+    decay: decay ?? this.decay,
+    speedScale: speedScale ?? this.speedScale,
+    minSpeed: minSpeed ?? this.minSpeed,
+    maxSpeed: maxSpeed ?? this.maxSpeed,
+    exponent: exponent ?? this.exponent,
+    baseDurationMs: baseDurationMs ?? this.baseDurationMs,
+    durationMsPerSpeed: durationMsPerSpeed ?? this.durationMsPerSpeed,
+    decayRate: decayRate ?? this.decayRate,
+    stopSpeed: stopSpeed ?? this.stopSpeed,
+    durationScale: durationScale ?? this.durationScale,
+    maxDurationMs: maxDurationMs ?? this.maxDurationMs,
+    maxDistance: maxDistance ?? this.maxDistance,
+  );
+
+  @override
+  List<Object?> get _members => [
+    decay,
+    speedScale,
+    minSpeed,
+    maxSpeed,
+    exponent,
+    baseDurationMs,
+    durationMsPerSpeed,
+    decayRate,
+    stopSpeed,
+    durationScale,
+    maxDurationMs,
+    maxDistance,
+  ];
+  @override
+  String toString() => _describe('MomentumOptions', const [
+    'decay',
+    'speedScale',
+    'minSpeed',
+    'maxSpeed',
+    'exponent',
+    'baseDurationMs',
+    'durationMsPerSpeed',
+    'decayRate',
+    'stopSpeed',
+    'durationScale',
+    'maxDurationMs',
+    'maxDistance',
+  ]);
+}
+
+/// Where the bearing settles after a gesture that changed it.
+///
+/// The targets are `target_count` bearings spaced evenly around the circle,
+/// starting at `target_offset`. The bearing eases to the nearest one when it is
+/// within `tolerance` of it, and otherwise stays where it is.
+///
+/// See `mln_bearing_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class BearingSnap extends _Value {
+  const BearingSnap({
+    this.targetCount,
+    this.targetOffset,
+    this.tolerance,
+    this.durationMs,
+  });
+
+  /// At least 1. Defaults to 1.
+  final int? targetCount;
+
+  /// In degrees. Defaults to 0, north.
+  final double? targetOffset;
+
+  /// In degrees, from 0 to 180. Defaults to 7.
+  final double? tolerance;
+
+  /// Defaults to 300.
+  final double? durationMs;
+
+  /// A copy of this value with the given members replaced.
+  BearingSnap copyWith({
+    int? targetCount,
+    double? targetOffset,
+    double? tolerance,
+    double? durationMs,
+  }) => BearingSnap(
+    targetCount: targetCount ?? this.targetCount,
+    targetOffset: targetOffset ?? this.targetOffset,
+    tolerance: tolerance ?? this.tolerance,
+    durationMs: durationMs ?? this.durationMs,
+  );
+
+  @override
+  List<Object?> get _members => [
+    targetCount,
+    targetOffset,
+    tolerance,
+    durationMs,
+  ];
+  @override
+  String toString() => _describe('BearingSnap', const [
+    'targetCount',
+    'targetOffset',
+    'tolerance',
+    'durationMs',
+  ]);
+}
+
+/// How a gesture keeps moving the camera after its last contact lifts.
+///
+/// A part moves only when its velocity is set, and each part slows on its own
+/// clock. The parts' defaults are:
+///
+/// | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | -------
+/// | -------- | ----------- | ------- | ------------ | --------------- | | pan
+/// | 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0 | max
+/// 600 ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 | 1 |
+/// 300 | 0 | min speed 5 |
+///
+/// Every part defaults to `MomentumDecay.power`, and the zoom moves at most 2.5
+/// levels.
+///
+/// See `mln_gesture_momentum` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class GestureMomentum extends _Value {
+  const GestureMomentum({
+    this.panVelocity,
+    this.zoomVelocity,
+    this.bearingVelocity,
+    this.pitchVelocity,
+    this.zoomAnchor,
+    this.bearingAnchor,
+    this.pan = const MomentumOptions(),
+    this.zoom = const MomentumOptions(),
+    this.bearing = const MomentumOptions(),
+    this.pitch = const MomentumOptions(),
+    this.panFollowsZoom,
+    this.bearingSnap,
+  });
+
+  /// How fast the map's content moved on the screen at release, in logical
+  /// pixels per second.
+  final ScreenPoint? panVelocity;
+
+  /// In zoom levels per second.
+  final double? zoomVelocity;
+
+  /// In degrees per second.
+  final double? bearingVelocity;
+
+  /// In degrees per second.
+  final double? pitchVelocity;
+
+  /// The screen point that the zoom keeps in place. Without one, the zoom keeps
+  /// the center of the view in place.
+  final ScreenPoint? zoomAnchor;
+
+  /// The screen point that the rotation keeps in place. Without one, the
+  /// rotation turns around the center of the view.
+  final ScreenPoint? bearingAnchor;
+  final MomentumOptions pan;
+  final MomentumOptions zoom;
+  final MomentumOptions bearing;
+  final MomentumOptions pitch;
+
+  /// When pan and zoom momentum both start, the pan slows over the zoom's
+  /// duration and curve, starts no faster, and moves no farther than it would
+  /// alone. Defaults to true.
+  final bool? panFollowsZoom;
+
+  /// Where the bearing settles after a gesture that changed it, once the rest
+  /// of the momentum ends. Without momentum, it settles at once. Without this,
+  /// the bearing stays where the gesture leaves it.
+  final BearingSnap? bearingSnap;
+
+  /// A copy of this value with the given members replaced.
+  GestureMomentum copyWith({
+    ScreenPoint? panVelocity,
+    double? zoomVelocity,
+    double? bearingVelocity,
+    double? pitchVelocity,
+    ScreenPoint? zoomAnchor,
+    ScreenPoint? bearingAnchor,
+    MomentumOptions? pan,
+    MomentumOptions? zoom,
+    MomentumOptions? bearing,
+    MomentumOptions? pitch,
+    bool? panFollowsZoom,
+    BearingSnap? bearingSnap,
+  }) => GestureMomentum(
+    panVelocity: panVelocity ?? this.panVelocity,
+    zoomVelocity: zoomVelocity ?? this.zoomVelocity,
+    bearingVelocity: bearingVelocity ?? this.bearingVelocity,
+    pitchVelocity: pitchVelocity ?? this.pitchVelocity,
+    zoomAnchor: zoomAnchor ?? this.zoomAnchor,
+    bearingAnchor: bearingAnchor ?? this.bearingAnchor,
+    pan: pan ?? this.pan,
+    zoom: zoom ?? this.zoom,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+    panFollowsZoom: panFollowsZoom ?? this.panFollowsZoom,
+    bearingSnap: bearingSnap ?? this.bearingSnap,
+  );
+
+  @override
+  List<Object?> get _members => [
+    panVelocity,
+    zoomVelocity,
+    bearingVelocity,
+    pitchVelocity,
+    zoomAnchor,
+    bearingAnchor,
+    pan,
+    zoom,
+    bearing,
+    pitch,
+    panFollowsZoom,
+    bearingSnap,
+  ];
+  @override
+  String toString() => _describe('GestureMomentum', const [
+    'panVelocity',
+    'zoomVelocity',
+    'bearingVelocity',
+    'pitchVelocity',
+    'zoomAnchor',
+    'bearingAnchor',
+    'pan',
+    'zoom',
+    'bearing',
+    'pitch',
+    'panFollowsZoom',
+    'bearingSnap',
+  ]);
+}
+
 /// A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
 /// and (`x2`, `y2`).
 ///
@@ -2666,6 +3021,38 @@ final class UnitBezier extends _Value {
   String toString() => _describe('UnitBezier', const ['x1', 'y1', 'x2', 'y2']);
 }
 
+/// How fast each part of a camera change moves.
+///
+/// See `mln_camera_velocity` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraVelocity extends _Value {
+  const CameraVelocity({
+    this.pan = const ScreenPoint(),
+    this.zoom = 0,
+    this.bearing = 0,
+    this.pitch = 0,
+  });
+
+  /// How fast the map's content moves on the screen, in logical pixels per
+  /// second.
+  final ScreenPoint pan;
+
+  /// In zoom levels per second.
+  final double zoom;
+
+  /// In degrees per second.
+  final double bearing;
+
+  /// In degrees per second.
+  final double pitch;
+
+  @override
+  List<Object?> get _members => [pan, zoom, bearing, pitch];
+  @override
+  String toString() =>
+      _describe('CameraVelocity', const ['pan', 'zoom', 'bearing', 'pitch']);
+}
+
 /// The end of a camera change.
 ///
 /// See `mln_camera_transition_end` in the
@@ -2674,6 +3061,7 @@ final class CameraTransitionEnd extends _Value {
   const CameraTransitionEnd({
     this.outcome = const CameraTransitionOutcome.fromRawValue(0),
     this.generation = 0,
+    this.velocity = const CameraVelocity(),
   });
   final CameraTransitionOutcome outcome;
 
@@ -2681,11 +3069,18 @@ final class CameraTransitionEnd extends _Value {
   /// the camera, or 0 when the map closed first.
   final int generation;
 
+  /// How fast a gesture's momentum still moved when it was cancelled, so that
+  /// the next gesture can carry it on. Zero for every other end.
+  final CameraVelocity velocity;
+
   @override
-  List<Object?> get _members => [outcome, generation];
+  List<Object?> get _members => [outcome, generation, velocity];
   @override
-  String toString() =>
-      _describe('CameraTransitionEnd', const ['outcome', 'generation']);
+  String toString() => _describe('CameraTransitionEnd', const [
+    'outcome',
+    'generation',
+    'velocity',
+  ]);
 }
 
 /// Receives the end of a camera change.
@@ -2782,6 +3177,7 @@ final class CameraDelta extends _Value {
     this.bearing,
     this.pitch,
     this.anchor,
+    this.momentum,
     this.animation = const AnimationOptions(),
     this.gesturePhase = const GesturePhase.fromRawValue(0),
   });
@@ -2802,6 +3198,10 @@ final class CameraDelta extends _Value {
   /// needs one of them, and it combines with `offset` only in a delta without a
   /// duration.
   final ScreenPoint? anchor;
+
+  /// How the gesture keeps moving after this delta. Only a delta in the
+  /// `GesturePhase.end` phase carries it.
+  final GestureMomentum? momentum;
   final AnimationOptions animation;
   final GesturePhase gesturePhase;
 
@@ -2812,6 +3212,7 @@ final class CameraDelta extends _Value {
     double? bearing,
     double? pitch,
     ScreenPoint? anchor,
+    GestureMomentum? momentum,
     AnimationOptions? animation,
     GesturePhase? gesturePhase,
   }) => CameraDelta(
@@ -2820,6 +3221,7 @@ final class CameraDelta extends _Value {
     bearing: bearing ?? this.bearing,
     pitch: pitch ?? this.pitch,
     anchor: anchor ?? this.anchor,
+    momentum: momentum ?? this.momentum,
     animation: animation ?? this.animation,
     gesturePhase: gesturePhase ?? this.gesturePhase,
   );
@@ -2831,6 +3233,7 @@ final class CameraDelta extends _Value {
     bearing,
     pitch,
     anchor,
+    momentum,
     animation,
     gesturePhase,
   ];
@@ -2841,6 +3244,7 @@ final class CameraDelta extends _Value {
     'bearing',
     'pitch',
     'anchor',
+    'momentum',
     'animation',
     'gesturePhase',
   ]);
@@ -6502,13 +6906,16 @@ final class OfflineRegionStatus extends _Value {
 final class RuntimeEventCameraChange extends _Value {
   const RuntimeEventCameraChange({
     this.mode = const CameraChangeMode.fromRawValue(0),
+    this.source = const CameraChangeSource.fromRawValue(0),
   });
   final CameraChangeMode mode;
+  final CameraChangeSource source;
 
   @override
-  List<Object?> get _members => [mode];
+  List<Object?> get _members => [mode, source];
   @override
-  String toString() => _describe('RuntimeEventCameraChange', const ['mode']);
+  String toString() =>
+      _describe('RuntimeEventCameraChange', const ['mode', 'source']);
 }
 
 /// The details of `RuntimeEventType.mapLoadingFailed`.

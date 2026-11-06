@@ -653,6 +653,18 @@ maplibre_native_ffi_map_add_style_source_json_finish(
  * the camera, so the rest of the replaced change never happens. To reach an
  * exact camera, use `maplibre_native_ffi_map_update_camera_async()`.
  *
+ * A delta in the end phase can carry momentum, which keeps the camera moving
+ * from the release velocities on each rendered frame. The gesture then lasts
+ * until the momentum and any bearing snap end: the snapshot keeps
+ * `gesture_in_progress` set, and camera events report
+ * `MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_MOMENTUM`. The end handler in
+ * `animation` runs when the gesture ends, and `animation` sets no other field
+ * except `transition_id`. A delta in the begin phase,
+ * `maplibre_native_ffi_map_cancel_camera_transitions_async()`, or a
+ * cancellation by that ID stops the momentum, and a later command that sets a
+ * field stops the parts of the momentum that move it. The pan moves the map's
+ * content its distance on the screen at any pitch.
+ *
  * See `mln_map_apply_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *

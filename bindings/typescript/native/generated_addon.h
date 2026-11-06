@@ -151,6 +151,9 @@ napi_value mln_ts_read_camera_query_result(
 napi_value mln_ts_read_camera_transition_end(
   napi_env env, const mln_camera_transition_end* source, size_t size
 );
+napi_value mln_ts_read_camera_velocity(
+  napi_env env, const mln_camera_velocity* source, size_t size
+);
 napi_value mln_ts_read_canonical_tile_id(
   napi_env env, const mln_canonical_tile_id* source, size_t size
 );
@@ -404,6 +407,9 @@ bool mln_ts_write_animation_options(
   mln_ts_call* call, napi_value value, mln_animation_options* out,
   const char* path
 );
+bool mln_ts_write_bearing_snap(
+  mln_ts_call* call, napi_value value, mln_bearing_snap* out, const char* path
+);
 bool mln_ts_write_bound_options(
   mln_ts_call* call, napi_value value, mln_bound_options* out, const char* path
 );
@@ -481,6 +487,10 @@ bool mln_ts_write_free_camera_options(
 );
 bool mln_ts_write_geo_json_source_options(
   mln_ts_call* call, napi_value value, mln_geo_json_source_options* out,
+  const char* path
+);
+bool mln_ts_write_gesture_momentum(
+  mln_ts_call* call, napi_value value, mln_gesture_momentum* out,
   const char* path
 );
 bool mln_ts_write_gpu_sync(
@@ -617,6 +627,10 @@ bool mln_ts_write_metal_surface_descriptor(
 );
 bool mln_ts_write_metal_surface_replacement(
   mln_ts_call* call, napi_value value, mln_metal_surface_replacement* out,
+  const char* path
+);
+bool mln_ts_write_momentum_options(
+  mln_ts_call* call, napi_value value, mln_momentum_options* out,
   const char* path
 );
 bool mln_ts_write_offline_geometry_region_definition(

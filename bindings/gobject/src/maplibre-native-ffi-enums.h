@@ -111,6 +111,31 @@ GType maplibre_native_ffi_camera_change_mode_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_camera_change_mode_get_type())
 
 /**
+ * MaplibreNativeFfiCameraChangeSource:
+ * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_COMMAND: A camera command outside a
+ *   gesture, or the map itself, as when a resize keeps the camera within its
+ *   bounds.
+ * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_GESTURE: A camera command with a
+ *   gesture phase.
+ * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_MOMENTUM: The momentum and bearing
+ *   snap that a gesture's end started.
+ *
+ * What moved the camera.
+ *
+ * See `mln_camera_change_source` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_COMMAND = 0,
+  MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_GESTURE = 1,
+  MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_MOMENTUM = 2,
+} MaplibreNativeFfiCameraChangeSource;
+
+GType maplibre_native_ffi_camera_change_source_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_CHANGE_SOURCE \
+  (maplibre_native_ffi_camera_change_source_get_type())
+
+/**
  * MaplibreNativeFfiCameraTransitionOutcome:
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_COMPLETED: The camera finished
  *   the change.
@@ -505,6 +530,28 @@ typedef enum {
 GType maplibre_native_ffi_map_mode_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_MAP_MODE \
   (maplibre_native_ffi_map_mode_get_type())
+
+/**
+ * MaplibreNativeFfiMomentumDecay:
+ * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_POWER: The share of the distance traveled
+ *   is 1 - (1 - t)^`exponent`, where t goes from 0 to 1 over the momentum's
+ *   duration. An exponent of 2 slows at a constant rate.
+ * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_EXPONENTIAL: The speed falls to
+ *   e^-`decay_rate` of itself each second, until it drops below `stop_speed`.
+ *
+ * How a part of a gesture's momentum slows to a stop.
+ *
+ * See `mln_momentum_decay` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_POWER = 0,
+  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_EXPONENTIAL = 1,
+} MaplibreNativeFfiMomentumDecay;
+
+GType maplibre_native_ffi_momentum_decay_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY \
+  (maplibre_native_ffi_momentum_decay_get_type())
 
 /**
  * MaplibreNativeFfiNetworkStatus:

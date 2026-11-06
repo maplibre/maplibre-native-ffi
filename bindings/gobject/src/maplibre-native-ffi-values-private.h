@@ -25,6 +25,12 @@ G_GNUC_INTERNAL MaplibreNativeFfiAnimationOptions*
 maplibre_native_ffi_animation_options_copy(
   const MaplibreNativeFfiAnimationOptions* self
 );
+G_GNUC_INTERNAL void maplibre_native_ffi_bearing_snap_to_native(
+  const MaplibreNativeFfiBearingSnap* self, mln_bearing_snap* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiBearingSnap*
+maplibre_native_ffi_bearing_snap_copy(const MaplibreNativeFfiBearingSnap* self);
 G_GNUC_INTERNAL void maplibre_native_ffi_lat_lng_to_native(
   const MaplibreNativeFfiLatLng* self, mln_lat_lng* out,
   MaplibreNativeFfiCall* call
@@ -82,6 +88,22 @@ G_GNUC_INTERNAL void maplibre_native_ffi_screen_point_read(
 );
 G_GNUC_INTERNAL gpointer
 maplibre_native_ffi_screen_point_copy_func(gconstpointer self, gpointer data);
+G_GNUC_INTERNAL void maplibre_native_ffi_momentum_options_to_native(
+  const MaplibreNativeFfiMomentumOptions* self, mln_momentum_options* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMomentumOptions*
+maplibre_native_ffi_momentum_options_copy(
+  const MaplibreNativeFfiMomentumOptions* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_gesture_momentum_to_native(
+  const MaplibreNativeFfiGestureMomentum* self, mln_gesture_momentum* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiGestureMomentum*
+maplibre_native_ffi_gesture_momentum_copy(
+  const MaplibreNativeFfiGestureMomentum* self
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_delta_to_native(
   const MaplibreNativeFfiCameraDelta* self, mln_camera_delta* out,
   MaplibreNativeFfiCall* call
@@ -114,6 +136,11 @@ maplibre_native_ffi_camera_query_result_from_native(
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_query_result_read(
   MaplibreNativeFfiCameraQueryResult* out, const mln_camera_query_result* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiCameraVelocity*
+maplibre_native_ffi_camera_velocity_from_native(const mln_camera_velocity* in);
+G_GNUC_INTERNAL void maplibre_native_ffi_camera_velocity_read(
+  MaplibreNativeFfiCameraVelocity* out, const mln_camera_velocity* in
 );
 G_GNUC_INTERNAL MaplibreNativeFfiCameraTransitionEnd*
 maplibre_native_ffi_camera_transition_end_from_native(

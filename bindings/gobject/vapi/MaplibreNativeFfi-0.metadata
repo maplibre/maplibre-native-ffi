@@ -3,6 +3,7 @@ Camera struct
 CameraBounds struct
 CameraQueryResult struct
 CameraTransitionEnd struct
+CameraVelocity struct
 CanonicalTileId struct
 DmaBufFormat struct
 DmaBufPlane struct
@@ -62,6 +63,9 @@ CameraOptions.padding#property no_accessor_method
 DmaBufRingDescriptor.logical_size#property no_accessor_method
 FreeCameraOptions.orientation#property no_accessor_method
 FreeCameraOptions.position#property no_accessor_method
+GestureMomentum.bearing_anchor#property no_accessor_method
+GestureMomentum.pan_velocity#property no_accessor_method
+GestureMomentum.zoom_anchor#property no_accessor_method
 IoSurfaceRingDescriptor.logical_size#property no_accessor_method
 MapOptions.initial_extent#property no_accessor_method
 MapViewportOptions.frustum_offset#property no_accessor_method
