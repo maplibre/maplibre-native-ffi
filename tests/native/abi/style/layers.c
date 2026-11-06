@@ -214,14 +214,15 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
   );
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "layer property",
+    MLN_STATUS_INVALID_ARGUMENT, "property \"fill-color\" of layer \"dots\"",
     mln_map_set_style_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("fill-color"),
       MLN_BUFFER_LITERAL("\"#00ff00\""), &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "layer property",
+    MLN_STATUS_INVALID_ARGUMENT,
+    "property \"circle-radius\" of layer \"dots\" is not valid JSON",
     mln_map_set_style_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
       MLN_BUFFER_LITERAL("{\"radius\":"), &completion.descriptor, NULL
@@ -431,14 +432,16 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   EXPECT_LAYER_PROPERTY("", map, "dots", "source-layer");
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "does not take a source",
+    MLN_STATUS_INVALID_ARGUMENT,
+    "background layer \"paper\" does not take a source",
     mln_map_set_style_layer_property(
       map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("source"),
       MLN_BUFFER_LITERAL("\"points\""), &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "does not take a source-layer",
+    MLN_STATUS_INVALID_ARGUMENT,
+    "background layer \"paper\" does not take a source-layer",
     mln_map_set_style_layer_property(
       map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("source-layer"),
       MLN_BUFFER_LITERAL("\"pois\""), &completion.descriptor, NULL
@@ -471,14 +474,15 @@ static void a_layer_requires_a_source_that_supports_its_type(void) {
   TEST_ASSERT_EQUAL_STRING("hillshade", probe.type);
   TEST_ASSERT_EQUAL_STRING("dem", probe.source_id);
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_ALREADY_EXISTS, "layer already exists",
+    MLN_STATUS_ALREADY_EXISTS, "layer \"hillshade\" already exists",
     mln_map_add_style_layer_json(
       map, hillshade, MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
     )
   );
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "source does not support layer type",
+    MLN_STATUS_INVALID_ARGUMENT,
+    "source \"points\" does not support hillshade layer \"on-points\"",
     mln_map_add_style_layer_json(
       map,
       MLN_BUFFER_LITERAL(
@@ -489,7 +493,8 @@ static void a_layer_requires_a_source_that_supports_its_type(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "source does not support layer type",
+    MLN_STATUS_INVALID_ARGUMENT,
+    "source \"dem\" does not support circle layer \"dots\"",
     mln_map_add_style_layer_json(
       map,
       MLN_BUFFER_LITERAL(

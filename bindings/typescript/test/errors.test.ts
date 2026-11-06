@@ -35,7 +35,7 @@ test("a failed call carries its status, an unknown status code, and its own diag
     (error) =>
       error instanceof MaplibreError &&
       error.status === Status.notFound &&
-      error.diagnostic === "source does not exist",
+      error.diagnostic === 'source "missing" does not exist',
   );
 
   // A status this binding does not know keeps its code.

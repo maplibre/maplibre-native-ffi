@@ -57,7 +57,7 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   const mln_buffer_view empty_source =
     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE);
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_ALREADY_EXISTS, "source already exists",
+    MLN_STATUS_ALREADY_EXISTS, "source \"owned-source\" already exists",
     mln_map_add_style_source_json(
       map, source, empty_source, &completion.descriptor, NULL
     )
@@ -85,7 +85,7 @@ static void style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids(
   );
   TEST_ASSERT_FALSE(image_exists(map, "doomed-image"));
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, "doomed-image",
+    MLN_STATUS_NOT_FOUND, "style image \"doomed-image\" does not exist",
     mln_map_remove_style_image(map, doomed, &completion.descriptor, NULL)
   );
 
@@ -99,8 +99,8 @@ static void missing_style_ids_report_not_found(void) {
   const mln_buffer_view layer = MLN_BUFFER_LITERAL("absent-layer");
   const mln_buffer_view source = MLN_BUFFER_LITERAL("absent-source");
   const mln_buffer_view none = MLN_BUFFER_LITERAL("");
-  const char* missing_layer = "layer does not exist";
-  const char* missing_source = "source does not exist";
+  const char* missing_layer = "layer \"absent-layer\" does not exist";
+  const char* missing_source = "source \"absent-source\" does not exist";
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, missing_layer,
@@ -118,7 +118,7 @@ static void missing_style_ids_report_not_found(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, "before_layer_id does not exist",
+    MLN_STATUS_NOT_FOUND, "before_layer_id \"absent-layer\" does not exist",
     mln_map_add_style_layer_json(
       map,
       MLN_BUFFER_LITERAL(
@@ -128,7 +128,8 @@ static void missing_style_ids_report_not_found(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, missing_source,
+    MLN_STATUS_NOT_FOUND,
+    "layer \"hillshade\" uses source \"absent-source\", which does not exist",
     mln_map_add_style_layer_json(
       map,
       MLN_BUFFER_LITERAL(

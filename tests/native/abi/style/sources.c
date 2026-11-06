@@ -414,7 +414,7 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   ));
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_STATE, "used by a layer",
+    MLN_STATUS_INVALID_STATE, "source \"in-use\" is used by layer \"user\"",
     mln_map_remove_style_source(map, in_use, &completion.descriptor, NULL)
   );
   TEST_ASSERT_TRUE(source_exists(map, "in-use"));
@@ -525,7 +525,7 @@ static void image_sources_take_corners_images_and_urls(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_NOT_FOUND, "source does not exist",
+    MLN_STATUS_NOT_FOUND, "source \"missing\" does not exist",
     mln_map_set_image_source_image(
       map, MLN_BUFFER_LITERAL("missing"), &image, &completion.descriptor, NULL
     )

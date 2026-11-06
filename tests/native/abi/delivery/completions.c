@@ -136,7 +136,9 @@ static void operation_and_command_completions_reach_the_queue(void) {
   ));
   await_capture(queue.handle, &captured, &command_tag);
   MLN_TEST_STATUS(MLN_STATUS_NOT_FOUND, captured.status);
-  TEST_ASSERT_NOT_NULL(strstr(captured.diagnostic, "layer does not exist"));
+  TEST_ASSERT_NOT_NULL(
+    strstr(captured.diagnostic, "layer \"absent-layer\" does not exist")
+  );
 
   mln_test_destroy_map(map);
   mln_test_delivery_queue_release(&queue);
