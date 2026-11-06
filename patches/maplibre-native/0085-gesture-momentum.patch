@@ -31,10 +31,10 @@ index e72aacd..2646f15 100644
      "include/mln/map/map_observer.hpp",
 diff --git a/include/mln/map/camera_momentum.hpp b/include/mln/map/camera_momentum.hpp
 new file mode 100644
-index 0000000..6a5c461
+index 0000000..6b86726
 --- /dev/null
 +++ b/include/mln/map/camera_momentum.hpp
-@@ -0,0 +1,127 @@
+@@ -0,0 +1,128 @@
 +#pragma once
 +
 +#include <mln/util/chrono.hpp>
@@ -113,7 +113,8 @@ index 0000000..6a5c461
 +
 +/** Where a part settles once its glide ends normally: on the nearest of the
 +    targets every `spacing` from `offset`, when it is within `tolerance` of
-+    one. Bearing targets wrap around the circle. */
++    one. Bearing targets lie within one turn from `offset`, and the bearing
++    takes the shorter way around to the nearest. */
 +struct MomentumSnap {
 +    double spacing = 360;
 +    double offset = 0;
@@ -202,7 +203,7 @@ index 3e01d9a..77fe561 100644
      impl->transform.setGestureInProgress(inProgress);
      impl->onUpdate();
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index e2bb728..7ae4da0 100644
+index e2bb728..723dd75 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -13,6 +13,9 @@
@@ -215,7 +216,7 @@ index e2bb728..7ae4da0 100644
  #include <cstdio>
  #include <utility>
  #include <numbers>
-@@ -550,6 +553,159 @@ ProjectionMode Transform::getProjectionMode() const {
+@@ -550,6 +553,166 @@ ProjectionMode Transform::getProjectionMode() const {
          .withYSkew(state.getYSkew());
  }
  
@@ -363,19 +364,26 @@ index e2bb728..7ae4da0 100644
 +};
 +
 +// The change that `snap` makes to `value`, or zero when it stays. A circular
-+// value, the bearing, takes the shorter way around.
++// value, the bearing, has its targets within one turn from the offset, and
++// takes the shorter way around to the nearest.
 +static double snapDelta(double value, const MomentumSnap& snap, bool circular) {
 +    if (!(snap.spacing > 0.0)) return 0.0;
-+    const double target = snap.offset + std::round((value - snap.offset) / snap.spacing) * snap.spacing;
-+    double delta = target - value;
-+    if (circular) delta -= 360.0 * std::floor((delta + 180.0) / 360.0);
++    double delta = 0.0;
++    if (circular) {
++        const double turn = value - snap.offset - 360.0 * std::floor((value - snap.offset) / 360.0);
++        const double below = std::floor(turn / snap.spacing) * snap.spacing;
++        const double above = std::min(below + snap.spacing, 360.0);
++        delta = turn - below <= above - turn ? below - turn : above - turn;
++    } else {
++        delta = snap.offset + std::round((value - snap.offset) / snap.spacing) * snap.spacing - value;
++    }
 +    return std::abs(delta) <= snap.tolerance ? delta : 0.0;
 +}
 +
  // MARK: - Transition
  
  uint16_t Transform::cameraFields(const CameraOptions& camera) {
-@@ -588,14 +744,7 @@ void Transform::startTransition(const CameraOptions& camera,
+@@ -588,14 +751,7 @@ void Transform::startTransition(const CameraOptions& camera,
      transition->duration = latestTransitionDuration = transition->fields ? duration : Duration::zero();
      transition->frame = frame;
  
@@ -391,7 +399,7 @@ index e2bb728..7ae4da0 100644
      transitions.push_back(transition);
      updateMovementFlags();
      finishTransitions(finished);
-@@ -620,6 +769,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
+@@ -620,6 +776,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
      camera.center = getLatLng(LatLng::Unwrapped);
  
      for (const auto& transition : active) {
@@ -399,7 +407,7 @@ index e2bb728..7ae4da0 100644
          const double t = transition->duration == Duration::zero()
                               ? 1.0
                               : std::clamp(std::chrono::duration<double>(now - transition->start) /
-@@ -670,6 +820,9 @@ void Transform::updateMovementFlags() {
+@@ -670,6 +827,9 @@ void Transform::updateMovementFlags() {
  
  void Transform::finishTransitions(const std::vector<std::shared_ptr<Transition>>& finished) {
      for (const auto& transition : finished) {
@@ -409,7 +417,7 @@ index e2bb728..7ae4da0 100644
          if (transition->animation.transitionFinishFn) transition->animation.transitionFinishFn();
          // This notification ends a command, not necessarily all camera motion.
          observer.onCameraDidChange(transition->duration != Duration::zero() ? MapObserver::CameraChangeMode::Animated
-@@ -693,11 +846,17 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -693,11 +853,17 @@ void Transform::updateTransitions(const TimePoint& now) {
      } guard{updatingTransitions};
  
      const auto active = transitions;
@@ -429,7 +437,7 @@ index e2bb728..7ae4da0 100644
              std::erase(transitions, transition);
              finished.push_back(transition);
          }
-@@ -706,7 +865,7 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -706,7 +872,7 @@ void Transform::updateTransitions(const TimePoint& now) {
  
      for (const auto& transition : active) {
          if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) continue;
@@ -438,7 +446,7 @@ index e2bb728..7ae4da0 100644
              const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
                                              std::chrono::duration<double>(transition->duration),
                                          0.0,
-@@ -719,6 +878,284 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -719,6 +885,284 @@ void Transform::updateTransitions(const TimePoint& now) {
      finishTransitions(finished);
  }
  
@@ -779,10 +787,10 @@ index f767342..710ccc9 100644
      void finishTransitions(const std::vector<std::shared_ptr<Transition>>&);
  
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index c15ea59..0ff4ae5 100644
+index c15ea59..44700ea 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
-@@ -1619,3 +1619,259 @@ TEST(Transform, FlyDurationRange) {
+@@ -1619,3 +1619,267 @@ TEST(Transform, FlyDurationRange) {
      EXPECT_DOUBLE_EQ(1.0, transform.getZoom());
      EXPECT_FALSE(transform.inTransition());
  }
@@ -1022,6 +1030,14 @@ index c15ea59..0ff4ae5 100644
 +    EXPECT_NEAR(transform.getZoom(), 7, 1e-9);
 +    EXPECT_NEAR(util::rad2deg(transform.getPitch()), 30, 1e-9);
 +    EXPECT_FALSE(transform.inTransition());
++
++    // A spacing that doesn't divide the circle still finds the nearest
++    // target around it: 270 is 1 degree from -89.
++    CameraMomentum uneven;
++    uneven.bearingSnap = MomentumSnap{.spacing = 270, .tolerance = 7};
++    transform.jumpTo(CameraOptions().withBearing(-89));
++    transform.startMomentum(uneven, animation);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), -90, 1e-9);
 +}
 +
 +TEST(Transform, MomentumStopsAPartThatLimitsHold) {

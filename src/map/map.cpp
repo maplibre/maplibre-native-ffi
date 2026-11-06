@@ -4722,10 +4722,20 @@ auto move_camera(
   if (status != MLN_STATUS_OK) return status;
   apply_gesture_phase_before(live, gesture_phase);
   if (gesture_phase != MLN_GESTURE_PHASE_NONE) {
+    // A gesture's update can repeat a field it doesn't change.
     auto& events = *live.event_state;
-    if (camera.zoom) events.gesture_changed_zoom = true;
-    if (camera.bearing) events.gesture_changed_bearing = true;
-    if (camera.pitch) events.gesture_changed_pitch = true;
+    const auto current = live.map->getCameraOptions();
+    const auto changes =
+      [](const std::optional<double>& value, const std::optional<double>& now) {
+        return value && value != now;
+      };
+    if (changes(camera.zoom, current.zoom)) events.gesture_changed_zoom = true;
+    if (changes(camera.bearing, current.bearing)) {
+      events.gesture_changed_bearing = true;
+    }
+    if (changes(camera.pitch, current.pitch)) {
+      events.gesture_changed_pitch = true;
+    }
   }
   {
     const auto replacing = TransitionReplacementScope{*live.event_state, end};
