@@ -74,13 +74,7 @@ the offset for a drag, or the scale and the pinch's center as the anchor for a
 pinch. When the gesture ends, send the end phase, or the cancel phase if the
 platform cancels it.
 
-An end-phase delta with no movement doesn't move the camera, so it raises no
-camera events. To learn when the camera comes to rest, wait for the delta to
-finish, or for a [](api:MLN_RUNTIME_EVENT_MAP_IDLE) event.
-
 For momentum after a gesture, send an update-phase delta on each display frame.
-An animated delta replaces the one before it, and an anchor combines with an
-offset only in a delta without a duration.
 
 <Snippet page="camera" region="gesture" />
 
