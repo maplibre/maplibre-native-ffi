@@ -38,3 +38,5 @@ OpenHarmony SDK's tools instead, and packs and signs the HAP with
 `tools/ohos/pack-hap`, as the TypeScript binding's ArkTS suite does. ets-loader
 compiles the pages with its webpack configuration, which doesn't rewrite
 `@kit.*` imports. The example imports the `@ohos.*` modules instead.
+`scripts/webpack.config.cjs` gives that configuration the app's API floor, so
+ArkTS linter errors fail the build as they do in DevEco Studio.
