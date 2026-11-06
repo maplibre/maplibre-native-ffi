@@ -6348,7 +6348,6 @@ public data class StyleSourceInfo(
   public val id: String,
   public val type: StyleSourceType,
   public val isVolatile: Boolean,
-  /** The source's attribution, or empty when it has none. */
   public val attribution: String,
   public val url: String,
   /** The tiles that the style lists in the source itself, instead of at a URL. */

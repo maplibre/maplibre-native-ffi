@@ -14,10 +14,6 @@ public sealed record StyleSourceInfo
     public string Id { get; init; } = "";
     public StyleSourceType Type { get; init; }
     public bool IsVolatile { get; init; }
-
-    /// <summary>
-    /// The source's attribution, or empty when it has none.
-    /// </summary>
     public string Attribution { get; init; } = "";
     public string Url { get; init; } = "";
 

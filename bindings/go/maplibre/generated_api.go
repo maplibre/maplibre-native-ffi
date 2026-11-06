@@ -5565,10 +5565,9 @@ func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
 // See mln_style_source_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceInfo struct {
-	ID         string
-	Type       StyleSourceType
-	IsVolatile bool
-	// The source's attribution, or empty when it has none.
+	ID          string
+	Type        StyleSourceType
+	IsVolatile  bool
 	Attribution string
 	URL         string
 	// The tiles that the style lists in the source itself, instead of at a URL.

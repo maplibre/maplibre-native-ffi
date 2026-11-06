@@ -4715,8 +4715,6 @@ final class StyleSourceInfo extends _Value {
   final String id;
   final StyleSourceType type;
   final bool isVolatile;
-
-  /// The source's attribution, or empty when it has none.
   final String attribution;
   final String url;
 

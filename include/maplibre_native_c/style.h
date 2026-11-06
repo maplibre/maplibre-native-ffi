@@ -250,7 +250,6 @@ typedef struct mln_style_source_info {
   mln_style_source_type type;
   mln_style_source_info_fields fields;
   bool is_volatile;
-  /** The source's attribution, or empty when it has none. */
   mln_buffer_view attribution;
   mln_buffer_view url;
   /**

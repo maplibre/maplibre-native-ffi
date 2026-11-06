@@ -789,7 +789,6 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   public var id: String
   public var type: StyleSourceType
   public var isVolatile: Bool
-  /// The source's attribution, or empty when it has none.
   public var attribution: String
   public var url: String
   /// The tiles that the style lists in the source itself, instead of at a URL.

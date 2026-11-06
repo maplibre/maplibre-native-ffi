@@ -4837,7 +4837,6 @@ class StyleSourceInfo:
     is_volatile: bool
 
     attribution: str
-    """The source's attribution, or empty when it has none."""
 
     url: str
 

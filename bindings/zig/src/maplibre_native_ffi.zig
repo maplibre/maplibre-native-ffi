@@ -8430,7 +8430,6 @@ pub const StyleSourceInfo = struct {
     id: []const u8 = &.{},
     type: StyleSourceType = .unknown,
     is_volatile: bool = false,
-    /// The source's attribution, or empty when it has none.
     attribution: []const u8 = &.{},
     url: []const u8 = &.{},
     /// The tiles that the style lists in the source itself, instead of at a
