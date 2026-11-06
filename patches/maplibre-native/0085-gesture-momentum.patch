@@ -1,9 +1,9 @@
 Adds gesture momentum to the transform, so that SDKs on top of the engine
-stop each building their own engine for fling, friction, and bearing snap
-(https://github.com/maplibre/maplibre-native-ffi/issues/1705). A momentum
-moves the camera from where it stands on each frame, so other commands can
-change the fields that it leaves alone, and it pans in short screen steps,
-so a fling travels evenly at any pitch.
+stop each building their own fling, friction, and bearing snap
+(https://github.com/maplibre/maplibre-native-ffi/issues/1705). Each part of a
+momentum starts at its release speed and slows by friction or by Android's
+scroll spline. On a tilted map, a pan glides the same distance on screen in
+every direction.
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 03ad5ae..27026fe 100644
@@ -31,7 +31,7 @@ index e72aacd..2646f15 100644
      "include/mln/map/map_observer.hpp",
 diff --git a/include/mln/map/camera_momentum.hpp b/include/mln/map/camera_momentum.hpp
 new file mode 100644
-index 0000000..dfaa44f
+index 0000000..f0871b1
 --- /dev/null
 +++ b/include/mln/map/camera_momentum.hpp
 @@ -0,0 +1,112 @@
@@ -115,8 +115,8 @@ index 0000000..dfaa44f
 +    Each part starts at its release velocity and slows by its decay, applied
 +    every frame relative to the camera as it stands, so other commands can
 +    change the fields that the momentum leaves alone. A command that sets a
-+    field stops the parts that move it. Pan moves the map's content on screen
-+    in short steps, so it travels its distance at any pitch. */
++    field stops the parts that move it. On a tilted map, pan moves the map's
++    content the same distance on screen in every direction. */
 +struct CameraMomentum {
 +    /** How fast the map's content moved on screen, in logical pixels per
 +        second. */

@@ -14,8 +14,9 @@ namespace Maplibre.NativeFfi;
 /// the camera, or 0 when the map closed first.
 /// </param>
 /// <param name="Velocity">
-/// How fast a gesture's momentum still moved when it was cancelled, so that the
-/// next gesture can carry it on. Zero for every other end.
+/// How fast a gesture's momentum still moved when it was cancelled, which the
+/// next gesture can add to its own release velocities. Zero for every other
+/// end.
 /// </param>
 public readonly partial record struct CameraTransitionEnd(
     CameraTransitionOutcome Outcome,

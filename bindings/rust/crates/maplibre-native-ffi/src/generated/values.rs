@@ -216,7 +216,7 @@ pub struct BearingSnap {
     pub target_offset: Option<f64>,
     /// In degrees, from 0 to 180. Defaults to 7.
     pub tolerance: Option<f64>,
-    /// Zero settles at once. Defaults to 300.
+    /// Zero settles without easing. Defaults to 300.
     pub duration_ms: Option<f64>,
 }
 impl ToNative<sys::mln_bearing_snap> for BearingSnap {
@@ -716,8 +716,9 @@ pub struct CameraTransitionEnd {
     /// The generation of the first map snapshot that shows where the change
     /// left the camera, or 0 when the map closed first.
     pub generation: u64,
-    /// How fast a gesture's momentum still moved when it was cancelled, so that
-    /// the next gesture can carry it on. Zero for every other end.
+    /// How fast a gesture's momentum still moved when it was cancelled, which
+    /// the next gesture can add to its own release velocities. Zero for every
+    /// other end.
     pub velocity: CameraVelocity,
 }
 impl FromNative<sys::mln_camera_transition_end> for CameraTransitionEnd {
@@ -1768,7 +1769,7 @@ impl FromNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions {
     }
 }
 
-/// How a gesture keeps moving the camera after its last contact lifts.
+/// How a gesture keeps moving the camera after the user lets go.
 ///
 /// A part moves only when its velocity is set, and each part slows on its own.
 /// Every part defaults to `MomentumDecay::Friction` with a half-life of 140 ms,
@@ -1803,8 +1804,8 @@ pub struct GestureMomentum {
     pub zoom: MomentumOptions,
     pub bearing: MomentumOptions,
     pub pitch: MomentumOptions,
-    /// Where the bearing settles after a gesture that changed it, once the rest
-    /// of the momentum ends. Without momentum, it settles at once. Without
+    /// Where the bearing settles after a gesture that changed it. It settles
+    /// once the other parts stop, or right away when none of them move. Without
     /// this, the bearing stays where the gesture leaves it.
     pub bearing_snap: Option<BearingSnap>,
 }
@@ -3169,26 +3170,27 @@ impl Default for MomentumDecay {
 /// The part starts at its release speed. Speeds and distances are in the part's
 /// unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
 /// and pitch. A setting whose bit isn't set takes the part's default, which
-/// `GestureMomentum` lists.
+/// `GestureMomentum` lists. `min_speed` is finite and not negative, and every
+/// other setting is finite and positive.
 ///
 /// See `mln_momentum_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MomentumOptions {
     pub decay: Option<MomentumDecay>,
-    /// For `MomentumDecay::Friction`. Positive.
+    /// For `MomentumDecay::Friction`, how long the speed takes to halve.
     pub half_life_ms: Option<f64>,
-    /// For `MomentumDecay::Friction`, the speed at which it ends. Positive.
+    /// For `MomentumDecay::Friction`, the speed at which it ends.
     pub stop_speed: Option<f64>,
     /// For `MomentumDecay::Spline`, Android's
-    /// `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
+    /// `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
     pub scroll_friction: Option<f64>,
-    /// A slower release starts no momentum. Not negative.
+    /// A slower release starts no momentum.
     pub min_speed: Option<f64>,
-    /// A faster release counts as this speed. Positive.
+    /// A faster release counts as this speed.
     pub max_speed: Option<f64>,
     /// The farthest the part moves. A release that would move farther starts
-    /// slower, so it ends sooner. Positive.
+    /// slower, so it ends sooner.
     pub max_distance: Option<f64>,
 }
 impl ToNative<sys::mln_momentum_options> for MomentumOptions {

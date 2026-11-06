@@ -31,7 +31,7 @@ public sealed record BearingSnap
     public double? Tolerance { get; init; }
 
     /// <summary>
-    /// Zero settles at once. Defaults to 300.
+    /// Zero settles without easing. Defaults to 300.
     /// </summary>
     public double? DurationMs { get; init; }
 }

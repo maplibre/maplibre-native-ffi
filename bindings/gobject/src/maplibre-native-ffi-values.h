@@ -730,7 +730,8 @@ typedef struct {
  * @generation: The generation of the first map snapshot that shows where the
  *   change left the camera, or 0 when the map closed first.
  * @velocity: How fast a gesture's momentum still moved when it was cancelled,
- *   so that the next gesture can carry it on. Zero for every other end.
+ *   which the next gesture can add to its own release velocities. Zero for
+ *   every other end.
  *
  * The end of a camera change.
  *
@@ -2192,7 +2193,7 @@ void maplibre_native_ffi_bearing_snap_set_tolerance(
 /**
  * MaplibreNativeFfiBearingSnap:duration-ms: (setter set_duration_ms) (getter get_duration_ms)
  *
- * Zero settles at once. Defaults to 300.
+ * Zero settles without easing. Defaults to 300.
  */
 /**
  * maplibre_native_ffi_bearing_snap_get_duration_ms: (get-property duration-ms)
@@ -2612,7 +2613,8 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  * The part starts at its release speed. Speeds and distances are in the part's
  * unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
  * and pitch. A setting whose bit isn't set takes the part's default, which
- * `MaplibreNativeFfiGestureMomentum` lists.
+ * `MaplibreNativeFfiGestureMomentum` lists. `min_speed` is finite and not
+ * negative, and every other setting is finite and positive.
  *
  * A member that a `has_` method reports on is unset until its property or
  * setter sets it.
@@ -2670,7 +2672,8 @@ void maplibre_native_ffi_momentum_options_set_decay(
 /**
  * MaplibreNativeFfiMomentumOptions:half-life-ms: (setter set_half_life_ms) (getter get_half_life_ms)
  *
- * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_FRICTION`. Positive.
+ * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_FRICTION`, how long the speed takes
+ * to halve.
  */
 /**
  * maplibre_native_ffi_momentum_options_get_half_life_ms: (get-property half-life-ms)
@@ -2707,7 +2710,7 @@ void maplibre_native_ffi_momentum_options_set_half_life_ms(
  * MaplibreNativeFfiMomentumOptions:stop-speed: (setter set_stop_speed) (getter get_stop_speed)
  *
  * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_FRICTION`, the speed at which it
- * ends. Positive.
+ * ends.
  */
 /**
  * maplibre_native_ffi_momentum_options_get_stop_speed: (get-property stop-speed)
@@ -2744,7 +2747,7 @@ void maplibre_native_ffi_momentum_options_set_stop_speed(
  * MaplibreNativeFfiMomentumOptions:scroll-friction: (setter set_scroll_friction) (getter get_scroll_friction)
  *
  * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_SPLINE`, Android's
- * `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
+ * `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
  */
 /**
  * maplibre_native_ffi_momentum_options_get_scroll_friction: (get-property scroll-friction)
@@ -2780,7 +2783,7 @@ void maplibre_native_ffi_momentum_options_set_scroll_friction(
 /**
  * MaplibreNativeFfiMomentumOptions:min-speed: (setter set_min_speed) (getter get_min_speed)
  *
- * A slower release starts no momentum. Not negative.
+ * A slower release starts no momentum.
  */
 /**
  * maplibre_native_ffi_momentum_options_get_min_speed: (get-property min-speed)
@@ -2816,7 +2819,7 @@ void maplibre_native_ffi_momentum_options_set_min_speed(
 /**
  * MaplibreNativeFfiMomentumOptions:max-speed: (setter set_max_speed) (getter get_max_speed)
  *
- * A faster release counts as this speed. Positive.
+ * A faster release counts as this speed.
  */
 /**
  * maplibre_native_ffi_momentum_options_get_max_speed: (get-property max-speed)
@@ -2853,7 +2856,7 @@ void maplibre_native_ffi_momentum_options_set_max_speed(
  * MaplibreNativeFfiMomentumOptions:max-distance: (setter set_max_distance) (getter get_max_distance)
  *
  * The farthest the part moves. A release that would move farther starts slower,
- * so it ends sooner. Positive.
+ * so it ends sooner.
  */
 /**
  * maplibre_native_ffi_momentum_options_get_max_distance: (get-property max-distance)
@@ -2889,7 +2892,7 @@ void maplibre_native_ffi_momentum_options_set_max_distance(
 /**
  * MaplibreNativeFfiGestureMomentum:
  *
- * How a gesture keeps moving the camera after its last contact lifts.
+ * How a gesture keeps moving the camera after the user lets go.
  *
  * A part moves only when its velocity is set, and each part slows on its own.
  * Every part defaults to `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_FRICTION` with a
@@ -3259,8 +3262,8 @@ void maplibre_native_ffi_gesture_momentum_set_pitch(
 /**
  * MaplibreNativeFfiGestureMomentum:bearing-snap: (setter set_bearing_snap) (getter get_bearing_snap)
  *
- * Where the bearing settles after a gesture that changed it, once the rest of
- * the momentum ends. Without momentum, it settles at once. Without this, the
+ * Where the bearing settles after a gesture that changed it. It settles once
+ * the other parts stop, or right away when none of them move. Without this, the
  * bearing stays where the gesture leaves it.
  */
 /**

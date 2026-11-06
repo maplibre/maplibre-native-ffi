@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How a gesture keeps moving the camera after its last contact lifts.
+/// How a gesture keeps moving the camera after the user lets go.
 /// </summary>
 /// <remarks>
 /// <para>A part moves only when its velocity is set, and each part slows on its
@@ -63,8 +63,8 @@ public sealed record GestureMomentum
     public MomentumOptions Pitch { get; init; } = new();
 
     /// <summary>
-    /// Where the bearing settles after a gesture that changed it, once the rest
-    /// of the momentum ends. Without momentum, it settles at once. Without
+    /// Where the bearing settles after a gesture that changed it. It settles
+    /// once the other parts stop, or right away when none of them move. Without
     /// this, the bearing stays where the gesture leaves it.
     /// </summary>
     public BearingSnap? BearingSnap { get; init; }

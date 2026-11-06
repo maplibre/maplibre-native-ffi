@@ -76,7 +76,7 @@ public struct BearingSnap: Equatable, Hashable, Sendable {
   public var targetOffset: Double?
   /// In degrees, from 0 to 180. Defaults to 7.
   public var tolerance: Double?
-  /// Zero settles at once. Defaults to 300.
+  /// Zero settles without easing. Defaults to 300.
   public var durationMs: Double?
   public init(
     targetCount: UInt32? = nil,
@@ -599,8 +599,9 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   /// The generation of the first map snapshot that shows where the change left
   /// the camera, or 0 when the map closed first.
   public var generation: UInt64
-  /// How fast a gesture's momentum still moved when it was cancelled, so that
-  /// the next gesture can carry it on. Zero for every other end.
+  /// How fast a gesture's momentum still moved when it was cancelled, which the
+  /// next gesture can add to its own release velocities. Zero for every other
+  /// end.
   public var velocity: CameraVelocity
   public init(
     outcome: CameraTransitionOutcome = .init(rawValue: 0),
@@ -1015,7 +1016,7 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// How a gesture keeps moving the camera after its last contact lifts.
+/// How a gesture keeps moving the camera after the user lets go.
 ///
 /// A part moves only when its velocity is set, and each part slows on its own.
 /// Every part defaults to `MomentumDecay.friction` with a half-life of 140 ms,
@@ -1049,8 +1050,8 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
   public var zoom: MomentumOptions
   public var bearing: MomentumOptions
   public var pitch: MomentumOptions
-  /// Where the bearing settles after a gesture that changed it, once the rest
-  /// of the momentum ends. Without momentum, it settles at once. Without this,
+  /// Where the bearing settles after a gesture that changed it. It settles once
+  /// the other parts stop, or right away when none of them move. Without this,
   /// the bearing stays where the gesture leaves it.
   public var bearingSnap: BearingSnap?
   public init(
@@ -1752,25 +1753,26 @@ public struct MomentumDecay: RawRepresentable, CustomStringConvertible,
 /// The part starts at its release speed. Speeds and distances are in the part's
 /// unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
 /// and pitch. A setting whose bit isn't set takes the part's default, which
-/// `GestureMomentum` lists.
+/// `GestureMomentum` lists. `min_speed` is finite and not negative, and every
+/// other setting is finite and positive.
 ///
 /// See `mln_momentum_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MomentumOptions: Equatable, Hashable, Sendable {
   public var decay: MomentumDecay?
-  /// For `MomentumDecay.friction`. Positive.
+  /// For `MomentumDecay.friction`, how long the speed takes to halve.
   public var halfLifeMs: Double?
-  /// For `MomentumDecay.friction`, the speed at which it ends. Positive.
+  /// For `MomentumDecay.friction`, the speed at which it ends.
   public var stopSpeed: Double?
   /// For `MomentumDecay.spline`, Android's
-  /// `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
+  /// `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
   public var scrollFriction: Double?
-  /// A slower release starts no momentum. Not negative.
+  /// A slower release starts no momentum.
   public var minSpeed: Double?
-  /// A faster release counts as this speed. Positive.
+  /// A faster release counts as this speed.
   public var maxSpeed: Double?
   /// The farthest the part moves. A release that would move farther starts
-  /// slower, so it ends sooner. Positive.
+  /// slower, so it ends sooner.
   public var maxDistance: Double?
   public init(
     decay: MomentumDecay? = nil,

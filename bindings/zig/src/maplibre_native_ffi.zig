@@ -490,15 +490,17 @@ pub const Map = struct {
     /// exact camera, use `Map.updateCamera()`.
     ///
     /// A delta in the end phase can carry momentum, which keeps the camera moving
-    /// from the release velocities on each rendered frame. The gesture then lasts
-    /// until the momentum and any bearing snap end: the snapshot keeps
+    /// from the gesture's release velocities and slows it on each rendered frame.
+    /// The gesture lasts until the momentum ends: the snapshot keeps
     /// `gesture_in_progress` set, and camera events report
-    /// `CameraChangeSource.momentum`. The end handler in `animation` runs when the
-    /// gesture ends, and `animation` sets no other field except `transition_id`. A
-    /// delta in the begin phase, `Map.cancelCameraTransitions()`, or a cancellation
-    /// by that ID stops the momentum, and a later command that sets a field stops
-    /// the parts of the momentum that move it. The pan moves the map's content its
-    /// distance on the screen at any pitch.
+    /// `CameraChangeSource.momentum`. With momentum, `animation` sets only
+    /// `transition_id` and the end handler, which runs when the gesture ends.
+    ///
+    /// A delta in the begin phase, `Map.cancelCameraTransitions()`, or a
+    /// cancellation by that ID stops the momentum. A later command that sets a
+    /// field stops only the parts of the momentum that move that field. On a tilted
+    /// map, the pan moves the map's content the same distance on the screen in
+    /// every direction.
     ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -3450,7 +3452,7 @@ pub const BearingSnap = struct {
     target_offset: ?f64 = null,
     /// In degrees, from 0 to 180. Defaults to 7.
     tolerance: ?f64 = null,
-    /// Zero settles at once. Defaults to 300.
+    /// Zero settles without easing. Defaults to 300.
     duration_ms: ?f64 = null,
     pub fn toNative(self: BearingSnap) c.mln_bearing_snap {
         var raw = std.mem.zeroes(c.mln_bearing_snap);
@@ -3841,8 +3843,9 @@ pub const CameraTransitionEnd = struct {
     /// The generation of the first map snapshot that shows where the change
     /// left the camera, or 0 when the map closed first.
     generation: u64 = 0,
-    /// How fast a gesture's momentum still moved when it was cancelled, so that
-    /// the next gesture can carry it on. Zero for every other end.
+    /// How fast a gesture's momentum still moved when it was cancelled, which
+    /// the next gesture can add to its own release velocities. Zero for every
+    /// other end.
     velocity: CameraVelocity = .{},
     pub fn fromNative(raw: c.mln_camera_transition_end) CameraTransitionEnd {
         return .{
@@ -4734,7 +4737,7 @@ pub const GeoJsonSourceOptions = struct {
     }
 };
 
-/// How a gesture keeps moving the camera after its last contact lifts.
+/// How a gesture keeps moving the camera after the user lets go.
 ///
 /// A part moves only when its velocity is set, and each part slows on its own.
 /// Every part defaults to `MomentumDecay.friction` with a half-life of 140 ms,
@@ -4768,8 +4771,8 @@ pub const GestureMomentum = struct {
     zoom: MomentumOptions = .{},
     bearing: MomentumOptions = .{},
     pitch: MomentumOptions = .{},
-    /// Where the bearing settles after a gesture that changed it, once the rest
-    /// of the momentum ends. Without momentum, it settles at once. Without
+    /// Where the bearing settles after a gesture that changed it. It settles
+    /// once the other parts stop, or right away when none of them move. Without
     /// this, the bearing stays where the gesture leaves it.
     bearing_snap: ?BearingSnap = null,
     pub fn toNative(self: GestureMomentum) c.mln_gesture_momentum {
@@ -5924,25 +5927,26 @@ pub const MomentumDecay = enum(u32) {
 /// The part starts at its release speed. Speeds and distances are in the part's
 /// unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
 /// and pitch. A setting whose bit isn't set takes the part's default, which
-/// `GestureMomentum` lists.
+/// `GestureMomentum` lists. `min_speed` is finite and not negative, and every
+/// other setting is finite and positive.
 ///
 /// See `mln_momentum_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MomentumOptions = struct {
     decay: ?MomentumDecay = null,
-    /// For `MomentumDecay.friction`. Positive.
+    /// For `MomentumDecay.friction`, how long the speed takes to halve.
     half_life_ms: ?f64 = null,
-    /// For `MomentumDecay.friction`, the speed at which it ends. Positive.
+    /// For `MomentumDecay.friction`, the speed at which it ends.
     stop_speed: ?f64 = null,
     /// For `MomentumDecay.spline`, Android's
-    /// `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
+    /// `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
     scroll_friction: ?f64 = null,
-    /// A slower release starts no momentum. Not negative.
+    /// A slower release starts no momentum.
     min_speed: ?f64 = null,
-    /// A faster release counts as this speed. Positive.
+    /// A faster release counts as this speed.
     max_speed: ?f64 = null,
     /// The farthest the part moves. A release that would move farther starts
-    /// slower, so it ends sooner. Positive.
+    /// slower, so it ends sooner.
     max_distance: ?f64 = null,
     pub fn toNative(self: MomentumOptions) c.mln_momentum_options {
         var raw = std.mem.zeroes(c.mln_momentum_options);

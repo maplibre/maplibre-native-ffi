@@ -577,16 +577,18 @@ class _MapHandleOperations(GeneratedOperations):
         happens. To reach an exact camera, use `MapHandle.update_camera()`.
 
         A delta in the end phase can carry momentum, which keeps the camera
-        moving from the release velocities on each rendered frame. The
-        gesture then lasts until the momentum and any bearing snap end: the
+        moving from the gesture's release velocities and slows it on each
+        rendered frame. The gesture lasts until the momentum ends: the
         snapshot keeps `gesture_in_progress` set, and camera events report
-        `CameraChangeSource.MOMENTUM`. The end handler in `animation` runs
-        when the gesture ends, and `animation` sets no other field except
-        `transition_id`. A delta in the begin phase,
-        `MapHandle.cancel_camera_transitions()`, or a cancellation by that ID
-        stops the momentum, and a later command that sets a field stops the
-        parts of the momentum that move it. The pan moves the map's content
-        its distance on the screen at any pitch.
+        `CameraChangeSource.MOMENTUM`. With momentum, `animation` sets only
+        `transition_id` and the end handler, which runs when the gesture
+        ends.
+
+        A delta in the begin phase, `MapHandle.cancel_camera_transitions()`,
+        or a cancellation by that ID stops the momentum. A later command that
+        sets a field stops only the parts of the momentum that move that
+        field. On a tilted map, the pan moves the map's content the same
+        distance on the screen in every direction.
 
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -3784,16 +3786,18 @@ class MapHandleDiscarding:
         happens. To reach an exact camera, use `MapHandle.update_camera()`.
 
         A delta in the end phase can carry momentum, which keeps the camera
-        moving from the release velocities on each rendered frame. The
-        gesture then lasts until the momentum and any bearing snap end: the
+        moving from the gesture's release velocities and slows it on each
+        rendered frame. The gesture lasts until the momentum ends: the
         snapshot keeps `gesture_in_progress` set, and camera events report
-        `CameraChangeSource.MOMENTUM`. The end handler in `animation` runs
-        when the gesture ends, and `animation` sets no other field except
-        `transition_id`. A delta in the begin phase,
-        `MapHandle.cancel_camera_transitions()`, or a cancellation by that ID
-        stops the momentum, and a later command that sets a field stops the
-        parts of the momentum that move it. The pan moves the map's content
-        its distance on the screen at any pitch.
+        `CameraChangeSource.MOMENTUM`. With momentum, `animation` sets only
+        `transition_id` and the end handler, which runs when the gesture
+        ends.
+
+        A delta in the begin phase, `MapHandle.cancel_camera_transitions()`,
+        or a cancellation by that ID stops the momentum. A later command that
+        sets a field stops only the parts of the momentum that move that
+        field. On a tilted map, the pan moves the map's content the same
+        distance on the screen in every direction.
 
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

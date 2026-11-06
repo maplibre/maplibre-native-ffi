@@ -402,8 +402,9 @@ typedef struct mln_camera_transition_end {
    */
   uint64_t generation;
   /**
-   * How fast a gesture's momentum still moved when it was cancelled, so that
-   * the next gesture can carry it on. Zero for every other end.
+   * How fast a gesture's momentum still moved when it was cancelled, which the
+   * next gesture can add to its own release velocities. Zero for every other
+   * end.
    */
   mln_camera_velocity velocity;
 } mln_camera_transition_end;
@@ -528,31 +529,32 @@ typedef uint32_t mln_momentum_option_fields;
  * The part starts at its release speed. Speeds and distances are in the
  * part's unit: logical pixels for pan, zoom levels for zoom, and degrees for
  * bearing and pitch. A setting whose bit isn't set takes the part's default,
- * which mln_gesture_momentum lists.
+ * which mln_gesture_momentum lists. `min_speed` is finite and not negative,
+ * and every other setting is finite and positive.
  */
 typedef struct mln_momentum_options {
   mln_momentum_option_fields fields;
   mln_momentum_decay decay
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_DECAY");
-  /** For MLN_MOMENTUM_DECAY_FRICTION. Positive. */
+  /** For MLN_MOMENTUM_DECAY_FRICTION, how long the speed takes to halve. */
   double half_life_ms
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_HALF_LIFE_MS");
-  /** For MLN_MOMENTUM_DECAY_FRICTION, the speed at which it ends. Positive. */
+  /** For MLN_MOMENTUM_DECAY_FRICTION, the speed at which it ends. */
   double stop_speed
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_STOP_SPEED");
   /**
    * For MLN_MOMENTUM_DECAY_SPLINE, Android's
-   * `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
+   * `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
    */
   double scroll_friction
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_SCROLL_FRICTION");
-  /** A slower release starts no momentum. Not negative. */
+  /** A slower release starts no momentum. */
   double min_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MIN_SPEED");
-  /** A faster release counts as this speed. Positive. */
+  /** A faster release counts as this speed. */
   double max_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MAX_SPEED");
   /**
    * The farthest the part moves. A release that would move farther starts
-   * slower, so it ends sooner. Positive.
+   * slower, so it ends sooner.
    */
   double max_distance
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MAX_DISTANCE");
@@ -586,7 +588,7 @@ typedef struct mln_bearing_snap {
     MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_TARGET_OFFSET");
   /** In degrees, from 0 to 180. Defaults to 7. */
   double tolerance MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_TOLERANCE");
-  /** Zero settles at once. Defaults to 300. */
+  /** Zero settles without easing. Defaults to 300. */
   double duration_ms
     MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_DURATION_MS");
 } mln_bearing_snap;
@@ -606,7 +608,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_gesture_momentum_field : uint32_t {
 typedef uint32_t mln_gesture_momentum_fields;
 
 /**
- * How a gesture keeps moving the camera after its last contact lifts.
+ * How a gesture keeps moving the camera after the user lets go.
  *
  * A part moves only when its velocity is set, and each part slows on its own.
  * Every part defaults to MLN_MOMENTUM_DECAY_FRICTION with a half-life of
@@ -652,9 +654,9 @@ typedef struct mln_gesture_momentum {
   mln_momentum_options bearing;
   mln_momentum_options pitch;
   /**
-   * Where the bearing settles after a gesture that changed it, once the rest
-   * of the momentum ends. Without momentum, it settles at once. Without this,
-   * the bearing stays where the gesture leaves it.
+   * Where the bearing settles after a gesture that changed it. It settles
+   * once the other parts stop, or right away when none of them move. Without
+   * this, the bearing stays where the gesture leaves it.
    */
   mln_bearing_snap bearing_snap
     MLN_BINDING("mask=fields;bit=MLN_GESTURE_MOMENTUM_BEARING_SNAP");

@@ -4803,29 +4803,30 @@ public data class PremultipliedRgba8Image(
  *
  * The part starts at its release speed. Speeds and distances are in the part's unit: logical pixels
  * for pan, zoom levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't set
- * takes the part's default, which `GestureMomentum` lists.
+ * takes the part's default, which `GestureMomentum` lists. `min_speed` is finite and not negative,
+ * and every other setting is finite and positive.
  *
  * See `mln_momentum_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MomentumOptions(
   public val decay: MomentumDecay? = null,
-  /** For `MomentumDecay.FRICTION`. Positive. */
+  /** For `MomentumDecay.FRICTION`, how long the speed takes to halve. */
   public val halfLifeMs: Double? = null,
-  /** For `MomentumDecay.FRICTION`, the speed at which it ends. Positive. */
+  /** For `MomentumDecay.FRICTION`, the speed at which it ends. */
   public val stopSpeed: Double? = null,
   /**
-   * For `MomentumDecay.SPLINE`, Android's `ViewConfiguration.getScrollFriction()`. Positive, and
-   * 0.015 by default.
+   * For `MomentumDecay.SPLINE`, Android's `ViewConfiguration.getScrollFriction()`. Defaults to
+   * 0.015.
    */
   public val scrollFriction: Double? = null,
-  /** A slower release starts no momentum. Not negative. */
+  /** A slower release starts no momentum. */
   public val minSpeed: Double? = null,
-  /** A faster release counts as this speed. Positive. */
+  /** A faster release counts as this speed. */
   public val maxSpeed: Double? = null,
   /**
    * The farthest the part moves. A release that would move farther starts slower, so it ends
-   * sooner. Positive.
+   * sooner.
    */
   public val maxDistance: Double? = null,
 ) {
@@ -4877,7 +4878,7 @@ public data class BearingSnap(
   public val targetOffset: Double? = null,
   /** In degrees, from 0 to 180. Defaults to 7. */
   public val tolerance: Double? = null,
-  /** Zero settles at once. Defaults to 300. */
+  /** Zero settles without easing. Defaults to 300. */
   public val durationMs: Double? = null,
 ) {
   @PublishedApi
@@ -4908,7 +4909,7 @@ public data class BearingSnap(
 }
 
 /**
- * How a gesture keeps moving the camera after its last contact lifts.
+ * How a gesture keeps moving the camera after the user lets go.
  *
  * A part moves only when its velocity is set, and each part slows on its own. Every part defaults
  * to `MomentumDecay.FRICTION` with a half-life of 140 ms, and these other defaults:
@@ -4946,9 +4947,9 @@ public data class GestureMomentum(
   public val bearing: MomentumOptions = MomentumOptions(),
   public val pitch: MomentumOptions = MomentumOptions(),
   /**
-   * Where the bearing settles after a gesture that changed it, once the rest of the momentum ends.
-   * Without momentum, it settles at once. Without this, the bearing stays where the gesture leaves
-   * it.
+   * Where the bearing settles after a gesture that changed it. It settles once the other parts
+   * stop, or right away when none of them move. Without this, the bearing stays where the gesture
+   * leaves it.
    */
   public val bearingSnap: BearingSnap? = null,
 ) {
@@ -5061,8 +5062,8 @@ public data class CameraTransitionEnd(
    */
   @get:JvmName("getGeneration") public val generation: ULong,
   /**
-   * How fast a gesture's momentum still moved when it was cancelled, so that the next gesture can
-   * carry it on. Zero for every other end.
+   * How fast a gesture's momentum still moved when it was cancelled, which the next gesture can add
+   * to its own release velocities. Zero for every other end.
    */
   public val velocity: CameraVelocity,
 ) {
