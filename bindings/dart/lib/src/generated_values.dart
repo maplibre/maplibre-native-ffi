@@ -2410,98 +2410,6 @@ final class LogicalSize extends _Value {
   String toString() => _describe('LogicalSize', const ['width', 'height']);
 }
 
-/// Options for a GeoJSON
-/// \[source\](https://maplibre.org/maplibre-style-spec/sources/#geojson).
-///
-/// Zoom levels are whole numbers.
-///
-/// See `mln_geo_json_source_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class GeoJsonSourceOptions extends _Value {
-  const GeoJsonSourceOptions({
-    this.minZoom,
-    this.maxZoom,
-    this.tolerance,
-    this.clusterMaxZoom,
-    this.clusterProperties,
-    this.buffer,
-    this.clusterRadius,
-    this.clusterMinPoints,
-    this.lineMetrics,
-    this.cluster,
-  });
-  final double? minZoom;
-  final double? maxZoom;
-  final double? tolerance;
-
-  /// The last zoom level that has clusters, at most 30.
-  final double? clusterMaxZoom;
-
-  /// The `clusterProperties` object, or empty for none.
-  final Object? clusterProperties;
-  final int? buffer;
-  final int? clusterRadius;
-
-  /// At most 4294967295 on a 32-bit target.
-  final int? clusterMinPoints;
-  final bool? lineMetrics;
-  final bool? cluster;
-
-  /// A copy of this value with the given members replaced.
-  GeoJsonSourceOptions copyWith({
-    double? minZoom,
-    double? maxZoom,
-    double? tolerance,
-    double? clusterMaxZoom,
-    Object? clusterProperties = _unchanged,
-    int? buffer,
-    int? clusterRadius,
-    int? clusterMinPoints,
-    bool? lineMetrics,
-    bool? cluster,
-  }) => GeoJsonSourceOptions(
-    minZoom: minZoom ?? this.minZoom,
-    maxZoom: maxZoom ?? this.maxZoom,
-    tolerance: tolerance ?? this.tolerance,
-    clusterMaxZoom: clusterMaxZoom ?? this.clusterMaxZoom,
-    clusterProperties: identical(clusterProperties, _unchanged)
-        ? this.clusterProperties
-        : clusterProperties,
-    buffer: buffer ?? this.buffer,
-    clusterRadius: clusterRadius ?? this.clusterRadius,
-    clusterMinPoints: clusterMinPoints ?? this.clusterMinPoints,
-    lineMetrics: lineMetrics ?? this.lineMetrics,
-    cluster: cluster ?? this.cluster,
-  );
-
-  @override
-  List<Object?> get _members => [
-    minZoom,
-    maxZoom,
-    tolerance,
-    clusterMaxZoom,
-    clusterProperties,
-    buffer,
-    clusterRadius,
-    clusterMinPoints,
-    lineMetrics,
-    cluster,
-  ];
-  @override
-  String toString() => _describe('GeoJsonSourceOptions', const [
-    'minZoom',
-    'maxZoom',
-    'tolerance',
-    'clusterMaxZoom',
-    'clusterProperties',
-    'buffer',
-    'clusterRadius',
-    'clusterMinPoints',
-    'lineMetrics',
-    'cluster',
-  ]);
-}
-
 /// A point in the Web Mercator projection, in meters.
 ///
 /// See `mln_projected_meters` in the
@@ -2639,6 +2547,98 @@ final class CustomVectorSourceOptions {
   final CustomSourceCancelTileCallback? cancelTile;
   final double? minZoom;
   final double? maxZoom;
+}
+
+/// Options for a GeoJSON
+/// \[source\](https://maplibre.org/maplibre-style-spec/sources/#geojson).
+///
+/// Zoom levels are whole numbers.
+///
+/// See `mln_geo_json_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class GeoJsonSourceOptions extends _Value {
+  const GeoJsonSourceOptions({
+    this.minZoom,
+    this.maxZoom,
+    this.tolerance,
+    this.clusterMaxZoom,
+    this.clusterProperties,
+    this.buffer,
+    this.clusterRadius,
+    this.clusterMinPoints,
+    this.lineMetrics,
+    this.cluster,
+  });
+  final double? minZoom;
+  final double? maxZoom;
+  final double? tolerance;
+
+  /// The last zoom level that has clusters, at most 30.
+  final double? clusterMaxZoom;
+
+  /// The `clusterProperties` object, or empty for none.
+  final Object? clusterProperties;
+  final int? buffer;
+  final int? clusterRadius;
+
+  /// At most 4294967295 on a 32-bit target.
+  final int? clusterMinPoints;
+  final bool? lineMetrics;
+  final bool? cluster;
+
+  /// A copy of this value with the given members replaced.
+  GeoJsonSourceOptions copyWith({
+    double? minZoom,
+    double? maxZoom,
+    double? tolerance,
+    double? clusterMaxZoom,
+    Object? clusterProperties = _unchanged,
+    int? buffer,
+    int? clusterRadius,
+    int? clusterMinPoints,
+    bool? lineMetrics,
+    bool? cluster,
+  }) => GeoJsonSourceOptions(
+    minZoom: minZoom ?? this.minZoom,
+    maxZoom: maxZoom ?? this.maxZoom,
+    tolerance: tolerance ?? this.tolerance,
+    clusterMaxZoom: clusterMaxZoom ?? this.clusterMaxZoom,
+    clusterProperties: identical(clusterProperties, _unchanged)
+        ? this.clusterProperties
+        : clusterProperties,
+    buffer: buffer ?? this.buffer,
+    clusterRadius: clusterRadius ?? this.clusterRadius,
+    clusterMinPoints: clusterMinPoints ?? this.clusterMinPoints,
+    lineMetrics: lineMetrics ?? this.lineMetrics,
+    cluster: cluster ?? this.cluster,
+  );
+
+  @override
+  List<Object?> get _members => [
+    minZoom,
+    maxZoom,
+    tolerance,
+    clusterMaxZoom,
+    clusterProperties,
+    buffer,
+    clusterRadius,
+    clusterMinPoints,
+    lineMetrics,
+    cluster,
+  ];
+  @override
+  String toString() => _describe('GeoJsonSourceOptions', const [
+    'minZoom',
+    'maxZoom',
+    'tolerance',
+    'clusterMaxZoom',
+    'clusterProperties',
+    'buffer',
+    'clusterRadius',
+    'clusterMinPoints',
+    'lineMetrics',
+    'cluster',
+  ]);
 }
 
 /// An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
@@ -5109,8 +5109,7 @@ final class StyleSourceInfo extends _Value {
   final StyleVectorTileEncoding? vectorEncoding;
   final StyleRasterDemEncoding? rasterEncoding;
 
-  /// A GeoJSON source's options, with every field set. Data prepared with them
-  /// can replace the source's data.
+  /// A GeoJSON source's options, with every field set.
   final GeoJsonSourceOptions? geoJson;
 
   @override

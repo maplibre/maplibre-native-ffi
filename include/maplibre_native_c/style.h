@@ -265,10 +265,7 @@ typedef struct mln_style_source_info {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING");
   mln_style_raster_dem_encoding raster_encoding
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_RASTER_ENCODING");
-  /**
-   * A GeoJSON source's options, with every field set. Data prepared with them
-   * can replace the source's data.
-   */
+  /** A GeoJSON source's options, with every field set. */
   mln_geo_json_source_options geo_json
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_GEO_JSON");
 } mln_style_source_info;
@@ -568,42 +565,18 @@ MLN_API mln_status mln_map_list_style_sources(
 ) MLN_NOEXCEPT;
 
 /**
- * Prepares GeoJSON data for GeoJSON sources.
+ * Adds a GeoJSON source with no data.
  *
- * `data` is a GeoJSON feature collection, feature, or geometry. Preparing it
- * can be slow, but adding the result to a source is quick, and several sources
- * can share it.
- *
- * Returns:
- * - MLN_STATUS_INVALID_ARGUMENT when `data` isn't valid GeoJSON, when an
- *   option in `options` is out of range, or when `options` turns on
- *   clustering and `data` isn't a feature collection of points.
- */
-MLN_API mln_status mln_geo_json_source_data_create(
-  mln_buffer_view data MLN_BINDING("encoding=json"),
-  const mln_geo_json_source_options* options MLN_BINDING("nullable=true"),
-  mln_geo_json_source_data* out_data MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Releases prepared GeoJSON data.
- *
- * Sources that use the data keep it.
- */
-MLN_API void mln_geo_json_source_data_release(
-  mln_geo_json_source_data data
-) MLN_NOEXCEPT;
-
-/**
- * Adds a GeoJSON source with prepared data.
- *
- * The source uses the options that `data` was prepared with. `data` can be
- * released once this function returns.
+ * Give it data with mln_map_set_geo_json_source_data() or
+ * mln_map_set_geo_json_source_url(). Its options stay fixed for as long as the
+ * style holds it.
  *
  * `attribution` is the source's
  * [attribution](https://maplibre.org/maplibre-style-spec/sources/#attribution),
  * or empty for none.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when an option in `options` is out of range.
  *
  * Completes with:
  * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
@@ -612,8 +585,9 @@ MLN_API void mln_geo_json_source_data_release(
  *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_add_geo_json_source_data(
-  mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
+MLN_API mln_status mln_map_add_geo_json_source(
+  mln_map map, mln_buffer_view source_id,
+  const mln_geo_json_source_options* options MLN_BINDING("nullable=true"),
   mln_buffer_view attribution MLN_BINDING("nullable=true"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -637,20 +611,33 @@ MLN_API mln_status mln_map_set_geo_json_source_url(
 /**
  * Replaces the data of a GeoJSON source.
  *
- * `data` must have been prepared with the source's options, which
- * mln_map_get_style_source() reports, though `min_zoom` may differ. `data` can
- * be released once this function returns.
+ * `data` is a GeoJSON feature collection, feature, or geometry. The library
+ * prepares it for the source with the source's options, off the threads that
+ * the caller and the runtime use, and the command completes once the source
+ * holds it. Later commands don't wait for it. While the source is still
+ * preparing earlier data, only the newest data waits to follow it.
+ *
+ * With synchronous tiling on, as
+ * mln_map_set_geo_json_source_synchronous_tiling() describes, the command
+ * prepares `data` before later commands run, so the data shows in the next
+ * frame.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
  * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
- *   GeoJSON source, or `data` was prepared with other options.
+ *   GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+ *   clusters and `data` isn't a feature collection of points. The source
+ *   keeps its data.
+ * - MLN_STATUS_CANCELLED when newer data for the source replaces `data` while
+ *   it waits, or when the source's URL, its removal, a style load, or the
+ *   map's release replaces the source's data before `data` is ready.
  * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
  *   mln_map_set_style_url() describes.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geo_json_source_data(
-  mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
+  mln_map map, mln_buffer_view source_id,
+  mln_buffer_view data MLN_BINDING("encoding=json"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

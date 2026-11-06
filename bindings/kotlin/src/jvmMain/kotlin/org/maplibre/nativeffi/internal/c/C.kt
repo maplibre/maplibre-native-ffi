@@ -81,17 +81,6 @@ internal actual object C {
   private val mln_delivery_queue_release =
     Ffm.downcall("mln_delivery_queue_release", null, JAVA_LONG)
   private val mln_frame_pacer_release = Ffm.downcall("mln_frame_pacer_release", null, JAVA_LONG)
-  private val mln_geo_json_source_data_create =
-    Ffm.downcall(
-      "mln_geo_json_source_data_create",
-      JAVA_INT,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_geo_json_source_data_release =
-    Ffm.downcall("mln_geo_json_source_data_release", null, JAVA_LONG)
   private val mln_http_header_transform_response_set_header =
     Ffm.downcall(
       "mln_http_header_transform_response_set_header",
@@ -143,9 +132,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_add_geo_json_source_data =
+  private val mln_map_add_geo_json_source =
     Ffm.downcall(
-      "mln_map_add_geo_json_source_data",
+      "mln_map_add_geo_json_source",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -786,7 +775,7 @@ internal actual object C {
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
-      JAVA_LONG,
+      mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -1535,23 +1524,6 @@ internal actual object C {
     mln_frame_pacer_release.invoke(pacer)
   }
 
-  actual fun mln_geo_json_source_data_create(
-    data: Long,
-    options: Long,
-    outData: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_geo_json_source_data_create.invokeExact(
-      Ffm.value(data, mln_buffer_view),
-      options,
-      outData,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_geo_json_source_data_release(data: Long) {
-    mln_geo_json_source_data_release.invoke(data)
-  }
-
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -1628,18 +1600,18 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_add_geo_json_source_data(
+  actual fun mln_map_add_geo_json_source(
     map: Long,
     sourceId: Long,
-    data: Long,
+    options: Long,
     attribution: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_add_geo_json_source_data.invokeExact(
+    mln_map_add_geo_json_source.invokeExact(
       map,
       Ffm.value(sourceId, mln_buffer_view),
-      data,
+      options,
       Ffm.value(attribution, mln_buffer_view),
       completion,
       outDiagnostic,
@@ -2630,7 +2602,7 @@ internal actual object C {
     mln_map_set_geo_json_source_data.invokeExact(
       map,
       Ffm.value(sourceId, mln_buffer_view),
-      data,
+      Ffm.value(data, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int

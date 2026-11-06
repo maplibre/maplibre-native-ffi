@@ -201,23 +201,6 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_frame_pacer_release(pacer.toULong())
   }
 
-  actual fun mln_geo_json_source_data_create(
-    data: Long,
-    options: Long,
-    outData: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_geo_json_source_data_create(
-      data.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      options.toCPointer(),
-      outData.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_geo_json_source_data_release(data: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_geo_json_source_data_release(data.toULong())
-  }
-
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -300,18 +283,18 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_add_geo_json_source_data(
+  actual fun mln_map_add_geo_json_source(
     map: Long,
     sourceId: Long,
-    data: Long,
+    options: Long,
     attribution: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_add_geo_json_source_data(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_add_geo_json_source(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      data.toULong(),
+      options.toCPointer(),
       attribution.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
@@ -1427,7 +1410,7 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_map_set_geo_json_source_data(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      data.toULong(),
+      data.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

@@ -512,59 +512,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_geo_json_source_data_create(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_buffer_view arg_data = {0};
-  mln_geo_json_source_options arg_options;
-  const void* present_options = NULL;
-  mln_geo_json_source_data arg_out_data = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  if (!mln_ts_read_json_view(call, call->argv[0], &arg_data, "data")) goto done;
-  if (!mln_ts_is_absent(call, call->argv[1])) {
-    memset(&arg_options, 0, sizeof arg_options);
-    arg_options.size = sizeof arg_options;
-    if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
-    if (!mln_ts_write_geo_json_source_options(
-          call, call->argv[1], &arg_options, "options"
-        ))
-      goto done;
-    present_options = &arg_options;
-  }
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_geo_json_source_data_create(
-    arg_data, present_options, &arg_out_data, &diagnostic
-  );
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_data);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_geo_json_source_data_release(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_geo_json_source_data arg_data = 0;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "data")) goto done;
-    arg_data = (mln_geo_json_source_data)number;
-  }
-  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  mln_geo_json_source_data_release(arg_data);
-  mln_ts_consume(call);
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_lat_lng_for_projected_meters(
   napi_env env, napi_callback_info info
 ) {
@@ -780,14 +727,15 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_add_geo_json_source_data(
+static napi_value mln_ts_export_mln_map_add_geo_json_source(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
   mln_buffer_view arg_source_id = {0};
-  uint64_t arg_data = 0;
+  mln_geo_json_source_options arg_options;
+  const void* present_options = NULL;
   mln_buffer_view arg_attribution = {0};
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
@@ -801,7 +749,16 @@ static napi_value mln_ts_export_mln_map_add_geo_json_source_data(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
-  if (!mln_ts_read_u64(call, call->argv[2], &arg_data, "data")) goto done;
+  if (!mln_ts_is_absent(call, call->argv[2])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
+    if (!mln_ts_write_geo_json_source_options(
+          call, call->argv[2], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
   if (!mln_ts_is_absent(call, call->argv[3])) {
     if (!mln_ts_read_text_view(
           call, call->argv[3], &arg_attribution, "attribution"
@@ -814,9 +771,9 @@ static napi_value mln_ts_export_mln_map_add_geo_json_source_data(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_add_geo_json_source_data(
-    arg_map, arg_source_id, arg_data, arg_attribution, present_completion,
-    &diagnostic
+  status = mln_map_add_geo_json_source(
+    arg_map, arg_source_id, present_options, arg_attribution,
+    present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -4152,7 +4109,7 @@ static napi_value mln_ts_export_mln_map_set_geo_json_source_data(
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
   mln_buffer_view arg_source_id = {0};
-  uint64_t arg_data = 0;
+  mln_buffer_view arg_data = {0};
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -4165,7 +4122,7 @@ static napi_value mln_ts_export_mln_map_set_geo_json_source_data(
   }
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
-  if (!mln_ts_read_u64(call, call->argv[2], &arg_data, "data")) goto done;
+  if (!mln_ts_read_json_view(call, call->argv[2], &arg_data, "data")) goto done;
   if (!mln_ts_read_completion(
         call, call->argv[3], true, NULL, &arg_completion, &present_completion
       ))
@@ -7851,10 +7808,6 @@ static const mln_ts_export exports[] = {
   {"mln_c_version", mln_ts_export_mln_c_version},
   {"mln_camera_for_tile", mln_ts_export_mln_camera_for_tile},
   {"mln_frame_pacer_release", mln_ts_export_mln_frame_pacer_release},
-  {"mln_geo_json_source_data_create",
-   mln_ts_export_mln_geo_json_source_data_create},
-  {"mln_geo_json_source_data_release",
-   mln_ts_export_mln_geo_json_source_data_release},
   {"mln_lat_lng_for_projected_meters",
    mln_ts_export_mln_lat_lng_for_projected_meters},
   {"mln_log_clear_callback", mln_ts_export_mln_log_clear_callback},
@@ -7867,8 +7820,7 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_add_custom_geometry_source},
   {"mln_map_add_custom_vector_source",
    mln_ts_export_mln_map_add_custom_vector_source},
-  {"mln_map_add_geo_json_source_data",
-   mln_ts_export_mln_map_add_geo_json_source_data},
+  {"mln_map_add_geo_json_source", mln_ts_export_mln_map_add_geo_json_source},
   {"mln_map_add_image_source_image",
    mln_ts_export_mln_map_add_image_source_image},
   {"mln_map_add_style_layer_json", mln_ts_export_mln_map_add_style_layer_json},

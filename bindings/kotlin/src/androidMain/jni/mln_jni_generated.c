@@ -211,24 +211,6 @@ static void mln_frame_pacer_release_jni(JNIEnv* env, jclass type, jlong pacer) {
   mln_frame_pacer_release((mln_frame_pacer)pacer);
 }
 
-static jint mln_geo_json_source_data_create_jni(
-  JNIEnv* env, jclass type, jlong data, jlong options, jlong out_data,
-  jlong out_diagnostic
-) {
-  return (jint)mln_geo_json_source_data_create(
-    MLN_JNI_RECORD(mln_buffer_view, data),
-    MLN_JNI_POINTER(const mln_geo_json_source_options*, options),
-    MLN_JNI_POINTER(mln_geo_json_source_data*, out_data),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static void mln_geo_json_source_data_release_jni(
-  JNIEnv* env, jclass type, jlong data
-) {
-  mln_geo_json_source_data_release((mln_geo_json_source_data)data);
-}
-
 static jint mln_http_header_transform_response_set_header_jni(
   JNIEnv* env, jclass type, jlong response, jlong name, jlong value,
   jlong out_diagnostic
@@ -314,13 +296,13 @@ static jint mln_map_add_custom_vector_source_jni(
   );
 }
 
-static jint mln_map_add_geo_json_source_data_jni(
-  JNIEnv* env, jclass type, jlong map, jlong source_id, jlong data,
+static jint mln_map_add_geo_json_source_jni(
+  JNIEnv* env, jclass type, jlong map, jlong source_id, jlong options,
   jlong attribution, jlong completion, jlong out_diagnostic
 ) {
-  return (jint)mln_map_add_geo_json_source_data(
+  return (jint)mln_map_add_geo_json_source(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
-    (mln_geo_json_source_data)data,
+    MLN_JNI_POINTER(const mln_geo_json_source_options*, options),
     MLN_JNI_RECORD(mln_buffer_view, attribution),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
@@ -1290,7 +1272,7 @@ static jint mln_map_set_geo_json_source_data_jni(
 ) {
   return (jint)mln_map_set_geo_json_source_data(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
-    (mln_geo_json_source_data)data,
+    MLN_JNI_RECORD(mln_buffer_view, data),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2445,10 +2427,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_frame_pacer_release", "(J)V", (void*)mln_frame_pacer_release_jni},
-  {"mln_geo_json_source_data_create", "(JJJJ)I",
-   (void*)mln_geo_json_source_data_create_jni},
-  {"mln_geo_json_source_data_release", "(J)V",
-   (void*)mln_geo_json_source_data_release_jni},
   {"mln_http_header_transform_response_set_header", "(JJJJ)I",
    (void*)mln_http_header_transform_response_set_header_jni},
   {"mln_lat_lng_for_projected_meters", "(JJJ)I",
@@ -2463,8 +2441,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_add_custom_geometry_source_jni},
   {"mln_map_add_custom_vector_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_vector_source_jni},
-  {"mln_map_add_geo_json_source_data", "(JJJJJJ)I",
-   (void*)mln_map_add_geo_json_source_data_jni},
+  {"mln_map_add_geo_json_source", "(JJJJJJ)I",
+   (void*)mln_map_add_geo_json_source_jni},
   {"mln_map_add_image_source_image", "(JJJJJJJ)I",
    (void*)mln_map_add_image_source_image_jni},
   {"mln_map_add_style_layer_json", "(JJJJJ)I",
@@ -2846,10 +2824,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
   {"mln_frame_pacer_release", "(J)V", (void*)mln_frame_pacer_release_jni},
-  {"mln_geo_json_source_data_create", "(JJJJ)I",
-   (void*)mln_geo_json_source_data_create_jni},
-  {"mln_geo_json_source_data_release", "(J)V",
-   (void*)mln_geo_json_source_data_release_jni},
   {"mln_http_header_transform_response_set_header", "(JJJJ)I",
    (void*)mln_http_header_transform_response_set_header_jni},
   {"mln_lat_lng_for_projected_meters", "(JJJ)I",
@@ -2864,8 +2838,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_add_custom_geometry_source_jni},
   {"mln_map_add_custom_vector_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_vector_source_jni},
-  {"mln_map_add_geo_json_source_data", "(JJJJJJ)I",
-   (void*)mln_map_add_geo_json_source_data_jni},
+  {"mln_map_add_geo_json_source", "(JJJJJJ)I",
+   (void*)mln_map_add_geo_json_source_jni},
   {"mln_map_add_image_source_image", "(JJJJJJJ)I",
    (void*)mln_map_add_image_source_image_jni},
   {"mln_map_add_style_layer_json", "(JJJJJ)I",

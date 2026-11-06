@@ -364,24 +364,10 @@ auto mln_map_list_style_sources(
   });
 }
 
-auto mln_geo_json_source_data_create(
-  mln_buffer_view data, const mln_geo_json_source_options* options,
-  mln_geo_json_source_data* out_data, mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::geojson_source_data_create(data, options, out_data);
-  });
-}
-
-auto mln_geo_json_source_data_release(mln_geo_json_source_data data) noexcept
-  -> void {
-  mln::core::geojson_source_data_release(data);
-}
-
-auto mln_map_add_geo_json_source_data(
-  mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
-  mln_buffer_view attribution, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
+auto mln_map_add_geo_json_source(
+  mln_map map, mln_buffer_view source_id,
+  const mln_geo_json_source_options* options, mln_buffer_view attribution,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
@@ -390,21 +376,16 @@ auto mln_map_add_geo_json_source_data(
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    // The lease taken at submit keeps the prepared index alive until the
-    // command runs, so the host may destroy the handle right after this call.
-    auto prepared = mln::core::geojson_source_data_table().lease(data);
-    if (prepared == nullptr) return mln::core::recorded_handle_fault_status();
+    auto native = mln::core::native_geojson_source_options(options);
+    if (!native) return MLN_STATUS_INVALID_ARGUMENT;
     auto id = OwnedView{source_id};
     auto owned_attribution = OwnedView{attribution};
     return submit_style_edit(
       map,
       [id = std::move(id), owned_attribution = std::move(owned_attribution),
-       prepared =
-         std::shared_ptr<const mln::core::GeoJsonSourceDataObject>{
-           std::move(prepared)
-         }](mln::core::MapObject& live) -> mln_status {
-        return mln::core::map_add_geojson_source_data(
-          live, id.view(), prepared, owned_attribution.view()
+       native = std::move(*native)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_add_geojson_source(
+          live, id.view(), native, owned_attribution.view()
         );
       },
       completion
@@ -440,30 +421,19 @@ auto mln_map_set_geo_json_source_url(
 }
 
 auto mln_map_set_geo_json_source_data(
-  mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_non_empty_view(source_id, "source_id")) {
+    if (
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_non_empty_view(data, "data")
+    ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    // The lease taken at submit keeps the prepared index alive until the
-    // command runs, so the host may destroy the handle right after this call.
-    auto prepared = mln::core::geojson_source_data_table().lease(data);
-    if (prepared == nullptr) return mln::core::recorded_handle_fault_status();
-    auto id = OwnedView{source_id};
-    return submit_style_edit(
-      map,
-      [id = std::move(id),
-       prepared =
-         std::shared_ptr<const mln::core::GeoJsonSourceDataObject>{
-           std::move(prepared)
-         }](mln::core::MapObject& live) -> mln_status {
-        return mln::core::map_set_geojson_source_data(
-          live, id.view(), prepared
-        );
-      },
-      completion
+    return mln::core::submit_geojson_source_data(
+      map, mln::core::string_from_view(source_id),
+      mln::core::string_from_view(data), completion
     );
   });
 }

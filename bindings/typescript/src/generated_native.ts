@@ -138,14 +138,6 @@ export interface NativeOperations {
     logicalSize: LogicalSize,
   ): CameraOptions;
   mln_frame_pacer_release(pacer: bigint, token: object | undefined): void;
-  mln_geo_json_source_data_create(
-    data: unknown,
-    options: GeoJsonSourceOptions | undefined,
-  ): bigint;
-  mln_geo_json_source_data_release(
-    data: bigint,
-    token: object | undefined,
-  ): void;
   mln_lat_lng_for_projected_meters(meters: ProjectedMeters): LatLng;
   mln_log_clear_callback(): void;
   mln_log_set_async_severity_mask(mask: LogSeverityFlag): void;
@@ -166,10 +158,10 @@ export interface NativeOperations {
     options: CustomVectorSourceOptions,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_add_geo_json_source_data(
+  mln_map_add_geo_json_source(
     map: bigint,
     sourceId: string,
-    data: bigint,
+    options: GeoJsonSourceOptions | undefined,
     attribution: string | undefined,
     completion: NativeCompletion | undefined,
   ): void;
@@ -586,7 +578,7 @@ export interface NativeOperations {
   mln_map_set_geo_json_source_data(
     map: bigint,
     sourceId: string,
-    data: bigint,
+    data: unknown,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_geo_json_source_synchronous_tiling(

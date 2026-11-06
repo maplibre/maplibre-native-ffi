@@ -110,34 +110,35 @@ private constructor(
     }
 
   /**
-   * Adds a GeoJSON source with prepared data.
+   * Adds a GeoJSON source with no data.
    *
-   * The source uses the options that `data` was prepared with. `data` can be released once this
-   * function returns.
+   * Give it data with `MapHandle.setGeoJsonSourceData()` or `MapHandle.setGeoJsonSourceUrl()`. Its
+   * options stay fixed for as long as the style holds it.
    *
    * `attribution` is the source's
    * &#91;attribution&#93;(https://maplibre.org/maplibre-style-spec/sources/#attribution), or empty
    * for none.
    *
-   * See `mln_map_add_geo_json_source_data` in the
+   * See `mln_map_add_geo_json_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
    * Errors:
    *
+   * - `Status.INVALID_ARGUMENT` when an option in `options` is out of range.
    * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun addGeoJsonSourceData(
+  public fun addGeoJsonSource(
     sourceId: String,
-    data: GeoJsonSourceDataHandle,
+    options: GeoJsonSourceOptions? = null,
     attribution: String? = null,
   ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
-        C.mln_map_add_geo_json_source_data(
+        C.mln_map_add_geo_json_source(
           handle,
           view(sourceId),
-          argument(data, data.binding),
+          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
           view(attribution),
           completion,
           diagnostic,
@@ -1467,8 +1468,13 @@ private constructor(
   /**
    * Replaces the data of a GeoJSON source.
    *
-   * `data` must have been prepared with the source's options, which `MapHandle.getStyleSource()`
-   * reports, though `min_zoom` may differ. `data` can be released once this function returns.
+   * `data` is a GeoJSON feature collection, feature, or geometry. The library prepares it for the
+   * source with the source's options, off the threads that the caller and the runtime use, and the
+   * command completes once the source holds it. Later commands don't wait for it. While the source
+   * is still preparing earlier data, only the newest data waits to follow it.
+   *
+   * With synchronous tiling on, as `MapHandle.setGeoJsonSourceSynchronousTiling()` describes, the
+   * command prepares `data` before later commands run, so the data shows in the next frame.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1476,20 +1482,21 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source, or `data`
-   *   was prepared with other options.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source, when
+   *   `data` isn't valid GeoJSON, or when the source clusters and `data` isn't a feature collection
+   *   of points. The source keeps its data.
+   * - `Status.CANCELLED` when newer data for the source replaces `data` while it waits, or when the
+   *   source's URL, its removal, a style load, or the map's release replaces the source's data
+   *   before `data` is ready.
    * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun setGeoJsonSourceData(
-    sourceId: String,
-    data: GeoJsonSourceDataHandle,
-  ): Completion<CommandCompletion> =
+  public fun setGeoJsonSourceData(sourceId: String, data: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
         C.mln_map_set_geo_json_source_data(
           handle,
           view(sourceId),
-          argument(data, data.binding),
+          view(data),
           completion,
           diagnostic,
         ),
@@ -2002,18 +2009,18 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
       )
     }
 
-  /** [MapHandle.addGeoJsonSourceData] without its completion. */
-  public fun addGeoJsonSourceData(
+  /** [MapHandle.addGeoJsonSource] without its completion. */
+  public fun addGeoJsonSource(
     sourceId: String,
-    data: GeoJsonSourceDataHandle,
+    options: GeoJsonSourceOptions? = null,
     attribution: String? = null,
   ): Unit =
     nativeDiscard(owner, binding) {
       check(
-        C.mln_map_add_geo_json_source_data(
+        C.mln_map_add_geo_json_source(
           handle,
           view(sourceId),
-          argument(data, data.binding),
+          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
           view(attribution),
           completion,
           diagnostic,
@@ -2393,13 +2400,13 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
     }
 
   /** [MapHandle.setGeoJsonSourceData] without its completion. */
-  public fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): Unit =
+  public fun setGeoJsonSourceData(sourceId: String, data: String): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_geo_json_source_data(
           handle,
           view(sourceId),
-          argument(data, data.binding),
+          view(data),
           completion,
           diagnostic,
         ),

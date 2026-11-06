@@ -6,7 +6,6 @@ from ._future import completed_future
 from ._generated_operations import (
     _AcquiredFrameHandleOperations,
     _FramePacerHandleOperations,
-    _GeoJsonSourceDataHandleOperations,
     _MapHandleOperations,
     _MapProjectionHandleOperations,
     _OffscreenDeviceHandleOperations,
@@ -55,32 +54,6 @@ class FramePacerHandle(_FramePacerHandleOperations, ScopedHandleMixin):
 
     __module__ = "maplibre_native_ffi"
     _handle_name = "FramePacerHandle"
-
-    def __init__(self):
-        raise TypeError("native handles are returned by their owning operations")
-
-    @classmethod
-    def _from_native(cls, native, parent=None):
-        owner = cls.__new__(cls)
-        owner._native = native
-        owner._parent = parent
-        return owner
-
-    @property
-    def id(self) -> int:
-        """The native handle value. It stays readable after release."""
-        return int(self._native.id)
-
-
-class GeoJsonSourceDataHandle(_GeoJsonSourceDataHandleOperations, ScopedHandleMixin):
-    """GeoJSON data, parsed and ready to add to a GeoJSON source.
-
-    See `mln_geo_json_source_data` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    """
-
-    __module__ = "maplibre_native_ffi"
-    _handle_name = "GeoJsonSourceDataHandle"
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")

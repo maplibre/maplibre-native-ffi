@@ -2,7 +2,6 @@
 // tests, which never run them.
 package org.maplibre.nativeffi.docsnippets
 
-import org.maplibre.nativeffi.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.PremultipliedRgba8Image
 import org.maplibre.nativeffi.RuntimeEventHandler
@@ -45,21 +44,11 @@ private suspend fun style(map: MapHandle, pixels: ByteArray) {
   // #endregion add
 
   // #region geojson
-  val data =
-    GeoJsonSourceDataHandle.create(
-      """{"type": "Point", "coordinates": [-122.4, 37.8]}""",
-    )
-  map.discarding.addGeoJsonSourceData("points", data)
-  // The source keeps its own reference to the data.
-  data.release()
-
-  // Later, prepare new data with the same options, and set it.
-  val next =
-    GeoJsonSourceDataHandle.create(
-      """{"type": "Point", "coordinates": [2.35, 48.86]}""",
-    )
-  map.discarding.setGeoJsonSourceData("points", next)
-  next.release()
+  map.discarding.addGeoJsonSource("points")
+  map.discarding.setGeoJsonSourceData(
+    "points",
+    """{"type": "Point", "coordinates": [-122.4, 37.8]}""",
+  )
   // #endregion geojson
 
   // #region set-property

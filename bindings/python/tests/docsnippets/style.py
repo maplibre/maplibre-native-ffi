@@ -36,18 +36,10 @@ def style(map_handle: mln.MapHandle, pixels: bytes) -> None:
     # #endregion add
 
     # #region geojson
-    # The source keeps its own reference to
-    # the data, so the block can release it.
-    with mln.GeoJsonSourceDataHandle.create(
-        {"type": "Point", "coordinates": [-122.4, 37.8]}
-    ) as data:
-        map_handle.discarding.add_geo_json_source_data("points", data)
-
-    # Later, prepare new data with the same options, and set it.
-    with mln.GeoJsonSourceDataHandle.create(
-        {"type": "Point", "coordinates": [2.35, 48.86]}
-    ) as data:
-        map_handle.discarding.set_geo_json_source_data("points", data)
+    map_handle.discarding.add_geo_json_source("points")
+    map_handle.discarding.set_geo_json_source_data(
+        "points", {"type": "Point", "coordinates": [-122.4, 37.8]}
+    )
     # #endregion geojson
 
     # #region set-property

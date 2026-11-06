@@ -12,7 +12,9 @@
 #include <vector>
 
 #include <mln/style/image.hpp>
+#include <mln/style/sources/geojson_source.hpp>
 #include <mln/util/feature.hpp>
+#include <mln/util/immutable.hpp>
 
 #include "completion/completion_result.hpp"
 #include "maplibre_native_c.h"
@@ -27,7 +29,6 @@ class UpdateParameters;
 
 namespace mln::core {
 
-struct GeoJsonSourceDataObject;
 struct MapObject;
 struct FeatureStateSnapshot;
 
@@ -334,18 +335,40 @@ auto map_set_style_source_volatile(
 auto map_list_style_sources(
   MapObject& live, std::vector<StyleSourceRecord>& out_sources
 ) -> mln_status;
-auto map_add_geojson_source_data(
+auto map_add_geojson_source(
   MapObject& live, mln_buffer_view source_id,
-  const std::shared_ptr<const GeoJsonSourceDataObject>& data,
+  const mln::Immutable<mln::style::GeoJSONOptions>& options,
   mln_buffer_view attribution
 ) -> mln_status;
 auto map_set_geojson_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status;
-auto map_set_geojson_source_data(
-  MapObject& live, mln_buffer_view source_id,
-  const std::shared_ptr<const GeoJsonSourceDataObject>& data
+// What replacing a GeoJSON source's data needs from the source.
+struct GeoJsonSourceTarget {
+  std::optional<mln::Immutable<mln::style::GeoJSONOptions>> options;
+  bool synchronous = false;
+};
+auto map_find_geojson_source(
+  MapObject& live, const std::string& source_id, GeoJsonSourceTarget& out_target
 ) -> mln_status;
+auto map_install_geojson_source_data(
+  MapObject& live, const std::string& source_id,
+  std::shared_ptr<mln::style::GeoJSONData> data
+) -> mln_status;
+// Replaces a GeoJSON source's data with `data`, as
+// mln_map_set_geo_json_source_data() describes.
+auto submit_geojson_source_data(
+  mln_map map, std::string source_id, std::string data,
+  const mln_completion* completion
+) -> mln_status;
+// Cancels the data that the source named `source_id` waits for, if any, or
+// that every source waits for. Run on the runtime worker, and complete the
+// cancelled commands from a later task.
+auto cancel_geojson_source_update(
+  MapObject& live, const std::string& source_id, const char* reason
+) noexcept -> void;
+auto cancel_geojson_source_updates(MapObject& live, const char* reason) noexcept
+  -> void;
 auto map_set_geojson_source_synchronous_tiling(
   MapObject& live, mln_buffer_view source_id, bool enabled
 ) -> mln_status;

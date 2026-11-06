@@ -129,17 +129,6 @@ internal static unsafe partial class NativeMethods
     internal static partial void mln_frame_pacer_release(MlnFramePacer pacer);
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_geo_json_source_data_create(
-        mln_buffer_view data,
-        mln_geo_json_source_options* options,
-        MlnGeoJsonSourceData* out_data,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial void mln_geo_json_source_data_release(MlnGeoJsonSourceData data);
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_http_header_transform_response_set_header(
         mln_http_header_transform_response* response,
         mln_buffer_view name,
@@ -196,10 +185,10 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_add_geo_json_source_data(
+    internal static partial mln_status mln_map_add_geo_json_source(
         MlnMap map,
         mln_buffer_view source_id,
-        MlnGeoJsonSourceData data,
+        mln_geo_json_source_options* options,
         mln_buffer_view attribution,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
@@ -888,7 +877,7 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_set_geo_json_source_data(
         MlnMap map,
         mln_buffer_view source_id,
-        MlnGeoJsonSourceData data,
+        mln_buffer_view data,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

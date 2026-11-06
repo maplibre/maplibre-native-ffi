@@ -6,7 +6,6 @@ import {
   CameraTransitionOutcome,
   type CameraTransitionEnd,
   CameraUpdateMode,
-  GeoJsonSourceDataHandle,
   type LatLng,
   MaplibreError,
   MapProjectionHandle,
@@ -144,20 +143,17 @@ test("JSON crosses as JSON.stringify and JSON.parse values", async () => {
 });
 
 test("integer narrowing is checked and 64-bit carriers round-trip", async () => {
+  const fixture = await openRuntime();
+  const map = await fixture.openStyledMap();
   // A value outside a 32-bit field's range is rejected before it crosses,
   // rather than truncated into a valid one.
-  assert.throws(
-    () =>
-      GeoJsonSourceDataHandle.create(
-        { type: "FeatureCollection", features: [] },
-        { buffer: 2 ** 32 },
-      ),
+  await assert.rejects(
+    map.addGeoJsonSource("points", { buffer: 2 ** 32 }),
     (error) =>
       error instanceof RangeError &&
       error.message ===
         "options.buffer: expected an integer from 0 to 4294967295",
   );
-  const fixture = await openRuntime();
   await assert.rejects(
     fixture.runtime.setMaximumAmbientCacheSize(-1n),
     (error) =>
@@ -167,7 +163,6 @@ test("integer narrowing is checked and 64-bit carriers round-trip", async () => 
 
   // Cancelling the largest identity ends the ease that carries it, so the
   // identity crossed whole both times.
-  const map = await fixture.openStyledMap();
   const maximum = 2n ** 64n - 1n;
   let end!: (value: CameraTransitionEnd) => void;
   const ended = new Promise<CameraTransitionEnd>((resolve) => (end = resolve));

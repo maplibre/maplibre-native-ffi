@@ -37,19 +37,10 @@ namespace Style {
 		// #endregion add
 
 		// #region geojson
-		// The source keeps its own reference to the data.
-		var data = new GeoJsonSourceData.create (
-			"""{"type": "Point", "coordinates": [-122.4, 37.8]}""",
-			null
+		map.add_geo_json_source_async.begin ("points", null, null);
+		map.set_geo_json_source_data_async.begin (
+			"points", """{"type": "Point", "coordinates": [-122.4, 37.8]}"""
 		);
-		map.add_geo_json_source_data_async.begin ("points", data, null);
-
-		// Later, prepare new data with the same options, and set it.
-		var moved = new GeoJsonSourceData.create (
-			"""{"type": "Point", "coordinates": [2.35, 48.86]}""",
-			null
-		);
-		map.set_geo_json_source_data_async.begin ("points", moved);
 		// #endregion geojson
 
 		// #region set-property

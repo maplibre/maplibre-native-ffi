@@ -45,19 +45,11 @@ internal static class Style
         // #endregion add
 
         // #region geojson
-        var data = GeoJsonSourceDataHandle.Create(
+        map.Discarding.AddGeoJsonSource("points");
+        map.Discarding.SetGeoJsonSourceData(
+            "points",
             """{"type":"Point","coordinates":[-122.4,37.8]}"""
         );
-        map.Discarding.AddGeoJsonSourceData("points", data);
-        // The source keeps its own reference to the data.
-        data.Release();
-
-        // Later, prepare new data with the same options, and set it.
-        var next = GeoJsonSourceDataHandle.Create(
-            """{"type":"Point","coordinates":[2.35,48.86]}"""
-        );
-        map.Discarding.SetGeoJsonSourceData("points", next);
-        next.Release();
         // #endregion geojson
 
         // #region set-property

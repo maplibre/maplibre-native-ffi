@@ -29,16 +29,6 @@ struct _MaplibreNativeFfiFramePacer {
   MaplibreNativeFfiReady* ready;
 };
 
-struct _MaplibreNativeFfiGeoJsonSourceData {
-  GObject parent_instance;
-  mln_geo_json_source_data handle;
-  mln_geo_json_source_data released_handle;
-  // The object of the handle's parent, which outlives it.
-  GObject* parent;
-  gboolean borrowed;
-  MaplibreNativeFfiReady* ready;
-};
-
 struct _MaplibreNativeFfiMap {
   GObject parent_instance;
   mln_map handle;
@@ -794,102 +784,6 @@ void maplibre_native_ffi_frame_pacer_release(
 }
 
 G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiGeoJsonSourceData, maplibre_native_ffi_geo_json_source_data,
-  G_TYPE_OBJECT
-)
-
-static void maplibre_native_ffi_geo_json_source_data_object_dispose(
-  GObject* object
-) {
-  MaplibreNativeFfiGeoJsonSourceData* self =
-    MAPLIBRE_NATIVE_FFI_GEO_JSON_SOURCE_DATA(object);
-  if (self->handle != MLN_HANDLE_NULL) {
-    (void)mln_geo_json_source_data_release(self->handle);
-    self->handle = MLN_HANDLE_NULL;
-  }
-  g_clear_object(&self->parent);
-  g_clear_pointer(&self->ready, maplibre_native_ffi_ready_unref);
-  G_OBJECT_CLASS(maplibre_native_ffi_geo_json_source_data_parent_class)
-    ->dispose(object);
-}
-
-static void maplibre_native_ffi_geo_json_source_data_class_init(
-  MaplibreNativeFfiGeoJsonSourceDataClass* klass
-) {
-  G_OBJECT_CLASS(klass)->dispose =
-    maplibre_native_ffi_geo_json_source_data_object_dispose;
-}
-
-static void maplibre_native_ffi_geo_json_source_data_init(
-  MaplibreNativeFfiGeoJsonSourceData* self
-) {
-  self->handle = MLN_HANDLE_NULL;
-  self->released_handle = MLN_HANDLE_NULL;
-}
-
-MaplibreNativeFfiGeoJsonSourceData*
-maplibre_native_ffi_geo_json_source_data_wrap(
-  mln_geo_json_source_data handle, gpointer parent, gboolean borrowed,
-  MaplibreNativeFfiReady* ready
-) {
-  MaplibreNativeFfiGeoJsonSourceData* self =
-    g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_GEO_JSON_SOURCE_DATA, NULL);
-  self->handle = handle;
-  self->parent = parent != NULL ? g_object_ref(G_OBJECT(parent)) : NULL;
-  self->borrowed = borrowed;
-  if (ready != NULL) {
-    // The wrapper takes its own reference, which the caller keeps.
-    self->ready = maplibre_native_ffi_ready_ref(ready);
-  }
-  return self;
-}
-
-guint64 maplibre_native_ffi_geo_json_source_data_get_id(
-  MaplibreNativeFfiGeoJsonSourceData* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_DATA(self), 0);
-  return (guint64)(self->handle != MLN_HANDLE_NULL ? self->handle
-                                                   : self->released_handle);
-}
-
-MaplibreNativeFfiGeoJsonSourceData*
-maplibre_native_ffi_geo_json_source_data_create(
-  const char* data, MaplibreNativeFfiGeoJsonSourceOptions* options,
-  GError** error
-) {
-  g_return_val_if_fail(
-    options == NULL || MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_OPTIONS(options),
-    NULL
-  );
-  g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  mln_geo_json_source_options options_native_;
-  if (options != NULL)
-    maplibre_native_ffi_geo_json_source_options_to_native(
-      options, &options_native_, NULL
-    );
-  mln_geo_json_source_data out_data_ = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_geo_json_source_data_create(
-    maplibre_native_ffi_text_view(data),
-    (options != NULL ? &options_native_ : NULL), &out_data_, &diagnostic_
-  );
-  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
-    return NULL;
-  }
-  return maplibre_native_ffi_geo_json_source_data_wrap(
-    out_data_, NULL, FALSE, NULL
-  );
-}
-
-void maplibre_native_ffi_geo_json_source_data_release(
-  MaplibreNativeFfiGeoJsonSourceData* self
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_DATA(self));
-  mln_geo_json_source_data_release(self->handle);
-  self->handle = MLN_HANDLE_NULL;
-}
-
-G_DEFINE_FINAL_TYPE(
   MaplibreNativeFfiMap, maplibre_native_ffi_map, G_TYPE_OBJECT
 )
 
@@ -1012,26 +906,33 @@ maplibre_native_ffi_map_add_custom_vector_source_finish(
   return g_task_propagate_pointer(G_TASK(result), error);
 }
 
-void maplibre_native_ffi_map_add_geo_json_source_data_async(
+void maplibre_native_ffi_map_add_geo_json_source_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  MaplibreNativeFfiGeoJsonSourceData* data, const char* attribution,
+  MaplibreNativeFfiGeoJsonSourceOptions* options, const char* attribution,
   GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_DATA(data));
+  g_return_if_fail(
+    options == NULL || MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_OPTIONS(options)
+  );
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
-    &async_, self, maplibre_native_ffi_map_add_geo_json_source_data_async,
-    callback, user_data, TRUE
+    &async_, self, maplibre_native_ffi_map_add_geo_json_source_async, callback,
+    user_data, TRUE
   );
+  mln_geo_json_source_options options_native_;
+  if (options != NULL)
+    maplibre_native_ffi_geo_json_source_options_to_native(
+      options, &options_native_, &async_.call
+    );
   if (!maplibre_native_ffi_async_begin(
         &async_, maplibre_native_ffi_command_decode,
         (GDestroyNotify)maplibre_native_ffi_command_completion_free
       ))
     return;
-  mln_status status_ = mln_map_add_geo_json_source_data(
+  mln_status status_ = mln_map_add_geo_json_source(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (data != NULL ? data->handle : MLN_HANDLE_NULL),
+    (options != NULL ? &options_native_ : NULL),
     maplibre_native_ffi_text_view(attribution), async_.completion_argument,
     &async_.diagnostic
   );
@@ -1039,7 +940,7 @@ void maplibre_native_ffi_map_add_geo_json_source_data_async(
 }
 
 MaplibreNativeFfiCommandCompletion*
-maplibre_native_ffi_map_add_geo_json_source_data_finish(
+maplibre_native_ffi_map_add_geo_json_source_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
 ) {
   g_return_val_if_fail(g_task_is_valid(result, self), NULL);
@@ -3309,12 +3210,10 @@ maplibre_native_ffi_map_set_free_camera_options_finish(
 }
 
 void maplibre_native_ffi_map_set_geo_json_source_data_async(
-  MaplibreNativeFfiMap* self, const char* source_id,
-  MaplibreNativeFfiGeoJsonSourceData* data, GAsyncReadyCallback callback,
-  gpointer user_data
+  MaplibreNativeFfiMap* self, const char* source_id, const char* data,
+  GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_DATA(data));
   MaplibreNativeFfiAsync async_;
   maplibre_native_ffi_async_init(
     &async_, self, maplibre_native_ffi_map_set_geo_json_source_data_async,
@@ -3327,7 +3226,7 @@ void maplibre_native_ffi_map_set_geo_json_source_data_async(
     return;
   mln_status status_ = mln_map_set_geo_json_source_data(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (data != NULL ? data->handle : MLN_HANDLE_NULL), async_.completion_argument,
+    maplibre_native_ffi_text_view(data), async_.completion_argument,
     &async_.diagnostic
   );
   maplibre_native_ffi_async_end(&async_, status_);

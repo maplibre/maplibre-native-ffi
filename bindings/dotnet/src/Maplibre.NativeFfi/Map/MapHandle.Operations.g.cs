@@ -148,18 +148,21 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Adds a GeoJSON source with prepared data.
+    /// Adds a GeoJSON source with no data.
     /// </summary>
     /// <remarks>
-    /// <para>The source uses the options that <c>data</c> was prepared with.
-    /// <c>data</c> can be released once this function returns.</para>
+    /// <para>Give it data with <c>MapHandle.SetGeoJsonSourceDataAsync()</c> or
+    /// <c>MapHandle.SetGeoJsonSourceUrlAsync()</c>. Its options stay fixed for
+    /// as long as the style holds it.</para>
     /// <para><c>attribution</c> is the source's
     /// [attribution](https://maplibre.org/maplibre-style-spec/sources/#attribution),
     /// or empty for none.</para>
-    /// <para>See <c>mln_map_add_geo_json_source_data</c> in the <see
+    /// <para>See <c>mln_map_add_geo_json_source</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when an option in
+    /// <c>options</c> is out of range.</description></item>
     /// <item><description><c>Status.AlreadyExists</c> when the style already
     /// has a source named <c>sourceId</c>.</description></item>
     /// <item><description><c>Status.InvalidState</c> while the style isn't
@@ -167,18 +170,21 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// describes.</description></item>
     /// </list>
     /// </remarks>
-    public Task<CommandCompletion> AddGeoJsonSourceDataAsync(
+    public Task<CommandCompletion> AddGeoJsonSourceAsync(
         string sourceId,
-        GeoJsonSourceDataHandle data,
+        GeoJsonSourceOptions? options = null,
         string? attribution = null
     )
     {
         using var scope = new NativeCallScope(this);
+        var nativeOptions = options is null
+            ? default(mln_geo_json_source_options)
+            : NativeGeoJsonSourceOptions(options, scope);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_add_geo_json_source_data(
+        var nativeStatus = NativeMethods.mln_map_add_geo_json_source(
             Handle,
             scope.Utf8(sourceId),
-            scope.Use(data),
+            options is null ? null : &nativeOptions,
             attribution is null ? default : scope.Utf8(attribution),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2530,10 +2536,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Replaces the data of a GeoJSON source.
     /// </summary>
     /// <remarks>
-    /// <para><c>data</c> must have been prepared with the source's options,
-    /// which <c>MapHandle.GetStyleSourceAsync()</c> reports, though
-    /// <c>min_zoom</c> may differ. <c>data</c> can be released once this
-    /// function returns.</para>
+    /// <para><c>data</c> is a GeoJSON feature collection, feature, or geometry.
+    /// The library prepares it for the source with the source's options, off
+    /// the threads that the caller and the runtime use, and the command
+    /// completes once the source holds it. Later commands don't wait for it.
+    /// While the source is still preparing earlier data, only the newest data
+    /// waits to follow it.</para>
+    /// <para>With synchronous tiling on, as
+    /// <c>MapHandle.SetGeoJsonSourceSynchronousTilingAsync()</c> describes, the
+    /// command prepares <c>data</c> before later commands run, so the data
+    /// shows in the next frame.</para>
     /// <para>See <c>mln_map_set_geo_json_source_data</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -2541,24 +2553,26 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <item><description><c>Status.NotFound</c> when the style has no source
     /// named <c>sourceId</c>.</description></item>
     /// <item><description><c>Status.InvalidArgument</c> when the source named
-    /// <c>sourceId</c> isn't a GeoJSON source, or <c>data</c> was prepared with
-    /// other options.</description></item>
+    /// <c>sourceId</c> isn't a GeoJSON source, when <c>data</c> isn't valid
+    /// GeoJSON, or when the source clusters and <c>data</c> isn't a feature
+    /// collection of points. The source keeps its data.</description></item>
+    /// <item><description><c>Status.Cancelled</c> when newer data for the
+    /// source replaces <c>data</c> while it waits, or when the source's URL,
+    /// its removal, a style load, or the map's release replaces the source's
+    /// data before <c>data</c> is ready.</description></item>
     /// <item><description><c>Status.InvalidState</c> while the style isn't
     /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
     /// describes.</description></item>
     /// </list>
     /// </remarks>
-    public Task<CommandCompletion> SetGeoJsonSourceDataAsync(
-        string sourceId,
-        GeoJsonSourceDataHandle data
-    )
+    public Task<CommandCompletion> SetGeoJsonSourceDataAsync(string sourceId, string data)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_geo_json_source_data(
             Handle,
             scope.Utf8(sourceId),
-            scope.Use(data),
+            scope.Utf8(data),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -3191,19 +3205,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddGeoJsonSourceData(
+        public void AddGeoJsonSource(
             string sourceId,
-            GeoJsonSourceDataHandle data,
+            GeoJsonSourceOptions? options = null,
             string? attribution = null
         )
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
+            var nativeOptions = options is null
+                ? default(mln_geo_json_source_options)
+                : NativeGeoJsonSourceOptions(options, scope);
             Check(
-                NativeMethods.mln_map_add_geo_json_source_data(
+                NativeMethods.mln_map_add_geo_json_source(
                     receiverHandle,
                     scope.Utf8(sourceId),
-                    scope.Use(data),
+                    options is null ? null : &nativeOptions,
                     attribution is null ? default : scope.Utf8(attribution),
                     null,
                     Diagnostic
@@ -3707,7 +3724,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetGeoJsonSourceData(string sourceId, GeoJsonSourceDataHandle data)
+        public void SetGeoJsonSourceData(string sourceId, string data)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -3715,7 +3732,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_set_geo_json_source_data(
                     receiverHandle,
                     scope.Utf8(sourceId),
-                    scope.Use(data),
+                    scope.Utf8(data),
                     null,
                     Diagnostic
                 )

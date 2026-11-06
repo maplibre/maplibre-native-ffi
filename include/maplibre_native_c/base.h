@@ -110,11 +110,6 @@ typedef uint64_t mln_map MLN_BINDING(
   "kind=handle;release=mln_map_release;parent=mln_runtime;"
   "dispose=mln_map_dispose"
 );
-/** GeoJSON data, parsed and ready to add to a GeoJSON source. */
-typedef uint64_t mln_geo_json_source_data MLN_BINDING(
-  "kind=handle;release=mln_geo_json_source_data_release;"
-  "dispose=mln_geo_json_source_data_release"
-);
 /** A parsed style expression. */
 typedef uint64_t mln_style_expression MLN_BINDING(
   "kind=handle;release=mln_style_expression_release;"

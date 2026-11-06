@@ -74,39 +74,41 @@ impl MapHandle {
         })
     }
 
-    /// Adds a GeoJSON source with prepared data.
+    /// Adds a GeoJSON source with no data.
     ///
-    /// The source uses the options that `data` was prepared with. `data` can be
-    /// released once this function returns.
+    /// Give it data with `MapHandle::set_geo_json_source_data()` or
+    /// `MapHandle::set_geo_json_source_url()`. Its options stay fixed for as
+    /// long as the style holds it.
     ///
     /// `attribution` is the source's
     /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
     /// or empty for none.
     ///
-    /// See `mln_map_add_geo_json_source_data` in the
+    /// See `mln_map_add_geo_json_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     ///
     /// # Errors
     ///
+    /// - `Status::InvalidArgument` when an option in `options` is out of range.
     /// - `Status::AlreadyExists` when the style already has a source named
     ///   `source_id`.
     /// - `Status::InvalidState` while the style isn't loaded, as
     ///   `MapHandle::set_style_url()` describes.
-    pub fn add_geo_json_source_data(
+    pub fn add_geo_json_source(
         &self,
         source_id: &str,
-        data: &GeoJsonSourceDataHandle,
+        options: Option<&GeoJsonSourceOptions>,
         attribution: Option<&str>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
-        let data = data.inner.native();
         let source_id = call.input(&source_id)?;
+        let options = call.optional_reference(options.as_ref())?;
         let attribution = call.input(&attribution)?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geo_json_source_data(
+            sys::mln_map_add_geo_json_source(
                 map,
                 source_id,
-                data,
+                options,
                 attribution,
                 completion,
                 out_diagnostic,
@@ -2275,9 +2277,17 @@ impl MapHandle {
 
     /// Replaces the data of a GeoJSON source.
     ///
-    /// `data` must have been prepared with the source's options, which
-    /// `MapHandle::get_style_source()` reports, though `min_zoom` may differ.
-    /// `data` can be released once this function returns.
+    /// `data` is a GeoJSON feature collection, feature, or geometry. The
+    /// library prepares it for the source with the source's options, off the
+    /// threads that the caller and the runtime use, and the command completes
+    /// once the source holds it. Later commands don't wait for it. While the
+    /// source is still preparing earlier data, only the newest data waits to
+    /// follow it.
+    ///
+    /// With synchronous tiling on, as
+    /// `MapHandle::set_geo_json_source_synchronous_tiling()` describes, the
+    /// command prepares `data` before later commands run, so the data shows in
+    /// the next frame.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2286,17 +2296,23 @@ impl MapHandle {
     ///
     /// - `Status::NotFound` when the style has no source named `source_id`.
     /// - `Status::InvalidArgument` when the source named `source_id` isn't a
-    ///   GeoJSON source, or `data` was prepared with other options.
+    ///   GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+    ///   clusters and `data` isn't a feature collection of points. The source
+    ///   keeps its data.
+    /// - `Status::Cancelled` when newer data for the source replaces `data`
+    ///   while it waits, or when the source's URL, its removal, a style load,
+    ///   or the map's release replaces the source's data before `data` is
+    ///   ready.
     /// - `Status::InvalidState` while the style isn't loaded, as
     ///   `MapHandle::set_style_url()` describes.
     pub fn set_geo_json_source_data(
         &self,
         source_id: &str,
-        data: &GeoJsonSourceDataHandle,
+        data: &str,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
-        let data = data.inner.native();
         let source_id = call.input(&source_id)?;
+        let data = call.input(&data)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
         })
@@ -2831,32 +2847,37 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Adds a GeoJSON source with prepared data.
+    /// Adds a GeoJSON source with no data.
     ///
-    /// The source uses the options that `data` was prepared with. `data` can be
-    /// released once this function returns.
+    /// Give it data with `MapHandle::set_geo_json_source_data()` or
+    /// `MapHandle::set_geo_json_source_url()`. Its options stay fixed for as
+    /// long as the style holds it.
     ///
     /// `attribution` is the source's
     /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
     /// or empty for none.
     ///
-    /// See `mln_map_add_geo_json_source_data` in the
+    /// See `mln_map_add_geo_json_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn add_geo_json_source_data(
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when an option in `options` is out of range.
+    pub fn add_geo_json_source(
         &self,
         source_id: &str,
-        data: &GeoJsonSourceDataHandle,
+        options: Option<&GeoJsonSourceOptions>,
         attribution: Option<&str>,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
-        let data = data.inner.native();
         let source_id = call.input(&source_id)?;
+        let options = call.optional_reference(options.as_ref())?;
         let attribution = call.input(&attribution)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geo_json_source_data(
+            sys::mln_map_add_geo_json_source(
                 map,
                 source_id,
-                data,
+                options,
                 attribution,
                 completion,
                 out_diagnostic,
@@ -3512,20 +3533,24 @@ impl MapHandleDiscarding<'_> {
 
     /// Replaces the data of a GeoJSON source.
     ///
-    /// `data` must have been prepared with the source's options, which
-    /// `MapHandle::get_style_source()` reports, though `min_zoom` may differ.
-    /// `data` can be released once this function returns.
+    /// `data` is a GeoJSON feature collection, feature, or geometry. The
+    /// library prepares it for the source with the source's options, off the
+    /// threads that the caller and the runtime use, and the command completes
+    /// once the source holds it. Later commands don't wait for it. While the
+    /// source is still preparing earlier data, only the newest data waits to
+    /// follow it.
+    ///
+    /// With synchronous tiling on, as
+    /// `MapHandle::set_geo_json_source_synchronous_tiling()` describes, the
+    /// command prepares `data` before later commands run, so the data shows in
+    /// the next frame.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_geo_json_source_data(
-        &self,
-        source_id: &str,
-        data: &GeoJsonSourceDataHandle,
-    ) -> Result<()> {
+    pub fn set_geo_json_source_data(&self, source_id: &str, data: &str) -> Result<()> {
         let mut call = self.0.inner.call();
-        let data = data.inner.native();
         let source_id = call.input(&source_id)?;
+        let data = call.input(&data)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
         })

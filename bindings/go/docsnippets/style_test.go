@@ -53,28 +53,13 @@ func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	// #endregion add
 
 	// #region geojson
-	data, err := maplibre.NewGeoJSONSourceData(
-		`{"type": "Point", "coordinates": [-122.4, 37.8]}`, nil,
+	err = m.Discarding().AddGeoJSONSource("points", nil, "")
+	if err != nil {
+		return err
+	}
+	err = m.Discarding().SetGeoJSONSourceData(
+		"points", `{"type": "Point", "coordinates": [-122.4, 37.8]}`,
 	)
-	if err != nil {
-		return err
-	}
-	// The source keeps its own reference to the data.
-	defer data.Release()
-	err = m.Discarding().AddGeoJSONSourceData("points", data, "")
-	if err != nil {
-		return err
-	}
-
-	// Later, prepare new data with the same options, and set it.
-	next, err := maplibre.NewGeoJSONSourceData(
-		`{"type": "Point", "coordinates": [2.35, 48.86]}`, nil,
-	)
-	if err != nil {
-		return err
-	}
-	defer next.Release()
-	err = m.Discarding().SetGeoJSONSourceData("points", next)
 	if err != nil {
 		return err
 	}

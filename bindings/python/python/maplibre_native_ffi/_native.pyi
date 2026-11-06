@@ -29,15 +29,6 @@ class _FramePacerHandle:
     def _dispose(self) -> Any: ...
     def release(self) -> Any: ...
 
-class _GeoJsonSourceDataHandle:
-    _is_closed: bool
-    _is_borrowed: bool
-    id: int
-    @staticmethod
-    def create(data: Any, options: GeoJsonSourceOptions | None = None) -> Any: ...
-    def _dispose(self) -> Any: ...
-    def release(self) -> Any: ...
-
 class _MapHandle:
     _is_closed: bool
     _is_borrowed: bool
@@ -54,16 +45,16 @@ class _MapHandle:
     def _discard_add_custom_vector_source(
         self, source_id: str, options: CustomVectorSourceOptions
     ) -> None: ...
-    def add_geo_json_source_data(
+    def add_geo_json_source(
         self,
         source_id: str,
-        data: _GeoJsonSourceDataHandle,
+        options: GeoJsonSourceOptions | None = None,
         attribution: str | None = None,
     ) -> Future[CommandCompletion]: ...
-    def _discard_add_geo_json_source_data(
+    def _discard_add_geo_json_source(
         self,
         source_id: str,
-        data: _GeoJsonSourceDataHandle,
+        options: GeoJsonSourceOptions | None = None,
         attribution: str | None = None,
     ) -> None: ...
     def add_image_source_image(
@@ -317,11 +308,9 @@ class _MapHandle:
     ) -> Future[CommandCompletion]: ...
     def _discard_set_free_camera_options(self, options: FreeCameraOptions) -> None: ...
     def set_geo_json_source_data(
-        self, source_id: str, data: _GeoJsonSourceDataHandle
+        self, source_id: str, data: Any
     ) -> Future[CommandCompletion]: ...
-    def _discard_set_geo_json_source_data(
-        self, source_id: str, data: _GeoJsonSourceDataHandle
-    ) -> None: ...
+    def _discard_set_geo_json_source_data(self, source_id: str, data: Any) -> None: ...
     def set_geo_json_source_synchronous_tiling(
         self, source_id: str, enabled: bool
     ) -> Future[CommandCompletion]: ...

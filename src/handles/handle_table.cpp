@@ -53,8 +53,6 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_acquired_frame";
     case HandleKind::RenderFrameBatch:
       return "mln_render_frame_batch";
-    case HandleKind::GeoJsonSourceData:
-      return "mln_geo_json_source_data";
     case HandleKind::DeliveryQueue:
       return "mln_delivery_queue";
     case HandleKind::StyleExpression:

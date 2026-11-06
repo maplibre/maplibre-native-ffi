@@ -60,54 +60,6 @@ internal fun NativeArena.writeLogicalSize(value: LogicalSize): Long =
   allocate(8, 4).also { putLogicalSize(it, value) }
 
 @JvmSynthetic
-internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSourceOptions) {
-  writeU32(target, w(72, 80, 68).toUInt())
-  var fields = 0u
-  value.minZoom?.let {
-    fields = fields or 1u
-    writeF64(target + 8, it)
-  }
-  value.maxZoom?.let {
-    fields = fields or 2u
-    writeF64(target + 16, it)
-  }
-  value.tolerance?.let {
-    fields = fields or 4u
-    writeF64(target + 24, it)
-  }
-  value.clusterMaxZoom?.let {
-    fields = fields or 8u
-    writeF64(target + 32, it)
-  }
-  putView(target + 40, value.clusterProperties)
-  value.buffer?.let {
-    fields = fields or 16u
-    writeU32(target + w(48, 56), it)
-  }
-  value.clusterRadius?.let {
-    fields = fields or 32u
-    writeU32(target + w(52, 60), it)
-  }
-  value.clusterMinPoints?.let {
-    fields = fields or 64u
-    writeU64(target + w(56, 64), it)
-  }
-  value.lineMetrics?.let {
-    fields = fields or 128u
-    writeBool(target + w(64, 72), it)
-  }
-  value.cluster?.let {
-    fields = fields or 256u
-    writeBool(target + w(65, 73), it)
-  }
-  writeU32(target + 4, fields)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeGeoJsonSourceOptions(value: GeoJsonSourceOptions): Long =
-  allocate(w(72, 80, 68), w(8, 8, 4)).also { putGeoJsonSourceOptions(it, value) }
-
-@JvmSynthetic
 internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters) {
   writeF64(target, value.northing)
   writeF64(target + 8, value.easting)
@@ -316,6 +268,54 @@ internal fun NativeCall.putCustomVectorSourceOptions(
 @JvmSynthetic
 internal fun NativeCall.writeCustomVectorSourceOptions(value: CustomVectorSourceOptions): Long =
   allocate(w(56, 64, 48), w(8, 8, 4)).also { putCustomVectorSourceOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSourceOptions) {
+  writeU32(target, w(72, 80, 68).toUInt())
+  var fields = 0u
+  value.minZoom?.let {
+    fields = fields or 1u
+    writeF64(target + 8, it)
+  }
+  value.maxZoom?.let {
+    fields = fields or 2u
+    writeF64(target + 16, it)
+  }
+  value.tolerance?.let {
+    fields = fields or 4u
+    writeF64(target + 24, it)
+  }
+  value.clusterMaxZoom?.let {
+    fields = fields or 8u
+    writeF64(target + 32, it)
+  }
+  putView(target + 40, value.clusterProperties)
+  value.buffer?.let {
+    fields = fields or 16u
+    writeU32(target + w(48, 56), it)
+  }
+  value.clusterRadius?.let {
+    fields = fields or 32u
+    writeU32(target + w(52, 60), it)
+  }
+  value.clusterMinPoints?.let {
+    fields = fields or 64u
+    writeU64(target + w(56, 64), it)
+  }
+  value.lineMetrics?.let {
+    fields = fields or 128u
+    writeBool(target + w(64, 72), it)
+  }
+  value.cluster?.let {
+    fields = fields or 256u
+    writeBool(target + w(65, 73), it)
+  }
+  writeU32(target + 4, fields)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGeoJsonSourceOptions(value: GeoJsonSourceOptions): Long =
+  allocate(w(72, 80, 68), w(8, 8, 4)).also { putGeoJsonSourceOptions(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putPremultipliedRgba8Image(target: Long, value: PremultipliedRgba8Image) {

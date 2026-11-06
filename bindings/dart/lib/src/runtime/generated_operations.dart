@@ -392,98 +392,6 @@ Pointer<raw.mln_logical_size> _writeLogicalSize(
   return result;
 }
 
-Pointer<raw.mln_geo_json_source_options> _writeGeoJsonSourceOptions(
-  GeoJsonSourceOptions value,
-  Allocator arena, {
-  Pointer<raw.mln_geo_json_source_options>? into,
-}) {
-  final result = into ?? arena<raw.mln_geo_json_source_options>();
-  result.ref.size = sizeOf<raw.mln_geo_json_source_options>();
-  if (value.minZoom != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM;
-    result.ref.min_zoom = value.minZoom!;
-  }
-  if (value.maxZoom != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM;
-    result.ref.max_zoom = value.maxZoom!;
-  }
-  if (value.tolerance != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE;
-    result.ref.tolerance = value.tolerance!;
-  }
-  if (value.clusterMaxZoom != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
-    result.ref.cluster_max_zoom = value.clusterMaxZoom!;
-  }
-  result.ref.cluster_properties = _nativeJsonView(
-    value.clusterProperties,
-    arena,
-    member: true,
-  );
-  if (value.buffer != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_BUFFER;
-    result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
-  }
-  if (value.clusterRadius != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS;
-    result.ref.cluster_radius = _nativeInteger(
-      value.clusterRadius!,
-      0,
-      4294967295,
-    );
-  }
-  if (value.clusterMinPoints != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
-    result.ref.cluster_min_points = value.clusterMinPoints!;
-  }
-  if (value.lineMetrics != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS;
-    result.ref.line_metrics = value.lineMetrics!;
-  }
-  if (value.cluster != null) {
-    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
-    result.ref.cluster = value.cluster!;
-  }
-  return result;
-}
-
-GeoJsonSourceOptions _readGeoJsonSourceOptions(
-  raw.mln_geo_json_source_options source,
-) => GeoJsonSourceOptions(
-  minZoom: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM) != 0
-      ? source.min_zoom
-      : null,
-  maxZoom: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM) != 0
-      ? source.max_zoom
-      : null,
-  tolerance: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE) != 0
-      ? source.tolerance
-      : null,
-  clusterMaxZoom:
-      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) != 0
-      ? source.cluster_max_zoom
-      : null,
-  clusterProperties: _decodeJsonView(source.cluster_properties),
-  buffer: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_BUFFER) != 0
-      ? source.buffer
-      : null,
-  clusterRadius:
-      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS) != 0
-      ? source.cluster_radius
-      : null,
-  clusterMinPoints:
-      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS) != 0
-      ? source.cluster_min_points
-      : null,
-  lineMetrics:
-      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS) != 0
-      ? source.line_metrics
-      : null,
-  cluster: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER) != 0
-      ? source.cluster
-      : null,
-);
-
 Pointer<raw.mln_projected_meters> _writeProjectedMeters(
   ProjectedMeters value,
   Allocator arena, {
@@ -691,6 +599,98 @@ _prepareCustomVectorSourceOptions(
     rethrow;
   }
 }
+
+Pointer<raw.mln_geo_json_source_options> _writeGeoJsonSourceOptions(
+  GeoJsonSourceOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_geo_json_source_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_geo_json_source_options>();
+  result.ref.size = sizeOf<raw.mln_geo_json_source_options>();
+  if (value.minZoom != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM;
+    result.ref.min_zoom = value.minZoom!;
+  }
+  if (value.maxZoom != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM;
+    result.ref.max_zoom = value.maxZoom!;
+  }
+  if (value.tolerance != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE;
+    result.ref.tolerance = value.tolerance!;
+  }
+  if (value.clusterMaxZoom != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+    result.ref.cluster_max_zoom = value.clusterMaxZoom!;
+  }
+  result.ref.cluster_properties = _nativeJsonView(
+    value.clusterProperties,
+    arena,
+    member: true,
+  );
+  if (value.buffer != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_BUFFER;
+    result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
+  }
+  if (value.clusterRadius != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS;
+    result.ref.cluster_radius = _nativeInteger(
+      value.clusterRadius!,
+      0,
+      4294967295,
+    );
+  }
+  if (value.clusterMinPoints != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+    result.ref.cluster_min_points = value.clusterMinPoints!;
+  }
+  if (value.lineMetrics != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS;
+    result.ref.line_metrics = value.lineMetrics!;
+  }
+  if (value.cluster != null) {
+    result.ref.fields |= raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER;
+    result.ref.cluster = value.cluster!;
+  }
+  return result;
+}
+
+GeoJsonSourceOptions _readGeoJsonSourceOptions(
+  raw.mln_geo_json_source_options source,
+) => GeoJsonSourceOptions(
+  minZoom: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM) != 0
+      ? source.min_zoom
+      : null,
+  maxZoom: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM) != 0
+      ? source.max_zoom
+      : null,
+  tolerance: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE) != 0
+      ? source.tolerance
+      : null,
+  clusterMaxZoom:
+      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) != 0
+      ? source.cluster_max_zoom
+      : null,
+  clusterProperties: _decodeJsonView(source.cluster_properties),
+  buffer: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_BUFFER) != 0
+      ? source.buffer
+      : null,
+  clusterRadius:
+      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS) != 0
+      ? source.cluster_radius
+      : null,
+  clusterMinPoints:
+      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS) != 0
+      ? source.cluster_min_points
+      : null,
+  lineMetrics:
+      (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS) != 0
+      ? source.line_metrics
+      : null,
+  cluster: (source.fields & raw.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER) != 0
+      ? source.cluster
+      : null,
+);
 
 Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   PremultipliedRgba8Image value,
@@ -4093,83 +4093,6 @@ final class FramePacerHandle implements Finalizable {
   });
 }
 
-/// Issued native handle id.
-extension type const _NativeGeoJsonSourceData(int raw)
-    implements NativeHandle {}
-
-/// Owner of one native handle.
-///
-/// GeoJSON data, parsed and ready to add to a GeoJSON source.
-///
-/// See `mln_geo_json_source_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class GeoJsonSourceDataHandle implements Finalizable {
-  GeoJsonSourceDataHandle._(_NativeGeoJsonSourceData handle)
-    : _state = NativeHandleState(handle, 'GeoJsonSourceDataHandle');
-  final NativeHandleState<_NativeGeoJsonSourceData> _state;
-  // ignore: unused_element
-  _NativeGeoJsonSourceData get _handle => _state.handle;
-
-  /// The native handle id.
-  int get id => _state.handleId;
-
-  /// Whether the binding has accepted a release, dispose, or discard of
-  /// this handle.
-  bool get isClosed => _state.isClosed;
-
-  @override
-  String toString() =>
-      'GeoJsonSourceDataHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
-
-  /// Prepares GeoJSON data for GeoJSON sources.
-  ///
-  /// `data` is a GeoJSON feature collection, feature, or geometry. Preparing it
-  /// can be slow, but adding the result to a source is quick, and several
-  /// sources can share it.
-  ///
-  /// See `mln_geo_json_source_data_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.invalidArgument` when `data` isn't valid GeoJSON, when an option
-  ///   in `options` is out of range, or when `options` turns on clustering and
-  ///   `data` isn't a feature collection of points.
-  static GeoJsonSourceDataHandle create(
-    Object? data, {
-    GeoJsonSourceOptions? options,
-  }) => withNativeArena((arena) {
-    ensureAbiVersion();
-    final outData = arena<Uint64>();
-    _check(
-      raw.mln_geo_json_source_data_create(
-        _nativeJsonView(data, arena),
-        options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
-        outData,
-        nativeDiagnostic,
-      ),
-    );
-    return _adoptOwned(
-      outData.value,
-      () => GeoJsonSourceDataHandle._(_NativeGeoJsonSourceData(outData.value)),
-      (handle) {
-        raw.mln_geo_json_source_data_release(handle);
-      },
-    );
-  });
-
-  /// Releases prepared GeoJSON data.
-  ///
-  /// Sources that use the data keep it.
-  ///
-  /// See `mln_geo_json_source_data_release` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  void release() => _state.close((handle) {
-    raw.mln_geo_json_source_data_release(handle.raw);
-    return nativeStatusOk;
-  });
-}
-
 extension type MapHandleDiscarding._(MapHandle _owner) {
   _NativeMap get _handle => _owner._handle;
   _CallbackRoots get _callbackRoots => _owner._callbackRoots;
@@ -4207,15 +4130,15 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       ),
     );
   });
-  void addGeoJsonSourceData(
-    String sourceId,
-    GeoJsonSourceDataHandle data, {
+  void addGeoJsonSource(
+    String sourceId, {
+    GeoJsonSourceOptions? options,
     String? attribution,
   }) => _discard(
-    (arena, completion) => raw.mln_map_add_geo_json_source_data(
+    (arena, completion) => raw.mln_map_add_geo_json_source(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
-      data._handle.raw,
+      options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
       attribution == null
           ? arena<raw.mln_buffer_view>().ref
           : nativeStringView(attribution, arena).value,
@@ -4562,16 +4485,15 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) =>
-      _discard(
-        (arena, completion) => raw.mln_map_set_geo_json_source_data(
-          _handle.raw,
-          nativeStringView(sourceId, arena).value,
-          data._handle.raw,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
+  void setGeoJsonSourceData(String sourceId, Object? data) => _discard(
+    (arena, completion) => raw.mln_map_set_geo_json_source_data(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _nativeJsonView(data, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   void setGeoJsonSourceSynchronousTiling(String sourceId, bool enabled) =>
       _discard(
         (arena, completion) =>
@@ -4865,33 +4787,35 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     );
   });
 
-  /// Adds a GeoJSON source with prepared data.
+  /// Adds a GeoJSON source with no data.
   ///
-  /// The source uses the options that `data` was prepared with. `data` can be
-  /// released once this function returns.
+  /// Give it data with `MapHandle.setGeoJsonSourceData()` or
+  /// `MapHandle.setGeoJsonSourceUrl()`. Its options stay fixed for as long as
+  /// the style holds it.
   ///
   /// `attribution` is the source's
   /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
   /// or empty for none.
   ///
-  /// See `mln_map_add_geo_json_source_data` in the
+  /// See `mln_map_add_geo_json_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   ///
   /// Errors:
   ///
+  /// - `Status.invalidArgument` when an option in `options` is out of range.
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   /// - `Status.invalidState` while the style isn't loaded, as
   ///   `MapHandle.setStyleUrl()` describes.
-  Future<CommandCompletion> addGeoJsonSourceData(
-    String sourceId,
-    GeoJsonSourceDataHandle data, {
+  Future<CommandCompletion> addGeoJsonSource(
+    String sourceId, {
+    GeoJsonSourceOptions? options,
     String? attribution,
   }) => _command(
-    (arena, completion) => raw.mln_map_add_geo_json_source_data(
+    (arena, completion) => raw.mln_map_add_geo_json_source(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
-      data._handle.raw,
+      options == null ? nullptr : _writeGeoJsonSourceOptions(options, arena),
       attribution == null
           ? arena<raw.mln_buffer_view>().ref
           : nativeStringView(attribution, arena).value,
@@ -6708,9 +6632,16 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
 
   /// Replaces the data of a GeoJSON source.
   ///
-  /// `data` must have been prepared with the source's options, which
-  /// `MapHandle.getStyleSource()` reports, though `min_zoom` may differ. `data`
-  /// can be released once this function returns.
+  /// `data` is a GeoJSON feature collection, feature, or geometry. The library
+  /// prepares it for the source with the source's options, off the threads that
+  /// the caller and the runtime use, and the command completes once the source
+  /// holds it. Later commands don't wait for it. While the source is still
+  /// preparing earlier data, only the newest data waits to follow it.
+  ///
+  /// With synchronous tiling on, as
+  /// `MapHandle.setGeoJsonSourceSynchronousTiling()` describes, the command
+  /// prepares `data` before later commands run, so the data shows in the next
+  /// frame.
   ///
   /// See `mln_map_set_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -6719,17 +6650,22 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't a
-  ///   GeoJSON source, or `data` was prepared with other options.
+  ///   GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+  ///   clusters and `data` isn't a feature collection of points. The source
+  ///   keeps its data.
+  /// - `Status.cancelled` when newer data for the source replaces `data` while
+  ///   it waits, or when the source's URL, its removal, a style load, or the
+  ///   map's release replaces the source's data before `data` is ready.
   /// - `Status.invalidState` while the style isn't loaded, as
   ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> setGeoJsonSourceData(
     String sourceId,
-    GeoJsonSourceDataHandle data,
+    Object? data,
   ) => _command(
     (arena, completion) => raw.mln_map_set_geo_json_source_data(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
-      data._handle.raw,
+      _nativeJsonView(data, arena),
       completion,
       nativeDiagnostic,
     ),

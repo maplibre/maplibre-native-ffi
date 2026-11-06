@@ -61,15 +61,6 @@ internal expect object C {
 
   fun mln_frame_pacer_release(pacer: Long): Unit
 
-  fun mln_geo_json_source_data_create(
-    data: Long,
-    options: Long,
-    outData: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_geo_json_source_data_release(data: Long): Unit
-
   fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -108,10 +99,10 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_add_geo_json_source_data(
+  fun mln_map_add_geo_json_source(
     map: Long,
     sourceId: Long,
-    data: Long,
+    options: Long,
     attribution: Long,
     completion: Long,
     outDiagnostic: Long,

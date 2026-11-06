@@ -119,23 +119,6 @@ internal actual object C {
     mln_kw_mln_frame_pacer_release(pacer)
   }
 
-  actual fun mln_geo_json_source_data_create(
-    data: Long,
-    options: Long,
-    outData: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_geo_json_source_data_create(
-      word(data),
-      word(options),
-      word(outData),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_geo_json_source_data_release(data: Long) {
-    mln_kw_mln_geo_json_source_data_release(data)
-  }
-
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -208,18 +191,18 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_add_geo_json_source_data(
+  actual fun mln_map_add_geo_json_source(
     map: Long,
     sourceId: Long,
-    data: Long,
+    options: Long,
     attribution: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_add_geo_json_source_data(
+    mln_kw_mln_map_add_geo_json_source(
       map,
       word(sourceId),
-      data,
+      word(options),
       word(attribution),
       word(completion),
       word(outDiagnostic),
@@ -1180,7 +1163,7 @@ internal actual object C {
     mln_kw_mln_map_set_geo_json_source_data(
       map,
       word(sourceId),
-      data,
+      word(data),
       word(completion),
       word(outDiagnostic),
     )
@@ -2263,16 +2246,6 @@ private fun mln_kw_mln_delivery_queue_release(p0: Long): Unit =
 private fun mln_kw_mln_frame_pacer_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_frame_pacer_release(p0)")
 
-private fun mln_kw_mln_geo_json_source_data_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geo_json_source_data_create(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_geo_json_source_data_release(p0: Long): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_geo_json_source_data_release(p0)",
-  )
-
 private fun mln_kw_mln_http_header_transform_response_set_header(
   p0: Int,
   p1: Int,
@@ -2326,16 +2299,16 @@ private fun mln_kw_mln_map_add_custom_vector_source(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_custom_vector_source(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_add_geo_json_source_data(
+private fun mln_kw_mln_map_add_geo_json_source(
   p0: Long,
   p1: Int,
-  p2: Long,
+  p2: Int,
   p3: Int,
   p4: Int,
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source_data(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_add_image_source_image(
@@ -2994,7 +2967,7 @@ private fun mln_kw_mln_map_set_free_camera_options(p0: Long, p1: Int, p2: Int, p
 private fun mln_kw_mln_map_set_geo_json_source_data(
   p0: Long,
   p1: Int,
-  p2: Long,
+  p2: Int,
   p3: Int,
   p4: Int,
 ): Int =

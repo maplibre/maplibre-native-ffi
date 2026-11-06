@@ -105,57 +105,6 @@ public final class FramePacerHandle: @unchecked Sendable, NativeReceiver,
   }
 }
 
-struct NativeGeoJsonSourceDataHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_geo_json_source_data_release(raw); return true
-  }
-}
-
-/// GeoJSON data, parsed and ready to add to a GeoJSON source.
-///
-/// See `mln_geo_json_source_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class GeoJsonSourceDataHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
-  let handle: NativeHandleState<NativeGeoJsonSourceDataHandle>
-  init(adopting raw: mln_geo_json_source_data) throws {
-    handle = try NativeHandleState(
-      typeName: "GeoJsonSourceDataHandle",
-      handle: NativeGeoJsonSourceDataHandle(raw: raw)
-    )
-  }
-
-  /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
-  /// Whether the binding has accepted a release, dispose, or discard of this
-  /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (
-    lhs: GeoJsonSourceDataHandle,
-    rhs: GeoJsonSourceDataHandle
-  ) -> Bool {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
-}
-
 struct NativeMapHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
     mln_map_dispose(

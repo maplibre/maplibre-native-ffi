@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -24,7 +25,6 @@
 #include "geojson/geojson_source_data.hpp"
 
 #include "diagnostics/diagnostics.hpp"
-#include "execution/worker_thread.hpp"
 #include "geojson/geojson.hpp"
 #include "map/map.hpp"
 #include "style/style_value.hpp"
@@ -108,9 +108,9 @@ auto validate_clustered_geojson(const mln::GeoJSON& geojson) -> bool {
 }
 
 // Serializes tile slicing over a geojson-vt index. The index caches sliced
-// tiles lazily. A prepared handle installed on several sources, or a
-// synchronous tiling toggle with async slices in flight, mixes inline and
-// queued slices on one index, so every slice takes this wrapper's lock. Engine
+// tiles lazily. A synchronous tiling toggle with async slices in flight mixes
+// inline and queued slices on one index, so every slice takes this wrapper's
+// lock. Engine
 // patch 0071 locks every geojson-vt slice too. The wrapper also lets a queued
 // slice hold its data weakly and marks the GeoJsonTileSlice sync point.
 class SerializedGeoJsonData final : public mln::style::GeoJSONData {
@@ -209,10 +209,6 @@ auto pin_sequenced_scheduler(const std::shared_ptr<mln::Scheduler>& scheduler)
 }  // namespace
 
 namespace mln::core {
-
-auto geojson_source_data_table() -> HandleTable<GeoJsonSourceDataObject>& {
-  return handle_table<GeoJsonSourceDataObject>();
-}
 
 auto effective_geojson_source_options(
   const mln_geo_json_source_options* options
@@ -365,6 +361,18 @@ auto validate_geojson_source_options(const mln_geo_json_source_options* options)
   return validate_and_resolve_geojson_source_options(options, effective);
 }
 
+auto native_geojson_source_options(const mln_geo_json_source_options* options)
+  -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>> {
+  auto effective = mln_geo_json_source_options{};
+  if (
+    validate_and_resolve_geojson_source_options(options, effective) !=
+    MLN_STATUS_OK
+  ) {
+    return std::nullopt;
+  }
+  return to_native_geojson_source_options(effective);
+}
+
 // Cluster properties reach Converter<GeoJSONOptions> as a one-member object,
 // which is what parses the aggregation expressions.
 auto to_native_geojson_source_options(
@@ -412,41 +420,6 @@ auto to_native_geojson_source_options(
   return mln::makeMutable<mln::style::GeoJSONOptions>(std::move(native));
 }
 
-namespace {
-
-// Cluster aggregations parse into expression pairs, which carry deep equality,
-// so options prepared from equivalent cluster_properties JSON compare equal.
-auto cluster_properties_equal(
-  const mln::style::GeoJSONOptions::ClusterProperties& left,
-  const mln::style::GeoJSONOptions::ClusterProperties& right
-) -> bool {
-  if (left.size() != right.size()) {
-    return false;
-  }
-  for (const auto& [key, expressions] : left) {
-    const auto found = right.find(key);
-    if (found == right.end()) {
-      return false;
-    }
-    const auto& [map_expression, reduce_expression] = expressions;
-    const auto& [other_map, other_reduce] = found->second;
-    if (
-      map_expression == nullptr || reduce_expression == nullptr ||
-      other_map == nullptr || other_reduce == nullptr
-    ) {
-      return false;
-    }
-    if (
-      !(*map_expression == *other_map) || !(*reduce_expression == *other_reduce)
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-}  // namespace
-
 auto from_native_geojson_source_options(
   const mln::style::GeoJSONOptions& options, std::string& out_cluster_properties
 ) -> mln_geo_json_source_options {
@@ -493,86 +466,49 @@ auto from_native_geojson_source_options(
   return result;
 }
 
-auto geojson_source_options_equal(
-  const mln::style::GeoJSONOptions& left,
-  const mln::style::GeoJSONOptions& right
-) -> bool {
-  return left.maxzoom == right.maxzoom && left.buffer == right.buffer &&
-         left.tolerance == right.tolerance &&
-         left.lineMetrics == right.lineMetrics &&
-         left.cluster == right.cluster &&
-         left.clusterRadius == right.clusterRadius &&
-         left.clusterMaxZoom == right.clusterMaxZoom &&
-         left.clusterMinPoints == right.clusterMinPoints &&
-         cluster_properties_equal(
-           left.clusterProperties, right.clusterProperties
-         );
-}
+auto prepare_geojson_source_data(
+  std::string_view data,
+  const mln::Immutable<mln::style::GeoJSONOptions>& options
+) -> PreparedGeoJsonSourceData {
+  auto result = PreparedGeoJsonSourceData{};
+  const auto fail = [&result](mln_status status) {
+    result.status = status;
+    result.message = thread_last_error_message();
+    return std::move(result);
+  };
+  clear_thread_error();
+  try {
+    auto geojson =
+      to_native_geojson({.data = data.data(), .size = data.size()});
+    if (!geojson) return fail(MLN_STATUS_INVALID_ARGUMENT);
+    if (options->cluster && !validate_clustered_geojson(*geojson)) {
+      return fail(MLN_STATUS_INVALID_ARGUMENT);
+    }
 
-auto geojson_source_data_create(
-  mln_buffer_view data, const mln_geo_json_source_options* options,
-  mln_geo_json_source_data* out_data
-) -> mln_status {
-  if (out_data == nullptr) {
-    set_thread_error("out_data must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    auto scheduler = mln::Scheduler::GetSequenced();
+    pin_sequenced_scheduler(scheduler);
+    auto index = mln::style::GeoJSONData::create(*geojson, scheduler, options);
+    // Supercluster indexes are immutable after construction and always slice
+    // inline, so only the geojson-vt path needs the serializing wrapper. This
+    // mirrors the dispatch inside GeoJSONData::create.
+    const auto clustered = options->cluster &&
+                           geojson->is<mln::FeatureCollection>() &&
+                           !geojson->get<mln::FeatureCollection>().empty();
+    if (!clustered) {
+      index = std::make_shared<SerializedGeoJsonData>(
+        std::move(index), std::move(scheduler)
+      );
+    }
+    result.data = std::move(index);
+  } catch (const std::exception& exception) {
+    result = {.status = MLN_STATUS_NATIVE_ERROR, .message = exception.what()};
+  } catch (...) {
+    result = {
+      .status = MLN_STATUS_NATIVE_ERROR,
+      .message = "preparing GeoJSON data failed"
+    };
   }
-  if (*out_data != MLN_HANDLE_NULL) {
-    set_thread_error("*out_data must be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto effective = mln_geo_json_source_options{};
-  const auto options_status =
-    validate_and_resolve_geojson_source_options(options, effective);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto geojson = to_native_geojson(data);
-  if (!geojson) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (effective.cluster && !validate_clustered_geojson(*geojson)) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto native_options = to_native_geojson_source_options(effective);
-  if (!native_options) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  // Preparation can run before any runtime, so it raises the stack itself.
-  reserve_default_thread_stack();
-  auto scheduler = mln::Scheduler::GetSequenced();
-  pin_sequenced_scheduler(scheduler);
-  auto index =
-    mln::style::GeoJSONData::create(*geojson, scheduler, *native_options);
-  // Supercluster indexes are immutable after construction and always slice
-  // inline, so only the geojson-vt path needs the serializing wrapper. This
-  // mirrors the dispatch inside GeoJSONData::create.
-  const auto clustered = (*native_options)->cluster &&
-                         geojson->is<mln::FeatureCollection>() &&
-                         !geojson->get<mln::FeatureCollection>().empty();
-  if (!clustered) {
-    index = std::make_shared<SerializedGeoJsonData>(
-      std::move(index), std::move(scheduler)
-    );
-  }
-  auto object =
-    std::make_shared<GeoJsonSourceDataObject>(GeoJsonSourceDataObject{
-      .data = std::move(index),
-      .options = std::move(*native_options),
-    });
-  *out_data = geojson_source_data_table().insert(std::move(object));
-  return MLN_STATUS_OK;
-}
-
-auto geojson_source_data_release(mln_geo_json_source_data data) -> void {
-  if (data == MLN_HANDLE_NULL) {
-    return;
-  }
-  geojson_source_data_table().remove(data);
+  return result;
 }
 
 }  // namespace mln::core

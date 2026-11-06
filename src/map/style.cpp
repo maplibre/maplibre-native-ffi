@@ -57,6 +57,7 @@
 #include <mln/style/sources/custom_geometry_source.hpp>
 #include <mln/style/sources/custom_vector_source.hpp>
 #include <mln/style/sources/geojson_source.hpp>
+#include <mln/style/sources/geojson_source_impl.hpp>
 #include <mln/style/sources/image_source.hpp>
 #include <mln/style/sources/raster_dem_source.hpp>
 #include <mln/style/sources/raster_source.hpp>
@@ -1206,6 +1207,7 @@ auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
   // longer holds the callbacks that read the host's state.
   removed.reset();
   release_callback_source(live, id);
+  cancel_geojson_source_update(live, id, "the source was removed");
   return MLN_STATUS_OK;
 }
 
@@ -1293,9 +1295,9 @@ auto map_list_style_sources(
   return MLN_STATUS_OK;
 }
 
-auto map_add_geojson_source_data(
+auto map_add_geojson_source(
   MapObject& live, mln_buffer_view source_id,
-  const std::shared_ptr<const GeoJsonSourceDataObject>& data,
+  const mln::Immutable<mln::style::GeoJSONOptions>& options,
   mln_buffer_view attribution
 ) -> mln_status {
   auto& style = map_native(live).getStyle();
@@ -1305,15 +1307,15 @@ auto map_add_geojson_source_data(
     return add_status;
   }
 
-  auto options = mln::makeMutable<mln::style::GeoJSONOptions>(*data->options);
+  auto source_options = mln::makeMutable<mln::style::GeoJSONOptions>(*options);
   if (attribution.size > 0) {
-    options->attribution = string_from_view(attribution);
+    source_options->attribution = string_from_view(attribution);
   }
-  auto source = std::make_unique<mln::style::GeoJSONSource>(
-    id, mln::Immutable<mln::style::GeoJSONOptions>{std::move(options)}
+  style.addSource(
+    std::make_unique<mln::style::GeoJSONSource>(
+      id, mln::Immutable<mln::style::GeoJSONOptions>{std::move(source_options)}
+    )
   );
-  source->setGeoJSONData(data->data);
-  style.addSource(std::move(source));
   return MLN_STATUS_OK;
 }
 
@@ -1330,33 +1332,37 @@ auto map_set_geojson_source_url(
   }
 
   geojson_source->setURL(string_from_view(url));
+  cancel_geojson_source_update(live, id, "the source's URL replaced its data");
   return MLN_STATUS_OK;
 }
 
-auto map_set_geojson_source_data(
-  MapObject& live, mln_buffer_view source_id,
-  const std::shared_ptr<const GeoJsonSourceDataObject>& data
+auto map_find_geojson_source(
+  MapObject& live, const std::string& source_id, GeoJsonSourceTarget& out_target
 ) -> mln_status {
-  const auto id = string_from_view(source_id);
   mln::style::GeoJSONSource* geojson_source = nullptr;
   const auto status = find_source(
-    map_native(live).getStyle(), id, "a GeoJSON source", geojson_source
+    map_native(live).getStyle(), source_id, "a GeoJSON source", geojson_source
   );
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (!geojson_source_options_equal(
-        geojson_source->getOptions(), *data->options
-      )) {
-    const auto message =
-      "prepared GeoJSON data options do not match the options that GeoJSON "
-      "source " +
-      quote_id(id) + " was added with";
-    set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  out_target.options.emplace(geojson_source->impl().getOptions());
+  out_target.synchronous = geojson_source->baseImpl->isUpdateSynchronous();
+  return MLN_STATUS_OK;
+}
 
-  geojson_source->setGeoJSONData(data->data);
+auto map_install_geojson_source_data(
+  MapObject& live, const std::string& source_id,
+  std::shared_ptr<mln::style::GeoJSONData> data
+) -> mln_status {
+  mln::style::GeoJSONSource* geojson_source = nullptr;
+  const auto status = find_source(
+    map_native(live).getStyle(), source_id, "a GeoJSON source", geojson_source
+  );
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  geojson_source->setGeoJSONData(std::move(data));
   return MLN_STATUS_OK;
 }
 

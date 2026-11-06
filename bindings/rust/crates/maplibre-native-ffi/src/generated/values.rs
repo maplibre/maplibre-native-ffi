@@ -6201,8 +6201,7 @@ pub struct StyleSourceInfo {
     pub tile_size: Option<u32>,
     pub vector_encoding: Option<StyleVectorTileEncoding>,
     pub raster_encoding: Option<StyleRasterDemEncoding>,
-    /// A GeoJSON source's options, with every field set. Data prepared with
-    /// them can replace the source's data.
+    /// A GeoJSON source's options, with every field set.
     pub geo_json: Option<GeoJsonSourceOptions>,
 }
 impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
