@@ -48,5 +48,8 @@ closes, it releases the session, the map, and the runtime.
 
 WPF can't draw over a hosted window, so the status shows in `StatusOverlay.cs`,
 a window of its own that the main window owns and that follows the map's corner.
-`MapView.cs` turns mouse and key input into camera changes. Everything else
-matches the Compose example in `examples/compose`.
+`MapView.cs` turns mouse, touch, and key input into camera changes. Input to a
+hosted window skips WPF's input system, so it feeds its mouse and touch points
+to WPF's `ManipulationProcessor2D`. When a gesture ends, it passes the
+processor's release velocities to the map, which keeps the camera moving after a
+flick. Everything else matches the Compose example in `examples/compose`.
