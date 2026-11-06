@@ -13,8 +13,9 @@ library's logs.
 ## Set an event handler
 
 Events come from the runtime, so one event handler, set with
-[](api:mln_runtime_set_event_handler), receives the events of all its maps. Set
-it before you create a map, so it receives the map's first events.
+[](api:mln_runtime_set_event_handler), receives the events of the runtime and
+all its maps. Set it before you create a map, so it receives the map's first
+events.
 
 Each event names its type and the map that sent it. The handler runs on a
 library thread, so hand longer work to another thread.
