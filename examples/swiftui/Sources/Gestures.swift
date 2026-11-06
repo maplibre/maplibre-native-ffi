@@ -2,7 +2,8 @@
 // and pan, and a double tap zooms in. On macOS, a drag pans, a right or Control
 // drag rotates and pitches, a trackpad scrolls, pinches, and rotates, a mouse
 // wheel zooms, and a double click or a two-finger double tap zooms in, or out
-// with Shift.
+// with Shift. Each gesture ends with its release velocities, so the map keeps
+// moving until a touch or a click stops it.
 
 import CoreGraphics
 import MaplibreNativeFFI
@@ -11,81 +12,152 @@ import MaplibreNativeFFI
   import UIKit
 
   @MainActor
-  final class TouchGestures {
-    private static let tapSlop = 10.0
-
+  final class TouchGestures: NSObject, UIGestureRecognizerDelegate {
     private unowned let view: UIView
     private let apply: (CameraDelta) -> Void
-    // The touches at the last event, in the order they began.
-    private var touches: [(touch: UITouch, point: CGPoint)] = []
-    private var start: CGPoint?
-    private var moved = false
+    // The gesture lasts while any of the view's touches or recognizers do.
+    private var touches: Set<UITouch> = []
+    private var recognizing = 0
+    private var cancelled = false
+    private var momentum = GestureMomentum()
+    // The pinch's scale and rotation at the last event, and their centroid.
+    private var scale = 1.0
+    private var rotation = 0.0
+    private var anchor: ScreenPoint?
 
     init(view: UIView, apply: @escaping (CameraDelta) -> Void) {
       self.view = view
       self.apply = apply
+      super.init()
+      let doubleTap = UITapGestureRecognizer(
+        target: self,
+        action: #selector(doubleTapped)
+      )
+      doubleTap.numberOfTapsRequired = 2
+      for recognizer in [
+        UIPanGestureRecognizer(target: self, action: #selector(panned)),
+        UIPinchGestureRecognizer(target: self, action: #selector(pinched)),
+        UIRotationGestureRecognizer(target: self, action: #selector(rotated)),
+        doubleTap,
+      ] {
+        recognizer.delegate = self
+        view.addGestureRecognizer(recognizer)
+      }
     }
 
+    /// A touch down starts a gesture, which stops the last one's momentum.
     func began(_ began: Set<UITouch>) {
-      if touches.isEmpty {
-        start = began.first.map { $0.location(in: view) }
-        moved = false
+      if touches.isEmpty, recognizing == 0 {
+        cancelled = false
+        momentum = GestureMomentum()
         apply(CameraDelta(gesturePhase: .begin))
       }
-      for touch in began {
-        touches.append((touch, touch.location(in: view)))
+      touches.formUnion(began)
+    }
+
+    func ended(_ ended: Set<UITouch>) {
+      touches.subtract(ended)
+      finish()
+    }
+
+    func gestureRecognizer(
+      _: UIGestureRecognizer,
+      shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
+    ) -> Bool {
+      true
+    }
+
+    @objc private func panned(_ pan: UIPanGestureRecognizer) {
+      let offset = pan.translation(in: view)
+      pan.setTranslation(.zero, in: view)
+      handle(pan, CameraDelta(offset: ScreenPoint(x: offset.x, y: offset.y))) {
+        let velocity = pan.velocity(in: view)
+        momentum.pan.velocity = ScreenPoint(x: velocity.x, y: velocity.y)
       }
     }
 
-    func moved(_: Set<UITouch>) {
-      let pairs = touches.map { ($0.point, $0.touch.location(in: view)) }
-      touches = touches.map { ($0.touch, $0.touch.location(in: view)) }
-      guard let (before, after) = pairs.first else { return }
-      if let start, distance(start, after) > Self.tapSlop {
-        moved = true
+    @objc private func pinched(_ pinch: UIPinchGestureRecognizer) {
+      if pinch.state == .began {
+        scale = 1
       }
+      let change = pinch.scale / scale
+      scale = pinch.scale
+      anchor = centroid(pinch)
+      handle(pinch, CameraDelta(scale: change, anchor: anchor)) {
+        // The velocity is in scale factor per second, and each doubling of
+        // the scale is a zoom level.
+        momentum.zoom = AnchoredMomentum(
+          velocity: pinch.velocity / pinch.scale / log(2),
+          anchor: anchor
+        )
+      }
+    }
 
-      guard pairs.count > 1 else {
-        apply(CameraDelta(
-          offset: ScreenPoint(x: after.x - before.x, y: after.y - before.y),
-          gesturePhase: .update
-        ))
-        return
+    @objc private func rotated(_ turn: UIRotationGestureRecognizer) {
+      if turn.state == .began {
+        rotation = 0
       }
-      // The span between the touches scales and turns about their midpoint,
-      // which moves with them.
-      moved = true
-      let (otherBefore, otherAfter) = pairs[1]
-      let midBefore = midpoint(before, otherBefore)
-      let midAfter = midpoint(after, otherAfter)
-      let spanBefore = span(before, otherBefore)
-      let spanAfter = span(after, otherAfter)
-      let scale = length(spanAfter) / length(spanBefore)
-      let turn = (angle(spanAfter) - angle(spanBefore)) * 180 / .pi
+      // The rotation runs clockwise, which turns the bearing the other way.
+      let change = -(turn.rotation - rotation) * 180 / .pi
+      rotation = turn.rotation
+      anchor = centroid(turn)
+      handle(turn, CameraDelta(bearing: change, anchor: anchor)) {
+        momentum.bearing = AnchoredMomentum(
+          velocity: -turn.velocity * 180 / .pi,
+          anchor: anchor
+        )
+      }
+    }
+
+    @objc private func doubleTapped(_ tap: UITapGestureRecognizer) {
+      let point = tap.location(in: view)
       apply(CameraDelta(
-        offset: ScreenPoint(
-          x: midAfter.x - midBefore.x,
-          y: midAfter.y - midBefore.y
-        ),
-        scale: scale.isFinite && scale > 0 ? scale : 1,
-        bearing: -wrapDegrees(turn),
-        anchor: ScreenPoint(x: midAfter.x, y: midAfter.y),
-        gesturePhase: .update
+        scale: 2,
+        anchor: ScreenPoint(x: point.x, y: point.y),
+        animation: AnimationOptions(durationMs: 300)
       ))
     }
 
-    func ended(_ ended: Set<UITouch>, cancelled: Bool) {
-      touches.removeAll { ended.contains($0.touch) }
-      guard touches.isEmpty else { return }
-      apply(CameraDelta(gesturePhase: cancelled ? .cancel : .end))
-      if !cancelled, !moved, let touch = ended.first, touch.tapCount == 2 {
-        let point = touch.location(in: view)
-        apply(CameraDelta(
-          scale: 2,
-          anchor: ScreenPoint(x: point.x, y: point.y),
-          animation: AnimationOptions(durationMs: 300)
-        ))
+    /// Applies a recognizer's change, and keeps its velocity at release.
+    private func handle(
+      _ recognizer: UIGestureRecognizer,
+      _ change: CameraDelta,
+      release: () -> Void
+    ) {
+      var change = change
+      change.gesturePhase = .update
+      switch recognizer.state {
+      case .began:
+        recognizing += 1
+        apply(change)
+      case .changed:
+        apply(change)
+      case .ended:
+        release()
+        recognizing -= 1
+        finish()
+      case .cancelled:
+        cancelled = true
+        recognizing -= 1
+        finish()
+      default:
+        break
       }
+    }
+
+    /// Ends the gesture once its touches and recognizers have all ended.
+    private func finish() {
+      guard touches.isEmpty, recognizing == 0 else { return }
+      apply(cancelled
+        ? CameraDelta(gesturePhase: .cancel)
+        : CameraDelta(momentum: momentum, gesturePhase: .end))
+    }
+
+    /// Where a two-finger recognizer's touches meet, while it has both.
+    private func centroid(_ recognizer: UIGestureRecognizer) -> ScreenPoint? {
+      guard recognizer.numberOfTouches == 2 else { return anchor }
+      let point = recognizer.location(in: view)
+      return ScreenPoint(x: point.x, y: point.y)
     }
   }
 
@@ -94,10 +166,17 @@ import MaplibreNativeFFI
 
   @MainActor
   final class PointerGestures {
+    /// How far a right drag turns the bearing and pitch.
+    private static let degreesPerPoint = 0.5
+
     private unowned let view: NSView
     private let apply: (CameraDelta) -> Void
     private var previous: CGPoint?
     private var rotating = false
+    private var drag = VelocityTracker()
+    private var scroll = VelocityTracker()
+    private var magnification = VelocityTracker()
+    private var rotation = VelocityTracker()
 
     init(view: NSView, apply: @escaping (CameraDelta) -> Void) {
       self.view = view
@@ -107,6 +186,7 @@ import MaplibreNativeFFI
     func mouseDown(_ event: NSEvent, rotating: Bool) {
       previous = point(event)
       self.rotating = rotating
+      drag = VelocityTracker()
       apply(CameraDelta(gesturePhase: .begin))
     }
 
@@ -116,10 +196,11 @@ import MaplibreNativeFFI
       self.previous = current
       let dx = current.x - previous.x
       let dy = current.y - previous.y
+      drag.add(dx, dy, at: event.timestamp)
       if rotating {
         apply(CameraDelta(
-          bearing: dx * 0.5,
-          pitch: -dy * 0.5,
+          bearing: dx * Self.degreesPerPoint,
+          pitch: -dy * Self.degreesPerPoint,
           gesturePhase: .update
         ))
       } else {
@@ -133,39 +214,66 @@ import MaplibreNativeFFI
     func mouseUp(_ event: NSEvent) {
       guard previous != nil else { return }
       previous = nil
-      apply(CameraDelta(gesturePhase: .end))
+      let velocity = drag.velocity(at: event.timestamp)
+      let turn = Self.degreesPerPoint
+      let momentum = rotating
+        ? GestureMomentum(
+          bearing: AnchoredMomentum(velocity: velocity.x * turn),
+          pitch: AnchoredMomentum(velocity: -velocity.y * turn)
+        )
+        : GestureMomentum(pan: PanMomentum(velocity: velocity))
+      apply(CameraDelta(momentum: momentum, gesturePhase: .end))
       if event.clickCount == 2 {
         zoom(event, in: !event.modifierFlags.contains(.shift))
       }
     }
 
     func scrollWheel(_ event: NSEvent) {
-      if event.hasPreciseScrollingDeltas {
-        // A trackpad or Magic Mouse scroll pans, and its momentum carries on
-        // after the fingers lift.
-        apply(CameraDelta(
-          offset: ScreenPoint(
-            x: event.scrollingDeltaX,
-            y: event.scrollingDeltaY
-          ),
-          gesturePhase: phase(event.phase)
-        ))
-      } else {
+      guard event.hasPreciseScrollingDeltas else {
         // A mouse wheel zooms about the pointer, by lines.
         let at = point(event)
         apply(CameraDelta(
           scale: pow(2, event.scrollingDeltaY * 40 / 300),
           anchor: ScreenPoint(x: at.x, y: at.y)
         ))
+        return
       }
+      // A trackpad or Magic Mouse scroll pans. The system's momentum events
+      // after release are skipped, as the map makes its own.
+      guard event.momentumPhase.isEmpty else { return }
+      scroll.add(
+        event.scrollingDeltaX,
+        event.scrollingDeltaY,
+        at: event.timestamp
+      )
+      let phase = phase(event.phase)
+      apply(CameraDelta(
+        offset: ScreenPoint(x: event.scrollingDeltaX, y: event.scrollingDeltaY),
+        momentum: phase == .end
+          ? GestureMomentum(pan: PanMomentum(
+            velocity: scroll.velocity(at: event.timestamp)
+          ))
+          : nil,
+        gesturePhase: phase
+      ))
     }
 
     func magnify(_ event: NSEvent) {
       let at = point(event)
+      let anchor = ScreenPoint(x: at.x, y: at.y)
+      let scale = max(0.01, 1 + event.magnification)
+      magnification.add(log2(scale), at: event.timestamp)
+      let phase = phase(event.phase)
       apply(CameraDelta(
-        scale: max(0.01, 1 + event.magnification),
-        anchor: ScreenPoint(x: at.x, y: at.y),
-        gesturePhase: phase(event.phase)
+        scale: scale,
+        anchor: anchor,
+        momentum: phase == .end
+          ? GestureMomentum(zoom: AnchoredMomentum(
+            velocity: magnification.velocity(at: event.timestamp).x,
+            anchor: anchor
+          ))
+          : nil,
+        gesturePhase: phase
       ))
     }
 
@@ -173,10 +281,19 @@ import MaplibreNativeFFI
       // The rotation is in degrees, counterclockwise, which turns the bearing
       // the same way.
       let at = point(event)
+      let anchor = ScreenPoint(x: at.x, y: at.y)
+      rotation.add(Double(event.rotation), at: event.timestamp)
+      let phase = phase(event.phase)
       apply(CameraDelta(
         bearing: Double(event.rotation),
-        anchor: ScreenPoint(x: at.x, y: at.y),
-        gesturePhase: phase(event.phase)
+        anchor: anchor,
+        momentum: phase == .end
+          ? GestureMomentum(bearing: AnchoredMomentum(
+            velocity: rotation.velocity(at: event.timestamp).x,
+            anchor: anchor
+          ))
+          : nil,
+        gesturePhase: phase
       ))
     }
 
@@ -197,10 +314,11 @@ import MaplibreNativeFFI
       view.convert(event.locationInWindow, from: nil)
     }
 
-    /// The gesture phase of a trackpad event. Momentum scrolling has none.
+    /// The gesture phase of a trackpad event. Fingers that rest on the
+    /// trackpad may begin a scroll, which stops the last one's momentum.
     private func phase(_ phase: NSEvent.Phase) -> GesturePhase {
       switch phase {
-      case .began: .begin
+      case .mayBegin, .began: .begin
       case .changed, .stationary: .update
       case .ended: .end
       case .cancelled: .cancel
@@ -208,30 +326,29 @@ import MaplibreNativeFFI
       }
     }
   }
+
+  /// Estimates how fast a gesture moved as it ended, from its recent events.
+  private struct VelocityTracker {
+    private static let window: TimeInterval = 0.1
+
+    private var samples: [(time: TimeInterval, x: Double, y: Double)] = []
+
+    mutating func add(_ dx: Double, _ dy: Double = 0, at time: TimeInterval) {
+      let x = (samples.last?.x ?? 0) + dx
+      let y = (samples.last?.y ?? 0) + dy
+      samples.removeAll { time - $0.time > Self.window }
+      samples.append((time, x, y))
+    }
+
+    /// The velocity, in units per second, over the window that ends at `time`.
+    func velocity(at time: TimeInterval) -> ScreenPoint {
+      guard let first = samples.first(where: { time - $0.time <= Self.window }),
+            let last = samples.last, time > first.time
+      else { return ScreenPoint(x: 0, y: 0) }
+      return ScreenPoint(
+        x: (last.x - first.x) / (time - first.time),
+        y: (last.y - first.y) / (time - first.time)
+      )
+    }
+  }
 #endif
-
-private func midpoint(_ a: CGPoint, _ b: CGPoint) -> CGPoint {
-  CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
-}
-
-private func span(_ a: CGPoint, _ b: CGPoint) -> CGVector {
-  CGVector(dx: b.x - a.x, dy: b.y - a.y)
-}
-
-private func length(_ v: CGVector) -> Double {
-  hypot(v.dx, v.dy)
-}
-
-private func angle(_ v: CGVector) -> Double {
-  atan2(v.dy, v.dx)
-}
-
-private func distance(_ a: CGPoint, _ b: CGPoint) -> Double {
-  length(span(a, b))
-}
-
-/// An angle in degrees, wrapped to [-180, 180).
-private func wrapDegrees(_ degrees: Double) -> Double {
-  ((degrees + 180).truncatingRemainder(dividingBy: 360) + 360)
-    .truncatingRemainder(dividingBy: 360) - 180
-}
