@@ -18,6 +18,7 @@
 #include "map/map.hpp"
 #include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
+#include "runtime/runtime.hpp"
 #include "support/style.h"
 #include "support/test_support.h"
 
@@ -311,6 +312,34 @@ void releasing_the_map_cancels_data_in_preparation() {
   mln_test_destroy_runtime(runtime);
 }
 
+// A disposed runtime refuses new submissions but finishes the commands it
+// accepted, so data in preparation still reaches its source.
+void a_disposed_runtime_finishes_data_in_preparation() {
+  SyncPointScope sync;
+  // Untracked, since the case disposes both itself.
+  auto runtime_options = mln_runtime_options{};
+  runtime_options.size = sizeof(mln_runtime_options);
+  auto runtime = mln_runtime{MLN_HANDLE_NULL};
+  MLN_TEST_OK(mln_runtime_create(&runtime_options, &runtime, nullptr));
+  const auto map_options = mln_test_map_options();
+  auto map = mln_map{MLN_HANDLE_NULL};
+  MLN_TEST_OK(mln_test_map_create_status(runtime, &map_options, &map));
+  add_drawn_source(map);
+  sync.hold(SyncPoint::GeoJsonDataPrepare);
+  auto preparing = mln_test_completion_default(0);
+  submit_data(map, POINT_COLLECTION("preparing"), preparing);
+  TEST_ASSERT_TRUE(sync.wait_for_hits(SyncPoint::GeoJsonDataPrepare, 1));
+
+  const auto retired = std::weak_ptr{mln::core::lease_runtime(runtime)};
+  MLN_TEST_OK(mln_runtime_dispose(runtime, nullptr));
+  sync.release(SyncPoint::GeoJsonDataPrepare);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&preparing));
+  MLN_TEST_OK(mln_map_dispose(map, nullptr));
+  TEST_ASSERT_TRUE(
+    await([&] { return retired.expired(); }, "the runtime's retirement")
+  );
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
@@ -319,4 +348,5 @@ MLN_TEST_GROUP {
   RUN_TEST(only_the_newest_data_waits_behind_a_preparation);
   RUN_TEST(replacing_the_sources_data_cancels_data_in_preparation);
   RUN_TEST(releasing_the_map_cancels_data_in_preparation);
+  RUN_TEST(a_disposed_runtime_finishes_data_in_preparation);
 }

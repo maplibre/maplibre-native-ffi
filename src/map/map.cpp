@@ -4591,78 +4591,60 @@ struct GeoJsonSourceDataTask final : MapCommandTask {
   }
 };
 
-// Installs data that a background preparation finished, unless something
-// cancelled the preparation meanwhile, then starts the data that waits.
-struct GeoJsonSourceInstallTask final : MapCommandTask {
-  std::string source_id;
-  uint64_t preparation;
-  PreparedGeoJsonSourceData prepared;
-
-  GeoJsonSourceInstallTask(
-    std::string id, uint64_t preparation, PreparedGeoJsonSourceData prepared
-  )
-      : source_id(std::move(id)),
-        preparation(preparation),
-        prepared(std::move(prepared)) {
-    command = true;
-    run = [](ExecutorTask* base) noexcept {
-      auto owner = std::unique_ptr<GeoJsonSourceInstallTask>{
-        static_cast<GeoJsonSourceInstallTask*>(base)
-      };
-      run_runtime_command_task(*owner);
-    };
-    work = [](RuntimeCommandTask& base) {
-      static_cast<GeoJsonSourceInstallTask&>(base).execute();
-    };
-    clear_work = [](RuntimeCommandTask& base) noexcept {
-      auto& self = static_cast<GeoJsonSourceInstallTask&>(base);
-      self.prepared = {};
-      self.map_lease.reset();
-      self.map.reset();
-    };
+// Runs on the runtime worker. Installs data that a background preparation
+// finished, unless something cancelled the preparation meanwhile, then starts
+// the data that waits.
+auto install_geojson_source_data(
+  const std::shared_ptr<MapObject>& map, const std::string& source_id,
+  uint64_t preparation, PreparedGeoJsonSourceData prepared
+) -> void {
+  auto& live = *map;
+  const auto found = live.geojson_updates.find(source_id);
+  if (
+    found == live.geojson_updates.end() ||
+    found->second.preparing != preparation
+  ) {
+    return;
   }
-
-  auto execute() -> void {
-    auto& live = *map;
-    const auto found = live.geojson_updates.find(source_id);
-    if (
-      found == live.geojson_updates.end() ||
-      found->second.preparing != preparation
-    ) {
-      return;
+  const auto finished = std::exchange(found->second.preparing_completion, {});
+  found->second.preparing = 0;
+  auto outcome = run_map_transaction(map, [&](MapObject& target) -> mln_status {
+    if (prepared.status != MLN_STATUS_OK) {
+      set_thread_error(prepared.message.c_str());
+      return prepared.status;
     }
-    const auto finished = std::exchange(found->second.preparing_completion, {});
-    found->second.preparing = 0;
-    auto outcome =
-      run_map_transaction(map, [&](MapObject& target) -> mln_status {
-        if (prepared.status != MLN_STATUS_OK) {
-          set_thread_error(prepared.message.c_str());
-          return prepared.status;
-        }
-        return map_install_geojson_source_data(
-          target, source_id, std::move(prepared.data)
-        );
-      });
-    complete_map_command(finished.get(), std::move(outcome));
-    start_waiting_geojson_source_update(live, source_id);
-  }
-};
+    return map_install_geojson_source_data(
+      target, source_id, std::move(prepared.data)
+    );
+  });
+  complete_map_command(finished.get(), std::move(outcome));
+  start_waiting_geojson_source_update(live, source_id);
+}
 
-// Runs on MapLibre's background pool. A map that is closing has cancelled the
-// preparation already, so a submission it refuses has nothing to report.
+// Runs on MapLibre's background pool. The install finishes a command that the
+// runtime already accepted, so it goes straight to the runtime worker instead
+// of through a new submission, which a disposed runtime would refuse. The
+// command's pending completion holds the runtime open until then. A map that
+// is gone, or a runtime that has stopped, cancelled the preparation already.
 auto submit_geojson_source_install(
   mln_map map, std::string source_id, uint64_t preparation,
   PreparedGeoJsonSourceData prepared
 ) noexcept -> void {
   try {
-    auto task = std::make_unique<GeoJsonSourceInstallTask>(
-      std::move(source_id), preparation, std::move(prepared)
+    auto live = handle_table<MapObject>().lease(map);
+    if (live == nullptr) return;
+    const auto runtime = live->runtime_state;
+    runtime->executor.invoke(
+      [live = std::move(live), source_id = std::move(source_id), preparation,
+       prepared = std::move(prepared)]() mutable noexcept -> void {
+        try {
+          install_geojson_source_data(
+            live, source_id, preparation, std::move(prepared)
+          );
+        } catch (...) {
+        }
+      }
     );
-    if (prepare_map_command_task(map, *task, nullptr) != MLN_STATUS_OK) return;
-    const auto runtime = task->map->runtime_state;
-    if (submit_runtime_command_task(runtime, *task) == MLN_STATUS_OK) {
-      static_cast<void>(task.release());
-    }
   } catch (...) {
   }
 }
