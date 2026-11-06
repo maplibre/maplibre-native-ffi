@@ -187,12 +187,12 @@ static void a_release_glides_and_then_ends_the_gesture(void) {
   probe.hook = observe_end;
   probe.context = &observation;
   mln_gesture_momentum momentum = {0};
-  momentum.fields = MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
-  momentum.pan_velocity = (mln_screen_point){.x = 600.0, .y = 800.0};
-  momentum.pan.fields =
-    MLN_MOMENTUM_OPTION_HALF_LIFE_MS | MLN_MOMENTUM_OPTION_STOP_SPEED;
-  momentum.pan.half_life_ms = 20.0;
-  momentum.pan.stop_speed = 100.0;
+  momentum.pan.fields = MLN_PAN_MOMENTUM_VELOCITY;
+  momentum.pan.velocity = (mln_screen_point){.x = 600.0, .y = 800.0};
+  momentum.pan.decay.fields =
+    MLN_MOMENTUM_DECAY_HALF_LIFE_MS | MLN_MOMENTUM_DECAY_STOP_SPEED;
+  momentum.pan.decay.half_life_ms = 20.0;
+  momentum.pan.decay.stop_speed = 100.0;
   const mln_camera_delta delta = release(&momentum, &probe);
   apply_delta(fixture.map, &delta);
   TEST_ASSERT_TRUE(read_snapshot(fixture.map).gesture_in_progress);
@@ -224,21 +224,23 @@ static void a_new_gesture_stops_momentum_and_reports_its_speed(void) {
   probe.hook = observe_end;
   probe.context = &observation;
   mln_gesture_momentum momentum = {0};
-  momentum.fields =
-    MLN_GESTURE_MOMENTUM_PAN_VELOCITY | MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY |
-    MLN_GESTURE_MOMENTUM_BEARING_VELOCITY | MLN_GESTURE_MOMENTUM_PITCH_VELOCITY;
-  momentum.pan_velocity = (mln_screen_point){.x = 1000.0, .y = -500.0};
-  momentum.zoom_velocity = 1.0;
-  momentum.bearing_velocity = -90.0;
-  momentum.pitch_velocity = 20.0;
-  mln_momentum_options* parts[] = {
-    &momentum.pan, &momentum.zoom, &momentum.bearing, &momentum.pitch
+  momentum.pan.fields = MLN_PAN_MOMENTUM_VELOCITY;
+  momentum.pan.velocity = (mln_screen_point){.x = 1000.0, .y = -500.0};
+  momentum.zoom.fields = MLN_ANCHORED_MOMENTUM_VELOCITY;
+  momentum.zoom.velocity = 1.0;
+  momentum.bearing.fields = MLN_ANCHORED_MOMENTUM_VELOCITY;
+  momentum.bearing.velocity = -90.0;
+  momentum.pitch.fields = MLN_ANCHORED_MOMENTUM_VELOCITY;
+  momentum.pitch.velocity = 20.0;
+  mln_momentum_decay* decays[] = {
+    &momentum.pan.decay, &momentum.zoom.decay, &momentum.bearing.decay,
+    &momentum.pitch.decay
   };
-  for (size_t i = 0; i < sizeof(parts) / sizeof(*parts); ++i) {
-    parts[i]->fields =
-      MLN_MOMENTUM_OPTION_HALF_LIFE_MS | MLN_MOMENTUM_OPTION_MAX_DISTANCE;
-    parts[i]->half_life_ms = 600000.0;
-    parts[i]->max_distance = 1e9;
+  for (size_t i = 0; i < sizeof(decays) / sizeof(*decays); ++i) {
+    decays[i]->fields =
+      MLN_MOMENTUM_DECAY_HALF_LIFE_MS | MLN_MOMENTUM_DECAY_MAX_DISTANCE;
+    decays[i]->half_life_ms = 600000.0;
+    decays[i]->max_distance = 1e9;
   }
   const mln_camera_delta delta = release(&momentum, &probe);
   apply_delta(map, &delta);
@@ -265,14 +267,14 @@ static void a_new_gesture_stops_momentum_and_reports_its_speed(void) {
 
 static mln_gesture_momentum long_pan_and_zoom(void) {
   mln_gesture_momentum momentum = {0};
-  momentum.fields =
-    MLN_GESTURE_MOMENTUM_PAN_VELOCITY | MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY;
-  momentum.pan_velocity = (mln_screen_point){.x = 1000.0, .y = 0.0};
-  momentum.zoom_velocity = 1.0;
-  momentum.pan.fields = MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
-  momentum.pan.half_life_ms = 600000.0;
-  momentum.zoom.fields = MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
-  momentum.zoom.half_life_ms = 600000.0;
+  momentum.pan.fields = MLN_PAN_MOMENTUM_VELOCITY;
+  momentum.pan.velocity = (mln_screen_point){.x = 1000.0, .y = 0.0};
+  momentum.pan.decay.fields = MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
+  momentum.pan.decay.half_life_ms = 600000.0;
+  momentum.zoom.fields = MLN_ANCHORED_MOMENTUM_VELOCITY;
+  momentum.zoom.velocity = 1.0;
+  momentum.zoom.decay.fields = MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
+  momentum.zoom.decay.half_life_ms = 600000.0;
   return momentum;
 }
 
@@ -318,8 +320,8 @@ static void a_slow_release_ends_the_gesture_at_once(void) {
   mln_test_transition_end probe;
   mln_test_transition_end_init(&probe);
   mln_gesture_momentum momentum = {0};
-  momentum.fields = MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
-  momentum.pan_velocity = (mln_screen_point){.x = 150.0, .y = 0.0};
+  momentum.pan.fields = MLN_PAN_MOMENTUM_VELOCITY;
+  momentum.pan.velocity = (mln_screen_point){.x = 150.0, .y = 0.0};
   const mln_camera_delta delta = release(&momentum, &probe);
   apply_delta(map, &delta);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.calls));

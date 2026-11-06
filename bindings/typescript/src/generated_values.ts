@@ -11,6 +11,27 @@ import {
 } from "./internal/native_registrations.ts";
 
 /**
+ * How a gesture's zoom, bearing, or pitch keeps changing after release.
+ *
+ * See `mln_anchored_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface AnchoredMomentum {
+  /**
+   * How fast the value changed at release: zoom levels per second for zoom, and
+   * degrees per second for bearing and pitch. The part moves only when this is
+   * set.
+   */
+  velocity?: number;
+  /**
+   * The screen point that the change keeps in place. Without one, the change
+   * keeps the center of the view in place.
+   */
+  anchor?: ScreenPoint;
+  decay?: MomentumDecay;
+}
+
+/**
  * The Android hardware buffer of an acquired frame.
  *
  * See `mln_android_hardware_buffer_frame` in the
@@ -1062,8 +1083,8 @@ export interface GeoJsonSourceOptions {
  * How a gesture keeps moving the camera after the user lets go.
  *
  * A part moves only when its velocity is set, and each part slows on its own.
- * Every part defaults to `MomentumDecay.friction` with a half-life of 140 ms,
- * and these other defaults:
+ * Every part defaults to `MomentumDecayModel.friction` with a half-life of 140
+ * ms, and these other defaults:
  *
  * - Pan stops at 10 logical pixels per second, needs a release of at least 200,
  *   and counts a release faster than 10000 as 10000.
@@ -1075,37 +1096,10 @@ export interface GeoJsonSourceOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface GestureMomentum {
-  /**
-   * How fast the map's content moved on the screen at release, in logical
-   * pixels per second.
-   */
-  panVelocity?: ScreenPoint;
-  /**
-   * In zoom levels per second.
-   */
-  zoomVelocity?: number;
-  /**
-   * In degrees per second.
-   */
-  bearingVelocity?: number;
-  /**
-   * In degrees per second.
-   */
-  pitchVelocity?: number;
-  /**
-   * The screen point that the zoom keeps in place. Without one, the zoom keeps
-   * the center of the view in place.
-   */
-  zoomAnchor?: ScreenPoint;
-  /**
-   * The screen point that the rotation keeps in place. Without one, the
-   * rotation turns around the center of the view.
-   */
-  bearingAnchor?: ScreenPoint;
-  pan?: MomentumOptions;
-  zoom?: MomentumOptions;
-  bearing?: MomentumOptions;
-  pitch?: MomentumOptions;
+  pan?: PanMomentum;
+  zoom?: AnchoredMomentum;
+  bearing?: AnchoredMomentum;
+  pitch?: AnchoredMomentum;
   /**
    * Where the bearing settles after a gesture that changed it. It settles once
    * the other parts stop, or right away when none of them move. Without this,
@@ -1845,53 +1839,30 @@ export interface MetalTextureFrame {
 }
 
 /**
- * How a part of a gesture's momentum slows from its release speed.
+ * How one part of a gesture's momentum slows from its release speed.
+ *
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom
+ * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
+ * set takes the part's default, which `GestureMomentum` lists. `min_speed` is
+ * finite and not negative, and every other setting is finite and positive. One
+ * value can serve every release, as a preset that matches a platform's
+ * scrolling.
  *
  * See `mln_momentum_decay` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-export const MomentumDecay = {
+export interface MomentumDecay {
+  model?: MomentumDecayModel;
   /**
-   * The speed halves every `half_life_ms`, until it drops to `stop_speed`.
-   * UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
-   * deceleration 69 ms.
-   */
-  friction: 0,
-  /**
-   * Android's scroll fling, as OverScroller computes it with `scroll_friction`.
-   * Only pan can use it.
-   */
-  spline: 1,
-} as const;
-/** One of the MomentumDecay values, or a value this binding does not know. */
-export type MomentumDecay =
-  | (typeof MomentumDecay)[keyof typeof MomentumDecay]
-  | (number & {});
-
-/**
- * How one part of a gesture keeps moving after its release.
- *
- * The part starts at its release speed. Speeds and distances are in the part's
- * unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
- * and pitch. A setting whose bit isn't set takes the part's default, which
- * `GestureMomentum` lists. `min_speed` is finite and not negative, and every
- * other setting is finite and positive.
- *
- * See `mln_momentum_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export interface MomentumOptions {
-  decay?: MomentumDecay;
-  /**
-   * For `MomentumDecay.friction`, how long the speed takes to halve.
+   * For `MomentumDecayModel.friction`, how long the speed takes to halve.
    */
   halfLifeMs?: number;
   /**
-   * For `MomentumDecay.friction`, the speed at which it ends.
+   * For `MomentumDecayModel.friction`, the speed at which it ends.
    */
   stopSpeed?: number;
   /**
-   * For `MomentumDecay.spline`, Android's
+   * For `MomentumDecayModel.spline`, Android's
    * `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
    */
   scrollFriction?: number;
@@ -1909,6 +1880,30 @@ export interface MomentumOptions {
    */
   maxDistance?: number;
 }
+
+/**
+ * How a part of a gesture's momentum slows from its release speed.
+ *
+ * See `mln_momentum_decay_model` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export const MomentumDecayModel = {
+  /**
+   * The speed halves every `half_life_ms`, until it drops to `stop_speed`.
+   * UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
+   * deceleration 69 ms.
+   */
+  friction: 0,
+  /**
+   * Android's scroll fling, as OverScroller computes it with `scroll_friction`.
+   * Only pan can use it.
+   */
+  spline: 1,
+} as const;
+/** One of the MomentumDecayModel values, or a value this binding does not know. */
+export type MomentumDecayModel =
+  | (typeof MomentumDecayModel)[keyof typeof MomentumDecayModel]
+  | (number & {});
 
 /**
  * Whether the library may use the network.
@@ -2344,6 +2339,21 @@ export interface OpenGlTextureFrame {
   readonly slot: number;
   readonly texture: number;
   readonly target: number;
+}
+
+/**
+ * How a gesture's pan keeps moving the map's content after release.
+ *
+ * See `mln_pan_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface PanMomentum {
+  /**
+   * How fast the map's content moved on the screen at release, in logical
+   * pixels per second. The pan moves only when this is set.
+   */
+  velocity?: ScreenPoint;
+  decay?: MomentumDecay;
 }
 
 /**

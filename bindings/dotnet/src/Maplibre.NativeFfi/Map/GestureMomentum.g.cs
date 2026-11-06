@@ -7,8 +7,8 @@ namespace Maplibre.NativeFfi;
 /// </summary>
 /// <remarks>
 /// <para>A part moves only when its velocity is set, and each part slows on its
-/// own. Every part defaults to <c>MomentumDecay.Friction</c> with a half-life
-/// of 140 ms, and these other defaults:</para>
+/// own. Every part defaults to <c>MomentumDecayModel.Friction</c> with a
+/// half-life of 140 ms, and these other defaults:</para>
 /// <list type="bullet">
 /// <item><description>Pan stops at 10 logical pixels per second, needs a
 /// release of at least 200, and counts a release faster than 10000 as
@@ -25,42 +25,10 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public sealed record GestureMomentum
 {
-    /// <summary>
-    /// How fast the map's content moved on the screen at release, in logical
-    /// pixels per second.
-    /// </summary>
-    public ScreenPoint? PanVelocity { get; init; }
-
-    /// <summary>
-    /// In zoom levels per second.
-    /// </summary>
-    public double? ZoomVelocity { get; init; }
-
-    /// <summary>
-    /// In degrees per second.
-    /// </summary>
-    public double? BearingVelocity { get; init; }
-
-    /// <summary>
-    /// In degrees per second.
-    /// </summary>
-    public double? PitchVelocity { get; init; }
-
-    /// <summary>
-    /// The screen point that the zoom keeps in place. Without one, the zoom
-    /// keeps the center of the view in place.
-    /// </summary>
-    public ScreenPoint? ZoomAnchor { get; init; }
-
-    /// <summary>
-    /// The screen point that the rotation keeps in place. Without one, the
-    /// rotation turns around the center of the view.
-    /// </summary>
-    public ScreenPoint? BearingAnchor { get; init; }
-    public MomentumOptions Pan { get; init; } = new();
-    public MomentumOptions Zoom { get; init; } = new();
-    public MomentumOptions Bearing { get; init; } = new();
-    public MomentumOptions Pitch { get; init; } = new();
+    public PanMomentum Pan { get; init; } = new();
+    public AnchoredMomentum Zoom { get; init; } = new();
+    public AnchoredMomentum Bearing { get; init; } = new();
+    public AnchoredMomentum Pitch { get; init; } = new();
 
     /// <summary>
     /// Where the bearing settles after a gesture that changed it. It settles

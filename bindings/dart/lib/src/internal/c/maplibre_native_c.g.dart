@@ -112,6 +112,15 @@ typedef mln_user_data_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_wake_callback = Pointer<NativeFunction<mln_wake_callbackFunction>>;
 typedef mln_wake_callbackFunction = Void Function(Pointer<Void> user_data);
 
+final class mln_anchored_momentum extends Struct {
+  @Uint32()
+  external int fields;
+  @Double()
+  external double velocity;
+  external mln_screen_point anchor;
+  external mln_momentum_decay decay;
+}
+
 final class mln_android_hardware_buffer_frame extends Struct {
   @Uint32()
   external int size;
@@ -629,19 +638,10 @@ final class mln_geo_json_source_options extends Struct {
 final class mln_gesture_momentum extends Struct {
   @Uint32()
   external int fields;
-  external mln_screen_point pan_velocity;
-  @Double()
-  external double zoom_velocity;
-  @Double()
-  external double bearing_velocity;
-  @Double()
-  external double pitch_velocity;
-  external mln_screen_point zoom_anchor;
-  external mln_screen_point bearing_anchor;
-  external mln_momentum_options pan;
-  external mln_momentum_options zoom;
-  external mln_momentum_options bearing;
-  external mln_momentum_options pitch;
+  external mln_pan_momentum pan;
+  external mln_anchored_momentum zoom;
+  external mln_anchored_momentum bearing;
+  external mln_anchored_momentum pitch;
   external mln_bearing_snap bearing_snap;
 }
 
@@ -953,11 +953,11 @@ final class mln_metal_texture_frame extends Struct {
   external int pixel_format;
 }
 
-final class mln_momentum_options extends Struct {
+final class mln_momentum_decay extends Struct {
   @Uint32()
   external int fields;
   @Uint32()
-  external int decay;
+  external int model;
   @Double()
   external double half_life_ms;
   @Double()
@@ -1156,6 +1156,13 @@ final class mln_open_gl_texture_frame extends Struct {
   external int texture;
   @Uint32()
   external int target;
+}
+
+final class mln_pan_momentum extends Struct {
+  @Uint32()
+  external int fields;
+  external mln_screen_point velocity;
+  external mln_momentum_decay decay;
 }
 
 final class mln_premultiplied_rgba8_image extends Struct {
@@ -2079,6 +2086,10 @@ final class mln_win32_window_replacement extends Struct {
   external Pointer<Void> window;
 }
 
+// mln_anchored_momentum_field
+const MLN_ANCHORED_MOMENTUM_VELOCITY = 1;
+const MLN_ANCHORED_MOMENTUM_ANCHOR = 2;
+
 // mln_animation_option_field
 const MLN_ANIMATION_OPTION_DURATION = 1;
 const MLN_ANIMATION_OPTION_VELOCITY = 2;
@@ -2201,13 +2212,7 @@ const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 128;
 const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256;
 
 // mln_gesture_momentum_field
-const MLN_GESTURE_MOMENTUM_PAN_VELOCITY = 1;
-const MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY = 2;
-const MLN_GESTURE_MOMENTUM_BEARING_VELOCITY = 4;
-const MLN_GESTURE_MOMENTUM_PITCH_VELOCITY = 8;
-const MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR = 16;
-const MLN_GESTURE_MOMENTUM_BEARING_ANCHOR = 32;
-const MLN_GESTURE_MOMENTUM_BEARING_SNAP = 64;
+const MLN_GESTURE_MOMENTUM_BEARING_SNAP = 1;
 
 // mln_gesture_phase
 const MLN_GESTURE_PHASE_NONE = 0;
@@ -2302,18 +2307,18 @@ const MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 2;
 const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4;
 const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
 
-// mln_momentum_decay
-const MLN_MOMENTUM_DECAY_FRICTION = 0;
-const MLN_MOMENTUM_DECAY_SPLINE = 1;
+// mln_momentum_decay_field
+const MLN_MOMENTUM_DECAY_MODEL = 1;
+const MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 2;
+const MLN_MOMENTUM_DECAY_STOP_SPEED = 4;
+const MLN_MOMENTUM_DECAY_SCROLL_FRICTION = 8;
+const MLN_MOMENTUM_DECAY_MIN_SPEED = 16;
+const MLN_MOMENTUM_DECAY_MAX_SPEED = 32;
+const MLN_MOMENTUM_DECAY_MAX_DISTANCE = 64;
 
-// mln_momentum_option_field
-const MLN_MOMENTUM_OPTION_DECAY = 1;
-const MLN_MOMENTUM_OPTION_HALF_LIFE_MS = 2;
-const MLN_MOMENTUM_OPTION_STOP_SPEED = 4;
-const MLN_MOMENTUM_OPTION_SCROLL_FRICTION = 8;
-const MLN_MOMENTUM_OPTION_MIN_SPEED = 16;
-const MLN_MOMENTUM_OPTION_MAX_SPEED = 32;
-const MLN_MOMENTUM_OPTION_MAX_DISTANCE = 64;
+// mln_momentum_decay_model
+const MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0;
+const MLN_MOMENTUM_DECAY_MODEL_SPLINE = 1;
 
 // mln_network_status
 const MLN_NETWORK_STATUS_ONLINE = 1;
@@ -2357,6 +2362,9 @@ const MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL = 3;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 2;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4;
+
+// mln_pan_momentum_field
+const MLN_PAN_MOMENTUM_VELOCITY = 1;
 
 // mln_projection_mode_option_field
 const MLN_PROJECTION_MODE_OPTION_AXONOMETRIC = 1;

@@ -1,25 +1,54 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
+#nullable enable
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How a part of a gesture's momentum slows from its release speed.
+/// How one part of a gesture's momentum slows from its release speed.
 /// </summary>
 /// <remarks>
-/// See <c>mln_momentum_decay</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+/// <para>Speeds and distances are in the part's unit: logical pixels for pan,
+/// zoom levels for zoom, and degrees for bearing and pitch. A setting whose bit
+/// isn't set takes the part's default, which <c>GestureMomentum</c> lists.
+/// <c>min_speed</c> is finite and not negative, and every other setting is
+/// finite and positive. One value can serve every release, as a preset that
+/// matches a platform's scrolling.</para>
+/// <para>See <c>mln_momentum_decay</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>
-public enum MomentumDecay : uint
+public sealed record MomentumDecay
 {
-    /// <summary>
-    /// The speed halves every <c>half_life_ms</c>, until it drops to
-    /// <c>stop_speed</c>. UIScrollView's normal deceleration is a half-life of
-    /// 346 ms, and its fast deceleration 69 ms.
-    /// </summary>
-    Friction = 0,
+    public MomentumDecayModel? Model { get; init; }
 
     /// <summary>
-    /// Android's scroll fling, as OverScroller computes it with
-    /// <c>scroll_friction</c>. Only pan can use it.
+    /// For <c>MomentumDecayModel.Friction</c>, how long the speed takes to
+    /// halve.
     /// </summary>
-    Spline = 1,
+    public double? HalfLifeMs { get; init; }
+
+    /// <summary>
+    /// For <c>MomentumDecayModel.Friction</c>, the speed at which it ends.
+    /// </summary>
+    public double? StopSpeed { get; init; }
+
+    /// <summary>
+    /// For <c>MomentumDecayModel.Spline</c>, Android's
+    /// <c>ViewConfiguration.getScrollFriction()</c>. Defaults to 0.015.
+    /// </summary>
+    public double? ScrollFriction { get; init; }
+
+    /// <summary>
+    /// A slower release starts no momentum.
+    /// </summary>
+    public double? MinSpeed { get; init; }
+
+    /// <summary>
+    /// A faster release counts as this speed.
+    /// </summary>
+    public double? MaxSpeed { get; init; }
+
+    /// <summary>
+    /// The farthest the part moves. A release that would move farther starts
+    /// slower, so it ends sooner.
+    /// </summary>
+    public double? MaxDistance { get; init; }
 }

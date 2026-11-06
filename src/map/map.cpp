@@ -4815,67 +4815,67 @@ auto momentum_defaults(
 // Applies `options` over a part's defaults, or returns nothing and sets the
 // thread error when an option is invalid.
 auto resolve_momentum_decay(
-  const mln_momentum_options& options, mln::MomentumDecay decay,
+  const mln_momentum_decay& options, mln::MomentumDecay decay,
   std::string_view part, bool spline_allowed
 ) -> std::optional<mln::MomentumDecay> {
   constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_MOMENTUM_OPTION_DECAY) |
-    MLN_MOMENTUM_OPTION_HALF_LIFE_MS | MLN_MOMENTUM_OPTION_STOP_SPEED |
-    MLN_MOMENTUM_OPTION_SCROLL_FRICTION | MLN_MOMENTUM_OPTION_MIN_SPEED |
-    MLN_MOMENTUM_OPTION_MAX_SPEED | MLN_MOMENTUM_OPTION_MAX_DISTANCE;
+    static_cast<uint32_t>(MLN_MOMENTUM_DECAY_MODEL) |
+    MLN_MOMENTUM_DECAY_HALF_LIFE_MS | MLN_MOMENTUM_DECAY_STOP_SPEED |
+    MLN_MOMENTUM_DECAY_SCROLL_FRICTION | MLN_MOMENTUM_DECAY_MIN_SPEED |
+    MLN_MOMENTUM_DECAY_MAX_SPEED | MLN_MOMENTUM_DECAY_MAX_DISTANCE;
   const auto fields = options.fields;
   const auto fail = [part](std::string_view problem) {
-    const auto message = std::string{"momentum options for "} +
+    const auto message = std::string{"the momentum decay of "} +
                          std::string{part} + " " + std::string{problem};
     set_thread_error(message.c_str());
     return std::nullopt;
   };
   const auto has = [fields](uint32_t bit) { return (fields & bit) != 0U; };
-  if ((fields & ~known_fields) != 0U) return fail("contain unknown bits");
-  if (has(MLN_MOMENTUM_OPTION_DECAY)) {
-    if (options.decay > MLN_MOMENTUM_DECAY_SPLINE) {
-      return fail("have an invalid decay");
+  if ((fields & ~known_fields) != 0U) return fail("contains unknown bits");
+  if (has(MLN_MOMENTUM_DECAY_MODEL)) {
+    if (options.model > MLN_MOMENTUM_DECAY_MODEL_SPLINE) {
+      return fail("has an invalid model");
     }
-    if (options.decay == MLN_MOMENTUM_DECAY_SPLINE && !spline_allowed) {
-      return fail("can't use the spline decay, which only pan can use");
+    if (options.model == MLN_MOMENTUM_DECAY_MODEL_SPLINE && !spline_allowed) {
+      return fail("can't use the spline model, which only pan can use");
     }
-    decay.model = options.decay == MLN_MOMENTUM_DECAY_SPLINE
+    decay.model = options.model == MLN_MOMENTUM_DECAY_MODEL_SPLINE
                     ? mln::MomentumDecay::Model::Spline
                     : mln::MomentumDecay::Model::Friction;
   }
   const auto positive = [](double value) {
     return std::isfinite(value) && value > 0.0;
   };
-  if (has(MLN_MOMENTUM_OPTION_HALF_LIFE_MS)) {
+  if (has(MLN_MOMENTUM_DECAY_HALF_LIFE_MS)) {
     if (
       !positive(options.half_life_ms) ||
       !is_native_duration_ms(options.half_life_ms)
     ) {
-      return fail("need a positive half-life in the native duration range");
+      return fail("needs a positive half-life in the native duration range");
     }
     decay.halfLife = duration_from_milliseconds(options.half_life_ms);
   }
   if (
-    (has(MLN_MOMENTUM_OPTION_STOP_SPEED) && !positive(options.stop_speed)) ||
-    (has(MLN_MOMENTUM_OPTION_SCROLL_FRICTION) &&
+    (has(MLN_MOMENTUM_DECAY_STOP_SPEED) && !positive(options.stop_speed)) ||
+    (has(MLN_MOMENTUM_DECAY_SCROLL_FRICTION) &&
      !positive(options.scroll_friction)) ||
-    (has(MLN_MOMENTUM_OPTION_MIN_SPEED) &&
+    (has(MLN_MOMENTUM_DECAY_MIN_SPEED) &&
      !(std::isfinite(options.min_speed) && options.min_speed >= 0.0)) ||
-    (has(MLN_MOMENTUM_OPTION_MAX_SPEED) && !positive(options.max_speed)) ||
-    (has(MLN_MOMENTUM_OPTION_MAX_DISTANCE) && !positive(options.max_distance))
+    (has(MLN_MOMENTUM_DECAY_MAX_SPEED) && !positive(options.max_speed)) ||
+    (has(MLN_MOMENTUM_DECAY_MAX_DISTANCE) && !positive(options.max_distance))
   ) {
     return fail(
-      "need a finite minimum speed that isn't negative, and finite positive "
+      "needs a finite minimum speed that isn't negative, and finite positive "
       "values for the rest"
     );
   }
-  if (has(MLN_MOMENTUM_OPTION_STOP_SPEED)) decay.stopSpeed = options.stop_speed;
-  if (has(MLN_MOMENTUM_OPTION_SCROLL_FRICTION)) {
+  if (has(MLN_MOMENTUM_DECAY_STOP_SPEED)) decay.stopSpeed = options.stop_speed;
+  if (has(MLN_MOMENTUM_DECAY_SCROLL_FRICTION)) {
     decay.scrollFriction = options.scroll_friction;
   }
-  if (has(MLN_MOMENTUM_OPTION_MIN_SPEED)) decay.minSpeed = options.min_speed;
-  if (has(MLN_MOMENTUM_OPTION_MAX_SPEED)) decay.maxSpeed = options.max_speed;
-  if (has(MLN_MOMENTUM_OPTION_MAX_DISTANCE)) {
+  if (has(MLN_MOMENTUM_DECAY_MIN_SPEED)) decay.minSpeed = options.min_speed;
+  if (has(MLN_MOMENTUM_DECAY_MAX_SPEED)) decay.maxSpeed = options.max_speed;
+  if (has(MLN_MOMENTUM_DECAY_MAX_DISTANCE)) {
     decay.maxDistance = options.max_distance;
   }
   return decay;
@@ -4920,84 +4920,93 @@ auto validate_bearing_snap(const mln_bearing_snap& snap)
   return result;
 }
 
+// One anchored part of a gesture's momentum, converted for MapLibre.
+struct NativeAnchoredMomentum {
+  std::optional<double> velocity;
+  std::optional<mln::ScreenCoordinate> anchor;
+  mln::MomentumDecay decay;
+};
+
+auto to_native_anchored_momentum(
+  const mln_anchored_momentum& part, mln::MomentumDecay defaults,
+  std::string_view name
+) -> std::optional<NativeAnchoredMomentum> {
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_ANCHORED_MOMENTUM_VELOCITY) |
+    MLN_ANCHORED_MOMENTUM_ANCHOR;
+  if ((part.fields & ~known_fields) != 0U) {
+    set_thread_error("mln_anchored_momentum.fields contains unknown bits");
+    return std::nullopt;
+  }
+  auto result = NativeAnchoredMomentum{};
+  if ((part.fields & MLN_ANCHORED_MOMENTUM_VELOCITY) != 0U) {
+    if (!std::isfinite(part.velocity)) {
+      set_thread_error("gesture momentum velocities must be finite");
+      return std::nullopt;
+    }
+    result.velocity = part.velocity;
+  }
+  if ((part.fields & MLN_ANCHORED_MOMENTUM_ANCHOR) != 0U) {
+    if (validate_screen_point(part.anchor) != MLN_STATUS_OK)
+      return std::nullopt;
+    result.anchor = to_native_screen_point(part.anchor);
+  }
+  const auto decay = resolve_momentum_decay(part.decay, defaults, name, false);
+  if (!decay) return std::nullopt;
+  result.decay = *decay;
+  return result;
+}
+
 // Converts a gesture's momentum on the caller's thread, so that invalid input
 // fails the call. MapLibre plans each part from its velocity. The result
 // leaves out finishFn, which the worker sets.
 auto to_native_gesture_momentum(const mln_gesture_momentum& momentum)
   -> std::optional<mln::CameraMomentum> {
-  constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_GESTURE_MOMENTUM_PAN_VELOCITY) |
-    MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY | MLN_GESTURE_MOMENTUM_BEARING_VELOCITY |
-    MLN_GESTURE_MOMENTUM_PITCH_VELOCITY | MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR |
-    MLN_GESTURE_MOMENTUM_BEARING_ANCHOR | MLN_GESTURE_MOMENTUM_BEARING_SNAP;
-  const auto fields = momentum.fields;
-  if ((fields & ~known_fields) != 0U) {
+  if ((momentum.fields & ~MLN_GESTURE_MOMENTUM_BEARING_SNAP) != 0U) {
     set_thread_error("mln_gesture_momentum.fields contains unknown bits");
     return std::nullopt;
   }
-  const auto has = [fields](uint32_t bit) { return (fields & bit) != 0U; };
-  if (
-    (has(MLN_GESTURE_MOMENTUM_PAN_VELOCITY) &&
-     validate_screen_point(momentum.pan_velocity) != MLN_STATUS_OK) ||
-    (has(MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY) &&
-     !std::isfinite(momentum.zoom_velocity)) ||
-    (has(MLN_GESTURE_MOMENTUM_BEARING_VELOCITY) &&
-     !std::isfinite(momentum.bearing_velocity)) ||
-    (has(MLN_GESTURE_MOMENTUM_PITCH_VELOCITY) &&
-     !std::isfinite(momentum.pitch_velocity))
-  ) {
-    set_thread_error("gesture momentum velocities must be finite");
-    return std::nullopt;
-  }
-  if (
-    (has(MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR) &&
-     validate_screen_point(momentum.zoom_anchor) != MLN_STATUS_OK) ||
-    (has(MLN_GESTURE_MOMENTUM_BEARING_ANCHOR) &&
-     validate_screen_point(momentum.bearing_anchor) != MLN_STATUS_OK)
-  ) {
-    return std::nullopt;
-  }
   auto result = mln::CameraMomentum{};
-  const auto pan = resolve_momentum_decay(
-    momentum.pan, momentum_defaults(10.0, 200.0, 10000.0), "pan", true
+  const auto& pan = momentum.pan;
+  if ((pan.fields & ~MLN_PAN_MOMENTUM_VELOCITY) != 0U) {
+    set_thread_error("mln_pan_momentum.fields contains unknown bits");
+    return std::nullopt;
+  }
+  if ((pan.fields & MLN_PAN_MOMENTUM_VELOCITY) != 0U) {
+    if (validate_screen_point(pan.velocity) != MLN_STATUS_OK) {
+      return std::nullopt;
+    }
+    result.panVelocity = to_native_screen_point(pan.velocity);
+  }
+  const auto pan_decay = resolve_momentum_decay(
+    pan.decay, momentum_defaults(10.0, 200.0, 10000.0), "pan", true
   );
-  const auto zoom = resolve_momentum_decay(
+  if (!pan_decay) return std::nullopt;
+  result.panDecay = *pan_decay;
+  const auto zoom = to_native_anchored_momentum(
     momentum.zoom,
     momentum_defaults(0.01, 0.0, std::numeric_limits<double>::infinity(), 2.5),
-    "zoom", false
+    "zoom"
   );
-  const auto bearing = resolve_momentum_decay(
-    momentum.bearing, momentum_defaults(1.0, 60.0), "bearing", false
+  const auto bearing = to_native_anchored_momentum(
+    momentum.bearing, momentum_defaults(1.0, 60.0), "bearing"
   );
-  const auto pitch = resolve_momentum_decay(
-    momentum.pitch, momentum_defaults(1.0, 5.0), "pitch", false
+  const auto pitch = to_native_anchored_momentum(
+    momentum.pitch, momentum_defaults(1.0, 5.0), "pitch"
   );
-  if (!pan || !zoom || !bearing || !pitch) return std::nullopt;
-  result.panDecay = *pan;
-  result.zoomDecay = *zoom;
-  result.bearingDecay = *bearing;
-  result.pitchDecay = *pitch;
-  if (has(MLN_GESTURE_MOMENTUM_BEARING_SNAP)) {
+  if (!zoom || !bearing || !pitch) return std::nullopt;
+  result.zoomVelocity = zoom->velocity;
+  result.zoomAnchor = zoom->anchor;
+  result.zoomDecay = zoom->decay;
+  result.bearingVelocity = bearing->velocity;
+  result.bearingAnchor = bearing->anchor;
+  result.bearingDecay = bearing->decay;
+  result.pitchVelocity = pitch->velocity;
+  result.pitchAnchor = pitch->anchor;
+  result.pitchDecay = pitch->decay;
+  if ((momentum.fields & MLN_GESTURE_MOMENTUM_BEARING_SNAP) != 0U) {
     result.bearingSnap = validate_bearing_snap(momentum.bearing_snap);
     if (!result.bearingSnap) return std::nullopt;
-  }
-  if (has(MLN_GESTURE_MOMENTUM_PAN_VELOCITY)) {
-    result.panVelocity = to_native_screen_point(momentum.pan_velocity);
-  }
-  if (has(MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY)) {
-    result.zoomVelocity = momentum.zoom_velocity;
-  }
-  if (has(MLN_GESTURE_MOMENTUM_BEARING_VELOCITY)) {
-    result.bearingVelocity = momentum.bearing_velocity;
-  }
-  if (has(MLN_GESTURE_MOMENTUM_PITCH_VELOCITY)) {
-    result.pitchVelocity = momentum.pitch_velocity;
-  }
-  if (has(MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR)) {
-    result.zoomAnchor = to_native_screen_point(momentum.zoom_anchor);
-  }
-  if (has(MLN_GESTURE_MOMENTUM_BEARING_ANCHOR)) {
-    result.bearingAnchor = to_native_screen_point(momentum.bearing_anchor);
   }
   return result;
 }

@@ -8,6 +8,22 @@ namespace Maplibre.NativeFfi.Internal.Struct;
 
 internal static unsafe class GeneratedValues
 {
+    internal static mln_anchored_momentum NativeAnchoredMomentum(AnchoredMomentum value)
+    {
+        Required(value.Decay, "AnchoredMomentum.Decay must not be null.");
+        var native = new mln_anchored_momentum();
+        native.fields = 0;
+        native.fields |= Put(value.Velocity, ref native.velocity, MLN_ANCHORED_MOMENTUM_VELOCITY);
+        native.fields |= Put(
+            value.Anchor,
+            ref native.anchor,
+            MLN_ANCHORED_MOMENTUM_ANCHOR,
+            NativeScreenPoint
+        );
+        native.decay = NativeMomentumDecay(value.Decay);
+        return native;
+    }
+
     internal static AndroidHardwareBufferFrame CopyAndroidHardwareBufferFrame(
         mln_android_hardware_buffer_frame value
     ) =>
@@ -847,43 +863,10 @@ internal static unsafe class GeneratedValues
         Required(value.Pitch, "GestureMomentum.Pitch must not be null.");
         var native = new mln_gesture_momentum();
         native.fields = 0;
-        native.fields |= Put(
-            value.PanVelocity,
-            ref native.pan_velocity,
-            MLN_GESTURE_MOMENTUM_PAN_VELOCITY,
-            NativeScreenPoint
-        );
-        native.fields |= Put(
-            value.ZoomVelocity,
-            ref native.zoom_velocity,
-            MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY
-        );
-        native.fields |= Put(
-            value.BearingVelocity,
-            ref native.bearing_velocity,
-            MLN_GESTURE_MOMENTUM_BEARING_VELOCITY
-        );
-        native.fields |= Put(
-            value.PitchVelocity,
-            ref native.pitch_velocity,
-            MLN_GESTURE_MOMENTUM_PITCH_VELOCITY
-        );
-        native.fields |= Put(
-            value.ZoomAnchor,
-            ref native.zoom_anchor,
-            MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR,
-            NativeScreenPoint
-        );
-        native.fields |= Put(
-            value.BearingAnchor,
-            ref native.bearing_anchor,
-            MLN_GESTURE_MOMENTUM_BEARING_ANCHOR,
-            NativeScreenPoint
-        );
-        native.pan = NativeMomentumOptions(value.Pan);
-        native.zoom = NativeMomentumOptions(value.Zoom);
-        native.bearing = NativeMomentumOptions(value.Bearing);
-        native.pitch = NativeMomentumOptions(value.Pitch);
+        native.pan = NativePanMomentum(value.Pan);
+        native.zoom = NativeAnchoredMomentum(value.Zoom);
+        native.bearing = NativeAnchoredMomentum(value.Bearing);
+        native.pitch = NativeAnchoredMomentum(value.Pitch);
         native.fields |= Put(
             value.BearingSnap,
             ref native.bearing_snap,
@@ -1362,37 +1345,33 @@ internal static unsafe class GeneratedValues
             value.pixel_format
         );
 
-    internal static mln_momentum_options NativeMomentumOptions(MomentumOptions value)
+    internal static mln_momentum_decay NativeMomentumDecay(MomentumDecay value)
     {
-        var native = new mln_momentum_options();
+        var native = new mln_momentum_decay();
         native.fields = 0;
         native.fields |= Put(
-            value.Decay,
-            ref native.decay,
-            MLN_MOMENTUM_OPTION_DECAY,
-            static present => (mln_momentum_decay)present
+            value.Model,
+            ref native.model,
+            MLN_MOMENTUM_DECAY_MODEL,
+            static present => (mln_momentum_decay_model)present
         );
         native.fields |= Put(
             value.HalfLifeMs,
             ref native.half_life_ms,
-            MLN_MOMENTUM_OPTION_HALF_LIFE_MS
+            MLN_MOMENTUM_DECAY_HALF_LIFE_MS
         );
-        native.fields |= Put(
-            value.StopSpeed,
-            ref native.stop_speed,
-            MLN_MOMENTUM_OPTION_STOP_SPEED
-        );
+        native.fields |= Put(value.StopSpeed, ref native.stop_speed, MLN_MOMENTUM_DECAY_STOP_SPEED);
         native.fields |= Put(
             value.ScrollFriction,
             ref native.scroll_friction,
-            MLN_MOMENTUM_OPTION_SCROLL_FRICTION
+            MLN_MOMENTUM_DECAY_SCROLL_FRICTION
         );
-        native.fields |= Put(value.MinSpeed, ref native.min_speed, MLN_MOMENTUM_OPTION_MIN_SPEED);
-        native.fields |= Put(value.MaxSpeed, ref native.max_speed, MLN_MOMENTUM_OPTION_MAX_SPEED);
+        native.fields |= Put(value.MinSpeed, ref native.min_speed, MLN_MOMENTUM_DECAY_MIN_SPEED);
+        native.fields |= Put(value.MaxSpeed, ref native.max_speed, MLN_MOMENTUM_DECAY_MAX_SPEED);
         native.fields |= Put(
             value.MaxDistance,
             ref native.max_distance,
-            MLN_MOMENTUM_OPTION_MAX_DISTANCE
+            MLN_MOMENTUM_DECAY_MAX_DISTANCE
         );
         return native;
     }
@@ -1660,6 +1639,21 @@ internal static unsafe class GeneratedValues
 
     internal static OpenGlTextureFrame CopyOpenGlTextureFrame(mln_open_gl_texture_frame value) =>
         new(value.width, value.height, value.scale_factor, value.slot, value.texture, value.target);
+
+    internal static mln_pan_momentum NativePanMomentum(PanMomentum value)
+    {
+        Required(value.Decay, "PanMomentum.Decay must not be null.");
+        var native = new mln_pan_momentum();
+        native.fields = 0;
+        native.fields |= Put(
+            value.Velocity,
+            ref native.velocity,
+            MLN_PAN_MOMENTUM_VELOCITY,
+            NativeScreenPoint
+        );
+        native.decay = NativeMomentumDecay(value.Decay);
+        return native;
+    }
 
     internal static mln_premultiplied_rgba8_image NativePremultipliedRgba8Image(
         PremultipliedRgba8Image value,

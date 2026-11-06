@@ -52,6 +52,7 @@ Vec3 struct
 VulkanBorrowedTexture struct
 VulkanSurfaceReplacement struct
 CommandCompletion struct
+AnchoredMomentum.anchor#property no_accessor_method
 AnimationOptions.easing#property no_accessor_method
 BoundOptions.bounds#property no_accessor_method
 CameraDelta.anchor#property no_accessor_method
@@ -63,9 +64,6 @@ CameraOptions.padding#property no_accessor_method
 DmaBufRingDescriptor.logical_size#property no_accessor_method
 FreeCameraOptions.orientation#property no_accessor_method
 FreeCameraOptions.position#property no_accessor_method
-GestureMomentum.bearing_anchor#property no_accessor_method
-GestureMomentum.pan_velocity#property no_accessor_method
-GestureMomentum.zoom_anchor#property no_accessor_method
 IoSurfaceRingDescriptor.logical_size#property no_accessor_method
 MapOptions.initial_extent#property no_accessor_method
 MapViewportOptions.frustum_offset#property no_accessor_method
@@ -78,6 +76,7 @@ OpenGlBorrowedTextureDescriptor.logical_size#property no_accessor_method
 OpenGlBorrowedTextureReplacement.logical_size#property no_accessor_method
 OpenGlSurfaceDescriptor.logical_size#property no_accessor_method
 OpenGlSurfaceReplacement.logical_size#property no_accessor_method
+PanMomentum.velocity#property no_accessor_method
 RenderedFeatureQueryOptions.layer_ids#property no_accessor_method
 SourceFeatureQueryOptions.source_layer_ids#property no_accessor_method
 StyleExpressionInputs.available_images#property no_accessor_method

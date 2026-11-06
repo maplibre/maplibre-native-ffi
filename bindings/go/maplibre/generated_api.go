@@ -545,31 +545,31 @@ func (value MapMode) String() string {
 	return fmt.Sprintf("MapMode(%d)", value)
 }
 
-// MomentumDecay corresponds to mln_momentum_decay. How a part of a gesture's
-// momentum slows from its release speed.
+// MomentumDecayModel corresponds to mln_momentum_decay_model. How a part of a
+// gesture's momentum slows from its release speed.
 //
-// See mln_momentum_decay in the C API reference:
+// See mln_momentum_decay_model in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type MomentumDecay uint32
+type MomentumDecayModel uint32
 
 const (
 	// The speed halves every half_life_ms, until it drops to stop_speed.
 	// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
 	// deceleration 69 ms.
-	MomentumDecayFriction MomentumDecay = MomentumDecay(C.MLN_MOMENTUM_DECAY_FRICTION)
+	MomentumDecayModelFriction MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_FRICTION)
 	// Android's scroll fling, as OverScroller computes it with scroll_friction.
 	// Only pan can use it.
-	MomentumDecaySpline MomentumDecay = MomentumDecay(C.MLN_MOMENTUM_DECAY_SPLINE)
+	MomentumDecayModelSpline MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_SPLINE)
 )
 
-func (value MomentumDecay) String() string {
+func (value MomentumDecayModel) String() string {
 	switch value {
 	case 0:
-		return "MomentumDecayFriction"
+		return "MomentumDecayModelFriction"
 	case 1:
-		return "MomentumDecaySpline"
+		return "MomentumDecayModelSpline"
 	}
-	return fmt.Sprintf("MomentumDecay(%d)", value)
+	return fmt.Sprintf("MomentumDecayModel(%d)", value)
 }
 
 // NetworkStatus corresponds to mln_network_status. Whether the library may use
@@ -1986,6 +1986,31 @@ func (RuntimeEventPayloadSpriteVariant) bindingTag() uint32 {
 }
 func (RuntimeEventPayloadSpriteVariant) isRuntimeEventPayload() {}
 
+// AnchoredMomentum corresponds to mln_anchored_momentum. How a gesture's zoom,
+// bearing, or pitch keeps changing after release.
+//
+// See mln_anchored_momentum in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type AnchoredMomentum struct {
+	// How fast the value changed at release: zoom levels per second for zoom, and
+	// degrees per second for bearing and pitch. The part moves only when this is
+	// set.
+	Velocity *float64
+	// The screen point that the change keeps in place. Without one, the change
+	// keeps the center of the view in place.
+	Anchor *ScreenPoint
+	Decay  MomentumDecay
+}
+
+func nativeAnchoredMomentum(input AnchoredMomentum, arena *bindingArena) C.mln_anchored_momentum {
+	raw := C.mln_anchored_momentum{}
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_ANCHORED_MOMENTUM_VELOCITY, &raw.velocity, input.Velocity, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_ANCHORED_MOMENTUM_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
+	raw.decay = nativeMomentumDecay(input.Decay, arena)
+	return raw
+}
+
 // AndroidHardwareBufferFrame corresponds to mln_android_hardware_buffer_frame.
 // The Android hardware buffer of an acquired frame.
 //
@@ -3060,8 +3085,8 @@ func nativeGeoJSONSourceOptions(input GeoJSONSourceOptions, arena *bindingArena)
 // moving the camera after the user lets go.
 //
 // A part moves only when its velocity is set, and each part slows on its own.
-// Every part defaults to MomentumDecayFriction with a half-life of 140 ms, and
-// these other defaults:
+// Every part defaults to MomentumDecayModelFriction with a half-life of 140 ms,
+// and these other defaults:
 //
 //   - Pan stops at 10 logical pixels per second, needs a release of at least
 //     200, and counts a release faster than 10000 as 10000.
@@ -3072,25 +3097,10 @@ func nativeGeoJSONSourceOptions(input GeoJSONSourceOptions, arena *bindingArena)
 // See mln_gesture_momentum in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type GestureMomentum struct {
-	// How fast the map's content moved on the screen at release, in logical pixels
-	// per second.
-	PanVelocity *ScreenPoint
-	// In zoom levels per second.
-	ZoomVelocity *float64
-	// In degrees per second.
-	BearingVelocity *float64
-	// In degrees per second.
-	PitchVelocity *float64
-	// The screen point that the zoom keeps in place. Without one, the zoom keeps
-	// the center of the view in place.
-	ZoomAnchor *ScreenPoint
-	// The screen point that the rotation keeps in place. Without one, the rotation
-	// turns around the center of the view.
-	BearingAnchor *ScreenPoint
-	Pan           MomentumOptions
-	Zoom          MomentumOptions
-	Bearing       MomentumOptions
-	Pitch         MomentumOptions
+	Pan     PanMomentum
+	Zoom    AnchoredMomentum
+	Bearing AnchoredMomentum
+	Pitch   AnchoredMomentum
 	// Where the bearing settles after a gesture that changed it. It settles once
 	// the other parts stop, or right away when none of them move. Without this, the
 	// bearing stays where the gesture leaves it.
@@ -3100,16 +3110,10 @@ type GestureMomentum struct {
 func nativeGestureMomentum(input GestureMomentum, arena *bindingArena) C.mln_gesture_momentum {
 	raw := C.mln_gesture_momentum{}
 	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_GESTURE_MOMENTUM_PAN_VELOCITY, &raw.pan_velocity, input.PanVelocity, arena, nativeScreenPoint)
-	bindingMasked(&raw.fields, C.MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY, &raw.zoom_velocity, input.ZoomVelocity, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_GESTURE_MOMENTUM_BEARING_VELOCITY, &raw.bearing_velocity, input.BearingVelocity, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_GESTURE_MOMENTUM_PITCH_VELOCITY, &raw.pitch_velocity, input.PitchVelocity, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR, &raw.zoom_anchor, input.ZoomAnchor, arena, nativeScreenPoint)
-	bindingMasked(&raw.fields, C.MLN_GESTURE_MOMENTUM_BEARING_ANCHOR, &raw.bearing_anchor, input.BearingAnchor, arena, nativeScreenPoint)
-	raw.pan = nativeMomentumOptions(input.Pan, arena)
-	raw.zoom = nativeMomentumOptions(input.Zoom, arena)
-	raw.bearing = nativeMomentumOptions(input.Bearing, arena)
-	raw.pitch = nativeMomentumOptions(input.Pitch, arena)
+	raw.pan = nativePanMomentum(input.Pan, arena)
+	raw.zoom = nativeAnchoredMomentum(input.Zoom, arena)
+	raw.bearing = nativeAnchoredMomentum(input.Bearing, arena)
+	raw.pitch = nativeAnchoredMomentum(input.Pitch, arena)
 	bindingMasked(&raw.fields, C.MLN_GESTURE_MOMENTUM_BEARING_SNAP, &raw.bearing_snap, input.BearingSnap, arena, nativeBearingSnap)
 	return raw
 }
@@ -3895,25 +3899,26 @@ func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
 	return result
 }
 
-// MomentumOptions corresponds to mln_momentum_options. How one part of a
-// gesture keeps moving after its release.
+// MomentumDecay corresponds to mln_momentum_decay. How one part of a gesture's
+// momentum slows from its release speed.
 //
-// The part starts at its release speed. Speeds and distances are in the part's
-// unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
-// and pitch. A setting whose bit isn't set takes the part's default, which
-// GestureMomentum lists. min_speed is finite and not negative, and every other
-// setting is finite and positive.
+// Speeds and distances are in the part's unit: logical pixels for pan, zoom
+// levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
+// set takes the part's default, which GestureMomentum lists. min_speed is
+// finite and not negative, and every other setting is finite and positive. One
+// value can serve every release, as a preset that matches a platform's
+// scrolling.
 //
-// See mln_momentum_options in the C API reference:
+// See mln_momentum_decay in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type MomentumOptions struct {
-	Decay *MomentumDecay
-	// For MomentumDecayFriction, how long the speed takes to halve.
+type MomentumDecay struct {
+	Model *MomentumDecayModel
+	// For MomentumDecayModelFriction, how long the speed takes to halve.
 	HalfLifeMs *float64
-	// For MomentumDecayFriction, the speed at which it ends.
+	// For MomentumDecayModelFriction, the speed at which it ends.
 	StopSpeed *float64
-	// For MomentumDecaySpline, Android's ViewConfiguration.getScrollFriction().
-	// Defaults to 0.015.
+	// For MomentumDecayModelSpline, Android's
+	// ViewConfiguration.getScrollFriction(). Defaults to 0.015.
 	ScrollFriction *float64
 	// A slower release starts no momentum.
 	MinSpeed *float64
@@ -3924,16 +3929,16 @@ type MomentumOptions struct {
 	MaxDistance *float64
 }
 
-func nativeMomentumOptions(input MomentumOptions, arena *bindingArena) C.mln_momentum_options {
-	raw := C.mln_momentum_options{}
+func nativeMomentumDecay(input MomentumDecay, arena *bindingArena) C.mln_momentum_decay {
+	raw := C.mln_momentum_decay{}
 	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_OPTION_DECAY, &raw.decay, input.Decay, arena, bindingNumber[MomentumDecay, C.mln_momentum_decay])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_OPTION_HALF_LIFE_MS, &raw.half_life_ms, input.HalfLifeMs, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_OPTION_STOP_SPEED, &raw.stop_speed, input.StopSpeed, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_OPTION_SCROLL_FRICTION, &raw.scroll_friction, input.ScrollFriction, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_OPTION_MIN_SPEED, &raw.min_speed, input.MinSpeed, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_OPTION_MAX_SPEED, &raw.max_speed, input.MaxSpeed, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_OPTION_MAX_DISTANCE, &raw.max_distance, input.MaxDistance, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MODEL, &raw.model, input.Model, arena, bindingNumber[MomentumDecayModel, C.mln_momentum_decay_model])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_HALF_LIFE_MS, &raw.half_life_ms, input.HalfLifeMs, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_STOP_SPEED, &raw.stop_speed, input.StopSpeed, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_SCROLL_FRICTION, &raw.scroll_friction, input.ScrollFriction, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MIN_SPEED, &raw.min_speed, input.MinSpeed, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MAX_SPEED, &raw.max_speed, input.MaxSpeed, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MAX_DISTANCE, &raw.max_distance, input.MaxDistance, arena, bindingNumber[float64, C.double])
 	return raw
 }
 
@@ -4402,6 +4407,26 @@ func copyOpenGLTextureFrame(raw C.mln_open_gl_texture_frame) OpenGLTextureFrame 
 	result.Texture = uint32(raw.texture)
 	result.Target = uint32(raw.target)
 	return result
+}
+
+// PanMomentum corresponds to mln_pan_momentum. How a gesture's pan keeps moving
+// the map's content after release.
+//
+// See mln_pan_momentum in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type PanMomentum struct {
+	// How fast the map's content moved on the screen at release, in logical pixels
+	// per second. The pan moves only when this is set.
+	Velocity *ScreenPoint
+	Decay    MomentumDecay
+}
+
+func nativePanMomentum(input PanMomentum, arena *bindingArena) C.mln_pan_momentum {
+	raw := C.mln_pan_momentum{}
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_PAN_MOMENTUM_VELOCITY, &raw.velocity, input.Velocity, arena, nativeScreenPoint)
+	raw.decay = nativeMomentumDecay(input.Decay, arena)
+	return raw
 }
 
 // PremultipliedRgba8Image corresponds to mln_premultiplied_rgba8_image. An

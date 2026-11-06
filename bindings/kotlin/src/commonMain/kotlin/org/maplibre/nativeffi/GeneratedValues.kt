@@ -1050,18 +1050,19 @@ public class MapMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
- * See `mln_momentum_decay` in the
+ * See `mln_momentum_decay_model` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public class MomentumDecay(@get:JvmName("getRawValue") public val rawValue: UInt) {
+public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
       0u -> "FRICTION"
       1u -> "SPLINE"
-      else -> "MomentumDecay($rawValue)"
+      else -> "MomentumDecayModel($rawValue)"
     }
 
-  override fun equals(other: Any?): Boolean = other is MomentumDecay && other.rawValue == rawValue
+  override fun equals(other: Any?): Boolean =
+    other is MomentumDecayModel && other.rawValue == rawValue
 
   override fun hashCode(): Int = rawValue.hashCode()
 
@@ -1070,25 +1071,25 @@ public class MomentumDecay(@get:JvmName("getRawValue") public val rawValue: UInt
      * The speed halves every `half_life_ms`, until it drops to `stop_speed`. UIScrollView's normal
      * deceleration is a half-life of 346 ms, and its fast deceleration 69 ms.
      */
-    @JvmField public val FRICTION: MomentumDecay = MomentumDecay(FRICTION_VALUE)
+    @JvmField public val FRICTION: MomentumDecayModel = MomentumDecayModel(FRICTION_VALUE)
     /** The `rawValue` of [FRICTION]. */
     public const val FRICTION_VALUE: UInt = 0u
     /**
      * Android's scroll fling, as OverScroller computes it with `scroll_friction`. Only pan can use
      * it.
      */
-    @JvmField public val SPLINE: MomentumDecay = MomentumDecay(SPLINE_VALUE)
+    @JvmField public val SPLINE: MomentumDecayModel = MomentumDecayModel(SPLINE_VALUE)
     /** The `rawValue` of [SPLINE]. */
     public const val SPLINE_VALUE: UInt = 1u
 
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): MomentumDecay =
+    public fun of(rawValue: UInt): MomentumDecayModel =
       when (rawValue) {
         FRICTION_VALUE -> FRICTION
         SPLINE_VALUE -> SPLINE
-        else -> MomentumDecay(rawValue)
+        else -> MomentumDecayModel(rawValue)
       }
   }
 }
@@ -4799,24 +4800,25 @@ public data class PremultipliedRgba8Image(
 }
 
 /**
- * How one part of a gesture keeps moving after its release.
+ * How one part of a gesture's momentum slows from its release speed.
  *
- * The part starts at its release speed. Speeds and distances are in the part's unit: logical pixels
- * for pan, zoom levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't set
- * takes the part's default, which `GestureMomentum` lists. `min_speed` is finite and not negative,
- * and every other setting is finite and positive.
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom levels for zoom, and
+ * degrees for bearing and pitch. A setting whose bit isn't set takes the part's default, which
+ * `GestureMomentum` lists. `min_speed` is finite and not negative, and every other setting is
+ * finite and positive. One value can serve every release, as a preset that matches a platform's
+ * scrolling.
  *
- * See `mln_momentum_options` in the
+ * See `mln_momentum_decay` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class MomentumOptions(
-  public val decay: MomentumDecay? = null,
-  /** For `MomentumDecay.FRICTION`, how long the speed takes to halve. */
+public data class MomentumDecay(
+  public val model: MomentumDecayModel? = null,
+  /** For `MomentumDecayModel.FRICTION`, how long the speed takes to halve. */
   public val halfLifeMs: Double? = null,
-  /** For `MomentumDecay.FRICTION`, the speed at which it ends. */
+  /** For `MomentumDecayModel.FRICTION`, the speed at which it ends. */
   public val stopSpeed: Double? = null,
   /**
-   * For `MomentumDecay.SPLINE`, Android's `ViewConfiguration.getScrollFriction()`. Defaults to
+   * For `MomentumDecayModel.SPLINE`, Android's `ViewConfiguration.getScrollFriction()`. Defaults to
    * 0.015.
    */
   public val scrollFriction: Double? = null,
@@ -4830,34 +4832,98 @@ public data class MomentumOptions(
    */
   public val maxDistance: Double? = null,
 ) {
-  @PublishedApi internal fun withDecay(decay: MomentumDecay): MomentumOptions = copy(decay = decay)
+  @PublishedApi
+  internal fun withModel(model: MomentumDecayModel): MomentumDecay = copy(model = model)
 
   @PublishedApi
-  internal fun withHalfLifeMs(halfLifeMs: Double): MomentumOptions = copy(halfLifeMs = halfLifeMs)
+  internal fun withHalfLifeMs(halfLifeMs: Double): MomentumDecay = copy(halfLifeMs = halfLifeMs)
 
   @PublishedApi
-  internal fun withStopSpeed(stopSpeed: Double): MomentumOptions = copy(stopSpeed = stopSpeed)
+  internal fun withStopSpeed(stopSpeed: Double): MomentumDecay = copy(stopSpeed = stopSpeed)
 
   @PublishedApi
-  internal fun withScrollFriction(scrollFriction: Double): MomentumOptions =
+  internal fun withScrollFriction(scrollFriction: Double): MomentumDecay =
     copy(scrollFriction = scrollFriction)
 
   @PublishedApi
-  internal fun withMinSpeed(minSpeed: Double): MomentumOptions = copy(minSpeed = minSpeed)
+  internal fun withMinSpeed(minSpeed: Double): MomentumDecay = copy(minSpeed = minSpeed)
 
   @PublishedApi
-  internal fun withMaxSpeed(maxSpeed: Double): MomentumOptions = copy(maxSpeed = maxSpeed)
+  internal fun withMaxSpeed(maxSpeed: Double): MomentumDecay = copy(maxSpeed = maxSpeed)
 
   @PublishedApi
-  internal fun withMaxDistance(maxDistance: Double): MomentumOptions =
-    copy(maxDistance = maxDistance)
+  internal fun withMaxDistance(maxDistance: Double): MomentumDecay = copy(maxDistance = maxDistance)
 
   public companion object {
     /**
      * Creates a value from the members without defaults, for Java, which sets the others with the
      * `withX` methods.
      */
-    @JvmStatic @PublishedApi internal fun of(): MomentumOptions = MomentumOptions()
+    @JvmStatic @PublishedApi internal fun of(): MomentumDecay = MomentumDecay()
+  }
+}
+
+/**
+ * How a gesture's pan keeps moving the map's content after release.
+ *
+ * See `mln_pan_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class PanMomentum(
+  /**
+   * How fast the map's content moved on the screen at release, in logical pixels per second. The
+   * pan moves only when this is set.
+   */
+  public val velocity: ScreenPoint? = null,
+  public val decay: MomentumDecay = MomentumDecay(),
+) {
+  @PublishedApi
+  internal fun withVelocity(velocity: ScreenPoint): PanMomentum = copy(velocity = velocity)
+
+  @PublishedApi internal fun withDecay(decay: MomentumDecay): PanMomentum = copy(decay = decay)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): PanMomentum = PanMomentum()
+  }
+}
+
+/**
+ * How a gesture's zoom, bearing, or pitch keeps changing after release.
+ *
+ * See `mln_anchored_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class AnchoredMomentum(
+  /**
+   * How fast the value changed at release: zoom levels per second for zoom, and degrees per second
+   * for bearing and pitch. The part moves only when this is set.
+   */
+  public val velocity: Double? = null,
+  /**
+   * The screen point that the change keeps in place. Without one, the change keeps the center of
+   * the view in place.
+   */
+  public val anchor: ScreenPoint? = null,
+  public val decay: MomentumDecay = MomentumDecay(),
+) {
+  @PublishedApi
+  internal fun withVelocity(velocity: Double): AnchoredMomentum = copy(velocity = velocity)
+
+  @PublishedApi
+  internal fun withAnchor(anchor: ScreenPoint): AnchoredMomentum = copy(anchor = anchor)
+
+  @PublishedApi internal fun withDecay(decay: MomentumDecay): AnchoredMomentum = copy(decay = decay)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): AnchoredMomentum = AnchoredMomentum()
   }
 }
 
@@ -4912,7 +4978,7 @@ public data class BearingSnap(
  * How a gesture keeps moving the camera after the user lets go.
  *
  * A part moves only when its velocity is set, and each part slows on its own. Every part defaults
- * to `MomentumDecay.FRICTION` with a half-life of 140 ms, and these other defaults:
+ * to `MomentumDecayModel.FRICTION` with a half-life of 140 ms, and these other defaults:
  *
  * - Pan stops at 10 logical pixels per second, needs a release of at least 200, and counts a
  *   release faster than 10000 as 10000.
@@ -4924,28 +4990,10 @@ public data class BearingSnap(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class GestureMomentum(
-  /** How fast the map's content moved on the screen at release, in logical pixels per second. */
-  public val panVelocity: ScreenPoint? = null,
-  /** In zoom levels per second. */
-  public val zoomVelocity: Double? = null,
-  /** In degrees per second. */
-  public val bearingVelocity: Double? = null,
-  /** In degrees per second. */
-  public val pitchVelocity: Double? = null,
-  /**
-   * The screen point that the zoom keeps in place. Without one, the zoom keeps the center of the
-   * view in place.
-   */
-  public val zoomAnchor: ScreenPoint? = null,
-  /**
-   * The screen point that the rotation keeps in place. Without one, the rotation turns around the
-   * center of the view.
-   */
-  public val bearingAnchor: ScreenPoint? = null,
-  public val pan: MomentumOptions = MomentumOptions(),
-  public val zoom: MomentumOptions = MomentumOptions(),
-  public val bearing: MomentumOptions = MomentumOptions(),
-  public val pitch: MomentumOptions = MomentumOptions(),
+  public val pan: PanMomentum = PanMomentum(),
+  public val zoom: AnchoredMomentum = AnchoredMomentum(),
+  public val bearing: AnchoredMomentum = AnchoredMomentum(),
+  public val pitch: AnchoredMomentum = AnchoredMomentum(),
   /**
    * Where the bearing settles after a gesture that changed it. It settles once the other parts
    * stop, or right away when none of them move. Without this, the bearing stays where the gesture
@@ -4953,39 +5001,15 @@ public data class GestureMomentum(
    */
   public val bearingSnap: BearingSnap? = null,
 ) {
-  @PublishedApi
-  internal fun withPanVelocity(panVelocity: ScreenPoint): GestureMomentum =
-    copy(panVelocity = panVelocity)
+  @PublishedApi internal fun withPan(pan: PanMomentum): GestureMomentum = copy(pan = pan)
+
+  @PublishedApi internal fun withZoom(zoom: AnchoredMomentum): GestureMomentum = copy(zoom = zoom)
 
   @PublishedApi
-  internal fun withZoomVelocity(zoomVelocity: Double): GestureMomentum =
-    copy(zoomVelocity = zoomVelocity)
+  internal fun withBearing(bearing: AnchoredMomentum): GestureMomentum = copy(bearing = bearing)
 
   @PublishedApi
-  internal fun withBearingVelocity(bearingVelocity: Double): GestureMomentum =
-    copy(bearingVelocity = bearingVelocity)
-
-  @PublishedApi
-  internal fun withPitchVelocity(pitchVelocity: Double): GestureMomentum =
-    copy(pitchVelocity = pitchVelocity)
-
-  @PublishedApi
-  internal fun withZoomAnchor(zoomAnchor: ScreenPoint): GestureMomentum =
-    copy(zoomAnchor = zoomAnchor)
-
-  @PublishedApi
-  internal fun withBearingAnchor(bearingAnchor: ScreenPoint): GestureMomentum =
-    copy(bearingAnchor = bearingAnchor)
-
-  @PublishedApi internal fun withPan(pan: MomentumOptions): GestureMomentum = copy(pan = pan)
-
-  @PublishedApi internal fun withZoom(zoom: MomentumOptions): GestureMomentum = copy(zoom = zoom)
-
-  @PublishedApi
-  internal fun withBearing(bearing: MomentumOptions): GestureMomentum = copy(bearing = bearing)
-
-  @PublishedApi
-  internal fun withPitch(pitch: MomentumOptions): GestureMomentum = copy(pitch = pitch)
+  internal fun withPitch(pitch: AnchoredMomentum): GestureMomentum = copy(pitch = pitch)
 
   @PublishedApi
   internal fun withBearingSnap(bearingSnap: BearingSnap): GestureMomentum =

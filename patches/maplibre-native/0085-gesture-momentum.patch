@@ -31,10 +31,10 @@ index e72aacd..2646f15 100644
      "include/mln/map/map_observer.hpp",
 diff --git a/include/mln/map/camera_momentum.hpp b/include/mln/map/camera_momentum.hpp
 new file mode 100644
-index 0000000..f0871b1
+index 0000000..8bdce0b
 --- /dev/null
 +++ b/include/mln/map/camera_momentum.hpp
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,114 @@
 +#pragma once
 +
 +#include <mln/util/chrono.hpp>
@@ -138,6 +138,8 @@ index 0000000..f0871b1
 +    /** Degrees per second. */
 +    std::optional<double> pitchVelocity;
 +    MomentumDecay pitchDecay;
++    /** The screen point that the tilt keeps in place. */
++    std::optional<ScreenCoordinate> pitchAnchor;
 +
 +    std::optional<BearingSnap> bearingSnap;
 +
@@ -187,7 +189,7 @@ index 3e01d9a..77fe561 100644
      impl->transform.setGestureInProgress(inProgress);
      impl->onUpdate();
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index e2bb728..a33bd4f 100644
+index e2bb728..b1a7ac7 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -13,6 +13,8 @@
@@ -476,7 +478,7 @@ index e2bb728..a33bd4f 100644
              const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
                                              std::chrono::duration<double>(transition->duration),
                                          0.0,
-@@ -719,6 +931,229 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -719,6 +931,241 @@ void Transform::updateTransitions(const TimePoint& now) {
      finishTransitions(finished);
  }
  
@@ -533,7 +535,11 @@ index e2bb728..a33bd4f 100644
 +              options.bearingVelocity,
 +              options.bearingDecay,
 +              Bearing | (options.bearingAnchor ? Center : 0));
-+    addScalar(momentum->pitch, momentum->pitchTotal, options.pitchVelocity, options.pitchDecay, Pitch);
++    addScalar(momentum->pitch,
++              momentum->pitchTotal,
++              options.pitchVelocity,
++              options.pitchDecay,
++              Pitch | (options.pitchAnchor ? Center : 0));
 +    // Without motion, the bearing settles only if it is near a target now.
 +    momentum->snapPending = options.bearingSnap &&
 +                            (moving || bearingSnapDelta(-util::rad2deg(state.getBearing()), *options.bearingSnap) != 0.0);
@@ -600,7 +606,7 @@ index e2bb728..a33bd4f 100644
 +        stepBearing(momentum.bearingTotal * fraction, momentum.options.bearingAnchor);
 +    }
 +    if (const double fraction = advance(momentum.pitch); fraction != 0.0) {
-+        if (!stepPitch(momentum.pitchTotal * fraction)) momentum.pitch.moving = false;
++        if (!stepPitch(momentum.pitchTotal * fraction, momentum.options.pitchAnchor)) momentum.pitch.moving = false;
 +    }
 +
 +    // The bearing settles once no part moves, which can be before the motion's
@@ -696,18 +702,26 @@ index e2bb728..a33bd4f 100644
 +    if (point) state.moveLatLng(anchorLatLng, *point);
 +}
 +
-+bool Transform::stepPitch(double pitch) {
++bool Transform::stepPitch(double pitch, const std::optional<ScreenCoordinate>& anchor) {
++    std::optional<ScreenCoordinate> point;
++    LatLng anchorLatLng;
++    if (anchor) {
++        point = ScreenCoordinate{anchor->x, state.getSize().height - anchor->y};
++        anchorLatLng = state.screenCoordinateToLatLng(*point);
++    }
 +    const double before = state.getPitch();
 +    state.setPitch(util::clamp(
 +        before + util::deg2rad(pitch), state.getMinPitch(), getMaxPitchForEdgeInsets(state.getEdgeInsets())));
-+    return state.getPitch() != before;
++    if (state.getPitch() == before) return false;
++    if (point) state.moveLatLng(anchorLatLng, *point);
++    return true;
 +}
 +
  void Transform::cancelTransitions() {
      auto finished = std::exchange(transitions, {});
      updateMovementFlags();
 diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
-index f767342..e56aefb 100644
+index f767342..4eb88b2 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
 @@ -1,6 +1,7 @@
@@ -755,15 +769,15 @@ index f767342..e56aefb 100644
 +    bool stepPan(const ScreenCoordinate& offset);
 +    bool stepZoom(double zoom, const std::optional<ScreenCoordinate>& anchor);
 +    void stepBearing(double bearing, const std::optional<ScreenCoordinate>& anchor);
-+    bool stepPitch(double pitch);
++    bool stepPitch(double pitch, const std::optional<ScreenCoordinate>& anchor);
      void updateMovementFlags();
      void finishTransitions(const std::vector<std::shared_ptr<Transition>>&);
  
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index c15ea59..338ab1c 100644
+index c15ea59..961a725 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
-@@ -1619,3 +1619,229 @@ TEST(Transform, FlyDurationRange) {
+@@ -1619,3 +1619,246 @@ TEST(Transform, FlyDurationRange) {
      EXPECT_DOUBLE_EQ(1.0, transform.getZoom());
      EXPECT_FALSE(transform.inTransition());
  }
@@ -868,6 +882,23 @@ index c15ea59..338ab1c 100644
 +    transform.updateTransitions(start + Milliseconds(560));
 +    EXPECT_FALSE(transform.inTransition());
 +    EXPECT_NEAR(transform.latLngToScreenCoordinate(center).x, 500 + 194, 1);
++}
++
++TEST(Transform, MomentumKeepsItsAnchorInPlace) {
++    Transform transform;
++    transform.resize({1000, 1000});
++    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 20}).withZoom(8).withPitch(20));
++    const ScreenCoordinate anchor{800, 300};
++    const LatLng ground = transform.screenCoordinateToLatLng(anchor);
++    CameraMomentum momentum;
++    momentum.pitchVelocity = 20.0;
++    momentum.pitchAnchor = anchor;
++    transform.startMomentum(momentum);
++    transform.updateTransitions(transform.getLatestTransitionStart() + Seconds(3));
++    EXPECT_GT(util::rad2deg(transform.getPitch()), 20);
++    const auto point = transform.latLngToScreenCoordinate(ground);
++    EXPECT_NEAR(point.x, anchor.x, 1e-6);
++    EXPECT_NEAR(point.y, anchor.y, 1e-6);
 +}
 +
 +TEST(Transform, MomentumCapsItsDistance) {

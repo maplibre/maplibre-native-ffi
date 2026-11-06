@@ -708,40 +708,72 @@ Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   return result;
 }
 
-Pointer<raw.mln_momentum_options> _writeMomentumOptions(
-  MomentumOptions value,
+Pointer<raw.mln_momentum_decay> _writeMomentumDecay(
+  MomentumDecay value,
   Allocator arena, {
-  Pointer<raw.mln_momentum_options>? into,
+  Pointer<raw.mln_momentum_decay>? into,
 }) {
-  final result = into ?? arena<raw.mln_momentum_options>();
-  if (value.decay != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DECAY;
-    result.ref.decay = value.decay!.rawValue;
+  final result = into ?? arena<raw.mln_momentum_decay>();
+  if (value.model != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MODEL;
+    result.ref.model = value.model!.rawValue;
   }
   if (value.halfLifeMs != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
     result.ref.half_life_ms = value.halfLifeMs!;
   }
   if (value.stopSpeed != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_STOP_SPEED;
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_STOP_SPEED;
     result.ref.stop_speed = value.stopSpeed!;
   }
   if (value.scrollFriction != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_SCROLL_FRICTION;
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_SCROLL_FRICTION;
     result.ref.scroll_friction = value.scrollFriction!;
   }
   if (value.minSpeed != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MIN_SPEED;
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MIN_SPEED;
     result.ref.min_speed = value.minSpeed!;
   }
   if (value.maxSpeed != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MAX_SPEED;
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MAX_SPEED;
     result.ref.max_speed = value.maxSpeed!;
   }
   if (value.maxDistance != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MAX_DISTANCE;
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MAX_DISTANCE;
     result.ref.max_distance = value.maxDistance!;
   }
+  return result;
+}
+
+Pointer<raw.mln_pan_momentum> _writePanMomentum(
+  PanMomentum value,
+  Allocator arena, {
+  Pointer<raw.mln_pan_momentum>? into,
+}) {
+  final result = into ?? arena<raw.mln_pan_momentum>();
+  if (value.velocity != null) {
+    result.ref.fields |= raw.MLN_PAN_MOMENTUM_VELOCITY;
+    result.ref.velocity = _writeScreenPoint(value.velocity!, arena).ref;
+  }
+  result.ref.decay = _writeMomentumDecay(value.decay, arena).ref;
+  return result;
+}
+
+Pointer<raw.mln_anchored_momentum> _writeAnchoredMomentum(
+  AnchoredMomentum value,
+  Allocator arena, {
+  Pointer<raw.mln_anchored_momentum>? into,
+}) {
+  final result = into ?? arena<raw.mln_anchored_momentum>();
+  if (value.velocity != null) {
+    result.ref.fields |= raw.MLN_ANCHORED_MOMENTUM_VELOCITY;
+    result.ref.velocity = value.velocity!;
+  }
+  if (value.anchor != null) {
+    result.ref.fields |= raw.MLN_ANCHORED_MOMENTUM_ANCHOR;
+    result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
+  }
+  result.ref.decay = _writeMomentumDecay(value.decay, arena).ref;
   return result;
 }
 
@@ -776,37 +808,10 @@ Pointer<raw.mln_gesture_momentum> _writeGestureMomentum(
   Pointer<raw.mln_gesture_momentum>? into,
 }) {
   final result = into ?? arena<raw.mln_gesture_momentum>();
-  if (value.panVelocity != null) {
-    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
-    result.ref.pan_velocity = _writeScreenPoint(value.panVelocity!, arena).ref;
-  }
-  if (value.zoomVelocity != null) {
-    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY;
-    result.ref.zoom_velocity = value.zoomVelocity!;
-  }
-  if (value.bearingVelocity != null) {
-    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_VELOCITY;
-    result.ref.bearing_velocity = value.bearingVelocity!;
-  }
-  if (value.pitchVelocity != null) {
-    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_PITCH_VELOCITY;
-    result.ref.pitch_velocity = value.pitchVelocity!;
-  }
-  if (value.zoomAnchor != null) {
-    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR;
-    result.ref.zoom_anchor = _writeScreenPoint(value.zoomAnchor!, arena).ref;
-  }
-  if (value.bearingAnchor != null) {
-    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_ANCHOR;
-    result.ref.bearing_anchor = _writeScreenPoint(
-      value.bearingAnchor!,
-      arena,
-    ).ref;
-  }
-  result.ref.pan = _writeMomentumOptions(value.pan, arena).ref;
-  result.ref.zoom = _writeMomentumOptions(value.zoom, arena).ref;
-  result.ref.bearing = _writeMomentumOptions(value.bearing, arena).ref;
-  result.ref.pitch = _writeMomentumOptions(value.pitch, arena).ref;
+  result.ref.pan = _writePanMomentum(value.pan, arena).ref;
+  result.ref.zoom = _writeAnchoredMomentum(value.zoom, arena).ref;
+  result.ref.bearing = _writeAnchoredMomentum(value.bearing, arena).ref;
+  result.ref.pitch = _writeAnchoredMomentum(value.pitch, arena).ref;
   if (value.bearingSnap != null) {
     result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_SNAP;
     result.ref.bearing_snap = _writeBearingSnap(value.bearingSnap!, arena).ref;

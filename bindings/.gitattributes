@@ -33,6 +33,7 @@
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverity.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverityFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/MaplibreNative.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/AnchoredMomentum.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/AnimationOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/BearingSnap.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/BoundOptions.g.cs linguist-generated=true
@@ -73,12 +74,13 @@
 /dotnet/src/Maplibre.NativeFfi/Map/MapViewport.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MapViewportOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MomentumDecay.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Map/MomentumOptions.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/MomentumDecayModel.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/NorthOrientation.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/OfflineGeometryRegionDefinition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/OfflineRegionDefinition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/OfflineRegionInfo.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/OfflineTilePyramidRegionDefinition.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/PanMomentum.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ProjectedMeters.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ProjectionMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ProjectionModeOptions.g.cs linguist-generated=true

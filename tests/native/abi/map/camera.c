@@ -647,29 +647,29 @@ static void delta_momentum_infinite_velocity(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.fields = MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY;
-  delta->momentum.zoom_velocity = INFINITY;
+  delta->momentum.zoom.fields = MLN_ANCHORED_MOMENTUM_VELOCITY;
+  delta->momentum.zoom.velocity = INFINITY;
 }
 static void delta_momentum_negative_option(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.pan.fields = MLN_MOMENTUM_OPTION_MIN_SPEED;
-  delta->momentum.pan.min_speed = -1.0;
+  delta->momentum.pan.decay.fields = MLN_MOMENTUM_DECAY_MIN_SPEED;
+  delta->momentum.pan.decay.min_speed = -1.0;
 }
 static void delta_momentum_zero_half_life(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.zoom.fields = MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
-  delta->momentum.zoom.half_life_ms = 0.0;
+  delta->momentum.zoom.decay.fields = MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
+  delta->momentum.zoom.decay.half_life_ms = 0.0;
 }
 static void delta_momentum_spline_zoom(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.zoom.fields = MLN_MOMENTUM_OPTION_DECAY;
-  delta->momentum.zoom.decay = MLN_MOMENTUM_DECAY_SPLINE;
+  delta->momentum.zoom.decay.fields = MLN_MOMENTUM_DECAY_MODEL;
+  delta->momentum.zoom.decay.model = MLN_MOMENTUM_DECAY_MODEL_SPLINE;
 }
 static void delta_momentum_snap_without_targets(void* descriptor) {
   mln_camera_delta* delta = descriptor;
@@ -683,9 +683,9 @@ static void delta_momentum_unselected_garbage(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.pan_velocity.x = NAN;
-  delta->momentum.zoom_anchor.y = INFINITY;
-  delta->momentum.zoom.min_speed = -1.0;
+  delta->momentum.pan.velocity.x = NAN;
+  delta->momentum.zoom.anchor.y = INFINITY;
+  delta->momentum.zoom.decay.min_speed = -1.0;
   delta->momentum.bearing_snap.tolerance = 360.0;
 }
 
