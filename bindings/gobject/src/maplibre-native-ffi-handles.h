@@ -5290,10 +5290,8 @@ MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(
  *
  * Creates a map on `runtime`.
  *
- * The map takes asynchronous calls, including render session attaches, before
- * the completion runs. They wait for it, and complete with
- * `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when creation fails.
- * `maplibre_native_ffi_map_get_snapshot()` fails until creation succeeds.
+ * Asynchronous calls on the map before the completion runs wait for it, and
+ * complete with `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when creation fails.
  *
  * The object is ready once `maplibre_native_ffi_map_ready_async` finishes,
  * which fails with the errors that the completion reports.

@@ -9493,9 +9493,8 @@ func NewRuntime(options *RuntimeOptions) (*RuntimeHandle, error) {
 
 // CreateMap creates a map on runtime.
 //
-// The map takes asynchronous calls, including render session attaches, before
-// the completion runs. They wait for it, and complete with StatusInvalidState
-// when creation fails. MapHandle.Snapshot() fails until creation succeeds.
+// Asynchronous calls on the map before the completion runs wait for it, and
+// complete with StatusInvalidState when creation fails.
 //
 // See mln_runtime_create_map in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html

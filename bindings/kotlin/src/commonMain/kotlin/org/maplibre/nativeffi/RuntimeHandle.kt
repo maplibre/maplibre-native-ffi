@@ -93,9 +93,8 @@ private constructor(
   /**
    * Creates a map on `runtime`.
    *
-   * The map takes asynchronous calls, including render session attaches, before the completion
-   * runs. They wait for it, and complete with `Status.INVALID_STATE` when creation fails.
-   * `MapHandle.getSnapshot()` fails until creation succeeds.
+   * Asynchronous calls on the map before the completion runs wait for it, and complete with
+   * `Status.INVALID_STATE` when creation fails.
    *
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
