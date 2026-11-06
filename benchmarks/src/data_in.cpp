@@ -51,7 +51,8 @@ void geojson_replace(benchmark::State& state) {
   );
   Completion completion;
   BENCH_CHECK(mln_map_add_geo_json_source_data(
-    scene.map(), view("points"), data, completion.descriptor(), nullptr
+    scene.map(), view("points"), data, {nullptr, 0}, completion.descriptor(),
+    nullptr
   ));
   mln_geo_json_source_data_release(data);
   finish(completion, "the GeoJSON source");

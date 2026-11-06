@@ -32,7 +32,7 @@ index 77569ab..e4efa79 100644
  };
  class GeoJSONData {
 diff --git a/src/mln/style/conversion/geojson_options.cpp b/src/mln/style/conversion/geojson_options.cpp
-index 979e112..c50b474 100644
+index 979e112..4226128 100644
 --- a/src/mln/style/conversion/geojson_options.cpp
 +++ b/src/mln/style/conversion/geojson_options.cpp
 @@ -111,6 +111,16 @@ std::optional<GeoJSONOptions> Converter<GeoJSONOptions>::operator()(const Conver
@@ -41,12 +41,12 @@ index 979e112..c50b474 100644
  
 +    const auto attributionValue = objectMember(value, "attribution");
 +    if (attributionValue) {
-+        if (toString(*attributionValue)) {
-+            options.attribution = *toString(*attributionValue);
-+        } else {
-+            error.message = "GeoJSON source attribution value must be a string";
++        std::optional<std::string> attribution = toString(*attributionValue);
++        if (!attribution) {
++            error.message = "source attribution must be a string";
 +            return std::nullopt;
 +        }
++        options.attribution = std::move(*attribution);
 +    }
 +
      const auto clusterProperties = objectMember(value, "clusterProperties");

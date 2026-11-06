@@ -153,6 +153,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <remarks>
     /// <para>The source uses the options that <c>data</c> was prepared with.
     /// <c>data</c> can be released once this function returns.</para>
+    /// <para><c>attribution</c> is the source's
+    /// [attribution](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+    /// or empty for none.</para>
     /// <para>See <c>mln_map_add_geo_json_source_data</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -166,7 +169,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </remarks>
     public Task<CommandCompletion> AddGeoJsonSourceDataAsync(
         string sourceId,
-        GeoJsonSourceDataHandle data
+        GeoJsonSourceDataHandle data,
+        string? attribution = null
     )
     {
         using var scope = new NativeCallScope(this);
@@ -175,6 +179,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             scope.Use(data),
+            attribution is null ? default : scope.Utf8(attribution),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -3154,7 +3159,11 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void AddGeoJsonSourceData(string sourceId, GeoJsonSourceDataHandle data)
+        public void AddGeoJsonSourceData(
+            string sourceId,
+            GeoJsonSourceDataHandle data,
+            string? attribution = null
+        )
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
@@ -3163,6 +3172,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     receiverHandle,
                     scope.Utf8(sourceId),
                     scope.Use(data),
+                    attribution is null ? default : scope.Utf8(attribution),
                     null,
                     Diagnostic
                 )

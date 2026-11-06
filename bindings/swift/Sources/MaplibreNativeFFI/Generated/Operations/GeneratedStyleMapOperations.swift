@@ -63,6 +63,10 @@ public extension MapHandle {
   /// The source uses the options that `data` was prepared with. `data` can be
   /// released once this function returns.
   ///
+  /// `attribution` is the source's
+  /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+  /// or empty for none.
+  ///
   /// See `mln_map_add_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   ///
@@ -75,13 +79,15 @@ public extension MapHandle {
   @discardableResult
   func addGeoJsonSourceData(
     _ bindingArg0: String,
-    data bindingArg1: GeoJsonSourceDataHandle
+    data bindingArg1: GeoJsonSourceDataHandle,
+    attribution bindingArg2: String? = nil
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_add_geo_json_source_data(
         raw,
         arena.view(bindingArg0),
         arena.use(bindingArg1.handle),
+        bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
         completion,
         diagnostic
       )
@@ -1159,7 +1165,8 @@ public extension MapHandleDiscarding {
 
   func addGeoJsonSourceData(
     _ bindingArg0: String,
-    data bindingArg1: GeoJsonSourceDataHandle
+    data bindingArg1: GeoJsonSourceDataHandle,
+    attribution bindingArg2: String? = nil
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
@@ -1167,6 +1174,7 @@ public extension MapHandleDiscarding {
           raw,
           arena.view(bindingArg0),
           arena.use(bindingArg1.handle),
+          bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
           nil,
           diagnostic
         )

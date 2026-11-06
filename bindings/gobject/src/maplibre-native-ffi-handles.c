@@ -1014,8 +1014,8 @@ maplibre_native_ffi_map_add_custom_vector_source_finish(
 
 void maplibre_native_ffi_map_add_geo_json_source_data_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  MaplibreNativeFfiGeoJsonSourceData* data, GAsyncReadyCallback callback,
-  gpointer user_data
+  MaplibreNativeFfiGeoJsonSourceData* data, const char* attribution,
+  GAsyncReadyCallback callback, gpointer user_data
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GEO_JSON_SOURCE_DATA(data));
@@ -1031,7 +1031,8 @@ void maplibre_native_ffi_map_add_geo_json_source_data_async(
     return;
   mln_status status_ = mln_map_add_geo_json_source_data(
     self->handle, maplibre_native_ffi_text_view(source_id),
-    (data != NULL ? data->handle : MLN_HANDLE_NULL), async_.completion_argument,
+    (data != NULL ? data->handle : MLN_HANDLE_NULL),
+    maplibre_native_ffi_text_view(attribution), async_.completion_argument,
     &async_.diagnostic
   );
   maplibre_native_ffi_async_end(&async_, status_);

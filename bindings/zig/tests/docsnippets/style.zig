@@ -58,7 +58,7 @@ fn style(pixels: []const u8) !void {
         null,
         null,
     );
-    try map.discarding().addGeoJsonSourceData("points", data, null);
+    try map.discarding().addGeoJsonSourceData("points", data, null, null);
     // The source keeps its own reference to the data.
     data.release();
 

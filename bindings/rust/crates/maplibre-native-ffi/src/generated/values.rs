@@ -5881,6 +5881,7 @@ pub struct StyleSourceInfo {
     pub id: String,
     pub r#type: StyleSourceType,
     pub is_volatile: bool,
+    /// The source's attribution, or empty when it has none.
     pub attribution: String,
     pub url: String,
     /// The tiles that the style lists in the source itself, instead of at a

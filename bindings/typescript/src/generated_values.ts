@@ -3687,6 +3687,9 @@ export interface StyleSourceInfo {
   readonly id: string;
   readonly type: StyleSourceType;
   readonly isVolatile: boolean;
+  /**
+   * The source's attribution, or empty when it has none.
+   */
   readonly attribution: string;
   readonly url: string;
   /**

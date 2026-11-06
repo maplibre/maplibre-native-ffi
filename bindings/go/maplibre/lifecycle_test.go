@@ -129,7 +129,7 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 
 	f := newFixture(t)
 	for _, input := range []*GeoJSONSourceDataHandle{nil, {}} {
-		if future, err := f.m.AddGeoJSONSourceData("source", input); future != nil || !errors.Is(err, StatusInvalidArgument) {
+		if future, err := f.m.AddGeoJSONSourceData("source", input, ""); future != nil || !errors.Is(err, StatusInvalidArgument) {
 			t.Fatalf("input %#v: (%v, %v), want nil and StatusInvalidArgument", input, future, err)
 		}
 	}
@@ -140,7 +140,7 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	if err := data.Release(); err != nil {
 		t.Fatal(err)
 	}
-	if future, err := f.m.AddGeoJSONSourceData("source", data); future != nil || !errors.Is(err, StatusInvalidState) {
+	if future, err := f.m.AddGeoJSONSourceData("source", data, ""); future != nil || !errors.Is(err, StatusInvalidState) {
 		t.Fatalf("closed input: (%v, %v), want nil and StatusInvalidState", future, err)
 	}
 }

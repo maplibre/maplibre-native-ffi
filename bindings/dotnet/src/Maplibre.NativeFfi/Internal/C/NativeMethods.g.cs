@@ -200,6 +200,7 @@ internal static unsafe partial class NativeMethods
         MlnMap map,
         mln_buffer_view source_id,
         MlnGeoJsonSourceData data,
+        mln_buffer_view attribution,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

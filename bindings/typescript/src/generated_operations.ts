@@ -999,6 +999,10 @@ export class MapHandle extends Owner {
    * The source uses the options that `data` was prepared with. `data` can be
    * released once this function returns.
    *
+   * `attribution` is the source's
+   * &#91;attribution&#93;(https://maplibre.org/maplibre-style-spec/sources/#attribution),
+   * or empty for none.
+   *
    * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
@@ -1012,12 +1016,14 @@ export class MapHandle extends Owner {
   addGeoJsonSourceData(
     sourceId: string,
     data: GeoJsonSourceDataHandle,
+    attribution?: string,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_add_geo_json_source_data(
         this.id,
         sourceId,
         data.id,
+        attribution,
         completion,
       ),
     );
@@ -3583,14 +3589,23 @@ export class MapHandleDiscarding {
    * The source uses the options that `data` was prepared with. `data` can be
    * released once this function returns.
    *
+   * `attribution` is the source's
+   * &#91;attribution&#93;(https://maplibre.org/maplibre-style-spec/sources/#attribution),
+   * or empty for none.
+   *
    * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  addGeoJsonSourceData(sourceId: string, data: GeoJsonSourceDataHandle): void {
+  addGeoJsonSourceData(
+    sourceId: string,
+    data: GeoJsonSourceDataHandle,
+    attribution?: string,
+  ): void {
     native.mln_map_add_geo_json_source_data(
       this.#owner.id,
       sourceId,
       data.id,
+      attribution,
       undefined,
     );
   }

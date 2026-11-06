@@ -55,10 +55,16 @@ class _MapHandle:
         self, source_id: str, options: CustomVectorSourceOptions
     ) -> None: ...
     def add_geo_json_source_data(
-        self, source_id: str, data: _GeoJsonSourceDataHandle
+        self,
+        source_id: str,
+        data: _GeoJsonSourceDataHandle,
+        attribution: str | None = None,
     ) -> Future[CommandCompletion]: ...
     def _discard_add_geo_json_source_data(
-        self, source_id: str, data: _GeoJsonSourceDataHandle
+        self,
+        source_id: str,
+        data: _GeoJsonSourceDataHandle,
+        attribution: str | None = None,
     ) -> None: ...
     def add_image_source_image(
         self,

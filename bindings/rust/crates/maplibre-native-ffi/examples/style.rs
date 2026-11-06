@@ -40,7 +40,8 @@ async fn style(map: &MapHandle, pixels: &[u8]) -> Result<()> {
         r#"{"type":"Point","coordinates":[-122.4,37.8]}"#,
         None,
     )?;
-    map.discarding().add_geo_json_source_data("points", &data)?;
+    map.discarding()
+        .add_geo_json_source_data("points", &data, None)?;
     // The source keeps its own reference to the data.
     drop(data);
 

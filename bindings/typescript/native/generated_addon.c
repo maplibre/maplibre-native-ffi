@@ -788,11 +788,12 @@ static napi_value mln_ts_export_mln_map_add_geo_json_source_data(
   mln_map arg_map = 0;
   mln_buffer_view arg_source_id = {0};
   uint64_t arg_data = 0;
+  mln_buffer_view arg_attribution = {0};
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
   mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
+  if (!mln_ts_begin(call, env, info, 5)) return NULL;
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
@@ -801,14 +802,21 @@ static napi_value mln_ts_export_mln_map_add_geo_json_source_data(
   if (!mln_ts_read_text_view(call, call->argv[1], &arg_source_id, "sourceId"))
     goto done;
   if (!mln_ts_read_u64(call, call->argv[2], &arg_data, "data")) goto done;
+  if (!mln_ts_is_absent(call, call->argv[3])) {
+    if (!mln_ts_read_text_view(
+          call, call->argv[3], &arg_attribution, "attribution"
+        ))
+      goto done;
+  }
   if (!mln_ts_read_completion(
-        call, call->argv[3], true, NULL, &arg_completion, &present_completion
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_add_geo_json_source_data(
-    arg_map, arg_source_id, arg_data, present_completion, &diagnostic
+    arg_map, arg_source_id, arg_data, arg_attribution, present_completion,
+    &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;

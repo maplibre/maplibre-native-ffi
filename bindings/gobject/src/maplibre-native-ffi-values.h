@@ -14004,7 +14004,7 @@ gboolean maplibre_native_ffi_style_source_info_get_is_volatile(
 /**
  * maplibre_native_ffi_style_source_info_get_attribution:
  *
- * The `attribution` member.
+ * The source's attribution, or empty when it has none.
  *
  * Returns: (transfer none): the text
  */

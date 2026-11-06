@@ -304,6 +304,7 @@ internal actual object C {
     map: Long,
     sourceId: Long,
     data: Long,
+    attribution: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
@@ -311,6 +312,7 @@ internal actual object C {
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       data.toULong(),
+      attribution.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

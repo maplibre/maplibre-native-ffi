@@ -200,6 +200,7 @@ internal actual object C {
     map: Long,
     sourceId: Long,
     data: Long,
+    attribution: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int

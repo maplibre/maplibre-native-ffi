@@ -61,7 +61,7 @@ func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 	}
 	// The source keeps its own reference to the data.
 	defer data.Release()
-	err = m.Discarding().AddGeoJSONSourceData("points", data)
+	err = m.Discarding().AddGeoJSONSourceData("points", data, "")
 	if err != nil {
 		return err
 	}

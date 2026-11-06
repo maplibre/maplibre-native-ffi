@@ -128,7 +128,8 @@ static void add_the_late_source(
     NULL, &data, NULL
   ));
   MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("late"), data, &completion.descriptor, NULL
+    map, MLN_BUFFER_LITERAL("late"), data, MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
   ));
   mln_geo_json_source_data_release(data);
 }
@@ -326,7 +327,8 @@ typedef struct update_state {
 
 static void add_empty_geojson(mln_map map, update_state* state) {
   MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("geo"), state->data, &completion.descriptor, NULL
+    map, MLN_BUFFER_LITERAL("geo"), state->data, MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
   ));
 }
 static void remove_geojson(mln_map map, update_state* state) {

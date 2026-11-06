@@ -280,13 +280,14 @@ int32_t mln_kw_mln_map_add_custom_vector_source(
 }
 
 int32_t mln_kw_mln_map_add_geo_json_source_data(
-  int64_t map, uintptr_t source_id, int64_t data, uintptr_t completion,
-  uintptr_t out_diagnostic
+  int64_t map, uintptr_t source_id, int64_t data, uintptr_t attribution,
+  uintptr_t completion, uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_map_add_geo_json_source_data(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
-    (mln_geo_json_source_data)data, (const mln_completion*)completion,
-    (mln_diagnostic*)out_diagnostic
+    (mln_geo_json_source_data)data,
+    *(const mln_buffer_view*)(uintptr_t)attribution,
+    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
 }
 

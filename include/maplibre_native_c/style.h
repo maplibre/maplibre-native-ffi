@@ -250,6 +250,7 @@ typedef struct mln_style_source_info {
   mln_style_source_type type;
   mln_style_source_info_fields fields;
   bool is_volatile;
+  /** The source's attribution, or empty when it has none. */
   mln_buffer_view attribution;
   mln_buffer_view url;
   /**
@@ -598,6 +599,10 @@ MLN_API void mln_geo_json_source_data_release(
  * The source uses the options that `data` was prepared with. `data` can be
  * released once this function returns.
  *
+ * `attribution` is the source's
+ * [attribution](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+ * or empty for none.
+ *
  * Completes with:
  * - MLN_STATUS_ALREADY_EXISTS when the style already has a source named
  *   `source_id`.
@@ -607,6 +612,7 @@ MLN_API void mln_geo_json_source_data_release(
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_geo_json_source_data(
   mln_map map, mln_buffer_view source_id, mln_geo_json_source_data data,
+  mln_buffer_view attribution MLN_BINDING("nullable=true"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

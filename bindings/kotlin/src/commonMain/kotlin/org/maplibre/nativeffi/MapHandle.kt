@@ -115,6 +115,10 @@ private constructor(
    * The source uses the options that `data` was prepared with. `data` can be released once this
    * function returns.
    *
+   * `attribution` is the source's
+   * &#91;attribution&#93;(https://maplibre.org/maplibre-style-spec/sources/#attribution), or empty
+   * for none.
+   *
    * See `mln_map_add_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
@@ -126,6 +130,7 @@ private constructor(
   public fun addGeoJsonSourceData(
     sourceId: String,
     data: GeoJsonSourceDataHandle,
+    attribution: String? = null,
   ): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
       check(
@@ -133,6 +138,7 @@ private constructor(
           handle,
           view(sourceId),
           argument(data, data.binding),
+          view(attribution),
           completion,
           diagnostic,
         ),
@@ -1969,13 +1975,18 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
     }
 
   /** [MapHandle.addGeoJsonSourceData] without its completion. */
-  public fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): Unit =
+  public fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+    attribution: String? = null,
+  ): Unit =
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_add_geo_json_source_data(
           handle,
           view(sourceId),
           argument(data, data.binding),
+          view(attribution),
           completion,
           diagnostic,
         ),

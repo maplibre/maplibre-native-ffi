@@ -316,11 +316,12 @@ static jint mln_map_add_custom_vector_source_jni(
 
 static jint mln_map_add_geo_json_source_data_jni(
   JNIEnv* env, jclass type, jlong map, jlong source_id, jlong data,
-  jlong completion, jlong out_diagnostic
+  jlong attribution, jlong completion, jlong out_diagnostic
 ) {
   return (jint)mln_map_add_geo_json_source_data(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
     (mln_geo_json_source_data)data,
+    MLN_JNI_RECORD(mln_buffer_view, attribution),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2462,7 +2463,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_add_custom_geometry_source_jni},
   {"mln_map_add_custom_vector_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_vector_source_jni},
-  {"mln_map_add_geo_json_source_data", "(JJJJJ)I",
+  {"mln_map_add_geo_json_source_data", "(JJJJJJ)I",
    (void*)mln_map_add_geo_json_source_data_jni},
   {"mln_map_add_image_source_image", "(JJJJJJJ)I",
    (void*)mln_map_add_image_source_image_jni},
@@ -2863,7 +2864,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_add_custom_geometry_source_jni},
   {"mln_map_add_custom_vector_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_vector_source_jni},
-  {"mln_map_add_geo_json_source_data", "(JJJJJ)I",
+  {"mln_map_add_geo_json_source_data", "(JJJJJJ)I",
    (void*)mln_map_add_geo_json_source_data_jni},
   {"mln_map_add_image_source_image", "(JJJJJJJ)I",
    (void*)mln_map_add_image_source_image_jni},

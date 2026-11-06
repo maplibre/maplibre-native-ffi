@@ -383,7 +383,7 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
     mln_test_completion completion = mln_test_completion_default(0);
     MLN_TEST_OK(mln_map_add_geo_json_source_data(
       map, mln_buffer_view_from_cstr(sources[index]), data,
-      &completion.descriptor, NULL
+      MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
     ));
     // The last install is still pending when the handle goes away.
     if (index == 2) {
@@ -400,7 +400,8 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
     map, MLN_BUFFER_LITERAL("first"), data, &rejected, NULL
   ));
   MLN_TEST_INVALID_STATE(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("fourth"), data, &rejected, NULL
+    map, MLN_BUFFER_LITERAL("fourth"), data, MLN_BUFFER_LITERAL(""), &rejected,
+    NULL
   ));
 
   mln_test_render_fixture fixture = {0};
@@ -468,7 +469,7 @@ static void prepared_data_must_match_the_source_options(void) {
   );
   mln_geo_json_source_data data = prepare(points, &source);
   MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, id, data, &completion.descriptor, NULL
+    map, id, data, MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
   ));
   mln_geo_json_source_data_release(data);
 
@@ -551,7 +552,8 @@ static void render_points(
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   mln_geo_json_source_data data = prepare(points, options);
   MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
+    map, MLN_BUFFER_LITERAL("points"), data, MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
   ));
   mln_geo_json_source_data_release(data);
   draw_source(map, "points");

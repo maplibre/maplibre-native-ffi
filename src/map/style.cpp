@@ -1230,7 +1230,8 @@ auto map_list_style_sources(
 
 auto map_add_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
-  const std::shared_ptr<const GeoJsonSourceDataObject>& data
+  const std::shared_ptr<const GeoJsonSourceDataObject>& data,
+  mln_buffer_view attribution
 ) -> mln_status {
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
@@ -1239,7 +1240,13 @@ auto map_add_geojson_source_data(
     return add_status;
   }
 
-  auto source = std::make_unique<mln::style::GeoJSONSource>(id, data->options);
+  auto options = mln::makeMutable<mln::style::GeoJSONOptions>(*data->options);
+  if (attribution.size > 0) {
+    options->attribution = string_from_view(attribution);
+  }
+  auto source = std::make_unique<mln::style::GeoJSONSource>(
+    id, mln::Immutable<mln::style::GeoJSONOptions>{std::move(options)}
+  );
   source->setGeoJSONData(data->data);
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
