@@ -320,9 +320,13 @@ static void a_new_gesture_stops_momentum_and_reports_its_speed(void) {
   begin_gesture(map);
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED);
   const mln_camera_velocity velocity = observation.velocity;
-  TEST_ASSERT_TRUE(velocity.pan.x > 0.0 && velocity.pan.x <= 560.0);
+  // No frame moved the camera, so each part still had its starting speed:
+  // 0.56 of the pan's release speed, and 4 times the zoom's 2.5 levels over
+  // 600 seconds. The tolerance covers rounding the duration to the native
+  // clock.
+  TEST_ASSERT_DOUBLE_WITHIN(0.5, 560.0, velocity.pan.x);
   TEST_ASSERT_EQUAL_DOUBLE(0.0, velocity.pan.y);
-  TEST_ASSERT_TRUE(velocity.zoom > 0.0 && velocity.zoom <= 1.0);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-5, 2.5 * 4.0 / 600.0, velocity.zoom);
   snapshot = read_snapshot(map);
   TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
   TEST_ASSERT_FALSE(snapshot.transition_in_progress);
