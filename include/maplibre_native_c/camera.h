@@ -84,6 +84,11 @@ MLN_API mln_status mln_map_update_camera(
  * changes, and combines with an offset only when the delta has no animation.
  * The function finishes when the map applies the delta, before an animation
  * ends.
+ *
+ * A delta that replaces an animated one starts from where that animation left
+ * the camera, so the rest of the replaced change never happens. Two quick
+ * animated deltas that each zoom in by one level end short of two levels. To
+ * reach an exact camera, use mln_map_update_camera().
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_apply_camera_delta(

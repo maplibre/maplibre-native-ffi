@@ -303,6 +303,11 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// anchor needs one of those changes, and combines with an offset only when
     /// the delta has no animation. The function finishes when the map applies
     /// the delta, before an animation ends.</para>
+    /// <para>A delta that replaces an animated one starts from where that
+    /// animation left the camera, so the rest of the replaced change never
+    /// happens. Two quick animated deltas that each zoom in by one level end
+    /// short of two levels. To reach an exact camera, use
+    /// <c>MapHandle.UpdateCameraAsync()</c>.</para>
     /// <para>See <c>mln_map_apply_camera_delta</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -1626,6 +1631,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Reads a property of a layer in the map's style.
     /// </summary>
     /// <remarks>
+    /// <para>The value comes back in the engine's normalized form, which can
+    /// differ from the value that was set. A color set as <c>"#ff0000"</c>
+    /// reads back as <c>["rgba", 255, 0, 0, 1]</c>.</para>
     /// <para>Completes with no value when the layer doesn't set the
     /// property.</para>
     /// <para>See <c>mln_map_get_style_layer_property</c> in the <see
@@ -1662,6 +1670,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Reads a property of the light of the map's style.
     /// </summary>
     /// <remarks>
+    /// <para>The value comes back in the engine's normalized form, which can
+    /// differ from the value that was set. A color set as <c>"#ff0000"</c>
+    /// reads back as <c>["rgba", 255, 0, 0, 1]</c>.</para>
     /// <para>Completes with no value when the light doesn't set the
     /// property.</para>
     /// <para>See <c>mln_map_get_style_light_property</c> in the <see
@@ -1692,6 +1703,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Reads a source of the map's style.
     /// </summary>
     /// <remarks>
+    /// <para>A tile source with a <c>url</c> has an empty attribution until its
+    /// TileJSON loads, which raises
+    /// <c>RuntimeEventType.MapSourceChanged</c>.</para>
     /// <para>Completes with no value when the style has no source named
     /// <c>sourceId</c>.</para>
     /// <para>See <c>mln_map_get_style_source</c> in the <see

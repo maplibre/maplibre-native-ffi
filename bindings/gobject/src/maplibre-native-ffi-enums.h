@@ -1120,7 +1120,10 @@ GType maplibre_native_ffi_runtime_event_source_type_get_type(void) G_GNUC_CONST;
  *   image that it doesn't have.
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_TILE_ACTION: A tile moved to another
  *   step of loading.
- * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SOURCE_CHANGED:
+ * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SOURCE_CHANGED: A source in the style
+ *   changed. Its TileJSON loaded for the first time or with new contents, or a
+ *   call set its volatile flag, a GeoJSON source's data, or an image source's
+ *   image or coordinates.
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR: A resource
  *   that the region needs failed to download.

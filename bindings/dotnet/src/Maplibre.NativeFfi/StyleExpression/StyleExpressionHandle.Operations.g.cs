@@ -100,7 +100,13 @@ public sealed unsafe partial class StyleExpressionHandle
     /// Evaluates a style expression and writes its result as JSON.
     /// </summary>
     /// <remarks>
-    /// <para>A number in the result that isn't finite becomes null.</para>
+    /// <para>A number in the result that isn't finite becomes null. A color is
+    /// <c>["rgba", r, g, b, a]</c>, with red, green, and blue from 0 to 255 and
+    /// alpha from 0 to 1. Each channel is exact only to single precision, so a
+    /// channel set from an integer can come back slightly different. Formatted
+    /// text is a <c>["format", …]</c> expression, an image is <c>{"name": …,
+    /// "available": …}</c>, padding is <c>[top, right, bottom, left]</c>, and a
+    /// variable anchor offset is <c>[anchor, [x, y], …]</c>.</para>
     /// <para>See <c>mln_style_expression_evaluate</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>

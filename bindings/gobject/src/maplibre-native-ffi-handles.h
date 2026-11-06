@@ -644,6 +644,11 @@ maplibre_native_ffi_map_add_style_source_json_finish(
  * The function finishes when the map applies the delta, before an animation
  * ends.
  *
+ * A delta that replaces an animated one starts from where that animation left
+ * the camera, so the rest of the replaced change never happens. Two quick
+ * animated deltas that each zoom in by one level end short of two levels. To
+ * reach an exact camera, use `maplibre_native_ffi_map_update_camera_async()`.
+ *
  * See `mln_map_apply_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
  *
@@ -1684,6 +1689,10 @@ char* maplibre_native_ffi_map_get_style_layer_json_finish(
  *
  * Reads a property of a layer in the map's style.
  *
+ * The value comes back in the engine's normalized form, which can differ from
+ * the value that was set. A color set as `"#ff0000"` reads back as `["rgba",
+ * 255, 0, 0, 1]`.
+ *
  * Completes with no value when the layer doesn't set the property.
  *
  * See `mln_map_get_style_layer_property` in the
@@ -1719,6 +1728,10 @@ char* maplibre_native_ffi_map_get_style_layer_property_finish(
  *
  * Reads a property of the light of the map's style.
  *
+ * The value comes back in the engine's normalized form, which can differ from
+ * the value that was set. A color set as `"#ff0000"` reads back as `["rgba",
+ * 255, 0, 0, 1]`.
+ *
  * Completes with no value when the light doesn't set the property.
  *
  * See `mln_map_get_style_light_property` in the
@@ -1748,6 +1761,9 @@ char* maplibre_native_ffi_map_get_style_light_property_finish(
  * @user_data: the data to pass to `callback`
  *
  * Reads a source of the map's style.
+ *
+ * A tile source with a `url` has an empty attribution until its TileJSON loads,
+ * which raises `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SOURCE_CHANGED`.
  *
  * Completes with no value when the style has no source named `source_id`.
  *
@@ -5964,7 +5980,12 @@ MaplibreNativeFfiStyleExpression* maplibre_native_ffi_style_expression_create(
  *
  * Evaluates a style expression and writes its result as JSON.
  *
- * A number in the result that isn't finite becomes null.
+ * A number in the result that isn't finite becomes null. A color is `["rgba",
+ * r, g, b, a]`, with red, green, and blue from 0 to 255 and alpha from 0 to 1.
+ * Each channel is exact only to single precision, so a channel set from an
+ * integer can come back slightly different. Formatted text is a `["format", …]`
+ * expression, an image is `{"name": …, "available": …}`, padding is `[top,
+ * right, bottom, left]`, and a variable anchor offset is `[anchor, [x, y], …]`.
  *
  * See `mln_style_expression_evaluate` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
