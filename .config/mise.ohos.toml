@@ -7,7 +7,7 @@
   "macos",
 ] }
 # mise has no registry entry for the OpenHarmony SDK, so this resolves through the
-# plugin that the hook below registers. Its unpacking step needs a POSIX shell,
+# plugin that [plugins] below names. Its unpacking step needs a POSIX shell,
 # which is why Windows is left out.
 ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
 # Oniro publishes its emulator image against the corresponding OpenHarmony
@@ -23,7 +23,7 @@ ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
   "macos",
 ] }
 
-[hooks]
-# Register the plugin before the first SDK installation resolves it. The root
-# postinstall hook refreshes the same symlink for ordinary installs.
-preinstall = ["mise plugins link --force ohos-sdk .mise/plugins/ohos-sdk"]
+[plugins]
+# mise installs a plugin once and only warns when this entry later names another
+# tag. After changing it, run `mise -E ohos plugins install --force ohos-sdk`.
+ohos-sdk = "https://github.com/sargunv/mise-ohos-sdk#v0.1.0"

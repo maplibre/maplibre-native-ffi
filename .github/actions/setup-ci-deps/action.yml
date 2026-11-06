@@ -504,11 +504,20 @@ runs:
         # is large enough to compete with every other target for the shared
         # repository cache. Re-fetching one costs less than the eviction pressure an
         # entry that size adds.
+        #
+        # mise keeps emsdk and the OpenHarmony SDK in content-addressed
+        # `<tool>-<hash>` directories, which `<tool>/` links to, so `emsdk*` and
+        # `ohos-sdk*` exclude both. The `http:` backend's installs have no hash.
+        # The OpenHarmony SDK's hash covers the archive but not the plugin, so a
+        # cached install could also predate the plugin's current layout. Its
+        # plugin is excluded too: mise keeps an installed plugin when its
+        # `[plugins]` tag changes, so a near-miss restore would run the old tag.
         path: |
           ~/.local/share/mise
-          !~/.local/share/mise/installs/emsdk
+          !~/.local/share/mise/installs/emsdk*
           !~/.local/share/mise/installs/http-oniro-emulator
-          !~/.local/share/mise/installs/ohos-sdk
+          !~/.local/share/mise/installs/ohos-sdk*
+          !~/.local/share/mise/plugins/ohos-sdk
           ~/AppData/Local/mise
           ~/.rustup
           ~/.cargo/bin
@@ -600,9 +609,10 @@ runs:
         # Matches the restore above, exclusions included.
         path: |
           ~/.local/share/mise
-          !~/.local/share/mise/installs/emsdk
+          !~/.local/share/mise/installs/emsdk*
           !~/.local/share/mise/installs/http-oniro-emulator
-          !~/.local/share/mise/installs/ohos-sdk
+          !~/.local/share/mise/installs/ohos-sdk*
+          !~/.local/share/mise/plugins/ohos-sdk
           ~/AppData/Local/mise
           ~/.rustup
           ~/.cargo/bin
