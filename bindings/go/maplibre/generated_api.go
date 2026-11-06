@@ -3924,9 +3924,10 @@ type MomentumDecay struct {
 	// Required for MomentumDecayModelPlanned.
 	DurationMs *float64
 	// For MomentumDecayModelPlanned, the share of distance covered over the share
-	// of duration_ms. Its x values are between 0 and 1. Defaults to (0, 0, 0.25,
-	// 1), the curve that camera animations ease along by default. Android's scroll
-	// fling follows (0.175, 0.5, 0.35, 1).
+	// of duration_ms. Its control points are between 0 and 1, so the glide never
+	// passes its distance. Defaults to (0, 0, 0.25, 1), the curve that camera
+	// animations ease along by default. Android's scroll fling follows (0.175, 0.5,
+	// 0.35, 1).
 	Curve *UnitBezier
 	// A slower release starts no momentum.
 	MinSpeed *float64

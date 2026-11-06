@@ -691,6 +691,16 @@ static void delta_momentum_unselected_garbage(void* descriptor) {
   delta->momentum.bearing_snap.tolerance = 360.0;
 }
 
+static void delta_momentum_overshooting_curve(void* descriptor) {
+  delta_momentum_planned_without_distance(descriptor);
+  mln_momentum_decay* decay =
+    &((mln_camera_delta*)descriptor)->momentum.zoom.decay;
+  decay->fields |= MLN_MOMENTUM_DECAY_DISTANCE | MLN_MOMENTUM_DECAY_CURVE;
+  decay->distance = 1.0;
+  decay->curve =
+    (mln_unit_bezier){.x1 = 1.0 / 3, .y1 = 2.0, .x2 = 2.0 / 3, .y2 = 2.0};
+}
+
 static const mln_test_validation_case delta_cases[] = {
   {"undersized", delta_undersized, MLN_STATUS_INVALID_ARGUMENT, "valid size"},
   {"unknown field", delta_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
@@ -721,6 +731,8 @@ static const mln_test_validation_case delta_cases[] = {
    MLN_STATUS_INVALID_ARGUMENT, "positive half-life"},
   {"planned glide without a distance", delta_momentum_planned_without_distance,
    MLN_STATUS_INVALID_ARGUMENT, "needs a distance and a duration"},
+  {"planned curve that overshoots", delta_momentum_overshooting_curve,
+   MLN_STATUS_INVALID_ARGUMENT, "control points are within [0, 1]"},
   {"bearing snap without targets", delta_momentum_snap_without_targets,
    MLN_STATUS_INVALID_ARGUMENT, "needs a target"},
   {"unselected momentum fields stay unread", delta_momentum_unselected_garbage,

@@ -44,10 +44,10 @@ public sealed record MomentumDecay
 
     /// <summary>
     /// For <c>MomentumDecayModel.Planned</c>, the share of <c>distance</c>
-    /// covered over the share of <c>duration_ms</c>. Its x values are between 0
-    /// and 1. Defaults to (0, 0, 0.25, 1), the curve that camera animations
-    /// ease along by default. Android's scroll fling follows (0.175, 0.5, 0.35,
-    /// 1).
+    /// covered over the share of <c>duration_ms</c>. Its control points are
+    /// between 0 and 1, so the glide never passes its distance. Defaults to (0,
+    /// 0, 0.25, 1), the curve that camera animations ease along by default.
+    /// Android's scroll fling follows (0.175, 0.5, 0.35, 1).
     /// </summary>
     public UnitBezier? Curve { get; init; }
 

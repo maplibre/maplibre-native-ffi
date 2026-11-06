@@ -3118,9 +3118,10 @@ class MomentumDecay:
 
     curve: UnitBezier | None = None
     """For `MomentumDecayModel.PLANNED`, the share of `distance` covered over
-    the share of `duration_ms`. Its x values are between 0 and 1. Defaults to
-    (0, 0, 0.25, 1), the curve that camera animations ease along by default.
-    Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+    the share of `duration_ms`. Its control points are between 0 and 1, so
+    the glide never passes its distance. Defaults to (0, 0, 0.25, 1), the
+    curve that camera animations ease along by default. Android's scroll
+    fling follows (0.175, 0.5, 0.35, 1).
     """
 
     min_speed: float | None = None

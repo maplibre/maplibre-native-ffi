@@ -4884,9 +4884,10 @@ auto resolve_momentum_decay(
       if (
         !std::isfinite(curve.x1) || !std::isfinite(curve.y1) ||
         !std::isfinite(curve.x2) || !std::isfinite(curve.y2) ||
-        curve.x1 < 0.0 || curve.x1 > 1.0 || curve.x2 < 0.0 || curve.x2 > 1.0
+        curve.x1 < 0.0 || curve.x1 > 1.0 || curve.x2 < 0.0 || curve.x2 > 1.0 ||
+        curve.y1 < 0.0 || curve.y1 > 1.0 || curve.y2 < 0.0 || curve.y2 > 1.0
       ) {
-        return fail("needs a finite curve whose x values are within [0, 1]");
+        return fail("needs a curve whose control points are within [0, 1]");
       }
       decay.curve = {
         .x1 = curve.x1, .y1 = curve.y1, .x2 = curve.x2, .y2 = curve.y2
