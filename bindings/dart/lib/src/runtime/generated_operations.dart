@@ -4072,16 +4072,22 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       ),
     );
   });
-  void addGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) =>
-      _discard(
-        (arena, completion) => raw.mln_map_add_geo_json_source_data(
-          _handle.raw,
-          nativeStringView(sourceId, arena).value,
-          data._handle.raw,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
+  void addGeoJsonSourceData(
+    String sourceId,
+    GeoJsonSourceDataHandle data, {
+    String? attribution,
+  }) => _discard(
+    (arena, completion) => raw.mln_map_add_geo_json_source_data(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      data._handle.raw,
+      attribution == null
+          ? arena<raw.mln_buffer_view>().ref
+          : nativeStringView(attribution, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   void addImageSourceImage(
     String sourceId,
     List<LatLng> coordinates,
@@ -4729,6 +4735,10 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// The source uses the options that `data` was prepared with. `data` can be
   /// released once this function returns.
   ///
+  /// `attribution` is the source's
+  /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+  /// or empty for none.
+  ///
   /// See `mln_map_add_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   ///
@@ -4740,12 +4750,16 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///   `MapHandle.setStyleUrl()` describes.
   Future<CommandCompletion> addGeoJsonSourceData(
     String sourceId,
-    GeoJsonSourceDataHandle data,
-  ) => _command(
+    GeoJsonSourceDataHandle data, {
+    String? attribution,
+  }) => _command(
     (arena, completion) => raw.mln_map_add_geo_json_source_data(
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       data._handle.raw,
+      attribution == null
+          ? arena<raw.mln_buffer_view>().ref
+          : nativeStringView(attribution, arena).value,
       completion,
       nativeDiagnostic,
     ),

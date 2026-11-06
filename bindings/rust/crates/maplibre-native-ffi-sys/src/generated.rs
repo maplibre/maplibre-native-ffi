@@ -2354,6 +2354,7 @@ unsafe extern "C" {
         map: mln_map,
         source_id: mln_buffer_view,
         data: mln_geo_json_source_data,
+        attribution: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

@@ -52,7 +52,8 @@ void add_drawn_source(
 ) {
   mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(empty_style_json));
   MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, nullptr
+    map, MLN_BUFFER_LITERAL("points"), data, MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, nullptr
   ));
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
     map,

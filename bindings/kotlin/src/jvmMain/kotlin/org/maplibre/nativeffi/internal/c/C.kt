@@ -150,6 +150,7 @@ internal actual object C {
       JAVA_LONG,
       mln_buffer_view,
       JAVA_LONG,
+      mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -1631,6 +1632,7 @@ internal actual object C {
     map: Long,
     sourceId: Long,
     data: Long,
+    attribution: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
@@ -1638,6 +1640,7 @@ internal actual object C {
       map,
       Ffm.value(sourceId, mln_buffer_view),
       data,
+      Ffm.value(attribution, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int

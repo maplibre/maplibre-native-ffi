@@ -467,12 +467,19 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_custom_vector_source(source_id, options)
 
     def add_geo_json_source_data(
-        self, source_id: str, data: GeoJsonSourceDataHandle
+        self,
+        source_id: str,
+        data: GeoJsonSourceDataHandle,
+        attribution: str | None = None,
     ) -> Future[CommandCompletion]:
         """Adds a GeoJSON source with prepared data.
 
         The source uses the options that `data` was prepared with. `data` can
         be released once this function returns.
+
+        `attribution` is the source's
+        \\[attribution\\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+        or empty for none.
 
         See `mln_map_add_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -484,7 +491,9 @@ class _MapHandleOperations(GeneratedOperations):
         - `Status.INVALID_STATE` while the style isn't loaded, as
           `MapHandle.set_style_url()` describes.
         """
-        return self._native.add_geo_json_source_data(source_id, data._native)
+        return self._native.add_geo_json_source_data(
+            source_id, data._native, attribution
+        )
 
     def add_image_source_image(
         self,
@@ -3683,17 +3692,26 @@ class MapHandleDiscarding:
         return self._native._discard_add_custom_vector_source(source_id, options)
 
     def add_geo_json_source_data(
-        self, source_id: str, data: GeoJsonSourceDataHandle
+        self,
+        source_id: str,
+        data: GeoJsonSourceDataHandle,
+        attribution: str | None = None,
     ) -> None:
         """Adds a GeoJSON source with prepared data.
 
         The source uses the options that `data` was prepared with. `data` can
         be released once this function returns.
 
+        `attribution` is the source's
+        \\[attribution\\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+        or empty for none.
+
         See `mln_map_add_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
-        return self._native._discard_add_geo_json_source_data(source_id, data._native)
+        return self._native._discard_add_geo_json_source_data(
+            source_id, data._native, attribution
+        )
 
     def add_image_source_image(
         self,

@@ -7223,6 +7223,10 @@ func (receiver *MapHandle) AddCustomVectorSource(sourceID string, options Custom
 // The source uses the options that data was prepared with. data can be released
 // once this function returns.
 //
+// attribution is the source's
+// [attribution](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+// or empty for none.
+//
 // See mln_map_add_geo_json_source_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
@@ -7230,9 +7234,9 @@ func (receiver *MapHandle) AddCustomVectorSource(sourceID string, options Custom
 //   - StatusAlreadyExists when the style already has a source named sourceID.
 //   - StatusInvalidState while the style isn't loaded, as
 //     MapHandle.SetStyleURL() describes.
-func (receiver *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle, attribution string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), completion, diagnostic))
+		return int32(C.mln_map_add_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), bindingView(attribution, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -9981,10 +9985,10 @@ func (view MapHandleDiscarding) AddCustomVectorSource(sourceID string, options C
 	})
 }
 
-func (view MapHandleDiscarding) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) error {
+func (view MapHandleDiscarding) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle, attribution string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), completion, diagnostic))
+		return int32(C.mln_map_add_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), bindingView(attribution, arena), completion, diagnostic))
 	})
 }
 

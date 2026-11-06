@@ -402,6 +402,10 @@ pub const Map = struct {
     /// The source uses the options that `data` was prepared with. `data` can be
     /// released once this function returns.
     ///
+    /// `attribution` is the source's
+    /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+    /// or empty for none.
+    ///
     /// See `mln_map_add_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     ///
@@ -411,8 +415,8 @@ pub const Map = struct {
     ///   `source_id`.
     /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
     ///   describes.
-    pub fn addGeoJsonSourceData(self: Map, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_add_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
+    pub fn addGeoJsonSourceData(self: Map, source_id: []const u8, data: GeoJsonSourceData, attribution: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_add_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data, attribution });
     }
 
     /// Adds an image source that shows `image`.
@@ -9611,9 +9615,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_add_custom_vector_source", .handle, map, null, diagnostic, .{ source_id, options });
     }
 
-    pub fn addGeoJsonSourceData(self: MapDiscarding, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn addGeoJsonSourceData(self: MapDiscarding, source_id: []const u8, data: GeoJsonSourceData, attribution: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_add_geo_json_source_data", .handle, map, null, diagnostic, .{ source_id, data });
+        return call.discard("mln_map_add_geo_json_source_data", .handle, map, null, diagnostic, .{ source_id, data, attribution });
     }
 
     pub fn addImageSourceImage(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

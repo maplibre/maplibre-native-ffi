@@ -4054,17 +4054,20 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (source_id, data))]
+    #[pyo3(signature = (source_id, data, attribution=None))]
     fn add_geo_json_source_data(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
         data: &GeoJsonSourceDataHandle,
+        attribution: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let data_handle = data.input();
+        let attribution = attribution.unwrap_or_else(|| py.None().into_bound(py));
+        let attribution_value = storage.buffer(attribution.clone(), true)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
@@ -4072,23 +4075,27 @@ impl MapHandle {
                     handle,
                     source_id_value,
                     data_handle,
+                    attribution_value,
                     completion,
                     diagnostic,
                 )
             })
         }
     }
-    #[pyo3(signature = (source_id, data))]
+    #[pyo3(signature = (source_id, data, attribution=None))]
     fn _discard_add_geo_json_source_data(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
         data: &GeoJsonSourceDataHandle,
+        attribution: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let data_handle = data.input();
+        let attribution = attribution.unwrap_or_else(|| py.None().into_bound(py));
+        let attribution_value = storage.buffer(attribution.clone(), true)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
@@ -4096,6 +4103,7 @@ impl MapHandle {
                     handle,
                     source_id_value,
                     data_handle,
+                    attribution_value,
                     completion,
                     diagnostic,
                 )

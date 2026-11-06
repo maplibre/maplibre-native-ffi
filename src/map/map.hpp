@@ -336,7 +336,8 @@ auto map_list_style_sources(
 ) -> mln_status;
 auto map_add_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
-  const std::shared_ptr<const GeoJsonSourceDataObject>& data
+  const std::shared_ptr<const GeoJsonSourceDataObject>& data,
+  mln_buffer_view attribution
 ) -> mln_status;
 auto map_set_geojson_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url

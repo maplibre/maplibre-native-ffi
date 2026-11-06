@@ -42,7 +42,7 @@ namespace Style {
 			"""{"type": "Point", "coordinates": [-122.4, 37.8]}""",
 			null
 		);
-		map.add_geo_json_source_data_async.begin ("points", data);
+		map.add_geo_json_source_data_async.begin ("points", data, null);
 
 		// Later, prepare new data with the same options, and set it.
 		var moved = new GeoJsonSourceData.create (

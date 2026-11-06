@@ -2964,6 +2964,7 @@ external int mln_map_add_custom_vector_source(
     mln_map,
     mln_buffer_view,
     mln_geo_json_source_data,
+    mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
@@ -2972,6 +2973,7 @@ external int mln_map_add_geo_json_source_data(
   int map,
   mln_buffer_view source_id,
   int data,
+  mln_buffer_view attribution,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

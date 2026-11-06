@@ -82,7 +82,8 @@ void mln_doc_style(const uint8_t* pixels) {
     NULL, &data, NULL
   );
   mln_map_add_geo_json_source_data(
-    map, mln_buffer_view_from_cstr("points"), data, NULL, NULL
+    map, mln_buffer_view_from_cstr("points"), data,
+    (mln_buffer_view){0}, NULL, NULL
   );
   // The source keeps its own reference to the data.
   mln_geo_json_source_data_release(data);

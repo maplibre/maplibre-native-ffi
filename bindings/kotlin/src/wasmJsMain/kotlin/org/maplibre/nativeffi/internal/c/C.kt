@@ -212,6 +212,7 @@ internal actual object C {
     map: Long,
     sourceId: Long,
     data: Long,
+    attribution: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
@@ -219,6 +220,7 @@ internal actual object C {
       map,
       word(sourceId),
       data,
+      word(attribution),
       word(completion),
       word(outDiagnostic),
     )
@@ -2330,9 +2332,10 @@ private fun mln_kw_mln_map_add_geo_json_source_data(
   p2: Long,
   p3: Int,
   p4: Int,
+  p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source_data(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source_data(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_add_image_source_image(

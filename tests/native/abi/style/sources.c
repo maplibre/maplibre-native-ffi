@@ -261,6 +261,49 @@ static void a_geojson_source_reports_the_options_its_data_needs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A GeoJSON source added with prepared data keeps its attribution when
+// prepared data replaces its data.
+static void a_geojson_source_keeps_the_attribution_it_was_added_with(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
+
+  mln_geo_json_source_data data = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_geo_json_source_data_create(
+    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
+    NULL, &data, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
+    map, MLN_BUFFER_LITERAL("attributed"), data,
+    MLN_BUFFER_LITERAL("Fixture data"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
+    map, MLN_BUFFER_LITERAL("plain"), data, (mln_buffer_view){0},
+    &completion.descriptor, NULL
+  ));
+  mln_geo_json_source_data_release(data);
+  TEST_ASSERT_EQUAL_STRING(
+    "Fixture data", read_source(map, "attributed").attribution
+  );
+  TEST_ASSERT_EQUAL_size_t(0, read_source(map, "plain").info.attribution.size);
+
+  data = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_geo_json_source_data_create(
+    MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"), NULL,
+    &data, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_data(
+    map, MLN_BUFFER_LITERAL("attributed"), data, &completion.descriptor, NULL
+  ));
+  mln_geo_json_source_data_release(data);
+  TEST_ASSERT_EQUAL_STRING(
+    "Fixture data", read_source(map, "attributed").attribution
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // The engine counts cluster points in a size_t, so a count past 32 bits
 // reports exactly and prepares data that the source takes. A 32-bit target
 // can't hold one.
@@ -549,6 +592,7 @@ static void image_sources_take_corners_images_and_urls(void) {
 MLN_TEST_GROUP {
   RUN_TEST(a_source_reports_its_url_attribution_and_tilejson);
   RUN_TEST(a_geojson_source_reports_the_options_its_data_needs);
+  RUN_TEST(a_geojson_source_keeps_the_attribution_it_was_added_with);
 #if SIZE_MAX > UINT32_MAX
   RUN_TEST(a_geojson_source_reports_its_full_cluster_min_points);
 #endif

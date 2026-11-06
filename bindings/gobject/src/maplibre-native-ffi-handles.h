@@ -461,6 +461,7 @@ maplibre_native_ffi_map_add_custom_vector_source_finish(
 /**
  * maplibre_native_ffi_map_add_geo_json_source_data_async:
  * @source_id: the UTF-8 text
+ * @attribution: (nullable): the UTF-8 text
  * @callback: (scope async) (nullable): the callback to call when the call finishes
  * @user_data: the data to pass to `callback`
  *
@@ -468,6 +469,10 @@ maplibre_native_ffi_map_add_custom_vector_source_finish(
  *
  * The source uses the options that `data` was prepared with. `data` can be
  * released once this function returns.
+ *
+ * `attribution` is the source's
+ * \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+ * or empty for none.
  *
  * See `mln_map_add_geo_json_source_data` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -483,8 +488,8 @@ maplibre_native_ffi_map_add_custom_vector_source_finish(
  */
 void maplibre_native_ffi_map_add_geo_json_source_data_async(
   MaplibreNativeFfiMap* self, const char* source_id,
-  MaplibreNativeFfiGeoJsonSourceData* data, GAsyncReadyCallback callback,
-  gpointer user_data
+  MaplibreNativeFfiGeoJsonSourceData* data, const char* attribution,
+  GAsyncReadyCallback callback, gpointer user_data
 );
 
 /**

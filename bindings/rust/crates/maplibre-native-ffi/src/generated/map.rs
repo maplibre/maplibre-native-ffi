@@ -79,6 +79,10 @@ impl MapHandle {
     /// The source uses the options that `data` was prepared with. `data` can be
     /// released once this function returns.
     ///
+    /// `attribution` is the source's
+    /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+    /// or empty for none.
+    ///
     /// See `mln_map_add_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     ///
@@ -92,12 +96,21 @@ impl MapHandle {
         &self,
         source_id: &str,
         data: &GeoJsonSourceDataHandle,
+        attribution: Option<&str>,
     ) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let data = data.inner.native();
         let source_id = call.input(&source_id)?;
+        let attribution = call.input(&attribution)?;
         call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
+            sys::mln_map_add_geo_json_source_data(
+                map,
+                source_id,
+                data,
+                attribution,
+                completion,
+                out_diagnostic,
+            )
         })
     }
 
@@ -2810,18 +2823,31 @@ impl MapHandleDiscarding<'_> {
     /// The source uses the options that `data` was prepared with. `data` can be
     /// released once this function returns.
     ///
+    /// `attribution` is the source's
+    /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
+    /// or empty for none.
+    ///
     /// See `mln_map_add_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn add_geo_json_source_data(
         &self,
         source_id: &str,
         data: &GeoJsonSourceDataHandle,
+        attribution: Option<&str>,
     ) -> Result<()> {
         let mut call = self.0.inner.call();
         let data = data.inner.native();
         let source_id = call.input(&source_id)?;
+        let attribution = call.input(&attribution)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_add_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
+            sys::mln_map_add_geo_json_source_data(
+                map,
+                source_id,
+                data,
+                attribution,
+                completion,
+                out_diagnostic,
+            )
         })
     }
 

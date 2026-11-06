@@ -170,6 +170,7 @@ export interface NativeOperations {
     map: bigint,
     sourceId: string,
     data: bigint,
+    attribution: string | undefined,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_image_source_image(
