@@ -26,6 +26,9 @@ to other servers in the style.
 For values that change, such as a token that expires, give the transform a
 callback instead. It sets the headers of each request.
 
+In a browser and on OpenHarmony, the header transform is unsupported. To add
+headers there, serve the requests with a [resource provider](#serve-resources).
+
 <Snippet page="network" region="headers" />
 
 ## Rewrite URLs
