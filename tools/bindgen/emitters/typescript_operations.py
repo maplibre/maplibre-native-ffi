@@ -1107,8 +1107,9 @@ def render_owner(bound, values, native: str, handle, methods) -> str:
     if readied:
         summary = (
             f"Settles once the {readied} is ready, and rejects with a "
-            f"`MaplibreError` when it fails to become ready. The {readied} "
-            "takes calls before then. A rejection that nothing awaits isn't "
+            f"`MaplibreError` when it fails to become ready. Asynchronous calls "
+            f"on the {readied} before then wait for it. A rejection that "
+            "nothing awaits isn't "
             "reported as unhandled."
         )
         text += (

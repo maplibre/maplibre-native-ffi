@@ -1,6 +1,7 @@
 // Map creation through the public ABI: the map the call returns at once, what
 // it accepts while it is still creating, and its release before it is ready.
 
+#include "support/frames.h"
 #include "support/test_support.h"
 
 // Parks the runtime worker inside a completion on a map of its own, so a map
@@ -29,31 +30,43 @@ static void a_creating_map_runs_accepted_work_once_it_is_ready(void) {
   ));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
 
-  // Calls that read the native map wait for the completion.
+  // A snapshot copies state that only creation makes.
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_INVALID_STATE(mln_map_get_snapshot(map, &snapshot, NULL));
-  const mln_render_session_attach_options options = {
-    .size = sizeof(mln_render_session_attach_options)
-  };
-  mln_test_completion attach = mln_test_completion_default(0);
-  mln_test_render_fixture fixture = {0};
-  MLN_TEST_INVALID_STATE(mln_test_render_fixture_start_attach(
-    map, &options, &attach.descriptor, &fixture
-  ));
-  mln_test_completion_reject(&attach);
-  mln_test_completion_destroy(&attach);
 
-  // Ordered work queues behind creation.
+  // Ordered work, and an attach, queue behind creation.
   mln_test_completion style = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_set_style_json(
     map, mln_test_empty_style_json, &style.descriptor, NULL
   ));
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
+  options.frame_wake = mln_test_pulse_wake();
+  options.driver_work_wake = mln_test_pulse_wake();
+  mln_test_completion attach = mln_test_completion_default(0);
+  mln_test_render_fixture fixture = {0};
+  MLN_TEST_OK(mln_test_render_fixture_start_attach(
+    map, &options, &attach.descriptor, &fixture
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
+  TEST_ASSERT_FALSE(mln_test_completion_poll(&attach));
   TEST_ASSERT_FALSE(mln_test_completion_poll(&created));
   mln_test_gate_release(&gate);
   MLN_TEST_OK(mln_test_completion_settle(&created));
   MLN_TEST_OK(mln_test_completion_settle(&style));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
+  mln_test_completion_destroy(&attach);
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
 
+  mln_test_render_demand_forced(&fixture, 1);
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(&fixture);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+
+  mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_map(parking);
   mln_test_destroy_runtime(runtime);

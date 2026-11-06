@@ -124,7 +124,8 @@ def owner(bound, native, plans, factories, members, imports):
         # A handle that no attach created, such as a borrowed one, is ready.
         parameters.append(
             f"/** Completes once the {readied} is ready, and fails with a [MaplibreException] "
-            f"when it fails to become ready. The {readied} takes calls before then. */\n"
+            f"when it fails to become ready. Asynchronous calls on the {readied} before then "
+            "wait for it. */\n"
             "  public val ready: Completion<Unit>"
         )
         factory.append("ready: Completion<Unit> = Completion.completed(Unit)")

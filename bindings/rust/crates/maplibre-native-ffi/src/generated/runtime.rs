@@ -80,6 +80,11 @@ impl RuntimeHandle {
 
     /// Creates a map on `runtime`.
     ///
+    /// The map takes asynchronous calls, including render session attaches,
+    /// before the completion runs. They wait for it, and complete with
+    /// `Status::InvalidState` when creation fails. `MapHandle::get_snapshot()`
+    /// fails until creation succeeds.
+    ///
     /// See `mln_runtime_create_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     pub fn create_map(&self, options: &MapOptions) -> Result<(MapHandle, NativeFuture<()>)> {

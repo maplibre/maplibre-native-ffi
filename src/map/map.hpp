@@ -600,6 +600,11 @@ auto map_post_resize(
   mln_map map, uint32_t width, uint32_t height,
   const mln_completion* completion = nullptr
 ) -> mln_status;
+// Calls `settled` once the map's creation has finished, with whether it
+// succeeded: before returning when the map already exists, and otherwise on
+// the runtime worker, after the creation task.
+auto map_post_after_creation(mln_map map, std::function<void(bool)> settled)
+  -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
 // The hooks through which the map tells its attached session about render
 // work. The map calls them on the runtime worker, and an empty one does

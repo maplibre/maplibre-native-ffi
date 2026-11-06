@@ -6,6 +6,11 @@ import Foundation
 public extension RuntimeHandle {
   /// Creates a map on `runtime`.
   ///
+  /// The map takes asynchronous calls, including render session attaches,
+  /// before the completion runs. They wait for it, and complete with
+  /// `Status.invalidState` when creation fails. `MapHandle.getSnapshot()` fails
+  /// until creation succeeds.
+  ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func createMap(options bindingArg0: MapOptions) throws -> MapHandle {

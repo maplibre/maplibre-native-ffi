@@ -1522,6 +1522,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// after they apply, use <c>MapHandle.GetCameraAsync()</c>.</para>
     /// <para>See <c>mln_map_get_snapshot</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> until
+    /// <c>RuntimeHandle.CreateMap()</c> completes with
+    /// <c>Status.Ok</c>.</description></item>
+    /// </list>
     /// </remarks>
     public MapSnapshot GetSnapshot()
     {

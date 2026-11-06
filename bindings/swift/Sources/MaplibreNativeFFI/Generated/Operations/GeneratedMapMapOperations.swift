@@ -90,6 +90,11 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_snapshot` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` until `RuntimeHandle.createMap()` completes with
+  ///   `Status.ok`.
   func getSnapshot() throws -> MapSnapshot {
     var value0 = mln_map_snapshot()
     value0.size = UInt32(MemoryLayout<mln_map_snapshot>.size)

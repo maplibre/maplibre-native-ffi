@@ -87,6 +87,16 @@ void work_queued_on_a_failed_map_reports_invalid_state() {
   MLN_TEST_OK(mln_map_set_debug_flags(map, 0, &command.descriptor, nullptr));
   auto still = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, nullptr));
+  auto attach_options = mln_render_session_attach_options{
+    .size = sizeof(mln_render_session_attach_options)
+  };
+  attach_options.frame_wake = mln_test_pulse_wake();
+  attach_options.driver_work_wake = mln_test_pulse_wake();
+  auto attach = mln_test_completion_default(0);
+  auto fixture = mln_test_render_fixture{};
+  MLN_TEST_OK(mln_test_render_fixture_start_attach(
+    map, &attach_options, &attach.descriptor, &fixture
+  ));
   const auto status = mln_test_completion_settle(&created);
   mln::testing::set_sync_point_handler(nullptr, nullptr);
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
@@ -94,6 +104,11 @@ void work_queued_on_a_failed_map_reports_invalid_state() {
   TEST_ASSERT_TRUE(mln_test_completion_wait(&command, -1));
   MLN_TEST_INVALID_STATE(mln_test_completion_settle(&command));
   MLN_TEST_INVALID_STATE(mln_test_completion_settle(&still));
+  MLN_TEST_INVALID_STATE(
+    mln_test_render_fixture_finish_operation(&fixture, &attach)
+  );
+  mln_test_completion_destroy(&attach);
+  mln_test_render_fixture_destroy(&fixture);
 
   auto url = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_get_style_url(map, &url.descriptor, nullptr));

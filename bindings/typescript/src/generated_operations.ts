@@ -906,8 +906,8 @@ export class MapHandle extends Owner {
 
   /**
    * Settles once the map is ready, and rejects with a `MaplibreError` when it
-   * fails to become ready. The map takes calls before then. A rejection that
-   * nothing awaits isn't reported as unhandled.
+   * fails to become ready. Asynchronous calls on the map before then wait for
+   * it. A rejection that nothing awaits isn't reported as unhandled.
    */
   readonly ready: Promise<void>;
 
@@ -2396,6 +2396,11 @@ export class MapHandle extends Owner {
    *
    * See `mln_map_get_snapshot` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` until `RuntimeHandle.createMap()` completes with
+   *   `Status.ok`.
    */
   getSnapshot(): MapSnapshot {
     return native.mln_map_get_snapshot(this.id);
@@ -4724,8 +4729,8 @@ export class RenderSessionHandle extends Owner {
 
   /**
    * Settles once the session is ready, and rejects with a `MaplibreError` when
-   * it fails to become ready. The session takes calls before then. A rejection
-   * that nothing awaits isn't reported as unhandled.
+   * it fails to become ready. Asynchronous calls on the session before then
+   * wait for it. A rejection that nothing awaits isn't reported as unhandled.
    */
   readonly ready: Promise<void>;
 
@@ -5930,6 +5935,11 @@ export class RuntimeHandle extends Owner {
 
   /**
    * Creates a map on `runtime`.
+   *
+   * The map takes asynchronous calls, including render session attaches, before
+   * the completion runs. They wait for it, and complete with
+   * `Status.invalidState` when creation fails. `MapHandle.getSnapshot()` fails
+   * until creation succeeds.
    *
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

@@ -335,8 +335,9 @@ def render_owner(native, handle, bodies, bound, roots):
         parameters.append("this.ready")
         summary = (
             f"Completes once the {readied} is ready, and fails with a "
-            f"[MaplibreException] when it fails to become ready. The {readied} "
-            "takes calls before then. A failure that nothing awaits isn't "
+            f"[MaplibreException] when it fails to become ready. Asynchronous "
+            f"calls on the {readied} before then wait for it. A failure that "
+            "nothing awaits isn't "
             "reported to the zone."
         )
         fields.append(

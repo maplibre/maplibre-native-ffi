@@ -1115,6 +1115,11 @@ pub const Map = struct {
     ///
     /// See `mln_map_get_snapshot` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` until `Runtime.createMap()` completes with
+    ///   `Status.ok`.
     pub fn getSnapshot(self: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapSnapshot {
         return call.invoke("mln_map_get_snapshot", .handle, self, null, diagnostic, .{call.sizedOut(MapSnapshot)});
     }
@@ -2840,6 +2845,11 @@ pub const Runtime = struct {
     }
 
     /// Creates a map on `runtime`.
+    ///
+    /// The map takes asynchronous calls, including render session attaches, before
+    /// the completion runs. They wait for it, and complete with
+    /// `error.InvalidState` when creation fails. `Map.getSnapshot()` fails until
+    /// creation succeeds.
     ///
     /// See `mln_runtime_create_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

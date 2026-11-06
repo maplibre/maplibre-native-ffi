@@ -1048,10 +1048,14 @@ typedef struct mln_camera_query_result {
 /**
  * Creates a map on `runtime`.
  *
+ * The map takes asynchronous calls, including render session attaches, before
+ * the completion runs. They wait for it, and complete with
+ * MLN_STATUS_INVALID_STATE when creation fails. mln_map_get_snapshot() fails
+ * until creation succeeds.
+ *
  * Lifetimes:
  * `out_map` receives the handle before the call returns, while the map is
- * still being built. Commands sent to the map before the completion runs wait
- * for it, but mln_map_get_snapshot() fails until then.
+ * still being built.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_runtime_create_map(
@@ -1065,6 +1069,10 @@ MLN_API mln_status mln_runtime_create_map(
  *
  * The copy doesn't wait for pending commands. To read the camera after they
  * apply, use mln_map_get_camera().
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_STATE until mln_runtime_create_map() completes with
+ *   MLN_STATUS_OK.
  */
 MLN_BINDING("execution=snapshot")
 MLN_API mln_status mln_map_get_snapshot(

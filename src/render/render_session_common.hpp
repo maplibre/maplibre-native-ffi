@@ -993,6 +993,9 @@ struct mln_render_session_object
   bool disposal_keeps_graphics = false;
   bool destruction_started = false;
   bool attached = false;
+  // Whether the map's creation succeeded, once it has finished, under
+  // control_mutex. The attach's driver work waits for it.
+  std::optional<bool> map_created;
   // Set by a target release and cleared by the next target replacement.
   // Written only by driver work, which runs one item at a time, under
   // control_mutex, so the driver reads it without the lock.

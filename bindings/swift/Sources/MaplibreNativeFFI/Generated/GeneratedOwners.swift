@@ -197,7 +197,8 @@ public final class MapHandle: @unchecked Sendable, NativeReceiver, Identifiable,
   }
 
   /// Returns once the map is ready, and throws a ``MaplibreError`` when it
-  /// fails to become ready. The map takes calls before then.
+  /// fails to become ready. Asynchronous calls on the map before then wait for
+  /// it.
   public var ready: Void {
     get async throws { try await readiness?.value }
   }
@@ -362,7 +363,8 @@ public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver,
   }
 
   /// Returns once the session is ready, and throws a ``MaplibreError`` when it
-  /// fails to become ready. The session takes calls before then.
+  /// fails to become ready. Asynchronous calls on the session before then wait
+  /// for it.
   public var ready: Void {
     get async throws { try await readiness?.value }
   }

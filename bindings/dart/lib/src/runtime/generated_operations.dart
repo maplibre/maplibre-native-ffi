@@ -4648,8 +4648,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   MapHandleDiscarding get discarding => MapHandleDiscarding._(this);
 
   /// Completes once the map is ready, and fails with a [MaplibreException] when
-  /// it fails to become ready. The map takes calls before then. A failure that
-  /// nothing awaits isn't reported to the zone.
+  /// it fails to become ready. Asynchronous calls on the map before then wait
+  /// for it. A failure that nothing awaits isn't reported to the zone.
   final Future<void> ready;
 
   /// The native handle id, which runtime events report as their source.
@@ -5898,6 +5898,11 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_get_snapshot` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidState` until `RuntimeHandle.createMap()` completes with
+  ///   `Status.ok`.
   MapSnapshot getSnapshot() => withNativeArena((arena) {
     final outSnapshot = arena<raw.mln_map_snapshot>();
     outSnapshot.ref.size = sizeOf<raw.mln_map_snapshot>();
@@ -7382,8 +7387,9 @@ final class RenderSessionHandle implements Finalizable {
       RenderSessionHandleDiscarding._(this);
 
   /// Completes once the session is ready, and fails with a [MaplibreException]
-  /// when it fails to become ready. The session takes calls before then. A
-  /// failure that nothing awaits isn't reported to the zone.
+  /// when it fails to become ready. Asynchronous calls on the session before
+  /// then wait for it. A failure that nothing awaits isn't reported to the
+  /// zone.
   final Future<void> ready;
 
   /// The native handle id.
@@ -8577,6 +8583,11 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
       });
 
   /// Creates a map on `runtime`.
+  ///
+  /// The map takes asynchronous calls, including render session attaches,
+  /// before the completion runs. They wait for it, and complete with
+  /// `Status.invalidState` when creation fails. `MapHandle.getSnapshot()` fails
+  /// until creation succeeds.
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
