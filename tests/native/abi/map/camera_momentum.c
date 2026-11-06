@@ -211,8 +211,9 @@ static void a_release_glides_and_then_ends_the_gesture(void) {
   destroy_fixture(&fixture);
 }
 
-// A new gesture stops the momentum and reports each part's speed, which no
-// frame has slowed yet, while the new gesture keeps the map's gesture flag.
+// A new gesture stops the momentum and reports each part's speed, while the
+// new gesture keeps the map's gesture flag. With a ten-minute half-life, a
+// frame that runs before the new gesture barely slows the parts.
 static void a_new_gesture_stops_momentum_and_reports_its_speed(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -249,11 +250,11 @@ static void a_new_gesture_stops_momentum_and_reports_its_speed(void) {
   begin_gesture(map);
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED);
   const mln_camera_velocity velocity = observation.velocity;
-  TEST_ASSERT_DOUBLE_WITHIN(1e-3, 1000.0, velocity.pan.x);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-3, -500.0, velocity.pan.y);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 1.0, velocity.zoom);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, -90.0, velocity.bearing);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 20.0, velocity.pitch);
+  TEST_ASSERT_DOUBLE_WITHIN(1.0, 1000.0, velocity.pan.x);
+  TEST_ASSERT_DOUBLE_WITHIN(0.5, -500.0, velocity.pan.y);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-3, 1.0, velocity.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(0.09, -90.0, velocity.bearing);
+  TEST_ASSERT_DOUBLE_WITHIN(0.02, 20.0, velocity.pitch);
   snapshot = read_snapshot(map);
   TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
   TEST_ASSERT_FALSE(snapshot.transition_in_progress);
