@@ -383,9 +383,8 @@ typedef struct mln_runtime_options {
   mln_buffer_view asset_path;
   /**
    * The path of the cache database file, which holds the ambient cache and
-   * offline regions. The library creates the file if it doesn't exist, so its
-   * directory must be writable. A relative path is relative to the working
-   * directory. Empty keeps the cache in memory.
+   * offline regions. Its directory must be writable. Empty keeps the cache in
+   * memory.
    */
   mln_buffer_view cache_path;
 } mln_runtime_options;
