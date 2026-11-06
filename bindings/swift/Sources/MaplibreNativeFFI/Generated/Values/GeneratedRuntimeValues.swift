@@ -1648,6 +1648,7 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   public static let mapStyleImageMissing: RuntimeEventType = .init(rawValue: 14)
   /// A tile moved to another step of loading.
   public static let mapTileAction: RuntimeEventType = .init(rawValue: 15)
+  /// A source in the style changed, such as when its TileJSON loads.
   public static let mapSourceChanged: RuntimeEventType = .init(rawValue: 16)
   public static let offlineRegionStatusChanged: RuntimeEventType =
     .init(rawValue: 17)

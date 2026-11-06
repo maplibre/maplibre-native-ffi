@@ -534,6 +534,9 @@ MLN_API mln_status mln_map_remove_style_source(
 /**
  * Reads a source of the map's style.
  *
+ * A tile source with a `url` has an empty attribution until its TileJSON loads,
+ * which raises MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED.
+ *
  * Completes with no value when the style has no source named `source_id`.
  */
 MLN_BINDING("execution=query;result=mln_style_source_info;nullable=true")
@@ -1073,6 +1076,9 @@ MLN_API mln_status mln_map_set_style_light_property(
 /**
  * Reads a property of the light of the map's style.
  *
+ * The value can differ in form from the value that was set: a color set as
+ * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+ *
  * Completes with no value when the light doesn't set the property.
  */
 MLN_BINDING(
@@ -1125,6 +1131,9 @@ MLN_API mln_status mln_map_set_style_layer_property(
 
 /**
  * Reads a property of a layer in the map's style.
+ *
+ * The value can differ in form from the value that was set: a color set as
+ * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
  *
  * Completes with no value when the layer doesn't set the property.
  *

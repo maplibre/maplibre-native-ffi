@@ -217,6 +217,10 @@ impl MapHandle {
     /// animation. The function finishes when the map applies the delta, before
     /// an animation ends.
     ///
+    /// A delta that replaces an animated one starts from where that animation
+    /// left the camera, so the rest of the replaced change never happens. To
+    /// reach an exact camera, use `MapHandle::update_camera()`.
+    ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn apply_camera_delta(
@@ -1564,6 +1568,9 @@ impl MapHandle {
 
     /// Reads a property of a layer in the map's style.
     ///
+    /// The value can differ in form from the value that was set: a color set as
+    /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+    ///
     /// Completes with no value when the layer doesn't set the property.
     ///
     /// See `mln_map_get_style_layer_property` in the
@@ -1596,6 +1603,9 @@ impl MapHandle {
 
     /// Reads a property of the light of the map's style.
     ///
+    /// The value can differ in form from the value that was set: a color set as
+    /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+    ///
     /// Completes with no value when the light doesn't set the property.
     ///
     /// See `mln_map_get_style_light_property` in the
@@ -1620,6 +1630,9 @@ impl MapHandle {
     }
 
     /// Reads a source of the map's style.
+    ///
+    /// A tile source with a `url` has an empty attribution until its TileJSON
+    /// loads, which raises `RuntimeEventType::MapSourceChanged`.
     ///
     /// Completes with no value when the style has no source named `source_id`.
     ///
@@ -2895,6 +2908,10 @@ impl MapHandleDiscarding<'_> {
     /// of those changes, and combines with an offset only when the delta has no
     /// animation. The function finishes when the map applies the delta, before
     /// an animation ends.
+    ///
+    /// A delta that replaces an animated one starts from where that animation
+    /// left the camera, so the rest of the replaced change never happens. To
+    /// reach an exact camera, use `MapHandle::update_camera()`.
     ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

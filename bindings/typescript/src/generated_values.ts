@@ -3272,6 +3272,9 @@ export const RuntimeEventType = {
    * A tile moved to another step of loading.
    */
   mapTileAction: 15,
+  /**
+   * A source in the style changed, such as when its TileJSON loads.
+   */
   mapSourceChanged: 16,
   offlineRegionStatusChanged: 17,
   /**

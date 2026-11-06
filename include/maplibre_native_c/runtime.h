@@ -130,6 +130,7 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 14,
   /** A tile moved to another step of loading. */
   MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 15,
+  /** A source in the style changed, such as when its TileJSON loads. */
   MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
   /** A resource that the region needs failed to download. */

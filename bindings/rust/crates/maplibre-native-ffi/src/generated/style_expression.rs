@@ -47,7 +47,12 @@ impl StyleExpressionHandle {
 
     /// Evaluates a style expression and writes its result as JSON.
     ///
-    /// A number in the result that isn't finite becomes null.
+    /// A number in the result that isn't finite becomes null. A color is
+    /// `["rgba", r, g, b, a]`, with red, green, and blue from 0 to 255 and
+    /// alpha from 0 to 1, each exact only to single precision. Formatted text
+    /// is a `["format", …]` expression, an image is `{"name": …, "available":
+    /// …}`, padding is `[top, right, bottom, left]`, and a variable anchor
+    /// offset is `[anchor, [x, y], …]`.
     ///
     /// See `mln_style_expression_evaluate` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).

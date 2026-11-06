@@ -1128,6 +1128,10 @@ export class MapHandle extends Owner {
    * animation. The function finishes when the map applies the delta, before an
    * animation ends.
    *
+   * A delta that replaces an animated one starts from where that animation left
+   * the camera, so the rest of the replaced change never happens. To reach an
+   * exact camera, use `MapHandle.updateCamera()`.
+   *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
@@ -2447,6 +2451,9 @@ export class MapHandle extends Owner {
   /**
    * Reads a property of a layer in the map's style.
    *
+   * The value can differ in form from the value that was set: a color set as
+   * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+   *
    * Completes with no value when the layer doesn't set the property.
    *
    * See `mln_map_get_style_layer_property` in the
@@ -2473,6 +2480,9 @@ export class MapHandle extends Owner {
   /**
    * Reads a property of the light of the map's style.
    *
+   * The value can differ in form from the value that was set: a color set as
+   * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+   *
    * Completes with no value when the light doesn't set the property.
    *
    * See `mln_map_get_style_light_property` in the
@@ -2490,6 +2500,9 @@ export class MapHandle extends Owner {
 
   /**
    * Reads a source of the map's style.
+   *
+   * A tile source with a `url` has an empty attribution until its TileJSON
+   * loads, which raises `RuntimeEventType.mapSourceChanged`.
    *
    * Completes with no value when the style has no source named `sourceId`.
    *
@@ -3664,6 +3677,10 @@ export class MapHandleDiscarding {
    * those changes, and combines with an offset only when the delta has no
    * animation. The function finishes when the map applies the delta, before an
    * animation ends.
+   *
+   * A delta that replaces an animated one starts from where that animation left
+   * the camera, so the rest of the replaced change never happens. To reach an
+   * exact camera, use `MapHandle.updateCamera()`.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -6524,7 +6541,12 @@ export class StyleExpressionHandle extends Owner {
   /**
    * Evaluates a style expression and writes its result as JSON.
    *
-   * A number in the result that isn't finite becomes null.
+   * A number in the result that isn't finite becomes null. A color is `["rgba",
+   * r, g, b, a]`, with red, green, and blue from 0 to 255 and alpha from 0 to
+   * 1, each exact only to single precision. Formatted text is a `["format", …]`
+   * expression, an image is `{"name": …, "available": …}`, padding is `[top,
+   * right, bottom, left]`, and a variable anchor offset is `[anchor, [x, y],
+   * …]`.
    *
    * See `mln_style_expression_evaluate` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).

@@ -152,7 +152,12 @@ MLN_API mln_status mln_style_expression_get_info(
 /**
  * Evaluates a style expression and writes its result as JSON.
  *
- * A number in the result that isn't finite becomes null.
+ * A number in the result that isn't finite becomes null. A color is
+ * `["rgba", r, g, b, a]`, with red, green, and blue from 0 to 255 and alpha
+ * from 0 to 1, each exact only to single precision. Formatted text is a
+ * `["format", …]` expression, an image is `{"name": …, "available": …}`,
+ * padding is `[top, right, bottom, left]`, and a variable anchor offset is
+ * `[anchor, [x, y], …]`.
  *
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when the expression fails to evaluate, such as

@@ -56,6 +56,10 @@ public enum RuntimeEventType : uint
     /// A tile moved to another step of loading.
     /// </summary>
     MapTileAction = 15,
+
+    /// <summary>
+    /// A source in the style changed, such as when its TileJSON loads.
+    /// </summary>
     MapSourceChanged = 16,
     OfflineRegionStatusChanged = 17,
 

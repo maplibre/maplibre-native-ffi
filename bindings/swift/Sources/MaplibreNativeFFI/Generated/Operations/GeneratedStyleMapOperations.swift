@@ -300,6 +300,9 @@ public extension MapHandle {
 
   /// Reads a property of a layer in the map's style.
   ///
+  /// The value can differ in form from the value that was set: a color set as
+  /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+  ///
   /// Completes with no value when the layer doesn't set the property.
   ///
   /// See `mln_map_get_style_layer_property` in the
@@ -332,6 +335,9 @@ public extension MapHandle {
 
   /// Reads a property of the light of the map's style.
   ///
+  /// The value can differ in form from the value that was set: a color set as
+  /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+  ///
   /// Completes with no value when the light doesn't set the property.
   ///
   /// See `mln_map_get_style_light_property` in the
@@ -355,6 +361,9 @@ public extension MapHandle {
   }
 
   /// Reads a source of the map's style.
+  ///
+  /// A tile source with a `url` has an empty attribution until its TileJSON
+  /// loads, which raises `RuntimeEventType.mapSourceChanged`.
   ///
   /// Completes with no value when the style has no source named `sourceId`.
   ///

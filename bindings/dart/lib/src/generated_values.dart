@@ -1065,6 +1065,8 @@ final class RuntimeEventType extends _Enum {
 
   /// A tile moved to another step of loading.
   static const mapTileAction = RuntimeEventType.fromRawValue(15);
+
+  /// A source in the style changed, such as when its TileJSON loads.
   static const mapSourceChanged = RuntimeEventType.fromRawValue(16);
   static const offlineRegionStatusChanged = RuntimeEventType.fromRawValue(17);
 
