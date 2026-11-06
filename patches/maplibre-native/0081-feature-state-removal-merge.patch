@@ -1,0 +1,120 @@
+Renders feature state that is set in the same frame as a removal from the same
+source layer (https://github.com/maplibre/maplibre-native-ffi/issues/1706).
+SourceFeatureState::coalesceChanges() built the frame's changes for each
+source layer from the set states, then replaced that entry with the removed
+states, so the tiles only heard about the removal. Removing the state of
+feature A and setting the state of feature B before one frame cleared A but
+left B unchanged on screen until a later frame resent every current state. On
+an idle map no such frame comes. The removed states now merge into the set
+states, as in GL JS.
+Upstream: not proposed
+
+diff --git a/src/mln/renderer/source_state.cpp b/src/mln/renderer/source_state.cpp
+index bd930ba..f9376e9 100644
+--- a/src/mln/renderer/source_state.cpp
++++ b/src/mln/renderer/source_state.cpp
+@@ -91,7 +91,10 @@ void SourceFeatureState::coalesceChanges(std::vector<RenderTile>& tiles) {
+                 layerStates[featureID] = currentStates[sourceLayer][featureID];
+             }
+         }
+-        changes[sourceLayer] = std::move(layerStates);
++        auto& layerChanges = changes[sourceLayer];
++        for (auto& [featureID, featureState] : layerStates) {
++            layerChanges[featureID] = std::move(featureState);
++        }
+     }
+ 
+     stateChanges.clear();
+diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index d521208..8140958 100644
+--- a/test/map/map.test.cpp
++++ b/test/map/map.test.cpp
+@@ -2548,6 +2548,88 @@ TEST(Map, FeatureStateChangesRenderedStyle) {
+     }
+ }
+ 
++// Removing state from one feature and setting it on another in the same frame
++// must render both changes in that frame. The removal used to replace the
++// coalesced changes for the source layer, so the other feature kept its old
++// color until a later frame.
++TEST(Map, FeatureStateRemoveAndSetInOneFrame) {
++    MapTest<> test;
++
++    test.map.getStyle().loadJSON(R"STYLE({
++      "version": 8,
++      "sources": {
++        "fs": {
++          "type": "geojson",
++          "data": {
++            "type": "FeatureCollection",
++            "features": [{
++              "type": "Feature",
++              "id": 1,
++              "properties": {},
++              "geometry": {
++                "type": "Polygon",
++                "coordinates": [[[-180, -85], [0, -85], [0, 85], [-180, 85], [-180, -85]]]
++              }
++            }, {
++              "type": "Feature",
++              "id": 2,
++              "properties": {},
++              "geometry": {
++                "type": "Polygon",
++                "coordinates": [[[0, -85], [180, -85], [180, 85], [0, 85], [0, -85]]]
++              }
++            }]
++          }
++        }
++      },
++      "layers": [{
++        "id": "fill",
++        "type": "fill",
++        "source": "fs",
++        "paint": {
++          "fill-color": ["case", ["boolean", ["feature-state", "active"], false], "#ff0000", "#0000ff"]
++        }
++      }]
++    })STYLE");
++
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{0, 0}).withZoom(0.0));
++
++    auto* renderer = test.frontend.getRenderer();
++
++    // Reads one channel (0=R, 1=G, 2=B) of the pixel at a quarter (feature 1)
++    // or three quarters (feature 2) of the width, at mid height
++    const auto channel = [](const PremultipliedImage& image, size_t quarter, size_t channel) -> int {
++        const size_t x = image.size.width * quarter / 4;
++        const size_t y = image.size.height / 2;
++        return image.data.get()[y * image.stride() + x * image.channels + channel];
++    };
++
++    {
++        const auto result = test.frontend.render(test.map);
++        EXPECT_LT(channel(result.image, 1, 0), 40) << "feature 1 red channel (default)";
++        EXPECT_LT(channel(result.image, 3, 0), 40) << "feature 2 red channel (default)";
++    }
++
++    FeatureState active;
++    active["active"] = true;
++    renderer->setFeatureState("fs", {}, "1", active);
++    {
++        const auto result = test.frontend.render(test.map);
++        EXPECT_GT(channel(result.image, 1, 0), 200) << "feature 1 red channel (active)";
++        EXPECT_LT(channel(result.image, 3, 0), 40) << "feature 2 red channel (default)";
++    }
++
++    renderer->removeFeatureState("fs", {}, std::optional<std::string>("1"), {});
++    renderer->setFeatureState("fs", {}, "2", active);
++    {
++        const auto result = test.frontend.render(test.map);
++        EXPECT_LT(channel(result.image, 1, 0), 40) << "feature 1 red channel (removed)";
++        EXPECT_GT(channel(result.image, 1, 2), 200) << "feature 1 blue channel (removed)";
++        EXPECT_GT(channel(result.image, 3, 0), 200) << "feature 2 red channel (active)";
++        EXPECT_LT(channel(result.image, 3, 2), 40) << "feature 2 blue channel (active)";
++    }
++}
++
+ static std::size_t countGreenPixels(const PremultipliedImage& image) {
+     std::size_t greenPixels = 0;
+     for (std::size_t i = 0; i < image.bytes(); i += image.channels) {

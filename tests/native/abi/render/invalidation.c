@@ -665,6 +665,53 @@ static void frame_results_report_whether_the_map_was_fully_loaded(void) {
   mln_test_provider_destroy(provider);
 }
 
+// One frame that removes one feature's state and sets another's shows both
+// changes, on a map with nothing else to render.
+static void a_frame_shows_feature_state_moved_between_features(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  MLN_TEST_OK(mln_test_map_set_style_json(
+    map,
+    MLN_BUFFER_LITERAL(
+      "{\"version\":8,\"transition\":{\"duration\":0},\"sources\":{\"point\":"
+      "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
+      "\"features\":[{\"type\":\"Feature\",\"id\":1,\"properties\":{},"
+      "\"geometry\":{\"type\":\"Point\",\"coordinates\":[30,0]}},"
+      "{\"type\":\"Feature\",\"id\":2,\"properties\":{},\"geometry\":"
+      "{\"type\":\"Point\",\"coordinates\":[0,0]}}]}}},"
+      "\"layers\":[{\"id\":\"point\",\"type\":\"circle\",\"source\":\"point\","
+      "\"paint\":{\"circle-radius\":20,\"circle-color\":[\"case\","
+      "[\"boolean\",[\"feature-state\",\"selected\"],false],\"#00ff00\",\"#"
+      "ff0000\"]}}]}"
+    )
+  ));
+  set_selected(map, "{\"selected\":true}");
+  mln_test_render_until_idle(runtime, map, &fixture);
+  expect_center_pixel(&fixture, red, "before the state moves");
+
+  const mln_feature_state_selector point_two = {
+    .size = sizeof(mln_feature_state_selector),
+    .fields = MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
+    .source_id = {.data = "point", .size = 5},
+    .feature_id = {.type = MLN_FEATURE_ID_TYPE_UINT, .data.uint_value = 2},
+  };
+  MLN_TEST_AWAIT_OK(
+    mln_map_remove_feature_state(map, &point_one, &completion.descriptor, NULL)
+  );
+  MLN_TEST_AWAIT_OK(mln_map_set_feature_state(
+    map, &point_two, MLN_BUFFER_LITERAL("{\"selected\":true}"),
+    &completion.descriptor, NULL
+  ));
+  render_forced(&fixture, 1);
+  expect_center_pixel(&fixture, green, "the frame that moves the state");
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // The backends whose renderer counts frames and draws per render pass:
 // WebGPU, Metal, and Vulkan.
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU) || \
@@ -733,6 +780,7 @@ MLN_TEST_GROUP {
   RUN_TEST(each_mutation_publishes_a_render_update_only_when_it_changes);
   RUN_TEST(frame_results_report_whether_the_map_needs_another_frame);
   RUN_TEST(frame_results_report_whether_the_map_was_fully_loaded);
+  RUN_TEST(a_frame_shows_feature_state_moved_between_features);
 #ifdef COUNTS_DRAWS_PER_FRAME
   RUN_TEST(a_drawn_frame_reports_its_statistics);
 #endif
