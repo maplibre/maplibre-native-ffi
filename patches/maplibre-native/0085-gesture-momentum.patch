@@ -202,7 +202,7 @@ index 3e01d9a..77fe561 100644
      impl->transform.setGestureInProgress(inProgress);
      impl->onUpdate();
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index e2bb728..674168d 100644
+index e2bb728..91baa07 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -13,6 +13,9 @@
@@ -440,7 +440,7 @@ index e2bb728..674168d 100644
              const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
                                              std::chrono::duration<double>(transition->duration),
                                          0.0,
-@@ -719,6 +880,251 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -719,6 +880,253 @@ void Transform::updateTransitions(const TimePoint& now) {
      finishTransitions(finished);
  }
  
@@ -607,13 +607,15 @@ index e2bb728..674168d 100644
 +
 +bool Transform::stepPan(const ScreenCoordinate& offset) {
 +    // Each step moves the content no farther than a drag moves it in one
-+    // event, so the travel on screen stays even at high pitch.
++    // event, so the travel on screen stays even at high pitch. A frame that
++    // would need more steps than a frame can afford takes longer ones.
 +    constexpr double maxStep = 16.0;
++    constexpr double maxSteps = 100.0;
 +    const double distance = std::hypot(offset.x, offset.y);
 +    if (!(distance > 0.0)) return true;
 +    const LatLng before = getLatLng(LatLng::Unwrapped);
 +    const double altitude = state.getCenterAltitude();
-+    const double steps = std::ceil(distance / maxStep);
++    const double steps = std::min(std::ceil(distance / maxStep), maxSteps);
 +    const ScreenCoordinate step{offset.x / steps, offset.y / steps};
 +    const bool bounded = state.getLatLngBounds() != LatLngBounds();
 +    for (double i = 0; i < steps; ++i) {
