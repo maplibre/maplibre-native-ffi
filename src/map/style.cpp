@@ -114,6 +114,27 @@ auto string_from_view(mln_buffer_view string) -> std::string {
   return std::string{static_cast<const char*>(string.data), string.size};
 }
 
+// Quotes an ID for a diagnostic, as in `source "water" does not exist`.
+auto quoted(std::string_view id) -> std::string {
+  auto result = std::string{"\""};
+  result.append(id);
+  result.push_back('"');
+  return result;
+}
+
+auto set_source_error(std::string_view source_id, std::string_view problem)
+  -> void {
+  const auto message =
+    "source " + quoted(source_id) + " " + std::string{problem};
+  mln::core::set_thread_error(message.c_str());
+}
+
+auto set_layer_error(std::string_view layer_id, std::string_view problem)
+  -> void {
+  const auto message = "layer " + quoted(layer_id) + " " + std::string{problem};
+  mln::core::set_thread_error(message.c_str());
+}
+
 auto to_c_source_type(mln::style::SourceType type) -> mln_style_source_type {
   switch (type) {
     case mln::style::SourceType::Vector:
@@ -418,7 +439,7 @@ auto validate_source_can_be_added(
   mln::style::Style& style, const std::string& source_id
 ) -> mln_status {
   if (style.getSource(source_id) != nullptr) {
-    mln::core::set_thread_error("source already exists");
+    set_source_error(source_id, "already exists");
     return MLN_STATUS_ALREADY_EXISTS;
   }
   return MLN_STATUS_OK;
@@ -1105,7 +1126,7 @@ auto map_add_style_source_json(
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   if (style.getSource(id) != nullptr) {
-    set_thread_error("source already exists");
+    set_source_error(id, "already exists");
     return MLN_STATUS_ALREADY_EXISTS;
   }
 
@@ -1115,7 +1136,7 @@ auto map_add_style_source_json(
       string_from_view(source_json), error, id
     );
   if (!source) {
-    set_style_conversion_error("style source", error);
+    set_style_conversion_error(("style source " + quoted(id)).c_str(), error);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -1128,13 +1149,22 @@ auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   if (style.getSource(id) == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
 
   auto removed = style.removeSource(id);
   if (!removed) {
-    set_thread_error("source is used by a layer");
+    const auto layers = style.getLayers();
+    const auto user = std::ranges::find_if(
+      layers, [&id](const mln::style::Layer* layer) -> bool {
+        return layer->getSourceID() == id;
+      }
+    );
+    set_source_error(
+      id, user == layers.end() ? "is used by a layer"
+                               : "is used by layer " + quoted((*user)->getID())
+    );
     return MLN_STATUS_INVALID_STATE;
   }
   // The detached source is dropped before the release runs, so the style no
@@ -1248,15 +1278,15 @@ auto map_add_geojson_source_data(
 auto map_set_geojson_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
-    set_thread_error("source is not a GeoJSON source");
+    set_source_error(id, "is not a GeoJSON source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -1268,15 +1298,15 @@ auto map_set_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
-    set_thread_error("source is not a GeoJSON source");
+    set_source_error(id, "is not a GeoJSON source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!geojson_source_options_equal(
@@ -1284,8 +1314,8 @@ auto map_set_geojson_source_data(
       )) {
     const auto message =
       "prepared GeoJSON data options do not match the options that GeoJSON "
-      "source \"" +
-      string_from_view(source_id) + "\" was added with";
+      "source " +
+      quoted(id) + " was added with";
     set_thread_error(message.c_str());
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1297,15 +1327,15 @@ auto map_set_geojson_source_data(
 auto map_set_geojson_source_synchronous_tiling(
   MapObject& live, mln_buffer_view source_id, bool enabled
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
-    set_thread_error("source is not a GeoJSON source");
+    set_source_error(id, "is not a GeoJSON source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -1319,7 +1349,7 @@ auto map_set_style_source_volatile(
   const auto id = string_from_view(source_id);
   auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
 
@@ -1391,15 +1421,15 @@ auto lookup_custom_geometry_source(
   MapObject& live, mln_buffer_view source_id,
   mln::style::CustomGeometrySource*& out_source
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   out_source = source->as<mln::style::CustomGeometrySource>();
   if (out_source == nullptr) {
-    set_thread_error("source is not a custom geometry source");
+    set_source_error(id, "is not a custom geometry source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
@@ -1493,15 +1523,15 @@ auto lookup_custom_vector_source(
   MapObject& live, mln_buffer_view source_id,
   mln::style::CustomVectorSource*& out_source
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   out_source = source->as<mln::style::CustomVectorSource>();
   if (out_source == nullptr) {
-    set_thread_error("source is not a custom vector source");
+    set_source_error(id, "is not a custom vector source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
@@ -1687,7 +1717,8 @@ auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(image_id);
   if (!style.getImage(id).has_value()) {
-    set_thread_error(("no style image has ID " + id).c_str());
+    const auto message = "style image " + quoted(id) + " does not exist";
+    set_thread_error(message.c_str());
     return MLN_STATUS_NOT_FOUND;
   }
   style.removeImage(id);
@@ -1778,15 +1809,15 @@ auto map_add_image_source_image(
 auto map_set_image_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
-    set_thread_error("source is not an image source");
+    set_source_error(id, "is not an image source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   image_source->setURL(string_from_view(url));
@@ -1796,15 +1827,15 @@ auto map_set_image_source_url(
 auto map_set_image_source_image(
   MapObject& live, mln_buffer_view source_id, mln::PremultipliedImage image
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
-    set_thread_error("source is not an image source");
+    set_source_error(id, "is not an image source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   image_source->setImage(std::move(image));
@@ -1814,15 +1845,15 @@ auto map_set_image_source_image(
 auto map_set_image_source_coordinates(
   MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
-    set_thread_error("source is not an image source");
+    set_source_error(id, "is not an image source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   image_source->setCoordinates(to_native_image_source_coordinates(coordinates));
@@ -1834,15 +1865,15 @@ auto map_get_image_source_coordinates(
   std::vector<mln_lat_lng>& out_coordinates
 ) -> mln_status {
   out_coordinates.clear();
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
+  const auto id = string_from_view(source_id);
+  auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
-    set_thread_error("source does not exist");
+    set_source_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
-    set_thread_error("source is not an image source");
+    set_source_error(id, "is not an image source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -1860,7 +1891,9 @@ auto map_add_style_layer_json(
   if (before_layer_id.size > 0) {
     before = string_from_view(before_layer_id);
     if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
+      const auto message =
+        "before_layer_id " + quoted(*before) + " does not exist";
+      set_thread_error(message.c_str());
       return MLN_STATUS_NOT_FOUND;
     }
   }
@@ -1877,7 +1910,7 @@ auto map_add_style_layer_json(
 
   const auto id = (*layer)->getID();
   if (style.getLayer(id) != nullptr) {
-    set_thread_error("layer already exists");
+    set_layer_error(id, "already exists");
     return MLN_STATUS_ALREADY_EXISTS;
   }
   if (
@@ -1886,11 +1919,18 @@ auto map_add_style_layer_json(
   ) {
     const auto* source = style.getSource((*layer)->getSourceID());
     if (source == nullptr) {
-      set_thread_error("layer source does not exist");
+      set_layer_error(
+        id, "uses source " + quoted((*layer)->getSourceID()) +
+              ", which does not exist"
+      );
       return MLN_STATUS_NOT_FOUND;
     }
     if (!source->supportsLayerType((*layer)->getTypeInfo())) {
-      set_thread_error("source does not support layer type");
+      const auto& type = (*layer)->getTypeInfo()->type;
+      set_source_error(
+        (*layer)->getSourceID(),
+        "does not support " + std::string{type} + " layer " + quoted(id)
+      );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
   }
@@ -1904,7 +1944,7 @@ auto map_remove_style_layer(MapObject& live, mln_buffer_view layer_id)
   const auto id = string_from_view(layer_id);
   auto removed = map_native(live).getStyle().removeLayer(id);
   if (removed == nullptr) {
-    set_thread_error("layer does not exist");
+    set_layer_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
   return MLN_STATUS_OK;
@@ -1957,7 +1997,7 @@ auto map_move_style_layer(
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(layer_id);
   if (style.getLayer(id) == nullptr) {
-    set_thread_error("layer does not exist");
+    set_layer_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
 
@@ -1968,7 +2008,9 @@ auto map_move_style_layer(
       return MLN_STATUS_OK;
     }
     if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
+      const auto message =
+        "before_layer_id " + quoted(*before) + " does not exist";
+      set_thread_error(message.c_str());
       return MLN_STATUS_NOT_FOUND;
     }
   }
@@ -2027,19 +2069,20 @@ auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status {
+  const auto name = string_from_view(property_name);
+  const auto context = "style light property " + quoted(name);
   auto document = mln::JSDocument{};
-  if (!parse_json_document(value, "style light property", document)) {
+  if (!parse_json_document(value, context.c_str(), document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   auto error = map_native(live).getStyle().getLight()->setProperty(
-    string_from_view(property_name),
-    mln::style::conversion::Convertible{
-      static_cast<const mln::JSValue*>(&document)
-    }
+    name, mln::style::conversion::Convertible{
+            static_cast<const mln::JSValue*>(&document)
+          }
   );
   if (error) {
-    set_style_conversion_error("style light property", *error);
+    set_style_conversion_error(context.c_str(), *error);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
@@ -2135,8 +2178,8 @@ auto require_layer_takes_source(
   ) {
     return true;
   }
-  const auto message = std::string{"layer type does not take a "} + field +
-                       "; layer id is " + layer.getID();
+  const auto message = std::string{layer.getTypeInfo()->type} + " layer " +
+                       quoted(layer.getID()) + " does not take a " + field;
   set_thread_error(message.c_str());
   return false;
 }
@@ -2147,19 +2190,20 @@ auto map_set_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
 ) -> mln_status {
+  const auto id = string_from_view(layer_id);
+  const auto name = string_from_view(property_name);
+  const auto context = "property " + quoted(name) + " of layer " + quoted(id);
   auto document = mln::JSDocument{};
-  if (!parse_json_document(value, "layer property", document)) {
+  if (!parse_json_document(value, context.c_str(), document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* layer =
-    map_native(live).getStyle().getLayer(string_from_view(layer_id));
+  auto* layer = map_native(live).getStyle().getLayer(id);
   if (layer == nullptr) {
-    set_thread_error("layer does not exist");
+    set_layer_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
 
-  const auto name = string_from_view(property_name);
   if (
     (name == "source" || name == "source-layer") &&
     !require_layer_takes_source(*layer, name.c_str())
@@ -2187,7 +2231,7 @@ auto map_set_layer_property(
           }
   );
   if (error) {
-    set_style_conversion_error("layer property", *error);
+    set_style_conversion_error(context.c_str(), *error);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -2199,10 +2243,10 @@ auto map_get_layer_property(
   std::string& out_value, bool& out_found
 ) -> mln_status {
   out_found = false;
-  auto* layer =
-    map_native(live).getStyle().getLayer(string_from_view(layer_id));
+  const auto id = string_from_view(layer_id);
+  auto* layer = map_native(live).getStyle().getLayer(id);
   if (layer == nullptr) {
-    set_thread_error("layer does not exist");
+    set_layer_error(id, "does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
 
