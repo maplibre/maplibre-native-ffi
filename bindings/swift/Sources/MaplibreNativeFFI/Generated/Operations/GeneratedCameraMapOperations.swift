@@ -14,9 +14,8 @@ public extension MapHandle {
   /// animation ends.
   ///
   /// A delta that replaces an animated one starts from where that animation
-  /// left the camera, so the rest of the replaced change never happens. Two
-  /// quick animated deltas that each zoom in by one level end short of two
-  /// levels. To reach an exact camera, use `MapHandle.updateCamera()`.
+  /// left the camera, so the rest of the replaced change never happens. To
+  /// reach an exact camera, use `MapHandle.updateCamera()`.
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

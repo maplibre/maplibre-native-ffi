@@ -2491,11 +2491,7 @@ public class RuntimeEventType(@get:JvmName("getRawValue") public val rawValue: U
     @JvmField public val MAP_TILE_ACTION: RuntimeEventType = RuntimeEventType(MAP_TILE_ACTION_VALUE)
     /** The `rawValue` of [MAP_TILE_ACTION]. */
     public const val MAP_TILE_ACTION_VALUE: UInt = 15u
-    /**
-     * A source in the style changed. Its TileJSON loaded for the first time or with new contents,
-     * or a call set its volatile flag, a GeoJSON source's data, or an image source's image or
-     * coordinates.
-     */
+    /** A source in the style changed, such as when its TileJSON loads. */
     @JvmField
     public val MAP_SOURCE_CHANGED: RuntimeEventType = RuntimeEventType(MAP_SOURCE_CHANGED_VALUE)
     /** The `rawValue` of [MAP_SOURCE_CHANGED]. */

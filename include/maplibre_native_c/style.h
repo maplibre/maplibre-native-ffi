@@ -1076,9 +1076,8 @@ MLN_API mln_status mln_map_set_style_light_property(
 /**
  * Reads a property of the light of the map's style.
  *
- * The value comes back in the engine's normalized form, which can differ from
- * the value that was set. A color set as `"#ff0000"` reads back as
- * `["rgba", 255, 0, 0, 1]`.
+ * The value can differ in form from the value that was set: a color set as
+ * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
  *
  * Completes with no value when the light doesn't set the property.
  */
@@ -1133,9 +1132,8 @@ MLN_API mln_status mln_map_set_style_layer_property(
 /**
  * Reads a property of a layer in the map's style.
  *
- * The value comes back in the engine's normalized form, which can differ from
- * the value that was set. A color set as `"#ff0000"` reads back as
- * `["rgba", 255, 0, 0, 1]`.
+ * The value can differ in form from the value that was set: a color set as
+ * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
  *
  * Completes with no value when the layer doesn't set the property.
  *

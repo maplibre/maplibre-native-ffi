@@ -482,9 +482,8 @@ pub const Map = struct {
     /// animation ends.
     ///
     /// A delta that replaces an animated one starts from where that animation left
-    /// the camera, so the rest of the replaced change never happens. Two quick
-    /// animated deltas that each zoom in by one level end short of two levels. To
-    /// reach an exact camera, use `Map.updateCamera()`.
+    /// the camera, so the rest of the replaced change never happens. To reach an
+    /// exact camera, use `Map.updateCamera()`.
     ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1157,9 +1156,8 @@ pub const Map = struct {
 
     /// Reads a property of a layer in the map's style.
     ///
-    /// The value comes back in the engine's normalized form, which can differ from
-    /// the value that was set. A color set as `"#ff0000"` reads back as `["rgba",
-    /// 255, 0, 0, 1]`.
+    /// The value can differ in form from the value that was set: a color set as
+    /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
     ///
     /// Completes with no value when the layer doesn't set the property.
     ///
@@ -1175,9 +1173,8 @@ pub const Map = struct {
 
     /// Reads a property of the light of the map's style.
     ///
-    /// The value comes back in the engine's normalized form, which can differ from
-    /// the value that was set. A color set as `"#ff0000"` reads back as `["rgba",
-    /// 255, 0, 0, 1]`.
+    /// The value can differ in form from the value that was set: a color set as
+    /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
     ///
     /// Completes with no value when the light doesn't set the property.
     ///
@@ -3135,10 +3132,9 @@ pub const StyleExpression = struct {
     /// Evaluates a style expression and writes its result as JSON.
     ///
     /// A number in the result that isn't finite becomes null. A color is `["rgba",
-    /// r, g, b, a]`, with red, green, and blue from 0 to 255 and alpha from 0 to 1.
-    /// Each channel is exact only to single precision, so a channel set from an
-    /// integer can come back slightly different. Formatted text is a `["format",
-    /// …]` expression, an image is `{"name": …, "available": …}`, padding is `[top,
+    /// r, g, b, a]`, with red, green, and blue from 0 to 255 and alpha from 0 to 1,
+    /// each exact only to single precision. Formatted text is a `["format", …]`
+    /// expression, an image is `{"name": …, "available": …}`, padding is `[top,
     /// right, bottom, left]`, and a variable anchor offset is `[anchor, [x, y],
     /// …]`.
     ///
@@ -7900,9 +7896,7 @@ pub const RuntimeEventType = enum(u32) {
     map_style_image_missing = 14,
     /// A tile moved to another step of loading.
     map_tile_action = 15,
-    /// A source in the style changed. Its TileJSON loaded for the first time or
-    /// with new contents, or a call set its volatile flag, a GeoJSON source's
-    /// data, or an image source's image or coordinates.
+    /// A source in the style changed, such as when its TileJSON loads.
     map_source_changed = 16,
     offline_region_status_changed = 17,
     /// A resource that the region needs failed to download.

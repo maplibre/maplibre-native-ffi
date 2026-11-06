@@ -3273,9 +3273,7 @@ export const RuntimeEventType = {
    */
   mapTileAction: 15,
   /**
-   * A source in the style changed. Its TileJSON loaded for the first time or
-   * with new contents, or a call set its volatile flag, a GeoJSON source's
-   * data, or an image source's image or coordinates.
+   * A source in the style changed, such as when its TileJSON loads.
    */
   mapSourceChanged: 16,
   offlineRegionStatusChanged: 17,
