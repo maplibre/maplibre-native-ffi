@@ -10,7 +10,9 @@
 # LICENSE.txt that they don't include. This script calls the OpenHarmony SDK's
 # tools instead: ets-loader compiles the ArkUI pages with the SDK's own webpack
 # configuration, es2abc merges them and the binding into modules.abc, and
-# tools/ohos/pack-hap packs and signs the HAP.
+# tools/ohos/pack-hap packs and signs the HAP. webpack.config.cjs gives
+# ets-loader the API floor, so ArkTS linter errors fail the build as they do in
+# DevEco Studio.
 set -euo pipefail
 
 usage="usage: build-hap.sh <abi> <facade HAR> <backend HAR>"
@@ -84,8 +86,9 @@ jq -n --arg work "$work" --arg record "$facade_record" '{
     aceProfilePath="$module/resources/base/profile" \
     aceBuildJson="$work/build.json" cachePath="$work/cache" \
     node "$loader/node_modules/webpack/bin/webpack.js" \
-    --config "$loader/webpack.config.js" \
-    --env buildMode=debug --env compilerType=ark --env sourceMap=none
+    --config "$example/scripts/webpack.config.cjs" \
+    --env compatibleSdkVersion="$api" --env buildMode=debug \
+    --env compilerType=ark --env sourceMap=none
 )
 if [[ ! -s "$work/cache/filesInfo.txt" ]]; then
   echo "error: ets-loader didn't compile the pages" >&2
