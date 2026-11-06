@@ -257,12 +257,15 @@ import MaplibreNativeFFI
       // A trackpad or Magic Mouse scroll pans. The system's momentum events
       // after release are skipped, as the map makes its own.
       guard event.momentumPhase.isEmpty else { return }
+      let phase = phase(event.phase)
+      if phase == .begin {
+        scroll = VelocityTracker()
+      }
       scroll.add(
         event.scrollingDeltaX,
         event.scrollingDeltaY,
         at: event.timestamp
       )
-      let phase = phase(event.phase)
       apply(CameraDelta(
         offset: ScreenPoint(x: event.scrollingDeltaX, y: event.scrollingDeltaY),
         momentum: phase == .end
@@ -278,8 +281,11 @@ import MaplibreNativeFFI
       let at = point(event)
       let anchor = ScreenPoint(x: at.x, y: at.y)
       let scale = max(0.01, 1 + event.magnification)
-      magnification.add(log2(scale), at: event.timestamp)
       let phase = phase(event.phase)
+      if phase == .begin {
+        magnification = VelocityTracker()
+      }
+      magnification.add(log2(scale), at: event.timestamp)
       apply(CameraDelta(
         scale: scale,
         anchor: anchor,
@@ -298,8 +304,11 @@ import MaplibreNativeFFI
       // the same way.
       let at = point(event)
       let anchor = ScreenPoint(x: at.x, y: at.y)
-      rotation.add(Double(event.rotation), at: event.timestamp)
       let phase = phase(event.phase)
+      if phase == .begin {
+        rotation = VelocityTracker()
+      }
+      rotation.add(Double(event.rotation), at: event.timestamp)
       apply(CameraDelta(
         bearing: Double(event.rotation),
         anchor: anchor,

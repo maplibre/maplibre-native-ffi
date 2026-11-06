@@ -38,8 +38,8 @@ namespace Example {
 		public Gestures (Gtk.Widget widget) {
 			this.widget = widget;
 
-			// A swipe is a drag that reports its velocity at release. GTK
-			// ends a cancelled gesture as well, so the end checks for that.
+			// A swipe is a drag that reports its velocity at release. A
+			// cancelled drag may still report one, which is ignored.
 			drag = new Gtk.GestureSwipe ();
 			drag.button = 0;
 			drag.begin.connect ((sequence) => {
@@ -65,8 +65,14 @@ namespace Example {
 				previous_y = y;
 				apply (delta);
 			});
-			drag.cancel.connect (() => cancelled = true);
+			drag.cancel.connect (() => {
+				cancelled = true;
+				apply (phase (GesturePhase.CANCEL));
+			});
 			drag.swipe.connect ((velocity_x, velocity_y) => {
+				if (cancelled) {
+					return;
+				}
 				var momentum = new GestureMomentum ();
 				if (rotating) {
 					momentum.bearing.velocity = velocity_x * 0.5;
@@ -74,7 +80,7 @@ namespace Example {
 				} else {
 					momentum.pan.velocity = { x: velocity_x, y: velocity_y };
 				}
-				apply (cancelled ? phase (GesturePhase.CANCEL) : end (momentum));
+				apply (end (momentum));
 			});
 			widget.add_controller (drag);
 
