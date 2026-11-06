@@ -340,11 +340,11 @@ static void a_rotating_gesture_settles_on_a_target(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_gesture_momentum momentum = {0};
-  momentum.fields = MLN_GESTURE_MOMENTUM_BEARING_SNAP;
-  momentum.bearing_snap.fields =
-    MLN_BEARING_SNAP_TARGET_COUNT | MLN_BEARING_SNAP_DURATION_MS;
-  momentum.bearing_snap.target_count = 4;
-  momentum.bearing_snap.duration_ms = 0.0;
+  momentum.bearing.fields = MLN_ANCHORED_MOMENTUM_SNAP;
+  momentum.bearing.snap.fields =
+    MLN_MOMENTUM_SNAP_SPACING | MLN_MOMENTUM_SNAP_DURATION_MS;
+  momentum.bearing.snap.spacing = 90.0;
+  momentum.bearing.snap.duration_ms = 0.0;
 
   mln_camera_delta rotate = {.size = sizeof(mln_camera_delta)};
   rotate.fields = MLN_CAMERA_DELTA_BEARING;

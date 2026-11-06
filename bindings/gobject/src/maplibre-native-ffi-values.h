@@ -74,6 +74,12 @@ G_DECLARE_FINAL_TYPE(
   MaplibreNativeFfiMomentumDecay, maplibre_native_ffi_momentum_decay,
   MAPLIBRE_NATIVE_FFI, MOMENTUM_DECAY, GObject
 )
+#define MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_SNAP \
+  (maplibre_native_ffi_momentum_snap_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiMomentumSnap, maplibre_native_ffi_momentum_snap,
+  MAPLIBRE_NATIVE_FFI, MOMENTUM_SNAP, GObject
+)
 #define MAPLIBRE_NATIVE_FFI_TYPE_ANCHORED_MOMENTUM \
   (maplibre_native_ffi_anchored_momentum_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -87,12 +93,6 @@ typedef struct _MaplibreNativeFfiCameraTransitionHandler
 G_DECLARE_FINAL_TYPE(
   MaplibreNativeFfiAnimationOptions, maplibre_native_ffi_animation_options,
   MAPLIBRE_NATIVE_FFI, ANIMATION_OPTIONS, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_BEARING_SNAP \
-  (maplibre_native_ffi_bearing_snap_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiBearingSnap, maplibre_native_ffi_bearing_snap,
-  MAPLIBRE_NATIVE_FFI, BEARING_SNAP, GObject
 )
 #define MAPLIBRE_NATIVE_FFI_TYPE_BOUND_OPTIONS \
   (maplibre_native_ffi_bound_options_get_type())
@@ -1802,7 +1802,7 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  * set takes the part's default, which `MaplibreNativeFfiGestureMomentum` lists.
  * `min_speed` is finite and not negative, and every other number is finite and
  * positive. A friction decay can serve every release, as a preset that matches
- * a platform's scrolling. A planned glide takes its direction from the part's
+ * a platform's scrolling. An eased glide takes its direction from the part's
  * velocity, and its distance and duration from the caller's plan.
  *
  * A member that a `has_` method reports on is unset until its property or
@@ -1935,7 +1935,7 @@ void maplibre_native_ffi_momentum_decay_set_stop_speed(
 /**
  * MaplibreNativeFfiMomentumDecay:distance: (setter set_distance) (getter get_distance)
  *
- * Required for `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_PLANNED`.
+ * Required for `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE`.
  */
 /**
  * maplibre_native_ffi_momentum_decay_get_distance: (get-property distance)
@@ -1971,7 +1971,7 @@ void maplibre_native_ffi_momentum_decay_set_distance(
 /**
  * MaplibreNativeFfiMomentumDecay:duration-ms: (setter set_duration_ms) (getter get_duration_ms)
  *
- * Required for `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_PLANNED`.
+ * Required for `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE`.
  */
 /**
  * maplibre_native_ffi_momentum_decay_get_duration_ms: (get-property duration-ms)
@@ -2005,43 +2005,43 @@ void maplibre_native_ffi_momentum_decay_set_duration_ms(
 );
 
 /**
- * MaplibreNativeFfiMomentumDecay:curve: (setter set_curve) (getter get_curve)
+ * MaplibreNativeFfiMomentumDecay:easing: (setter set_easing) (getter get_easing)
  *
- * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_PLANNED`, the share of
- * `distance` covered over the share of `duration_ms`. Its control points are
- * between 0 and 1, so the glide never passes its distance. Defaults to (0, 0,
- * 0.25, 1), the curve that camera animations ease along by default. Android's
- * scroll fling follows (0.175, 0.5, 0.35, 1).
+ * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE`, the share of `distance`
+ * covered over the share of `duration_ms`. Its control points are between 0 and
+ * 1, so the glide never passes its distance. Defaults to (0, 0, 0.25, 1), the
+ * curve that camera animations ease along by default. Android's scroll fling
+ * follows (0.175, 0.5, 0.35, 1).
  */
 /**
- * maplibre_native_ffi_momentum_decay_get_curve: (get-property curve)
+ * maplibre_native_ffi_momentum_decay_get_easing: (get-property easing)
  *
- * Gets `MaplibreNativeFfiMomentumDecay:curve`.
+ * Gets `MaplibreNativeFfiMomentumDecay:easing`.
  *
  * Returns: (transfer none): the value
  */
-MaplibreNativeFfiUnitBezier* maplibre_native_ffi_momentum_decay_get_curve(
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_momentum_decay_get_easing(
   MaplibreNativeFfiMomentumDecay* self
 );
 
 /**
- * maplibre_native_ffi_momentum_decay_has_curve:
+ * maplibre_native_ffi_momentum_decay_has_easing:
  *
- * Whether `MaplibreNativeFfiMomentumDecay:curve` is set.
+ * Whether `MaplibreNativeFfiMomentumDecay:easing` is set.
  *
  * Returns: whether the member is set
  */
-gboolean maplibre_native_ffi_momentum_decay_has_curve(
+gboolean maplibre_native_ffi_momentum_decay_has_easing(
   MaplibreNativeFfiMomentumDecay* self
 );
 
 /**
- * maplibre_native_ffi_momentum_decay_set_curve: (set-property curve)
+ * maplibre_native_ffi_momentum_decay_set_easing: (set-property easing)
  * @value: the value
  *
- * Sets `MaplibreNativeFfiMomentumDecay:curve`.
+ * Sets `MaplibreNativeFfiMomentumDecay:easing`.
  */
-void maplibre_native_ffi_momentum_decay_set_curve(
+void maplibre_native_ffi_momentum_decay_set_easing(
   MaplibreNativeFfiMomentumDecay* self, const MaplibreNativeFfiUnitBezier* value
 );
 
@@ -2154,6 +2154,176 @@ gboolean maplibre_native_ffi_momentum_decay_has_max_distance(
  */
 void maplibre_native_ffi_momentum_decay_set_max_distance(
   MaplibreNativeFfiMomentumDecay* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumSnap:
+ *
+ * Where a part settles after a gesture that changed it.
+ *
+ * The targets are every `spacing` from `offset`, in the part's unit. Bearing
+ * targets wrap around the circle. Once the part's glide ends, or right away
+ * when it doesn't move, the part eases to the nearest target if it is within
+ * `tolerance` of it, and otherwise stays where it is. A setting whose bit isn't
+ * set takes the part's default, which `MaplibreNativeFfiGestureMomentum` lists.
+ *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
+ * See `mln_momentum_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+/**
+ * maplibre_native_ffi_momentum_snap_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiMomentumSnap` whose members are zero, empty, or unset.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_momentum_snap_new(void);
+
+/**
+ * MaplibreNativeFfiMomentumSnap:spacing: (setter set_spacing) (getter get_spacing)
+ *
+ * Positive.
+ */
+/**
+ * maplibre_native_ffi_momentum_snap_get_spacing: (get-property spacing)
+ *
+ * Gets `MaplibreNativeFfiMomentumSnap:spacing`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_snap_get_spacing(
+  MaplibreNativeFfiMomentumSnap* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_snap_has_spacing:
+ *
+ * Whether `MaplibreNativeFfiMomentumSnap:spacing` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_snap_has_spacing(
+  MaplibreNativeFfiMomentumSnap* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_snap_set_spacing: (set-property spacing)
+ *
+ * Sets `MaplibreNativeFfiMomentumSnap:spacing`.
+ */
+void maplibre_native_ffi_momentum_snap_set_spacing(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumSnap:offset: (setter set_offset) (getter get_offset)
+ *
+ * Defaults to 0.
+ */
+/**
+ * maplibre_native_ffi_momentum_snap_get_offset: (get-property offset)
+ *
+ * Gets `MaplibreNativeFfiMomentumSnap:offset`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_snap_get_offset(
+  MaplibreNativeFfiMomentumSnap* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_snap_has_offset:
+ *
+ * Whether `MaplibreNativeFfiMomentumSnap:offset` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_snap_has_offset(
+  MaplibreNativeFfiMomentumSnap* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_snap_set_offset: (set-property offset)
+ *
+ * Sets `MaplibreNativeFfiMomentumSnap:offset`.
+ */
+void maplibre_native_ffi_momentum_snap_set_offset(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumSnap:tolerance: (setter set_tolerance) (getter get_tolerance)
+ *
+ * Not negative.
+ */
+/**
+ * maplibre_native_ffi_momentum_snap_get_tolerance: (get-property tolerance)
+ *
+ * Gets `MaplibreNativeFfiMomentumSnap:tolerance`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_snap_get_tolerance(
+  MaplibreNativeFfiMomentumSnap* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_snap_has_tolerance:
+ *
+ * Whether `MaplibreNativeFfiMomentumSnap:tolerance` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_snap_has_tolerance(
+  MaplibreNativeFfiMomentumSnap* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_snap_set_tolerance: (set-property tolerance)
+ *
+ * Sets `MaplibreNativeFfiMomentumSnap:tolerance`.
+ */
+void maplibre_native_ffi_momentum_snap_set_tolerance(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumSnap:duration-ms: (setter set_duration_ms) (getter get_duration_ms)
+ *
+ * Zero settles without easing. Defaults to 300.
+ */
+/**
+ * maplibre_native_ffi_momentum_snap_get_duration_ms: (get-property duration-ms)
+ *
+ * Gets `MaplibreNativeFfiMomentumSnap:duration-ms`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_snap_get_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_snap_has_duration_ms:
+ *
+ * Whether `MaplibreNativeFfiMomentumSnap:duration-ms` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_snap_has_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_snap_set_duration_ms: (set-property duration-ms)
+ *
+ * Sets `MaplibreNativeFfiMomentumSnap:duration-ms`.
+ */
+void maplibre_native_ffi_momentum_snap_set_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
 );
 
 /**
@@ -2279,6 +2449,44 @@ MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_anchored_momentum_get_decay(
  */
 void maplibre_native_ffi_anchored_momentum_set_decay(
   MaplibreNativeFfiAnchoredMomentum* self, MaplibreNativeFfiMomentumDecay* value
+);
+
+/**
+ * MaplibreNativeFfiAnchoredMomentum:snap: (setter set_snap) (getter get_snap)
+ *
+ * Where the part settles. Without this, it stays where the gesture and its
+ * glide leave it.
+ */
+/**
+ * maplibre_native_ffi_anchored_momentum_get_snap: (get-property snap)
+ *
+ * Gets `MaplibreNativeFfiAnchoredMomentum:snap`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_anchored_momentum_get_snap(
+  MaplibreNativeFfiAnchoredMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_anchored_momentum_has_snap:
+ *
+ * Whether `MaplibreNativeFfiAnchoredMomentum:snap` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_anchored_momentum_has_snap(
+  MaplibreNativeFfiAnchoredMomentum* self
+);
+
+/**
+ * maplibre_native_ffi_anchored_momentum_set_snap: (set-property snap)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiAnchoredMomentum:snap`.
+ */
+void maplibre_native_ffi_anchored_momentum_set_snap(
+  MaplibreNativeFfiAnchoredMomentum* self, MaplibreNativeFfiMomentumSnap* value
 );
 
 /**
@@ -2584,174 +2792,6 @@ maplibre_native_ffi_animation_options_get_end_handler(
 void maplibre_native_ffi_animation_options_set_end_handler(
   MaplibreNativeFfiAnimationOptions* self,
   const MaplibreNativeFfiCameraTransitionHandler* value
-);
-
-/**
- * MaplibreNativeFfiBearingSnap:
- *
- * Where the bearing settles after a gesture that changed it.
- *
- * The targets are `target_count` bearings spaced evenly around the circle,
- * starting at `target_offset`. The bearing eases to the nearest one when it is
- * within `tolerance` of it, and otherwise stays where it is.
- *
- * A member that a `has_` method reports on is unset until its property or
- * setter sets it.
- *
- * See `mln_bearing_snap` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-/**
- * maplibre_native_ffi_bearing_snap_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiBearingSnap` whose members are zero, empty, or unset.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiBearingSnap* maplibre_native_ffi_bearing_snap_new(void);
-
-/**
- * MaplibreNativeFfiBearingSnap:target-count: (setter set_target_count) (getter get_target_count)
- *
- * At least 1. Defaults to 1.
- */
-/**
- * maplibre_native_ffi_bearing_snap_get_target_count: (get-property target-count)
- *
- * Gets `MaplibreNativeFfiBearingSnap:target-count`.
- *
- * Returns: the value
- */
-guint32 maplibre_native_ffi_bearing_snap_get_target_count(
-  MaplibreNativeFfiBearingSnap* self
-);
-
-/**
- * maplibre_native_ffi_bearing_snap_has_target_count:
- *
- * Whether `MaplibreNativeFfiBearingSnap:target-count` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_bearing_snap_has_target_count(
-  MaplibreNativeFfiBearingSnap* self
-);
-
-/**
- * maplibre_native_ffi_bearing_snap_set_target_count: (set-property target-count)
- *
- * Sets `MaplibreNativeFfiBearingSnap:target-count`.
- */
-void maplibre_native_ffi_bearing_snap_set_target_count(
-  MaplibreNativeFfiBearingSnap* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiBearingSnap:target-offset: (setter set_target_offset) (getter get_target_offset)
- *
- * In degrees. Defaults to 0, north.
- */
-/**
- * maplibre_native_ffi_bearing_snap_get_target_offset: (get-property target-offset)
- *
- * Gets `MaplibreNativeFfiBearingSnap:target-offset`.
- *
- * Returns: the value
- */
-gdouble maplibre_native_ffi_bearing_snap_get_target_offset(
-  MaplibreNativeFfiBearingSnap* self
-);
-
-/**
- * maplibre_native_ffi_bearing_snap_has_target_offset:
- *
- * Whether `MaplibreNativeFfiBearingSnap:target-offset` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_bearing_snap_has_target_offset(
-  MaplibreNativeFfiBearingSnap* self
-);
-
-/**
- * maplibre_native_ffi_bearing_snap_set_target_offset: (set-property target-offset)
- *
- * Sets `MaplibreNativeFfiBearingSnap:target-offset`.
- */
-void maplibre_native_ffi_bearing_snap_set_target_offset(
-  MaplibreNativeFfiBearingSnap* self, gdouble value
-);
-
-/**
- * MaplibreNativeFfiBearingSnap:tolerance: (setter set_tolerance) (getter get_tolerance)
- *
- * In degrees, from 0 to 180. Defaults to 7.
- */
-/**
- * maplibre_native_ffi_bearing_snap_get_tolerance: (get-property tolerance)
- *
- * Gets `MaplibreNativeFfiBearingSnap:tolerance`.
- *
- * Returns: the value
- */
-gdouble maplibre_native_ffi_bearing_snap_get_tolerance(
-  MaplibreNativeFfiBearingSnap* self
-);
-
-/**
- * maplibre_native_ffi_bearing_snap_has_tolerance:
- *
- * Whether `MaplibreNativeFfiBearingSnap:tolerance` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_bearing_snap_has_tolerance(
-  MaplibreNativeFfiBearingSnap* self
-);
-
-/**
- * maplibre_native_ffi_bearing_snap_set_tolerance: (set-property tolerance)
- *
- * Sets `MaplibreNativeFfiBearingSnap:tolerance`.
- */
-void maplibre_native_ffi_bearing_snap_set_tolerance(
-  MaplibreNativeFfiBearingSnap* self, gdouble value
-);
-
-/**
- * MaplibreNativeFfiBearingSnap:duration-ms: (setter set_duration_ms) (getter get_duration_ms)
- *
- * Zero settles without easing. Defaults to 300.
- */
-/**
- * maplibre_native_ffi_bearing_snap_get_duration_ms: (get-property duration-ms)
- *
- * Gets `MaplibreNativeFfiBearingSnap:duration-ms`.
- *
- * Returns: the value
- */
-gdouble maplibre_native_ffi_bearing_snap_get_duration_ms(
-  MaplibreNativeFfiBearingSnap* self
-);
-
-/**
- * maplibre_native_ffi_bearing_snap_has_duration_ms:
- *
- * Whether `MaplibreNativeFfiBearingSnap:duration-ms` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_bearing_snap_has_duration_ms(
-  MaplibreNativeFfiBearingSnap* self
-);
-
-/**
- * maplibre_native_ffi_bearing_snap_set_duration_ms: (set-property duration-ms)
- *
- * Sets `MaplibreNativeFfiBearingSnap:duration-ms`.
- */
-void maplibre_native_ffi_bearing_snap_set_duration_ms(
-  MaplibreNativeFfiBearingSnap* self, gdouble value
 );
 
 GType maplibre_native_ffi_lat_lng_get_type(void) G_GNUC_CONST;
@@ -3201,12 +3241,12 @@ void maplibre_native_ffi_pan_momentum_set_decay(
  *
  * - Pan stops at 10 logical pixels per second, needs a release of at least 200,
  *   and counts a release faster than 10000 as 10000.
- * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap
+ *   settles on the nearest whole level.
  * - Bearing stops at 1 degree per second and needs a release of at least 60.
- * - Pitch stops at 1 degree per second and needs a release of at least 5.
- *
- * A member that a `has_` method reports on is unset until its property or
- * setter sets it.
+ *   Its snap settles on north within 7 degrees.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+ *   snap settles flat within 7 degrees.
  *
  * See `mln_gesture_momentum` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3214,7 +3254,7 @@ void maplibre_native_ffi_pan_momentum_set_decay(
 /**
  * maplibre_native_ffi_gesture_momentum_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiGestureMomentum` whose members are zero, empty, or unset.
+ * Creates a `MaplibreNativeFfiGestureMomentum` whose members are zero or empty.
  *
  * Returns: (transfer full): the new value
  */
@@ -3330,46 +3370,6 @@ maplibre_native_ffi_gesture_momentum_get_pitch(
 void maplibre_native_ffi_gesture_momentum_set_pitch(
   MaplibreNativeFfiGestureMomentum* self,
   MaplibreNativeFfiAnchoredMomentum* value
-);
-
-/**
- * MaplibreNativeFfiGestureMomentum:bearing-snap: (setter set_bearing_snap) (getter get_bearing_snap)
- *
- * Where the bearing settles after a gesture that changed it. It settles once
- * the other parts stop, or right away when none of them move. Without this, the
- * bearing stays where the gesture leaves it.
- */
-/**
- * maplibre_native_ffi_gesture_momentum_get_bearing_snap: (get-property bearing-snap)
- *
- * Gets `MaplibreNativeFfiGestureMomentum:bearing-snap`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiBearingSnap*
-maplibre_native_ffi_gesture_momentum_get_bearing_snap(
-  MaplibreNativeFfiGestureMomentum* self
-);
-
-/**
- * maplibre_native_ffi_gesture_momentum_has_bearing_snap:
- *
- * Whether `MaplibreNativeFfiGestureMomentum:bearing-snap` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_gesture_momentum_has_bearing_snap(
-  MaplibreNativeFfiGestureMomentum* self
-);
-
-/**
- * maplibre_native_ffi_gesture_momentum_set_bearing_snap: (set-property bearing-snap)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiGestureMomentum:bearing-snap`.
- */
-void maplibre_native_ffi_gesture_momentum_set_bearing_snap(
-  MaplibreNativeFfiGestureMomentum* self, MaplibreNativeFfiBearingSnap* value
 );
 
 /**

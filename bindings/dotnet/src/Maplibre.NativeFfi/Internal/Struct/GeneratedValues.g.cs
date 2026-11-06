@@ -21,6 +21,12 @@ internal static unsafe class GeneratedValues
             NativeScreenPoint
         );
         native.decay = NativeMomentumDecay(value.Decay);
+        native.fields |= Put(
+            value.Snap,
+            ref native.snap,
+            MLN_ANCHORED_MOMENTUM_SNAP,
+            NativeMomentumSnap
+        );
         return native;
     }
 
@@ -99,29 +105,6 @@ internal static unsafe class GeneratedValues
             MLN_ANIMATION_OPTION_TRANSITION_ID
         );
         native.end_handler = NativeCameraTransitionHandler(value.EndHandler, scope);
-        return native;
-    }
-
-    internal static mln_bearing_snap NativeBearingSnap(BearingSnap value)
-    {
-        var native = new mln_bearing_snap();
-        native.fields = 0;
-        native.fields |= Put(
-            value.TargetCount,
-            ref native.target_count,
-            MLN_BEARING_SNAP_TARGET_COUNT
-        );
-        native.fields |= Put(
-            value.TargetOffset,
-            ref native.target_offset,
-            MLN_BEARING_SNAP_TARGET_OFFSET
-        );
-        native.fields |= Put(value.Tolerance, ref native.tolerance, MLN_BEARING_SNAP_TOLERANCE);
-        native.fields |= Put(
-            value.DurationMs,
-            ref native.duration_ms,
-            MLN_BEARING_SNAP_DURATION_MS
-        );
         return native;
     }
 
@@ -862,17 +845,10 @@ internal static unsafe class GeneratedValues
         Required(value.Bearing, "GestureMomentum.Bearing must not be null.");
         Required(value.Pitch, "GestureMomentum.Pitch must not be null.");
         var native = new mln_gesture_momentum();
-        native.fields = 0;
         native.pan = NativePanMomentum(value.Pan);
         native.zoom = NativeAnchoredMomentum(value.Zoom);
         native.bearing = NativeAnchoredMomentum(value.Bearing);
         native.pitch = NativeAnchoredMomentum(value.Pitch);
-        native.fields |= Put(
-            value.BearingSnap,
-            ref native.bearing_snap,
-            MLN_GESTURE_MOMENTUM_BEARING_SNAP,
-            NativeBearingSnap
-        );
         return native;
     }
 
@@ -1368,9 +1344,9 @@ internal static unsafe class GeneratedValues
             MLN_MOMENTUM_DECAY_DURATION_MS
         );
         native.fields |= Put(
-            value.Curve,
-            ref native.curve,
-            MLN_MOMENTUM_DECAY_CURVE,
+            value.Easing,
+            ref native.easing,
+            MLN_MOMENTUM_DECAY_EASING,
             NativeUnitBezier
         );
         native.fields |= Put(value.MinSpeed, ref native.min_speed, MLN_MOMENTUM_DECAY_MIN_SPEED);
@@ -1379,6 +1355,21 @@ internal static unsafe class GeneratedValues
             value.MaxDistance,
             ref native.max_distance,
             MLN_MOMENTUM_DECAY_MAX_DISTANCE
+        );
+        return native;
+    }
+
+    internal static mln_momentum_snap NativeMomentumSnap(MomentumSnap value)
+    {
+        var native = new mln_momentum_snap();
+        native.fields = 0;
+        native.fields |= Put(value.Spacing, ref native.spacing, MLN_MOMENTUM_SNAP_SPACING);
+        native.fields |= Put(value.Offset, ref native.offset, MLN_MOMENTUM_SNAP_OFFSET);
+        native.fields |= Put(value.Tolerance, ref native.tolerance, MLN_MOMENTUM_SNAP_TOLERANCE);
+        native.fields |= Put(
+            value.DurationMs,
+            ref native.duration_ms,
+            MLN_MOMENTUM_SNAP_DURATION_MS
         );
         return native;
     }

@@ -11,8 +11,8 @@ namespace Maplibre.NativeFfi;
 /// isn't set takes the part's default, which <c>GestureMomentum</c> lists.
 /// <c>min_speed</c> is finite and not negative, and every other number is
 /// finite and positive. A friction decay can serve every release, as a preset
-/// that matches a platform's scrolling. A planned glide takes its direction
-/// from the part's velocity, and its distance and duration from the caller's
+/// that matches a platform's scrolling. An eased glide takes its direction from
+/// the part's velocity, and its distance and duration from the caller's
 /// plan.</para>
 /// <para>See <c>mln_momentum_decay</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
@@ -33,23 +33,23 @@ public sealed record MomentumDecay
     public double? StopSpeed { get; init; }
 
     /// <summary>
-    /// Required for <c>MomentumDecayModel.Planned</c>.
+    /// Required for <c>MomentumDecayModel.Ease</c>.
     /// </summary>
     public double? Distance { get; init; }
 
     /// <summary>
-    /// Required for <c>MomentumDecayModel.Planned</c>.
+    /// Required for <c>MomentumDecayModel.Ease</c>.
     /// </summary>
     public double? DurationMs { get; init; }
 
     /// <summary>
-    /// For <c>MomentumDecayModel.Planned</c>, the share of <c>distance</c>
-    /// covered over the share of <c>duration_ms</c>. Its control points are
-    /// between 0 and 1, so the glide never passes its distance. Defaults to (0,
-    /// 0, 0.25, 1), the curve that camera animations ease along by default.
-    /// Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+    /// For <c>MomentumDecayModel.Ease</c>, the share of <c>distance</c> covered
+    /// over the share of <c>duration_ms</c>. Its control points are between 0
+    /// and 1, so the glide never passes its distance. Defaults to (0, 0, 0.25,
+    /// 1), the curve that camera animations ease along by default. Android's
+    /// scroll fling follows (0.175, 0.5, 0.35, 1).
     /// </summary>
-    public UnitBezier? Curve { get; init; }
+    public UnitBezier? Easing { get; init; }
 
     /// <summary>
     /// A slower release starts no momentum.

@@ -119,6 +119,7 @@ final class mln_anchored_momentum extends Struct {
   external double velocity;
   external mln_screen_point anchor;
   external mln_momentum_decay decay;
+  external mln_momentum_snap snap;
 }
 
 final class mln_android_hardware_buffer_frame extends Struct {
@@ -176,19 +177,6 @@ final class mln_animation_options extends Struct {
   @Uint64()
   external int transition_id;
   external mln_camera_transition_handler end_handler;
-}
-
-final class mln_bearing_snap extends Struct {
-  @Uint32()
-  external int fields;
-  @Uint32()
-  external int target_count;
-  @Double()
-  external double target_offset;
-  @Double()
-  external double tolerance;
-  @Double()
-  external double duration_ms;
 }
 
 final class mln_bound_options extends Struct {
@@ -636,13 +624,10 @@ final class mln_geo_json_source_options extends Struct {
 }
 
 final class mln_gesture_momentum extends Struct {
-  @Uint32()
-  external int fields;
   external mln_pan_momentum pan;
   external mln_anchored_momentum zoom;
   external mln_anchored_momentum bearing;
   external mln_anchored_momentum pitch;
-  external mln_bearing_snap bearing_snap;
 }
 
 final class mln_gpu_sync extends Struct {
@@ -966,13 +951,26 @@ final class mln_momentum_decay extends Struct {
   external double distance;
   @Double()
   external double duration_ms;
-  external mln_unit_bezier curve;
+  external mln_unit_bezier easing;
   @Double()
   external double min_speed;
   @Double()
   external double max_speed;
   @Double()
   external double max_distance;
+}
+
+final class mln_momentum_snap extends Struct {
+  @Uint32()
+  external int fields;
+  @Double()
+  external double spacing;
+  @Double()
+  external double offset;
+  @Double()
+  external double tolerance;
+  @Double()
+  external double duration_ms;
 }
 
 final class mln_offline_geometry_region_definition extends Struct {
@@ -2092,6 +2090,7 @@ final class mln_win32_window_replacement extends Struct {
 // mln_anchored_momentum_field
 const MLN_ANCHORED_MOMENTUM_VELOCITY = 1;
 const MLN_ANCHORED_MOMENTUM_ANCHOR = 2;
+const MLN_ANCHORED_MOMENTUM_SNAP = 4;
 
 // mln_animation_option_field
 const MLN_ANIMATION_OPTION_DURATION = 1;
@@ -2099,12 +2098,6 @@ const MLN_ANIMATION_OPTION_VELOCITY = 2;
 const MLN_ANIMATION_OPTION_MIN_ZOOM = 4;
 const MLN_ANIMATION_OPTION_EASING = 8;
 const MLN_ANIMATION_OPTION_TRANSITION_ID = 16;
-
-// mln_bearing_snap_field
-const MLN_BEARING_SNAP_TARGET_COUNT = 1;
-const MLN_BEARING_SNAP_TARGET_OFFSET = 2;
-const MLN_BEARING_SNAP_TOLERANCE = 4;
-const MLN_BEARING_SNAP_DURATION_MS = 8;
 
 // mln_bound_option_field
 const MLN_BOUND_OPTION_BOUNDS = 1;
@@ -2214,9 +2207,6 @@ const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64;
 const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 128;
 const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256;
 
-// mln_gesture_momentum_field
-const MLN_GESTURE_MOMENTUM_BEARING_SNAP = 1;
-
 // mln_gesture_phase
 const MLN_GESTURE_PHASE_NONE = 0;
 const MLN_GESTURE_PHASE_BEGIN = 1;
@@ -2316,14 +2306,20 @@ const MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 2;
 const MLN_MOMENTUM_DECAY_STOP_SPEED = 4;
 const MLN_MOMENTUM_DECAY_DISTANCE = 8;
 const MLN_MOMENTUM_DECAY_DURATION_MS = 16;
-const MLN_MOMENTUM_DECAY_CURVE = 32;
+const MLN_MOMENTUM_DECAY_EASING = 32;
 const MLN_MOMENTUM_DECAY_MIN_SPEED = 64;
 const MLN_MOMENTUM_DECAY_MAX_SPEED = 128;
 const MLN_MOMENTUM_DECAY_MAX_DISTANCE = 256;
 
 // mln_momentum_decay_model
 const MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0;
-const MLN_MOMENTUM_DECAY_MODEL_PLANNED = 1;
+const MLN_MOMENTUM_DECAY_MODEL_EASE = 1;
+
+// mln_momentum_snap_field
+const MLN_MOMENTUM_SNAP_SPACING = 1;
+const MLN_MOMENTUM_SNAP_OFFSET = 2;
+const MLN_MOMENTUM_SNAP_TOLERANCE = 4;
+const MLN_MOMENTUM_SNAP_DURATION_MS = 8;
 
 // mln_network_status
 const MLN_NETWORK_STATUS_ONLINE = 1;

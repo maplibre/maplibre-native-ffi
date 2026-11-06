@@ -128,7 +128,7 @@ struct _MaplibreNativeFfiMomentumDecay {
   gdouble stop_speed;
   gdouble distance;
   gdouble duration_ms;
-  MaplibreNativeFfiUnitBezier curve;
+  MaplibreNativeFfiUnitBezier easing;
   gdouble min_speed;
   gdouble max_speed;
   gdouble max_distance;
@@ -141,7 +141,7 @@ enum {
   MOMENTUM_DECAY_PROP_STOP_SPEED,
   MOMENTUM_DECAY_PROP_DISTANCE,
   MOMENTUM_DECAY_PROP_DURATION_MS,
-  MOMENTUM_DECAY_PROP_CURVE,
+  MOMENTUM_DECAY_PROP_EASING,
   MOMENTUM_DECAY_PROP_MIN_SPEED,
   MOMENTUM_DECAY_PROP_MAX_SPEED,
   MOMENTUM_DECAY_PROP_MAX_DISTANCE,
@@ -176,8 +176,8 @@ static void maplibre_native_ffi_momentum_decay_get_property(
     case MOMENTUM_DECAY_PROP_DURATION_MS:
       g_value_set_double(value, self->duration_ms);
       break;
-    case MOMENTUM_DECAY_PROP_CURVE:
-      g_value_set_boxed(value, &self->curve);
+    case MOMENTUM_DECAY_PROP_EASING:
+      g_value_set_boxed(value, &self->easing);
       break;
     case MOMENTUM_DECAY_PROP_MIN_SPEED:
       g_value_set_double(value, self->min_speed);
@@ -224,8 +224,8 @@ static void maplibre_native_ffi_momentum_decay_set_property(
         self, g_value_get_double(value)
       );
       break;
-    case MOMENTUM_DECAY_PROP_CURVE:
-      maplibre_native_ffi_momentum_decay_set_curve(
+    case MOMENTUM_DECAY_PROP_EASING:
+      maplibre_native_ffi_momentum_decay_set_easing(
         self, g_value_get_boxed(value)
       );
       break;
@@ -274,8 +274,8 @@ static void maplibre_native_ffi_momentum_decay_class_init(
     g_param_spec_double(
       "duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
     );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_CURVE] = g_param_spec_boxed(
-    "curve", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_UNIT_BEZIER, PROPERTY_FLAGS
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_EASING] = g_param_spec_boxed(
+    "easing", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_UNIT_BEZIER, PROPERTY_FLAGS
   );
   momentum_decay_properties[MOMENTUM_DECAY_PROP_MIN_SPEED] =
     g_param_spec_double(
@@ -450,32 +450,32 @@ void maplibre_native_ffi_momentum_decay_set_duration_ms(
     );
 }
 
-MaplibreNativeFfiUnitBezier* maplibre_native_ffi_momentum_decay_get_curve(
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_momentum_decay_get_easing(
   MaplibreNativeFfiMomentumDecay* self
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), NULL);
-  return (MaplibreNativeFfiUnitBezier*)&self->curve;
+  return (MaplibreNativeFfiUnitBezier*)&self->easing;
 }
 
-gboolean maplibre_native_ffi_momentum_decay_has_curve(
+gboolean maplibre_native_ffi_momentum_decay_has_easing(
   MaplibreNativeFfiMomentumDecay* self
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_CURVE) != 0;
+  return (self->fields & MLN_MOMENTUM_DECAY_EASING) != 0;
 }
 
-void maplibre_native_ffi_momentum_decay_set_curve(
+void maplibre_native_ffi_momentum_decay_set_easing(
   MaplibreNativeFfiMomentumDecay* self, const MaplibreNativeFfiUnitBezier* value
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
   g_return_if_fail(value != NULL);
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_CURVE) != 0;
-  gboolean changed = memcmp(&self->curve, value, sizeof self->curve) != 0;
-  self->curve = *value;
-  self->fields |= MLN_MOMENTUM_DECAY_CURVE;
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_EASING) != 0;
+  gboolean changed = memcmp(&self->easing, value, sizeof self->easing) != 0;
+  self->easing = *value;
+  self->fields |= MLN_MOMENTUM_DECAY_EASING;
   if (changed || !was_set)
     g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_CURVE]
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_EASING]
     );
 }
 
@@ -575,7 +575,7 @@ MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_momentum_decay_copy(
   copy->stop_speed = self->stop_speed;
   copy->distance = self->distance;
   copy->duration_ms = self->duration_ms;
-  copy->curve = self->curve;
+  copy->easing = self->easing;
   copy->min_speed = self->min_speed;
   copy->max_speed = self->max_speed;
   copy->max_distance = self->max_distance;
@@ -593,10 +593,260 @@ void maplibre_native_ffi_momentum_decay_to_native(
   out->stop_speed = (double)(self->stop_speed);
   out->distance = (double)(self->distance);
   out->duration_ms = (double)(self->duration_ms);
-  maplibre_native_ffi_unit_bezier_to_native(&self->curve, &out->curve, call);
+  maplibre_native_ffi_unit_bezier_to_native(&self->easing, &out->easing, call);
   out->min_speed = (double)(self->min_speed);
   out->max_speed = (double)(self->max_speed);
   out->max_distance = (double)(self->max_distance);
+}
+
+struct _MaplibreNativeFfiMomentumSnap {
+  GObject parent_instance;
+  guint64 fields;
+  gdouble spacing;
+  gdouble offset;
+  gdouble tolerance;
+  gdouble duration_ms;
+};
+
+enum {
+  MOMENTUM_SNAP_PROP_0,
+  MOMENTUM_SNAP_PROP_SPACING,
+  MOMENTUM_SNAP_PROP_OFFSET,
+  MOMENTUM_SNAP_PROP_TOLERANCE,
+  MOMENTUM_SNAP_PROP_DURATION_MS,
+  MOMENTUM_SNAP_N_PROPERTIES
+};
+
+static GParamSpec* momentum_snap_properties[MOMENTUM_SNAP_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiMomentumSnap, maplibre_native_ffi_momentum_snap,
+  G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_momentum_snap_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiMomentumSnap* self =
+    MAPLIBRE_NATIVE_FFI_MOMENTUM_SNAP(object);
+  switch (id) {
+    case MOMENTUM_SNAP_PROP_SPACING:
+      g_value_set_double(value, self->spacing);
+      break;
+    case MOMENTUM_SNAP_PROP_OFFSET:
+      g_value_set_double(value, self->offset);
+      break;
+    case MOMENTUM_SNAP_PROP_TOLERANCE:
+      g_value_set_double(value, self->tolerance);
+      break;
+    case MOMENTUM_SNAP_PROP_DURATION_MS:
+      g_value_set_double(value, self->duration_ms);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_momentum_snap_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiMomentumSnap* self =
+    MAPLIBRE_NATIVE_FFI_MOMENTUM_SNAP(object);
+  switch (id) {
+    case MOMENTUM_SNAP_PROP_SPACING:
+      maplibre_native_ffi_momentum_snap_set_spacing(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_SNAP_PROP_OFFSET:
+      maplibre_native_ffi_momentum_snap_set_offset(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_SNAP_PROP_TOLERANCE:
+      maplibre_native_ffi_momentum_snap_set_tolerance(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_SNAP_PROP_DURATION_MS:
+      maplibre_native_ffi_momentum_snap_set_duration_ms(
+        self, g_value_get_double(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_momentum_snap_class_init(
+  MaplibreNativeFfiMomentumSnapClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->get_property = maplibre_native_ffi_momentum_snap_get_property;
+  object_class->set_property = maplibre_native_ffi_momentum_snap_set_property;
+  momentum_snap_properties[MOMENTUM_SNAP_PROP_SPACING] = g_param_spec_double(
+    "spacing", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+  );
+  momentum_snap_properties[MOMENTUM_SNAP_PROP_OFFSET] = g_param_spec_double(
+    "offset", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+  );
+  momentum_snap_properties[MOMENTUM_SNAP_PROP_TOLERANCE] = g_param_spec_double(
+    "tolerance", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+  );
+  momentum_snap_properties[MOMENTUM_SNAP_PROP_DURATION_MS] =
+    g_param_spec_double(
+      "duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  g_object_class_install_properties(
+    object_class, MOMENTUM_SNAP_N_PROPERTIES, momentum_snap_properties
+  );
+}
+
+static void maplibre_native_ffi_momentum_snap_init(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  (void)self;
+}
+
+MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_momentum_snap_new(void) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_SNAP, NULL);
+}
+
+gdouble maplibre_native_ffi_momentum_snap_get_spacing(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
+  return self->spacing;
+}
+
+gboolean maplibre_native_ffi_momentum_snap_has_spacing(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_SNAP_SPACING) != 0;
+}
+
+void maplibre_native_ffi_momentum_snap_set_spacing(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_SPACING) != 0;
+  gboolean changed = self->spacing != value;
+  self->spacing = value;
+  self->fields |= MLN_MOMENTUM_SNAP_SPACING;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_SPACING]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_snap_get_offset(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
+  return self->offset;
+}
+
+gboolean maplibre_native_ffi_momentum_snap_has_offset(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_SNAP_OFFSET) != 0;
+}
+
+void maplibre_native_ffi_momentum_snap_set_offset(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_OFFSET) != 0;
+  gboolean changed = self->offset != value;
+  self->offset = value;
+  self->fields |= MLN_MOMENTUM_SNAP_OFFSET;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_OFFSET]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_snap_get_tolerance(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
+  return self->tolerance;
+}
+
+gboolean maplibre_native_ffi_momentum_snap_has_tolerance(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_SNAP_TOLERANCE) != 0;
+}
+
+void maplibre_native_ffi_momentum_snap_set_tolerance(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_TOLERANCE) != 0;
+  gboolean changed = self->tolerance != value;
+  self->tolerance = value;
+  self->fields |= MLN_MOMENTUM_SNAP_TOLERANCE;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_TOLERANCE]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_snap_get_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
+  return self->duration_ms;
+}
+
+gboolean maplibre_native_ffi_momentum_snap_has_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_SNAP_DURATION_MS) != 0;
+}
+
+void maplibre_native_ffi_momentum_snap_set_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_DURATION_MS) != 0;
+  gboolean changed = self->duration_ms != value;
+  self->duration_ms = value;
+  self->fields |= MLN_MOMENTUM_SNAP_DURATION_MS;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_DURATION_MS]
+    );
+}
+
+MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_momentum_snap_copy(
+  const MaplibreNativeFfiMomentumSnap* self
+) {
+  MaplibreNativeFfiMomentumSnap* copy = maplibre_native_ffi_momentum_snap_new();
+  copy->fields = self->fields;
+  copy->spacing = self->spacing;
+  copy->offset = self->offset;
+  copy->tolerance = self->tolerance;
+  copy->duration_ms = self->duration_ms;
+  return copy;
+}
+
+void maplibre_native_ffi_momentum_snap_to_native(
+  const MaplibreNativeFfiMomentumSnap* self, mln_momentum_snap* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memset(out, 0, sizeof *out);
+  out->fields = (mln_momentum_snap_fields)self->fields;
+  out->spacing = (double)(self->spacing);
+  out->offset = (double)(self->offset);
+  out->tolerance = (double)(self->tolerance);
+  out->duration_ms = (double)(self->duration_ms);
 }
 
 struct _MaplibreNativeFfiAnchoredMomentum {
@@ -605,6 +855,7 @@ struct _MaplibreNativeFfiAnchoredMomentum {
   gdouble velocity;
   MaplibreNativeFfiScreenPoint anchor;
   MaplibreNativeFfiMomentumDecay* decay;
+  MaplibreNativeFfiMomentumSnap* snap;
 };
 
 enum {
@@ -612,6 +863,7 @@ enum {
   ANCHORED_MOMENTUM_PROP_VELOCITY,
   ANCHORED_MOMENTUM_PROP_ANCHOR,
   ANCHORED_MOMENTUM_PROP_DECAY,
+  ANCHORED_MOMENTUM_PROP_SNAP,
   ANCHORED_MOMENTUM_N_PROPERTIES
 };
 
@@ -626,6 +878,7 @@ static void maplibre_native_ffi_anchored_momentum_finalize(GObject* object) {
   MaplibreNativeFfiAnchoredMomentum* self =
     MAPLIBRE_NATIVE_FFI_ANCHORED_MOMENTUM(object);
   g_clear_object(&self->decay);
+  g_clear_object(&self->snap);
   G_OBJECT_CLASS(maplibre_native_ffi_anchored_momentum_parent_class)
     ->finalize(object);
 }
@@ -644,6 +897,9 @@ static void maplibre_native_ffi_anchored_momentum_get_property(
       break;
     case ANCHORED_MOMENTUM_PROP_DECAY:
       g_value_set_object(value, self->decay);
+      break;
+    case ANCHORED_MOMENTUM_PROP_SNAP:
+      g_value_set_object(value, self->snap);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -668,6 +924,11 @@ static void maplibre_native_ffi_anchored_momentum_set_property(
       break;
     case ANCHORED_MOMENTUM_PROP_DECAY:
       maplibre_native_ffi_anchored_momentum_set_decay(
+        self, g_value_get_object(value)
+      );
+      break;
+    case ANCHORED_MOMENTUM_PROP_SNAP:
+      maplibre_native_ffi_anchored_momentum_set_snap(
         self, g_value_get_object(value)
       );
       break;
@@ -699,6 +960,10 @@ static void maplibre_native_ffi_anchored_momentum_class_init(
       "decay", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY,
       PROPERTY_FLAGS
     );
+  anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_SNAP] =
+    g_param_spec_object(
+      "snap", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_SNAP, PROPERTY_FLAGS
+    );
   g_object_class_install_properties(
     object_class, ANCHORED_MOMENTUM_N_PROPERTIES, anchored_momentum_properties
   );
@@ -708,6 +973,7 @@ static void maplibre_native_ffi_anchored_momentum_init(
   MaplibreNativeFfiAnchoredMomentum* self
 ) {
   self->decay = maplibre_native_ffi_momentum_decay_new();
+  self->snap = maplibre_native_ffi_momentum_snap_new();
 }
 
 MaplibreNativeFfiAnchoredMomentum* maplibre_native_ffi_anchored_momentum_new(
@@ -796,6 +1062,34 @@ void maplibre_native_ffi_anchored_momentum_set_decay(
   );
 }
 
+MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_anchored_momentum_get_snap(
+  MaplibreNativeFfiAnchoredMomentum* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), NULL);
+  return self->snap;
+}
+
+gboolean maplibre_native_ffi_anchored_momentum_has_snap(
+  MaplibreNativeFfiAnchoredMomentum* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), FALSE);
+  return (self->fields & MLN_ANCHORED_MOMENTUM_SNAP) != 0;
+}
+
+void maplibre_native_ffi_anchored_momentum_set_snap(
+  MaplibreNativeFfiAnchoredMomentum* self, MaplibreNativeFfiMomentumSnap* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(value));
+  MaplibreNativeFfiMomentumSnap* previous = self->snap;
+  self->snap = maplibre_native_ffi_momentum_snap_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  self->fields |= MLN_ANCHORED_MOMENTUM_SNAP;
+  g_object_notify_by_pspec(
+    G_OBJECT(self), anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_SNAP]
+  );
+}
+
 MaplibreNativeFfiAnchoredMomentum* maplibre_native_ffi_anchored_momentum_copy(
   const MaplibreNativeFfiAnchoredMomentum* self
 ) {
@@ -808,6 +1102,10 @@ MaplibreNativeFfiAnchoredMomentum* maplibre_native_ffi_anchored_momentum_copy(
   copy->decay = self->decay != NULL
                   ? maplibre_native_ffi_momentum_decay_copy(self->decay)
                   : NULL;
+  g_clear_object(&copy->snap);
+  copy->snap = self->snap != NULL
+                 ? maplibre_native_ffi_momentum_snap_copy(self->snap)
+                 : NULL;
   return copy;
 }
 
@@ -823,6 +1121,8 @@ void maplibre_native_ffi_anchored_momentum_to_native(
     maplibre_native_ffi_momentum_decay_to_native(
       self->decay, &out->decay, call
     );
+  if (self->snap != NULL)
+    maplibre_native_ffi_momentum_snap_to_native(self->snap, &out->snap, call);
 }
 
 struct _MaplibreNativeFfiCameraTransitionHandler {
@@ -1274,253 +1574,6 @@ void maplibre_native_ffi_animation_options_to_native(
     maplibre_native_ffi_camera_transition_handler_to_native(
       self->end_handler, &out->end_handler, call
     );
-}
-
-struct _MaplibreNativeFfiBearingSnap {
-  GObject parent_instance;
-  guint64 fields;
-  guint32 target_count;
-  gdouble target_offset;
-  gdouble tolerance;
-  gdouble duration_ms;
-};
-
-enum {
-  BEARING_SNAP_PROP_0,
-  BEARING_SNAP_PROP_TARGET_COUNT,
-  BEARING_SNAP_PROP_TARGET_OFFSET,
-  BEARING_SNAP_PROP_TOLERANCE,
-  BEARING_SNAP_PROP_DURATION_MS,
-  BEARING_SNAP_N_PROPERTIES
-};
-
-static GParamSpec* bearing_snap_properties[BEARING_SNAP_N_PROPERTIES];
-
-G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiBearingSnap, maplibre_native_ffi_bearing_snap, G_TYPE_OBJECT
-)
-
-static void maplibre_native_ffi_bearing_snap_get_property(
-  GObject* object, guint id, GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiBearingSnap* self = MAPLIBRE_NATIVE_FFI_BEARING_SNAP(object);
-  switch (id) {
-    case BEARING_SNAP_PROP_TARGET_COUNT:
-      g_value_set_uint(value, self->target_count);
-      break;
-    case BEARING_SNAP_PROP_TARGET_OFFSET:
-      g_value_set_double(value, self->target_offset);
-      break;
-    case BEARING_SNAP_PROP_TOLERANCE:
-      g_value_set_double(value, self->tolerance);
-      break;
-    case BEARING_SNAP_PROP_DURATION_MS:
-      g_value_set_double(value, self->duration_ms);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_bearing_snap_set_property(
-  GObject* object, guint id, const GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiBearingSnap* self = MAPLIBRE_NATIVE_FFI_BEARING_SNAP(object);
-  switch (id) {
-    case BEARING_SNAP_PROP_TARGET_COUNT:
-      maplibre_native_ffi_bearing_snap_set_target_count(
-        self, g_value_get_uint(value)
-      );
-      break;
-    case BEARING_SNAP_PROP_TARGET_OFFSET:
-      maplibre_native_ffi_bearing_snap_set_target_offset(
-        self, g_value_get_double(value)
-      );
-      break;
-    case BEARING_SNAP_PROP_TOLERANCE:
-      maplibre_native_ffi_bearing_snap_set_tolerance(
-        self, g_value_get_double(value)
-      );
-      break;
-    case BEARING_SNAP_PROP_DURATION_MS:
-      maplibre_native_ffi_bearing_snap_set_duration_ms(
-        self, g_value_get_double(value)
-      );
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_bearing_snap_class_init(
-  MaplibreNativeFfiBearingSnapClass* klass
-) {
-  GObjectClass* object_class = G_OBJECT_CLASS(klass);
-  object_class->get_property = maplibre_native_ffi_bearing_snap_get_property;
-  object_class->set_property = maplibre_native_ffi_bearing_snap_set_property;
-  bearing_snap_properties[BEARING_SNAP_PROP_TARGET_COUNT] = g_param_spec_uint(
-    "target-count", NULL, NULL, 0, G_MAXUINT32, 0, PROPERTY_FLAGS
-  );
-  bearing_snap_properties[BEARING_SNAP_PROP_TARGET_OFFSET] =
-    g_param_spec_double(
-      "target-offset", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  bearing_snap_properties[BEARING_SNAP_PROP_TOLERANCE] = g_param_spec_double(
-    "tolerance", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-  );
-  bearing_snap_properties[BEARING_SNAP_PROP_DURATION_MS] = g_param_spec_double(
-    "duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-  );
-  g_object_class_install_properties(
-    object_class, BEARING_SNAP_N_PROPERTIES, bearing_snap_properties
-  );
-}
-
-static void maplibre_native_ffi_bearing_snap_init(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  (void)self;
-}
-
-MaplibreNativeFfiBearingSnap* maplibre_native_ffi_bearing_snap_new(void) {
-  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_BEARING_SNAP, NULL);
-}
-
-guint32 maplibre_native_ffi_bearing_snap_get_target_count(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self), 0);
-  return self->target_count;
-}
-
-gboolean maplibre_native_ffi_bearing_snap_has_target_count(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self), FALSE);
-  return (self->fields & MLN_BEARING_SNAP_TARGET_COUNT) != 0;
-}
-
-void maplibre_native_ffi_bearing_snap_set_target_count(
-  MaplibreNativeFfiBearingSnap* self, guint32 value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self));
-  gboolean was_set = (self->fields & MLN_BEARING_SNAP_TARGET_COUNT) != 0;
-  gboolean changed = self->target_count != value;
-  self->target_count = value;
-  self->fields |= MLN_BEARING_SNAP_TARGET_COUNT;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), bearing_snap_properties[BEARING_SNAP_PROP_TARGET_COUNT]
-    );
-}
-
-gdouble maplibre_native_ffi_bearing_snap_get_target_offset(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self), 0);
-  return self->target_offset;
-}
-
-gboolean maplibre_native_ffi_bearing_snap_has_target_offset(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self), FALSE);
-  return (self->fields & MLN_BEARING_SNAP_TARGET_OFFSET) != 0;
-}
-
-void maplibre_native_ffi_bearing_snap_set_target_offset(
-  MaplibreNativeFfiBearingSnap* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self));
-  gboolean was_set = (self->fields & MLN_BEARING_SNAP_TARGET_OFFSET) != 0;
-  gboolean changed = self->target_offset != value;
-  self->target_offset = value;
-  self->fields |= MLN_BEARING_SNAP_TARGET_OFFSET;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), bearing_snap_properties[BEARING_SNAP_PROP_TARGET_OFFSET]
-    );
-}
-
-gdouble maplibre_native_ffi_bearing_snap_get_tolerance(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self), 0);
-  return self->tolerance;
-}
-
-gboolean maplibre_native_ffi_bearing_snap_has_tolerance(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self), FALSE);
-  return (self->fields & MLN_BEARING_SNAP_TOLERANCE) != 0;
-}
-
-void maplibre_native_ffi_bearing_snap_set_tolerance(
-  MaplibreNativeFfiBearingSnap* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self));
-  gboolean was_set = (self->fields & MLN_BEARING_SNAP_TOLERANCE) != 0;
-  gboolean changed = self->tolerance != value;
-  self->tolerance = value;
-  self->fields |= MLN_BEARING_SNAP_TOLERANCE;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), bearing_snap_properties[BEARING_SNAP_PROP_TOLERANCE]
-    );
-}
-
-gdouble maplibre_native_ffi_bearing_snap_get_duration_ms(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self), 0);
-  return self->duration_ms;
-}
-
-gboolean maplibre_native_ffi_bearing_snap_has_duration_ms(
-  MaplibreNativeFfiBearingSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self), FALSE);
-  return (self->fields & MLN_BEARING_SNAP_DURATION_MS) != 0;
-}
-
-void maplibre_native_ffi_bearing_snap_set_duration_ms(
-  MaplibreNativeFfiBearingSnap* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(self));
-  gboolean was_set = (self->fields & MLN_BEARING_SNAP_DURATION_MS) != 0;
-  gboolean changed = self->duration_ms != value;
-  self->duration_ms = value;
-  self->fields |= MLN_BEARING_SNAP_DURATION_MS;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), bearing_snap_properties[BEARING_SNAP_PROP_DURATION_MS]
-    );
-}
-
-MaplibreNativeFfiBearingSnap* maplibre_native_ffi_bearing_snap_copy(
-  const MaplibreNativeFfiBearingSnap* self
-) {
-  MaplibreNativeFfiBearingSnap* copy = maplibre_native_ffi_bearing_snap_new();
-  copy->fields = self->fields;
-  copy->target_count = self->target_count;
-  copy->target_offset = self->target_offset;
-  copy->tolerance = self->tolerance;
-  copy->duration_ms = self->duration_ms;
-  return copy;
-}
-
-void maplibre_native_ffi_bearing_snap_to_native(
-  const MaplibreNativeFfiBearingSnap* self, mln_bearing_snap* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->fields = (mln_bearing_snap_fields)self->fields;
-  out->target_count = (uint32_t)(self->target_count);
-  out->target_offset = (double)(self->target_offset);
-  out->tolerance = (double)(self->tolerance);
-  out->duration_ms = (double)(self->duration_ms);
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -2219,12 +2272,10 @@ void maplibre_native_ffi_pan_momentum_to_native(
 
 struct _MaplibreNativeFfiGestureMomentum {
   GObject parent_instance;
-  guint64 fields;
   MaplibreNativeFfiPanMomentum* pan;
   MaplibreNativeFfiAnchoredMomentum* zoom;
   MaplibreNativeFfiAnchoredMomentum* bearing;
   MaplibreNativeFfiAnchoredMomentum* pitch;
-  MaplibreNativeFfiBearingSnap* bearing_snap;
 };
 
 enum {
@@ -2233,7 +2284,6 @@ enum {
   GESTURE_MOMENTUM_PROP_ZOOM,
   GESTURE_MOMENTUM_PROP_BEARING,
   GESTURE_MOMENTUM_PROP_PITCH,
-  GESTURE_MOMENTUM_PROP_BEARING_SNAP,
   GESTURE_MOMENTUM_N_PROPERTIES
 };
 
@@ -2251,7 +2301,6 @@ static void maplibre_native_ffi_gesture_momentum_finalize(GObject* object) {
   g_clear_object(&self->zoom);
   g_clear_object(&self->bearing);
   g_clear_object(&self->pitch);
-  g_clear_object(&self->bearing_snap);
   G_OBJECT_CLASS(maplibre_native_ffi_gesture_momentum_parent_class)
     ->finalize(object);
 }
@@ -2273,9 +2322,6 @@ static void maplibre_native_ffi_gesture_momentum_get_property(
       break;
     case GESTURE_MOMENTUM_PROP_PITCH:
       g_value_set_object(value, self->pitch);
-      break;
-    case GESTURE_MOMENTUM_PROP_BEARING_SNAP:
-      g_value_set_object(value, self->bearing_snap);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -2305,11 +2351,6 @@ static void maplibre_native_ffi_gesture_momentum_set_property(
       break;
     case GESTURE_MOMENTUM_PROP_PITCH:
       maplibre_native_ffi_gesture_momentum_set_pitch(
-        self, g_value_get_object(value)
-      );
-      break;
-    case GESTURE_MOMENTUM_PROP_BEARING_SNAP:
-      maplibre_native_ffi_gesture_momentum_set_bearing_snap(
         self, g_value_get_object(value)
       );
       break;
@@ -2344,11 +2385,6 @@ static void maplibre_native_ffi_gesture_momentum_class_init(
       "pitch", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_ANCHORED_MOMENTUM,
       PROPERTY_FLAGS
     );
-  gesture_momentum_properties[GESTURE_MOMENTUM_PROP_BEARING_SNAP] =
-    g_param_spec_object(
-      "bearing-snap", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_BEARING_SNAP,
-      PROPERTY_FLAGS
-    );
   g_object_class_install_properties(
     object_class, GESTURE_MOMENTUM_N_PROPERTIES, gesture_momentum_properties
   );
@@ -2361,7 +2397,6 @@ static void maplibre_native_ffi_gesture_momentum_init(
   self->zoom = maplibre_native_ffi_anchored_momentum_new();
   self->bearing = maplibre_native_ffi_anchored_momentum_new();
   self->pitch = maplibre_native_ffi_anchored_momentum_new();
-  self->bearing_snap = maplibre_native_ffi_bearing_snap_new();
 }
 
 MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_gesture_momentum_new(
@@ -2456,42 +2491,11 @@ void maplibre_native_ffi_gesture_momentum_set_pitch(
   );
 }
 
-MaplibreNativeFfiBearingSnap*
-maplibre_native_ffi_gesture_momentum_get_bearing_snap(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self), NULL);
-  return self->bearing_snap;
-}
-
-gboolean maplibre_native_ffi_gesture_momentum_has_bearing_snap(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self), FALSE);
-  return (self->fields & MLN_GESTURE_MOMENTUM_BEARING_SNAP) != 0;
-}
-
-void maplibre_native_ffi_gesture_momentum_set_bearing_snap(
-  MaplibreNativeFfiGestureMomentum* self, MaplibreNativeFfiBearingSnap* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_BEARING_SNAP(value));
-  MaplibreNativeFfiBearingSnap* previous = self->bearing_snap;
-  self->bearing_snap = maplibre_native_ffi_bearing_snap_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  self->fields |= MLN_GESTURE_MOMENTUM_BEARING_SNAP;
-  g_object_notify_by_pspec(
-    G_OBJECT(self),
-    gesture_momentum_properties[GESTURE_MOMENTUM_PROP_BEARING_SNAP]
-  );
-}
-
 MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_gesture_momentum_copy(
   const MaplibreNativeFfiGestureMomentum* self
 ) {
   MaplibreNativeFfiGestureMomentum* copy =
     maplibre_native_ffi_gesture_momentum_new();
-  copy->fields = self->fields;
   g_clear_object(&copy->pan);
   copy->pan =
     self->pan != NULL ? maplibre_native_ffi_pan_momentum_copy(self->pan) : NULL;
@@ -2507,11 +2511,6 @@ MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_gesture_momentum_copy(
   copy->pitch = self->pitch != NULL
                   ? maplibre_native_ffi_anchored_momentum_copy(self->pitch)
                   : NULL;
-  g_clear_object(&copy->bearing_snap);
-  copy->bearing_snap =
-    self->bearing_snap != NULL
-      ? maplibre_native_ffi_bearing_snap_copy(self->bearing_snap)
-      : NULL;
   return copy;
 }
 
@@ -2520,7 +2519,6 @@ void maplibre_native_ffi_gesture_momentum_to_native(
   MaplibreNativeFfiCall* call
 ) {
   memset(out, 0, sizeof *out);
-  out->fields = (mln_gesture_momentum_fields)self->fields;
   if (self->pan != NULL)
     maplibre_native_ffi_pan_momentum_to_native(self->pan, &out->pan, call);
   if (self->zoom != NULL)
@@ -2534,10 +2532,6 @@ void maplibre_native_ffi_gesture_momentum_to_native(
   if (self->pitch != NULL)
     maplibre_native_ffi_anchored_momentum_to_native(
       self->pitch, &out->pitch, call
-    );
-  if (self->bearing_snap != NULL)
-    maplibre_native_ffi_bearing_snap_to_native(
-      self->bearing_snap, &out->bearing_snap, call
     );
 }
 

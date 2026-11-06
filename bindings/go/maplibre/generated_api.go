@@ -557,10 +557,10 @@ const (
 	// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
 	// deceleration 69 ms.
 	MomentumDecayModelFriction MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_FRICTION)
-	// The part moves distance over duration_ms, along curve. The caller plans the
-	// glide, for example from the platform's own fling physics, such as Android's
-	// OverScroller.
-	MomentumDecayModelPlanned MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_PLANNED)
+	// The part eases distance over duration_ms, along easing, as a camera animation
+	// does. The caller plans the glide, for example from the platform's own fling
+	// physics, such as Android's OverScroller.
+	MomentumDecayModelEase MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_EASE)
 )
 
 func (value MomentumDecayModel) String() string {
@@ -568,7 +568,7 @@ func (value MomentumDecayModel) String() string {
 	case 0:
 		return "MomentumDecayModelFriction"
 	case 1:
-		return "MomentumDecayModelPlanned"
+		return "MomentumDecayModelEase"
 	}
 	return fmt.Sprintf("MomentumDecayModel(%d)", value)
 }
@@ -2001,6 +2001,9 @@ type AnchoredMomentum struct {
 	// keeps the center of the view in place.
 	Anchor *ScreenPoint
 	Decay  MomentumDecay
+	// Where the part settles. Without this, it stays where the gesture and its
+	// glide leave it.
+	Snap *MomentumSnap
 }
 
 func nativeAnchoredMomentum(input AnchoredMomentum, arena *bindingArena) C.mln_anchored_momentum {
@@ -2009,6 +2012,7 @@ func nativeAnchoredMomentum(input AnchoredMomentum, arena *bindingArena) C.mln_a
 	bindingMasked(&raw.fields, C.MLN_ANCHORED_MOMENTUM_VELOCITY, &raw.velocity, input.Velocity, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_ANCHORED_MOMENTUM_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
 	raw.decay = nativeMomentumDecay(input.Decay, arena)
+	bindingMasked(&raw.fields, C.MLN_ANCHORED_MOMENTUM_SNAP, &raw.snap, input.Snap, arena, nativeMomentumSnap)
 	return raw
 }
 
@@ -2151,36 +2155,6 @@ func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_a
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_EASING, &raw.easing, input.Easing, arena, nativeUnitBezier)
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_TRANSITION_ID, &raw.transition_id, input.TransitionID, arena, bindingNumber[uint64, C.uint64_t])
 	raw.end_handler = nativeCameraTransitionHandler(input.EndHandler, arena)
-	return raw
-}
-
-// BearingSnap corresponds to mln_bearing_snap. Where the bearing settles after
-// a gesture that changed it.
-//
-// The targets are target_count bearings spaced evenly around the circle,
-// starting at target_offset. The bearing eases to the nearest one when it is
-// within tolerance of it, and otherwise stays where it is.
-//
-// See mln_bearing_snap in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type BearingSnap struct {
-	// At least 1. Defaults to 1.
-	TargetCount *uint32
-	// In degrees. Defaults to 0, north.
-	TargetOffset *float64
-	// In degrees, from 0 to 180. Defaults to 7.
-	Tolerance *float64
-	// Zero settles without easing. Defaults to 300.
-	DurationMs *float64
-}
-
-func nativeBearingSnap(input BearingSnap, arena *bindingArena) C.mln_bearing_snap {
-	raw := C.mln_bearing_snap{}
-	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_BEARING_SNAP_TARGET_COUNT, &raw.target_count, input.TargetCount, arena, bindingNumber[uint32, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_BEARING_SNAP_TARGET_OFFSET, &raw.target_offset, input.TargetOffset, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_BEARING_SNAP_TOLERANCE, &raw.tolerance, input.Tolerance, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_BEARING_SNAP_DURATION_MS, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
 	return raw
 }
 
@@ -3091,9 +3065,12 @@ func nativeGeoJSONSourceOptions(input GeoJSONSourceOptions, arena *bindingArena)
 //
 //   - Pan stops at 10 logical pixels per second, needs a release of at least
 //     200, and counts a release faster than 10000 as 10000.
-//   - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+//   - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+//     snap settles on the nearest whole level.
 //   - Bearing stops at 1 degree per second and needs a release of at least 60.
-//   - Pitch stops at 1 degree per second and needs a release of at least 5.
+//     Its snap settles on north within 7 degrees.
+//   - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+//     snap settles flat within 7 degrees.
 //
 // See mln_gesture_momentum in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -3102,20 +3079,14 @@ type GestureMomentum struct {
 	Zoom    AnchoredMomentum
 	Bearing AnchoredMomentum
 	Pitch   AnchoredMomentum
-	// Where the bearing settles after a gesture that changed it. It settles once
-	// the other parts stop, or right away when none of them move. Without this, the
-	// bearing stays where the gesture leaves it.
-	BearingSnap *BearingSnap
 }
 
 func nativeGestureMomentum(input GestureMomentum, arena *bindingArena) C.mln_gesture_momentum {
 	raw := C.mln_gesture_momentum{}
-	raw.fields = 0
 	raw.pan = nativePanMomentum(input.Pan, arena)
 	raw.zoom = nativeAnchoredMomentum(input.Zoom, arena)
 	raw.bearing = nativeAnchoredMomentum(input.Bearing, arena)
 	raw.pitch = nativeAnchoredMomentum(input.Pitch, arena)
-	bindingMasked(&raw.fields, C.MLN_GESTURE_MOMENTUM_BEARING_SNAP, &raw.bearing_snap, input.BearingSnap, arena, nativeBearingSnap)
 	return raw
 }
 
@@ -3908,7 +3879,7 @@ func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
 // set takes the part's default, which GestureMomentum lists. min_speed is
 // finite and not negative, and every other number is finite and positive. A
 // friction decay can serve every release, as a preset that matches a platform's
-// scrolling. A planned glide takes its direction from the part's velocity, and
+// scrolling. An eased glide takes its direction from the part's velocity, and
 // its distance and duration from the caller's plan.
 //
 // See mln_momentum_decay in the C API reference:
@@ -3919,16 +3890,16 @@ type MomentumDecay struct {
 	HalfLifeMs *float64
 	// For MomentumDecayModelFriction, the speed at which it ends.
 	StopSpeed *float64
-	// Required for MomentumDecayModelPlanned.
+	// Required for MomentumDecayModelEase.
 	Distance *float64
-	// Required for MomentumDecayModelPlanned.
+	// Required for MomentumDecayModelEase.
 	DurationMs *float64
-	// For MomentumDecayModelPlanned, the share of distance covered over the share
-	// of duration_ms. Its control points are between 0 and 1, so the glide never
+	// For MomentumDecayModelEase, the share of distance covered over the share of
+	// duration_ms. Its control points are between 0 and 1, so the glide never
 	// passes its distance. Defaults to (0, 0, 0.25, 1), the curve that camera
 	// animations ease along by default. Android's scroll fling follows (0.175, 0.5,
 	// 0.35, 1).
-	Curve *UnitBezier
+	Easing *UnitBezier
 	// A slower release starts no momentum.
 	MinSpeed *float64
 	// For MomentumDecayModelFriction, a faster release counts as this.
@@ -3947,10 +3918,42 @@ func nativeMomentumDecay(input MomentumDecay, arena *bindingArena) C.mln_momentu
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_STOP_SPEED, &raw.stop_speed, input.StopSpeed, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_DISTANCE, &raw.distance, input.Distance, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_DURATION_MS, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_CURVE, &raw.curve, input.Curve, arena, nativeUnitBezier)
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_EASING, &raw.easing, input.Easing, arena, nativeUnitBezier)
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MIN_SPEED, &raw.min_speed, input.MinSpeed, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MAX_SPEED, &raw.max_speed, input.MaxSpeed, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MAX_DISTANCE, &raw.max_distance, input.MaxDistance, arena, bindingNumber[float64, C.double])
+	return raw
+}
+
+// MomentumSnap corresponds to mln_momentum_snap. Where a part settles after a
+// gesture that changed it.
+//
+// The targets are every spacing from offset, in the part's unit. Bearing
+// targets wrap around the circle. Once the part's glide ends, or right away
+// when it doesn't move, the part eases to the nearest target if it is within
+// tolerance of it, and otherwise stays where it is. A setting whose bit isn't
+// set takes the part's default, which GestureMomentum lists.
+//
+// See mln_momentum_snap in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type MomentumSnap struct {
+	// Positive.
+	Spacing *float64
+	// Defaults to 0.
+	Offset *float64
+	// Not negative.
+	Tolerance *float64
+	// Zero settles without easing. Defaults to 300.
+	DurationMs *float64
+}
+
+func nativeMomentumSnap(input MomentumSnap, arena *bindingArena) C.mln_momentum_snap {
+	raw := C.mln_momentum_snap{}
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_SNAP_SPACING, &raw.spacing, input.Spacing, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_SNAP_OFFSET, &raw.offset, input.Offset, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_SNAP_TOLERANCE, &raw.tolerance, input.Tolerance, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_SNAP_DURATION_MS, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
 	return raw
 }
 

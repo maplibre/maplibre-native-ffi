@@ -535,7 +535,7 @@ class MomentumDecayModel(UnknownIntEnum):
     """
 
     FRICTION = 0
-    PLANNED = 1
+    EASE = 1
 
 
 class NetworkStatus(UnknownIntEnum):
@@ -1111,12 +1111,18 @@ class AnchoredMomentum:
 
     decay: MomentumDecay = field(default_factory=lambda: MomentumDecay())
 
+    snap: MomentumSnap | None = None
+    """Where the part settles. Without this, it stays where the gesture and its
+    glide leave it.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
             velocity=raw["velocity"],
             anchor=_maybe(ScreenPoint._from_native, raw["anchor"]),
             decay=MomentumDecay._from_native(raw["decay"]),
+            snap=_maybe(MomentumSnap._from_native, raw["snap"]),
         )
 
 
@@ -1290,40 +1296,6 @@ class AnimationOptions:
             easing=_maybe(UnitBezier._from_native, raw["easing"]),
             transition_id=raw["transition_id"],
             end_handler=CameraTransitionHandler(),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class BearingSnap:
-    """Where the bearing settles after a gesture that changed it.
-
-    The targets are `target_count` bearings spaced evenly around the circle,
-    starting at `target_offset`. The bearing eases to the nearest one when it
-    is within `tolerance` of it, and otherwise stays where it is.
-
-    See `mln_bearing_snap` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    target_count: int | None = None
-    """At least 1. Defaults to 1."""
-
-    target_offset: float | None = None
-    """In degrees. Defaults to 0, north."""
-
-    tolerance: float | None = None
-    """In degrees, from 0 to 180. Defaults to 7."""
-
-    duration_ms: float | None = None
-    """Zero settles without easing. Defaults to 300."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            target_count=raw["target_count"],
-            target_offset=raw["target_offset"],
-            tolerance=raw["tolerance"],
-            duration_ms=raw["duration_ms"],
         )
 
 
@@ -2285,10 +2257,12 @@ class GestureMomentum:
 
     - Pan stops at 10 logical pixels per second, needs a release of at least
       200, and counts a release faster than 10000 as 10000.
-    - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+    - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+      snap settles on the nearest whole level.
     - Bearing stops at 1 degree per second and needs a release of at least
-      60.
+      60. Its snap settles on north within 7 degrees.
     - Pitch stops at 1 degree per second and needs a release of at least 5.
+      Its snap settles flat within 7 degrees.
 
     See `mln_gesture_momentum` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2302,12 +2276,6 @@ class GestureMomentum:
 
     pitch: AnchoredMomentum = field(default_factory=lambda: AnchoredMomentum())
 
-    bearing_snap: BearingSnap | None = None
-    """Where the bearing settles after a gesture that changed it. It settles
-    once the other parts stop, or right away when none of them move. Without
-    this, the bearing stays where the gesture leaves it.
-    """
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -2315,7 +2283,6 @@ class GestureMomentum:
             zoom=AnchoredMomentum._from_native(raw["zoom"]),
             bearing=AnchoredMomentum._from_native(raw["bearing"]),
             pitch=AnchoredMomentum._from_native(raw["pitch"]),
-            bearing_snap=_maybe(BearingSnap._from_native, raw["bearing_snap"]),
         )
 
 
@@ -3094,7 +3061,7 @@ class MomentumDecay:
     isn't set takes the part's default, which `GestureMomentum` lists.
     `min_speed` is finite and not negative, and every other number is finite
     and positive. A friction decay can serve every release, as a preset that
-    matches a platform's scrolling. A planned glide takes its direction from
+    matches a platform's scrolling. An eased glide takes its direction from
     the part's velocity, and its distance and duration from the caller's
     plan.
 
@@ -3111,17 +3078,17 @@ class MomentumDecay:
     """For `MomentumDecayModel.FRICTION`, the speed at which it ends."""
 
     distance: float | None = None
-    """Required for `MomentumDecayModel.PLANNED`."""
+    """Required for `MomentumDecayModel.EASE`."""
 
     duration_ms: float | None = None
-    """Required for `MomentumDecayModel.PLANNED`."""
+    """Required for `MomentumDecayModel.EASE`."""
 
-    curve: UnitBezier | None = None
-    """For `MomentumDecayModel.PLANNED`, the share of `distance` covered over
-    the share of `duration_ms`. Its control points are between 0 and 1, so
-    the glide never passes its distance. Defaults to (0, 0, 0.25, 1), the
-    curve that camera animations ease along by default. Android's scroll
-    fling follows (0.175, 0.5, 0.35, 1).
+    easing: UnitBezier | None = None
+    """For `MomentumDecayModel.EASE`, the share of `distance` covered over the
+    share of `duration_ms`. Its control points are between 0 and 1, so the
+    glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
+    that camera animations ease along by default. Android's scroll fling
+    follows (0.175, 0.5, 0.35, 1).
     """
 
     min_speed: float | None = None
@@ -3144,10 +3111,47 @@ class MomentumDecay:
             stop_speed=raw["stop_speed"],
             distance=raw["distance"],
             duration_ms=raw["duration_ms"],
-            curve=_maybe(UnitBezier._from_native, raw["curve"]),
+            easing=_maybe(UnitBezier._from_native, raw["easing"]),
             min_speed=raw["min_speed"],
             max_speed=raw["max_speed"],
             max_distance=raw["max_distance"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MomentumSnap:
+    """Where a part settles after a gesture that changed it.
+
+    The targets are every `spacing` from `offset`, in the part's unit.
+    Bearing targets wrap around the circle. Once the part's glide ends, or
+    right away when it doesn't move, the part eases to the nearest target if
+    it is within `tolerance` of it, and otherwise stays where it is. A
+    setting whose bit isn't set takes the part's default, which
+    `GestureMomentum` lists.
+
+    See `mln_momentum_snap` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    spacing: float | None = None
+    """Positive."""
+
+    offset: float | None = None
+    """Defaults to 0."""
+
+    tolerance: float | None = None
+    """Not negative."""
+
+    duration_ms: float | None = None
+    """Zero settles without easing. Defaults to 300."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            spacing=raw["spacing"],
+            offset=raw["offset"],
+            tolerance=raw["tolerance"],
+            duration_ms=raw["duration_ms"],
         )
 
 

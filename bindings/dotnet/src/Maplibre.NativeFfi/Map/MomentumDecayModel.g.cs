@@ -18,9 +18,10 @@ public enum MomentumDecayModel : uint
     Friction = 0,
 
     /// <summary>
-    /// The part moves <c>distance</c> over <c>duration_ms</c>, along
-    /// <c>curve</c>. The caller plans the glide, for example from the
-    /// platform's own fling physics, such as Android's OverScroller.
+    /// The part eases <c>distance</c> over <c>duration_ms</c>, along
+    /// <c>easing</c>, as a camera animation does. The caller plans the glide,
+    /// for example from the platform's own fling physics, such as Android's
+    /// OverScroller.
     /// </summary>
-    Planned = 1,
+    Ease = 1,
 }

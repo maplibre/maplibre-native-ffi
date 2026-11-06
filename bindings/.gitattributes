@@ -35,7 +35,6 @@
 /dotnet/src/Maplibre.NativeFfi/Logging/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/AnchoredMomentum.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/AnimationOptions.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Map/BearingSnap.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/BoundOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/Camera.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraBounds.g.cs linguist-generated=true
@@ -75,6 +74,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/MapViewportOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MomentumDecay.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MomentumDecayModel.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/MomentumSnap.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/NorthOrientation.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/OfflineGeometryRegionDefinition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/OfflineRegionDefinition.g.cs linguist-generated=true

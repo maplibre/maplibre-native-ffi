@@ -29,6 +29,11 @@ export interface AnchoredMomentum {
    */
   anchor?: ScreenPoint;
   decay?: MomentumDecay;
+  /**
+   * Where the part settles. Without this, it stays where the gesture and its
+   * glide leave it.
+   */
+  snap?: MomentumSnap;
 }
 
 /**
@@ -152,35 +157,6 @@ export interface AnimationOptions {
    */
   transitionId?: bigint;
   endHandler?: CameraTransitionHandler;
-}
-
-/**
- * Where the bearing settles after a gesture that changed it.
- *
- * The targets are `target_count` bearings spaced evenly around the circle,
- * starting at `target_offset`. The bearing eases to the nearest one when it is
- * within `tolerance` of it, and otherwise stays where it is.
- *
- * See `mln_bearing_snap` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export interface BearingSnap {
-  /**
-   * At least 1. Defaults to 1.
-   */
-  targetCount?: number;
-  /**
-   * In degrees. Defaults to 0, north.
-   */
-  targetOffset?: number;
-  /**
-   * In degrees, from 0 to 180. Defaults to 7.
-   */
-  tolerance?: number;
-  /**
-   * Zero settles without easing. Defaults to 300.
-   */
-  durationMs?: number;
 }
 
 /**
@@ -1088,9 +1064,12 @@ export interface GeoJsonSourceOptions {
  *
  * - Pan stops at 10 logical pixels per second, needs a release of at least 200,
  *   and counts a release faster than 10000 as 10000.
- * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap
+ *   settles on the nearest whole level.
  * - Bearing stops at 1 degree per second and needs a release of at least 60.
- * - Pitch stops at 1 degree per second and needs a release of at least 5.
+ *   Its snap settles on north within 7 degrees.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+ *   snap settles flat within 7 degrees.
  *
  * See `mln_gesture_momentum` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1100,12 +1079,6 @@ export interface GestureMomentum {
   zoom?: AnchoredMomentum;
   bearing?: AnchoredMomentum;
   pitch?: AnchoredMomentum;
-  /**
-   * Where the bearing settles after a gesture that changed it. It settles once
-   * the other parts stop, or right away when none of them move. Without this,
-   * the bearing stays where the gesture leaves it.
-   */
-  bearingSnap?: BearingSnap;
 }
 
 /**
@@ -1846,7 +1819,7 @@ export interface MetalTextureFrame {
  * set takes the part's default, which `GestureMomentum` lists. `min_speed` is
  * finite and not negative, and every other number is finite and positive. A
  * friction decay can serve every release, as a preset that matches a platform's
- * scrolling. A planned glide takes its direction from the part's velocity, and
+ * scrolling. An eased glide takes its direction from the part's velocity, and
  * its distance and duration from the caller's plan.
  *
  * See `mln_momentum_decay` in the
@@ -1863,21 +1836,21 @@ export interface MomentumDecay {
    */
   stopSpeed?: number;
   /**
-   * Required for `MomentumDecayModel.planned`.
+   * Required for `MomentumDecayModel.ease`.
    */
   distance?: number;
   /**
-   * Required for `MomentumDecayModel.planned`.
+   * Required for `MomentumDecayModel.ease`.
    */
   durationMs?: number;
   /**
-   * For `MomentumDecayModel.planned`, the share of `distance` covered over the
+   * For `MomentumDecayModel.ease`, the share of `distance` covered over the
    * share of `duration_ms`. Its control points are between 0 and 1, so the
    * glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
    * that camera animations ease along by default. Android's scroll fling
    * follows (0.175, 0.5, 0.35, 1).
    */
-  curve?: UnitBezier;
+  easing?: UnitBezier;
   /**
    * A slower release starts no momentum.
    */
@@ -1908,16 +1881,47 @@ export const MomentumDecayModel = {
    */
   friction: 0,
   /**
-   * The part moves `distance` over `duration_ms`, along `curve`. The caller
-   * plans the glide, for example from the platform's own fling physics, such as
-   * Android's OverScroller.
+   * The part eases `distance` over `duration_ms`, along `easing`, as a camera
+   * animation does. The caller plans the glide, for example from the platform's
+   * own fling physics, such as Android's OverScroller.
    */
-  planned: 1,
+  ease: 1,
 } as const;
 /** One of the MomentumDecayModel values, or a value this binding does not know. */
 export type MomentumDecayModel =
   | (typeof MomentumDecayModel)[keyof typeof MomentumDecayModel]
   | (number & {});
+
+/**
+ * Where a part settles after a gesture that changed it.
+ *
+ * The targets are every `spacing` from `offset`, in the part's unit. Bearing
+ * targets wrap around the circle. Once the part's glide ends, or right away
+ * when it doesn't move, the part eases to the nearest target if it is within
+ * `tolerance` of it, and otherwise stays where it is. A setting whose bit isn't
+ * set takes the part's default, which `GestureMomentum` lists.
+ *
+ * See `mln_momentum_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface MomentumSnap {
+  /**
+   * Positive.
+   */
+  spacing?: number;
+  /**
+   * Defaults to 0.
+   */
+  offset?: number;
+  /**
+   * Not negative.
+   */
+  tolerance?: number;
+  /**
+   * Zero settles without easing. Defaults to 300.
+   */
+  durationMs?: number;
+}
 
 /**
  * Whether the library may use the network.

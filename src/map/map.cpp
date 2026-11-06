@@ -4680,7 +4680,9 @@ auto apply_gesture_phase_before(MapObject& live, mln_gesture_phase phase)
     (phase == MLN_GESTURE_PHASE_BEGIN || !events.gesture_active)
   ) {
     events.gesture_serial += 1;
+    events.gesture_changed_zoom = false;
     events.gesture_changed_bearing = false;
+    events.gesture_changed_pitch = false;
   }
   if (phase == MLN_GESTURE_PHASE_BEGIN) cancel_all_camera_transitions(live);
   if (phase == MLN_GESTURE_PHASE_BEGIN || phase == MLN_GESTURE_PHASE_UPDATE) {
@@ -4719,8 +4721,11 @@ auto move_camera(
   const auto status = std::invoke(std::forward<Target>(target), camera);
   if (status != MLN_STATUS_OK) return status;
   apply_gesture_phase_before(live, gesture_phase);
-  if (gesture_phase != MLN_GESTURE_PHASE_NONE && camera.bearing) {
-    live.event_state->gesture_changed_bearing = true;
+  if (gesture_phase != MLN_GESTURE_PHASE_NONE) {
+    auto& events = *live.event_state;
+    if (camera.zoom) events.gesture_changed_zoom = true;
+    if (camera.bearing) events.gesture_changed_bearing = true;
+    if (camera.pitch) events.gesture_changed_pitch = true;
   }
   {
     const auto replacing = TransitionReplacementScope{*live.event_state, end};
@@ -4822,7 +4827,7 @@ auto resolve_momentum_decay(
     static_cast<uint32_t>(MLN_MOMENTUM_DECAY_MODEL) |
     MLN_MOMENTUM_DECAY_HALF_LIFE_MS | MLN_MOMENTUM_DECAY_STOP_SPEED |
     MLN_MOMENTUM_DECAY_DISTANCE | MLN_MOMENTUM_DECAY_DURATION_MS |
-    MLN_MOMENTUM_DECAY_CURVE | MLN_MOMENTUM_DECAY_MIN_SPEED |
+    MLN_MOMENTUM_DECAY_EASING | MLN_MOMENTUM_DECAY_MIN_SPEED |
     MLN_MOMENTUM_DECAY_MAX_SPEED | MLN_MOMENTUM_DECAY_MAX_DISTANCE;
   const auto fields = options.fields;
   const auto fail = [part](std::string_view problem) {
@@ -4834,11 +4839,11 @@ auto resolve_momentum_decay(
   const auto has = [fields](uint32_t bit) { return (fields & bit) != 0U; };
   if ((fields & ~known_fields) != 0U) return fail("contains unknown bits");
   if (has(MLN_MOMENTUM_DECAY_MODEL)) {
-    if (options.model > MLN_MOMENTUM_DECAY_MODEL_PLANNED) {
+    if (options.model > MLN_MOMENTUM_DECAY_MODEL_EASE) {
       return fail("has an invalid model");
     }
-    decay.model = options.model == MLN_MOMENTUM_DECAY_MODEL_PLANNED
-                    ? mln::MomentumDecay::Model::Planned
+    decay.model = options.model == MLN_MOMENTUM_DECAY_MODEL_EASE
+                    ? mln::MomentumDecay::Model::Ease
                     : mln::MomentumDecay::Model::Friction;
   }
   const auto positive = [](double value) {
@@ -4867,11 +4872,11 @@ auto resolve_momentum_decay(
     );
   }
   if (has(MLN_MOMENTUM_DECAY_STOP_SPEED)) decay.stopSpeed = options.stop_speed;
-  if (decay.model == mln::MomentumDecay::Model::Planned) {
+  if (decay.model == mln::MomentumDecay::Model::Ease) {
     if (
       !has(MLN_MOMENTUM_DECAY_DISTANCE) || !has(MLN_MOMENTUM_DECAY_DURATION_MS)
     ) {
-      return fail("needs a distance and a duration for a planned glide");
+      return fail("needs a distance and a duration for an eased glide");
     }
     if (
       !positive(options.duration_ms) ||
@@ -4879,17 +4884,17 @@ auto resolve_momentum_decay(
     ) {
       return fail("needs a positive duration in the native duration range");
     }
-    if (has(MLN_MOMENTUM_DECAY_CURVE)) {
-      const auto curve = options.curve;
+    if (has(MLN_MOMENTUM_DECAY_EASING)) {
+      const auto curve = options.easing;
       if (
         !std::isfinite(curve.x1) || !std::isfinite(curve.y1) ||
         !std::isfinite(curve.x2) || !std::isfinite(curve.y2) ||
         curve.x1 < 0.0 || curve.x1 > 1.0 || curve.x2 < 0.0 || curve.x2 > 1.0 ||
         curve.y1 < 0.0 || curve.y1 > 1.0 || curve.y2 < 0.0 || curve.y2 > 1.0
       ) {
-        return fail("needs a curve whose control points are within [0, 1]");
+        return fail("needs an easing whose control points are within [0, 1]");
       }
-      decay.curve = {
+      decay.easing = {
         .x1 = curve.x1, .y1 = curve.y1, .x2 = curve.x2, .y2 = curve.y2
       };
     }
@@ -4904,38 +4909,41 @@ auto resolve_momentum_decay(
   return decay;
 }
 
-auto validate_bearing_snap(const mln_bearing_snap& snap)
-  -> std::optional<mln::BearingSnap> {
+// Applies `snap` over a part's default snap, or returns nothing and sets the
+// thread error when a setting is invalid.
+auto resolve_momentum_snap(
+  const mln_momentum_snap& snap, mln::MomentumSnap result
+) -> std::optional<mln::MomentumSnap> {
   constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_BEARING_SNAP_TARGET_COUNT) |
-    MLN_BEARING_SNAP_TARGET_OFFSET | MLN_BEARING_SNAP_TOLERANCE |
-    MLN_BEARING_SNAP_DURATION_MS;
+    static_cast<uint32_t>(MLN_MOMENTUM_SNAP_SPACING) |
+    MLN_MOMENTUM_SNAP_OFFSET | MLN_MOMENTUM_SNAP_TOLERANCE |
+    MLN_MOMENTUM_SNAP_DURATION_MS;
   if ((snap.fields & ~known_fields) != 0U) {
-    set_thread_error("mln_bearing_snap.fields contains unknown bits");
+    set_thread_error("mln_momentum_snap.fields contains unknown bits");
     return std::nullopt;
   }
-  auto result = mln::BearingSnap{};
   auto duration_ms = 300.0;
-  if ((snap.fields & MLN_BEARING_SNAP_TARGET_COUNT) != 0U) {
-    result.targetCount = snap.target_count;
+  if ((snap.fields & MLN_MOMENTUM_SNAP_SPACING) != 0U) {
+    result.spacing = snap.spacing;
   }
-  if ((snap.fields & MLN_BEARING_SNAP_TARGET_OFFSET) != 0U) {
-    result.targetOffset = snap.target_offset;
+  if ((snap.fields & MLN_MOMENTUM_SNAP_OFFSET) != 0U) {
+    result.offset = snap.offset;
   }
-  if ((snap.fields & MLN_BEARING_SNAP_TOLERANCE) != 0U) {
+  if ((snap.fields & MLN_MOMENTUM_SNAP_TOLERANCE) != 0U) {
     result.tolerance = snap.tolerance;
   }
-  if ((snap.fields & MLN_BEARING_SNAP_DURATION_MS) != 0U) {
+  if ((snap.fields & MLN_MOMENTUM_SNAP_DURATION_MS) != 0U) {
     duration_ms = snap.duration_ms;
   }
   if (
-    result.targetCount == 0 || !std::isfinite(result.targetOffset) ||
-    !(result.tolerance >= 0.0 && result.tolerance <= 180.0) ||
+    !(std::isfinite(result.spacing) && result.spacing > 0.0) ||
+    !std::isfinite(result.offset) ||
+    !(std::isfinite(result.tolerance) && result.tolerance >= 0.0) ||
     !is_native_duration_ms(duration_ms)
   ) {
     set_thread_error(
-      "a bearing snap needs a target, a finite offset, a tolerance from 0 to "
-      "180, and a duration in the native range"
+      "a momentum snap needs a positive spacing, a finite offset, a tolerance "
+      "that isn't negative, and a duration in the native range"
     );
     return std::nullopt;
   }
@@ -4948,15 +4956,16 @@ struct NativeAnchoredMomentum {
   std::optional<double> velocity;
   std::optional<mln::ScreenCoordinate> anchor;
   mln::MomentumDecay decay;
+  std::optional<mln::MomentumSnap> snap;
 };
 
 auto to_native_anchored_momentum(
   const mln_anchored_momentum& part, mln::MomentumDecay defaults,
-  std::string_view name
+  mln::MomentumSnap snap_defaults, std::string_view name
 ) -> std::optional<NativeAnchoredMomentum> {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_ANCHORED_MOMENTUM_VELOCITY) |
-    MLN_ANCHORED_MOMENTUM_ANCHOR;
+    MLN_ANCHORED_MOMENTUM_ANCHOR | MLN_ANCHORED_MOMENTUM_SNAP;
   if ((part.fields & ~known_fields) != 0U) {
     set_thread_error("mln_anchored_momentum.fields contains unknown bits");
     return std::nullopt;
@@ -4977,6 +4986,10 @@ auto to_native_anchored_momentum(
   const auto decay = resolve_momentum_decay(part.decay, defaults, name);
   if (!decay) return std::nullopt;
   result.decay = *decay;
+  if ((part.fields & MLN_ANCHORED_MOMENTUM_SNAP) != 0U) {
+    result.snap = resolve_momentum_snap(part.snap, snap_defaults);
+    if (!result.snap) return std::nullopt;
+  }
   return result;
 }
 
@@ -4985,10 +4998,6 @@ auto to_native_anchored_momentum(
 // leaves out finishFn, which the worker sets.
 auto to_native_gesture_momentum(const mln_gesture_momentum& momentum)
   -> std::optional<mln::CameraMomentum> {
-  if ((momentum.fields & ~MLN_GESTURE_MOMENTUM_BEARING_SNAP) != 0U) {
-    set_thread_error("mln_gesture_momentum.fields contains unknown bits");
-    return std::nullopt;
-  }
   auto result = mln::CameraMomentum{};
   const auto& pan = momentum.pan;
   if ((pan.fields & ~MLN_PAN_MOMENTUM_VELOCITY) != 0U) {
@@ -5006,16 +5015,20 @@ auto to_native_gesture_momentum(const mln_gesture_momentum& momentum)
   );
   if (!pan_decay) return std::nullopt;
   result.panDecay = *pan_decay;
+  // By default, the zoom settles on the nearest whole level, the bearing on
+  // north, and the pitch flat.
   const auto zoom = to_native_anchored_momentum(
     momentum.zoom,
     momentum_defaults(0.01, 0.0, std::numeric_limits<double>::infinity(), 2.5),
-    "zoom"
+    mln::MomentumSnap{.spacing = 1.0, .tolerance = 0.5}, "zoom"
   );
   const auto bearing = to_native_anchored_momentum(
-    momentum.bearing, momentum_defaults(1.0, 60.0), "bearing"
+    momentum.bearing, momentum_defaults(1.0, 60.0),
+    mln::MomentumSnap{.spacing = 360.0, .tolerance = 7.0}, "bearing"
   );
   const auto pitch = to_native_anchored_momentum(
-    momentum.pitch, momentum_defaults(1.0, 5.0), "pitch"
+    momentum.pitch, momentum_defaults(1.0, 5.0),
+    mln::MomentumSnap{.spacing = 90.0, .tolerance = 7.0}, "pitch"
   );
   if (!zoom || !bearing || !pitch) return std::nullopt;
   result.zoomVelocity = zoom->velocity;
@@ -5027,10 +5040,9 @@ auto to_native_gesture_momentum(const mln_gesture_momentum& momentum)
   result.pitchVelocity = pitch->velocity;
   result.pitchAnchor = pitch->anchor;
   result.pitchDecay = pitch->decay;
-  if ((momentum.fields & MLN_GESTURE_MOMENTUM_BEARING_SNAP) != 0U) {
-    result.bearingSnap = validate_bearing_snap(momentum.bearing_snap);
-    if (!result.bearingSnap) return std::nullopt;
-  }
+  result.zoomSnap = zoom->snap;
+  result.bearingSnap = bearing->snap;
+  result.pitchSnap = pitch->snap;
   return result;
 }
 
@@ -5164,9 +5176,10 @@ auto start_gesture_momentum(
   const std::shared_ptr<CameraTransitionEnd>& end
 ) -> void {
   auto& events = *live.event_state;
-  if (momentum.bearingSnap && !events.gesture_changed_bearing) {
-    momentum.bearingSnap.reset();
-  }
+  // Only the parts that the gesture changed settle.
+  if (!events.gesture_changed_zoom) momentum.zoomSnap.reset();
+  if (!events.gesture_changed_bearing) momentum.bearingSnap.reset();
+  if (!events.gesture_changed_pitch) momentum.pitchSnap.reset();
   events.gesture_active = false;
   momentum.finishFn = [event_state = live.event_state, command,
                        serial =
@@ -5234,12 +5247,20 @@ auto map_apply_camera_delta(
                                  )
                                : animation;
           apply_gesture_phase_before(live, copied.gesture_phase);
-          if (
-            copied.gesture_phase != MLN_GESTURE_PHASE_NONE &&
-            (copied.fields & MLN_CAMERA_DELTA_BEARING) != 0U &&
-            copied.bearing != 0.0
-          ) {
-            live.event_state->gesture_changed_bearing = true;
+          if (copied.gesture_phase != MLN_GESTURE_PHASE_NONE) {
+            auto& events = *live.event_state;
+            const auto has = [&copied](uint32_t bit) {
+              return (copied.fields & bit) != 0U;
+            };
+            if (has(MLN_CAMERA_DELTA_SCALE) && copied.scale != 1.0) {
+              events.gesture_changed_zoom = true;
+            }
+            if (has(MLN_CAMERA_DELTA_BEARING) && copied.bearing != 0.0) {
+              events.gesture_changed_bearing = true;
+            }
+            if (has(MLN_CAMERA_DELTA_PITCH) && copied.pitch != 0.0) {
+              events.gesture_changed_pitch = true;
+            }
           }
           if (pans) {
             const auto replacing =

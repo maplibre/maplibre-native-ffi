@@ -15,6 +15,9 @@ pub struct AnchoredMomentum {
     /// keeps the center of the view in place.
     pub anchor: Option<ScreenPoint>,
     pub decay: MomentumDecay,
+    /// Where the part settles. Without this, it stays where the gesture and its
+    /// glide leave it.
+    pub snap: Option<MomentumSnap>,
 }
 impl ToNative<sys::mln_anchored_momentum> for AnchoredMomentum {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_anchored_momentum> {
@@ -29,6 +32,10 @@ impl ToNative<sys::mln_anchored_momentum> for AnchoredMomentum {
             raw.anchor = to_native(&*item, arena)?;
         }
         raw.decay = to_native(&self.decay, arena)?;
+        if let Some(item) = &self.snap {
+            raw.fields |= sys::MLN_ANCHORED_MOMENTUM_SNAP;
+            raw.snap = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
@@ -228,49 +235,6 @@ impl ToNative<sys::mln_animation_options> for AnimationOptions {
             raw.transition_id = *item;
         }
         raw.end_handler = to_native(&self.end_handler, arena)?;
-        Ok(raw)
-    }
-}
-
-/// Where the bearing settles after a gesture that changed it.
-///
-/// The targets are `target_count` bearings spaced evenly around the circle,
-/// starting at `target_offset`. The bearing eases to the nearest one when it is
-/// within `tolerance` of it, and otherwise stays where it is.
-///
-/// See `mln_bearing_snap` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct BearingSnap {
-    /// At least 1. Defaults to 1.
-    pub target_count: Option<u32>,
-    /// In degrees. Defaults to 0, north.
-    pub target_offset: Option<f64>,
-    /// In degrees, from 0 to 180. Defaults to 7.
-    pub tolerance: Option<f64>,
-    /// Zero settles without easing. Defaults to 300.
-    pub duration_ms: Option<f64>,
-}
-impl ToNative<sys::mln_bearing_snap> for BearingSnap {
-    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_bearing_snap> {
-        let mut raw: sys::mln_bearing_snap = unsafe { std::mem::zeroed() };
-        raw.fields = 0;
-        if let Some(item) = &self.target_count {
-            raw.fields |= sys::MLN_BEARING_SNAP_TARGET_COUNT;
-            raw.target_count = *item;
-        }
-        if let Some(item) = &self.target_offset {
-            raw.fields |= sys::MLN_BEARING_SNAP_TARGET_OFFSET;
-            raw.target_offset = *item;
-        }
-        if let Some(item) = &self.tolerance {
-            raw.fields |= sys::MLN_BEARING_SNAP_TOLERANCE;
-            raw.tolerance = *item;
-        }
-        if let Some(item) = &self.duration_ms {
-            raw.fields |= sys::MLN_BEARING_SNAP_DURATION_MS;
-            raw.duration_ms = *item;
-        }
         Ok(raw)
     }
 }
@@ -1809,9 +1773,12 @@ impl FromNative<sys::mln_geo_json_source_options> for GeoJsonSourceOptions {
 ///
 /// - Pan stops at 10 logical pixels per second, needs a release of at least
 ///   200, and counts a release faster than 10000 as 10000.
-/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+///   snap settles on the nearest whole level.
 /// - Bearing stops at 1 degree per second and needs a release of at least 60.
-/// - Pitch stops at 1 degree per second and needs a release of at least 5.
+///   Its snap settles on north within 7 degrees.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+///   snap settles flat within 7 degrees.
 ///
 /// See `mln_gesture_momentum` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1821,23 +1788,14 @@ pub struct GestureMomentum {
     pub zoom: AnchoredMomentum,
     pub bearing: AnchoredMomentum,
     pub pitch: AnchoredMomentum,
-    /// Where the bearing settles after a gesture that changed it. It settles
-    /// once the other parts stop, or right away when none of them move. Without
-    /// this, the bearing stays where the gesture leaves it.
-    pub bearing_snap: Option<BearingSnap>,
 }
 impl ToNative<sys::mln_gesture_momentum> for GestureMomentum {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_gesture_momentum> {
         let mut raw: sys::mln_gesture_momentum = unsafe { std::mem::zeroed() };
-        raw.fields = 0;
         raw.pan = to_native(&self.pan, arena)?;
         raw.zoom = to_native(&self.zoom, arena)?;
         raw.bearing = to_native(&self.bearing, arena)?;
         raw.pitch = to_native(&self.pitch, arena)?;
-        if let Some(item) = &self.bearing_snap {
-            raw.fields |= sys::MLN_GESTURE_MOMENTUM_BEARING_SNAP;
-            raw.bearing_snap = to_native(&*item, arena)?;
-        }
         Ok(raw)
     }
 }
@@ -3144,7 +3102,7 @@ impl FromNative<sys::mln_metal_texture_frame> for MetalTextureFrame {
 /// isn't set takes the part's default, which `GestureMomentum` lists.
 /// `min_speed` is finite and not negative, and every other number is finite and
 /// positive. A friction decay can serve every release, as a preset that matches
-/// a platform's scrolling. A planned glide takes its direction from the part's
+/// a platform's scrolling. An eased glide takes its direction from the part's
 /// velocity, and its distance and duration from the caller's plan.
 ///
 /// See `mln_momentum_decay` in the
@@ -3156,16 +3114,16 @@ pub struct MomentumDecay {
     pub half_life_ms: Option<f64>,
     /// For `MomentumDecayModel::Friction`, the speed at which it ends.
     pub stop_speed: Option<f64>,
-    /// Required for `MomentumDecayModel::Planned`.
+    /// Required for `MomentumDecayModel::Ease`.
     pub distance: Option<f64>,
-    /// Required for `MomentumDecayModel::Planned`.
+    /// Required for `MomentumDecayModel::Ease`.
     pub duration_ms: Option<f64>,
-    /// For `MomentumDecayModel::Planned`, the share of `distance` covered over
-    /// the share of `duration_ms`. Its control points are between 0 and 1, so
-    /// the glide never passes its distance. Defaults to (0, 0, 0.25, 1), the
-    /// curve that camera animations ease along by default. Android's scroll
-    /// fling follows (0.175, 0.5, 0.35, 1).
-    pub curve: Option<UnitBezier>,
+    /// For `MomentumDecayModel::Ease`, the share of `distance` covered over the
+    /// share of `duration_ms`. Its control points are between 0 and 1, so the
+    /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
+    /// that camera animations ease along by default. Android's scroll fling
+    /// follows (0.175, 0.5, 0.35, 1).
+    pub easing: Option<UnitBezier>,
     /// A slower release starts no momentum.
     pub min_speed: Option<f64>,
     /// For `MomentumDecayModel::Friction`, a faster release counts as this.
@@ -3199,9 +3157,9 @@ impl ToNative<sys::mln_momentum_decay> for MomentumDecay {
             raw.fields |= sys::MLN_MOMENTUM_DECAY_DURATION_MS;
             raw.duration_ms = *item;
         }
-        if let Some(item) = &self.curve {
-            raw.fields |= sys::MLN_MOMENTUM_DECAY_CURVE;
-            raw.curve = to_native(&*item, arena)?;
+        if let Some(item) = &self.easing {
+            raw.fields |= sys::MLN_MOMENTUM_DECAY_EASING;
+            raw.easing = to_native(&*item, arena)?;
         }
         if let Some(item) = &self.min_speed {
             raw.fields |= sys::MLN_MOMENTUM_DECAY_MIN_SPEED;
@@ -3229,15 +3187,60 @@ pub enum MomentumDecayModel: u32 {
     /// UIScrollView's normal deceleration is a half-life of 346 ms, and its
     /// fast deceleration 69 ms.
     Friction = 0,
-    /// The part moves `distance` over `duration_ms`, along `curve`. The caller
-    /// plans the glide, for example from the platform's own fling physics, such
-    /// as Android's OverScroller.
-    Planned = 1,
+    /// The part eases `distance` over `duration_ms`, along `easing`, as a
+    /// camera animation does. The caller plans the glide, for example from the
+    /// platform's own fling physics, such as Android's OverScroller.
+    Ease = 1,
 } Unknown
 }
 impl Default for MomentumDecayModel {
     fn default() -> Self {
         Self::Friction
+    }
+}
+
+/// Where a part settles after a gesture that changed it.
+///
+/// The targets are every `spacing` from `offset`, in the part's unit. Bearing
+/// targets wrap around the circle. Once the part's glide ends, or right away
+/// when it doesn't move, the part eases to the nearest target if it is within
+/// `tolerance` of it, and otherwise stays where it is. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists.
+///
+/// See `mln_momentum_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MomentumSnap {
+    /// Positive.
+    pub spacing: Option<f64>,
+    /// Defaults to 0.
+    pub offset: Option<f64>,
+    /// Not negative.
+    pub tolerance: Option<f64>,
+    /// Zero settles without easing. Defaults to 300.
+    pub duration_ms: Option<f64>,
+}
+impl ToNative<sys::mln_momentum_snap> for MomentumSnap {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_momentum_snap> {
+        let mut raw: sys::mln_momentum_snap = unsafe { std::mem::zeroed() };
+        raw.fields = 0;
+        if let Some(item) = &self.spacing {
+            raw.fields |= sys::MLN_MOMENTUM_SNAP_SPACING;
+            raw.spacing = *item;
+        }
+        if let Some(item) = &self.offset {
+            raw.fields |= sys::MLN_MOMENTUM_SNAP_OFFSET;
+            raw.offset = *item;
+        }
+        if let Some(item) = &self.tolerance {
+            raw.fields |= sys::MLN_MOMENTUM_SNAP_TOLERANCE;
+            raw.tolerance = *item;
+        }
+        if let Some(item) = &self.duration_ms {
+            raw.fields |= sys::MLN_MOMENTUM_SNAP_DURATION_MS;
+            raw.duration_ms = *item;
+        }
+        Ok(raw)
     }
 }
 

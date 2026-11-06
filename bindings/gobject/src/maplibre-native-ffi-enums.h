@@ -536,9 +536,10 @@ GType maplibre_native_ffi_map_mode_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_FRICTION: The speed halves every
  *   `half_life_ms`, until it drops to `stop_speed`. UIScrollView's normal
  *   deceleration is a half-life of 346 ms, and its fast deceleration 69 ms.
- * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_PLANNED: The part moves `distance`
- *   over `duration_ms`, along `curve`. The caller plans the glide, for example
- *   from the platform's own fling physics, such as Android's OverScroller.
+ * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE: The part eases `distance`
+ *   over `duration_ms`, along `easing`, as a camera animation does. The caller
+ *   plans the glide, for example from the platform's own fling physics, such as
+ *   Android's OverScroller.
  *
  * How a part of a gesture's momentum slows from its release speed.
  *
@@ -547,7 +548,7 @@ GType maplibre_native_ffi_map_mode_get_type(void) G_GNUC_CONST;
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_FRICTION = 0,
-  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_PLANNED = 1,
+  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE = 1,
 } MaplibreNativeFfiMomentumDecayModel;
 
 GType maplibre_native_ffi_momentum_decay_model_get_type(void) G_GNUC_CONST;

@@ -133,7 +133,10 @@ struct MapEventState {
   // with its first phase after the previous one ended, and its momentum can
   // outlast it.
   bool gesture_active = false;
+  // Which fields the gesture changed, so that only those parts settle.
+  bool gesture_changed_zoom = false;
   bool gesture_changed_bearing = false;
+  bool gesture_changed_pitch = false;
   uint64_t gesture_serial = 0;
 
   [[nodiscard]] auto in_transaction() const noexcept -> bool {

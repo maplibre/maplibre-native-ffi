@@ -3225,6 +3225,15 @@ bool mln_ts_write_anchored_momentum(
     if (!mln_ts_write_momentum_decay(call, member, &out->decay, child))
       return false;
   }
+  if (!mln_ts_member(call, value, "snap", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "snap");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->snap, 0, sizeof out->snap);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_momentum_snap(call, member, &out->snap, child))
+      return false;
+    out->fields |= MLN_ANCHORED_MOMENTUM_SNAP;
+  }
   return true;
 }
 
@@ -3411,56 +3420,6 @@ bool mln_ts_write_animation_options(
           call, member, &out->end_handler, child
         ))
       return false;
-  }
-  return true;
-}
-
-bool mln_ts_write_bearing_snap(
-  mln_ts_call* call, napi_value value, mln_bearing_snap* out, const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "targetCount", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "targetCount");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->target_count = (uint32_t)number;
-    }
-    out->fields |= MLN_BEARING_SNAP_TARGET_COUNT;
-  }
-  if (!mln_ts_member(call, value, "targetOffset", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "targetOffset");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->target_offset = (double)number;
-    }
-    out->fields |= MLN_BEARING_SNAP_TARGET_OFFSET;
-  }
-  if (!mln_ts_member(call, value, "tolerance", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "tolerance");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->tolerance = (double)number;
-    }
-    out->fields |= MLN_BEARING_SNAP_TOLERANCE;
-  }
-  if (!mln_ts_member(call, value, "durationMs", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "durationMs");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      double number = 0;
-      if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->duration_ms = (double)number;
-    }
-    out->fields |= MLN_BEARING_SNAP_DURATION_MS;
   }
   return true;
 }
@@ -4583,15 +4542,6 @@ bool mln_ts_write_gesture_momentum(
     if (!mln_ts_read_record(call, member, child)) return false;
     if (!mln_ts_write_anchored_momentum(call, member, &out->pitch, child))
       return false;
-  }
-  if (!mln_ts_member(call, value, "bearingSnap", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "bearingSnap");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->bearing_snap, 0, sizeof out->bearing_snap);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_bearing_snap(call, member, &out->bearing_snap, child))
-      return false;
-    out->fields |= MLN_GESTURE_MOMENTUM_BEARING_SNAP;
   }
   return true;
 }
@@ -5772,14 +5722,14 @@ bool mln_ts_write_momentum_decay(
     }
     out->fields |= MLN_MOMENTUM_DECAY_DURATION_MS;
   }
-  if (!mln_ts_member(call, value, "curve", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "curve");
+  if (!mln_ts_member(call, value, "easing", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "easing");
   if (!mln_ts_is_absent(call, member)) {
-    memset(&out->curve, 0, sizeof out->curve);
+    memset(&out->easing, 0, sizeof out->easing);
     if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_unit_bezier(call, member, &out->curve, child))
+    if (!mln_ts_write_unit_bezier(call, member, &out->easing, child))
       return false;
-    out->fields |= MLN_MOMENTUM_DECAY_CURVE;
+    out->fields |= MLN_MOMENTUM_DECAY_EASING;
   }
   if (!mln_ts_member(call, value, "minSpeed", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minSpeed");
@@ -5810,6 +5760,55 @@ bool mln_ts_write_momentum_decay(
       out->max_distance = (double)number;
     }
     out->fields |= MLN_MOMENTUM_DECAY_MAX_DISTANCE;
+  }
+  return true;
+}
+
+bool mln_ts_write_momentum_snap(
+  mln_ts_call* call, napi_value value, mln_momentum_snap* out, const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "spacing", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "spacing");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->spacing = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_SNAP_SPACING;
+  }
+  if (!mln_ts_member(call, value, "offset", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "offset");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->offset = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_SNAP_OFFSET;
+  }
+  if (!mln_ts_member(call, value, "tolerance", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "tolerance");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->tolerance = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_SNAP_TOLERANCE;
+  }
+  if (!mln_ts_member(call, value, "durationMs", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "durationMs");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->duration_ms = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_SNAP_DURATION_MS;
   }
   return true;
 }

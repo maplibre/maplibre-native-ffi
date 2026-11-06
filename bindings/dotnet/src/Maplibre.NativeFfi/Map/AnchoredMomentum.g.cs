@@ -24,4 +24,10 @@ public sealed record AnchoredMomentum
     /// </summary>
     public ScreenPoint? Anchor { get; init; }
     public MomentumDecay Decay { get; init; } = new();
+
+    /// <summary>
+    /// Where the part settles. Without this, it stays where the gesture and its
+    /// glide leave it.
+    /// </summary>
+    public MomentumSnap? Snap { get; init; }
 }

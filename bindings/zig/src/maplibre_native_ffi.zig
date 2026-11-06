@@ -3282,12 +3282,16 @@ pub const AnchoredMomentum = struct {
     /// keeps the center of the view in place.
     anchor: ?ScreenPoint = null,
     decay: MomentumDecay = .{},
+    /// Where the part settles. Without this, it stays where the gesture and its
+    /// glide leave it.
+    snap: ?MomentumSnap = null,
     pub fn toNative(self: AnchoredMomentum) c.mln_anchored_momentum {
         var raw = std.mem.zeroes(c.mln_anchored_momentum);
         raw.fields = 0;
         marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_VELOCITY, &raw.velocity, self.velocity);
         marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_ANCHOR, &raw.anchor, self.anchor);
         raw.decay = self.decay.toNative();
+        marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_SNAP, &raw.snap, self.snap);
         return raw;
     }
     pub fn fromNative(raw: c.mln_anchored_momentum) AnchoredMomentum {
@@ -3295,6 +3299,7 @@ pub const AnchoredMomentum = struct {
             .velocity = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_VELOCITY != 0) raw.velocity else null,
             .anchor = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
             .decay = MomentumDecay.fromNative(raw.decay),
+            .snap = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_SNAP != 0) MomentumSnap.fromNative(raw.snap) else null,
         };
     }
 };
@@ -3463,42 +3468,6 @@ pub const AnimationOptions = struct {
             .easing = if (raw.fields & c.MLN_ANIMATION_OPTION_EASING != 0) UnitBezier.fromNative(raw.easing) else null,
             .transition_id = if (raw.fields & c.MLN_ANIMATION_OPTION_TRANSITION_ID != 0) raw.transition_id else null,
             .end_handler = .{},
-        };
-    }
-};
-
-/// Where the bearing settles after a gesture that changed it.
-///
-/// The targets are `target_count` bearings spaced evenly around the circle,
-/// starting at `target_offset`. The bearing eases to the nearest one when it is
-/// within `tolerance` of it, and otherwise stays where it is.
-///
-/// See `mln_bearing_snap` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const BearingSnap = struct {
-    /// At least 1. Defaults to 1.
-    target_count: ?u32 = null,
-    /// In degrees. Defaults to 0, north.
-    target_offset: ?f64 = null,
-    /// In degrees, from 0 to 180. Defaults to 7.
-    tolerance: ?f64 = null,
-    /// Zero settles without easing. Defaults to 300.
-    duration_ms: ?f64 = null,
-    pub fn toNative(self: BearingSnap) c.mln_bearing_snap {
-        var raw = std.mem.zeroes(c.mln_bearing_snap);
-        raw.fields = 0;
-        marshal.present(&raw.fields, c.MLN_BEARING_SNAP_TARGET_COUNT, &raw.target_count, self.target_count);
-        marshal.present(&raw.fields, c.MLN_BEARING_SNAP_TARGET_OFFSET, &raw.target_offset, self.target_offset);
-        marshal.present(&raw.fields, c.MLN_BEARING_SNAP_TOLERANCE, &raw.tolerance, self.tolerance);
-        marshal.present(&raw.fields, c.MLN_BEARING_SNAP_DURATION_MS, &raw.duration_ms, self.duration_ms);
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_bearing_snap) BearingSnap {
-        return .{
-            .target_count = if (raw.fields & c.MLN_BEARING_SNAP_TARGET_COUNT != 0) raw.target_count else null,
-            .target_offset = if (raw.fields & c.MLN_BEARING_SNAP_TARGET_OFFSET != 0) raw.target_offset else null,
-            .tolerance = if (raw.fields & c.MLN_BEARING_SNAP_TOLERANCE != 0) raw.tolerance else null,
-            .duration_ms = if (raw.fields & c.MLN_BEARING_SNAP_DURATION_MS != 0) raw.duration_ms else null,
         };
     }
 };
@@ -4775,9 +4744,12 @@ pub const GeoJsonSourceOptions = struct {
 ///
 /// - Pan stops at 10 logical pixels per second, needs a release of at least
 ///   200, and counts a release faster than 10000 as 10000.
-/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+///   snap settles on the nearest whole level.
 /// - Bearing stops at 1 degree per second and needs a release of at least 60.
-/// - Pitch stops at 1 degree per second and needs a release of at least 5.
+///   Its snap settles on north within 7 degrees.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+///   snap settles flat within 7 degrees.
 ///
 /// See `mln_gesture_momentum` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4786,18 +4758,12 @@ pub const GestureMomentum = struct {
     zoom: AnchoredMomentum = .{},
     bearing: AnchoredMomentum = .{},
     pitch: AnchoredMomentum = .{},
-    /// Where the bearing settles after a gesture that changed it. It settles
-    /// once the other parts stop, or right away when none of them move. Without
-    /// this, the bearing stays where the gesture leaves it.
-    bearing_snap: ?BearingSnap = null,
     pub fn toNative(self: GestureMomentum) c.mln_gesture_momentum {
         var raw = std.mem.zeroes(c.mln_gesture_momentum);
-        raw.fields = 0;
         raw.pan = self.pan.toNative();
         raw.zoom = self.zoom.toNative();
         raw.bearing = self.bearing.toNative();
         raw.pitch = self.pitch.toNative();
-        marshal.present(&raw.fields, c.MLN_GESTURE_MOMENTUM_BEARING_SNAP, &raw.bearing_snap, self.bearing_snap);
         return raw;
     }
     pub fn fromNative(raw: c.mln_gesture_momentum) GestureMomentum {
@@ -4806,7 +4772,6 @@ pub const GestureMomentum = struct {
             .zoom = AnchoredMomentum.fromNative(raw.zoom),
             .bearing = AnchoredMomentum.fromNative(raw.bearing),
             .pitch = AnchoredMomentum.fromNative(raw.pitch),
-            .bearing_snap = if (raw.fields & c.MLN_GESTURE_MOMENTUM_BEARING_SNAP != 0) BearingSnap.fromNative(raw.bearing_snap) else null,
         };
     }
 };
@@ -5915,7 +5880,7 @@ pub const MetalTextureFrame = struct {
 /// isn't set takes the part's default, which `GestureMomentum` lists.
 /// `min_speed` is finite and not negative, and every other number is finite and
 /// positive. A friction decay can serve every release, as a preset that matches
-/// a platform's scrolling. A planned glide takes its direction from the part's
+/// a platform's scrolling. An eased glide takes its direction from the part's
 /// velocity, and its distance and duration from the caller's plan.
 ///
 /// See `mln_momentum_decay` in the
@@ -5926,16 +5891,16 @@ pub const MomentumDecay = struct {
     half_life_ms: ?f64 = null,
     /// For `MomentumDecayModel.friction`, the speed at which it ends.
     stop_speed: ?f64 = null,
-    /// Required for `MomentumDecayModel.planned`.
+    /// Required for `MomentumDecayModel.ease`.
     distance: ?f64 = null,
-    /// Required for `MomentumDecayModel.planned`.
+    /// Required for `MomentumDecayModel.ease`.
     duration_ms: ?f64 = null,
-    /// For `MomentumDecayModel.planned`, the share of `distance` covered over
-    /// the share of `duration_ms`. Its control points are between 0 and 1, so
-    /// the glide never passes its distance. Defaults to (0, 0, 0.25, 1), the
-    /// curve that camera animations ease along by default. Android's scroll
-    /// fling follows (0.175, 0.5, 0.35, 1).
-    curve: ?UnitBezier = null,
+    /// For `MomentumDecayModel.ease`, the share of `distance` covered over the
+    /// share of `duration_ms`. Its control points are between 0 and 1, so the
+    /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
+    /// that camera animations ease along by default. Android's scroll fling
+    /// follows (0.175, 0.5, 0.35, 1).
+    easing: ?UnitBezier = null,
     /// A slower release starts no momentum.
     min_speed: ?f64 = null,
     /// For `MomentumDecayModel.friction`, a faster release counts as this.
@@ -5952,7 +5917,7 @@ pub const MomentumDecay = struct {
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_STOP_SPEED, &raw.stop_speed, self.stop_speed);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DISTANCE, &raw.distance, self.distance);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DURATION_MS, &raw.duration_ms, self.duration_ms);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_CURVE, &raw.curve, self.curve);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_EASING, &raw.easing, self.easing);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MIN_SPEED, &raw.min_speed, self.min_speed);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MAX_SPEED, &raw.max_speed, self.max_speed);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MAX_DISTANCE, &raw.max_distance, self.max_distance);
@@ -5965,7 +5930,7 @@ pub const MomentumDecay = struct {
             .stop_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_STOP_SPEED != 0) raw.stop_speed else null,
             .distance = if (raw.fields & c.MLN_MOMENTUM_DECAY_DISTANCE != 0) raw.distance else null,
             .duration_ms = if (raw.fields & c.MLN_MOMENTUM_DECAY_DURATION_MS != 0) raw.duration_ms else null,
-            .curve = if (raw.fields & c.MLN_MOMENTUM_DECAY_CURVE != 0) UnitBezier.fromNative(raw.curve) else null,
+            .easing = if (raw.fields & c.MLN_MOMENTUM_DECAY_EASING != 0) UnitBezier.fromNative(raw.easing) else null,
             .min_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_MIN_SPEED != 0) raw.min_speed else null,
             .max_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_MAX_SPEED != 0) raw.max_speed else null,
             .max_distance = if (raw.fields & c.MLN_MOMENTUM_DECAY_MAX_DISTANCE != 0) raw.max_distance else null,
@@ -5982,13 +5947,51 @@ pub const MomentumDecayModel = enum(u32) {
     /// UIScrollView's normal deceleration is a half-life of 346 ms, and its
     /// fast deceleration 69 ms.
     friction = 0,
-    /// The part moves `distance` over `duration_ms`, along `curve`. The caller
-    /// plans the glide, for example from the platform's own fling physics, such
-    /// as Android's OverScroller.
-    planned = 1,
+    /// The part eases `distance` over `duration_ms`, along `easing`, as a
+    /// camera animation does. The caller plans the glide, for example from the
+    /// platform's own fling physics, such as Android's OverScroller.
+    ease = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// Where a part settles after a gesture that changed it.
+///
+/// The targets are every `spacing` from `offset`, in the part's unit. Bearing
+/// targets wrap around the circle. Once the part's glide ends, or right away
+/// when it doesn't move, the part eases to the nearest target if it is within
+/// `tolerance` of it, and otherwise stays where it is. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists.
+///
+/// See `mln_momentum_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const MomentumSnap = struct {
+    /// Positive.
+    spacing: ?f64 = null,
+    /// Defaults to 0.
+    offset: ?f64 = null,
+    /// Not negative.
+    tolerance: ?f64 = null,
+    /// Zero settles without easing. Defaults to 300.
+    duration_ms: ?f64 = null,
+    pub fn toNative(self: MomentumSnap) c.mln_momentum_snap {
+        var raw = std.mem.zeroes(c.mln_momentum_snap);
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_SNAP_SPACING, &raw.spacing, self.spacing);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_SNAP_OFFSET, &raw.offset, self.offset);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_SNAP_TOLERANCE, &raw.tolerance, self.tolerance);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_SNAP_DURATION_MS, &raw.duration_ms, self.duration_ms);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_momentum_snap) MomentumSnap {
+        return .{
+            .spacing = if (raw.fields & c.MLN_MOMENTUM_SNAP_SPACING != 0) raw.spacing else null,
+            .offset = if (raw.fields & c.MLN_MOMENTUM_SNAP_OFFSET != 0) raw.offset else null,
+            .tolerance = if (raw.fields & c.MLN_MOMENTUM_SNAP_TOLERANCE != 0) raw.tolerance else null,
+            .duration_ms = if (raw.fields & c.MLN_MOMENTUM_SNAP_DURATION_MS != 0) raw.duration_ms else null,
+        };
+    }
 };
 
 /// Whether the library may use the network.

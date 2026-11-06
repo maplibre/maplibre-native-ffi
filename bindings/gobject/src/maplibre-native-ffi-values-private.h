@@ -32,6 +32,14 @@ G_GNUC_INTERNAL MaplibreNativeFfiMomentumDecay*
 maplibre_native_ffi_momentum_decay_copy(
   const MaplibreNativeFfiMomentumDecay* self
 );
+G_GNUC_INTERNAL void maplibre_native_ffi_momentum_snap_to_native(
+  const MaplibreNativeFfiMomentumSnap* self, mln_momentum_snap* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMomentumSnap*
+maplibre_native_ffi_momentum_snap_copy(
+  const MaplibreNativeFfiMomentumSnap* self
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_anchored_momentum_to_native(
   const MaplibreNativeFfiAnchoredMomentum* self, mln_anchored_momentum* out,
   MaplibreNativeFfiCall* call
@@ -52,12 +60,6 @@ G_GNUC_INTERNAL MaplibreNativeFfiAnimationOptions*
 maplibre_native_ffi_animation_options_copy(
   const MaplibreNativeFfiAnimationOptions* self
 );
-G_GNUC_INTERNAL void maplibre_native_ffi_bearing_snap_to_native(
-  const MaplibreNativeFfiBearingSnap* self, mln_bearing_snap* out,
-  MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiBearingSnap*
-maplibre_native_ffi_bearing_snap_copy(const MaplibreNativeFfiBearingSnap* self);
 G_GNUC_INTERNAL void maplibre_native_ffi_lat_lng_to_native(
   const MaplibreNativeFfiLatLng* self, mln_lat_lng* out,
   MaplibreNativeFfiCall* call

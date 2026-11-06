@@ -31,7 +31,7 @@ index e72aacd..2646f15 100644
      "include/mln/map/map_observer.hpp",
 diff --git a/include/mln/map/camera_momentum.hpp b/include/mln/map/camera_momentum.hpp
 new file mode 100644
-index 0000000..bb3b4a6
+index 0000000..6a5c461
 --- /dev/null
 +++ b/include/mln/map/camera_momentum.hpp
 @@ -0,0 +1,127 @@
@@ -55,13 +55,13 @@ index 0000000..bb3b4a6
 +    enum class Model {
 +        /** The speed halves every `halfLife`, until it drops to `stopSpeed`. */
 +        Friction,
-+        /** The part moves `distance` over `duration`, along `curve`, as a
++        /** The part moves `distance` over `duration`, along `easing`, as a
 +            caller plans it, for example from a platform's own fling physics. */
-+        Planned,
++        Ease,
 +    };
 +
 +    /** A unit cubic Bézier, from (0, 0) to (1, 1), with these control points. */
-+    struct Curve {
++    struct Easing {
 +        double x1 = 0;
 +        double y1 = 0;
 +        double x2 = 0.25;
@@ -72,18 +72,18 @@ index 0000000..bb3b4a6
 +    Duration halfLife = std::chrono::milliseconds(140);
 +    /** Must be positive for Model::Friction. */
 +    double stopSpeed = 1;
-+    /** For Model::Planned. */
++    /** For Model::Ease. */
 +    double distance = 0;
 +    Duration duration = Duration::zero();
-+    /** For Model::Planned, the share of `distance` covered over the share of
++    /** For Model::Ease, the share of `distance` covered over the share of
 +        `duration`. Android's scroll fling follows (0.175, 0.5, 0.35, 1). */
-+    Curve curve;
++    Easing easing;
 +    /** A slower release doesn't move. */
 +    double minSpeed = 0;
 +    /** For Model::Friction, a faster release counts as this speed. */
 +    double maxSpeed = std::numeric_limits<double>::infinity();
 +    /** The farthest the part moves. A friction release that would move
-+        farther starts slower, so it ends sooner, and a planned glide moves at
++        farther starts slower, so it ends sooner, and an eased glide moves at
 +        most this far over its duration. */
 +    double maxDistance = std::numeric_limits<double>::infinity();
 +};
@@ -111,13 +111,12 @@ index 0000000..bb3b4a6
 +    bool replaced = false;
 +};
 +
-+/** Where the bearing settles once the rest of a momentum ends normally. */
-+struct BearingSnap {
-+    /** Equally spaced bearings to settle on, starting at `targetOffset`
-+        degrees. */
-+    uint32_t targetCount = 1;
-+    double targetOffset = 0;
-+    /** The largest distance, in degrees, from which the bearing settles. */
++/** Where a part settles once its glide ends normally: on the nearest of the
++    targets every `spacing` from `offset`, when it is within `tolerance` of
++    one. Bearing targets wrap around the circle. */
++struct MomentumSnap {
++    double spacing = 360;
++    double offset = 0;
 +    double tolerance = 7;
 +    /** Zero settles at once. */
 +    Duration duration = Duration::zero();
@@ -141,20 +140,21 @@ index 0000000..bb3b4a6
 +    MomentumDecay zoomDecay;
 +    /** The screen point that the zoom keeps in place. */
 +    std::optional<ScreenCoordinate> zoomAnchor;
++    std::optional<MomentumSnap> zoomSnap;
 +
 +    /** Degrees per second. */
 +    std::optional<double> bearingVelocity;
 +    MomentumDecay bearingDecay;
 +    /** The screen point that the rotation keeps in place. */
 +    std::optional<ScreenCoordinate> bearingAnchor;
++    std::optional<MomentumSnap> bearingSnap;
 +
 +    /** Degrees per second. */
 +    std::optional<double> pitchVelocity;
 +    MomentumDecay pitchDecay;
 +    /** The screen point that the tilt keeps in place. */
 +    std::optional<ScreenCoordinate> pitchAnchor;
-+
-+    std::optional<BearingSnap> bearingSnap;
++    std::optional<MomentumSnap> pitchSnap;
 +
 +    /** Called once when the momentum ends, just before
 +        AnimationOptions::transitionFinishFn. */
@@ -202,7 +202,7 @@ index 3e01d9a..77fe561 100644
      impl->transform.setGestureInProgress(inProgress);
      impl->onUpdate();
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index e2bb728..91baa07 100644
+index e2bb728..7ae4da0 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -13,6 +13,9 @@
@@ -215,7 +215,7 @@ index e2bb728..91baa07 100644
  #include <cstdio>
  #include <utility>
  #include <numbers>
-@@ -550,6 +553,161 @@ ProjectionMode Transform::getProjectionMode() const {
+@@ -550,6 +553,159 @@ ProjectionMode Transform::getProjectionMode() const {
          .withYSkew(state.getYSkew());
  }
  
@@ -228,8 +228,8 @@ index e2bb728..91baa07 100644
 +        Duration duration = Duration::zero();
 +        // For friction, the decay rate per second.
 +        double rate = 0;
-+        // For a planned glide, the curve it follows.
-+        std::optional<MomentumDecay::Curve> curve;
++        // For an eased glide, the curve it follows.
++        std::optional<MomentumDecay::Easing> easing;
 +
 +        // Plans a release at `speed`, or returns nothing when it doesn't move.
 +        static std::optional<Glide> plan(double speed, const MomentumDecay& decay) {
@@ -248,7 +248,7 @@ index e2bb728..91baa07 100644
 +            } else {
 +                glide.distance = std::min(decay.distance, decay.maxDistance);
 +                seconds = std::chrono::duration<double>(decay.duration).count();
-+                glide.curve = decay.curve;
++                glide.easing = decay.easing;
 +            }
 +            // A glide too long for the clock doesn't move. The bound is exclusive,
 +            // as in flyTo(), because Duration::max() rounds up as a double.
@@ -267,7 +267,7 @@ index e2bb728..91baa07 100644
 +            if (elapsed <= Duration::zero()) return 0.0;
 +            const double t = std::chrono::duration<double>(elapsed).count();
 +            const double total = std::chrono::duration<double>(duration).count();
-+            if (!curve) return std::expm1(-rate * t) / std::expm1(-rate * total);
++            if (!easing) return std::expm1(-rate * t) / std::expm1(-rate * total);
 +            return bezier().solve(t / total, 1e-6);
 +        }
 +
@@ -276,29 +276,39 @@ index e2bb728..91baa07 100644
 +            if (elapsed >= duration) return 0.0;
 +            const double t = std::max(0.0, std::chrono::duration<double>(elapsed).count());
 +            const double total = std::chrono::duration<double>(duration).count();
-+            if (!curve) return rate * std::exp(-rate * t) / -std::expm1(-rate * total);
++            if (!easing) return rate * std::exp(-rate * t) / -std::expm1(-rate * total);
 +            // The slope dy/dx of the curve, from its derivatives in its own
 +            // parameter, which starts just past 0 where both can be 0.
 +            const auto ease = bezier();
 +            const double p = std::max(ease.solveCurveX(t / total, 1e-6), 1e-6);
-+            const double cy = 3.0 * curve->y1;
-+            const double by = 3.0 * (curve->y2 - curve->y1) - cy;
++            const double cy = 3.0 * easing->y1;
++            const double by = 3.0 * (easing->y2 - easing->y1) - cy;
 +            const double ay = 1.0 - cy - by;
 +            const double dy = (3.0 * ay * p + 2.0 * by) * p + cy;
 +            const double dx = ease.sampleCurveDerivativeX(p);
 +            return dx > 0.0 ? dy / dx / total : 0.0;
 +        }
 +
-+        util::UnitBezier bezier() const { return {curve->x1, curve->y1, curve->x2, curve->y2}; }
++        util::UnitBezier bezier() const { return {easing->x1, easing->y1, easing->x2, easing->y2}; }
 +    };
 +
 +    struct Part {
-+        // The fields that this part needs to keep moving.
++        // The fields that this part needs to keep moving or to settle.
 +        uint16_t fields = 0;
 +        Glide glide;
 +        // The share of the distance already applied.
 +        double applied = 0;
 +        bool moving = false;
++        // Where the part may settle once it stops moving.
++        std::optional<MomentumSnap> snap;
++        bool snapPending = false;
++        // The change that the settling makes, while it runs, and when it
++        // started.
++        std::optional<double> snapDelta;
++        Duration snapStart = Duration::zero();
++        double snapApplied = 0;
++
++        bool active() const { return moving || snapPending || snapDelta; }
 +    };
 +
 +    CameraMomentum options;
@@ -311,13 +321,6 @@ index e2bb728..91baa07 100644
 +    Part zoom;
 +    Part bearing;
 +    Part pitch;
-+    // Whether the bearing may still settle once the parts end.
-+    bool snapPending = false;
-+    // The bearing change that the settling makes, while it runs, and when it
-+    // started.
-+    std::optional<double> snapDelta;
-+    Duration snapStart = Duration::zero();
-+    double snapApplied = 0;
 +    // Whether another command took a field that a moving part needed.
 +    bool replaced = false;
 +    // When the last frame applied the momentum, from its start.
@@ -330,22 +333,15 @@ index e2bb728..91baa07 100644
 +    uint16_t retain(uint16_t owned) {
 +        uint16_t needed = 0;
 +        for (auto* part : parts()) {
-+            if (!part->moving) continue;
++            if (!part->active()) continue;
 +            if ((part->fields & owned) != part->fields) {
++                if (part->moving || part->snapDelta) replaced = true;
 +                part->moving = false;
-+                replaced = true;
++                part->snapPending = false;
++                part->snapDelta.reset();
 +                continue;
 +            }
 +            needed |= part->fields;
-+        }
-+        if (snapPending || snapDelta) {
-+            if (owned & Bearing) {
-+                needed |= Bearing;
-+            } else {
-+                if (snapDelta) replaced = true;
-+                snapPending = false;
-+                snapDelta.reset();
-+            }
 +        }
 +        return needed;
 +    }
@@ -366,18 +362,20 @@ index e2bb728..91baa07 100644
 +    }
 +};
 +
-+// The change that `snap` makes to `bearing`, or zero when the bearing stays.
-+static double bearingSnapDelta(double bearing, const BearingSnap& snap) {
-+    const double spacing = 360.0 / std::max<uint32_t>(snap.targetCount, 1);
-+    const double target = snap.targetOffset + std::round((bearing - snap.targetOffset) / spacing) * spacing;
-+    const double delta = target - bearing - 360.0 * std::floor((target - bearing + 180.0) / 360.0);
++// The change that `snap` makes to `value`, or zero when it stays. A circular
++// value, the bearing, takes the shorter way around.
++static double snapDelta(double value, const MomentumSnap& snap, bool circular) {
++    if (!(snap.spacing > 0.0)) return 0.0;
++    const double target = snap.offset + std::round((value - snap.offset) / snap.spacing) * snap.spacing;
++    double delta = target - value;
++    if (circular) delta -= 360.0 * std::floor((delta + 180.0) / 360.0);
 +    return std::abs(delta) <= snap.tolerance ? delta : 0.0;
 +}
 +
  // MARK: - Transition
  
  uint16_t Transform::cameraFields(const CameraOptions& camera) {
-@@ -588,14 +746,7 @@ void Transform::startTransition(const CameraOptions& camera,
+@@ -588,14 +744,7 @@ void Transform::startTransition(const CameraOptions& camera,
      transition->duration = latestTransitionDuration = transition->fields ? duration : Duration::zero();
      transition->frame = frame;
  
@@ -393,7 +391,7 @@ index e2bb728..91baa07 100644
      transitions.push_back(transition);
      updateMovementFlags();
      finishTransitions(finished);
-@@ -620,6 +771,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
+@@ -620,6 +769,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
      camera.center = getLatLng(LatLng::Unwrapped);
  
      for (const auto& transition : active) {
@@ -401,7 +399,7 @@ index e2bb728..91baa07 100644
          const double t = transition->duration == Duration::zero()
                               ? 1.0
                               : std::clamp(std::chrono::duration<double>(now - transition->start) /
-@@ -670,6 +822,9 @@ void Transform::updateMovementFlags() {
+@@ -670,6 +820,9 @@ void Transform::updateMovementFlags() {
  
  void Transform::finishTransitions(const std::vector<std::shared_ptr<Transition>>& finished) {
      for (const auto& transition : finished) {
@@ -411,7 +409,7 @@ index e2bb728..91baa07 100644
          if (transition->animation.transitionFinishFn) transition->animation.transitionFinishFn();
          // This notification ends a command, not necessarily all camera motion.
          observer.onCameraDidChange(transition->duration != Duration::zero() ? MapObserver::CameraChangeMode::Animated
-@@ -693,11 +848,17 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -693,11 +846,17 @@ void Transform::updateTransitions(const TimePoint& now) {
      } guard{updatingTransitions};
  
      const auto active = transitions;
@@ -431,7 +429,7 @@ index e2bb728..91baa07 100644
              std::erase(transitions, transition);
              finished.push_back(transition);
          }
-@@ -706,7 +867,7 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -706,7 +865,7 @@ void Transform::updateTransitions(const TimePoint& now) {
  
      for (const auto& transition : active) {
          if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) continue;
@@ -440,7 +438,7 @@ index e2bb728..91baa07 100644
              const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
                                              std::chrono::duration<double>(transition->duration),
                                          0.0,
-@@ -719,6 +880,253 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -719,6 +878,284 @@ void Transform::updateTransitions(const TimePoint& now) {
      finishTransitions(finished);
  }
  
@@ -457,57 +455,77 @@ index e2bb728..91baa07 100644
 +    return finished;
 +}
 +
++// The value that a part of a momentum moves, for its snap.
++static double momentumValue(const TransformState& state, size_t part) {
++    switch (part) {
++        case 1:
++            return state.getZoom();
++        case 2:
++            return -util::rad2deg(state.getBearing());
++        default:
++            return util::rad2deg(state.getPitch());
++    }
++}
++
 +void Transform::startMomentum(const CameraMomentum& options, const AnimationOptions& animation) {
 +    auto momentum = std::make_shared<MomentumState>();
 +    momentum->options = options;
 +    uint16_t moving = 0;
++    uint16_t settling = 0;
 +    Duration motion = Duration::zero();
 +    using Glide = MomentumState::Glide;
-+    const auto add = [&](MomentumState::Part& part, const std::optional<Glide>& glide, uint16_t fields) {
-+        if (!glide) return false;
-+        part = {.fields = fields, .glide = *glide, .applied = 0, .moving = true};
-+        moving |= fields;
-+        motion = std::max(motion, glide->duration);
-+        return true;
-+    };
 +    if (options.panVelocity) {
 +        const double speed = std::hypot(options.panVelocity->x, options.panVelocity->y);
-+        const auto glide = Glide::plan(speed, options.panDecay);
-+        if (add(momentum->pan, glide, Center)) {
++        if (const auto glide = Glide::plan(speed, options.panDecay)) {
++            momentum->pan = {.fields = Center, .glide = *glide, .moving = true};
++            moving |= Center;
++            motion = glide->duration;
 +            const double scale = glide->distance / speed;
 +            momentum->panTotal = {options.panVelocity->x * scale, options.panVelocity->y * scale};
 +        }
 +    }
-+    const auto addScalar = [&](MomentumState::Part& part,
-+                               double& total,
-+                               const std::optional<double>& velocity,
-+                               const MomentumDecay& decay,
-+                               uint16_t fields) {
-+        if (!velocity) return;
-+        const auto glide = Glide::plan(std::abs(*velocity), decay);
-+        if (add(part, glide, fields)) total = std::copysign(glide->distance, *velocity);
++    struct Scalar {
++        MomentumState::Part& part;
++        double& total;
++        const std::optional<double>& velocity;
++        const MomentumDecay& decay;
++        const std::optional<ScreenCoordinate>& anchor;
++        const std::optional<MomentumSnap>& snap;
++        uint16_t field;
 +    };
-+    addScalar(momentum->zoom,
-+              momentum->zoomTotal,
-+              options.zoomVelocity,
-+              options.zoomDecay,
-+              Zoom | (options.zoomAnchor ? Center : 0));
-+    addScalar(momentum->bearing,
-+              momentum->bearingTotal,
-+              options.bearingVelocity,
-+              options.bearingDecay,
-+              Bearing | (options.bearingAnchor ? Center : 0));
-+    addScalar(momentum->pitch,
-+              momentum->pitchTotal,
-+              options.pitchVelocity,
-+              options.pitchDecay,
-+              Pitch | (options.pitchAnchor ? Center : 0));
-+    // Without motion, the bearing settles only if it is near a target now.
-+    momentum->snapPending = options.bearingSnap &&
-+                            (moving || bearingSnapDelta(-util::rad2deg(state.getBearing()), *options.bearingSnap) != 0.0);
++    const std::array<Scalar, 3> scalars{{
++        {momentum->zoom, momentum->zoomTotal, options.zoomVelocity, options.zoomDecay, options.zoomAnchor,
++         options.zoomSnap, Zoom},
++        {momentum->bearing, momentum->bearingTotal, options.bearingVelocity, options.bearingDecay,
++         options.bearingAnchor, options.bearingSnap, Bearing},
++        {momentum->pitch, momentum->pitchTotal, options.pitchVelocity, options.pitchDecay, options.pitchAnchor,
++         options.pitchSnap, Pitch},
++    }};
++    bool instant = true;
++    for (size_t i = 0; i < scalars.size(); ++i) {
++        const auto& scalar = scalars[i];
++        auto& part = scalar.part;
++        part.fields = scalar.field | (scalar.anchor ? Center : 0);
++        const auto glide = scalar.velocity ? Glide::plan(std::abs(*scalar.velocity), scalar.decay) : std::nullopt;
++        if (glide) {
++            part.glide = *glide;
++            part.moving = true;
++            moving |= part.fields;
++            motion = std::max(motion, glide->duration);
++            scalar.total = std::copysign(glide->distance, *scalar.velocity);
++        }
++        // Without motion, a part settles only if it is near a target now.
++        part.snap = scalar.snap;
++        part.snapPending = scalar.snap &&
++                           (part.moving || snapDelta(momentumValue(state, i + 1), *scalar.snap, i == 1) != 0.0);
++        if (part.snapPending) {
++            settling |= part.fields;
++            if (scalar.snap->duration != Duration::zero()) instant = false;
++        }
++    }
 +
 +    auto transition = std::make_shared<Transition>(animation);
-+    transition->fields = moving | (momentum->snapPending ? Bearing : 0);
++    transition->fields = moving | settling;
 +    transition->coupledFields = 0;
 +    transition->movingFields = moving;
 +    transition->momentum = momentum;
@@ -515,22 +533,23 @@ index e2bb728..91baa07 100644
 +    transition->duration = latestTransitionDuration = motion;
 +
 +    // A momentum that doesn't move ends at once, without a camera change, and
-+    // an instant snap without motion settles at once.
-+    if (!moving && momentum->snapPending && options.bearingSnap->duration == Duration::zero()) {
-+        const double bearing = -util::rad2deg(state.getBearing());
-+        auto immediate = animation;
-+        immediate.transitionFinishFn = [finish = options.finishFn,
-+                                        ended = momentum->end(),
-+                                        next = animation.transitionFinishFn] {
-+            if (finish) finish(ended);
-+            if (next) next();
-+        };
-+        easeTo(CameraOptions().withBearing(bearing + bearingSnapDelta(bearing, *options.bearingSnap)), immediate);
-+        return;
-+    }
-+    if (!transition->fields) {
++    // instant snaps without motion settle at once.
++    if (!moving && (!settling || instant)) {
++        if (settling) {
++            auto finished = releaseFields(settling);
++            updateMovementFlags();
++            finishTransitions(finished);
++            observer.onCameraWillChange(MapObserver::CameraChangeMode::Immediate);
++            for (size_t i = 0; i < scalars.size(); ++i) {
++                auto& part = scalars[i].part;
++                if (!part.snapPending) continue;
++                part.snapPending = false;
++                stepScalar(i + 1, snapDelta(momentumValue(state, i + 1), *part.snap, i == 1), scalars[i].anchor);
++            }
++        }
 +        if (options.finishFn) options.finishFn(momentum->end());
 +        if (animation.transitionFinishFn) animation.transitionFinishFn();
++        if (settling) observer.onCameraDidChange(MapObserver::CameraChangeMode::Immediate);
 +        return;
 +    }
 +
@@ -542,6 +561,18 @@ index e2bb728..91baa07 100644
 +    // Finish callbacks may replace or cancel the momentum.
 +    if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) return;
 +    observer.onCameraWillChange(MapObserver::CameraChangeMode::Animated);
++}
++
++bool Transform::stepScalar(size_t part, double amount, const std::optional<ScreenCoordinate>& anchor) {
++    switch (part) {
++        case 1:
++            return stepZoom(amount, anchor);
++        case 2:
++            stepBearing(amount, anchor);
++            return true;
++        default:
++            return stepPitch(amount, anchor);
++    }
 +}
 +
 +void Transform::advanceMomentum(Transition& transition, const TimePoint& now) {
@@ -561,44 +592,42 @@ index e2bb728..91baa07 100644
 +    if (const double fraction = advance(momentum.pan); fraction != 0.0) {
 +        if (!stepPan({momentum.panTotal.x * fraction, momentum.panTotal.y * fraction})) momentum.pan.moving = false;
 +    }
-+    if (const double fraction = advance(momentum.zoom); fraction != 0.0) {
-+        if (!stepZoom(momentum.zoomTotal * fraction, momentum.options.zoomAnchor)) momentum.zoom.moving = false;
-+    }
-+    if (const double fraction = advance(momentum.bearing); fraction != 0.0) {
-+        stepBearing(momentum.bearingTotal * fraction, momentum.options.bearingAnchor);
-+    }
-+    if (const double fraction = advance(momentum.pitch); fraction != 0.0) {
-+        if (!stepPitch(momentum.pitchTotal * fraction, momentum.options.pitchAnchor)) momentum.pitch.moving = false;
-+    }
-+
-+    // The bearing settles once no part moves, which can be before the motion's
-+    // planned end when commands replaced its parts.
-+    const auto parts = momentum.parts();
-+    const bool moving = std::any_of(parts.begin(), parts.end(), [](const auto* part) { return part->moving; });
-+    if (momentum.snapPending && !moving) {
-+        momentum.snapPending = false;
-+        const auto& snap = *momentum.options.bearingSnap;
-+        const double delta = bearingSnapDelta(-util::rad2deg(state.getBearing()), snap);
-+        if (delta != 0.0) {
-+            momentum.snapDelta = delta;
-+            momentum.snapStart = elapsed;
-+            transition.duration = elapsed + snap.duration;
-+            transition.movingFields |= Bearing;
++    const std::array<std::tuple<MomentumState::Part*, double, const std::optional<ScreenCoordinate>*>, 3> scalars{{
++        {&momentum.zoom, momentum.zoomTotal, &momentum.options.zoomAnchor},
++        {&momentum.bearing, momentum.bearingTotal, &momentum.options.bearingAnchor},
++        {&momentum.pitch, momentum.pitchTotal, &momentum.options.pitchAnchor},
++    }};
++    for (size_t i = 0; i < scalars.size(); ++i) {
++        auto& [part, total, anchor] = scalars[i];
++        if (const double fraction = advance(*part); fraction != 0.0) {
++            if (!stepScalar(i + 1, total * fraction, *anchor)) part->moving = false;
 +        }
-+    }
-+    if (momentum.snapDelta) {
-+        const auto& snap = *momentum.options.bearingSnap;
-+        const double t = snap.duration == Duration::zero()
-+                             ? 1.0
-+                             : std::clamp(std::chrono::duration<double>(elapsed - momentum.snapStart) /
-+                                              std::chrono::duration<double>(snap.duration),
-+                                          0.0,
-+                                          1.0);
-+        const double eased = t >= 1.0 ? 1.0 : util::DEFAULT_TRANSITION_EASE.solve(t, 0.001);
-+        const double fraction = eased - momentum.snapApplied;
-+        momentum.snapApplied = eased;
-+        if (fraction != 0.0) stepBearing(*momentum.snapDelta * fraction, std::nullopt);
-+        if (t >= 1.0) momentum.snapDelta.reset();
++        // The part settles once it stops moving, which can be before its
++        // planned end when bounds, limits, or commands stopped it.
++        if (part->snapPending && !part->moving) {
++            part->snapPending = false;
++            const double delta = snapDelta(momentumValue(state, i + 1), *part->snap, i == 1);
++            if (delta != 0.0) {
++                part->snapDelta = delta;
++                part->snapStart = elapsed;
++                transition.duration = std::max(transition.duration, elapsed + part->snap->duration);
++                transition.movingFields |= part->fields;
++            }
++        }
++        if (part->snapDelta) {
++            const auto duration = part->snap->duration;
++            const double t = duration == Duration::zero()
++                                 ? 1.0
++                                 : std::clamp(std::chrono::duration<double>(elapsed - part->snapStart) /
++                                                  std::chrono::duration<double>(duration),
++                                              0.0,
++                                              1.0);
++            const double eased = t >= 1.0 ? 1.0 : util::DEFAULT_TRANSITION_EASE.solve(t, 0.001);
++            const double fraction = eased - part->snapApplied;
++            part->snapApplied = eased;
++            const bool moved = fraction == 0.0 || stepScalar(i + 1, *part->snapDelta * fraction, *anchor);
++            if (t >= 1.0 || !moved) part->snapDelta.reset();
++        }
 +    }
 +
 +    // Parts that ran to their end give up their fields.
@@ -695,7 +724,7 @@ index e2bb728..91baa07 100644
      auto finished = std::exchange(transitions, {});
      updateMovementFlags();
 diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
-index f767342..4eb88b2 100644
+index f767342..710ccc9 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
 @@ -1,6 +1,7 @@
@@ -724,7 +753,7 @@ index f767342..4eb88b2 100644
      struct Transition {
          explicit Transition(const AnimationOptions& options)
              : animation(options) {}
-@@ -182,9 +187,22 @@ private:
+@@ -182,9 +187,24 @@ private:
          std::function<CameraOptions(double)> frame;
          std::optional<ScreenCoordinate> anchor;
          LatLng anchorLatLng;
@@ -744,14 +773,16 @@ index f767342..4eb88b2 100644
 +    bool stepZoom(double zoom, const std::optional<ScreenCoordinate>& anchor);
 +    void stepBearing(double bearing, const std::optional<ScreenCoordinate>& anchor);
 +    bool stepPitch(double pitch, const std::optional<ScreenCoordinate>& anchor);
++    // Steps the zoom (1), bearing (2), or pitch (3) part of a momentum.
++    bool stepScalar(size_t part, double amount, const std::optional<ScreenCoordinate>& anchor);
      void updateMovementFlags();
      void finishTransitions(const std::vector<std::shared_ptr<Transition>>&);
  
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index c15ea59..7b5850d 100644
+index c15ea59..0ff4ae5 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
-@@ -1619,3 +1619,258 @@ TEST(Transform, FlyDurationRange) {
+@@ -1619,3 +1619,259 @@ TEST(Transform, FlyDurationRange) {
      EXPECT_DOUBLE_EQ(1.0, transform.getZoom());
      EXPECT_FALSE(transform.inTransition());
  }
@@ -840,18 +871,18 @@ index c15ea59..7b5850d 100644
 +    EXPECT_FALSE(transform.inTransition());
 +}
 +
-+// A planned glide follows its curve, and its speed is the curve's slope. A
++// An eased glide follows its curve, and its speed is the curve's slope. A
 +// straight curve moves at an even speed.
-+TEST(Transform, MomentumFollowsAPlannedGlide) {
++TEST(Transform, MomentumFollowsAnEasedGlide) {
 +    Transform transform;
 +    transform.resize({1000, 1000});
 +    transform.jumpTo(CameraOptions().withZoom(8));
 +    CameraMomentum momentum;
 +    momentum.zoomVelocity = -1.0;
-+    momentum.zoomDecay.model = MomentumDecay::Model::Planned;
++    momentum.zoomDecay.model = MomentumDecay::Model::Ease;
 +    momentum.zoomDecay.distance = 2;
 +    momentum.zoomDecay.duration = Seconds(1);
-+    momentum.zoomDecay.curve = {.x1 = 1.0 / 3, .y1 = 1.0 / 3, .x2 = 2.0 / 3, .y2 = 2.0 / 3};
++    momentum.zoomDecay.easing = {.x1 = 1.0 / 3, .y1 = 1.0 / 3, .x2 = 2.0 / 3, .y2 = 2.0 / 3};
 +    std::optional<MomentumEnd> ended;
 +    momentum.finishFn = [&](const MomentumEnd& end) { ended = end; };
 +    transform.startMomentum(momentum);
@@ -953,15 +984,15 @@ index c15ea59..7b5850d 100644
 +    EXPECT_FALSE(transform.inTransition());
 +}
 +
-+TEST(Transform, MomentumSettlesTheBearing) {
++TEST(Transform, MomentumSettlesOnTargets) {
 +    Transform transform;
 +    transform.resize({1000, 1000});
 +    transform.jumpTo(CameraOptions().withBearing(84));
 +    const double rate = frictionRate(Milliseconds(140));
 +    CameraMomentum momentum;
-+    // Moves (v - 1) / k = 4 degrees.
++    // Moves (v - 1) / k = 4 degrees, then settles on the nearest of every 90.
 +    momentum.bearingVelocity = 1.0 + 4.0 * rate;
-+    momentum.bearingSnap = BearingSnap{.targetCount = 4, .targetOffset = 0, .tolerance = 7, .duration = Milliseconds(200)};
++    momentum.bearingSnap = MomentumSnap{.spacing = 90, .tolerance = 7, .duration = Milliseconds(200)};
 +    unsigned finished = 0;
 +    AnimationOptions animation;
 +    animation.transitionFinishFn = [&] {
@@ -977,18 +1008,19 @@ index c15ea59..7b5850d 100644
 +    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 90, 1e-9);
 +    EXPECT_EQ(finished, 1u);
 +
-+    // Without motion, an instant snap settles at once, and a bearing outside
-+    // the tolerance stays.
++    // Without motion, instant snaps settle at once: the bearing around the
++    // circle, and the zoom on the nearest whole level. A value outside the
++    // tolerance stays.
 +    CameraMomentum snapOnly;
-+    snapOnly.bearingSnap = BearingSnap{.targetCount = 1, .targetOffset = 0, .tolerance = 7, .duration = Duration::zero()};
-+    transform.jumpTo(CameraOptions().withBearing(5));
++    snapOnly.bearingSnap = MomentumSnap{.spacing = 360, .tolerance = 7};
++    snapOnly.zoomSnap = MomentumSnap{.spacing = 1, .tolerance = 0.5};
++    snapOnly.pitchSnap = MomentumSnap{.spacing = 90, .tolerance = 7};
++    transform.jumpTo(CameraOptions().withBearing(355).withZoom(7.3).withPitch(30));
 +    transform.startMomentum(snapOnly, animation);
 +    EXPECT_EQ(finished, 2u);
 +    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 0, 1e-9);
-+    transform.jumpTo(CameraOptions().withBearing(30));
-+    transform.startMomentum(snapOnly, animation);
-+    EXPECT_EQ(finished, 3u);
-+    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 30, 1e-9);
++    EXPECT_NEAR(transform.getZoom(), 7, 1e-9);
++    EXPECT_NEAR(util::rad2deg(transform.getPitch()), 30, 1e-9);
 +    EXPECT_FALSE(transform.inTransition());
 +}
 +

@@ -16,14 +16,19 @@ public struct AnchoredMomentum: Equatable, Hashable, Sendable {
   /// keeps the center of the view in place.
   public var anchor: ScreenPoint?
   public var decay: MomentumDecay
+  /// Where the part settles. Without this, it stays where the gesture and its
+  /// glide leave it.
+  public var snap: MomentumSnap?
   public init(
     velocity: Double? = nil,
     anchor: ScreenPoint? = nil,
-    decay: MomentumDecay = .init()
+    decay: MomentumDecay = .init(),
+    snap: MomentumSnap? = nil
   ) {
     self.velocity = velocity
     self.anchor = anchor
     self.decay = decay
+    self.snap = snap
   }
 
   init(raw: mln_anchored_momentum) {
@@ -32,6 +37,8 @@ public struct AnchoredMomentum: Equatable, Hashable, Sendable {
     anchor = raw.fields & MLN_ANCHORED_MOMENTUM_ANCHOR
       .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
     decay = MomentumDecay(raw: raw.decay)
+    snap = raw.fields & MLN_ANCHORED_MOMENTUM_SNAP
+      .rawValue != 0 ? MomentumSnap(raw: raw.snap) : nil
   }
 
   func nativeValue() -> mln_anchored_momentum {
@@ -46,6 +53,10 @@ public struct AnchoredMomentum: Equatable, Hashable, Sendable {
         .nativeValue()
     }
     raw.decay = decay.nativeValue()
+    if let item = snap {
+      raw.fields |= MLN_ANCHORED_MOMENTUM_SNAP.rawValue; raw.snap = item
+        .nativeValue()
+    }
     return raw
   }
 }
@@ -104,68 +115,6 @@ public struct AnimationOptions: Sendable {
         .transition_id = item
     }
     raw.end_handler = try endHandler.nativeValue(arena: arena)
-    return raw
-  }
-}
-
-/// Where the bearing settles after a gesture that changed it.
-///
-/// The targets are `target_count` bearings spaced evenly around the circle,
-/// starting at `target_offset`. The bearing eases to the nearest one when it is
-/// within `tolerance` of it, and otherwise stays where it is.
-///
-/// See `mln_bearing_snap` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct BearingSnap: Equatable, Hashable, Sendable {
-  /// At least 1. Defaults to 1.
-  public var targetCount: UInt32?
-  /// In degrees. Defaults to 0, north.
-  public var targetOffset: Double?
-  /// In degrees, from 0 to 180. Defaults to 7.
-  public var tolerance: Double?
-  /// Zero settles without easing. Defaults to 300.
-  public var durationMs: Double?
-  public init(
-    targetCount: UInt32? = nil,
-    targetOffset: Double? = nil,
-    tolerance: Double? = nil,
-    durationMs: Double? = nil
-  ) {
-    self.targetCount = targetCount
-    self.targetOffset = targetOffset
-    self.tolerance = tolerance
-    self.durationMs = durationMs
-  }
-
-  init(raw: mln_bearing_snap) {
-    targetCount = raw.fields & MLN_BEARING_SNAP_TARGET_COUNT.rawValue != 0 ? raw
-      .target_count : nil
-    targetOffset = raw.fields & MLN_BEARING_SNAP_TARGET_OFFSET
-      .rawValue != 0 ? raw.target_offset : nil
-    tolerance = raw.fields & MLN_BEARING_SNAP_TOLERANCE.rawValue != 0 ? raw
-      .tolerance : nil
-    durationMs = raw.fields & MLN_BEARING_SNAP_DURATION_MS.rawValue != 0 ? raw
-      .duration_ms : nil
-  }
-
-  func nativeValue() -> mln_bearing_snap {
-    var raw = mln_bearing_snap()
-    raw.fields = 0
-    if let item = targetCount {
-      raw.fields |= MLN_BEARING_SNAP_TARGET_COUNT.rawValue; raw
-        .target_count = item
-    }
-    if let item = targetOffset {
-      raw.fields |= MLN_BEARING_SNAP_TARGET_OFFSET.rawValue; raw
-        .target_offset = item
-    }
-    if let item = tolerance {
-      raw.fields |= MLN_BEARING_SNAP_TOLERANCE.rawValue; raw.tolerance = item
-    }
-    if let item = durationMs {
-      raw.fields |= MLN_BEARING_SNAP_DURATION_MS.rawValue; raw
-        .duration_ms = item
-    }
     return raw
   }
 }
@@ -1071,9 +1020,12 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
 ///
 /// - Pan stops at 10 logical pixels per second, needs a release of at least
 ///   200, and counts a release faster than 10000 as 10000.
-/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+///   snap settles on the nearest whole level.
 /// - Bearing stops at 1 degree per second and needs a release of at least 60.
-/// - Pitch stops at 1 degree per second and needs a release of at least 5.
+///   Its snap settles on north within 7 degrees.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+///   snap settles flat within 7 degrees.
 ///
 /// See `mln_gesture_momentum` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1082,22 +1034,16 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
   public var zoom: AnchoredMomentum
   public var bearing: AnchoredMomentum
   public var pitch: AnchoredMomentum
-  /// Where the bearing settles after a gesture that changed it. It settles once
-  /// the other parts stop, or right away when none of them move. Without this,
-  /// the bearing stays where the gesture leaves it.
-  public var bearingSnap: BearingSnap?
   public init(
     pan: PanMomentum = .init(),
     zoom: AnchoredMomentum = .init(),
     bearing: AnchoredMomentum = .init(),
-    pitch: AnchoredMomentum = .init(),
-    bearingSnap: BearingSnap? = nil
+    pitch: AnchoredMomentum = .init()
   ) {
     self.pan = pan
     self.zoom = zoom
     self.bearing = bearing
     self.pitch = pitch
-    self.bearingSnap = bearingSnap
   }
 
   init(raw: mln_gesture_momentum) {
@@ -1105,21 +1051,14 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
     zoom = AnchoredMomentum(raw: raw.zoom)
     bearing = AnchoredMomentum(raw: raw.bearing)
     pitch = AnchoredMomentum(raw: raw.pitch)
-    bearingSnap = raw.fields & MLN_GESTURE_MOMENTUM_BEARING_SNAP
-      .rawValue != 0 ? BearingSnap(raw: raw.bearing_snap) : nil
   }
 
   func nativeValue() -> mln_gesture_momentum {
     var raw = mln_gesture_momentum()
-    raw.fields = 0
     raw.pan = pan.nativeValue()
     raw.zoom = zoom.nativeValue()
     raw.bearing = bearing.nativeValue()
     raw.pitch = pitch.nativeValue()
-    if let item = bearingSnap {
-      raw.fields |= MLN_GESTURE_MOMENTUM_BEARING_SNAP.rawValue; raw
-        .bearing_snap = item.nativeValue()
-    }
     return raw
   }
 }
@@ -1711,7 +1650,7 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
 /// isn't set takes the part's default, which `GestureMomentum` lists.
 /// `min_speed` is finite and not negative, and every other number is finite and
 /// positive. A friction decay can serve every release, as a preset that matches
-/// a platform's scrolling. A planned glide takes its direction from the part's
+/// a platform's scrolling. An eased glide takes its direction from the part's
 /// velocity, and its distance and duration from the caller's plan.
 ///
 /// See `mln_momentum_decay` in the
@@ -1722,16 +1661,16 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
   public var halfLifeMs: Double?
   /// For `MomentumDecayModel.friction`, the speed at which it ends.
   public var stopSpeed: Double?
-  /// Required for `MomentumDecayModel.planned`.
+  /// Required for `MomentumDecayModel.ease`.
   public var distance: Double?
-  /// Required for `MomentumDecayModel.planned`.
+  /// Required for `MomentumDecayModel.ease`.
   public var durationMs: Double?
-  /// For `MomentumDecayModel.planned`, the share of `distance` covered over the
+  /// For `MomentumDecayModel.ease`, the share of `distance` covered over the
   /// share of `duration_ms`. Its control points are between 0 and 1, so the
   /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
   /// that camera animations ease along by default. Android's scroll fling
   /// follows (0.175, 0.5, 0.35, 1).
-  public var curve: UnitBezier?
+  public var easing: UnitBezier?
   /// A slower release starts no momentum.
   public var minSpeed: Double?
   /// For `MomentumDecayModel.friction`, a faster release counts as this.
@@ -1746,7 +1685,7 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
     stopSpeed: Double? = nil,
     distance: Double? = nil,
     durationMs: Double? = nil,
-    curve: UnitBezier? = nil,
+    easing: UnitBezier? = nil,
     minSpeed: Double? = nil,
     maxSpeed: Double? = nil,
     maxDistance: Double? = nil
@@ -1756,7 +1695,7 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
     self.stopSpeed = stopSpeed
     self.distance = distance
     self.durationMs = durationMs
-    self.curve = curve
+    self.easing = easing
     self.minSpeed = minSpeed
     self.maxSpeed = maxSpeed
     self.maxDistance = maxDistance
@@ -1773,8 +1712,8 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
       .distance : nil
     durationMs = raw.fields & MLN_MOMENTUM_DECAY_DURATION_MS.rawValue != 0 ? raw
       .duration_ms : nil
-    curve = raw.fields & MLN_MOMENTUM_DECAY_CURVE
-      .rawValue != 0 ? UnitBezier(raw: raw.curve) : nil
+    easing = raw.fields & MLN_MOMENTUM_DECAY_EASING
+      .rawValue != 0 ? UnitBezier(raw: raw.easing) : nil
     minSpeed = raw.fields & MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue != 0 ? raw
       .min_speed : nil
     maxSpeed = raw.fields & MLN_MOMENTUM_DECAY_MAX_SPEED.rawValue != 0 ? raw
@@ -1805,8 +1744,8 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
       raw.fields |= MLN_MOMENTUM_DECAY_DURATION_MS.rawValue; raw
         .duration_ms = item
     }
-    if let item = curve {
-      raw.fields |= MLN_MOMENTUM_DECAY_CURVE.rawValue; raw.curve = item
+    if let item = easing {
+      raw.fields |= MLN_MOMENTUM_DECAY_EASING.rawValue; raw.easing = item
         .nativeValue()
     }
     if let item = minSpeed {
@@ -1839,16 +1778,78 @@ public struct MomentumDecayModel: RawRepresentable, CustomStringConvertible,
   /// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
   /// deceleration 69 ms.
   public static let friction: MomentumDecayModel = .init(rawValue: 0)
-  /// The part moves `distance` over `duration_ms`, along `curve`. The caller
-  /// plans the glide, for example from the platform's own fling physics, such
-  /// as Android's OverScroller.
-  public static let planned: MomentumDecayModel = .init(rawValue: 1)
+  /// The part eases `distance` over `duration_ms`, along `easing`, as a camera
+  /// animation does. The caller plans the glide, for example from the
+  /// platform's own fling physics, such as Android's OverScroller.
+  public static let ease: MomentumDecayModel = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
     case 0: return "friction"
-    case 1: return "planned"
+    case 1: return "ease"
     default: return "MomentumDecayModel(\(rawValue))"
     }
+  }
+}
+
+/// Where a part settles after a gesture that changed it.
+///
+/// The targets are every `spacing` from `offset`, in the part's unit. Bearing
+/// targets wrap around the circle. Once the part's glide ends, or right away
+/// when it doesn't move, the part eases to the nearest target if it is within
+/// `tolerance` of it, and otherwise stays where it is. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists.
+///
+/// See `mln_momentum_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct MomentumSnap: Equatable, Hashable, Sendable {
+  /// Positive.
+  public var spacing: Double?
+  /// Defaults to 0.
+  public var offset: Double?
+  /// Not negative.
+  public var tolerance: Double?
+  /// Zero settles without easing. Defaults to 300.
+  public var durationMs: Double?
+  public init(
+    spacing: Double? = nil,
+    offset: Double? = nil,
+    tolerance: Double? = nil,
+    durationMs: Double? = nil
+  ) {
+    self.spacing = spacing
+    self.offset = offset
+    self.tolerance = tolerance
+    self.durationMs = durationMs
+  }
+
+  init(raw: mln_momentum_snap) {
+    spacing = raw.fields & MLN_MOMENTUM_SNAP_SPACING.rawValue != 0 ? raw
+      .spacing : nil
+    offset = raw.fields & MLN_MOMENTUM_SNAP_OFFSET.rawValue != 0 ? raw
+      .offset : nil
+    tolerance = raw.fields & MLN_MOMENTUM_SNAP_TOLERANCE.rawValue != 0 ? raw
+      .tolerance : nil
+    durationMs = raw.fields & MLN_MOMENTUM_SNAP_DURATION_MS.rawValue != 0 ? raw
+      .duration_ms : nil
+  }
+
+  func nativeValue() -> mln_momentum_snap {
+    var raw = mln_momentum_snap()
+    raw.fields = 0
+    if let item = spacing {
+      raw.fields |= MLN_MOMENTUM_SNAP_SPACING.rawValue; raw.spacing = item
+    }
+    if let item = offset {
+      raw.fields |= MLN_MOMENTUM_SNAP_OFFSET.rawValue; raw.offset = item
+    }
+    if let item = tolerance {
+      raw.fields |= MLN_MOMENTUM_SNAP_TOLERANCE.rawValue; raw.tolerance = item
+    }
+    if let item = durationMs {
+      raw.fields |= MLN_MOMENTUM_SNAP_DURATION_MS.rawValue; raw
+        .duration_ms = item
+    }
+    return raw
   }
 }
 

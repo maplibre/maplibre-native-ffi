@@ -503,11 +503,11 @@ typedef enum mln_momentum_decay_model : uint32_t {
    */
   MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0,
   /**
-   * The part moves `distance` over `duration_ms`, along `curve`. The caller
-   * plans the glide, for example from the platform's own fling physics, such
-   * as Android's OverScroller.
+   * The part eases `distance` over `duration_ms`, along `easing`, as a camera
+   * animation does. The caller plans the glide, for example from the
+   * platform's own fling physics, such as Android's OverScroller.
    */
-  MLN_MOMENTUM_DECAY_MODEL_PLANNED = 1,
+  MLN_MOMENTUM_DECAY_MODEL_EASE = 1,
 } mln_momentum_decay_model;
 
 /** The fields that mln_momentum_decay sets. */
@@ -517,7 +517,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_momentum_decay_field : uint32_t {
   MLN_MOMENTUM_DECAY_STOP_SPEED = 1U << 2U,
   MLN_MOMENTUM_DECAY_DISTANCE = 1U << 3U,
   MLN_MOMENTUM_DECAY_DURATION_MS = 1U << 4U,
-  MLN_MOMENTUM_DECAY_CURVE = 1U << 5U,
+  MLN_MOMENTUM_DECAY_EASING = 1U << 5U,
   MLN_MOMENTUM_DECAY_MIN_SPEED = 1U << 6U,
   MLN_MOMENTUM_DECAY_MAX_SPEED = 1U << 7U,
   MLN_MOMENTUM_DECAY_MAX_DISTANCE = 1U << 8U,
@@ -534,7 +534,7 @@ typedef uint32_t mln_momentum_decay_fields;
  * isn't set takes the part's default, which mln_gesture_momentum lists.
  * `min_speed` is finite and not negative, and every other number is finite
  * and positive. A friction decay can serve every release, as a preset that
- * matches a platform's scrolling. A planned glide takes its direction from the
+ * matches a platform's scrolling. An eased glide takes its direction from the
  * part's velocity, and its distance and duration from the caller's plan.
  */
 typedef struct mln_momentum_decay {
@@ -548,19 +548,20 @@ typedef struct mln_momentum_decay {
   /** For MLN_MOMENTUM_DECAY_MODEL_FRICTION, the speed at which it ends. */
   double stop_speed
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_STOP_SPEED");
-  /** Required for MLN_MOMENTUM_DECAY_MODEL_PLANNED. */
+  /** Required for MLN_MOMENTUM_DECAY_MODEL_EASE. */
   double distance MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_DISTANCE");
-  /** Required for MLN_MOMENTUM_DECAY_MODEL_PLANNED. */
+  /** Required for MLN_MOMENTUM_DECAY_MODEL_EASE. */
   double duration_ms
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_DURATION_MS");
   /**
-   * For MLN_MOMENTUM_DECAY_MODEL_PLANNED, the share of `distance` covered over
+   * For MLN_MOMENTUM_DECAY_MODEL_EASE, the share of `distance` covered over
    * the share of `duration_ms`. Its control points are between 0 and 1, so the
-   * glide never passes its distance. Defaults to
-   * (0, 0, 0.25, 1), the curve that camera animations ease along by default.
-   * Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+   * glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
+   * that camera animations ease along by default. Android's scroll fling
+   * follows (0.175, 0.5, 0.35, 1).
    */
-  mln_unit_bezier curve MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_CURVE");
+  mln_unit_bezier easing
+    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_EASING");
   /** A slower release starts no momentum. */
   double min_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_MIN_SPEED");
   /** For MLN_MOMENTUM_DECAY_MODEL_FRICTION, a faster release counts as this. */
@@ -594,12 +595,46 @@ typedef struct mln_pan_momentum {
   mln_momentum_decay decay;
 } mln_pan_momentum;
 
+/** The fields that mln_momentum_snap sets. */
+typedef enum MLN_BINDING("kind=bitmask") mln_momentum_snap_field : uint32_t {
+  MLN_MOMENTUM_SNAP_SPACING = 1U << 0U,
+  MLN_MOMENTUM_SNAP_OFFSET = 1U << 1U,
+  MLN_MOMENTUM_SNAP_TOLERANCE = 1U << 2U,
+  MLN_MOMENTUM_SNAP_DURATION_MS = 1U << 3U,
+} mln_momentum_snap_field;
+
+/** A set of mln_momentum_snap_field bits. */
+typedef uint32_t mln_momentum_snap_fields;
+
+/**
+ * Where a part settles after a gesture that changed it.
+ *
+ * The targets are every `spacing` from `offset`, in the part's unit. Bearing
+ * targets wrap around the circle. Once the part's glide ends, or right away
+ * when it doesn't move, the part eases to the nearest target if it is within
+ * `tolerance` of it, and otherwise stays where it is. A setting whose bit
+ * isn't set takes the part's default, which mln_gesture_momentum lists.
+ */
+typedef struct mln_momentum_snap {
+  mln_momentum_snap_fields fields;
+  /** Positive. */
+  double spacing MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_SNAP_SPACING");
+  /** Defaults to 0. */
+  double offset MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_SNAP_OFFSET");
+  /** Not negative. */
+  double tolerance MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_SNAP_TOLERANCE");
+  /** Zero settles without easing. Defaults to 300. */
+  double duration_ms
+    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_SNAP_DURATION_MS");
+} mln_momentum_snap;
+
 /** The fields that mln_anchored_momentum sets. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_anchored_momentum_field : uint32_t {
   MLN_ANCHORED_MOMENTUM_VELOCITY = 1U << 0U,
   MLN_ANCHORED_MOMENTUM_ANCHOR = 1U << 1U,
+  MLN_ANCHORED_MOMENTUM_SNAP = 1U << 2U,
 } mln_anchored_momentum_field;
 
 /** A set of mln_anchored_momentum_field bits. */
@@ -623,48 +658,13 @@ typedef struct mln_anchored_momentum {
   mln_screen_point anchor
     MLN_BINDING("mask=fields;bit=MLN_ANCHORED_MOMENTUM_ANCHOR");
   mln_momentum_decay decay;
+  /**
+   * Where the part settles. Without this, it stays where the gesture and its
+   * glide leave it.
+   */
+  mln_momentum_snap snap
+    MLN_BINDING("mask=fields;bit=MLN_ANCHORED_MOMENTUM_SNAP");
 } mln_anchored_momentum;
-
-/** The fields that mln_bearing_snap sets. */
-typedef enum MLN_BINDING("kind=bitmask") mln_bearing_snap_field : uint32_t {
-  MLN_BEARING_SNAP_TARGET_COUNT = 1U << 0U,
-  MLN_BEARING_SNAP_TARGET_OFFSET = 1U << 1U,
-  MLN_BEARING_SNAP_TOLERANCE = 1U << 2U,
-  MLN_BEARING_SNAP_DURATION_MS = 1U << 3U,
-} mln_bearing_snap_field;
-
-/** A set of mln_bearing_snap_field bits. */
-typedef uint32_t mln_bearing_snap_fields;
-
-/**
- * Where the bearing settles after a gesture that changed it.
- *
- * The targets are `target_count` bearings spaced evenly around the circle,
- * starting at `target_offset`. The bearing eases to the nearest one when it is
- * within `tolerance` of it, and otherwise stays where it is.
- */
-typedef struct mln_bearing_snap {
-  mln_bearing_snap_fields fields;
-  /** At least 1. Defaults to 1. */
-  uint32_t target_count
-    MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_TARGET_COUNT");
-  /** In degrees. Defaults to 0, north. */
-  double target_offset
-    MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_TARGET_OFFSET");
-  /** In degrees, from 0 to 180. Defaults to 7. */
-  double tolerance MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_TOLERANCE");
-  /** Zero settles without easing. Defaults to 300. */
-  double duration_ms
-    MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_DURATION_MS");
-} mln_bearing_snap;
-
-/** The fields that mln_gesture_momentum sets. */
-typedef enum MLN_BINDING("kind=bitmask") mln_gesture_momentum_field : uint32_t {
-  MLN_GESTURE_MOMENTUM_BEARING_SNAP = 1U << 0U,
-} mln_gesture_momentum_field;
-
-/** A set of mln_gesture_momentum_field bits. */
-typedef uint32_t mln_gesture_momentum_fields;
 
 /**
  * How a gesture keeps moving the camera after the user lets go.
@@ -675,23 +675,18 @@ typedef uint32_t mln_gesture_momentum_fields;
  *
  * - Pan stops at 10 logical pixels per second, needs a release of at least
  *   200, and counts a release faster than 10000 as 10000.
- * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+ *   snap settles on the nearest whole level.
  * - Bearing stops at 1 degree per second and needs a release of at least 60.
- * - Pitch stops at 1 degree per second and needs a release of at least 5.
+ *   Its snap settles on north within 7 degrees.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+ *   snap settles flat within 7 degrees.
  */
 typedef struct mln_gesture_momentum {
-  mln_gesture_momentum_fields fields;
   mln_pan_momentum pan;
   mln_anchored_momentum zoom;
   mln_anchored_momentum bearing;
   mln_anchored_momentum pitch;
-  /**
-   * Where the bearing settles after a gesture that changed it. It settles
-   * once the other parts stop, or right away when none of them move. Without
-   * this, the bearing stays where the gesture leaves it.
-   */
-  mln_bearing_snap bearing_snap
-    MLN_BINDING("mask=fields;bit=MLN_GESTURE_MOMENTUM_BEARING_SNAP");
 } mln_gesture_momentum;
 
 /** The fields that mln_camera_delta sets. */

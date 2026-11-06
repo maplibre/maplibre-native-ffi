@@ -37,6 +37,7 @@ internal unsafe struct mln_anchored_momentum
     public double velocity;
     public mln_screen_point anchor;
     public mln_momentum_decay decay;
+    public mln_momentum_snap snap;
 }
 
 internal unsafe struct mln_android_hardware_buffer_frame
@@ -84,15 +85,6 @@ internal unsafe struct mln_animation_options
     public mln_unit_bezier easing;
     public ulong transition_id;
     public mln_camera_transition_handler end_handler;
-}
-
-internal unsafe struct mln_bearing_snap
-{
-    public mln_bearing_snap_field fields;
-    public uint target_count;
-    public double target_offset;
-    public double tolerance;
-    public double duration_ms;
 }
 
 internal unsafe struct mln_bound_options
@@ -468,12 +460,10 @@ internal unsafe struct mln_geo_json_source_options
 
 internal unsafe struct mln_gesture_momentum
 {
-    public mln_gesture_momentum_field fields;
     public mln_pan_momentum pan;
     public mln_anchored_momentum zoom;
     public mln_anchored_momentum bearing;
     public mln_anchored_momentum pitch;
-    public mln_bearing_snap bearing_snap;
 }
 
 internal unsafe struct mln_gpu_sync
@@ -743,10 +733,19 @@ internal unsafe struct mln_momentum_decay
     public double stop_speed;
     public double distance;
     public double duration_ms;
-    public mln_unit_bezier curve;
+    public mln_unit_bezier easing;
     public double min_speed;
     public double max_speed;
     public double max_distance;
+}
+
+internal unsafe struct mln_momentum_snap
+{
+    public mln_momentum_snap_field fields;
+    public double spacing;
+    public double offset;
+    public double tolerance;
+    public double duration_ms;
 }
 
 internal unsafe struct mln_offline_geometry_region_definition
@@ -1711,6 +1710,7 @@ internal enum mln_anchored_momentum_field : uint
 {
     MLN_ANCHORED_MOMENTUM_VELOCITY = 1,
     MLN_ANCHORED_MOMENTUM_ANCHOR = 2,
+    MLN_ANCHORED_MOMENTUM_SNAP = 4,
 }
 
 internal enum mln_animation_option_field : uint
@@ -1720,14 +1720,6 @@ internal enum mln_animation_option_field : uint
     MLN_ANIMATION_OPTION_MIN_ZOOM = 4,
     MLN_ANIMATION_OPTION_EASING = 8,
     MLN_ANIMATION_OPTION_TRANSITION_ID = 16,
-}
-
-internal enum mln_bearing_snap_field : uint
-{
-    MLN_BEARING_SNAP_TARGET_COUNT = 1,
-    MLN_BEARING_SNAP_TARGET_OFFSET = 2,
-    MLN_BEARING_SNAP_TOLERANCE = 4,
-    MLN_BEARING_SNAP_DURATION_MS = 8,
 }
 
 internal enum mln_bound_option_field : uint
@@ -1874,11 +1866,6 @@ internal enum mln_geo_json_source_option_field : uint
     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256,
 }
 
-internal enum mln_gesture_momentum_field : uint
-{
-    MLN_GESTURE_MOMENTUM_BEARING_SNAP = 1,
-}
-
 internal enum mln_gesture_phase : uint
 {
     MLN_GESTURE_PHASE_NONE = 0,
@@ -2003,7 +1990,7 @@ internal enum mln_momentum_decay_field : uint
     MLN_MOMENTUM_DECAY_STOP_SPEED = 4,
     MLN_MOMENTUM_DECAY_DISTANCE = 8,
     MLN_MOMENTUM_DECAY_DURATION_MS = 16,
-    MLN_MOMENTUM_DECAY_CURVE = 32,
+    MLN_MOMENTUM_DECAY_EASING = 32,
     MLN_MOMENTUM_DECAY_MIN_SPEED = 64,
     MLN_MOMENTUM_DECAY_MAX_SPEED = 128,
     MLN_MOMENTUM_DECAY_MAX_DISTANCE = 256,
@@ -2012,7 +1999,15 @@ internal enum mln_momentum_decay_field : uint
 internal enum mln_momentum_decay_model : uint
 {
     MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0,
-    MLN_MOMENTUM_DECAY_MODEL_PLANNED = 1,
+    MLN_MOMENTUM_DECAY_MODEL_EASE = 1,
+}
+
+internal enum mln_momentum_snap_field : uint
+{
+    MLN_MOMENTUM_SNAP_SPACING = 1,
+    MLN_MOMENTUM_SNAP_OFFSET = 2,
+    MLN_MOMENTUM_SNAP_TOLERANCE = 4,
+    MLN_MOMENTUM_SNAP_DURATION_MS = 8,
 }
 
 internal enum mln_network_status : uint

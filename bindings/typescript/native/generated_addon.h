@@ -411,9 +411,6 @@ bool mln_ts_write_animation_options(
   mln_ts_call* call, napi_value value, mln_animation_options* out,
   const char* path
 );
-bool mln_ts_write_bearing_snap(
-  mln_ts_call* call, napi_value value, mln_bearing_snap* out, const char* path
-);
 bool mln_ts_write_bound_options(
   mln_ts_call* call, napi_value value, mln_bound_options* out, const char* path
 );
@@ -635,6 +632,9 @@ bool mln_ts_write_metal_surface_replacement(
 );
 bool mln_ts_write_momentum_decay(
   mln_ts_call* call, napi_value value, mln_momentum_decay* out, const char* path
+);
+bool mln_ts_write_momentum_snap(
+  mln_ts_call* call, napi_value value, mln_momentum_snap* out, const char* path
 );
 bool mln_ts_write_offline_geometry_region_definition(
   mln_ts_call* call, napi_value value,

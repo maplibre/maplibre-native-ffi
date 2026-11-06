@@ -1057,7 +1057,7 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
   override fun toString(): String =
     when (rawValue) {
       0u -> "FRICTION"
-      1u -> "PLANNED"
+      1u -> "EASE"
       else -> "MomentumDecayModel($rawValue)"
     }
 
@@ -1075,12 +1075,13 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
     /** The `rawValue` of [FRICTION]. */
     public const val FRICTION_VALUE: UInt = 0u
     /**
-     * The part moves `distance` over `duration_ms`, along `curve`. The caller plans the glide, for
-     * example from the platform's own fling physics, such as Android's OverScroller.
+     * The part eases `distance` over `duration_ms`, along `easing`, as a camera animation does. The
+     * caller plans the glide, for example from the platform's own fling physics, such as Android's
+     * OverScroller.
      */
-    @JvmField public val PLANNED: MomentumDecayModel = MomentumDecayModel(PLANNED_VALUE)
-    /** The `rawValue` of [PLANNED]. */
-    public const val PLANNED_VALUE: UInt = 1u
+    @JvmField public val EASE: MomentumDecayModel = MomentumDecayModel(EASE_VALUE)
+    /** The `rawValue` of [EASE]. */
+    public const val EASE_VALUE: UInt = 1u
 
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
@@ -1088,7 +1089,7 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
     public fun of(rawValue: UInt): MomentumDecayModel =
       when (rawValue) {
         FRICTION_VALUE -> FRICTION
-        PLANNED_VALUE -> PLANNED
+        EASE_VALUE -> EASE
         else -> MomentumDecayModel(rawValue)
       }
   }
@@ -4837,7 +4838,7 @@ public data class UnitBezier(
  * degrees for bearing and pitch. A setting whose bit isn't set takes the part's default, which
  * `GestureMomentum` lists. `min_speed` is finite and not negative, and every other number is finite
  * and positive. A friction decay can serve every release, as a preset that matches a platform's
- * scrolling. A planned glide takes its direction from the part's velocity, and its distance and
+ * scrolling. An eased glide takes its direction from the part's velocity, and its distance and
  * duration from the caller's plan.
  *
  * See `mln_momentum_decay` in the
@@ -4849,17 +4850,17 @@ public data class MomentumDecay(
   public val halfLifeMs: Double? = null,
   /** For `MomentumDecayModel.FRICTION`, the speed at which it ends. */
   public val stopSpeed: Double? = null,
-  /** Required for `MomentumDecayModel.PLANNED`. */
+  /** Required for `MomentumDecayModel.EASE`. */
   public val distance: Double? = null,
-  /** Required for `MomentumDecayModel.PLANNED`. */
+  /** Required for `MomentumDecayModel.EASE`. */
   public val durationMs: Double? = null,
   /**
-   * For `MomentumDecayModel.PLANNED`, the share of `distance` covered over the share of
-   * `duration_ms`. Its control points are between 0 and 1, so the glide never passes its distance.
-   * Defaults to (0, 0, 0.25, 1), the curve that camera animations ease along by default. Android's
-   * scroll fling follows (0.175, 0.5, 0.35, 1).
+   * For `MomentumDecayModel.EASE`, the share of `distance` covered over the share of `duration_ms`.
+   * Its control points are between 0 and 1, so the glide never passes its distance. Defaults to (0,
+   * 0, 0.25, 1), the curve that camera animations ease along by default. Android's scroll fling
+   * follows (0.175, 0.5, 0.35, 1).
    */
-  public val curve: UnitBezier? = null,
+  public val easing: UnitBezier? = null,
   /** A slower release starts no momentum. */
   public val minSpeed: Double? = null,
   /** For `MomentumDecayModel.FRICTION`, a faster release counts as this. */
@@ -4885,7 +4886,7 @@ public data class MomentumDecay(
   @PublishedApi
   internal fun withDurationMs(durationMs: Double): MomentumDecay = copy(durationMs = durationMs)
 
-  @PublishedApi internal fun withCurve(curve: UnitBezier): MomentumDecay = copy(curve = curve)
+  @PublishedApi internal fun withEasing(easing: UnitBezier): MomentumDecay = copy(easing = easing)
 
   @PublishedApi
   internal fun withMinSpeed(minSpeed: Double): MomentumDecay = copy(minSpeed = minSpeed)
@@ -4934,6 +4935,46 @@ public data class PanMomentum(
 }
 
 /**
+ * Where a part settles after a gesture that changed it.
+ *
+ * The targets are every `spacing` from `offset`, in the part's unit. Bearing targets wrap around
+ * the circle. Once the part's glide ends, or right away when it doesn't move, the part eases to the
+ * nearest target if it is within `tolerance` of it, and otherwise stays where it is. A setting
+ * whose bit isn't set takes the part's default, which `GestureMomentum` lists.
+ *
+ * See `mln_momentum_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MomentumSnap(
+  /** Positive. */
+  public val spacing: Double? = null,
+  /** Defaults to 0. */
+  public val offset: Double? = null,
+  /** Not negative. */
+  public val tolerance: Double? = null,
+  /** Zero settles without easing. Defaults to 300. */
+  public val durationMs: Double? = null,
+) {
+  @PublishedApi internal fun withSpacing(spacing: Double): MomentumSnap = copy(spacing = spacing)
+
+  @PublishedApi internal fun withOffset(offset: Double): MomentumSnap = copy(offset = offset)
+
+  @PublishedApi
+  internal fun withTolerance(tolerance: Double): MomentumSnap = copy(tolerance = tolerance)
+
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): MomentumSnap = copy(durationMs = durationMs)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MomentumSnap = MomentumSnap()
+  }
+}
+
+/**
  * How a gesture's zoom, bearing, or pitch keeps changing after release.
  *
  * See `mln_anchored_momentum` in the
@@ -4951,6 +4992,8 @@ public data class AnchoredMomentum(
    */
   public val anchor: ScreenPoint? = null,
   public val decay: MomentumDecay = MomentumDecay(),
+  /** Where the part settles. Without this, it stays where the gesture and its glide leave it. */
+  public val snap: MomentumSnap? = null,
 ) {
   @PublishedApi
   internal fun withVelocity(velocity: Double): AnchoredMomentum = copy(velocity = velocity)
@@ -4959,6 +5002,8 @@ public data class AnchoredMomentum(
   internal fun withAnchor(anchor: ScreenPoint): AnchoredMomentum = copy(anchor = anchor)
 
   @PublishedApi internal fun withDecay(decay: MomentumDecay): AnchoredMomentum = copy(decay = decay)
+
+  @PublishedApi internal fun withSnap(snap: MomentumSnap): AnchoredMomentum = copy(snap = snap)
 
   public companion object {
     /**
@@ -4970,53 +5015,6 @@ public data class AnchoredMomentum(
 }
 
 /**
- * Where the bearing settles after a gesture that changed it.
- *
- * The targets are `target_count` bearings spaced evenly around the circle, starting at
- * `target_offset`. The bearing eases to the nearest one when it is within `tolerance` of it, and
- * otherwise stays where it is.
- *
- * See `mln_bearing_snap` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class BearingSnap(
-  /** At least 1. Defaults to 1. */
-  @get:JvmSynthetic public val targetCount: UInt? = null,
-  /** In degrees. Defaults to 0, north. */
-  public val targetOffset: Double? = null,
-  /** In degrees, from 0 to 180. Defaults to 7. */
-  public val tolerance: Double? = null,
-  /** Zero settles without easing. Defaults to 300. */
-  public val durationMs: Double? = null,
-) {
-  @PublishedApi
-  @JvmName("getTargetCount")
-  internal fun targetCountForJava(): Int? = targetCount?.toInt()
-
-  @PublishedApi
-  internal fun withTargetCount(targetCount: Int): BearingSnap =
-    copy(targetCount = targetCount.toUInt())
-
-  @PublishedApi
-  internal fun withTargetOffset(targetOffset: Double): BearingSnap =
-    copy(targetOffset = targetOffset)
-
-  @PublishedApi
-  internal fun withTolerance(tolerance: Double): BearingSnap = copy(tolerance = tolerance)
-
-  @PublishedApi
-  internal fun withDurationMs(durationMs: Double): BearingSnap = copy(durationMs = durationMs)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): BearingSnap = BearingSnap()
-  }
-}
-
-/**
  * How a gesture keeps moving the camera after the user lets go.
  *
  * A part moves only when its velocity is set, and each part slows on its own. Every part defaults
@@ -5024,9 +5022,12 @@ public data class BearingSnap(
  *
  * - Pan stops at 10 logical pixels per second, needs a release of at least 200, and counts a
  *   release faster than 10000 as 10000.
- * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
- * - Bearing stops at 1 degree per second and needs a release of at least 60.
- * - Pitch stops at 1 degree per second and needs a release of at least 5.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap settles on the
+ *   nearest whole level.
+ * - Bearing stops at 1 degree per second and needs a release of at least 60. Its snap settles on
+ *   north within 7 degrees.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its snap settles flat
+ *   within 7 degrees.
  *
  * See `mln_gesture_momentum` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5036,12 +5037,6 @@ public data class GestureMomentum(
   public val zoom: AnchoredMomentum = AnchoredMomentum(),
   public val bearing: AnchoredMomentum = AnchoredMomentum(),
   public val pitch: AnchoredMomentum = AnchoredMomentum(),
-  /**
-   * Where the bearing settles after a gesture that changed it. It settles once the other parts
-   * stop, or right away when none of them move. Without this, the bearing stays where the gesture
-   * leaves it.
-   */
-  public val bearingSnap: BearingSnap? = null,
 ) {
   @PublishedApi internal fun withPan(pan: PanMomentum): GestureMomentum = copy(pan = pan)
 
@@ -5052,10 +5047,6 @@ public data class GestureMomentum(
 
   @PublishedApi
   internal fun withPitch(pitch: AnchoredMomentum): GestureMomentum = copy(pitch = pitch)
-
-  @PublishedApi
-  internal fun withBearingSnap(bearingSnap: BearingSnap): GestureMomentum =
-    copy(bearingSnap = bearingSnap)
 
   public companion object {
     /**

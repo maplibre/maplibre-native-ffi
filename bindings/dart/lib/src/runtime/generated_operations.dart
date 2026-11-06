@@ -747,9 +747,9 @@ Pointer<raw.mln_momentum_decay> _writeMomentumDecay(
     result.ref.fields |= raw.MLN_MOMENTUM_DECAY_DURATION_MS;
     result.ref.duration_ms = value.durationMs!;
   }
-  if (value.curve != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_CURVE;
-    result.ref.curve = _writeUnitBezier(value.curve!, arena).ref;
+  if (value.easing != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_EASING;
+    result.ref.easing = _writeUnitBezier(value.easing!, arena).ref;
   }
   if (value.minSpeed != null) {
     result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MIN_SPEED;
@@ -780,6 +780,31 @@ Pointer<raw.mln_pan_momentum> _writePanMomentum(
   return result;
 }
 
+Pointer<raw.mln_momentum_snap> _writeMomentumSnap(
+  MomentumSnap value,
+  Allocator arena, {
+  Pointer<raw.mln_momentum_snap>? into,
+}) {
+  final result = into ?? arena<raw.mln_momentum_snap>();
+  if (value.spacing != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_SPACING;
+    result.ref.spacing = value.spacing!;
+  }
+  if (value.offset != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_OFFSET;
+    result.ref.offset = value.offset!;
+  }
+  if (value.tolerance != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_TOLERANCE;
+    result.ref.tolerance = value.tolerance!;
+  }
+  if (value.durationMs != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_DURATION_MS;
+    result.ref.duration_ms = value.durationMs!;
+  }
+  return result;
+}
+
 Pointer<raw.mln_anchored_momentum> _writeAnchoredMomentum(
   AnchoredMomentum value,
   Allocator arena, {
@@ -795,30 +820,9 @@ Pointer<raw.mln_anchored_momentum> _writeAnchoredMomentum(
     result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
   }
   result.ref.decay = _writeMomentumDecay(value.decay, arena).ref;
-  return result;
-}
-
-Pointer<raw.mln_bearing_snap> _writeBearingSnap(
-  BearingSnap value,
-  Allocator arena, {
-  Pointer<raw.mln_bearing_snap>? into,
-}) {
-  final result = into ?? arena<raw.mln_bearing_snap>();
-  if (value.targetCount != null) {
-    result.ref.fields |= raw.MLN_BEARING_SNAP_TARGET_COUNT;
-    result.ref.target_count = _nativeInteger(value.targetCount!, 0, 4294967295);
-  }
-  if (value.targetOffset != null) {
-    result.ref.fields |= raw.MLN_BEARING_SNAP_TARGET_OFFSET;
-    result.ref.target_offset = value.targetOffset!;
-  }
-  if (value.tolerance != null) {
-    result.ref.fields |= raw.MLN_BEARING_SNAP_TOLERANCE;
-    result.ref.tolerance = value.tolerance!;
-  }
-  if (value.durationMs != null) {
-    result.ref.fields |= raw.MLN_BEARING_SNAP_DURATION_MS;
-    result.ref.duration_ms = value.durationMs!;
+  if (value.snap != null) {
+    result.ref.fields |= raw.MLN_ANCHORED_MOMENTUM_SNAP;
+    result.ref.snap = _writeMomentumSnap(value.snap!, arena).ref;
   }
   return result;
 }
@@ -833,10 +837,6 @@ Pointer<raw.mln_gesture_momentum> _writeGestureMomentum(
   result.ref.zoom = _writeAnchoredMomentum(value.zoom, arena).ref;
   result.ref.bearing = _writeAnchoredMomentum(value.bearing, arena).ref;
   result.ref.pitch = _writeAnchoredMomentum(value.pitch, arena).ref;
-  if (value.bearingSnap != null) {
-    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_SNAP;
-    result.ref.bearing_snap = _writeBearingSnap(value.bearingSnap!, arena).ref;
-  }
   return result;
 }
 

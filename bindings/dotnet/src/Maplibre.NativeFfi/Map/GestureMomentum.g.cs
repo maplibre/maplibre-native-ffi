@@ -14,26 +14,24 @@ namespace Maplibre.NativeFfi;
 /// release of at least 200, and counts a release faster than 10000 as
 /// 10000.</description></item>
 /// <item><description>Zoom stops at 0.01 levels per second and moves at most
-/// 2.5 levels.</description></item>
+/// 2.5 levels. Its snap settles on the nearest whole
+/// level.</description></item>
 /// <item><description>Bearing stops at 1 degree per second and needs a release
-/// of at least 60.</description></item>
+/// of at least 60. Its snap settles on north within 7
+/// degrees.</description></item>
 /// <item><description>Pitch stops at 1 degree per second and needs a release of
-/// at least 5.</description></item>
+/// at least 5. Its snap settles flat within 7 degrees.</description></item>
 /// </list>
 /// <para>See <c>mln_gesture_momentum</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>
-public sealed record GestureMomentum
+public readonly partial record struct GestureMomentum(
+    PanMomentum Pan,
+    AnchoredMomentum Zoom,
+    AnchoredMomentum Bearing,
+    AnchoredMomentum Pitch
+)
 {
-    public PanMomentum Pan { get; init; } = new();
-    public AnchoredMomentum Zoom { get; init; } = new();
-    public AnchoredMomentum Bearing { get; init; } = new();
-    public AnchoredMomentum Pitch { get; init; } = new();
-
-    /// <summary>
-    /// Where the bearing settles after a gesture that changed it. It settles
-    /// once the other parts stop, or right away when none of them move. Without
-    /// this, the bearing stays where the gesture leaves it.
-    /// </summary>
-    public BearingSnap? BearingSnap { get; init; }
+    public GestureMomentum()
+        : this(new(), new(), new(), new()) { }
 }

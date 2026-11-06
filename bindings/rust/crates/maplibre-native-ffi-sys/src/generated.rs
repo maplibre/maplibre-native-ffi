@@ -10,17 +10,13 @@ pub const MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL: u64 = 0;
 pub type mln_anchored_momentum_field = u32;
 pub const MLN_ANCHORED_MOMENTUM_VELOCITY: mln_anchored_momentum_field = 1;
 pub const MLN_ANCHORED_MOMENTUM_ANCHOR: mln_anchored_momentum_field = 2;
+pub const MLN_ANCHORED_MOMENTUM_SNAP: mln_anchored_momentum_field = 4;
 pub type mln_animation_option_field = u32;
 pub const MLN_ANIMATION_OPTION_DURATION: mln_animation_option_field = 1;
 pub const MLN_ANIMATION_OPTION_VELOCITY: mln_animation_option_field = 2;
 pub const MLN_ANIMATION_OPTION_MIN_ZOOM: mln_animation_option_field = 4;
 pub const MLN_ANIMATION_OPTION_EASING: mln_animation_option_field = 8;
 pub const MLN_ANIMATION_OPTION_TRANSITION_ID: mln_animation_option_field = 16;
-pub type mln_bearing_snap_field = u32;
-pub const MLN_BEARING_SNAP_TARGET_COUNT: mln_bearing_snap_field = 1;
-pub const MLN_BEARING_SNAP_TARGET_OFFSET: mln_bearing_snap_field = 2;
-pub const MLN_BEARING_SNAP_TOLERANCE: mln_bearing_snap_field = 4;
-pub const MLN_BEARING_SNAP_DURATION_MS: mln_bearing_snap_field = 8;
 pub type mln_bound_option_field = u32;
 pub const MLN_BOUND_OPTION_BOUNDS: mln_bound_option_field = 1;
 pub const MLN_BOUND_OPTION_MIN_ZOOM: mln_bound_option_field = 2;
@@ -111,8 +107,6 @@ pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geo_json_source_option_
 pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geo_json_source_option_field = 64;
 pub const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS: mln_geo_json_source_option_field = 128;
 pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER: mln_geo_json_source_option_field = 256;
-pub type mln_gesture_momentum_field = u32;
-pub const MLN_GESTURE_MOMENTUM_BEARING_SNAP: mln_gesture_momentum_field = 1;
 pub type mln_gesture_phase = u32;
 pub const MLN_GESTURE_PHASE_NONE: mln_gesture_phase = 0;
 pub const MLN_GESTURE_PHASE_BEGIN: mln_gesture_phase = 1;
@@ -200,13 +194,18 @@ pub const MLN_MOMENTUM_DECAY_HALF_LIFE_MS: mln_momentum_decay_field = 2;
 pub const MLN_MOMENTUM_DECAY_STOP_SPEED: mln_momentum_decay_field = 4;
 pub const MLN_MOMENTUM_DECAY_DISTANCE: mln_momentum_decay_field = 8;
 pub const MLN_MOMENTUM_DECAY_DURATION_MS: mln_momentum_decay_field = 16;
-pub const MLN_MOMENTUM_DECAY_CURVE: mln_momentum_decay_field = 32;
+pub const MLN_MOMENTUM_DECAY_EASING: mln_momentum_decay_field = 32;
 pub const MLN_MOMENTUM_DECAY_MIN_SPEED: mln_momentum_decay_field = 64;
 pub const MLN_MOMENTUM_DECAY_MAX_SPEED: mln_momentum_decay_field = 128;
 pub const MLN_MOMENTUM_DECAY_MAX_DISTANCE: mln_momentum_decay_field = 256;
 pub type mln_momentum_decay_model = u32;
 pub const MLN_MOMENTUM_DECAY_MODEL_FRICTION: mln_momentum_decay_model = 0;
-pub const MLN_MOMENTUM_DECAY_MODEL_PLANNED: mln_momentum_decay_model = 1;
+pub const MLN_MOMENTUM_DECAY_MODEL_EASE: mln_momentum_decay_model = 1;
+pub type mln_momentum_snap_field = u32;
+pub const MLN_MOMENTUM_SNAP_SPACING: mln_momentum_snap_field = 1;
+pub const MLN_MOMENTUM_SNAP_OFFSET: mln_momentum_snap_field = 2;
+pub const MLN_MOMENTUM_SNAP_TOLERANCE: mln_momentum_snap_field = 4;
+pub const MLN_MOMENTUM_SNAP_DURATION_MS: mln_momentum_snap_field = 8;
 pub type mln_network_status = u32;
 pub const MLN_NETWORK_STATUS_ONLINE: mln_network_status = 1;
 pub const MLN_NETWORK_STATUS_OFFLINE: mln_network_status = 2;
@@ -534,6 +533,7 @@ pub struct mln_anchored_momentum {
     pub velocity: f64,
     pub anchor: mln_screen_point,
     pub decay: mln_momentum_decay,
+    pub snap: mln_momentum_snap,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -581,15 +581,6 @@ pub struct mln_animation_options {
     pub easing: mln_unit_bezier,
     pub transition_id: u64,
     pub end_handler: mln_camera_transition_handler,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_bearing_snap {
-    pub fields: mln_bearing_snap_fields,
-    pub target_count: u32,
-    pub target_offset: f64,
-    pub tolerance: f64,
-    pub duration_ms: f64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -938,12 +929,10 @@ pub struct mln_geo_json_source_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_gesture_momentum {
-    pub fields: mln_gesture_momentum_fields,
     pub pan: mln_pan_momentum,
     pub zoom: mln_anchored_momentum,
     pub bearing: mln_anchored_momentum,
     pub pitch: mln_anchored_momentum,
-    pub bearing_snap: mln_bearing_snap,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1202,10 +1191,19 @@ pub struct mln_momentum_decay {
     pub stop_speed: f64,
     pub distance: f64,
     pub duration_ms: f64,
-    pub curve: mln_unit_bezier,
+    pub easing: mln_unit_bezier,
     pub min_speed: f64,
     pub max_speed: f64,
     pub max_distance: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_momentum_snap {
+    pub fields: mln_momentum_snap_fields,
+    pub spacing: f64,
+    pub offset: f64,
+    pub tolerance: f64,
+    pub duration_ms: f64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2123,7 +2121,6 @@ pub struct mln_win32_window_replacement {
 pub struct mln_acquired_frame(pub u64);
 pub type mln_anchored_momentum_fields = u32;
 pub type mln_animation_option_fields = u32;
-pub type mln_bearing_snap_fields = u32;
 pub type mln_bound_option_fields = u32;
 pub type mln_camera_delta_fields = u32;
 pub type mln_camera_fit_option_fields = u32;
@@ -2166,7 +2163,6 @@ pub type mln_free_camera_option_fields = u32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_geo_json_source_data(pub u64);
 pub type mln_geo_json_source_option_fields = u32;
-pub type mln_gesture_momentum_fields = u32;
 pub type mln_gpu_sync_kind_flags = u32;
 pub type mln_http_header_transform_callback = Option<
     unsafe extern "C" fn(
@@ -2197,6 +2193,7 @@ pub struct mln_map_projection(pub u64);
 pub type mln_map_tile_option_fields = u32;
 pub type mln_map_viewport_option_fields = u32;
 pub type mln_momentum_decay_fields = u32;
+pub type mln_momentum_snap_fields = u32;
 pub type mln_offline_region_id = i64;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -664,22 +664,22 @@ static void delta_momentum_zero_half_life(void* descriptor) {
   delta->momentum.zoom.decay.fields = MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
   delta->momentum.zoom.decay.half_life_ms = 0.0;
 }
-static void delta_momentum_planned_without_distance(void* descriptor) {
+static void delta_momentum_eased_without_distance(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
   mln_momentum_decay* decay = &delta->momentum.zoom.decay;
   decay->fields = MLN_MOMENTUM_DECAY_MODEL | MLN_MOMENTUM_DECAY_DURATION_MS;
-  decay->model = MLN_MOMENTUM_DECAY_MODEL_PLANNED;
+  decay->model = MLN_MOMENTUM_DECAY_MODEL_EASE;
   decay->duration_ms = 300.0;
 }
-static void delta_momentum_snap_without_targets(void* descriptor) {
+static void delta_momentum_snap_without_spacing(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.fields = MLN_GESTURE_MOMENTUM_BEARING_SNAP;
-  delta->momentum.bearing_snap.fields = MLN_BEARING_SNAP_TARGET_COUNT;
-  delta->momentum.bearing_snap.target_count = 0;
+  delta->momentum.bearing.fields = MLN_ANCHORED_MOMENTUM_SNAP;
+  delta->momentum.bearing.snap.fields = MLN_MOMENTUM_SNAP_SPACING;
+  delta->momentum.bearing.snap.spacing = 0.0;
 }
 static void delta_momentum_unselected_garbage(void* descriptor) {
   mln_camera_delta* delta = descriptor;
@@ -688,16 +688,16 @@ static void delta_momentum_unselected_garbage(void* descriptor) {
   delta->momentum.pan.velocity.x = NAN;
   delta->momentum.zoom.anchor.y = INFINITY;
   delta->momentum.zoom.decay.min_speed = -1.0;
-  delta->momentum.bearing_snap.tolerance = 360.0;
+  delta->momentum.bearing.snap.tolerance = -1.0;
 }
 
 static void delta_momentum_overshooting_curve(void* descriptor) {
-  delta_momentum_planned_without_distance(descriptor);
+  delta_momentum_eased_without_distance(descriptor);
   mln_momentum_decay* decay =
     &((mln_camera_delta*)descriptor)->momentum.zoom.decay;
-  decay->fields |= MLN_MOMENTUM_DECAY_DISTANCE | MLN_MOMENTUM_DECAY_CURVE;
+  decay->fields |= MLN_MOMENTUM_DECAY_DISTANCE | MLN_MOMENTUM_DECAY_EASING;
   decay->distance = 1.0;
-  decay->curve =
+  decay->easing =
     (mln_unit_bezier){.x1 = 1.0 / 3, .y1 = 2.0, .x2 = 2.0 / 3, .y2 = 2.0};
 }
 
@@ -729,12 +729,12 @@ static const mln_test_validation_case delta_cases[] = {
    MLN_STATUS_INVALID_ARGUMENT, "isn't negative"},
   {"zero momentum half-life", delta_momentum_zero_half_life,
    MLN_STATUS_INVALID_ARGUMENT, "positive half-life"},
-  {"planned glide without a distance", delta_momentum_planned_without_distance,
+  {"eased glide without a distance", delta_momentum_eased_without_distance,
    MLN_STATUS_INVALID_ARGUMENT, "needs a distance and a duration"},
-  {"planned curve that overshoots", delta_momentum_overshooting_curve,
+  {"eased curve that overshoots", delta_momentum_overshooting_curve,
    MLN_STATUS_INVALID_ARGUMENT, "control points are within [0, 1]"},
-  {"bearing snap without targets", delta_momentum_snap_without_targets,
-   MLN_STATUS_INVALID_ARGUMENT, "needs a target"},
+  {"snap without a spacing", delta_momentum_snap_without_spacing,
+   MLN_STATUS_INVALID_ARGUMENT, "positive spacing"},
   {"unselected momentum fields stay unread", delta_momentum_unselected_garbage,
    MLN_STATUS_OK, NULL},
 };

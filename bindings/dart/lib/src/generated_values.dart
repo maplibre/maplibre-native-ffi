@@ -501,14 +501,14 @@ final class MomentumDecayModel extends _Enum {
   /// deceleration 69 ms.
   static const friction = MomentumDecayModel.fromRawValue(0);
 
-  /// The part moves `distance` over `duration_ms`, along `curve`. The caller
-  /// plans the glide, for example from the platform's own fling physics, such
-  /// as Android's OverScroller.
-  static const planned = MomentumDecayModel.fromRawValue(1);
+  /// The part eases `distance` over `duration_ms`, along `easing`, as a camera
+  /// animation does. The caller plans the glide, for example from the
+  /// platform's own fling physics, such as Android's OverScroller.
+  static const ease = MomentumDecayModel.fromRawValue(1);
   @override
   String toString() => switch (rawValue) {
     0 => 'MomentumDecayModel.friction',
-    1 => 'MomentumDecayModel.planned',
+    1 => 'MomentumDecayModel.ease',
     _ => 'MomentumDecayModel($rawValue)',
   };
 }
@@ -2722,7 +2722,7 @@ final class UnitBezier extends _Value {
 /// isn't set takes the part's default, which `GestureMomentum` lists.
 /// `min_speed` is finite and not negative, and every other number is finite and
 /// positive. A friction decay can serve every release, as a preset that matches
-/// a platform's scrolling. A planned glide takes its direction from the part's
+/// a platform's scrolling. An eased glide takes its direction from the part's
 /// velocity, and its distance and duration from the caller's plan.
 ///
 /// See `mln_momentum_decay` in the
@@ -2734,7 +2734,7 @@ final class MomentumDecay extends _Value {
     this.stopSpeed,
     this.distance,
     this.durationMs,
-    this.curve,
+    this.easing,
     this.minSpeed,
     this.maxSpeed,
     this.maxDistance,
@@ -2747,18 +2747,18 @@ final class MomentumDecay extends _Value {
   /// For `MomentumDecayModel.friction`, the speed at which it ends.
   final double? stopSpeed;
 
-  /// Required for `MomentumDecayModel.planned`.
+  /// Required for `MomentumDecayModel.ease`.
   final double? distance;
 
-  /// Required for `MomentumDecayModel.planned`.
+  /// Required for `MomentumDecayModel.ease`.
   final double? durationMs;
 
-  /// For `MomentumDecayModel.planned`, the share of `distance` covered over the
+  /// For `MomentumDecayModel.ease`, the share of `distance` covered over the
   /// share of `duration_ms`. Its control points are between 0 and 1, so the
   /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
   /// that camera animations ease along by default. Android's scroll fling
   /// follows (0.175, 0.5, 0.35, 1).
-  final UnitBezier? curve;
+  final UnitBezier? easing;
 
   /// A slower release starts no momentum.
   final double? minSpeed;
@@ -2778,7 +2778,7 @@ final class MomentumDecay extends _Value {
     double? stopSpeed,
     double? distance,
     double? durationMs,
-    UnitBezier? curve,
+    UnitBezier? easing,
     double? minSpeed,
     double? maxSpeed,
     double? maxDistance,
@@ -2788,7 +2788,7 @@ final class MomentumDecay extends _Value {
     stopSpeed: stopSpeed ?? this.stopSpeed,
     distance: distance ?? this.distance,
     durationMs: durationMs ?? this.durationMs,
-    curve: curve ?? this.curve,
+    easing: easing ?? this.easing,
     minSpeed: minSpeed ?? this.minSpeed,
     maxSpeed: maxSpeed ?? this.maxSpeed,
     maxDistance: maxDistance ?? this.maxDistance,
@@ -2801,7 +2801,7 @@ final class MomentumDecay extends _Value {
     stopSpeed,
     distance,
     durationMs,
-    curve,
+    easing,
     minSpeed,
     maxSpeed,
     maxDistance,
@@ -2813,7 +2813,7 @@ final class MomentumDecay extends _Value {
     'stopSpeed',
     'distance',
     'durationMs',
-    'curve',
+    'easing',
     'minSpeed',
     'maxSpeed',
     'maxDistance',
@@ -2845,6 +2845,60 @@ final class PanMomentum extends _Value {
   String toString() => _describe('PanMomentum', const ['velocity', 'decay']);
 }
 
+/// Where a part settles after a gesture that changed it.
+///
+/// The targets are every `spacing` from `offset`, in the part's unit. Bearing
+/// targets wrap around the circle. Once the part's glide ends, or right away
+/// when it doesn't move, the part eases to the nearest target if it is within
+/// `tolerance` of it, and otherwise stays where it is. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists.
+///
+/// See `mln_momentum_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class MomentumSnap extends _Value {
+  const MomentumSnap({
+    this.spacing,
+    this.offset,
+    this.tolerance,
+    this.durationMs,
+  });
+
+  /// Positive.
+  final double? spacing;
+
+  /// Defaults to 0.
+  final double? offset;
+
+  /// Not negative.
+  final double? tolerance;
+
+  /// Zero settles without easing. Defaults to 300.
+  final double? durationMs;
+
+  /// A copy of this value with the given members replaced.
+  MomentumSnap copyWith({
+    double? spacing,
+    double? offset,
+    double? tolerance,
+    double? durationMs,
+  }) => MomentumSnap(
+    spacing: spacing ?? this.spacing,
+    offset: offset ?? this.offset,
+    tolerance: tolerance ?? this.tolerance,
+    durationMs: durationMs ?? this.durationMs,
+  );
+
+  @override
+  List<Object?> get _members => [spacing, offset, tolerance, durationMs];
+  @override
+  String toString() => _describe('MomentumSnap', const [
+    'spacing',
+    'offset',
+    'tolerance',
+    'durationMs',
+  ]);
+}
+
 /// How a gesture's zoom, bearing, or pitch keeps changing after release.
 ///
 /// See `mln_anchored_momentum` in the
@@ -2854,6 +2908,7 @@ final class AnchoredMomentum extends _Value {
     this.velocity,
     this.anchor,
     this.decay = const MomentumDecay(),
+    this.snap,
   });
 
   /// How fast the value changed at release: zoom levels per second for zoom,
@@ -2866,78 +2921,31 @@ final class AnchoredMomentum extends _Value {
   final ScreenPoint? anchor;
   final MomentumDecay decay;
 
+  /// Where the part settles. Without this, it stays where the gesture and its
+  /// glide leave it.
+  final MomentumSnap? snap;
+
   /// A copy of this value with the given members replaced.
   AnchoredMomentum copyWith({
     double? velocity,
     ScreenPoint? anchor,
     MomentumDecay? decay,
+    MomentumSnap? snap,
   }) => AnchoredMomentum(
     velocity: velocity ?? this.velocity,
     anchor: anchor ?? this.anchor,
     decay: decay ?? this.decay,
+    snap: snap ?? this.snap,
   );
 
   @override
-  List<Object?> get _members => [velocity, anchor, decay];
+  List<Object?> get _members => [velocity, anchor, decay, snap];
   @override
-  String toString() =>
-      _describe('AnchoredMomentum', const ['velocity', 'anchor', 'decay']);
-}
-
-/// Where the bearing settles after a gesture that changed it.
-///
-/// The targets are `target_count` bearings spaced evenly around the circle,
-/// starting at `target_offset`. The bearing eases to the nearest one when it is
-/// within `tolerance` of it, and otherwise stays where it is.
-///
-/// See `mln_bearing_snap` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class BearingSnap extends _Value {
-  const BearingSnap({
-    this.targetCount,
-    this.targetOffset,
-    this.tolerance,
-    this.durationMs,
-  });
-
-  /// At least 1. Defaults to 1.
-  final int? targetCount;
-
-  /// In degrees. Defaults to 0, north.
-  final double? targetOffset;
-
-  /// In degrees, from 0 to 180. Defaults to 7.
-  final double? tolerance;
-
-  /// Zero settles without easing. Defaults to 300.
-  final double? durationMs;
-
-  /// A copy of this value with the given members replaced.
-  BearingSnap copyWith({
-    int? targetCount,
-    double? targetOffset,
-    double? tolerance,
-    double? durationMs,
-  }) => BearingSnap(
-    targetCount: targetCount ?? this.targetCount,
-    targetOffset: targetOffset ?? this.targetOffset,
-    tolerance: tolerance ?? this.tolerance,
-    durationMs: durationMs ?? this.durationMs,
-  );
-
-  @override
-  List<Object?> get _members => [
-    targetCount,
-    targetOffset,
-    tolerance,
-    durationMs,
-  ];
-  @override
-  String toString() => _describe('BearingSnap', const [
-    'targetCount',
-    'targetOffset',
-    'tolerance',
-    'durationMs',
+  String toString() => _describe('AnchoredMomentum', const [
+    'velocity',
+    'anchor',
+    'decay',
+    'snap',
   ]);
 }
 
@@ -2949,9 +2957,12 @@ final class BearingSnap extends _Value {
 ///
 /// - Pan stops at 10 logical pixels per second, needs a release of at least
 ///   200, and counts a release faster than 10000 as 10000.
-/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+///   snap settles on the nearest whole level.
 /// - Bearing stops at 1 degree per second and needs a release of at least 60.
-/// - Pitch stops at 1 degree per second and needs a release of at least 5.
+///   Its snap settles on north within 7 degrees.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+///   snap settles flat within 7 degrees.
 ///
 /// See `mln_gesture_momentum` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2961,17 +2972,11 @@ final class GestureMomentum extends _Value {
     this.zoom = const AnchoredMomentum(),
     this.bearing = const AnchoredMomentum(),
     this.pitch = const AnchoredMomentum(),
-    this.bearingSnap,
   });
   final PanMomentum pan;
   final AnchoredMomentum zoom;
   final AnchoredMomentum bearing;
   final AnchoredMomentum pitch;
-
-  /// Where the bearing settles after a gesture that changed it. It settles once
-  /// the other parts stop, or right away when none of them move. Without this,
-  /// the bearing stays where the gesture leaves it.
-  final BearingSnap? bearingSnap;
 
   /// A copy of this value with the given members replaced.
   GestureMomentum copyWith({
@@ -2979,25 +2984,18 @@ final class GestureMomentum extends _Value {
     AnchoredMomentum? zoom,
     AnchoredMomentum? bearing,
     AnchoredMomentum? pitch,
-    BearingSnap? bearingSnap,
   }) => GestureMomentum(
     pan: pan ?? this.pan,
     zoom: zoom ?? this.zoom,
     bearing: bearing ?? this.bearing,
     pitch: pitch ?? this.pitch,
-    bearingSnap: bearingSnap ?? this.bearingSnap,
   );
 
   @override
-  List<Object?> get _members => [pan, zoom, bearing, pitch, bearingSnap];
+  List<Object?> get _members => [pan, zoom, bearing, pitch];
   @override
-  String toString() => _describe('GestureMomentum', const [
-    'pan',
-    'zoom',
-    'bearing',
-    'pitch',
-    'bearingSnap',
-  ]);
+  String toString() =>
+      _describe('GestureMomentum', const ['pan', 'zoom', 'bearing', 'pitch']);
 }
 
 /// How fast each part of a camera change moves.
