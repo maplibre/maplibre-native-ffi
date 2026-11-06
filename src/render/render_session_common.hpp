@@ -1018,8 +1018,7 @@ struct mln_render_session_object
   // Every accepted demand reserves its result before it can reach the driver.
   std::size_t unfinished_demands = 0;
   std::deque<std::shared_ptr<const mln::core::QueuedFrameDemand>> demands;
-  // Waiting demands hold no work item until an update, a target change, or
-  // the map commands that they wait for.
+  // Waiting demands hold no work item until an update or target change.
   std::deque<std::shared_ptr<const mln::core::QueuedFrameDemand>>
     update_waiting_demands;
   // Still-image demands that are queued, parked, running, or waiting, each

@@ -232,7 +232,10 @@ internal sealed class RenderFixture : IDisposable
             while (result is null)
             {
                 ServiceDriverWork();
-                result = DrainFrames().LastOrDefault(frame => frame.Token == demand);
+                // Nullable, so a drain without the demand's result leaves it null.
+                result = DrainFrames()
+                    .Select(frame => (RenderFrameResult?)frame)
+                    .LastOrDefault(frame => frame!.Value.Token == demand);
                 if (result is null)
                     TestWaits.Wait(wake, elapsed, "a rendered frame");
             }

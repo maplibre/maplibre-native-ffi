@@ -956,6 +956,33 @@ auto run_frame_demand(
   const std::shared_ptr<const QueuedFrameDemand>& expected
 ) noexcept -> void;
 
+// Whether the map has applied the commands sent before the oldest queued
+// demand, which the work for `expected` runs next. Until it has, that work
+// waits at the front of the driver's queue, with the driver work behind it, so
+// the frame shows those commands and driver work keeps its order. The map's
+// commands notice then wakes the driver. Work whose demand already ended runs
+// nothing, so it doesn't wait.
+auto map_commands_ready_locked(
+  mln_render_session_object& session,
+  const std::shared_ptr<const QueuedFrameDemand>& expected
+) noexcept -> bool {
+  // Detach and abandon leave these states before they drop the map.
+  if (
+    expected == nullptr ||
+    (session.state != MLN_RENDER_SESSION_STATE_ATTACHING &&
+     session.state != MLN_RENDER_SESSION_STATE_ATTACHED) ||
+    std::find(session.demands.begin(), session.demands.end(), expected) ==
+      session.demands.end()
+  )
+    return true;
+  auto& map = *session.map_object;
+  const auto needed = session.demands.front()->map_commands;
+  if (map_commands_applied(map) >= needed) return true;
+  map_set_commands_awaited(map, true);
+  // A command that finished before the map saw the flag sent no notice.
+  return map_commands_applied(map) >= needed;
+}
+
 // If allocation fails, later driver work or detach gives the demand a result.
 auto queue_frame_demand_work_locked(
   mln_render_session_object& session, DeferredWakes& wakes,
@@ -969,7 +996,10 @@ auto queue_frame_demand_work_locked(
         .execute = [owner = session.shared_from_this(),
                     expected]() { run_frame_demand(owner, expected); },
         .cancel = {},
-        .ready = {},
+        .ready =
+          [owner = &session, expected]() {
+            return map_commands_ready_locked(*owner, expected);
+          },
         .renders_frame = true,
       }
     );
@@ -1862,7 +1892,10 @@ auto start_attach_render_session(
                     service_scheduler_work(live, expected);
                   },
                 .cancel = {},
-                .ready = {},
+                .ready =
+                  [owner = live.get(), expected]() {
+                    return map_commands_ready_locked(*owner, expected);
+                  },
                 .renders_frame = expected != nullptr,
               },
               wakes
@@ -1954,37 +1987,12 @@ auto notify_render_session_map_commands(
   if (session == nullptr) return;
   auto wakes = DeferredWakes{};
   const auto lock = std::scoped_lock{session->control_mutex};
-  // Detach and abandon leave this state before they drop the map, and then end
-  // the waiting demands themselves.
+  // Detach and abandon leave this state before they drop the map.
   if (session->state != MLN_RENDER_SESSION_STATE_ATTACHED) return;
-  auto& map = *session->map_object;
-  const auto applied = map_commands_applied(map);
-  auto& waiting = session->update_waiting_demands;
-  auto awaited = false;
-  auto ready = std::size_t{0};
-  // The demands whose commands applied run again ahead of the queued ones, in
-  // acceptance order. One that also waits for an update parks again.
-  for (auto entry = waiting.end(); entry != waiting.begin();) {
-    --entry;
-    const auto needed = (*entry)->map_commands;
-    if (needed > applied) {
-      awaited = true;
-      continue;
-    }
-    if (needed == 0) continue;
-    session->demands.push_front(*entry);
-    entry = waiting.erase(entry);
-    ++ready;
-  }
-  // A command that finishes after the read above still finds the flag set
-  // while a demand waits.
-  map_set_commands_awaited(map, awaited);
-  for (auto index = std::size_t{0}; index < ready; ++index) {
-    if (!queue_frame_demand_work_locked(
-          *session, wakes, session->demands[index]
-        ))
-      break;
-  }
+  // Demand work that still waits sets the flag again when the driver checks
+  // it, so a command that finishes after this still sends a notice.
+  map_set_commands_awaited(*session->map_object, false);
+  publish_driver_work_locked(*session, wakes);
 }
 
 auto notify_render_session_still_image(
@@ -2957,29 +2965,6 @@ auto service_scheduler_work(
   if (expected) run_frame_demand(session, expected);
 }
 
-// Parks `demand` until the map applies the commands sent before it, so its
-// frame shows them. Returns whether it parked. A demand that can't park
-// renders what the map has.
-auto park_for_map_commands_locked(
-  mln_render_session_object& session,
-  const std::shared_ptr<const QueuedFrameDemand>& demand
-) noexcept -> bool {
-  auto& map = *session.map_object;
-  if (map_commands_applied(map) >= demand->map_commands) return false;
-  try {
-    session.update_waiting_demands.push_back(demand);
-  } catch (...) {
-    return false;
-  }
-  map_set_commands_awaited(map, true);
-  // A command that finished before the map saw the flag sent no notice.
-  if (map_commands_applied(map) >= demand->map_commands) {
-    session.update_waiting_demands.pop_back();
-    return false;
-  }
-  return true;
-}
-
 // A demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE found nothing to render in
 // the map update of `evaluated` generation. It waits for the next update
 // unless a barrier accepted after it ends the wait or no ring slot can take a
@@ -3155,6 +3140,14 @@ auto run_frame_demand(
     .view = {},
     .mode = MLN_RENDER_MODE_PARTIAL,
   };
+  // Only a detaching session lets demand work run before the map applies the
+  // demand's commands, and a frame then would miss them. The detach work
+  // behind this keeps the map until it runs.
+  if (map_commands_applied(*session->map_object) < demand->map_commands) {
+    result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
+    publish_frame_result(session, result);
+    return;
+  }
   if (session->target_released || releasing) {
     // No target can take the frame, or the host is giving it up, so a frame
     // rendered to it would only delay the release. Tile and placement results
@@ -3164,23 +3157,6 @@ auto run_frame_demand(
     publish_frame_result(session, result);
     return;
   }
-  {
-    auto wakes = DeferredWakes{};
-    const auto lock = std::scoped_lock{session->control_mutex};
-    // A barrier accepted after the demand ends it, as it ends a waiting one.
-    if (
-      session->pending_frame_barriers != 0 &&
-      map_commands_applied(*session->map_object) < demand->map_commands
-    ) {
-      publish_frame_result_locked(*session, result, wakes);
-      return;
-    }
-    if (park_for_map_commands_locked(*session, demand)) return;
-  }
-  // The map has applied the commands sent before the demand, which stored
-  // their update first.
-  result.map_update_generation =
-    map_latest_update_generation(*session->map_object);
   const auto waits_for_update =
     (demand->flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0;
   auto rendered_map_generation = result.map_update_generation;
@@ -3588,7 +3564,10 @@ auto render_session_demand_frame(
       RenderDriverWork{
         .execute = [live, queued]() { run_frame_demand(live, queued); },
         .cancel = {},
-        .ready = {},
+        .ready =
+          [owner = live.get(), queued]() {
+            return map_commands_ready_locked(*owner, queued);
+          },
         .renders_frame = true,
       },
       wakes
