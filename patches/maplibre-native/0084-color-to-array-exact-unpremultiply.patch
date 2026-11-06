@@ -1,0 +1,64 @@
+Un-premultiplies colors in Color::toArray as r / a * 255 instead of
+r * 255 / a. The channels are floats, so r * 255 rounds before the division,
+and a full channel with partial alpha comes back as 254.99998474121094:
+'#ff000080' evaluates to ["rgba",254.99998474121094,0,0,0.5], and to-rgba,
+serialize and stringify carry the same noise. Dividing first gives exactly 1
+when r == a. GL JS also divides first: Color.rgb divides by alpha, then
+to-rgba scales by 255.
+Upstream: not proposed
+
+diff --git a/src/mln/util/color.cpp b/src/mln/util/color.cpp
+index 132336c..67e9f0c 100644
+--- a/src/mln/util/color.cpp
++++ b/src/mln/util/color.cpp
+@@ -196,9 +196,9 @@ std::array<double, 4> Color::toArray() const {
+         return {{0, 0, 0, 0}};
+     } else {
+         return {{
+-            r * 255 / a,
+-            g * 255 / a,
+-            b * 255 / a,
++            r / a * 255,
++            g / a * 255,
++            b / a * 255,
+             floor(a * 100 + .5) / 100 // round to 2 decimal places
+         }};
+     }
+diff --git a/src/mln/util/color.rs.cpp b/src/mln/util/color.rs.cpp
+index dbf2331..8c19080 100644
+--- a/src/mln/util/color.rs.cpp
++++ b/src/mln/util/color.rs.cpp
+@@ -31,9 +31,9 @@ std::array<double, 4> Color::toArray() const {
+         return {{0, 0, 0, 0}};
+     } else {
+         return {{
+-            r * 255 / a,
+-            g * 255 / a,
+-            b * 255 / a,
++            r / a * 255,
++            g / a * 255,
++            b / a * 255,
+             floor(a * 100 + .5) / 100 // round to 2 decimal places
+         }};
+     }
+diff --git a/test/util/color.test.cpp b/test/util/color.test.cpp
+index 8bb17bf..cf1c891 100644
+--- a/test/util/color.test.cpp
++++ b/test/util/color.test.cpp
+@@ -1,4 +1,5 @@
+ #include <gtest/gtest.h>
++#include <array>
+ #include <optional>
+ #include <string>
+ 
+@@ -125,3 +126,10 @@ TEST(ColorInterpolate, RgbIsTheExistingInterpolation) {
+     const Color mixed = Color::interpolate(red, Color::blue(), 0.5, ColorSpace::RGB);
+     expectColor(mixed, 0.25f, 0.0f, 0.5f, 0.75f);
+ }
++
++TEST(ColorToArray, UnpremultipliesExactly) {
++    const Color red = *Color::parse("#ff000080");
++    const std::array<double, 4> expected{{255, 0, 0, 0.5}};
++    EXPECT_EQ(expected, red.toArray());
++    EXPECT_EQ("rgba(255,0,0,0.5)", red.stringify());
++}
