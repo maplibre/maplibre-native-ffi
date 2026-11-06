@@ -4712,8 +4712,7 @@ auto submit_geojson_source_data(
   task->completion = task->retained_completion.get();
   const auto prepared = prepare_map_command_task(map, *task, nullptr);
   if (prepared != MLN_STATUS_OK) return prepared;
-  const auto runtime = task->map->runtime_state;
-  const auto status = submit_runtime_command_task(runtime, *task);
+  const auto status = submit_prepared_map_command_task(*task);
   if (status == MLN_STATUS_OK) static_cast<void>(task.release());
   return status;
 }
