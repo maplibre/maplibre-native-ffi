@@ -535,7 +535,7 @@ class MomentumDecayModel(UnknownIntEnum):
     """
 
     FRICTION = 0
-    SPLINE = 1
+    PLANNED = 1
 
 
 class NetworkStatus(UnknownIntEnum):
@@ -3092,9 +3092,11 @@ class MomentumDecay:
     Speeds and distances are in the part's unit: logical pixels for pan, zoom
     levels for zoom, and degrees for bearing and pitch. A setting whose bit
     isn't set takes the part's default, which `GestureMomentum` lists.
-    `min_speed` is finite and not negative, and every other setting is finite
-    and positive. One value can serve every release, as a preset that matches
-    a platform's scrolling.
+    `min_speed` is finite and not negative, and every other number is finite
+    and positive. A friction decay can serve every release, as a preset that
+    matches a platform's scrolling. A planned glide takes its direction from
+    the part's velocity, and its distance and duration from the caller's
+    plan.
 
     See `mln_momentum_decay` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3108,20 +3110,29 @@ class MomentumDecay:
     stop_speed: float | None = None
     """For `MomentumDecayModel.FRICTION`, the speed at which it ends."""
 
-    scroll_friction: float | None = None
-    """For `MomentumDecayModel.SPLINE`, Android's
-    `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
+    distance: float | None = None
+    """Required for `MomentumDecayModel.PLANNED`."""
+
+    duration_ms: float | None = None
+    """Required for `MomentumDecayModel.PLANNED`."""
+
+    curve: UnitBezier | None = None
+    """For `MomentumDecayModel.PLANNED`, the share of `distance` covered over
+    the share of `duration_ms`. Its x values are between 0 and 1. Defaults to
+    (0, 0, 0.25, 1), the curve that camera animations ease along by default.
+    Android's scroll fling follows (0.175, 0.5, 0.35, 1).
     """
 
     min_speed: float | None = None
     """A slower release starts no momentum."""
 
     max_speed: float | None = None
-    """A faster release counts as this speed."""
+    """For `MomentumDecayModel.FRICTION`, a faster release counts as this."""
 
     max_distance: float | None = None
-    """The farthest the part moves. A release that would move farther starts
-    slower, so it ends sooner.
+    """The farthest the part moves. A friction release that would move farther
+    starts slower, so it ends sooner, and a planned glide moves at most this
+    far over its duration.
     """
 
     @classmethod
@@ -3130,7 +3141,9 @@ class MomentumDecay:
             model=_maybe(MomentumDecayModel, raw["model"]),
             half_life_ms=raw["half_life_ms"],
             stop_speed=raw["stop_speed"],
-            scroll_friction=raw["scroll_friction"],
+            distance=raw["distance"],
+            duration_ms=raw["duration_ms"],
+            curve=_maybe(UnitBezier._from_native, raw["curve"]),
             min_speed=raw["min_speed"],
             max_speed=raw["max_speed"],
             max_distance=raw["max_distance"],

@@ -4816,12 +4816,13 @@ auto momentum_defaults(
 // thread error when an option is invalid.
 auto resolve_momentum_decay(
   const mln_momentum_decay& options, mln::MomentumDecay decay,
-  std::string_view part, bool spline_allowed
+  std::string_view part
 ) -> std::optional<mln::MomentumDecay> {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_MOMENTUM_DECAY_MODEL) |
     MLN_MOMENTUM_DECAY_HALF_LIFE_MS | MLN_MOMENTUM_DECAY_STOP_SPEED |
-    MLN_MOMENTUM_DECAY_SCROLL_FRICTION | MLN_MOMENTUM_DECAY_MIN_SPEED |
+    MLN_MOMENTUM_DECAY_DISTANCE | MLN_MOMENTUM_DECAY_DURATION_MS |
+    MLN_MOMENTUM_DECAY_CURVE | MLN_MOMENTUM_DECAY_MIN_SPEED |
     MLN_MOMENTUM_DECAY_MAX_SPEED | MLN_MOMENTUM_DECAY_MAX_DISTANCE;
   const auto fields = options.fields;
   const auto fail = [part](std::string_view problem) {
@@ -4833,14 +4834,11 @@ auto resolve_momentum_decay(
   const auto has = [fields](uint32_t bit) { return (fields & bit) != 0U; };
   if ((fields & ~known_fields) != 0U) return fail("contains unknown bits");
   if (has(MLN_MOMENTUM_DECAY_MODEL)) {
-    if (options.model > MLN_MOMENTUM_DECAY_MODEL_SPLINE) {
+    if (options.model > MLN_MOMENTUM_DECAY_MODEL_PLANNED) {
       return fail("has an invalid model");
     }
-    if (options.model == MLN_MOMENTUM_DECAY_MODEL_SPLINE && !spline_allowed) {
-      return fail("can't use the spline model, which only pan can use");
-    }
-    decay.model = options.model == MLN_MOMENTUM_DECAY_MODEL_SPLINE
-                    ? mln::MomentumDecay::Model::Spline
+    decay.model = options.model == MLN_MOMENTUM_DECAY_MODEL_PLANNED
+                    ? mln::MomentumDecay::Model::Planned
                     : mln::MomentumDecay::Model::Friction;
   }
   const auto positive = [](double value) {
@@ -4857,8 +4855,7 @@ auto resolve_momentum_decay(
   }
   if (
     (has(MLN_MOMENTUM_DECAY_STOP_SPEED) && !positive(options.stop_speed)) ||
-    (has(MLN_MOMENTUM_DECAY_SCROLL_FRICTION) &&
-     !positive(options.scroll_friction)) ||
+    (has(MLN_MOMENTUM_DECAY_DISTANCE) && !positive(options.distance)) ||
     (has(MLN_MOMENTUM_DECAY_MIN_SPEED) &&
      !(std::isfinite(options.min_speed) && options.min_speed >= 0.0)) ||
     (has(MLN_MOMENTUM_DECAY_MAX_SPEED) && !positive(options.max_speed)) ||
@@ -4870,8 +4867,33 @@ auto resolve_momentum_decay(
     );
   }
   if (has(MLN_MOMENTUM_DECAY_STOP_SPEED)) decay.stopSpeed = options.stop_speed;
-  if (has(MLN_MOMENTUM_DECAY_SCROLL_FRICTION)) {
-    decay.scrollFriction = options.scroll_friction;
+  if (decay.model == mln::MomentumDecay::Model::Planned) {
+    if (
+      !has(MLN_MOMENTUM_DECAY_DISTANCE) || !has(MLN_MOMENTUM_DECAY_DURATION_MS)
+    ) {
+      return fail("needs a distance and a duration for a planned glide");
+    }
+    if (
+      !positive(options.duration_ms) ||
+      !is_native_duration_ms(options.duration_ms)
+    ) {
+      return fail("needs a positive duration in the native duration range");
+    }
+    if (has(MLN_MOMENTUM_DECAY_CURVE)) {
+      const auto curve = options.curve;
+      if (
+        !std::isfinite(curve.x1) || !std::isfinite(curve.y1) ||
+        !std::isfinite(curve.x2) || !std::isfinite(curve.y2) ||
+        curve.x1 < 0.0 || curve.x1 > 1.0 || curve.x2 < 0.0 || curve.x2 > 1.0
+      ) {
+        return fail("needs a finite curve whose x values are within [0, 1]");
+      }
+      decay.curve = {
+        .x1 = curve.x1, .y1 = curve.y1, .x2 = curve.x2, .y2 = curve.y2
+      };
+    }
+    decay.distance = options.distance;
+    decay.duration = duration_from_milliseconds(options.duration_ms);
   }
   if (has(MLN_MOMENTUM_DECAY_MIN_SPEED)) decay.minSpeed = options.min_speed;
   if (has(MLN_MOMENTUM_DECAY_MAX_SPEED)) decay.maxSpeed = options.max_speed;
@@ -4951,7 +4973,7 @@ auto to_native_anchored_momentum(
       return std::nullopt;
     result.anchor = to_native_screen_point(part.anchor);
   }
-  const auto decay = resolve_momentum_decay(part.decay, defaults, name, false);
+  const auto decay = resolve_momentum_decay(part.decay, defaults, name);
   if (!decay) return std::nullopt;
   result.decay = *decay;
   return result;
@@ -4979,7 +5001,7 @@ auto to_native_gesture_momentum(const mln_gesture_momentum& momentum)
     result.panVelocity = to_native_screen_point(pan.velocity);
   }
   const auto pan_decay = resolve_momentum_decay(
-    pan.decay, momentum_defaults(10.0, 200.0, 10000.0), "pan", true
+    pan.decay, momentum_defaults(10.0, 200.0, 10000.0), "pan"
   );
   if (!pan_decay) return std::nullopt;
   result.panDecay = *pan_decay;

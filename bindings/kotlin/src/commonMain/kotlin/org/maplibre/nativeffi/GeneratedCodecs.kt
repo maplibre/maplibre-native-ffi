@@ -333,7 +333,7 @@ internal fun NativeArena.writePremultipliedRgba8Image(value: PremultipliedRgba8I
 
 @JvmSynthetic
 internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
-  writeU32(target, w(552, 560, 524).toUInt())
+  writeU32(target, w(712, 720, 684).toUInt())
   var fields = 0u
   value.offset?.let {
     fields = fields or 1u
@@ -359,14 +359,14 @@ internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
     fields = fields or 32u
     putGestureMomentum(target + 64, it)
   }
-  putAnimationOptions(target + w(448, 448, 428), value.animation)
-  writeU32(target + w(544, 552, 516), value.gesturePhase.rawValue)
+  putAnimationOptions(target + w(608, 608, 588), value.animation)
+  writeU32(target + w(704, 712, 676), value.gesturePhase.rawValue)
   writeU32(target + 4, fields)
 }
 
 @JvmSynthetic
 internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
-  allocate(w(552, 560, 524), w(8, 8, 4)).also { putCameraDelta(it, value) }
+  allocate(w(712, 720, 684), w(8, 8, 4)).also { putCameraDelta(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putAndroidHardwareBufferRingDescriptor(
@@ -1883,19 +1883,19 @@ internal fun NativeArena.writeStyleExpressionType(value: StyleExpressionType): L
 internal fun NativeArena.putGestureMomentum(target: Long, value: GestureMomentum) {
   var fields = 0u
   putPanMomentum(target + w(8, 8, 4), value.pan)
-  putAnchoredMomentum(target + w(88, 88, 80), value.zoom)
-  putAnchoredMomentum(target + w(176, 176, 164), value.bearing)
-  putAnchoredMomentum(target + w(264, 264, 248), value.pitch)
+  putAnchoredMomentum(target + w(128, 128, 120), value.zoom)
+  putAnchoredMomentum(target + w(256, 256, 244), value.bearing)
+  putAnchoredMomentum(target + w(384, 384, 368), value.pitch)
   value.bearingSnap?.let {
     fields = fields or 1u
-    putBearingSnap(target + w(352, 352, 332), it)
+    putBearingSnap(target + w(512, 512, 492), it)
   }
   writeU32(target, fields)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeGestureMomentum(value: GestureMomentum): Long =
-  allocate(w(384, 384, 364), w(8, 8, 4)).also { putGestureMomentum(it, value) }
+  allocate(w(544, 544, 524), w(8, 8, 4)).also { putGestureMomentum(it, value) }
 
 @JvmSynthetic
 internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
@@ -2448,7 +2448,7 @@ internal fun NativeArena.putPanMomentum(target: Long, value: PanMomentum) {
 
 @JvmSynthetic
 internal fun NativeArena.writePanMomentum(value: PanMomentum): Long =
-  allocate(w(80, 80, 76), w(8, 8, 4)).also { putPanMomentum(it, value) }
+  allocate(w(120, 120, 116), w(8, 8, 4)).also { putPanMomentum(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putAnchoredMomentum(target: Long, value: AnchoredMomentum) {
@@ -2467,7 +2467,7 @@ internal fun NativeArena.putAnchoredMomentum(target: Long, value: AnchoredMoment
 
 @JvmSynthetic
 internal fun NativeArena.writeAnchoredMomentum(value: AnchoredMomentum): Long =
-  allocate(w(88, 88, 84), w(8, 8, 4)).also { putAnchoredMomentum(it, value) }
+  allocate(w(128, 128, 124), w(8, 8, 4)).also { putAnchoredMomentum(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putBearingSnap(target: Long, value: BearingSnap) {
@@ -2682,28 +2682,36 @@ internal fun NativeArena.putMomentumDecay(target: Long, value: MomentumDecay) {
     fields = fields or 4u
     writeF64(target + 16, it)
   }
-  value.scrollFriction?.let {
+  value.distance?.let {
     fields = fields or 8u
     writeF64(target + 24, it)
   }
-  value.minSpeed?.let {
+  value.durationMs?.let {
     fields = fields or 16u
     writeF64(target + 32, it)
   }
-  value.maxSpeed?.let {
+  value.curve?.let {
     fields = fields or 32u
-    writeF64(target + 40, it)
+    putUnitBezier(target + 40, it)
+  }
+  value.minSpeed?.let {
+    fields = fields or 64u
+    writeF64(target + 72, it)
+  }
+  value.maxSpeed?.let {
+    fields = fields or 128u
+    writeF64(target + 80, it)
   }
   value.maxDistance?.let {
-    fields = fields or 64u
-    writeF64(target + 48, it)
+    fields = fields or 256u
+    writeF64(target + 88, it)
   }
   writeU32(target, fields)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeMomentumDecay(value: MomentumDecay): Long =
-  allocate(56, w(8, 8, 4)).also { putMomentumDecay(it, value) }
+  allocate(96, w(8, 8, 4)).also { putMomentumDecay(it, value) }
 
 @JvmSynthetic
 internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =

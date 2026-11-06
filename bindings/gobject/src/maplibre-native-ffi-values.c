@@ -90,13 +90,45 @@ MaplibreNativeFfiScreenPoint* maplibre_native_ffi_screen_point_from_native(
   return self;
 }
 
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiUnitBezier, maplibre_native_ffi_unit_bezier,
+  maplibre_native_ffi_unit_bezier_copy, maplibre_native_ffi_unit_bezier_free
+)
+
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_unit_bezier_copy(
+  const MaplibreNativeFfiUnitBezier* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_unit_bezier_free(MaplibreNativeFfiUnitBezier* self) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiUnitBezier) == sizeof(mln_unit_bezier));
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x1);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y1);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x2);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y2);
+
+void maplibre_native_ffi_unit_bezier_to_native(
+  const MaplibreNativeFfiUnitBezier* self, mln_unit_bezier* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memcpy(out, self, sizeof *out);
+}
+
 struct _MaplibreNativeFfiMomentumDecay {
   GObject parent_instance;
   guint64 fields;
   MaplibreNativeFfiMomentumDecayModel model;
   gdouble half_life_ms;
   gdouble stop_speed;
-  gdouble scroll_friction;
+  gdouble distance;
+  gdouble duration_ms;
+  MaplibreNativeFfiUnitBezier curve;
   gdouble min_speed;
   gdouble max_speed;
   gdouble max_distance;
@@ -107,7 +139,9 @@ enum {
   MOMENTUM_DECAY_PROP_MODEL,
   MOMENTUM_DECAY_PROP_HALF_LIFE_MS,
   MOMENTUM_DECAY_PROP_STOP_SPEED,
-  MOMENTUM_DECAY_PROP_SCROLL_FRICTION,
+  MOMENTUM_DECAY_PROP_DISTANCE,
+  MOMENTUM_DECAY_PROP_DURATION_MS,
+  MOMENTUM_DECAY_PROP_CURVE,
   MOMENTUM_DECAY_PROP_MIN_SPEED,
   MOMENTUM_DECAY_PROP_MAX_SPEED,
   MOMENTUM_DECAY_PROP_MAX_DISTANCE,
@@ -136,8 +170,14 @@ static void maplibre_native_ffi_momentum_decay_get_property(
     case MOMENTUM_DECAY_PROP_STOP_SPEED:
       g_value_set_double(value, self->stop_speed);
       break;
-    case MOMENTUM_DECAY_PROP_SCROLL_FRICTION:
-      g_value_set_double(value, self->scroll_friction);
+    case MOMENTUM_DECAY_PROP_DISTANCE:
+      g_value_set_double(value, self->distance);
+      break;
+    case MOMENTUM_DECAY_PROP_DURATION_MS:
+      g_value_set_double(value, self->duration_ms);
+      break;
+    case MOMENTUM_DECAY_PROP_CURVE:
+      g_value_set_boxed(value, &self->curve);
       break;
     case MOMENTUM_DECAY_PROP_MIN_SPEED:
       g_value_set_double(value, self->min_speed);
@@ -174,9 +214,19 @@ static void maplibre_native_ffi_momentum_decay_set_property(
         self, g_value_get_double(value)
       );
       break;
-    case MOMENTUM_DECAY_PROP_SCROLL_FRICTION:
-      maplibre_native_ffi_momentum_decay_set_scroll_friction(
+    case MOMENTUM_DECAY_PROP_DISTANCE:
+      maplibre_native_ffi_momentum_decay_set_distance(
         self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_DURATION_MS:
+      maplibre_native_ffi_momentum_decay_set_duration_ms(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_CURVE:
+      maplibre_native_ffi_momentum_decay_set_curve(
+        self, g_value_get_boxed(value)
       );
       break;
     case MOMENTUM_DECAY_PROP_MIN_SPEED:
@@ -217,10 +267,16 @@ static void maplibre_native_ffi_momentum_decay_class_init(
     g_param_spec_double(
       "stop-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
     );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_SCROLL_FRICTION] =
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_DISTANCE] = g_param_spec_double(
+    "distance", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+  );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_DURATION_MS] =
     g_param_spec_double(
-      "scroll-friction", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+      "duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
     );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_CURVE] = g_param_spec_boxed(
+    "curve", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_UNIT_BEZIER, PROPERTY_FLAGS
+  );
   momentum_decay_properties[MOMENTUM_DECAY_PROP_MIN_SPEED] =
     g_param_spec_double(
       "min-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
@@ -338,32 +394,88 @@ void maplibre_native_ffi_momentum_decay_set_stop_speed(
     );
 }
 
-gdouble maplibre_native_ffi_momentum_decay_get_scroll_friction(
+gdouble maplibre_native_ffi_momentum_decay_get_distance(
   MaplibreNativeFfiMomentumDecay* self
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
-  return self->scroll_friction;
+  return self->distance;
 }
 
-gboolean maplibre_native_ffi_momentum_decay_has_scroll_friction(
+gboolean maplibre_native_ffi_momentum_decay_has_distance(
   MaplibreNativeFfiMomentumDecay* self
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_SCROLL_FRICTION) != 0;
+  return (self->fields & MLN_MOMENTUM_DECAY_DISTANCE) != 0;
 }
 
-void maplibre_native_ffi_momentum_decay_set_scroll_friction(
+void maplibre_native_ffi_momentum_decay_set_distance(
   MaplibreNativeFfiMomentumDecay* self, gdouble value
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_SCROLL_FRICTION) != 0;
-  gboolean changed = self->scroll_friction != value;
-  self->scroll_friction = value;
-  self->fields |= MLN_MOMENTUM_DECAY_SCROLL_FRICTION;
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_DISTANCE) != 0;
+  gboolean changed = self->distance != value;
+  self->distance = value;
+  self->fields |= MLN_MOMENTUM_DECAY_DISTANCE;
   if (changed || !was_set)
     g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_decay_properties[MOMENTUM_DECAY_PROP_SCROLL_FRICTION]
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_DISTANCE]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->duration_ms;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_DURATION_MS) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_DURATION_MS) != 0;
+  gboolean changed = self->duration_ms != value;
+  self->duration_ms = value;
+  self->fields |= MLN_MOMENTUM_DECAY_DURATION_MS;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_DURATION_MS]
+    );
+}
+
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_momentum_decay_get_curve(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), NULL);
+  return (MaplibreNativeFfiUnitBezier*)&self->curve;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_curve(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_CURVE) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_curve(
+  MaplibreNativeFfiMomentumDecay* self, const MaplibreNativeFfiUnitBezier* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  g_return_if_fail(value != NULL);
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_CURVE) != 0;
+  gboolean changed = memcmp(&self->curve, value, sizeof self->curve) != 0;
+  self->curve = *value;
+  self->fields |= MLN_MOMENTUM_DECAY_CURVE;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_CURVE]
     );
 }
 
@@ -461,7 +573,9 @@ MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_momentum_decay_copy(
   copy->model = self->model;
   copy->half_life_ms = self->half_life_ms;
   copy->stop_speed = self->stop_speed;
-  copy->scroll_friction = self->scroll_friction;
+  copy->distance = self->distance;
+  copy->duration_ms = self->duration_ms;
+  copy->curve = self->curve;
   copy->min_speed = self->min_speed;
   copy->max_speed = self->max_speed;
   copy->max_distance = self->max_distance;
@@ -472,13 +586,14 @@ void maplibre_native_ffi_momentum_decay_to_native(
   const MaplibreNativeFfiMomentumDecay* self, mln_momentum_decay* out,
   MaplibreNativeFfiCall* call
 ) {
-  (void)call;
   memset(out, 0, sizeof *out);
   out->fields = (mln_momentum_decay_fields)self->fields;
   out->model = (mln_momentum_decay_model)(self->model);
   out->half_life_ms = (double)(self->half_life_ms);
   out->stop_speed = (double)(self->stop_speed);
-  out->scroll_friction = (double)(self->scroll_friction);
+  out->distance = (double)(self->distance);
+  out->duration_ms = (double)(self->duration_ms);
+  maplibre_native_ffi_unit_bezier_to_native(&self->curve, &out->curve, call);
   out->min_speed = (double)(self->min_speed);
   out->max_speed = (double)(self->max_speed);
   out->max_distance = (double)(self->max_distance);
@@ -708,36 +823,6 @@ void maplibre_native_ffi_anchored_momentum_to_native(
     maplibre_native_ffi_momentum_decay_to_native(
       self->decay, &out->decay, call
     );
-}
-
-G_DEFINE_BOXED_TYPE(
-  MaplibreNativeFfiUnitBezier, maplibre_native_ffi_unit_bezier,
-  maplibre_native_ffi_unit_bezier_copy, maplibre_native_ffi_unit_bezier_free
-)
-
-MaplibreNativeFfiUnitBezier* maplibre_native_ffi_unit_bezier_copy(
-  const MaplibreNativeFfiUnitBezier* self
-) {
-  g_return_val_if_fail(self != NULL, NULL);
-  return g_memdup2(self, sizeof *self);
-}
-
-void maplibre_native_ffi_unit_bezier_free(MaplibreNativeFfiUnitBezier* self) {
-  g_free(self);
-}
-
-G_STATIC_ASSERT(sizeof(MaplibreNativeFfiUnitBezier) == sizeof(mln_unit_bezier));
-SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x1);
-SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y1);
-SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x2);
-SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y2);
-
-void maplibre_native_ffi_unit_bezier_to_native(
-  const MaplibreNativeFfiUnitBezier* self, mln_unit_bezier* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiCameraTransitionHandler {

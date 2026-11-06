@@ -503,10 +503,11 @@ typedef enum mln_momentum_decay_model : uint32_t {
    */
   MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0,
   /**
-   * Android's scroll fling, as OverScroller computes it with
-   * `scroll_friction`. Only pan can use it.
+   * The part moves `distance` over `duration_ms`, along `curve`. The caller
+   * plans the glide, for example from the platform's own fling physics, such
+   * as Android's OverScroller.
    */
-  MLN_MOMENTUM_DECAY_MODEL_SPLINE = 1,
+  MLN_MOMENTUM_DECAY_MODEL_PLANNED = 1,
 } mln_momentum_decay_model;
 
 /** The fields that mln_momentum_decay sets. */
@@ -514,10 +515,12 @@ typedef enum MLN_BINDING("kind=bitmask") mln_momentum_decay_field : uint32_t {
   MLN_MOMENTUM_DECAY_MODEL = 1U << 0U,
   MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 1U << 1U,
   MLN_MOMENTUM_DECAY_STOP_SPEED = 1U << 2U,
-  MLN_MOMENTUM_DECAY_SCROLL_FRICTION = 1U << 3U,
-  MLN_MOMENTUM_DECAY_MIN_SPEED = 1U << 4U,
-  MLN_MOMENTUM_DECAY_MAX_SPEED = 1U << 5U,
-  MLN_MOMENTUM_DECAY_MAX_DISTANCE = 1U << 6U,
+  MLN_MOMENTUM_DECAY_DISTANCE = 1U << 3U,
+  MLN_MOMENTUM_DECAY_DURATION_MS = 1U << 4U,
+  MLN_MOMENTUM_DECAY_CURVE = 1U << 5U,
+  MLN_MOMENTUM_DECAY_MIN_SPEED = 1U << 6U,
+  MLN_MOMENTUM_DECAY_MAX_SPEED = 1U << 7U,
+  MLN_MOMENTUM_DECAY_MAX_DISTANCE = 1U << 8U,
 } mln_momentum_decay_field;
 
 /** A set of mln_momentum_decay_field bits. */
@@ -529,9 +532,10 @@ typedef uint32_t mln_momentum_decay_fields;
  * Speeds and distances are in the part's unit: logical pixels for pan, zoom
  * levels for zoom, and degrees for bearing and pitch. A setting whose bit
  * isn't set takes the part's default, which mln_gesture_momentum lists.
- * `min_speed` is finite and not negative, and every other setting is finite
- * and positive. One value can serve every release, as a preset that matches a
- * platform's scrolling.
+ * `min_speed` is finite and not negative, and every other number is finite
+ * and positive. A friction decay can serve every release, as a preset that
+ * matches a platform's scrolling. A planned glide takes its direction from the
+ * part's velocity, and its distance and duration from the caller's plan.
  */
 typedef struct mln_momentum_decay {
   mln_momentum_decay_fields fields;
@@ -544,19 +548,26 @@ typedef struct mln_momentum_decay {
   /** For MLN_MOMENTUM_DECAY_MODEL_FRICTION, the speed at which it ends. */
   double stop_speed
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_STOP_SPEED");
+  /** Required for MLN_MOMENTUM_DECAY_MODEL_PLANNED. */
+  double distance MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_DISTANCE");
+  /** Required for MLN_MOMENTUM_DECAY_MODEL_PLANNED. */
+  double duration_ms
+    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_DURATION_MS");
   /**
-   * For MLN_MOMENTUM_DECAY_MODEL_SPLINE, Android's
-   * `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
+   * For MLN_MOMENTUM_DECAY_MODEL_PLANNED, the share of `distance` covered over
+   * the share of `duration_ms`. Its x values are between 0 and 1. Defaults to
+   * (0, 0, 0.25, 1), the curve that camera animations ease along by default.
+   * Android's scroll fling follows (0.175, 0.5, 0.35, 1).
    */
-  double scroll_friction
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_SCROLL_FRICTION");
+  mln_unit_bezier curve MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_CURVE");
   /** A slower release starts no momentum. */
   double min_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_MIN_SPEED");
-  /** A faster release counts as this speed. */
+  /** For MLN_MOMENTUM_DECAY_MODEL_FRICTION, a faster release counts as this. */
   double max_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_MAX_SPEED");
   /**
-   * The farthest the part moves. A release that would move farther starts
-   * slower, so it ends sooner.
+   * The farthest the part moves. A friction release that would move farther
+   * starts slower, so it ends sooner, and a planned glide moves at most this
+   * far over its duration.
    */
   double max_distance
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_MAX_DISTANCE");

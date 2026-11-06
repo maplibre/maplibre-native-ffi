@@ -1057,7 +1057,7 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
   override fun toString(): String =
     when (rawValue) {
       0u -> "FRICTION"
-      1u -> "SPLINE"
+      1u -> "PLANNED"
       else -> "MomentumDecayModel($rawValue)"
     }
 
@@ -1075,12 +1075,12 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
     /** The `rawValue` of [FRICTION]. */
     public const val FRICTION_VALUE: UInt = 0u
     /**
-     * Android's scroll fling, as OverScroller computes it with `scroll_friction`. Only pan can use
-     * it.
+     * The part moves `distance` over `duration_ms`, along `curve`. The caller plans the glide, for
+     * example from the platform's own fling physics, such as Android's OverScroller.
      */
-    @JvmField public val SPLINE: MomentumDecayModel = MomentumDecayModel(SPLINE_VALUE)
-    /** The `rawValue` of [SPLINE]. */
-    public const val SPLINE_VALUE: UInt = 1u
+    @JvmField public val PLANNED: MomentumDecayModel = MomentumDecayModel(PLANNED_VALUE)
+    /** The `rawValue` of [PLANNED]. */
+    public const val PLANNED_VALUE: UInt = 1u
 
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
@@ -1088,7 +1088,7 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
     public fun of(rawValue: UInt): MomentumDecayModel =
       when (rawValue) {
         FRICTION_VALUE -> FRICTION
-        SPLINE_VALUE -> SPLINE
+        PLANNED_VALUE -> PLANNED
         else -> MomentumDecayModel(rawValue)
       }
   }
@@ -4800,13 +4800,45 @@ public data class PremultipliedRgba8Image(
 }
 
 /**
+ * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`) and (`x2`, `y2`).
+ *
+ * `x1` and `x2` are between 0 and 1.
+ *
+ * See `mln_unit_bezier` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class UnitBezier(
+  public val x1: Double = 0.0,
+  public val y1: Double = 0.0,
+  public val x2: Double = 0.0,
+  public val y2: Double = 0.0,
+) {
+  @PublishedApi internal fun withX1(x1: Double): UnitBezier = copy(x1 = x1)
+
+  @PublishedApi internal fun withY1(y1: Double): UnitBezier = copy(y1 = y1)
+
+  @PublishedApi internal fun withX2(x2: Double): UnitBezier = copy(x2 = x2)
+
+  @PublishedApi internal fun withY2(y2: Double): UnitBezier = copy(y2 = y2)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): UnitBezier = UnitBezier()
+  }
+}
+
+/**
  * How one part of a gesture's momentum slows from its release speed.
  *
  * Speeds and distances are in the part's unit: logical pixels for pan, zoom levels for zoom, and
  * degrees for bearing and pitch. A setting whose bit isn't set takes the part's default, which
- * `GestureMomentum` lists. `min_speed` is finite and not negative, and every other setting is
- * finite and positive. One value can serve every release, as a preset that matches a platform's
- * scrolling.
+ * `GestureMomentum` lists. `min_speed` is finite and not negative, and every other number is finite
+ * and positive. A friction decay can serve every release, as a preset that matches a platform's
+ * scrolling. A planned glide takes its direction from the part's velocity, and its distance and
+ * duration from the caller's plan.
  *
  * See `mln_momentum_decay` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4817,18 +4849,23 @@ public data class MomentumDecay(
   public val halfLifeMs: Double? = null,
   /** For `MomentumDecayModel.FRICTION`, the speed at which it ends. */
   public val stopSpeed: Double? = null,
+  /** Required for `MomentumDecayModel.PLANNED`. */
+  public val distance: Double? = null,
+  /** Required for `MomentumDecayModel.PLANNED`. */
+  public val durationMs: Double? = null,
   /**
-   * For `MomentumDecayModel.SPLINE`, Android's `ViewConfiguration.getScrollFriction()`. Defaults to
-   * 0.015.
+   * For `MomentumDecayModel.PLANNED`, the share of `distance` covered over the share of
+   * `duration_ms`. Its x values are between 0 and 1. Defaults to (0, 0, 0.25, 1), the curve that
+   * camera animations ease along by default. Android's scroll fling follows (0.175, 0.5, 0.35, 1).
    */
-  public val scrollFriction: Double? = null,
+  public val curve: UnitBezier? = null,
   /** A slower release starts no momentum. */
   public val minSpeed: Double? = null,
-  /** A faster release counts as this speed. */
+  /** For `MomentumDecayModel.FRICTION`, a faster release counts as this. */
   public val maxSpeed: Double? = null,
   /**
-   * The farthest the part moves. A release that would move farther starts slower, so it ends
-   * sooner.
+   * The farthest the part moves. A friction release that would move farther starts slower, so it
+   * ends sooner, and a planned glide moves at most this far over its duration.
    */
   public val maxDistance: Double? = null,
 ) {
@@ -4842,8 +4879,12 @@ public data class MomentumDecay(
   internal fun withStopSpeed(stopSpeed: Double): MomentumDecay = copy(stopSpeed = stopSpeed)
 
   @PublishedApi
-  internal fun withScrollFriction(scrollFriction: Double): MomentumDecay =
-    copy(scrollFriction = scrollFriction)
+  internal fun withDistance(distance: Double): MomentumDecay = copy(distance = distance)
+
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): MomentumDecay = copy(durationMs = durationMs)
+
+  @PublishedApi internal fun withCurve(curve: UnitBezier): MomentumDecay = copy(curve = curve)
 
   @PublishedApi
   internal fun withMinSpeed(minSpeed: Double): MomentumDecay = copy(minSpeed = minSpeed)
@@ -5021,37 +5062,6 @@ public data class GestureMomentum(
      * `withX` methods.
      */
     @JvmStatic @PublishedApi internal fun of(): GestureMomentum = GestureMomentum()
-  }
-}
-
-/**
- * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`) and (`x2`, `y2`).
- *
- * `x1` and `x2` are between 0 and 1.
- *
- * See `mln_unit_bezier` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class UnitBezier(
-  public val x1: Double = 0.0,
-  public val y1: Double = 0.0,
-  public val x2: Double = 0.0,
-  public val y2: Double = 0.0,
-) {
-  @PublishedApi internal fun withX1(x1: Double): UnitBezier = copy(x1 = x1)
-
-  @PublishedApi internal fun withY1(y1: Double): UnitBezier = copy(y1 = y1)
-
-  @PublishedApi internal fun withX2(x2: Double): UnitBezier = copy(x2 = x2)
-
-  @PublishedApi internal fun withY2(y2: Double): UnitBezier = copy(y2 = y2)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): UnitBezier = UnitBezier()
   }
 }
 

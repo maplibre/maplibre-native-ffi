@@ -1361,10 +1361,17 @@ internal static unsafe class GeneratedValues
             MLN_MOMENTUM_DECAY_HALF_LIFE_MS
         );
         native.fields |= Put(value.StopSpeed, ref native.stop_speed, MLN_MOMENTUM_DECAY_STOP_SPEED);
+        native.fields |= Put(value.Distance, ref native.distance, MLN_MOMENTUM_DECAY_DISTANCE);
         native.fields |= Put(
-            value.ScrollFriction,
-            ref native.scroll_friction,
-            MLN_MOMENTUM_DECAY_SCROLL_FRICTION
+            value.DurationMs,
+            ref native.duration_ms,
+            MLN_MOMENTUM_DECAY_DURATION_MS
+        );
+        native.fields |= Put(
+            value.Curve,
+            ref native.curve,
+            MLN_MOMENTUM_DECAY_CURVE,
+            NativeUnitBezier
         );
         native.fields |= Put(value.MinSpeed, ref native.min_speed, MLN_MOMENTUM_DECAY_MIN_SPEED);
         native.fields |= Put(value.MaxSpeed, ref native.max_speed, MLN_MOMENTUM_DECAY_MAX_SPEED);

@@ -664,12 +664,14 @@ static void delta_momentum_zero_half_life(void* descriptor) {
   delta->momentum.zoom.decay.fields = MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
   delta->momentum.zoom.decay.half_life_ms = 0.0;
 }
-static void delta_momentum_spline_zoom(void* descriptor) {
+static void delta_momentum_planned_without_distance(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.zoom.decay.fields = MLN_MOMENTUM_DECAY_MODEL;
-  delta->momentum.zoom.decay.model = MLN_MOMENTUM_DECAY_MODEL_SPLINE;
+  mln_momentum_decay* decay = &delta->momentum.zoom.decay;
+  decay->fields = MLN_MOMENTUM_DECAY_MODEL | MLN_MOMENTUM_DECAY_DURATION_MS;
+  decay->model = MLN_MOMENTUM_DECAY_MODEL_PLANNED;
+  decay->duration_ms = 300.0;
 }
 static void delta_momentum_snap_without_targets(void* descriptor) {
   mln_camera_delta* delta = descriptor;
@@ -717,8 +719,8 @@ static const mln_test_validation_case delta_cases[] = {
    MLN_STATUS_INVALID_ARGUMENT, "isn't negative"},
   {"zero momentum half-life", delta_momentum_zero_half_life,
    MLN_STATUS_INVALID_ARGUMENT, "positive half-life"},
-  {"spline decay outside pan", delta_momentum_spline_zoom,
-   MLN_STATUS_INVALID_ARGUMENT, "only pan can use"},
+  {"planned glide without a distance", delta_momentum_planned_without_distance,
+   MLN_STATUS_INVALID_ARGUMENT, "needs a distance and a duration"},
   {"bearing snap without targets", delta_momentum_snap_without_targets,
    MLN_STATUS_INVALID_ARGUMENT, "needs a target"},
   {"unselected momentum fields stay unread", delta_momentum_unselected_garbage,

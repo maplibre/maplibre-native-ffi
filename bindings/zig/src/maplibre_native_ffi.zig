@@ -5913,9 +5913,10 @@ pub const MetalTextureFrame = struct {
 /// Speeds and distances are in the part's unit: logical pixels for pan, zoom
 /// levels for zoom, and degrees for bearing and pitch. A setting whose bit
 /// isn't set takes the part's default, which `GestureMomentum` lists.
-/// `min_speed` is finite and not negative, and every other setting is finite
-/// and positive. One value can serve every release, as a preset that matches a
-/// platform's scrolling.
+/// `min_speed` is finite and not negative, and every other number is finite and
+/// positive. A friction decay can serve every release, as a preset that matches
+/// a platform's scrolling. A planned glide takes its direction from the part's
+/// velocity, and its distance and duration from the caller's plan.
 ///
 /// See `mln_momentum_decay` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5925,15 +5926,22 @@ pub const MomentumDecay = struct {
     half_life_ms: ?f64 = null,
     /// For `MomentumDecayModel.friction`, the speed at which it ends.
     stop_speed: ?f64 = null,
-    /// For `MomentumDecayModel.spline`, Android's
-    /// `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
-    scroll_friction: ?f64 = null,
+    /// Required for `MomentumDecayModel.planned`.
+    distance: ?f64 = null,
+    /// Required for `MomentumDecayModel.planned`.
+    duration_ms: ?f64 = null,
+    /// For `MomentumDecayModel.planned`, the share of `distance` covered over
+    /// the share of `duration_ms`. Its x values are between 0 and 1. Defaults
+    /// to (0, 0, 0.25, 1), the curve that camera animations ease along by
+    /// default. Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+    curve: ?UnitBezier = null,
     /// A slower release starts no momentum.
     min_speed: ?f64 = null,
-    /// A faster release counts as this speed.
+    /// For `MomentumDecayModel.friction`, a faster release counts as this.
     max_speed: ?f64 = null,
-    /// The farthest the part moves. A release that would move farther starts
-    /// slower, so it ends sooner.
+    /// The farthest the part moves. A friction release that would move farther
+    /// starts slower, so it ends sooner, and a planned glide moves at most this
+    /// far over its duration.
     max_distance: ?f64 = null,
     pub fn toNative(self: MomentumDecay) c.mln_momentum_decay {
         var raw = std.mem.zeroes(c.mln_momentum_decay);
@@ -5941,7 +5949,9 @@ pub const MomentumDecay = struct {
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MODEL, &raw.model, self.model);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_HALF_LIFE_MS, &raw.half_life_ms, self.half_life_ms);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_STOP_SPEED, &raw.stop_speed, self.stop_speed);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_SCROLL_FRICTION, &raw.scroll_friction, self.scroll_friction);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DISTANCE, &raw.distance, self.distance);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DURATION_MS, &raw.duration_ms, self.duration_ms);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_CURVE, &raw.curve, self.curve);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MIN_SPEED, &raw.min_speed, self.min_speed);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MAX_SPEED, &raw.max_speed, self.max_speed);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MAX_DISTANCE, &raw.max_distance, self.max_distance);
@@ -5952,7 +5962,9 @@ pub const MomentumDecay = struct {
             .model = if (raw.fields & c.MLN_MOMENTUM_DECAY_MODEL != 0) MomentumDecayModel.fromNative(raw.model) else null,
             .half_life_ms = if (raw.fields & c.MLN_MOMENTUM_DECAY_HALF_LIFE_MS != 0) raw.half_life_ms else null,
             .stop_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_STOP_SPEED != 0) raw.stop_speed else null,
-            .scroll_friction = if (raw.fields & c.MLN_MOMENTUM_DECAY_SCROLL_FRICTION != 0) raw.scroll_friction else null,
+            .distance = if (raw.fields & c.MLN_MOMENTUM_DECAY_DISTANCE != 0) raw.distance else null,
+            .duration_ms = if (raw.fields & c.MLN_MOMENTUM_DECAY_DURATION_MS != 0) raw.duration_ms else null,
+            .curve = if (raw.fields & c.MLN_MOMENTUM_DECAY_CURVE != 0) UnitBezier.fromNative(raw.curve) else null,
             .min_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_MIN_SPEED != 0) raw.min_speed else null,
             .max_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_MAX_SPEED != 0) raw.max_speed else null,
             .max_distance = if (raw.fields & c.MLN_MOMENTUM_DECAY_MAX_DISTANCE != 0) raw.max_distance else null,
@@ -5969,9 +5981,10 @@ pub const MomentumDecayModel = enum(u32) {
     /// UIScrollView's normal deceleration is a half-life of 346 ms, and its
     /// fast deceleration 69 ms.
     friction = 0,
-    /// Android's scroll fling, as OverScroller computes it with
-    /// `scroll_friction`. Only pan can use it.
-    spline = 1,
+    /// The part moves `distance` over `duration_ms`, along `curve`. The caller
+    /// plans the glide, for example from the platform's own fling physics, such
+    /// as Android's OverScroller.
+    planned = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;

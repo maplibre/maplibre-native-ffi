@@ -198,13 +198,15 @@ pub type mln_momentum_decay_field = u32;
 pub const MLN_MOMENTUM_DECAY_MODEL: mln_momentum_decay_field = 1;
 pub const MLN_MOMENTUM_DECAY_HALF_LIFE_MS: mln_momentum_decay_field = 2;
 pub const MLN_MOMENTUM_DECAY_STOP_SPEED: mln_momentum_decay_field = 4;
-pub const MLN_MOMENTUM_DECAY_SCROLL_FRICTION: mln_momentum_decay_field = 8;
-pub const MLN_MOMENTUM_DECAY_MIN_SPEED: mln_momentum_decay_field = 16;
-pub const MLN_MOMENTUM_DECAY_MAX_SPEED: mln_momentum_decay_field = 32;
-pub const MLN_MOMENTUM_DECAY_MAX_DISTANCE: mln_momentum_decay_field = 64;
+pub const MLN_MOMENTUM_DECAY_DISTANCE: mln_momentum_decay_field = 8;
+pub const MLN_MOMENTUM_DECAY_DURATION_MS: mln_momentum_decay_field = 16;
+pub const MLN_MOMENTUM_DECAY_CURVE: mln_momentum_decay_field = 32;
+pub const MLN_MOMENTUM_DECAY_MIN_SPEED: mln_momentum_decay_field = 64;
+pub const MLN_MOMENTUM_DECAY_MAX_SPEED: mln_momentum_decay_field = 128;
+pub const MLN_MOMENTUM_DECAY_MAX_DISTANCE: mln_momentum_decay_field = 256;
 pub type mln_momentum_decay_model = u32;
 pub const MLN_MOMENTUM_DECAY_MODEL_FRICTION: mln_momentum_decay_model = 0;
-pub const MLN_MOMENTUM_DECAY_MODEL_SPLINE: mln_momentum_decay_model = 1;
+pub const MLN_MOMENTUM_DECAY_MODEL_PLANNED: mln_momentum_decay_model = 1;
 pub type mln_network_status = u32;
 pub const MLN_NETWORK_STATUS_ONLINE: mln_network_status = 1;
 pub const MLN_NETWORK_STATUS_OFFLINE: mln_network_status = 2;
@@ -1198,7 +1200,9 @@ pub struct mln_momentum_decay {
     pub model: mln_momentum_decay_model,
     pub half_life_ms: f64,
     pub stop_speed: f64,
-    pub scroll_friction: f64,
+    pub distance: f64,
+    pub duration_ms: f64,
+    pub curve: mln_unit_bezier,
     pub min_speed: f64,
     pub max_speed: f64,
     pub max_distance: f64,

@@ -3142,9 +3142,10 @@ impl FromNative<sys::mln_metal_texture_frame> for MetalTextureFrame {
 /// Speeds and distances are in the part's unit: logical pixels for pan, zoom
 /// levels for zoom, and degrees for bearing and pitch. A setting whose bit
 /// isn't set takes the part's default, which `GestureMomentum` lists.
-/// `min_speed` is finite and not negative, and every other setting is finite
-/// and positive. One value can serve every release, as a preset that matches a
-/// platform's scrolling.
+/// `min_speed` is finite and not negative, and every other number is finite and
+/// positive. A friction decay can serve every release, as a preset that matches
+/// a platform's scrolling. A planned glide takes its direction from the part's
+/// velocity, and its distance and duration from the caller's plan.
 ///
 /// See `mln_momentum_decay` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3155,15 +3156,22 @@ pub struct MomentumDecay {
     pub half_life_ms: Option<f64>,
     /// For `MomentumDecayModel::Friction`, the speed at which it ends.
     pub stop_speed: Option<f64>,
-    /// For `MomentumDecayModel::Spline`, Android's
-    /// `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
-    pub scroll_friction: Option<f64>,
+    /// Required for `MomentumDecayModel::Planned`.
+    pub distance: Option<f64>,
+    /// Required for `MomentumDecayModel::Planned`.
+    pub duration_ms: Option<f64>,
+    /// For `MomentumDecayModel::Planned`, the share of `distance` covered over
+    /// the share of `duration_ms`. Its x values are between 0 and 1. Defaults
+    /// to (0, 0, 0.25, 1), the curve that camera animations ease along by
+    /// default. Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+    pub curve: Option<UnitBezier>,
     /// A slower release starts no momentum.
     pub min_speed: Option<f64>,
-    /// A faster release counts as this speed.
+    /// For `MomentumDecayModel::Friction`, a faster release counts as this.
     pub max_speed: Option<f64>,
-    /// The farthest the part moves. A release that would move farther starts
-    /// slower, so it ends sooner.
+    /// The farthest the part moves. A friction release that would move farther
+    /// starts slower, so it ends sooner, and a planned glide moves at most this
+    /// far over its duration.
     pub max_distance: Option<f64>,
 }
 impl ToNative<sys::mln_momentum_decay> for MomentumDecay {
@@ -3182,9 +3190,17 @@ impl ToNative<sys::mln_momentum_decay> for MomentumDecay {
             raw.fields |= sys::MLN_MOMENTUM_DECAY_STOP_SPEED;
             raw.stop_speed = *item;
         }
-        if let Some(item) = &self.scroll_friction {
-            raw.fields |= sys::MLN_MOMENTUM_DECAY_SCROLL_FRICTION;
-            raw.scroll_friction = *item;
+        if let Some(item) = &self.distance {
+            raw.fields |= sys::MLN_MOMENTUM_DECAY_DISTANCE;
+            raw.distance = *item;
+        }
+        if let Some(item) = &self.duration_ms {
+            raw.fields |= sys::MLN_MOMENTUM_DECAY_DURATION_MS;
+            raw.duration_ms = *item;
+        }
+        if let Some(item) = &self.curve {
+            raw.fields |= sys::MLN_MOMENTUM_DECAY_CURVE;
+            raw.curve = to_native(&*item, arena)?;
         }
         if let Some(item) = &self.min_speed {
             raw.fields |= sys::MLN_MOMENTUM_DECAY_MIN_SPEED;
@@ -3212,9 +3228,10 @@ pub enum MomentumDecayModel: u32 {
     /// UIScrollView's normal deceleration is a half-life of 346 ms, and its
     /// fast deceleration 69 ms.
     Friction = 0,
-    /// Android's scroll fling, as OverScroller computes it with
-    /// `scroll_friction`. Only pan can use it.
-    Spline = 1,
+    /// The part moves `distance` over `duration_ms`, along `curve`. The caller
+    /// plans the glide, for example from the platform's own fling physics, such
+    /// as Android's OverScroller.
+    Planned = 1,
 } Unknown
 }
 impl Default for MomentumDecayModel {

@@ -741,7 +741,9 @@ internal unsafe struct mln_momentum_decay
     public mln_momentum_decay_model model;
     public double half_life_ms;
     public double stop_speed;
-    public double scroll_friction;
+    public double distance;
+    public double duration_ms;
+    public mln_unit_bezier curve;
     public double min_speed;
     public double max_speed;
     public double max_distance;
@@ -1999,16 +2001,18 @@ internal enum mln_momentum_decay_field : uint
     MLN_MOMENTUM_DECAY_MODEL = 1,
     MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 2,
     MLN_MOMENTUM_DECAY_STOP_SPEED = 4,
-    MLN_MOMENTUM_DECAY_SCROLL_FRICTION = 8,
-    MLN_MOMENTUM_DECAY_MIN_SPEED = 16,
-    MLN_MOMENTUM_DECAY_MAX_SPEED = 32,
-    MLN_MOMENTUM_DECAY_MAX_DISTANCE = 64,
+    MLN_MOMENTUM_DECAY_DISTANCE = 8,
+    MLN_MOMENTUM_DECAY_DURATION_MS = 16,
+    MLN_MOMENTUM_DECAY_CURVE = 32,
+    MLN_MOMENTUM_DECAY_MIN_SPEED = 64,
+    MLN_MOMENTUM_DECAY_MAX_SPEED = 128,
+    MLN_MOMENTUM_DECAY_MAX_DISTANCE = 256,
 }
 
 internal enum mln_momentum_decay_model : uint
 {
     MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0,
-    MLN_MOMENTUM_DECAY_MODEL_SPLINE = 1,
+    MLN_MOMENTUM_DECAY_MODEL_PLANNED = 1,
 }
 
 internal enum mln_network_status : uint

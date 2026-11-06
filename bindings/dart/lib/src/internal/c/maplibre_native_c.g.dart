@@ -963,7 +963,10 @@ final class mln_momentum_decay extends Struct {
   @Double()
   external double stop_speed;
   @Double()
-  external double scroll_friction;
+  external double distance;
+  @Double()
+  external double duration_ms;
+  external mln_unit_bezier curve;
   @Double()
   external double min_speed;
   @Double()
@@ -2311,14 +2314,16 @@ const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
 const MLN_MOMENTUM_DECAY_MODEL = 1;
 const MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 2;
 const MLN_MOMENTUM_DECAY_STOP_SPEED = 4;
-const MLN_MOMENTUM_DECAY_SCROLL_FRICTION = 8;
-const MLN_MOMENTUM_DECAY_MIN_SPEED = 16;
-const MLN_MOMENTUM_DECAY_MAX_SPEED = 32;
-const MLN_MOMENTUM_DECAY_MAX_DISTANCE = 64;
+const MLN_MOMENTUM_DECAY_DISTANCE = 8;
+const MLN_MOMENTUM_DECAY_DURATION_MS = 16;
+const MLN_MOMENTUM_DECAY_CURVE = 32;
+const MLN_MOMENTUM_DECAY_MIN_SPEED = 64;
+const MLN_MOMENTUM_DECAY_MAX_SPEED = 128;
+const MLN_MOMENTUM_DECAY_MAX_DISTANCE = 256;
 
 // mln_momentum_decay_model
 const MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0;
-const MLN_MOMENTUM_DECAY_MODEL_SPLINE = 1;
+const MLN_MOMENTUM_DECAY_MODEL_PLANNED = 1;
 
 // mln_network_status
 const MLN_NETWORK_STATUS_ONLINE = 1;

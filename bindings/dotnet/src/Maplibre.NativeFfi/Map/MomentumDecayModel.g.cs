@@ -18,8 +18,9 @@ public enum MomentumDecayModel : uint
     Friction = 0,
 
     /// <summary>
-    /// Android's scroll fling, as OverScroller computes it with
-    /// <c>scroll_friction</c>. Only pan can use it.
+    /// The part moves <c>distance</c> over <c>duration_ms</c>, along
+    /// <c>curve</c>. The caller plans the glide, for example from the
+    /// platform's own fling physics, such as Android's OverScroller.
     /// </summary>
-    Spline = 1,
+    Planned = 1,
 }

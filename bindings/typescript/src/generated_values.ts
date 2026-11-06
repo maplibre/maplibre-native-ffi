@@ -1844,9 +1844,10 @@ export interface MetalTextureFrame {
  * Speeds and distances are in the part's unit: logical pixels for pan, zoom
  * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
  * set takes the part's default, which `GestureMomentum` lists. `min_speed` is
- * finite and not negative, and every other setting is finite and positive. One
- * value can serve every release, as a preset that matches a platform's
- * scrolling.
+ * finite and not negative, and every other number is finite and positive. A
+ * friction decay can serve every release, as a preset that matches a platform's
+ * scrolling. A planned glide takes its direction from the part's velocity, and
+ * its distance and duration from the caller's plan.
  *
  * See `mln_momentum_decay` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1862,21 +1863,32 @@ export interface MomentumDecay {
    */
   stopSpeed?: number;
   /**
-   * For `MomentumDecayModel.spline`, Android's
-   * `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
+   * Required for `MomentumDecayModel.planned`.
    */
-  scrollFriction?: number;
+  distance?: number;
+  /**
+   * Required for `MomentumDecayModel.planned`.
+   */
+  durationMs?: number;
+  /**
+   * For `MomentumDecayModel.planned`, the share of `distance` covered over the
+   * share of `duration_ms`. Its x values are between 0 and 1. Defaults to (0,
+   * 0, 0.25, 1), the curve that camera animations ease along by default.
+   * Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+   */
+  curve?: UnitBezier;
   /**
    * A slower release starts no momentum.
    */
   minSpeed?: number;
   /**
-   * A faster release counts as this speed.
+   * For `MomentumDecayModel.friction`, a faster release counts as this.
    */
   maxSpeed?: number;
   /**
-   * The farthest the part moves. A release that would move farther starts
-   * slower, so it ends sooner.
+   * The farthest the part moves. A friction release that would move farther
+   * starts slower, so it ends sooner, and a planned glide moves at most this
+   * far over its duration.
    */
   maxDistance?: number;
 }
@@ -1895,10 +1907,11 @@ export const MomentumDecayModel = {
    */
   friction: 0,
   /**
-   * Android's scroll fling, as OverScroller computes it with `scroll_friction`.
-   * Only pan can use it.
+   * The part moves `distance` over `duration_ms`, along `curve`. The caller
+   * plans the glide, for example from the platform's own fling physics, such as
+   * Android's OverScroller.
    */
-  spline: 1,
+  planned: 1,
 } as const;
 /** One of the MomentumDecayModel values, or a value this binding does not know. */
 export type MomentumDecayModel =

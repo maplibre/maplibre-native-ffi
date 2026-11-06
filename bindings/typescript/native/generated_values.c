@@ -5752,15 +5752,34 @@ bool mln_ts_write_momentum_decay(
     }
     out->fields |= MLN_MOMENTUM_DECAY_STOP_SPEED;
   }
-  if (!mln_ts_member(call, value, "scrollFriction", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "scrollFriction");
+  if (!mln_ts_member(call, value, "distance", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "distance");
   if (!mln_ts_is_absent(call, member)) {
     {
       double number = 0;
       if (!mln_ts_read_double(call, member, &number, child)) return false;
-      out->scroll_friction = (double)number;
+      out->distance = (double)number;
     }
-    out->fields |= MLN_MOMENTUM_DECAY_SCROLL_FRICTION;
+    out->fields |= MLN_MOMENTUM_DECAY_DISTANCE;
+  }
+  if (!mln_ts_member(call, value, "durationMs", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "durationMs");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->duration_ms = (double)number;
+    }
+    out->fields |= MLN_MOMENTUM_DECAY_DURATION_MS;
+  }
+  if (!mln_ts_member(call, value, "curve", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "curve");
+  if (!mln_ts_is_absent(call, member)) {
+    memset(&out->curve, 0, sizeof out->curve);
+    if (!mln_ts_read_record(call, member, child)) return false;
+    if (!mln_ts_write_unit_bezier(call, member, &out->curve, child))
+      return false;
+    out->fields |= MLN_MOMENTUM_DECAY_CURVE;
   }
   if (!mln_ts_member(call, value, "minSpeed", &member)) return false;
   mln_ts_path(child, sizeof child, path, "minSpeed");

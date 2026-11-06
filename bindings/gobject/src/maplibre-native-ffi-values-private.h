@@ -20,6 +20,10 @@ G_GNUC_INTERNAL void maplibre_native_ffi_screen_point_read(
 );
 G_GNUC_INTERNAL gpointer
 maplibre_native_ffi_screen_point_copy_func(gconstpointer self, gpointer data);
+G_GNUC_INTERNAL void maplibre_native_ffi_unit_bezier_to_native(
+  const MaplibreNativeFfiUnitBezier* self, mln_unit_bezier* out,
+  MaplibreNativeFfiCall* call
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_momentum_decay_to_native(
   const MaplibreNativeFfiMomentumDecay* self, mln_momentum_decay* out,
   MaplibreNativeFfiCall* call
@@ -35,10 +39,6 @@ G_GNUC_INTERNAL void maplibre_native_ffi_anchored_momentum_to_native(
 G_GNUC_INTERNAL MaplibreNativeFfiAnchoredMomentum*
 maplibre_native_ffi_anchored_momentum_copy(
   const MaplibreNativeFfiAnchoredMomentum* self
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_unit_bezier_to_native(
-  const MaplibreNativeFfiUnitBezier* self, mln_unit_bezier* out,
-  MaplibreNativeFfiCall* call
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_transition_handler_to_native(
   const MaplibreNativeFfiCameraTransitionHandler* self,

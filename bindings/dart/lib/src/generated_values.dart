@@ -501,13 +501,14 @@ final class MomentumDecayModel extends _Enum {
   /// deceleration 69 ms.
   static const friction = MomentumDecayModel.fromRawValue(0);
 
-  /// Android's scroll fling, as OverScroller computes it with
-  /// `scroll_friction`. Only pan can use it.
-  static const spline = MomentumDecayModel.fromRawValue(1);
+  /// The part moves `distance` over `duration_ms`, along `curve`. The caller
+  /// plans the glide, for example from the platform's own fling physics, such
+  /// as Android's OverScroller.
+  static const planned = MomentumDecayModel.fromRawValue(1);
   @override
   String toString() => switch (rawValue) {
     0 => 'MomentumDecayModel.friction',
-    1 => 'MomentumDecayModel.spline',
+    1 => 'MomentumDecayModel.planned',
     _ => 'MomentumDecayModel($rawValue)',
   };
 }
@@ -2685,14 +2686,44 @@ final class PremultipliedRgba8Image extends _Value {
   ]);
 }
 
+/// A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
+/// and (`x2`, `y2`).
+///
+/// `x1` and `x2` are between 0 and 1.
+///
+/// See `mln_unit_bezier` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class UnitBezier extends _Value {
+  const UnitBezier({this.x1 = 0, this.y1 = 0, this.x2 = 0, this.y2 = 0});
+  final double x1;
+  final double y1;
+  final double x2;
+  final double y2;
+
+  /// A copy of this value with the given members replaced.
+  UnitBezier copyWith({double? x1, double? y1, double? x2, double? y2}) =>
+      UnitBezier(
+        x1: x1 ?? this.x1,
+        y1: y1 ?? this.y1,
+        x2: x2 ?? this.x2,
+        y2: y2 ?? this.y2,
+      );
+
+  @override
+  List<Object?> get _members => [x1, y1, x2, y2];
+  @override
+  String toString() => _describe('UnitBezier', const ['x1', 'y1', 'x2', 'y2']);
+}
+
 /// How one part of a gesture's momentum slows from its release speed.
 ///
 /// Speeds and distances are in the part's unit: logical pixels for pan, zoom
 /// levels for zoom, and degrees for bearing and pitch. A setting whose bit
 /// isn't set takes the part's default, which `GestureMomentum` lists.
-/// `min_speed` is finite and not negative, and every other setting is finite
-/// and positive. One value can serve every release, as a preset that matches a
-/// platform's scrolling.
+/// `min_speed` is finite and not negative, and every other number is finite and
+/// positive. A friction decay can serve every release, as a preset that matches
+/// a platform's scrolling. A planned glide takes its direction from the part's
+/// velocity, and its distance and duration from the caller's plan.
 ///
 /// See `mln_momentum_decay` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2701,7 +2732,9 @@ final class MomentumDecay extends _Value {
     this.model,
     this.halfLifeMs,
     this.stopSpeed,
-    this.scrollFriction,
+    this.distance,
+    this.durationMs,
+    this.curve,
     this.minSpeed,
     this.maxSpeed,
     this.maxDistance,
@@ -2714,18 +2747,27 @@ final class MomentumDecay extends _Value {
   /// For `MomentumDecayModel.friction`, the speed at which it ends.
   final double? stopSpeed;
 
-  /// For `MomentumDecayModel.spline`, Android's
-  /// `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
-  final double? scrollFriction;
+  /// Required for `MomentumDecayModel.planned`.
+  final double? distance;
+
+  /// Required for `MomentumDecayModel.planned`.
+  final double? durationMs;
+
+  /// For `MomentumDecayModel.planned`, the share of `distance` covered over the
+  /// share of `duration_ms`. Its x values are between 0 and 1. Defaults to (0,
+  /// 0, 0.25, 1), the curve that camera animations ease along by default.
+  /// Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+  final UnitBezier? curve;
 
   /// A slower release starts no momentum.
   final double? minSpeed;
 
-  /// A faster release counts as this speed.
+  /// For `MomentumDecayModel.friction`, a faster release counts as this.
   final double? maxSpeed;
 
-  /// The farthest the part moves. A release that would move farther starts
-  /// slower, so it ends sooner.
+  /// The farthest the part moves. A friction release that would move farther
+  /// starts slower, so it ends sooner, and a planned glide moves at most this
+  /// far over its duration.
   final double? maxDistance;
 
   /// A copy of this value with the given members replaced.
@@ -2733,7 +2775,9 @@ final class MomentumDecay extends _Value {
     MomentumDecayModel? model,
     double? halfLifeMs,
     double? stopSpeed,
-    double? scrollFriction,
+    double? distance,
+    double? durationMs,
+    UnitBezier? curve,
     double? minSpeed,
     double? maxSpeed,
     double? maxDistance,
@@ -2741,7 +2785,9 @@ final class MomentumDecay extends _Value {
     model: model ?? this.model,
     halfLifeMs: halfLifeMs ?? this.halfLifeMs,
     stopSpeed: stopSpeed ?? this.stopSpeed,
-    scrollFriction: scrollFriction ?? this.scrollFriction,
+    distance: distance ?? this.distance,
+    durationMs: durationMs ?? this.durationMs,
+    curve: curve ?? this.curve,
     minSpeed: minSpeed ?? this.minSpeed,
     maxSpeed: maxSpeed ?? this.maxSpeed,
     maxDistance: maxDistance ?? this.maxDistance,
@@ -2752,7 +2798,9 @@ final class MomentumDecay extends _Value {
     model,
     halfLifeMs,
     stopSpeed,
-    scrollFriction,
+    distance,
+    durationMs,
+    curve,
     minSpeed,
     maxSpeed,
     maxDistance,
@@ -2762,7 +2810,9 @@ final class MomentumDecay extends _Value {
     'model',
     'halfLifeMs',
     'stopSpeed',
-    'scrollFriction',
+    'distance',
+    'durationMs',
+    'curve',
     'minSpeed',
     'maxSpeed',
     'maxDistance',
@@ -2947,35 +2997,6 @@ final class GestureMomentum extends _Value {
     'pitch',
     'bearingSnap',
   ]);
-}
-
-/// A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
-/// and (`x2`, `y2`).
-///
-/// `x1` and `x2` are between 0 and 1.
-///
-/// See `mln_unit_bezier` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class UnitBezier extends _Value {
-  const UnitBezier({this.x1 = 0, this.y1 = 0, this.x2 = 0, this.y2 = 0});
-  final double x1;
-  final double y1;
-  final double x2;
-  final double y2;
-
-  /// A copy of this value with the given members replaced.
-  UnitBezier copyWith({double? x1, double? y1, double? x2, double? y2}) =>
-      UnitBezier(
-        x1: x1 ?? this.x1,
-        y1: y1 ?? this.y1,
-        x2: x2 ?? this.x2,
-        y2: y2 ?? this.y2,
-      );
-
-  @override
-  List<Object?> get _members => [x1, y1, x2, y2];
-  @override
-  String toString() => _describe('UnitBezier', const ['x1', 'y1', 'x2', 'y2']);
 }
 
 /// How fast each part of a camera change moves.

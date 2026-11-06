@@ -708,6 +708,19 @@ Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   return result;
 }
 
+Pointer<raw.mln_unit_bezier> _writeUnitBezier(
+  UnitBezier value,
+  Allocator arena, {
+  Pointer<raw.mln_unit_bezier>? into,
+}) {
+  final result = into ?? arena<raw.mln_unit_bezier>();
+  result.ref.x1 = value.x1;
+  result.ref.y1 = value.y1;
+  result.ref.x2 = value.x2;
+  result.ref.y2 = value.y2;
+  return result;
+}
+
 Pointer<raw.mln_momentum_decay> _writeMomentumDecay(
   MomentumDecay value,
   Allocator arena, {
@@ -726,9 +739,17 @@ Pointer<raw.mln_momentum_decay> _writeMomentumDecay(
     result.ref.fields |= raw.MLN_MOMENTUM_DECAY_STOP_SPEED;
     result.ref.stop_speed = value.stopSpeed!;
   }
-  if (value.scrollFriction != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_SCROLL_FRICTION;
-    result.ref.scroll_friction = value.scrollFriction!;
+  if (value.distance != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_DISTANCE;
+    result.ref.distance = value.distance!;
+  }
+  if (value.durationMs != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_DURATION_MS;
+    result.ref.duration_ms = value.durationMs!;
+  }
+  if (value.curve != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_CURVE;
+    result.ref.curve = _writeUnitBezier(value.curve!, arena).ref;
   }
   if (value.minSpeed != null) {
     result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MIN_SPEED;
@@ -816,19 +837,6 @@ Pointer<raw.mln_gesture_momentum> _writeGestureMomentum(
     result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_SNAP;
     result.ref.bearing_snap = _writeBearingSnap(value.bearingSnap!, arena).ref;
   }
-  return result;
-}
-
-Pointer<raw.mln_unit_bezier> _writeUnitBezier(
-  UnitBezier value,
-  Allocator arena, {
-  Pointer<raw.mln_unit_bezier>? into,
-}) {
-  final result = into ?? arena<raw.mln_unit_bezier>();
-  result.ref.x1 = value.x1;
-  result.ref.y1 = value.y1;
-  result.ref.x2 = value.x2;
-  result.ref.y2 = value.y2;
   return result;
 }
 

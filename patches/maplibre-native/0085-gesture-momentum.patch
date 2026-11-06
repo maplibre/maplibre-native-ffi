@@ -31,10 +31,10 @@ index e72aacd..2646f15 100644
      "include/mln/map/map_observer.hpp",
 diff --git a/include/mln/map/camera_momentum.hpp b/include/mln/map/camera_momentum.hpp
 new file mode 100644
-index 0000000..8bdce0b
+index 0000000..bb3b4a6
 --- /dev/null
 +++ b/include/mln/map/camera_momentum.hpp
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,127 @@
 +#pragma once
 +
 +#include <mln/util/chrono.hpp>
@@ -55,23 +55,36 @@ index 0000000..8bdce0b
 +    enum class Model {
 +        /** The speed halves every `halfLife`, until it drops to `stopSpeed`. */
 +        Friction,
-+        /** Android's scroll fling, from OverScroller, with `scrollFriction`.
-+            Its physical constant is in logical pixels, so it suits pan. */
-+        Spline,
++        /** The part moves `distance` over `duration`, along `curve`, as a
++            caller plans it, for example from a platform's own fling physics. */
++        Planned,
++    };
++
++    /** A unit cubic Bézier, from (0, 0) to (1, 1), with these control points. */
++    struct Curve {
++        double x1 = 0;
++        double y1 = 0;
++        double x2 = 0.25;
++        double y2 = 1;
 +    };
 +
 +    Model model = Model::Friction;
 +    Duration halfLife = std::chrono::milliseconds(140);
 +    /** Must be positive for Model::Friction. */
 +    double stopSpeed = 1;
-+    /** Android's ViewConfiguration.getScrollFriction(). */
-+    double scrollFriction = 0.015;
++    /** For Model::Planned. */
++    double distance = 0;
++    Duration duration = Duration::zero();
++    /** For Model::Planned, the share of `distance` covered over the share of
++        `duration`. Android's scroll fling follows (0.175, 0.5, 0.35, 1). */
++    Curve curve;
 +    /** A slower release doesn't move. */
 +    double minSpeed = 0;
-+    /** A faster release counts as this speed. */
++    /** For Model::Friction, a faster release counts as this speed. */
 +    double maxSpeed = std::numeric_limits<double>::infinity();
-+    /** The farthest the part moves. A release that would move farther starts
-+        slower, so it ends sooner. */
++    /** The farthest the part moves. A friction release that would move
++        farther starts slower, so it ends sooner, and a planned glide moves at
++        most this far over its duration. */
 +    double maxDistance = std::numeric_limits<double>::infinity();
 +};
 +
@@ -189,82 +202,34 @@ index 3e01d9a..77fe561 100644
      impl->transform.setGestureInProgress(inProgress);
      impl->onUpdate();
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index e2bb728..b1a7ac7 100644
+index e2bb728..674168d 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
-@@ -13,6 +13,8 @@
+@@ -13,6 +13,9 @@
  #include <mln/util/platform.hpp>
  
  #include <algorithm>
 +#include <array>
++#include <vector>
 +#include <iterator>
  #include <cstdio>
  #include <utility>
  #include <numbers>
-@@ -550,6 +552,213 @@ ProjectionMode Transform::getProjectionMode() const {
+@@ -550,6 +553,161 @@ ProjectionMode Transform::getProjectionMode() const {
          .withYSkew(state.getYSkew());
  }
  
 +// MARK: - Momentum
-+
-+namespace {
-+
-+// Android's OverScroller spline, and the constants it plans a fling with.
-+constexpr int splineSamples = 100;
-+constexpr double splineInflexion = 0.35;
-+constexpr double splineStartTension = 0.5;
-+constexpr double splineEndTension = 1.0;
-+// SensorManager.GRAVITY_EARTH * inches per meter * pixels per inch * 0.84, for
-+// a 160 ppi screen, whose pixels are Android's density-independent pixels.
-+constexpr double splinePhysicalCoefficient = 9.80665 * 39.37 * 160.0 * 0.84;
-+
-+double splineDecelerationRate() {
-+    static const double rate = std::log(0.78) / std::log(0.9);
-+    return rate;
-+}
-+
-+// The share of a fling's distance that it covers at each hundredth of its
-+// duration, as SplineOverScroller computes it.
-+const std::array<double, splineSamples + 1>& splinePositions() {
-+    static const auto positions = [] {
-+        std::array<double, splineSamples + 1> result{};
-+        const double p1 = splineStartTension * splineInflexion;
-+        const double p2 = 1.0 - splineEndTension * (1.0 - splineInflexion);
-+        double xMin = 0.0;
-+        for (int i = 0; i < splineSamples; ++i) {
-+            const double alpha = static_cast<double>(i) / splineSamples;
-+            double xMax = 1.0;
-+            double x = 0.0;
-+            double coef = 0.0;
-+            while (true) {
-+                x = xMin + (xMax - xMin) / 2.0;
-+                coef = 3.0 * x * (1.0 - x);
-+                const double tx = coef * ((1.0 - x) * p1 + x * p2) + x * x * x;
-+                if (std::abs(tx - alpha) < 1e-5) break;
-+                if (tx > alpha) {
-+                    xMax = x;
-+                } else {
-+                    xMin = x;
-+                }
-+            }
-+            result[i] = coef * ((1.0 - x) * splineStartTension + x) + x * x * x;
-+        }
-+        result[splineSamples] = 1.0;
-+        return result;
-+    }();
-+    return positions;
-+}
-+
-+} // namespace
 +
 +struct Transform::MomentumState {
 +    // How far one part moves, over how long, and along which curve.
 +    struct Glide {
 +        double distance = 0;
 +        Duration duration = Duration::zero();
-+        bool spline = false;
 +        // For friction, the decay rate per second.
 +        double rate = 0;
++        // For a planned glide, the curve it follows.
++        std::optional<MomentumDecay::Curve> curve;
 +
 +        // Plans a release at `speed`, or returns nothing when it doesn't move.
 +        static std::optional<Glide> plan(double speed, const MomentumDecay& decay) {
@@ -281,17 +246,9 @@ index e2bb728..b1a7ac7 100644
 +                seconds = std::log(speed / decay.stopSpeed) / glide.rate;
 +                glide.distance = (speed - decay.stopSpeed) / glide.rate;
 +            } else {
-+                const double rate = splineDecelerationRate();
-+                const double coefficient = decay.scrollFriction * splinePhysicalCoefficient;
-+                if (!(coefficient > 0.0)) return std::nullopt;
-+                double l = std::log(splineInflexion * speed / coefficient);
-+                glide.distance = coefficient * std::exp(rate / (rate - 1.0) * l);
-+                if (glide.distance > decay.maxDistance) {
-+                    l = std::log(decay.maxDistance / coefficient) * (rate - 1.0) / rate;
-+                    glide.distance = decay.maxDistance;
-+                }
-+                seconds = std::exp(l / (rate - 1.0));
-+                glide.spline = true;
++                glide.distance = std::min(decay.distance, decay.maxDistance);
++                seconds = std::chrono::duration<double>(decay.duration).count();
++                glide.curve = decay.curve;
 +            }
 +            // A glide too long for the clock doesn't move. The bound is exclusive,
 +            // as in flyTo(), because Duration::max() rounds up as a double.
@@ -310,12 +267,8 @@ index e2bb728..b1a7ac7 100644
 +            if (elapsed <= Duration::zero()) return 0.0;
 +            const double t = std::chrono::duration<double>(elapsed).count();
 +            const double total = std::chrono::duration<double>(duration).count();
-+            if (!spline) return std::expm1(-rate * t) / std::expm1(-rate * total);
-+            const double u = t / total;
-+            const auto index = static_cast<size_t>(u * splineSamples);
-+            const auto& positions = splinePositions();
-+            const double slope = (positions[index + 1] - positions[index]) * splineSamples;
-+            return positions[index] + (u - static_cast<double>(index) / splineSamples) * slope;
++            if (!curve) return std::expm1(-rate * t) / std::expm1(-rate * total);
++            return bezier().solve(t / total, 1e-6);
 +        }
 +
 +        // The share of the distance covered per second after `elapsed`.
@@ -323,11 +276,20 @@ index e2bb728..b1a7ac7 100644
 +            if (elapsed >= duration) return 0.0;
 +            const double t = std::max(0.0, std::chrono::duration<double>(elapsed).count());
 +            const double total = std::chrono::duration<double>(duration).count();
-+            if (!spline) return rate * std::exp(-rate * t) / -std::expm1(-rate * total);
-+            const auto index = std::min<size_t>(static_cast<size_t>(t / total * splineSamples), splineSamples - 1);
-+            const auto& positions = splinePositions();
-+            return (positions[index + 1] - positions[index]) * splineSamples / total;
++            if (!curve) return rate * std::exp(-rate * t) / -std::expm1(-rate * total);
++            // The slope dy/dx of the curve, from its derivatives in its own
++            // parameter, which starts just past 0 where both can be 0.
++            const auto ease = bezier();
++            const double p = std::max(ease.solveCurveX(t / total, 1e-6), 1e-6);
++            const double cy = 3.0 * curve->y1;
++            const double by = 3.0 * (curve->y2 - curve->y1) - cy;
++            const double ay = 1.0 - cy - by;
++            const double dy = (3.0 * ay * p + 2.0 * by) * p + cy;
++            const double dx = ease.sampleCurveDerivativeX(p);
++            return dx > 0.0 ? dy / dx / total : 0.0;
 +        }
++
++        util::UnitBezier bezier() const { return {curve->x1, curve->y1, curve->x2, curve->y2}; }
 +    };
 +
 +    struct Part {
@@ -415,7 +377,7 @@ index e2bb728..b1a7ac7 100644
  // MARK: - Transition
  
  uint16_t Transform::cameraFields(const CameraOptions& camera) {
-@@ -588,14 +797,7 @@ void Transform::startTransition(const CameraOptions& camera,
+@@ -588,14 +746,7 @@ void Transform::startTransition(const CameraOptions& camera,
      transition->duration = latestTransitionDuration = transition->fields ? duration : Duration::zero();
      transition->frame = frame;
  
@@ -431,7 +393,7 @@ index e2bb728..b1a7ac7 100644
      transitions.push_back(transition);
      updateMovementFlags();
      finishTransitions(finished);
-@@ -620,6 +822,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
+@@ -620,6 +771,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
      camera.center = getLatLng(LatLng::Unwrapped);
  
      for (const auto& transition : active) {
@@ -439,7 +401,7 @@ index e2bb728..b1a7ac7 100644
          const double t = transition->duration == Duration::zero()
                               ? 1.0
                               : std::clamp(std::chrono::duration<double>(now - transition->start) /
-@@ -670,6 +873,9 @@ void Transform::updateMovementFlags() {
+@@ -670,6 +822,9 @@ void Transform::updateMovementFlags() {
  
  void Transform::finishTransitions(const std::vector<std::shared_ptr<Transition>>& finished) {
      for (const auto& transition : finished) {
@@ -449,7 +411,7 @@ index e2bb728..b1a7ac7 100644
          if (transition->animation.transitionFinishFn) transition->animation.transitionFinishFn();
          // This notification ends a command, not necessarily all camera motion.
          observer.onCameraDidChange(transition->duration != Duration::zero() ? MapObserver::CameraChangeMode::Animated
-@@ -693,11 +899,17 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -693,11 +848,17 @@ void Transform::updateTransitions(const TimePoint& now) {
      } guard{updatingTransitions};
  
      const auto active = transitions;
@@ -469,7 +431,7 @@ index e2bb728..b1a7ac7 100644
              std::erase(transitions, transition);
              finished.push_back(transition);
          }
-@@ -706,7 +918,7 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -706,7 +867,7 @@ void Transform::updateTransitions(const TimePoint& now) {
  
      for (const auto& transition : active) {
          if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) continue;
@@ -478,7 +440,7 @@ index e2bb728..b1a7ac7 100644
              const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
                                              std::chrono::duration<double>(transition->duration),
                                          0.0,
-@@ -719,6 +931,241 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -719,6 +880,251 @@ void Transform::updateTransitions(const TimePoint& now) {
      finishTransitions(finished);
  }
  
@@ -699,7 +661,12 @@ index e2bb728..b1a7ac7 100644
 +    }
 +    constexpr double pi = std::numbers::pi;
 +    state.setBearing(util::wrap(state.getBearing() - util::deg2rad(bearing), -pi, pi));
-+    if (point) state.moveLatLng(anchorLatLng, *point);
++    if (point) {
++        // Moving the center keeps the altitude in pixels, so restore it in meters.
++        const double altitude = state.getCenterAltitude();
++        state.moveLatLng(anchorLatLng, *point);
++        state.setCenterAltitude(altitude);
++    }
 +}
 +
 +bool Transform::stepPitch(double pitch, const std::optional<ScreenCoordinate>& anchor) {
@@ -713,7 +680,12 @@ index e2bb728..b1a7ac7 100644
 +    state.setPitch(util::clamp(
 +        before + util::deg2rad(pitch), state.getMinPitch(), getMaxPitchForEdgeInsets(state.getEdgeInsets())));
 +    if (state.getPitch() == before) return false;
-+    if (point) state.moveLatLng(anchorLatLng, *point);
++    if (point) {
++        // Moving the center keeps the altitude in pixels, so restore it in meters.
++        const double altitude = state.getCenterAltitude();
++        state.moveLatLng(anchorLatLng, *point);
++        state.setCenterAltitude(altitude);
++    }
 +    return true;
 +}
 +
@@ -774,10 +746,10 @@ index f767342..4eb88b2 100644
      void finishTransitions(const std::vector<std::shared_ptr<Transition>>&);
  
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index c15ea59..961a725 100644
+index c15ea59..7b5850d 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
-@@ -1619,3 +1619,246 @@ TEST(Transform, FlyDurationRange) {
+@@ -1619,3 +1619,258 @@ TEST(Transform, FlyDurationRange) {
      EXPECT_DOUBLE_EQ(1.0, transform.getZoom());
      EXPECT_FALSE(transform.inTransition());
  }
@@ -866,28 +838,37 @@ index c15ea59..961a725 100644
 +    EXPECT_FALSE(transform.inTransition());
 +}
 +
-+// Android's OverScroller flings 1000 dp/s about 194 dp over 0.56 s.
-+TEST(Transform, MomentumFlingsLikeAndroid) {
++// A planned glide follows its curve, and its speed is the curve's slope. A
++// straight curve moves at an even speed.
++TEST(Transform, MomentumFollowsAPlannedGlide) {
 +    Transform transform;
 +    transform.resize({1000, 1000});
-+    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 20}).withZoom(8));
-+    const LatLng center = transform.getLatLng();
++    transform.jumpTo(CameraOptions().withZoom(8));
 +    CameraMomentum momentum;
-+    momentum.panVelocity = ScreenCoordinate{1000, 0};
-+    momentum.panDecay.model = MomentumDecay::Model::Spline;
++    momentum.zoomVelocity = -1.0;
++    momentum.zoomDecay.model = MomentumDecay::Model::Planned;
++    momentum.zoomDecay.distance = 2;
++    momentum.zoomDecay.duration = Seconds(1);
++    momentum.zoomDecay.curve = {.x1 = 1.0 / 3, .y1 = 1.0 / 3, .x2 = 2.0 / 3, .y2 = 2.0 / 3};
++    std::optional<MomentumEnd> ended;
++    momentum.finishFn = [&](const MomentumEnd& end) { ended = end; };
 +    transform.startMomentum(momentum);
-+    const auto start = transform.getLatestTransitionStart();
-+    transform.updateTransitions(start + Milliseconds(550));
-+    EXPECT_TRUE(transform.inTransition());
-+    transform.updateTransitions(start + Milliseconds(560));
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(250));
++    EXPECT_NEAR(transform.getZoom(), 8 - 0.5, 1e-6);
++    transform.cancelTransitions();
++    ASSERT_TRUE(ended);
++    EXPECT_NEAR(ended->velocity.zoom, -2, 1e-6);
++
++    transform.startMomentum(momentum);
++    transform.updateTransitions(transform.getLatestTransitionStart() + Seconds(1));
++    EXPECT_NEAR(transform.getZoom(), 8 - 0.5 - 2, 1e-9);
 +    EXPECT_FALSE(transform.inTransition());
-+    EXPECT_NEAR(transform.latLngToScreenCoordinate(center).x, 500 + 194, 1);
 +}
 +
 +TEST(Transform, MomentumKeepsItsAnchorInPlace) {
 +    Transform transform;
 +    transform.resize({1000, 1000});
-+    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 20}).withZoom(8).withPitch(20));
++    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 20}).withZoom(8).withPitch(20).withCenterAltitude(120));
 +    const ScreenCoordinate anchor{800, 300};
 +    const LatLng ground = transform.screenCoordinateToLatLng(anchor);
 +    CameraMomentum momentum;
@@ -897,8 +878,11 @@ index c15ea59..961a725 100644
 +    transform.updateTransitions(transform.getLatestTransitionStart() + Seconds(3));
 +    EXPECT_GT(util::rad2deg(transform.getPitch()), 20);
 +    const auto point = transform.latLngToScreenCoordinate(ground);
-+    EXPECT_NEAR(point.x, anchor.x, 1e-6);
-+    EXPECT_NEAR(point.y, anchor.y, 1e-6);
++    // Restoring the altitude after the correction moves the view by far less
++    // than a pixel.
++    EXPECT_NEAR(point.x, anchor.x, 1e-4);
++    EXPECT_NEAR(point.y, anchor.y, 1e-4);
++    EXPECT_NEAR(transform.getState().getCenterAltitude(), 120, 1e-6);
 +}
 +
 +TEST(Transform, MomentumCapsItsDistance) {

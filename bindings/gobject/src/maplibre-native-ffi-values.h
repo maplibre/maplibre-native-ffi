@@ -1765,6 +1765,33 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   MaplibreNativeFfiScreenPoint, maplibre_native_ffi_screen_point_free
 )
 
+GType maplibre_native_ffi_unit_bezier_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_UNIT_BEZIER \
+  (maplibre_native_ffi_unit_bezier_get_type())
+
+/**
+ * maplibre_native_ffi_unit_bezier_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_unit_bezier_copy(
+  const MaplibreNativeFfiUnitBezier* self
+);
+
+/**
+ * maplibre_native_ffi_unit_bezier_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_unit_bezier_free(MaplibreNativeFfiUnitBezier* self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiUnitBezier, maplibre_native_ffi_unit_bezier_free
+)
+
 /**
  * MaplibreNativeFfiMomentumDecay:
  *
@@ -1773,9 +1800,10 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  * Speeds and distances are in the part's unit: logical pixels for pan, zoom
  * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
  * set takes the part's default, which `MaplibreNativeFfiGestureMomentum` lists.
- * `min_speed` is finite and not negative, and every other setting is finite and
- * positive. One value can serve every release, as a preset that matches a
- * platform's scrolling.
+ * `min_speed` is finite and not negative, and every other number is finite and
+ * positive. A friction decay can serve every release, as a preset that matches
+ * a platform's scrolling. A planned glide takes its direction from the part's
+ * velocity, and its distance and duration from the caller's plan.
  *
  * A member that a `has_` method reports on is unset until its property or
  * setter sets it.
@@ -1905,40 +1933,115 @@ void maplibre_native_ffi_momentum_decay_set_stop_speed(
 );
 
 /**
- * MaplibreNativeFfiMomentumDecay:scroll-friction: (setter set_scroll_friction) (getter get_scroll_friction)
+ * MaplibreNativeFfiMomentumDecay:distance: (setter set_distance) (getter get_distance)
  *
- * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_SPLINE`, Android's
- * `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
+ * Required for `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_PLANNED`.
  */
 /**
- * maplibre_native_ffi_momentum_decay_get_scroll_friction: (get-property scroll-friction)
+ * maplibre_native_ffi_momentum_decay_get_distance: (get-property distance)
  *
- * Gets `MaplibreNativeFfiMomentumDecay:scroll-friction`.
+ * Gets `MaplibreNativeFfiMomentumDecay:distance`.
  *
  * Returns: the value
  */
-gdouble maplibre_native_ffi_momentum_decay_get_scroll_friction(
+gdouble maplibre_native_ffi_momentum_decay_get_distance(
   MaplibreNativeFfiMomentumDecay* self
 );
 
 /**
- * maplibre_native_ffi_momentum_decay_has_scroll_friction:
+ * maplibre_native_ffi_momentum_decay_has_distance:
  *
- * Whether `MaplibreNativeFfiMomentumDecay:scroll-friction` is set.
+ * Whether `MaplibreNativeFfiMomentumDecay:distance` is set.
  *
  * Returns: whether the member is set
  */
-gboolean maplibre_native_ffi_momentum_decay_has_scroll_friction(
+gboolean maplibre_native_ffi_momentum_decay_has_distance(
   MaplibreNativeFfiMomentumDecay* self
 );
 
 /**
- * maplibre_native_ffi_momentum_decay_set_scroll_friction: (set-property scroll-friction)
+ * maplibre_native_ffi_momentum_decay_set_distance: (set-property distance)
  *
- * Sets `MaplibreNativeFfiMomentumDecay:scroll-friction`.
+ * Sets `MaplibreNativeFfiMomentumDecay:distance`.
  */
-void maplibre_native_ffi_momentum_decay_set_scroll_friction(
+void maplibre_native_ffi_momentum_decay_set_distance(
   MaplibreNativeFfiMomentumDecay* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumDecay:duration-ms: (setter set_duration_ms) (getter get_duration_ms)
+ *
+ * Required for `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_PLANNED`.
+ */
+/**
+ * maplibre_native_ffi_momentum_decay_get_duration_ms: (get-property duration-ms)
+ *
+ * Gets `MaplibreNativeFfiMomentumDecay:duration-ms`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_momentum_decay_get_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_decay_has_duration_ms:
+ *
+ * Whether `MaplibreNativeFfiMomentumDecay:duration-ms` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_decay_has_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_decay_set_duration_ms: (set-property duration-ms)
+ *
+ * Sets `MaplibreNativeFfiMomentumDecay:duration-ms`.
+ */
+void maplibre_native_ffi_momentum_decay_set_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+);
+
+/**
+ * MaplibreNativeFfiMomentumDecay:curve: (setter set_curve) (getter get_curve)
+ *
+ * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_PLANNED`, the share of
+ * `distance` covered over the share of `duration_ms`. Its x values are between
+ * 0 and 1. Defaults to (0, 0, 0.25, 1), the curve that camera animations ease
+ * along by default. Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+ */
+/**
+ * maplibre_native_ffi_momentum_decay_get_curve: (get-property curve)
+ *
+ * Gets `MaplibreNativeFfiMomentumDecay:curve`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_momentum_decay_get_curve(
+  MaplibreNativeFfiMomentumDecay* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_decay_has_curve:
+ *
+ * Whether `MaplibreNativeFfiMomentumDecay:curve` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_momentum_decay_has_curve(
+  MaplibreNativeFfiMomentumDecay* self
+);
+
+/**
+ * maplibre_native_ffi_momentum_decay_set_curve: (set-property curve)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiMomentumDecay:curve`.
+ */
+void maplibre_native_ffi_momentum_decay_set_curve(
+  MaplibreNativeFfiMomentumDecay* self, const MaplibreNativeFfiUnitBezier* value
 );
 
 /**
@@ -1980,7 +2083,8 @@ void maplibre_native_ffi_momentum_decay_set_min_speed(
 /**
  * MaplibreNativeFfiMomentumDecay:max-speed: (setter set_max_speed) (getter get_max_speed)
  *
- * A faster release counts as this speed.
+ * For `MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_FRICTION`, a faster release
+ * counts as this.
  */
 /**
  * maplibre_native_ffi_momentum_decay_get_max_speed: (get-property max-speed)
@@ -2016,8 +2120,9 @@ void maplibre_native_ffi_momentum_decay_set_max_speed(
 /**
  * MaplibreNativeFfiMomentumDecay:max-distance: (setter set_max_distance) (getter get_max_distance)
  *
- * The farthest the part moves. A release that would move farther starts slower,
- * so it ends sooner.
+ * The farthest the part moves. A friction release that would move farther
+ * starts slower, so it ends sooner, and a planned glide moves at most this far
+ * over its duration.
  */
 /**
  * maplibre_native_ffi_momentum_decay_get_max_distance: (get-property max-distance)
@@ -2174,33 +2279,6 @@ MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_anchored_momentum_get_decay(
 void maplibre_native_ffi_anchored_momentum_set_decay(
   MaplibreNativeFfiAnchoredMomentum* self, MaplibreNativeFfiMomentumDecay* value
 );
-
-GType maplibre_native_ffi_unit_bezier_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_UNIT_BEZIER \
-  (maplibre_native_ffi_unit_bezier_get_type())
-
-/**
- * maplibre_native_ffi_unit_bezier_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiUnitBezier* maplibre_native_ffi_unit_bezier_copy(
-  const MaplibreNativeFfiUnitBezier* self
-);
-
-/**
- * maplibre_native_ffi_unit_bezier_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_unit_bezier_free(MaplibreNativeFfiUnitBezier* self);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiUnitBezier, maplibre_native_ffi_unit_bezier_free
-)
 
 /**
  * MaplibreNativeFfiCameraTransitionHandler:

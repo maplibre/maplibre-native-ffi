@@ -1709,9 +1709,10 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
 /// Speeds and distances are in the part's unit: logical pixels for pan, zoom
 /// levels for zoom, and degrees for bearing and pitch. A setting whose bit
 /// isn't set takes the part's default, which `GestureMomentum` lists.
-/// `min_speed` is finite and not negative, and every other setting is finite
-/// and positive. One value can serve every release, as a preset that matches a
-/// platform's scrolling.
+/// `min_speed` is finite and not negative, and every other number is finite and
+/// positive. A friction decay can serve every release, as a preset that matches
+/// a platform's scrolling. A planned glide takes its direction from the part's
+/// velocity, and its distance and duration from the caller's plan.
 ///
 /// See `mln_momentum_decay` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1721,21 +1722,30 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
   public var halfLifeMs: Double?
   /// For `MomentumDecayModel.friction`, the speed at which it ends.
   public var stopSpeed: Double?
-  /// For `MomentumDecayModel.spline`, Android's
-  /// `ViewConfiguration.getScrollFriction()`. Defaults to 0.015.
-  public var scrollFriction: Double?
+  /// Required for `MomentumDecayModel.planned`.
+  public var distance: Double?
+  /// Required for `MomentumDecayModel.planned`.
+  public var durationMs: Double?
+  /// For `MomentumDecayModel.planned`, the share of `distance` covered over the
+  /// share of `duration_ms`. Its x values are between 0 and 1. Defaults to (0,
+  /// 0, 0.25, 1), the curve that camera animations ease along by default.
+  /// Android's scroll fling follows (0.175, 0.5, 0.35, 1).
+  public var curve: UnitBezier?
   /// A slower release starts no momentum.
   public var minSpeed: Double?
-  /// A faster release counts as this speed.
+  /// For `MomentumDecayModel.friction`, a faster release counts as this.
   public var maxSpeed: Double?
-  /// The farthest the part moves. A release that would move farther starts
-  /// slower, so it ends sooner.
+  /// The farthest the part moves. A friction release that would move farther
+  /// starts slower, so it ends sooner, and a planned glide moves at most this
+  /// far over its duration.
   public var maxDistance: Double?
   public init(
     model: MomentumDecayModel? = nil,
     halfLifeMs: Double? = nil,
     stopSpeed: Double? = nil,
-    scrollFriction: Double? = nil,
+    distance: Double? = nil,
+    durationMs: Double? = nil,
+    curve: UnitBezier? = nil,
     minSpeed: Double? = nil,
     maxSpeed: Double? = nil,
     maxDistance: Double? = nil
@@ -1743,7 +1753,9 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
     self.model = model
     self.halfLifeMs = halfLifeMs
     self.stopSpeed = stopSpeed
-    self.scrollFriction = scrollFriction
+    self.distance = distance
+    self.durationMs = durationMs
+    self.curve = curve
     self.minSpeed = minSpeed
     self.maxSpeed = maxSpeed
     self.maxDistance = maxDistance
@@ -1756,8 +1768,12 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
       .rawValue != 0 ? raw.half_life_ms : nil
     stopSpeed = raw.fields & MLN_MOMENTUM_DECAY_STOP_SPEED.rawValue != 0 ? raw
       .stop_speed : nil
-    scrollFriction = raw.fields & MLN_MOMENTUM_DECAY_SCROLL_FRICTION
-      .rawValue != 0 ? raw.scroll_friction : nil
+    distance = raw.fields & MLN_MOMENTUM_DECAY_DISTANCE.rawValue != 0 ? raw
+      .distance : nil
+    durationMs = raw.fields & MLN_MOMENTUM_DECAY_DURATION_MS.rawValue != 0 ? raw
+      .duration_ms : nil
+    curve = raw.fields & MLN_MOMENTUM_DECAY_CURVE
+      .rawValue != 0 ? UnitBezier(raw: raw.curve) : nil
     minSpeed = raw.fields & MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue != 0 ? raw
       .min_speed : nil
     maxSpeed = raw.fields & MLN_MOMENTUM_DECAY_MAX_SPEED.rawValue != 0 ? raw
@@ -1781,9 +1797,16 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
       raw.fields |= MLN_MOMENTUM_DECAY_STOP_SPEED.rawValue; raw
         .stop_speed = item
     }
-    if let item = scrollFriction {
-      raw.fields |= MLN_MOMENTUM_DECAY_SCROLL_FRICTION.rawValue; raw
-        .scroll_friction = item
+    if let item = distance {
+      raw.fields |= MLN_MOMENTUM_DECAY_DISTANCE.rawValue; raw.distance = item
+    }
+    if let item = durationMs {
+      raw.fields |= MLN_MOMENTUM_DECAY_DURATION_MS.rawValue; raw
+        .duration_ms = item
+    }
+    if let item = curve {
+      raw.fields |= MLN_MOMENTUM_DECAY_CURVE.rawValue; raw.curve = item
+        .nativeValue()
     }
     if let item = minSpeed {
       raw.fields |= MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue; raw.min_speed = item
@@ -1815,13 +1838,14 @@ public struct MomentumDecayModel: RawRepresentable, CustomStringConvertible,
   /// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
   /// deceleration 69 ms.
   public static let friction: MomentumDecayModel = .init(rawValue: 0)
-  /// Android's scroll fling, as OverScroller computes it with
-  /// `scroll_friction`. Only pan can use it.
-  public static let spline: MomentumDecayModel = .init(rawValue: 1)
+  /// The part moves `distance` over `duration_ms`, along `curve`. The caller
+  /// plans the glide, for example from the platform's own fling physics, such
+  /// as Android's OverScroller.
+  public static let planned: MomentumDecayModel = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
     case 0: return "friction"
-    case 1: return "spline"
+    case 1: return "planned"
     default: return "MomentumDecayModel(\(rawValue))"
     }
   }

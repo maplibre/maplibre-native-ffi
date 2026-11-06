@@ -557,9 +557,10 @@ const (
 	// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
 	// deceleration 69 ms.
 	MomentumDecayModelFriction MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_FRICTION)
-	// Android's scroll fling, as OverScroller computes it with scroll_friction.
-	// Only pan can use it.
-	MomentumDecayModelSpline MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_SPLINE)
+	// The part moves distance over duration_ms, along curve. The caller plans the
+	// glide, for example from the platform's own fling physics, such as Android's
+	// OverScroller.
+	MomentumDecayModelPlanned MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_PLANNED)
 )
 
 func (value MomentumDecayModel) String() string {
@@ -567,7 +568,7 @@ func (value MomentumDecayModel) String() string {
 	case 0:
 		return "MomentumDecayModelFriction"
 	case 1:
-		return "MomentumDecayModelSpline"
+		return "MomentumDecayModelPlanned"
 	}
 	return fmt.Sprintf("MomentumDecayModel(%d)", value)
 }
@@ -3905,9 +3906,10 @@ func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
 // Speeds and distances are in the part's unit: logical pixels for pan, zoom
 // levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
 // set takes the part's default, which GestureMomentum lists. min_speed is
-// finite and not negative, and every other setting is finite and positive. One
-// value can serve every release, as a preset that matches a platform's
-// scrolling.
+// finite and not negative, and every other number is finite and positive. A
+// friction decay can serve every release, as a preset that matches a platform's
+// scrolling. A planned glide takes its direction from the part's velocity, and
+// its distance and duration from the caller's plan.
 //
 // See mln_momentum_decay in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -3917,15 +3919,22 @@ type MomentumDecay struct {
 	HalfLifeMs *float64
 	// For MomentumDecayModelFriction, the speed at which it ends.
 	StopSpeed *float64
-	// For MomentumDecayModelSpline, Android's
-	// ViewConfiguration.getScrollFriction(). Defaults to 0.015.
-	ScrollFriction *float64
+	// Required for MomentumDecayModelPlanned.
+	Distance *float64
+	// Required for MomentumDecayModelPlanned.
+	DurationMs *float64
+	// For MomentumDecayModelPlanned, the share of distance covered over the share
+	// of duration_ms. Its x values are between 0 and 1. Defaults to (0, 0, 0.25,
+	// 1), the curve that camera animations ease along by default. Android's scroll
+	// fling follows (0.175, 0.5, 0.35, 1).
+	Curve *UnitBezier
 	// A slower release starts no momentum.
 	MinSpeed *float64
-	// A faster release counts as this speed.
+	// For MomentumDecayModelFriction, a faster release counts as this.
 	MaxSpeed *float64
-	// The farthest the part moves. A release that would move farther starts slower,
-	// so it ends sooner.
+	// The farthest the part moves. A friction release that would move farther
+	// starts slower, so it ends sooner, and a planned glide moves at most this far
+	// over its duration.
 	MaxDistance *float64
 }
 
@@ -3935,7 +3944,9 @@ func nativeMomentumDecay(input MomentumDecay, arena *bindingArena) C.mln_momentu
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MODEL, &raw.model, input.Model, arena, bindingNumber[MomentumDecayModel, C.mln_momentum_decay_model])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_HALF_LIFE_MS, &raw.half_life_ms, input.HalfLifeMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_STOP_SPEED, &raw.stop_speed, input.StopSpeed, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_SCROLL_FRICTION, &raw.scroll_friction, input.ScrollFriction, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_DISTANCE, &raw.distance, input.Distance, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_DURATION_MS, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_CURVE, &raw.curve, input.Curve, arena, nativeUnitBezier)
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MIN_SPEED, &raw.min_speed, input.MinSpeed, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MAX_SPEED, &raw.max_speed, input.MaxSpeed, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MAX_DISTANCE, &raw.max_distance, input.MaxDistance, arena, bindingNumber[float64, C.double])

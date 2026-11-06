@@ -2711,7 +2711,6 @@ fn generated_input_mln_momentum_decay<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_momentum_decay> {
-    let _ = storage;
     let mut raw: sys::mln_momentum_decay = unsafe { std::mem::zeroed() };
     raw.fields = 0;
     if let Some(field) = generated_present(value, "model")? {
@@ -2726,9 +2725,17 @@ fn generated_input_mln_momentum_decay<'py>(
         raw.stop_speed = field.extract::<f64>()?;
         raw.fields |= sys::MLN_MOMENTUM_DECAY_STOP_SPEED;
     }
-    if let Some(field) = generated_present(value, "scroll_friction")? {
-        raw.scroll_friction = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_DECAY_SCROLL_FRICTION;
+    if let Some(field) = generated_present(value, "distance")? {
+        raw.distance = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_DISTANCE;
+    }
+    if let Some(field) = generated_present(value, "duration_ms")? {
+        raw.duration_ms = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_DURATION_MS;
+    }
+    if let Some(field) = generated_present(value, "curve")? {
+        raw.curve = generated_input_mln_unit_bezier(&field, storage)?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_CURVE;
     }
     if let Some(field) = generated_present(value, "min_speed")? {
         raw.min_speed = field.extract::<f64>()?;
