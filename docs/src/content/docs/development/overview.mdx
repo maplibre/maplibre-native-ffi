@@ -67,9 +67,10 @@ To test on your own Android device, set `ANDROID_SERIAL`.
 The Windows presets build on Linux. `mise -E msvc install` downloads the MSVC
 runtime and the Windows SDK, and accepts
 [Microsoft's license](https://go.microsoft.com/fwlink/?LinkId=2086102) for them.
-Set `WINE` to a Wine executable, then run tests with
-`mise -E msvc run test windows-x64-vulkan`. Wine isn't Windows: when results
-differ, Windows CI is right.
+Install Proton Experimental from Steam, then run tests with
+`mise -E msvc run test windows-x64-vulkan`. Proton's launcher gives the prefix
+the fonts, ICU, and DXVK that .NET and WPF need. To use another Wine, set `WINE`
+to its executable. Wine isn't Windows: when results differ, Windows CI is right.
 
 ### MinGW
 
