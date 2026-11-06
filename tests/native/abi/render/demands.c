@@ -246,6 +246,8 @@ static void webgpu_demands_past_the_ring_depth_wait_for_the_gpu(void) {
     mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
   );
   const uint64_t depth = capabilities.texture_ring_depth;
+  // The demands wait for the map to apply the commands that set it up.
+  MLN_TEST_OK(mln_test_map_fence(map));
   for (uint64_t token = 1; token <= depth + 1; token += 1) {
     mln_test_render_demand_forced(&fixture, token);
   }
@@ -282,6 +284,8 @@ static void webgpu_a_demand_behind_unfinished_frames_wakes_the_driver(void) {
     mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
   );
   const uint64_t depth = capabilities.texture_ring_depth;
+  // The demands wait for the map to apply the commands that set it up.
+  MLN_TEST_OK(mln_test_map_fence(map));
   for (uint64_t token = 1; token <= depth; token += 1) {
     mln_test_render_demand_forced(&fixture, token);
   }
@@ -645,6 +649,134 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   detach(runtime, map, &fixture);
 }
 
+static void update_zoom(
+  mln_map map, double zoom, const mln_completion* completion
+) {
+  mln_camera_update update = {
+    .size = sizeof(mln_camera_update),
+    .camera = {.size = sizeof(mln_camera_options)}
+  };
+  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = zoom;
+  MLN_TEST_OK(mln_map_update_camera(map, &update, completion, NULL));
+}
+
+// Services a caller-driven session once, and checks that the demand waits:
+// such a session would otherwise run it during the service.
+static void expect_demand_waits(const mln_test_render_fixture* fixture) {
+  MLN_TEST_OK(mln_test_render_fixture_service(fixture));
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_test_drain_frame_results(fixture->session, &batch, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+}
+
+// The worker parks in the first camera command's completion, after storing
+// its update. The driver has that newer update to draw while the second
+// command waits behind it, and the frame must show the second.
+static void a_demand_shows_the_commands_sent_before_it(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture);
+  mln_test_render_until_idle(runtime, map, &fixture);
+
+  mln_test_gate gate;
+  mln_test_gate_init(&gate);
+  const mln_completion hold = mln_test_gate_completion(&gate);
+  update_zoom(map, 2.0, &hold);
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+  );
+  mln_test_completion moved = mln_test_completion_default(0);
+  update_zoom(map, 3.0, &moved.descriptor);
+  const mln_frame_demand demand = {
+    .size = sizeof(mln_frame_demand), .token = 631
+  };
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture.session, &demand, NULL));
+  expect_demand_waits(&fixture);
+
+  mln_test_gate_release(&gate);
+  MLN_TEST_OK(mln_test_completion_finish(&moved));
+  const mln_render_frame_result result = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT64(631, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
+    mln_test_completion_render_update_generation(&moved),
+    result.map_update_generation
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(3.0, result.view.camera.zoom);
+  mln_test_completion_destroy(&moved);
+  detach(runtime, map, &fixture);
+}
+
+// A command that changes nothing publishes no update, and the demand behind it
+// still finishes once the map applies it.
+static void a_demand_behind_a_command_without_an_update_finishes(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture);
+  mln_test_render_until_idle(runtime, map, &fixture);
+
+  mln_test_gate gate;
+  mln_test_gate_init(&gate);
+  const mln_completion hold = mln_test_gate_completion(&gate);
+  MLN_TEST_OK(mln_map_get_camera(map, &hold, NULL));
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+  );
+  mln_test_completion logged = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_dump_debug_logs(map, &logged.descriptor, NULL));
+  const mln_frame_demand demand = {
+    .size = sizeof(mln_frame_demand), .token = 641
+  };
+  MLN_TEST_OK(mln_render_session_demand_frame(fixture.session, &demand, NULL));
+  expect_demand_waits(&fixture);
+
+  mln_test_gate_release(&gate);
+  MLN_TEST_OK(mln_test_completion_finish(&logged));
+  mln_test_completion_destroy(&logged);
+  const mln_render_frame_result result = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT64(641, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, result.disposition);
+  detach(runtime, map, &fixture);
+}
+
+// A detach ends a demand that still waits for the map's commands instead of
+// rendering the map without them.
+static void a_detach_ends_a_demand_waiting_for_commands(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture);
+  mln_test_render_until_idle(runtime, map, &fixture);
+
+  mln_test_gate gate;
+  mln_test_gate_init(&gate);
+  const mln_completion hold = mln_test_gate_completion(&gate);
+  MLN_TEST_OK(mln_map_get_camera(map, &hold, NULL));
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+  );
+  mln_test_completion moved = mln_test_completion_default(0);
+  update_zoom(map, 3.0, &moved.descriptor);
+  mln_test_render_demand_forced(&fixture, 661);
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  const mln_render_frame_result result = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT64(661, result.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
+  );
+
+  mln_test_gate_release(&gate);
+  MLN_TEST_OK(mln_test_completion_finish(&moved));
+  mln_test_completion_destroy(&moved);
+  detach(runtime, map, &fixture);
+}
+
 static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
   mln_runtime runtime;
   mln_map map;
@@ -705,4 +837,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_waiting_demand_renders_the_next_map_update);
   RUN_TEST(a_waiting_demand_ends_by_supersession_barrier_or_detach);
   RUN_TEST(a_burst_of_held_commands_renders_in_one_frame);
+  RUN_TEST(a_demand_shows_the_commands_sent_before_it);
+  RUN_TEST(a_demand_behind_a_command_without_an_update_finishes);
+  RUN_TEST(a_detach_ends_a_demand_waiting_for_commands);
 }

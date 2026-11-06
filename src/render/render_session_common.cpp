@@ -953,13 +953,36 @@ auto push_driver_work_locked(
 
 auto run_frame_demand(
   const std::shared_ptr<mln_render_session_object>& session,
-  const std::shared_ptr<const mln_frame_demand>& expected
+  const std::shared_ptr<const QueuedFrameDemand>& expected
 ) noexcept -> void;
+
+// Whether the map has applied the commands sent before the demand that the
+// work for `expected` runs next. Work whose demand ended runs nothing.
+auto map_commands_ready_locked(
+  mln_render_session_object& session,
+  const std::shared_ptr<const QueuedFrameDemand>& expected
+) noexcept -> bool {
+  // Detach and abandon leave these states before they drop the map.
+  if (
+    expected == nullptr ||
+    (session.state != MLN_RENDER_SESSION_STATE_ATTACHING &&
+     session.state != MLN_RENDER_SESSION_STATE_ATTACHED) ||
+    std::find(session.demands.begin(), session.demands.end(), expected) ==
+      session.demands.end()
+  )
+    return true;
+  auto& map = *session.map_object;
+  const auto needed = session.demands.front()->map_commands;
+  if (map_commands_applied(map) >= needed) return true;
+  map_set_commands_awaited(map, true);
+  // A command that finished before the map saw the flag sent no notice.
+  return map_commands_applied(map) >= needed;
+}
 
 // If allocation fails, later driver work or detach gives the demand a result.
 auto queue_frame_demand_work_locked(
   mln_render_session_object& session, DeferredWakes& wakes,
-  const std::shared_ptr<const mln_frame_demand>& demand = {}
+  const std::shared_ptr<const QueuedFrameDemand>& demand = {}
 ) noexcept -> bool {
   const auto expected = demand ? demand : session.demands.front();
   auto& queue = session.driver_work;
@@ -969,7 +992,10 @@ auto queue_frame_demand_work_locked(
         .execute = [owner = session.shared_from_this(),
                     expected]() { run_frame_demand(owner, expected); },
         .cancel = {},
-        .ready = {},
+        .ready =
+          [owner = &session, expected]() {
+            return map_commands_ready_locked(*owner, expected);
+          },
         .renders_frame = true,
       }
     );
@@ -1043,10 +1069,14 @@ auto arm_still_image_demand_locked(
   try {
     reserve_frame_result_locked(session);
     session.demands.push_back(
-      std::make_shared<const mln_frame_demand>(mln_frame_demand{
-        .size = sizeof(mln_frame_demand),
-        .flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
-        .token = MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE,
+      // The map requested the image itself.
+      std::make_shared<const QueuedFrameDemand>(QueuedFrameDemand{
+        {
+          .size = sizeof(mln_frame_demand),
+          .flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE,
+          .token = MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE,
+        },
+        0,
       })
     );
   } catch (...) {
@@ -1366,7 +1396,7 @@ auto run_core_worker(
 
 auto service_scheduler_work(
   const std::shared_ptr<mln_render_session_object>& session,
-  std::shared_ptr<const mln_frame_demand> expected
+  std::shared_ptr<const QueuedFrameDemand> expected
 ) noexcept -> void;
 
 using RenderDriverWorkFactory = std::function<RenderDriverWork(
@@ -1776,6 +1806,12 @@ auto start_attach_render_session(
             notify_render_session_still_image(live.get());
           }
         },
+      .commands =
+        [weak_session]() noexcept {
+          if (const auto live = weak_session.lock()) {
+            notify_render_session_map_commands(live.get());
+          }
+        },
     }
   );
   if (notices_status != MLN_STATUS_OK) {
@@ -1851,7 +1887,10 @@ auto start_attach_render_session(
                     service_scheduler_work(live, expected);
                   },
                 .cancel = {},
-                .ready = {},
+                .ready =
+                  [owner = live.get(), expected]() {
+                    return map_commands_ready_locked(*owner, expected);
+                  },
                 .renders_frame = expected != nullptr,
               },
               wakes
@@ -1935,6 +1974,19 @@ auto notify_render_session_map_update(
   // Queueing work publishes it to the driver. A demand parked by a full ring
   // keeps no work item, and an update frees no slot, so it needs no wake here.
   resume_update_waiting_demands_locked(*session, wakes);
+}
+
+auto notify_render_session_map_commands(
+  mln_render_session_object* session
+) noexcept -> void {
+  if (session == nullptr) return;
+  auto wakes = DeferredWakes{};
+  const auto lock = std::scoped_lock{session->control_mutex};
+  // Detach and abandon leave this state before they drop the map.
+  if (session->state != MLN_RENDER_SESSION_STATE_ATTACHED) return;
+  // Work that still waits sets the flag again when the driver checks it.
+  map_set_commands_awaited(*session->map_object, false);
+  publish_driver_work_locked(*session, wakes);
 }
 
 auto notify_render_session_still_image(
@@ -2891,7 +2943,7 @@ auto deliver_pending_session_work(
 // behind a demand that happens to render.
 auto service_scheduler_work(
   const std::shared_ptr<mln_render_session_object>& session,
-  std::shared_ptr<const mln_frame_demand> expected
+  std::shared_ptr<const QueuedFrameDemand> expected
 ) noexcept -> void {
   {
     const auto lock = std::scoped_lock{session->control_mutex};
@@ -2914,7 +2966,7 @@ auto service_scheduler_work(
 // terminal disposition when the demand finishes.
 auto wait_for_map_update(
   const std::shared_ptr<mln_render_session_object>& session,
-  const std::shared_ptr<const mln_frame_demand>& pending,
+  const std::shared_ptr<const QueuedFrameDemand>& pending,
   std::uint64_t evaluated, mln_render_frame_result& result
 ) noexcept -> bool {
   mln::testing::hit(mln::testing::SyncPoint::RenderDemandWaits);
@@ -3039,9 +3091,9 @@ auto finish_unready_attempt(
 
 auto run_frame_demand(
   const std::shared_ptr<mln_render_session_object>& session,
-  const std::shared_ptr<const mln_frame_demand>& expected
+  const std::shared_ptr<const QueuedFrameDemand>& expected
 ) noexcept -> void {
-  auto demand = std::shared_ptr<const mln_frame_demand>{};
+  auto demand = std::shared_ptr<const QueuedFrameDemand>{};
   auto releasing = false;
   {
     const auto lock = std::scoped_lock{session->control_mutex};
@@ -3082,6 +3134,13 @@ auto run_frame_demand(
     .view = {},
     .mode = MLN_RENDER_MODE_PARTIAL,
   };
+  // Only a detaching session runs a demand before its commands apply. Its
+  // detach work, queued behind this, still holds the map.
+  if (map_commands_applied(*session->map_object) < demand->map_commands) {
+    result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
+    publish_frame_result(session, result);
+    return;
+  }
   if (session->target_released || releasing) {
     // No target can take the frame, or the host is giving it up, so a frame
     // rendered to it would only delay the release. Tile and placement results
@@ -3442,13 +3501,13 @@ auto render_session_demand_frame(
     return MLN_STATUS_INVALID_STATE;
   }
   const auto supersedes =
-    [&](const std::shared_ptr<const mln_frame_demand>& pending) {
+    [&](const std::shared_ptr<const QueuedFrameDemand>& pending) {
       return (demand->flags & MLN_FRAME_DEMAND_FORCE) == 0 &&
              pending->flags == demand->flags &&
              pending->token != MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE;
     };
   const auto supersede =
-    [&](const std::shared_ptr<const mln_frame_demand>& pending) {
+    [&](const std::shared_ptr<const QueuedFrameDemand>& pending) {
       publish_frame_result_locked(
         *live,
         mln_render_frame_result{
@@ -3484,7 +3543,11 @@ auto render_session_demand_frame(
     }
   }
   reserve_frame_result_locked(*live);
-  const auto queued = std::make_shared<const mln_frame_demand>(*demand);
+  const auto queued =
+    std::make_shared<const QueuedFrameDemand>(QueuedFrameDemand{
+      *demand,
+      live->map_object != nullptr ? map_commands_sent(*live->map_object) : 0,
+    });
   live->demands.push_back(queued);
   try {
     // Superseded work must not start a later demand ahead of ordered driver
@@ -3494,7 +3557,10 @@ auto render_session_demand_frame(
       RenderDriverWork{
         .execute = [live, queued]() { run_frame_demand(live, queued); },
         .cancel = {},
-        .ready = {},
+        .ready =
+          [owner = live.get(), queued]() {
+            return map_commands_ready_locked(*owner, queued);
+          },
         .renders_frame = true,
       },
       wakes

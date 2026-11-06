@@ -890,6 +890,11 @@ struct RenderTextureState {
   bool gpu_wait_pending = false;
 };
 
+// An accepted demand, and how many map commands were sent before it.
+struct QueuedFrameDemand : mln_frame_demand {
+  std::uint64_t map_commands = 0;
+};
+
 struct RenderDriverWork {
   std::function<void()> execute;
   std::function<void(mln_status, const char*)> cancel;
@@ -1011,9 +1016,10 @@ struct mln_render_session_object
   std::vector<mln_render_frame_result> frame_results;
   // Every accepted demand reserves its result before it can reach the driver.
   std::size_t unfinished_demands = 0;
-  std::deque<std::shared_ptr<const mln_frame_demand>> demands;
+  std::deque<std::shared_ptr<const mln::core::QueuedFrameDemand>> demands;
   // Waiting demands hold no work item until an update or target change.
-  std::deque<std::shared_ptr<const mln_frame_demand>> update_waiting_demands;
+  std::deque<std::shared_ptr<const mln::core::QueuedFrameDemand>>
+    update_waiting_demands;
   // Still-image demands that are queued, parked, running, or waiting, each
   // until its result, and the still image's update generation that the newest
   // was submitted for. A request can arrive before the previous request's
@@ -1170,6 +1176,11 @@ auto start_attach_render_session(
 // update of `update_generation`.
 auto notify_render_session_map_update(
   mln_render_session_object* session, uint64_t update_generation
+) noexcept -> void;
+// Called on the runtime worker when the attached map finishes a command while
+// a demand waits for commands.
+auto notify_render_session_map_commands(
+  mln_render_session_object* session
 ) noexcept -> void;
 // Called on the runtime worker when the attached map's still image becomes
 // pending or stops being pending.

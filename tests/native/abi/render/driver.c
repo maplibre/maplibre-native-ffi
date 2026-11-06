@@ -222,6 +222,8 @@ typedef struct maintenance_probe {
   mln_status status;
   bool drain_failed;
   size_t token_count;
+  // How many results the queue had given when the command completed.
+  size_t tokens_at_completion;
   uint64_t tokens[4];
 } maintenance_probe;
 
@@ -257,6 +259,7 @@ static void maintenance_completed(
   maintenance_probe* probe = user_data;
   probe->status = result->status;
   drain_tokens(probe);
+  probe->tokens_at_completion = probe->token_count;
   mln_test_flag_set(&probe->completed);
 }
 
@@ -275,6 +278,16 @@ static bool maintenance_settled(void* context) {
   }
   drain_tokens(wait->probe);
   return wait->probe->drain_failed || wait->probe->token_count >= 2;
+}
+
+// Holds once the command completed and one demand's result arrived.
+static bool maintenance_settled_after_one(void* context) {
+  probe_wait* wait = context;
+  if (!atomic_load(&wait->probe->completed)) {
+    return false;
+  }
+  drain_tokens(wait->probe);
+  return wait->probe->drain_failed || wait->probe->token_count >= 1;
 }
 
 // Every maintenance command queues the same way, so one stands for them.
@@ -308,6 +321,61 @@ static void maintenance_commands_run_in_order_with_frames(void) {
   TEST_ASSERT_EQUAL_size_t(2, probe.token_count);
   TEST_ASSERT_EQUAL_UINT64(1, probe.tokens[0]);
   TEST_ASSERT_EQUAL_UINT64(2, probe.tokens[1]);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// The runtime worker parks while the map has a command to apply, so the demand
+// waits for it. The maintenance command behind the demand still runs after
+// its frame.
+static void maintenance_waits_behind_a_demand_for_map_commands(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
+  mln_test_render_until_idle(runtime, map, &fixture);
+
+  mln_test_gate gate;
+  mln_test_gate_init(&gate);
+  const mln_completion hold = mln_test_gate_completion(&gate);
+  MLN_TEST_OK(mln_map_get_camera(map, &hold, NULL));
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+  );
+  mln_test_completion logged = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_dump_debug_logs(map, &logged.descriptor, NULL));
+  maintenance_probe probe = {.session = fixture.session};
+  atomic_init(&probe.completed, false);
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = maintenance_completed,
+    .user_data = &probe,
+    .release_user_data = maintenance_released,
+  };
+  mln_test_render_demand_forced(&fixture, 1);
+  MLN_TEST_OK(
+    mln_render_session_reduce_memory_use(fixture.session, &completion, NULL)
+  );
+  // A caller-driven session would run the command during this service if the
+  // demand didn't hold it.
+  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
+  TEST_ASSERT_FALSE(atomic_load(&probe.completed));
+
+  mln_test_gate_release(&gate);
+  MLN_TEST_OK(mln_test_completion_finish(&logged));
+  mln_test_completion_destroy(&logged);
+  probe_wait wait = {.fixture = &fixture, .probe = &probe};
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture, maintenance_settled_after_one, &wait, mln_test_deadline_default(),
+    "a maintenance command behind a demand"
+  ));
+  TEST_ASSERT_FALSE(probe.drain_failed);
+  MLN_TEST_OK(probe.status);
+  TEST_ASSERT_EQUAL_size_t(1, probe.tokens_at_completion);
+  TEST_ASSERT_EQUAL_UINT64(1, probe.tokens[0]);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -1136,6 +1204,9 @@ static void wakes_may_call_back_into_the_session(void) {
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   attach_reentrant_host(map, &fixture);
+  // The map applies its setup commands first, so the demand's work is ready
+  // and its wake runs on this thread.
+  MLN_TEST_OK(mln_test_map_fence(map));
 
   mln_test_render_demand_forced(&fixture, reentrant.token);
   TEST_ASSERT_TRUE(mln_test_await(
@@ -1276,6 +1347,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_attached_session_holds_its_map);
   RUN_TEST(a_detached_session_frees_its_map_and_refuses_work);
   RUN_TEST(maintenance_commands_run_in_order_with_frames);
+  RUN_TEST(maintenance_waits_behind_a_demand_for_map_commands);
   RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
   RUN_TEST(abandon_at_exit_keeps_every_graphics_object);
   RUN_TEST(abandon_from_a_driver_completion_is_busy);

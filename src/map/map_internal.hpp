@@ -70,6 +70,11 @@ struct MapObject {
   // Width and height follow resize on the runtime worker; scale_factor is
   // fixed at creation, so map_scale_factor() may read it from any thread.
   mln_logical_extent logical_extent{256, 256, 1.0};
+  // Commands sent to the map, and those the runtime worker finished.
+  std::atomic<uint64_t> commands_sent = 0;
+  std::atomic<uint64_t> commands_applied = 0;
+  // Written under the attached session's control mutex.
+  std::atomic_bool commands_awaited = false;
   mutable std::mutex snapshot_mutex;
   mln_map_snapshot snapshot{};
   uint64_t next_snapshot_generation = 1;
