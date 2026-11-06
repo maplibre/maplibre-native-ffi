@@ -1430,6 +1430,21 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_set_geo_json_source_json(
+    map: Long,
+    sourceId: Long,
+    data: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_geo_json_source_json(
+      map.toULong(),
+      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      data.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_set_geo_json_source_synchronous_tiling(
     map: Long,
     sourceId: Long,

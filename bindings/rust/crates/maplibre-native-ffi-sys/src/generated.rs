@@ -2908,6 +2908,13 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_set_geo_json_source_json(
+        map: mln_map,
+        source_id: mln_buffer_view,
+        data: mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_set_geo_json_source_synchronous_tiling(
         map: mln_map,
         source_id: mln_buffer_view,

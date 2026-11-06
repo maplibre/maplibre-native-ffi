@@ -4431,6 +4431,15 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
           nativeDiagnostic,
         ),
       );
+  void setGeoJsonSourceJson(String sourceId, Object? data) => _discard(
+    (arena, completion) => raw.mln_map_set_geo_json_source_json(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _nativeJsonView(data, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   void setGeoJsonSourceSynchronousTiling(String sourceId, bool enabled) =>
       _discard(
         (arena, completion) =>
@@ -6526,11 +6535,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
         ),
       );
 
-  /// Replaces the data of a GeoJSON source.
+  /// Replaces the data of a GeoJSON source with prepared data.
   ///
-  /// `data` must have been prepared with the source's options, which
-  /// `MapHandle.getStyleSource()` reports, though `min_zoom` may differ. `data`
-  /// can be released once this function returns.
+  /// `MapHandle.setGeoJsonSourceJson()` is simpler when the data isn't shared
+  /// or prepared ahead. `data` must have been prepared with the source's
+  /// options, which `MapHandle.getStyleSource()` reports, though `min_zoom` may
+  /// differ. `data` can be released once this function returns.
   ///
   /// See `mln_map_set_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -6550,6 +6560,39 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       _handle.raw,
       nativeStringView(sourceId, arena).value,
       data._handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Replaces the data of a GeoJSON source with GeoJSON text.
+  ///
+  /// `data` is a GeoJSON feature collection, feature, or geometry. The map
+  /// prepares it with the source's own options, so the source keeps how it was
+  /// added, including clustering. Preparing large data can be slow, and the map
+  /// runs its later commands after it finishes. To prepare data ahead or share
+  /// it between sources, use `GeoJsonSourceDataHandle.create()` and
+  /// `MapHandle.setGeoJsonSourceData()` instead.
+  ///
+  /// See `mln_map_set_geo_json_source_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no source named `sourceId`.
+  /// - `Status.invalidArgument` when the source named `sourceId` isn't a
+  ///   GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+  ///   clusters and `data` isn't a feature collection of points.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
+  Future<CommandCompletion> setGeoJsonSourceJson(
+    String sourceId,
+    Object? data,
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_geo_json_source_json(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _nativeJsonView(data, arena),
       completion,
       nativeDiagnostic,
     ),

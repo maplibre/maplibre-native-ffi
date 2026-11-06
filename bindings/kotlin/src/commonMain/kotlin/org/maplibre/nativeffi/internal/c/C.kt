@@ -634,6 +634,14 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_map_set_geo_json_source_json(
+    map: Long,
+    sourceId: Long,
+    data: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_set_geo_json_source_synchronous_tiling(
     map: Long,
     sourceId: Long,

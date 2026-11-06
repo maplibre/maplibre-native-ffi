@@ -115,9 +115,9 @@ static void source_commands_fail_on_the_wrong_source_type(void) {
     mln_map_set_image_source_url(map, taken, png, &completion.descriptor, NULL)
   );
 
-  // A URL update and the synchronous tiling override belong to GeoJSON
-  // sources alone. internal/geojson_tiling.cpp shows that the override
-  // reaches the next frame.
+  // A URL update, new GeoJSON text, and the synchronous tiling override
+  // belong to GeoJSON sources alone. internal/geojson_tiling.cpp shows that
+  // the override reaches the next frame.
   const mln_buffer_view image = MLN_BUFFER_LITERAL("image");
   MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
     map, image,
@@ -131,6 +131,14 @@ static void source_commands_fail_on_the_wrong_source_type(void) {
     MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
     mln_map_set_geo_json_source_url(
       map, image, geojson_url, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
+    mln_map_set_geo_json_source_json(
+      map, image,
+      MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
+      &completion.descriptor, NULL
     )
   );
   const mln_buffer_view vector = MLN_BUFFER_LITERAL("vector");

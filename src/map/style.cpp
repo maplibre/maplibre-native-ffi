@@ -1245,8 +1245,11 @@ auto map_add_geojson_source_data(
   return MLN_STATUS_OK;
 }
 
-auto map_set_geojson_source_url(
-  MapObject& live, mln_buffer_view source_id, mln_buffer_view url
+namespace {
+
+auto find_geojson_source(
+  MapObject& live, mln_buffer_view source_id,
+  mln::style::GeoJSONSource*& out_source
 ) -> mln_status {
   auto* source =
     map_native(live).getStyle().getSource(string_from_view(source_id));
@@ -1254,10 +1257,23 @@ auto map_set_geojson_source_url(
     set_thread_error("source does not exist");
     return MLN_STATUS_NOT_FOUND;
   }
-  auto* geojson_source = source->as<mln::style::GeoJSONSource>();
-  if (geojson_source == nullptr) {
+  out_source = source->as<mln::style::GeoJSONSource>();
+  if (out_source == nullptr) {
     set_thread_error("source is not a GeoJSON source");
     return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto map_set_geojson_source_url(
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view url
+) -> mln_status {
+  mln::style::GeoJSONSource* geojson_source = nullptr;
+  const auto found = find_geojson_source(live, source_id, geojson_source);
+  if (found != MLN_STATUS_OK) {
+    return found;
   }
 
   geojson_source->setURL(string_from_view(url));
@@ -1268,16 +1284,10 @@ auto map_set_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  auto* geojson_source = source->as<mln::style::GeoJSONSource>();
-  if (geojson_source == nullptr) {
-    set_thread_error("source is not a GeoJSON source");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  mln::style::GeoJSONSource* geojson_source = nullptr;
+  const auto found = find_geojson_source(live, source_id, geojson_source);
+  if (found != MLN_STATUS_OK) {
+    return found;
   }
   if (!geojson_source_options_equal(
         geojson_source->getOptions(), *data->options
@@ -1294,19 +1304,33 @@ auto map_set_geojson_source_data(
   return MLN_STATUS_OK;
 }
 
+auto map_set_geojson_source_json(
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view data
+) -> mln_status {
+  mln::style::GeoJSONSource* geojson_source = nullptr;
+  const auto found = find_geojson_source(live, source_id, geojson_source);
+  if (found != MLN_STATUS_OK) {
+    return found;
+  }
+
+  auto prepared = prepare_geojson_source_data(
+    data,
+    mln::makeMutable<mln::style::GeoJSONOptions>(geojson_source->getOptions())
+  );
+  if (prepared == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  geojson_source->setGeoJSONData(std::move(prepared));
+  return MLN_STATUS_OK;
+}
+
 auto map_set_geojson_source_synchronous_tiling(
   MapObject& live, mln_buffer_view source_id, bool enabled
 ) -> mln_status {
-  auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_NOT_FOUND;
-  }
-  auto* geojson_source = source->as<mln::style::GeoJSONSource>();
-  if (geojson_source == nullptr) {
-    set_thread_error("source is not a GeoJSON source");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  mln::style::GeoJSONSource* geojson_source = nullptr;
+  const auto found = find_geojson_source(live, source_id, geojson_source);
+  if (found != MLN_STATUS_OK) {
+    return found;
   }
 
   geojson_source->setOverrideSynchronousUpdate(enabled);

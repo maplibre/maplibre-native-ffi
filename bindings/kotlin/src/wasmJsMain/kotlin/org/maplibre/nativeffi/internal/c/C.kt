@@ -1183,6 +1183,21 @@ internal actual object C {
       word(outDiagnostic),
     )
 
+  actual fun mln_map_set_geo_json_source_json(
+    map: Long,
+    sourceId: Long,
+    data: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_set_geo_json_source_json(
+      map,
+      word(sourceId),
+      word(data),
+      word(completion),
+      word(outDiagnostic),
+    )
+
   actual fun mln_map_set_geo_json_source_synchronous_tiling(
     map: Long,
     sourceId: Long,
@@ -2997,6 +3012,17 @@ private fun mln_kw_mln_map_set_geo_json_source_data(
 ): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geo_json_source_data(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_map_set_geo_json_source_json(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geo_json_source_json(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_geo_json_source_synchronous_tiling(

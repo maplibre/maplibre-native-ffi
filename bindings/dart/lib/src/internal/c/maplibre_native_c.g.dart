@@ -4211,6 +4211,23 @@ external int mln_map_set_geo_json_source_data(
   Int32 Function(
     mln_map,
     mln_buffer_view,
+    mln_buffer_view,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_geo_json_source_json(
+  int map,
+  mln_buffer_view source_id,
+  mln_buffer_view data,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
     Bool,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,

@@ -345,6 +345,9 @@ auto map_set_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
 ) -> mln_status;
+auto map_set_geojson_source_json(
+  MapObject& live, mln_buffer_view source_id, mln_buffer_view data
+) -> mln_status;
 auto map_set_geojson_source_synchronous_tiling(
   MapObject& live, mln_buffer_view source_id, bool enabled
 ) -> mln_status;

@@ -66,15 +66,10 @@ func style(ctx context.Context, m *maplibre.MapHandle, pixels []byte) error {
 		return err
 	}
 
-	// Later, prepare new data with the same options, and set it.
-	next, err := maplibre.NewGeoJSONSourceData(
-		`{"type": "Point", "coordinates": [2.35, 48.86]}`, nil,
+	// Later, replace the data. The map prepares it with the source's options.
+	err = m.Discarding().SetGeoJSONSourceJSON(
+		"points", `{"type": "Point", "coordinates": [2.35, 48.86]}`,
 	)
-	if err != nil {
-		return err
-	}
-	defer next.Release()
-	err = m.Discarding().SetGeoJSONSourceData("points", next)
 	if err != nil {
 		return err
 	}

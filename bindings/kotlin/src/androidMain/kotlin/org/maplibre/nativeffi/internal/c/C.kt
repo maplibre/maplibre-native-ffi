@@ -888,6 +888,15 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_set_geo_json_source_json(
+    map: Long,
+    sourceId: Long,
+    data: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_set_geo_json_source_synchronous_tiling(
     map: Long,
     sourceId: Long,

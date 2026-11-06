@@ -627,11 +627,37 @@ MLN_API mln_status mln_map_set_geo_json_source_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Replaces the data of a GeoJSON source.
+ * Replaces the data of a GeoJSON source with GeoJSON text.
  *
- * `data` must have been prepared with the source's options, which
- * mln_map_get_style_source() reports, though `min_zoom` may differ. `data` can
- * be released once this function returns.
+ * `data` is a GeoJSON feature collection, feature, or geometry. The map
+ * prepares it with the source's own options, so the source keeps how it was
+ * added, including clustering. Preparing large data can be slow, and the map
+ * runs its later commands after it finishes. To prepare data ahead or share it
+ * between sources, use mln_geo_json_source_data_create() and
+ * mln_map_set_geo_json_source_data() instead.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source named `source_id` isn't a
+ *   GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+ *   clusters and `data` isn't a feature collection of points.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_set_geo_json_source_json(
+  mln_map map, mln_buffer_view source_id,
+  mln_buffer_view data MLN_BINDING("encoding=json"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Replaces the data of a GeoJSON source with prepared data.
+ *
+ * mln_map_set_geo_json_source_json() is simpler when the data isn't shared or
+ * prepared ahead. `data` must have been prepared with the source's options,
+ * which mln_map_get_style_source() reports, though `min_zoom` may differ.
+ * `data` can be released once this function returns.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no source named `source_id`.

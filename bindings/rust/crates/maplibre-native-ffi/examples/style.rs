@@ -44,13 +44,11 @@ async fn style(map: &MapHandle, pixels: &[u8]) -> Result<()> {
     // The source keeps its own reference to the data.
     drop(data);
 
-    // Later, prepare new data with the same options, and set it.
-    let next = GeoJsonSourceDataHandle::create(
+    // Later, replace the data. The map prepares it with the source's options.
+    map.discarding().set_geo_json_source_json(
+        "points",
         r#"{"type":"Point","coordinates":[2.35,48.86]}"#,
-        None,
     )?;
-    map.discarding().set_geo_json_source_data("points", &next)?;
-    drop(next);
     // #endregion geojson
 
     // #region set-property

@@ -3036,11 +3036,12 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Replaces the data of a GeoJSON source.
+   * Replaces the data of a GeoJSON source with prepared data.
    *
-   * `data` must have been prepared with the source's options, which
-   * `MapHandle.getStyleSource()` reports, though `min_zoom` may differ. `data`
-   * can be released once this function returns.
+   * `MapHandle.setGeoJsonSourceJson()` is simpler when the data isn't shared or
+   * prepared ahead. `data` must have been prepared with the source's options,
+   * which `MapHandle.getStyleSource()` reports, though `min_zoom` may differ.
+   * `data` can be released once this function returns.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3062,6 +3063,42 @@ export class MapHandle extends Owner {
         this.id,
         sourceId,
         data.id,
+        completion,
+      ),
+    );
+  }
+
+  /**
+   * Replaces the data of a GeoJSON source with GeoJSON text.
+   *
+   * `data` is a GeoJSON feature collection, feature, or geometry. The map
+   * prepares it with the source's own options, so the source keeps how it was
+   * added, including clustering. Preparing large data can be slow, and the map
+   * runs its later commands after it finishes. To prepare data ahead or share
+   * it between sources, use `GeoJsonSourceDataHandle.create()` and
+   * `MapHandle.setGeoJsonSourceData()` instead.
+   *
+   * See `mln_map_set_geo_json_source_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no source named `sourceId`.
+   * - `Status.invalidArgument` when the source named `sourceId` isn't a GeoJSON
+   *   source, when `data` isn't valid GeoJSON, or when the source clusters and
+   *   `data` isn't a feature collection of points.
+   * - `Status.invalidState` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
+   */
+  setGeoJsonSourceJson(
+    sourceId: string,
+    data: unknown,
+  ): Promise<CommandCompletion> {
+    return command((completion) =>
+      native.mln_map_set_geo_json_source_json(
+        this.id,
+        sourceId,
+        data,
         completion,
       ),
     );
@@ -4126,11 +4163,12 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Replaces the data of a GeoJSON source.
+   * Replaces the data of a GeoJSON source with prepared data.
    *
-   * `data` must have been prepared with the source's options, which
-   * `MapHandle.getStyleSource()` reports, though `min_zoom` may differ. `data`
-   * can be released once this function returns.
+   * `MapHandle.setGeoJsonSourceJson()` is simpler when the data isn't shared or
+   * prepared ahead. `data` must have been prepared with the source's options,
+   * which `MapHandle.getStyleSource()` reports, though `min_zoom` may differ.
+   * `data` can be released once this function returns.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4140,6 +4178,28 @@ export class MapHandleDiscarding {
       this.#owner.id,
       sourceId,
       data.id,
+      undefined,
+    );
+  }
+
+  /**
+   * Replaces the data of a GeoJSON source with GeoJSON text.
+   *
+   * `data` is a GeoJSON feature collection, feature, or geometry. The map
+   * prepares it with the source's own options, so the source keeps how it was
+   * added, including clustering. Preparing large data can be slow, and the map
+   * runs its later commands after it finishes. To prepare data ahead or share
+   * it between sources, use `GeoJsonSourceDataHandle.create()` and
+   * `MapHandle.setGeoJsonSourceData()` instead.
+   *
+   * See `mln_map_set_geo_json_source_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  setGeoJsonSourceJson(sourceId: string, data: unknown): void {
+    native.mln_map_set_geo_json_source_json(
+      this.#owner.id,
+      sourceId,
+      data,
       undefined,
     );
   }

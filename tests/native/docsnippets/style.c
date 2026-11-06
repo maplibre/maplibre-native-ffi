@@ -87,18 +87,15 @@ void mln_doc_style(const uint8_t* pixels) {
   // The source keeps its own reference to the data.
   mln_geo_json_source_data_release(data);
 
-  // Later, prepare new data with the same options, and set it.
-  mln_geo_json_source_data next = MLN_HANDLE_NULL;
-  mln_geo_json_source_data_create(
+  // Later, replace the data. The map prepares it with the source's
+  // options.
+  mln_map_set_geo_json_source_json(
+    map, mln_buffer_view_from_cstr("points"),
     mln_buffer_view_from_cstr(
       "{\"type\":\"Point\",\"coordinates\":[2.35,48.86]}"
     ),
-    NULL, &next, NULL
+    NULL, NULL
   );
-  mln_map_set_geo_json_source_data(
-    map, mln_buffer_view_from_cstr("points"), next, NULL, NULL
-  );
-  mln_geo_json_source_data_release(next);
   // #endregion geojson
 
   // #region set-property

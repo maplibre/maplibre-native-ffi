@@ -893,6 +893,15 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_geo_json_source_json(
+        MlnMap map,
+        mln_buffer_view source_id,
+        mln_buffer_view data,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_geo_json_source_synchronous_tiling(
         MlnMap map,
         mln_buffer_view source_id,

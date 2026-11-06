@@ -463,6 +463,32 @@ auto mln_map_set_geo_json_source_data(
   });
 }
 
+auto mln_map_set_geo_json_source_json(
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_non_empty_view(data, "data")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto id = OwnedView{source_id};
+    auto json = OwnedView{data};
+    return submit_style_edit(
+      map,
+      [id = std::move(id),
+       json = std::move(json)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_geojson_source_json(
+          live, id.view(), json.view()
+        );
+      },
+      completion
+    );
+  });
+}
+
 auto mln_map_set_geo_json_source_synchronous_tiling(
   mln_map map, mln_buffer_view source_id, bool enabled,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

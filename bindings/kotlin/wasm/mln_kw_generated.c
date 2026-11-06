@@ -1157,6 +1157,17 @@ int32_t mln_kw_mln_map_set_geo_json_source_data(
   );
 }
 
+int32_t mln_kw_mln_map_set_geo_json_source_json(
+  int64_t map, uintptr_t source_id, uintptr_t data, uintptr_t completion,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_set_geo_json_source_json(
+    (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
+    *(const mln_buffer_view*)(uintptr_t)data, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_map_set_geo_json_source_synchronous_tiling(
   int64_t map, uintptr_t source_id, int32_t enabled, uintptr_t completion,
   uintptr_t out_diagnostic

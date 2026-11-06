@@ -2490,13 +2490,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Replaces the data of a GeoJSON source.
+    /// Replaces the data of a GeoJSON source with prepared data.
     /// </summary>
     /// <remarks>
-    /// <para><c>data</c> must have been prepared with the source's options,
-    /// which <c>MapHandle.GetStyleSourceAsync()</c> reports, though
-    /// <c>min_zoom</c> may differ. <c>data</c> can be released once this
-    /// function returns.</para>
+    /// <para><c>MapHandle.SetGeoJsonSourceJsonAsync()</c> is simpler when the
+    /// data isn't shared or prepared ahead. <c>data</c> must have been prepared
+    /// with the source's options, which <c>MapHandle.GetStyleSourceAsync()</c>
+    /// reports, though <c>min_zoom</c> may differ. <c>data</c> can be released
+    /// once this function returns.</para>
     /// <para>See <c>mln_map_set_geo_json_source_data</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -2522,6 +2523,46 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Handle,
             scope.Utf8(sourceId),
             scope.Use(data),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
+    /// Replaces the data of a GeoJSON source with GeoJSON text.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>data</c> is a GeoJSON feature collection, feature, or geometry.
+    /// The map prepares it with the source's own options, so the source keeps
+    /// how it was added, including clustering. Preparing large data can be
+    /// slow, and the map runs its later commands after it finishes. To prepare
+    /// data ahead or share it between sources, use
+    /// <c>GeoJsonSourceDataHandle.Create()</c> and
+    /// <c>MapHandle.SetGeoJsonSourceDataAsync()</c> instead.</para>
+    /// <para>See <c>mln_map_set_geo_json_source_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.NotFound</c> when the style has no source
+    /// named <c>sourceId</c>.</description></item>
+    /// <item><description><c>Status.InvalidArgument</c> when the source named
+    /// <c>sourceId</c> isn't a GeoJSON source, when <c>data</c> isn't valid
+    /// GeoJSON, or when the source clusters and <c>data</c> isn't a feature
+    /// collection of points.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<CommandCompletion> SetGeoJsonSourceJsonAsync(string sourceId, string data)
+    {
+        using var scope = new NativeCallScope(this);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_set_geo_json_source_json(
+            Handle,
+            scope.Utf8(sourceId),
+            scope.Utf8(data),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -3674,6 +3715,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     receiverHandle,
                     scope.Utf8(sourceId),
                     scope.Use(data),
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void SetGeoJsonSourceJson(string sourceId, string data)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            Check(
+                NativeMethods.mln_map_set_geo_json_source_json(
+                    receiverHandle,
+                    scope.Utf8(sourceId),
+                    scope.Utf8(data),
                     null,
                     Diagnostic
                 )

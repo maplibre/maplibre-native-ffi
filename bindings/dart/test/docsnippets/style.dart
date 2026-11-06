@@ -43,13 +43,11 @@ Future<void> style(MapHandle map, Uint8List pixels) async {
   // The source keeps its own reference to the data.
   data.release();
 
-  // Later, prepare new data with the same options, and set it.
-  final next = GeoJsonSourceDataHandle.create({
+  // Later, replace the data. The map prepares it with the source's options.
+  map.discarding.setGeoJsonSourceJson('points', {
     'type': 'Point',
     'coordinates': [2.35, 48.86],
   });
-  map.discarding.setGeoJsonSourceData('points', next);
-  next.release();
   // #endregion geojson
 
   // #region set-property

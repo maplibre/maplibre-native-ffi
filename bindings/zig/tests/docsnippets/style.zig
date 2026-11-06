@@ -62,14 +62,12 @@ fn style(pixels: []const u8) !void {
     // The source keeps its own reference to the data.
     data.release();
 
-    // Later, prepare new data with the same options, and set it.
-    var next = try maplibre.GeoJsonSourceData.create(
+    // Later, replace the data. The map prepares it with the source's options.
+    try map.discarding().setGeoJsonSourceJson(
+        "points",
         "{\"type\":\"Point\",\"coordinates\":[2.35,48.86]}",
         null,
-        null,
     );
-    try map.discarding().setGeoJsonSourceData("points", next, null);
-    next.release();
     // #endregion geojson
 
     // #region set-property

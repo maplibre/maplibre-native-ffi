@@ -2229,11 +2229,13 @@ impl MapHandle {
         })
     }
 
-    /// Replaces the data of a GeoJSON source.
+    /// Replaces the data of a GeoJSON source with prepared data.
     ///
-    /// `data` must have been prepared with the source's options, which
-    /// `MapHandle::get_style_source()` reports, though `min_zoom` may differ.
-    /// `data` can be released once this function returns.
+    /// `MapHandle::set_geo_json_source_json()` is simpler when the data isn't
+    /// shared or prepared ahead. `data` must have been prepared with the
+    /// source's options, which `MapHandle::get_style_source()` reports, though
+    /// `min_zoom` may differ. `data` can be released once this function
+    /// returns.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2255,6 +2257,39 @@ impl MapHandle {
         let source_id = call.input(&source_id)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
+        })
+    }
+
+    /// Replaces the data of a GeoJSON source with GeoJSON text.
+    ///
+    /// `data` is a GeoJSON feature collection, feature, or geometry. The map
+    /// prepares it with the source's own options, so the source keeps how it
+    /// was added, including clustering. Preparing large data can be slow, and
+    /// the map runs its later commands after it finishes. To prepare data ahead
+    /// or share it between sources, use `GeoJsonSourceDataHandle::create()` and
+    /// `MapHandle::set_geo_json_source_data()` instead.
+    ///
+    /// See `mln_map_set_geo_json_source_json` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::NotFound` when the style has no source named `source_id`.
+    /// - `Status::InvalidArgument` when the source named `source_id` isn't a
+    ///   GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+    ///   clusters and `data` isn't a feature collection of points.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
+    pub fn set_geo_json_source_json(
+        &self,
+        source_id: &str,
+        data: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call();
+        let source_id = call.input(&source_id)?;
+        let data = call.input(&data)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_geo_json_source_json(map, source_id, data, completion, out_diagnostic)
         })
     }
 
@@ -3436,11 +3471,13 @@ impl MapHandleDiscarding<'_> {
         })
     }
 
-    /// Replaces the data of a GeoJSON source.
+    /// Replaces the data of a GeoJSON source with prepared data.
     ///
-    /// `data` must have been prepared with the source's options, which
-    /// `MapHandle::get_style_source()` reports, though `min_zoom` may differ.
-    /// `data` can be released once this function returns.
+    /// `MapHandle::set_geo_json_source_json()` is simpler when the data isn't
+    /// shared or prepared ahead. `data` must have been prepared with the
+    /// source's options, which `MapHandle::get_style_source()` reports, though
+    /// `min_zoom` may differ. `data` can be released once this function
+    /// returns.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3454,6 +3491,26 @@ impl MapHandleDiscarding<'_> {
         let source_id = call.input(&source_id)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geo_json_source_data(map, source_id, data, completion, out_diagnostic)
+        })
+    }
+
+    /// Replaces the data of a GeoJSON source with GeoJSON text.
+    ///
+    /// `data` is a GeoJSON feature collection, feature, or geometry. The map
+    /// prepares it with the source's own options, so the source keeps how it
+    /// was added, including clustering. Preparing large data can be slow, and
+    /// the map runs its later commands after it finishes. To prepare data ahead
+    /// or share it between sources, use `GeoJsonSourceDataHandle::create()` and
+    /// `MapHandle::set_geo_json_source_data()` instead.
+    ///
+    /// See `mln_map_set_geo_json_source_json` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_geo_json_source_json(&self, source_id: &str, data: &str) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let source_id = call.input(&source_id)?;
+        let data = call.input(&data)?;
+        call.discard(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_geo_json_source_json(map, source_id, data, completion, out_diagnostic)
         })
     }
 

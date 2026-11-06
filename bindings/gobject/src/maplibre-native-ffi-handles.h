@@ -2722,9 +2722,11 @@ maplibre_native_ffi_map_set_free_camera_options_finish(
  * @callback: (scope async) (nullable): the callback to call when the call finishes
  * @user_data: the data to pass to `callback`
  *
- * Replaces the data of a GeoJSON source.
+ * Replaces the data of a GeoJSON source with prepared data.
  *
- * `data` must have been prepared with the source's options, which
+ * `maplibre_native_ffi_map_set_geo_json_source_json_async()` is simpler when
+ * the data isn't shared or prepared ahead. `data` must have been prepared with
+ * the source's options, which
  * `maplibre_native_ffi_map_get_style_source_async()` reports, though `min_zoom`
  * may differ. `data` can be released once this function returns.
  *
@@ -2759,6 +2761,55 @@ void maplibre_native_ffi_map_set_geo_json_source_data_async(
  */
 MaplibreNativeFfiCommandCompletion*
 maplibre_native_ffi_map_set_geo_json_source_data_finish(
+  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
+);
+
+/**
+ * maplibre_native_ffi_map_set_geo_json_source_json_async:
+ * @source_id: the UTF-8 text
+ * @data: the UTF-8 text
+ * @callback: (scope async) (nullable): the callback to call when the call finishes
+ * @user_data: the data to pass to `callback`
+ *
+ * Replaces the data of a GeoJSON source with GeoJSON text.
+ *
+ * `data` is a GeoJSON feature collection, feature, or geometry. The map
+ * prepares it with the source's own options, so the source keeps how it was
+ * added, including clustering. Preparing large data can be slow, and the map
+ * runs its later commands after it finishes. To prepare data ahead or share it
+ * between sources, use `maplibre_native_ffi_geo_json_source_data_create()` and
+ * `maplibre_native_ffi_map_set_geo_json_source_data_async()` instead.
+ *
+ * See `mln_map_set_geo_json_source_json` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NOT_FOUND` when the style has no source named
+ *   `source_id`.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the source named
+ *   `source_id` isn't a GeoJSON source, when `data` isn't valid GeoJSON, or
+ *   when the source clusters and `data` isn't a feature collection of points.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
+ *   `maplibre_native_ffi_map_set_style_url_async()` describes.
+ *
+ * Without `callback`, nothing reports whether the call succeeds.
+ */
+void maplibre_native_ffi_map_set_geo_json_source_json_async(
+  MaplibreNativeFfiMap* self, const char* source_id, const char* data,
+  GAsyncReadyCallback callback, gpointer user_data
+);
+
+/**
+ * maplibre_native_ffi_map_set_geo_json_source_json_finish:
+ * @result: the result that the callback received
+ *
+ * Finishes a call that `maplibre_native_ffi_map_set_geo_json_source_json_async` started.
+ *
+ * Returns: (transfer full): the command's completion, or %NULL with `error` set
+ */
+MaplibreNativeFfiCommandCompletion*
+maplibre_native_ffi_map_set_geo_json_source_json_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
 );
 

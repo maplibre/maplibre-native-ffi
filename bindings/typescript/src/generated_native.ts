@@ -588,6 +588,12 @@ export interface NativeOperations {
     data: bigint,
     completion: NativeCompletion | undefined,
   ): void;
+  mln_map_set_geo_json_source_json(
+    map: bigint,
+    sourceId: string,
+    data: unknown,
+    completion: NativeCompletion | undefined,
+  ): void;
   mln_map_set_geo_json_source_synchronous_tiling(
     map: bigint,
     sourceId: string,

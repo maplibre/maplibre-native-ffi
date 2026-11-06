@@ -789,6 +789,16 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_set_geo_json_source_json =
+    Ffm.downcall(
+      "mln_map_set_geo_json_source_json",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
+      mln_buffer_view,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_set_geo_json_source_synchronous_tiling =
     Ffm.downcall(
       "mln_map_set_geo_json_source_synchronous_tiling",
@@ -2628,6 +2638,21 @@ internal actual object C {
       map,
       Ffm.value(sourceId, mln_buffer_view),
       data,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_set_geo_json_source_json(
+    map: Long,
+    sourceId: Long,
+    data: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_set_geo_json_source_json.invokeExact(
+      map,
+      Ffm.value(sourceId, mln_buffer_view),
+      Ffm.value(data, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int

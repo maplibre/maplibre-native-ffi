@@ -1523,11 +1523,12 @@ pub const Map = struct {
         return call.submit("mln_map_set_free_camera_options", .handle, self, call.command, null, diagnostic, .{options});
     }
 
-    /// Replaces the data of a GeoJSON source.
+    /// Replaces the data of a GeoJSON source with prepared data.
     ///
-    /// `data` must have been prepared with the source's options, which
-    /// `Map.getStyleSource()` reports, though `min_zoom` may differ. `data` can be
-    /// released once this function returns.
+    /// `Map.setGeoJsonSourceJson()` is simpler when the data isn't shared or
+    /// prepared ahead. `data` must have been prepared with the source's options,
+    /// which `Map.getStyleSource()` reports, though `min_zoom` may differ. `data`
+    /// can be released once this function returns.
     ///
     /// See `mln_map_set_geo_json_source_data` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1541,6 +1542,30 @@ pub const Map = struct {
     ///   describes.
     pub fn setGeoJsonSourceData(self: Map, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_geo_json_source_data", .handle, self, call.command, null, diagnostic, .{ source_id, data });
+    }
+
+    /// Replaces the data of a GeoJSON source with GeoJSON text.
+    ///
+    /// `data` is a GeoJSON feature collection, feature, or geometry. The map
+    /// prepares it with the source's own options, so the source keeps how it was
+    /// added, including clustering. Preparing large data can be slow, and the map
+    /// runs its later commands after it finishes. To prepare data ahead or share it
+    /// between sources, use `GeoJsonSourceData.create()` and
+    /// `Map.setGeoJsonSourceData()` instead.
+    ///
+    /// See `mln_map_set_geo_json_source_json` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.NotFound` when the style has no source named `source_id`.
+    /// - `error.InvalidArgument` when the source named `source_id` isn't a GeoJSON
+    ///   source, when `data` isn't valid GeoJSON, or when the source clusters and
+    ///   `data` isn't a feature collection of points.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
+    pub fn setGeoJsonSourceJson(self: Map, source_id: []const u8, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_set_geo_json_source_json", .handle, self, call.command, null, diagnostic, .{ source_id, data });
     }
 
     /// Sets whether a GeoJSON source builds its tiles while the map renders.
@@ -9746,6 +9771,11 @@ pub const MapDiscarding = struct {
     pub fn setGeoJsonSourceData(self: MapDiscarding, source_id: []const u8, data: GeoJsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_geo_json_source_data", .handle, map, null, diagnostic, .{ source_id, data });
+    }
+
+    pub fn setGeoJsonSourceJson(self: MapDiscarding, source_id: []const u8, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_geo_json_source_json", .handle, map, null, diagnostic, .{ source_id, data });
     }
 
     pub fn setGeoJsonSourceSynchronousTiling(self: MapDiscarding, source_id: []const u8, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

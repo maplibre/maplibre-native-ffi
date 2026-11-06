@@ -509,6 +509,38 @@ auto geojson_source_options_equal(
          );
 }
 
+auto prepare_geojson_source_data(
+  mln_buffer_view data,
+  const mln::Immutable<mln::style::GeoJSONOptions>& options
+) -> std::shared_ptr<mln::style::GeoJSONData> {
+  auto geojson = to_native_geojson(data);
+  if (!geojson) {
+    return nullptr;
+  }
+
+  if (options->cluster && !validate_clustered_geojson(*geojson)) {
+    return nullptr;
+  }
+
+  // Preparation can run before any runtime, so it raises the stack itself.
+  reserve_default_thread_stack();
+  auto scheduler = mln::Scheduler::GetSequenced();
+  pin_sequenced_scheduler(scheduler);
+  auto index = mln::style::GeoJSONData::create(*geojson, scheduler, options);
+  // Supercluster indexes are immutable after construction and always slice
+  // inline, so only the geojson-vt path needs the serializing wrapper. This
+  // mirrors the dispatch inside GeoJSONData::create.
+  const auto clustered = options->cluster &&
+                         geojson->is<mln::FeatureCollection>() &&
+                         !geojson->get<mln::FeatureCollection>().empty();
+  if (!clustered) {
+    index = std::make_shared<SerializedGeoJsonData>(
+      std::move(index), std::move(scheduler)
+    );
+  }
+  return index;
+}
+
 auto geojson_source_data_create(
   mln_buffer_view data, const mln_geo_json_source_options* options,
   mln_geo_json_source_data* out_data
@@ -528,36 +560,14 @@ auto geojson_source_data_create(
     return options_status;
   }
 
-  auto geojson = to_native_geojson(data);
-  if (!geojson) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (effective.cluster && !validate_clustered_geojson(*geojson)) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto native_options = to_native_geojson_source_options(effective);
   if (!native_options) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  // Preparation can run before any runtime, so it raises the stack itself.
-  reserve_default_thread_stack();
-  auto scheduler = mln::Scheduler::GetSequenced();
-  pin_sequenced_scheduler(scheduler);
-  auto index =
-    mln::style::GeoJSONData::create(*geojson, scheduler, *native_options);
-  // Supercluster indexes are immutable after construction and always slice
-  // inline, so only the geojson-vt path needs the serializing wrapper. This
-  // mirrors the dispatch inside GeoJSONData::create.
-  const auto clustered = (*native_options)->cluster &&
-                         geojson->is<mln::FeatureCollection>() &&
-                         !geojson->get<mln::FeatureCollection>().empty();
-  if (!clustered) {
-    index = std::make_shared<SerializedGeoJsonData>(
-      std::move(index), std::move(scheduler)
-    );
+  auto index = prepare_geojson_source_data(data, *native_options);
+  if (index == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto object =
     std::make_shared<GeoJsonSourceDataObject>(GeoJsonSourceDataObject{

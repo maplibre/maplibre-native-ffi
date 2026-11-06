@@ -165,6 +165,14 @@ static void missing_style_ids_report_not_found(void) {
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, missing_source,
+    mln_map_set_geo_json_source_json(
+      map, source,
+      MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
+      &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_NOT_FOUND, missing_source,
     mln_map_set_geo_json_source_synchronous_tiling(
       map, source, true, &completion.descriptor, NULL
     )

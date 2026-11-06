@@ -579,13 +579,15 @@ static void render_points(
 // sources cluster on a fixed 512-pixel tile: a 15-pixel radius leaves them
 // apart and a 17-pixel one joins them, unless the cluster needs more points
 // than there are.
+#define TWO_NEARBY_POINTS                                   \
+  "{\"type\":\"FeatureCollection\",\"features\":["          \
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\"," \
+  "\"coordinates\":[0,0]},\"properties\":{}},"              \
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\"," \
+  "\"coordinates\":[11.25,0]},\"properties\":{}}]}"
+
 static void clustering_fields_decide_which_points_the_source_holds(void) {
-  static const char points[] =
-    "{\"type\":\"FeatureCollection\",\"features\":["
-    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-    "\"coordinates\":[0,0]},\"properties\":{}},"
-    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-    "\"coordinates\":[11.25,0]},\"properties\":{}}]}";
+  static const char points[] = TWO_NEARBY_POINTS;
   mln_geo_json_source_options options = {
     .size = sizeof(mln_geo_json_source_options)
   };
@@ -600,6 +602,62 @@ static void clustering_fields_decide_which_points_the_source_holds(void) {
   render_points(points, &options, 1, "\"point_count\":2");
   options.cluster_min_points = 3;
   render_points(points, &options, 2, NULL);
+}
+
+// GeoJSON text takes the options of a source from the style's JSON, so the
+// points join as that source's 17-pixel radius says.
+static void geojson_text_replaces_data_with_the_source_options(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{\"points\":{\"type\":\"geojson\","
+           "\"data\":" EMPTY_COLLECTION ",\"cluster\":true,"
+           "\"clusterRadius\":17}},\"layers\":[]}"
+         )
+  );
+  draw_source(map, "points");
+  const mln_buffer_view id = MLN_BUFFER_LITERAL("points");
+  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_json(
+    map, id, MLN_BUFFER_LITERAL(TWO_NEARBY_POINTS), &completion.descriptor, NULL
+  ));
+
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  static const char* const sources[] = {"points"};
+  source_query query = {
+    .fixture = &fixture,
+    .sources = sources,
+    .source_count = 1,
+    .count = 1,
+    .text = "\"point_count\":2",
+  };
+  TEST_ASSERT_TRUE(mln_test_style_render_until(
+    &fixture, sources_hold_the_features, &query, "one cluster of two points"
+  ));
+
+  // Text that doesn't parse, or that a clustered source can't hold, fails and
+  // leaves the cluster in place.
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "GeoJSON is not valid JSON",
+    mln_map_set_geo_json_source_json(
+      map, id, MLN_BUFFER_LITERAL("{\"type\":"), &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "requires a feature collection",
+    mln_map_set_geo_json_source_json(
+      map, id, MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"),
+      &completion.descriptor, NULL
+    )
+  );
+  TEST_ASSERT_TRUE(mln_test_style_render_until(
+    &fixture, sources_hold_the_features, &query, "the cluster after failures"
+  ));
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 static void a_url_source_loads_through_the_resource_provider(void) {
@@ -662,5 +720,6 @@ MLN_TEST_GROUP {
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);
   RUN_TEST(clustering_fields_decide_which_points_the_source_holds);
+  RUN_TEST(geojson_text_replaces_data_with_the_source_options);
   RUN_TEST(a_url_source_loads_through_the_resource_provider);
 }

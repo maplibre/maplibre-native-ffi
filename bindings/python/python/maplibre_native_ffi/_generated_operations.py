@@ -1726,11 +1726,13 @@ class _MapHandleOperations(GeneratedOperations):
     def set_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> Future[CommandCompletion]:
-        """Replaces the data of a GeoJSON source.
+        """Replaces the data of a GeoJSON source with prepared data.
 
-        `data` must have been prepared with the source's options, which
-        `MapHandle.get_style_source()` reports, though `min_zoom` may differ.
-        `data` can be released once this function returns.
+        `MapHandle.set_geo_json_source_json()` is simpler when the data isn't
+        shared or prepared ahead. `data` must have been prepared with the
+        source's options, which `MapHandle.get_style_source()` reports,
+        though `min_zoom` may differ. `data` can be released once this
+        function returns.
 
         See `mln_map_set_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1744,6 +1746,33 @@ class _MapHandleOperations(GeneratedOperations):
           `MapHandle.set_style_url()` describes.
         """
         return self._native.set_geo_json_source_data(source_id, data._native)
+
+    def set_geo_json_source_json(
+        self, source_id: str, data: Any
+    ) -> Future[CommandCompletion]:
+        """Replaces the data of a GeoJSON source with GeoJSON text.
+
+        `data` is a GeoJSON feature collection, feature, or geometry. The map
+        prepares it with the source's own options, so the source keeps how it
+        was added, including clustering. Preparing large data can be slow,
+        and the map runs its later commands after it finishes. To prepare
+        data ahead or share it between sources, use
+        `GeoJsonSourceDataHandle.create()` and
+        `MapHandle.set_geo_json_source_data()` instead.
+
+        See `mln_map_set_geo_json_source_json` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the style has no source named `source_id`.
+        - `Status.INVALID_ARGUMENT` when the source named `source_id` isn't a
+          GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+          clusters and `data` isn't a feature collection of points.
+        - `Status.INVALID_STATE` while the style isn't loaded, as
+          `MapHandle.set_style_url()` describes.
+        """
+        return self._native.set_geo_json_source_json(source_id, data)
 
     def set_geo_json_source_synchronous_tiling(
         self, source_id: str, enabled: bool
@@ -4053,16 +4082,34 @@ class MapHandleDiscarding:
     def set_geo_json_source_data(
         self, source_id: str, data: GeoJsonSourceDataHandle
     ) -> None:
-        """Replaces the data of a GeoJSON source.
+        """Replaces the data of a GeoJSON source with prepared data.
 
-        `data` must have been prepared with the source's options, which
-        `MapHandle.get_style_source()` reports, though `min_zoom` may differ.
-        `data` can be released once this function returns.
+        `MapHandle.set_geo_json_source_json()` is simpler when the data isn't
+        shared or prepared ahead. `data` must have been prepared with the
+        source's options, which `MapHandle.get_style_source()` reports,
+        though `min_zoom` may differ. `data` can be released once this
+        function returns.
 
         See `mln_map_set_geo_json_source_data` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native._discard_set_geo_json_source_data(source_id, data._native)
+
+    def set_geo_json_source_json(self, source_id: str, data: Any) -> None:
+        """Replaces the data of a GeoJSON source with GeoJSON text.
+
+        `data` is a GeoJSON feature collection, feature, or geometry. The map
+        prepares it with the source's own options, so the source keeps how it
+        was added, including clustering. Preparing large data can be slow,
+        and the map runs its later commands after it finishes. To prepare
+        data ahead or share it between sources, use
+        `GeoJsonSourceDataHandle.create()` and
+        `MapHandle.set_geo_json_source_data()` instead.
+
+        See `mln_map_set_geo_json_source_json` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_geo_json_source_json(source_id, data)
 
     def set_geo_json_source_synchronous_tiling(
         self, source_id: str, enabled: bool

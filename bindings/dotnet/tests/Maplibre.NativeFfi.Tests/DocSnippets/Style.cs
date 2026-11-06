@@ -52,12 +52,11 @@ internal static class Style
         // The source keeps its own reference to the data.
         data.Release();
 
-        // Later, prepare new data with the same options, and set it.
-        var next = GeoJsonSourceDataHandle.Create(
+        // Later, replace the data. The map prepares it with the source's options.
+        map.Discarding.SetGeoJsonSourceJson(
+            "points",
             """{"type":"Point","coordinates":[2.35,48.86]}"""
         );
-        map.Discarding.SetGeoJsonSourceData("points", next);
-        next.Release();
         // #endregion geojson
 
         // #region set-property

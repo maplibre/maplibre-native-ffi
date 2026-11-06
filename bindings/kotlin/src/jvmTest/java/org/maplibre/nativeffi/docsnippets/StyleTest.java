@@ -95,15 +95,14 @@ public class StyleTest {
     // The source keeps its own reference to the data.
     data.release();
 
-    // Later, prepare new data with the same options, and set it.
-    GeoJsonSourceDataHandle next =
-        GeoJsonSourceDataHandle.create(
+    // Later, replace the data. The map prepares it with the source's
+    // options.
+    map.getDiscarding()
+        .setGeoJsonSourceJson(
+            "points",
             """
             {"type": "Point", "coordinates": [2.35, 48.86]}
-            """,
-            null);
-    map.getDiscarding().setGeoJsonSourceData("points", next);
-    next.release();
+            """);
     // #endregion geojson
 
     // #region set-property

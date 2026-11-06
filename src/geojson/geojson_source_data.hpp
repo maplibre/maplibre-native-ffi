@@ -51,6 +51,14 @@ auto geojson_source_options_equal(
   const mln::style::GeoJSONOptions& right
 ) -> bool;
 
+// Parses `data` and builds its index with `options`. Records an error and
+// returns null when `data` isn't valid GeoJSON, or when `options` turns on
+// clustering and `data` isn't a feature collection of points.
+auto prepare_geojson_source_data(
+  mln_buffer_view data,
+  const mln::Immutable<mln::style::GeoJSONOptions>& options
+) -> std::shared_ptr<mln::style::GeoJSONData>;
+
 auto geojson_source_data_create(
   mln_buffer_view data, const mln_geo_json_source_options* options,
   mln_geo_json_source_data* out_data

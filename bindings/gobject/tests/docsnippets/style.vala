@@ -44,12 +44,11 @@ namespace Style {
 		);
 		map.add_geo_json_source_data_async.begin ("points", data);
 
-		// Later, prepare new data with the same options, and set it.
-		var moved = new GeoJsonSourceData.create (
-			"""{"type": "Point", "coordinates": [2.35, 48.86]}""",
-			null
+		// Later, replace the data. The map prepares it with the source's options.
+		map.set_geo_json_source_json_async.begin (
+			"points",
+			"""{"type": "Point", "coordinates": [2.35, 48.86]}"""
 		);
-		map.set_geo_json_source_data_async.begin ("points", moved);
 		// #endregion geojson
 
 		// #region set-property

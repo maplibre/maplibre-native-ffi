@@ -43,8 +43,12 @@ top, unless you give the ID of a layer to draw it under. See
 For GeoJSON data in memory, prepare it as [](api:mln_geo_json_source_data)
 first, then add a GeoJSON source with [](api:mln_map_add_geo_json_source_data).
 Preparing processes the data before it reaches the map, so you can do it on any
-thread, off your event loop. To update the source, set new prepared data with
-[](api:mln_map_set_geo_json_source_data).
+thread, off your event loop.
+
+To replace the data of any GeoJSON source, including one from the style's JSON,
+set new GeoJSON with [](api:mln_map_set_geo_json_source_json). The map prepares
+it with the source's options, such as its clustering. To replace it with
+prepared data instead, use [](api:mln_map_set_geo_json_source_data).
 
 <Snippet page="style" region="geojson" />
 

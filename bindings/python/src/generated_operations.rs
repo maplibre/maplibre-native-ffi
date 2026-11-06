@@ -6575,6 +6575,54 @@ impl MapHandle {
             })
         }
     }
+    #[pyo3(signature = (source_id, data))]
+    fn set_geo_json_source_json(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        data: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let data_value = storage.json(data.clone(), false)?;
+        let handle = self.input();
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_set_geo_json_source_json(
+                    handle,
+                    source_id_value,
+                    data_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
+    #[pyo3(signature = (source_id, data))]
+    fn _discard_set_geo_json_source_json(
+        &self,
+        py: Python<'_>,
+        source_id: &Bound<'_, PyAny>,
+        data: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let source_id_value = storage.buffer(source_id.clone(), true)?;
+        let data_value = storage.json(data.clone(), false)?;
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_set_geo_json_source_json(
+                    handle,
+                    source_id_value,
+                    data_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
     #[pyo3(signature = (source_id, enabled))]
     fn set_geo_json_source_synchronous_tiling(
         &self,
