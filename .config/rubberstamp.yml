@@ -80,6 +80,10 @@ labels:
           rules:
             - if: { files: ["bindings/gobject/**", "examples/gtk/**"] }
               then: apply
+        binding:dotnet:
+          rules:
+            - if: { files: ["bindings/dotnet/**", "examples/wpf/**"] }
+              then: apply
       guidance: >-
         Only for work specific to this binding. Work that several bindings pick
         up alike, such as a C API addition that every binding exposes, doesn't
@@ -682,6 +686,18 @@ ci:
         - if:
             files:
               - examples/gtk/**
+          then: apply
+    wpf:
+      covers: >-
+        Builds the WPF example on Linux against the archive that the Windows x64
+        Vulkan target built, so it runs that target. It runs no app. Catches
+        what breaks the example's C# or XAML, or its build against the .NET
+        binding: changes to the example, and to the .NET binding's render
+        session and Win32 API that it calls.
+      rules:
+        - if:
+            files:
+              - examples/wpf/**
           then: apply
     ohpm:
       covers: >-

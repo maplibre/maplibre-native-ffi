@@ -1,0 +1,39 @@
+# The WPF example for Windows. Run it with `mise run //examples/wpf:run`, or
+# on Linux, which builds the Windows preset with the MSVC SDK and runs the app
+# under Wine, with `mise -E msvc run //examples/wpf:run`.
+
+[tools]
+"core:dotnet" = "{{vars.dotnet_version}}"
+
+# CI builds the app with this, without running it.
+[tasks.build]
+description = "Build the C library for a Windows preset, then build the WPF example against its install."
+usage = '''
+arg "[preset]" default="windows-x64-vulkan" {
+  choices "windows-x64-vulkan"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  dotnet build "$MISE_MONOREPO_ROOT/examples/wpf/MaplibreWpfExample.csproj" \
+    -c Release \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/$usage_preset/wpf-example/"
+'''
+
+[tasks.run]
+description = "Build the WPF example for a Windows preset and run it, under Wine on Linux."
+usage = '''
+arg "[preset]" default="windows-x64-vulkan" {
+  choices "windows-x64-vulkan"
+}
+'''
+depends = [{ task = "build", args = ["{{usage.preset}}"] }]
+run = '''
+app="$MISE_MONOREPO_ROOT/build/$usage_preset/wpf-example/Release/net10.0-windows/win-x64/maplibre-wpf-example.exe"
+if [[ "$(uname -s)" == Linux ]]; then
+  # A timeout of 0 lets the app run until you close it.
+  MLN_FFI_DEVICE_TIMEOUT=0 exec "$MISE_MONOREPO_ROOT/scripts/run-wine-test.sh" "$app"
+fi
+exec "$app"
+'''

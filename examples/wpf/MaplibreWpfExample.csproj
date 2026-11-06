@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../bindings/dotnet/Maplibre.NativeFfi.C.Local.props" />
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Lets Linux build the app, for CI and for running it under Wine. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- Wine has no .NET runtime, so the app carries its own. -->
+    <SelfContained>true</SelfContained>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>maplibre-wpf-example</AssemblyName>
+    <RootNamespace>Maplibre.NativeFfi.Example.Wpf</RootNamespace>
+    <!-- A Windows install keeps its DLLs in bin, whichever host builds the app. -->
+    <MaplibreNativeCRuntimeDir>$(MaplibreNativeCInstallDir)/bin</MaplibreNativeCRuntimeDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../bindings/dotnet/src/Maplibre.NativeFfi/Maplibre.NativeFfi.csproj" />
+  </ItemGroup>
+</Project>
