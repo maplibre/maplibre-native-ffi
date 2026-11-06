@@ -1,128 +1,179 @@
 // Gestures. A drag pans, two fingers pinch, rotate, and pan, and a double tap
-// zooms in. Touch points are in the component's virtual pixels, which are the
+// zooms in. The map keeps the fingers' speed when they lift, and a touch stops
+// it. Gesture events are in the component's virtual pixels, which are the
 // map's logical pixels.
 
-import { CameraDelta, GesturePhase, MapHandle, ScreenPoint } from '@maplibre/native-ffi';
+import { CameraDelta, GestureMomentum, GesturePhase, MapHandle, ScreenPoint } from '@maplibre/native-ffi';
 
-const doubleTapMs = 300;
-const tapSlop = 10;
+// How far back a pinch or rotation's speed at release looks. ArkUI reports the
+// speed of a pan, but not of a pinch or rotation.
+const releaseWindowMs = 100;
 
-interface Tap {
-  point: ScreenPoint;
+interface Sample {
   time: number;
+  value: number;
+}
+
+// How fast a value changed, from its recent samples.
+class Rate {
+  private samples: Sample[] = [];
+
+  clear(): void {
+    this.samples = [];
+  }
+
+  add(time: number, value: number): void {
+    this.samples = this.recent(time);
+    this.samples.push({ time: time, value: value });
+  }
+
+  // Per second, over the window before `time`.
+  at(time: number): number | undefined {
+    const recent = this.recent(time);
+    if (recent.length < 2) {
+      return undefined;
+    }
+    const first = recent[0];
+    const last = recent[recent.length - 1];
+    return last.time > first.time ? (last.value - first.value) / ((last.time - first.time) / 1000) : undefined;
+  }
+
+  private recent(time: number): Sample[] {
+    return this.samples.filter((sample: Sample) => time - sample.time <= releaseWindowMs);
+  }
 }
 
 export class MapGestures {
   private readonly map: () => MapHandle | undefined;
-  // The touches at the last event, by ID.
-  private previous: Map<number, ScreenPoint> = new Map<number, ScreenPoint>();
-  private start: ScreenPoint | undefined = undefined;
-  private moved = false;
-  private lastTap: Tap | undefined = undefined;
+  private active = false;
+  private panning = false;
+  // The pan's offset, the pinch's scale, and the rotation's angle at their
+  // last events.
+  private offset: ScreenPoint = { x: 0, y: 0 };
+  private scale = 1;
+  private angle = 0;
+  // The zoom levels and degrees of bearing that the gesture has added.
+  private zoom = 0;
+  private bearing = 0;
+  private zoomRate = new Rate();
+  private bearingRate = new Rate();
+  private center: ScreenPoint | undefined = undefined;
 
   constructor(map: () => MapHandle | undefined) {
     this.map = map;
   }
 
+  // The first finger down begins the gesture, which stops any glide. The last
+  // finger up ends it, unless a pan ends it with its velocity.
   onTouch(event: TouchEvent): void {
     switch (event.type) {
       case TouchType.Down:
-        if (this.previous.size === 0) {
-          this.begin(event);
-        } else {
-          this.previous = touches(event);
+        if (!this.active) {
+          this.begin();
         }
         break;
-      case TouchType.Move:
-        this.move(event);
-        break;
       case TouchType.Up:
-        this.previous = touches(event);
-        if (this.previous.size === 0) {
-          this.end(event);
+        if (!this.panning && allLifted(event)) {
+          this.end(event.timestamp, undefined);
         }
         break;
       case TouchType.Cancel:
-        this.previous.clear();
-        this.apply({ gesturePhase: GesturePhase.cancel });
+        this.cancel();
         break;
       default:
         break;
     }
   }
 
-  private begin(event: TouchEvent): void {
-    this.previous = touches(event);
-    this.start = this.previous.values().next().value;
-    this.moved = false;
+  panStart(event: GestureEvent): void {
+    this.panning = true;
+    this.offset = { x: 0, y: 0 };
+    this.pan(event);
+  }
+
+  pan(event: GestureEvent): void {
+    this.apply({
+      offset: { x: event.offsetX - this.offset.x, y: event.offsetY - this.offset.y },
+      gesturePhase: GesturePhase.update,
+    });
+    this.offset = { x: event.offsetX, y: event.offsetY };
+  }
+
+  // The content keeps the fingers' velocity.
+  panEnd(event: GestureEvent): void {
+    this.panning = false;
+    this.end(event.timestamp, { x: event.velocityX, y: event.velocityY });
+  }
+
+  pinchStart(event: GestureEvent): void {
+    this.scale = 1;
+    this.pinch(event);
+  }
+
+  pinch(event: GestureEvent): void {
+    this.center = { x: event.pinchCenterX, y: event.pinchCenterY };
+    this.zoom += Math.log2(event.scale / this.scale);
+    this.zoomRate.add(event.timestamp / 1e6, this.zoom);
+    this.apply({ scale: event.scale / this.scale, anchor: this.center, gesturePhase: GesturePhase.update });
+    this.scale = event.scale;
+  }
+
+  rotateStart(event: GestureEvent): void {
+    this.angle = 0;
+    this.rotate(event);
+  }
+
+  // The content turns with the fingers, so the bearing turns the other way.
+  rotate(event: GestureEvent): void {
+    this.center = centroid(event);
+    const turn = -wrapDegrees(event.angle - this.angle);
+    this.bearing += turn;
+    this.bearingRate.add(event.timestamp / 1e6, this.bearing);
+    this.apply({ bearing: turn, anchor: this.center, gesturePhase: GesturePhase.update });
+    this.angle = event.angle;
+  }
+
+  doubleTap(event: GestureEvent): void {
+    const finger = event.fingerList[0];
+    this.apply({ scale: 2, anchor: { x: finger.localX, y: finger.localY }, animation: { durationMs: 300 } });
+  }
+
+  cancel(): void {
+    this.panning = false;
+    if (this.active) {
+      this.active = false;
+      this.apply({ gesturePhase: GesturePhase.cancel });
+    }
+  }
+
+  private begin(): void {
+    this.active = true;
+    this.zoom = 0;
+    this.bearing = 0;
+    this.zoomRate.clear();
+    this.bearingRate.clear();
     this.apply({ gesturePhase: GesturePhase.begin });
   }
 
-  private move(event: TouchEvent): void {
-    const current = touches(event);
-    const befores: ScreenPoint[] = [];
-    const afters: ScreenPoint[] = [];
-    current.forEach((point: ScreenPoint, id: number) => {
-      const before = this.previous.get(id);
-      if (before !== undefined) {
-        befores.push(before);
-        afters.push(point);
-      }
-    });
-    this.previous = current;
-    if (befores.length === 0) {
+  // The event's timestamp is in nanoseconds.
+  private end(timestamp: number, pan: ScreenPoint | undefined): void {
+    if (!this.active) {
       return;
     }
-    const before = befores[0];
-    const after = afters[0];
-    if (this.start !== undefined && distance(this.start, after) > tapSlop) {
-      this.moved = true;
+    this.active = false;
+    const momentum: GestureMomentum = {};
+    if (pan !== undefined) {
+      momentum.pan = { velocity: pan };
     }
-
-    if (befores.length === 1) {
-      this.apply({
-        offset: { x: after.x - before.x, y: after.y - before.y },
-        gesturePhase: GesturePhase.update,
-      });
-      return;
+    const zoom = this.zoomRate.at(timestamp / 1e6);
+    if (zoom !== undefined) {
+      momentum.zoom = { velocity: zoom, anchor: this.center };
     }
-    // The span between the touches scales and turns about their midpoint,
-    // which moves with them.
-    this.moved = true;
-    const otherBefore = befores[1];
-    const otherAfter = afters[1];
-    const midBefore = midpoint(before, otherBefore);
-    const midAfter = midpoint(after, otherAfter);
-    const spanBefore: ScreenPoint = { x: otherBefore.x - before.x, y: otherBefore.y - before.y };
-    const spanAfter: ScreenPoint = { x: otherAfter.x - after.x, y: otherAfter.y - after.y };
-    const scale = Math.hypot(spanAfter.x, spanAfter.y) / Math.hypot(spanBefore.x, spanBefore.y);
-    const turn = (Math.atan2(spanAfter.y, spanAfter.x) - Math.atan2(spanBefore.y, spanBefore.x)) *
-      (180 / Math.PI);
-    this.apply({
-      offset: { x: midAfter.x - midBefore.x, y: midAfter.y - midBefore.y },
-      scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
-      bearing: -wrapDegrees(turn),
-      anchor: midAfter,
-      gesturePhase: GesturePhase.update,
-    });
-  }
-
-  private end(event: TouchEvent): void {
-    this.apply({ gesturePhase: GesturePhase.end });
-    if (this.moved || event.changedTouches.length === 0) {
-      return;
+    const bearing = this.bearingRate.at(timestamp / 1e6);
+    if (bearing !== undefined) {
+      momentum.bearing = { velocity: bearing, anchor: this.center };
     }
-    const touch = event.changedTouches[0];
-    const point: ScreenPoint = { x: touch.x, y: touch.y };
-    // The event's timestamp is in nanoseconds, from when the finger lifted.
-    const now = event.timestamp / 1e6;
-    if (this.lastTap !== undefined && now - this.lastTap.time < doubleTapMs &&
-      distance(this.lastTap.point, point) < tapSlop * 3) {
-      this.lastTap = undefined;
-      this.apply({ scale: 2, anchor: point, animation: { durationMs: 300 } });
-    } else {
-      this.lastTap = { point: point, time: now };
-    }
+    this.apply({ momentum: momentum, gesturePhase: GesturePhase.end });
   }
 
   private apply(delta: CameraDelta): void {
@@ -130,29 +181,20 @@ export class MapGestures {
   }
 }
 
-// The fingers still down after the event, by ID.
-function touches(event: TouchEvent): Map<number, ScreenPoint> {
-  const lifted = new Set<number>();
-  if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-    for (const touch of event.changedTouches) {
-      lifted.add(touch.id);
-    }
-  }
-  const points = new Map<number, ScreenPoint>();
-  for (const touch of event.touches) {
-    if (!lifted.has(touch.id)) {
-      points.set(touch.id, { x: touch.x, y: touch.y });
-    }
-  }
-  return points;
+// Whether the event lifts every finger that was down.
+function allLifted(event: TouchEvent): boolean {
+  return event.touches.every((touch: TouchObject) =>
+    event.changedTouches.some((lifted: TouchObject) => lifted.id === touch.id));
 }
 
-function midpoint(a: ScreenPoint, b: ScreenPoint): ScreenPoint {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
-
-function distance(a: ScreenPoint, b: ScreenPoint): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+function centroid(event: GestureEvent): ScreenPoint {
+  let x = 0;
+  let y = 0;
+  event.fingerList.forEach((finger: FingerInfo) => {
+    x += finger.localX;
+    y += finger.localY;
+  });
+  return { x: x / event.fingerList.length, y: y / event.fingerList.length };
 }
 
 // An angle in degrees, wrapped to [-180, 180).

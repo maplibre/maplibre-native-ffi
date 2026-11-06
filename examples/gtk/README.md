@@ -53,5 +53,10 @@ window is minimized or the screen is locked, because the frame clock stops. When
 it leaves its window, it releases the session and keeps the map, and attaches a
 new session when it shows again. A move to a display of another scale takes a
 new map, as the map renders at one scale factor for its life.
-`src/gestures.vala` turns pointer, touch, and key input into camera changes.
-Everything else matches the browser example in `examples/browser`.
+
+`src/gestures.vala` turns pointer, touch, and key input into camera changes. A
+drag, a pinch, or a touchpad scroll ends with its release velocities, so the map
+keeps moving after release. The velocities come from `GtkGestureSwipe`, from the
+`decelerate` signal of a kinetic `GtkEventControllerScroll`, and, for a pinch,
+from its last changes. Everything else matches the browser example in
+`examples/browser`.

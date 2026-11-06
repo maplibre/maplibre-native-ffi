@@ -53,6 +53,19 @@ struct Index {
         .width('100%')
         .height('100%')
         .onTouch((event: TouchEvent) => this.gestures.onTouch(event))
+        .gesture(GestureGroup(GestureMode.Parallel,
+          TapGesture({ count: 2 }).onAction((event: GestureEvent) => this.gestures.doubleTap(event)),
+          PanGesture()
+            .onActionStart((event: GestureEvent) => this.gestures.panStart(event))
+            .onActionUpdate((event: GestureEvent) => this.gestures.pan(event))
+            .onActionEnd((event: GestureEvent) => this.gestures.panEnd(event))
+            .onActionCancel(() => this.gestures.cancel()),
+          PinchGesture()
+            .onActionStart((event: GestureEvent) => this.gestures.pinchStart(event))
+            .onActionUpdate((event: GestureEvent) => this.gestures.pinch(event)),
+          RotationGesture()
+            .onActionStart((event: GestureEvent) => this.gestures.rotateStart(event))
+            .onActionUpdate((event: GestureEvent) => this.gestures.rotate(event))))
       if (this.status.message !== '') {
         Text(this.status.message)
           .fontSize(15)

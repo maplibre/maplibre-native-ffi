@@ -25,14 +25,15 @@ import SwiftUI
     }
 
     private let controller: MapController
-    private lazy var gestures = TouchGestures(view: self) { [weak self] delta in
-      try? self?.controller.map?.discarding.applyCameraDelta(delta)
-    }
+    private var gestures: TouchGestures?
 
     init(controller: MapController) {
       self.controller = controller
       super.init(frame: .zero)
       isMultipleTouchEnabled = true
+      gestures = TouchGestures(view: self) { [weak self] delta in
+        try? self?.controller.map?.discarding.applyCameraDelta(delta)
+      }
       registerForTraitChanges([UITraitDisplayScale.self]) { (
         view: MetalView,
         _
@@ -58,19 +59,16 @@ import SwiftUI
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with _: UIEvent?) {
-      gestures.began(touches)
-    }
-
-    override func touchesMoved(_ touches: Set<UITouch>, with _: UIEvent?) {
-      gestures.moved(touches)
+      gestures?.began(touches)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with _: UIEvent?) {
-      gestures.ended(touches, cancelled: false)
+      gestures?.ended(touches)
     }
 
+    /// A recognizer that takes over the touches cancels them here.
     override func touchesCancelled(_ touches: Set<UITouch>, with _: UIEvent?) {
-      gestures.ended(touches, cancelled: true)
+      gestures?.ended(touches)
     }
   }
 

@@ -39,4 +39,5 @@ surface when the platform destroys it, as the React Native example in
 `examples/react-native` does. The session renders on a library thread with an
 OpenGL ES context that the library makes for the window, and a frame pacer on
 the main thread's choreographer demands its frames. `MapGestures.kt` turns
-touches into camera changes.
+touches into camera changes, and measures each gesture's speed with Compose's
+velocity trackers so the map keeps moving after release.
