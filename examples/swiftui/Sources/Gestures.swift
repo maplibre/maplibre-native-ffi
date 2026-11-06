@@ -20,6 +20,10 @@ import MaplibreNativeFFI
     private var recognizing = 0
     private var cancelled = false
     private var momentum = GestureMomentum()
+    // When the pinch and rotation ended, so a later release can drop their
+    // velocities once the fingers have moved on.
+    private var pinchEnded = 0.0
+    private var rotationEnded = 0.0
     // The pinch's scale and rotation at the last event, and their centroid.
     private var scale = 1.0
     private var rotation = 0.0
@@ -90,6 +94,7 @@ import MaplibreNativeFFI
           velocity: pinch.velocity / pinch.scale / log(2),
           anchor: anchor
         )
+        pinchEnded = ProcessInfo.processInfo.systemUptime
       }
     }
 
@@ -106,6 +111,7 @@ import MaplibreNativeFFI
           velocity: -turn.velocity * 180 / .pi,
           anchor: anchor
         )
+        rotationEnded = ProcessInfo.processInfo.systemUptime
       }
     }
 
@@ -133,6 +139,7 @@ import MaplibreNativeFFI
       case .changed:
         apply(change)
       case .ended:
+        apply(change)
         release()
         recognizing -= 1
         finish()
@@ -148,6 +155,15 @@ import MaplibreNativeFFI
     /// Ends the gesture once its touches and recognizers have all ended.
     private func finish() {
       guard touches.isEmpty, recognizing == 0 else { return }
+      // A pinch or rotation that ended well before the release, as when one
+      // finger lifts and the other keeps panning, adds no momentum.
+      let now = ProcessInfo.processInfo.systemUptime
+      if now - pinchEnded > 0.1 {
+        momentum.zoom = AnchoredMomentum()
+      }
+      if now - rotationEnded > 0.1 {
+        momentum.bearing = AnchoredMomentum()
+      }
       apply(cancelled
         ? CameraDelta(gesturePhase: .cancel)
         : CameraDelta(momentum: momentum, gesturePhase: .end))
