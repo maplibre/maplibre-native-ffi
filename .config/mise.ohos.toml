@@ -12,7 +12,7 @@
 ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
 # Oniro publishes its emulator image against the corresponding OpenHarmony
 # release. Keep both tools on the same version so their system ABI stays aligned.
-"http:oniro-emulator" = { version = "{{vars.ohos_sdk_version}}", url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v{{ version }}/oniro_emulator.zip", checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da", size = "1449068188", bin_path = ".", os = [
+"http:oniro-emulator" = { version = "{{vars.ohos_sdk_version}}", url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v{{ version }}/oniro_emulator.zip", checksum = "sha256:5db9a636f04f3115e97e5d6daf96316c680642ad90ea9e275adc4f0382cf0109", size = "969434898", bin_path = ".", os = [
   "linux",
   "macos",
 ] }

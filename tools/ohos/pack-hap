@@ -6,8 +6,8 @@
 # <module-dir> holds the module's module.json and resources, and <libs-dir> a
 # directory of native libraries for each ABI. restool compiles the resources,
 # app_packing_tool packs them with <modules.abc> and the libraries, and
-# hap-sign-tool signs the HAP with the OpenHarmony SDK's debug signing material,
-# for the bundle that module.json names. The signed HAP is <hap>.
+# hap-sign-tool signs the HAP with the OpenHarmony SDK's signing material, for
+# the bundle that module.json names. The signed HAP is <hap>.
 #
 # DevEco Studio does these steps through hvigor. Its packages are on the
 # OpenHarmony npm registry, but their license is unknown: their package.json
@@ -51,10 +51,11 @@ mkdir -p "$work/compiled" "$work/pack"
     --out-path "$work/unsigned.hap" >/dev/null
 )
 
-# The SDK ships signing keys and an unsigned profile template but no
+# The SDK ships signing keys and unsigned profile templates but no
 # application certificate. The SDK's application CA issues one for the
-# release key, the template becomes this bundle's debug profile with no
-# device list, and the profile key signs it.
+# release key, the release template becomes this bundle's profile, and the
+# profile key signs it. OpenHarmony 7.0 installs a debug profile only on a
+# device that the profile lists by UDID.
 password=123456
 keystore="$signing/OpenHarmony.p12"
 for alias in root:"openharmony application root ca" sub:"openharmony application ca"; do
@@ -70,7 +71,7 @@ sign_tool=(java -jar "$signing/hap-sign-tool.jar")
   -keyPwd "$password" -issuerKeyPwd "$password" -outForm certChain \
   -rootCaCertFile "$work/root-ca.cer" -subCaCertFile "$work/sub-ca.cer" \
   -outFile "$work/app.cer" >/dev/null
-python3 - "$signing/UnsgnedDebugProfileTemplate.json" "$work/profile.json" \
+python3 - "$signing/UnsgnedReleasedProfileTemplate.json" "$work/profile.json" \
   "$bundle" "$work/app.cer" <<'PYTHON'
 import json
 import sys
@@ -83,11 +84,9 @@ with open(chain) as source:
 marker = "-----BEGIN CERTIFICATE-----"
 leaf = certificates[: certificates.index(marker, len(marker))]
 profile["bundle-info"]["bundle-name"] = bundle
-profile["bundle-info"]["development-certificate"] = leaf
-# The template expired in 2024 and names two devices; a profile without a
-# device list installs on the emulator.
+profile["bundle-info"]["distribution-certificate"] = leaf
+# The template expired in 2023.
 profile["validity"] = {"not-before": 1600000000, "not-after": 2500000000}
-profile.pop("debug-info", None)
 with open(target, "w") as destination:
     json.dump(profile, destination)
 PYTHON
