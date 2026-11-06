@@ -1,0 +1,11 @@
+<Window
+  x:Class="Maplibre.NativeFfi.Example.Wpf.MainWindow"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:local="clr-namespace:Maplibre.NativeFfi.Example.Wpf"
+  Title="MapLibre WPF example"
+  Width="1024"
+  Height="768"
+>
+  <local:MapView x:Name="Map" />
+</Window>

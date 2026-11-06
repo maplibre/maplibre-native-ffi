@@ -149,6 +149,11 @@ JOBS = {
         "gtk",
         lambda target: target.preset == "linux-gnu-x64-vulkan",
     ),
+    # The WPF example builds against the Windows x64 Vulkan archive.
+    "wpf-windows": (
+        "wpf",
+        lambda target: target.preset == "windows-x64-vulkan",
+    ),
     # The ArkUI example packs its HARs from one addon.
     "arkui-hap": ("arkui", lambda target: target.preset == "ohos-x64-egl"),
     "swift-package": (
