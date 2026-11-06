@@ -242,11 +242,29 @@ function scheduleHashUpdate(map: MapHandle): void {
 
 // Gestures. A drag pans, a right or Ctrl drag rotates and pitches, two
 // pointers pinch, rotate, and pan, the wheel zooms, and a double click zooms
-// in, or out with Shift.
+// in, or out with Shift. A drag or pinch keeps moving after release at the
+// speed it moved just before, and a press stops it.
+
+/** How far a gesture has moved the camera since it began, at `time`. */
+interface Motion {
+  readonly time: number;
+  readonly pan: ScreenPoint;
+  readonly zoom: number;
+  readonly bearing: number;
+  readonly pitch: number;
+}
+
+// The browser reports no pointer velocity, so the release velocities average
+// the gesture's motion over this window.
+const velocityWindowMs = 100;
 
 function addGestures(map: MapHandle): void {
   const pointers = new Map<number, ScreenPoint>();
   let rotating = false;
+  // The gesture's motion over the window before its latest move, oldest first.
+  let motion: Motion[] = [];
+  // The latest pinch's center, which its zoom and turn keep in place.
+  let anchor: ScreenPoint | undefined;
 
   const apply = (delta: CameraDelta) => map.discarding.applyCameraDelta(delta);
 
@@ -255,11 +273,45 @@ function addGestures(map: MapHandle): void {
     return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
   };
 
+  // Drops the motion before the window that ends at `time`, but keeps where
+  // the window starts.
+  const trim = (time: number) => {
+    while (motion.length > 1 && motion[1]!.time <= time - velocityWindowMs) {
+      motion.shift();
+    }
+  };
+
+  const move = (event: PointerEvent, delta: CameraDelta) => {
+    apply({ ...delta, gesturePhase: GesturePhase.update });
+    const last = motion.at(-1)!;
+    motion.push({
+      time: event.timeStamp,
+      pan: {
+        x: last.pan.x + (delta.offset?.x ?? 0),
+        y: last.pan.y + (delta.offset?.y ?? 0),
+      },
+      zoom: last.zoom + Math.log2(delta.scale ?? 1),
+      bearing: last.bearing + (delta.bearing ?? 0),
+      pitch: last.pitch + (delta.pitch ?? 0),
+    });
+    trim(event.timeStamp);
+  };
+
   canvas.addEventListener("pointerdown", (event) => {
     canvas.setPointerCapture(event.pointerId);
     if (pointers.size === 0) {
       rotating =
         event.pointerType === "mouse" && (event.button === 2 || event.ctrlKey);
+      motion = [
+        {
+          time: event.timeStamp,
+          pan: { x: 0, y: 0 },
+          zoom: 0,
+          bearing: 0,
+          pitch: 0,
+        },
+      ];
+      anchor = undefined;
       apply({ gesturePhase: GesturePhase.begin });
     }
     pointers.set(event.pointerId, point(event));
@@ -285,32 +337,56 @@ function addGestures(map: MapHandle): void {
       const turn =
         (Math.atan2(after.y, after.x) - Math.atan2(before.y, before.x)) *
         (180 / Math.PI);
-      apply({
+      anchor = { x: (current.x + other.x) / 2, y: (current.y + other.y) / 2 };
+      move(event, {
         offset: { x: dx / 2, y: dy / 2 },
         scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
         bearing: -wrapDegrees(turn),
-        anchor: { x: (current.x + other.x) / 2, y: (current.y + other.y) / 2 },
-        gesturePhase: GesturePhase.update,
+        anchor,
       });
     } else if (rotating) {
-      apply({
-        bearing: dx * 0.5,
-        pitch: -dy * 0.5,
-        gesturePhase: GesturePhase.update,
-      });
+      move(event, { bearing: dx * 0.5, pitch: -dy * 0.5 });
     } else {
-      apply({ offset: { x: dx, y: dy }, gesturePhase: GesturePhase.update });
+      move(event, { offset: { x: dx, y: dy } });
     }
   });
 
-  const release = (event: PointerEvent) => {
-    if (!pointers.delete(event.pointerId)) return;
-    if (pointers.size === 0) {
-      apply({ gesturePhase: GesturePhase.end });
+  canvas.addEventListener("pointerup", (event) => {
+    if (!pointers.delete(event.pointerId) || pointers.size > 0) return;
+    trim(event.timeStamp);
+    const start = motion[0]!;
+    const end = motion.at(-1)!;
+    const seconds =
+      Math.min(event.timeStamp - start.time, velocityWindowMs) / 1000;
+    const speed = (from: number, to: number) =>
+      seconds > 0 ? (to - from) / seconds : 0;
+    apply({
+      momentum: {
+        pan: {
+          velocity: {
+            x: speed(start.pan.x, end.pan.x),
+            y: speed(start.pan.y, end.pan.y),
+          },
+        },
+        zoom: { velocity: speed(start.zoom, end.zoom), anchor },
+        // The snap settles the bearing on north even when the gesture didn't
+        // turn the map, so only a turn asks for it.
+        bearing: {
+          velocity: speed(start.bearing, end.bearing),
+          anchor,
+          snap: end.bearing === 0 ? undefined : {},
+        },
+        pitch: { velocity: speed(start.pitch, end.pitch) },
+      },
+      gesturePhase: GesturePhase.end,
+    });
+  });
+
+  canvas.addEventListener("pointercancel", (event) => {
+    if (pointers.delete(event.pointerId) && pointers.size === 0) {
+      apply({ gesturePhase: GesturePhase.cancel });
     }
-  };
-  canvas.addEventListener("pointerup", release);
-  canvas.addEventListener("pointercancel", release);
+  });
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
   canvas.addEventListener(
