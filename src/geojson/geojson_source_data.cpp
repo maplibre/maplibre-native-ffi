@@ -501,11 +501,16 @@ auto prepare_geojson_source_data(
     }
     result.data = std::move(index);
   } catch (const std::exception& exception) {
-    result = {.status = MLN_STATUS_NATIVE_ERROR, .message = exception.what()};
+    result = {
+      .status = MLN_STATUS_NATIVE_ERROR,
+      .message = exception.what(),
+      .data = nullptr
+    };
   } catch (...) {
     result = {
       .status = MLN_STATUS_NATIVE_ERROR,
-      .message = "preparing GeoJSON data failed"
+      .message = "preparing GeoJSON data failed",
+      .data = nullptr
     };
   }
   return result;
