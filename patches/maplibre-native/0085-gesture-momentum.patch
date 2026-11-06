@@ -187,7 +187,7 @@ index 3e01d9a..77fe561 100644
      impl->transform.setGestureInProgress(inProgress);
      impl->onUpdate();
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index e2bb728..c632cc9 100644
+index e2bb728..a33bd4f 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -13,6 +13,8 @@
@@ -199,7 +199,7 @@ index e2bb728..c632cc9 100644
  #include <cstdio>
  #include <utility>
  #include <numbers>
-@@ -550,6 +552,208 @@ ProjectionMode Transform::getProjectionMode() const {
+@@ -550,6 +552,213 @@ ProjectionMode Transform::getProjectionMode() const {
          .withYSkew(state.getYSkew());
  }
  
@@ -291,7 +291,12 @@ index e2bb728..c632cc9 100644
 +                seconds = std::exp(l / (rate - 1.0));
 +                glide.spline = true;
 +            }
-+            if (!(glide.distance > 0.0) || !(seconds > 0.0) || !std::isfinite(seconds)) return std::nullopt;
++            // A glide too long for the clock doesn't move. The bound is exclusive,
++            // as in flyTo(), because Duration::max() rounds up as a double.
++            if (!(glide.distance > 0.0) || !(seconds > 0.0) ||
++                seconds >= std::chrono::duration<double>(Duration::max()).count()) {
++                return std::nullopt;
++            }
 +            glide.duration = std::chrono::duration_cast<Duration>(std::chrono::duration<double>(seconds));
 +            if (glide.duration <= Duration::zero()) return std::nullopt;
 +            return glide;
@@ -408,7 +413,7 @@ index e2bb728..c632cc9 100644
  // MARK: - Transition
  
  uint16_t Transform::cameraFields(const CameraOptions& camera) {
-@@ -588,14 +792,7 @@ void Transform::startTransition(const CameraOptions& camera,
+@@ -588,14 +797,7 @@ void Transform::startTransition(const CameraOptions& camera,
      transition->duration = latestTransitionDuration = transition->fields ? duration : Duration::zero();
      transition->frame = frame;
  
@@ -424,7 +429,7 @@ index e2bb728..c632cc9 100644
      transitions.push_back(transition);
      updateMovementFlags();
      finishTransitions(finished);
-@@ -620,6 +817,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
+@@ -620,6 +822,7 @@ void Transform::applyTransitions(const std::vector<std::shared_ptr<Transition>>&
      camera.center = getLatLng(LatLng::Unwrapped);
  
      for (const auto& transition : active) {
@@ -432,7 +437,7 @@ index e2bb728..c632cc9 100644
          const double t = transition->duration == Duration::zero()
                               ? 1.0
                               : std::clamp(std::chrono::duration<double>(now - transition->start) /
-@@ -670,6 +868,9 @@ void Transform::updateMovementFlags() {
+@@ -670,6 +873,9 @@ void Transform::updateMovementFlags() {
  
  void Transform::finishTransitions(const std::vector<std::shared_ptr<Transition>>& finished) {
      for (const auto& transition : finished) {
@@ -442,7 +447,7 @@ index e2bb728..c632cc9 100644
          if (transition->animation.transitionFinishFn) transition->animation.transitionFinishFn();
          // This notification ends a command, not necessarily all camera motion.
          observer.onCameraDidChange(transition->duration != Duration::zero() ? MapObserver::CameraChangeMode::Animated
-@@ -693,11 +894,17 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -693,11 +899,17 @@ void Transform::updateTransitions(const TimePoint& now) {
      } guard{updatingTransitions};
  
      const auto active = transitions;
@@ -462,7 +467,7 @@ index e2bb728..c632cc9 100644
              std::erase(transitions, transition);
              finished.push_back(transition);
          }
-@@ -706,7 +913,7 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -706,7 +918,7 @@ void Transform::updateTransitions(const TimePoint& now) {
  
      for (const auto& transition : active) {
          if (std::find(transitions.begin(), transitions.end(), transition) == transitions.end()) continue;
@@ -471,7 +476,7 @@ index e2bb728..c632cc9 100644
              const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
                                              std::chrono::duration<double>(transition->duration),
                                          0.0,
-@@ -719,6 +926,229 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -719,6 +931,229 @@ void Transform::updateTransitions(const TimePoint& now) {
      finishTransitions(finished);
  }
  
