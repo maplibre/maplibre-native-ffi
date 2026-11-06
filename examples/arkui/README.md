@@ -36,7 +36,17 @@ registry, but their license is unknown: their `package.json` names a
 `LICENSE.txt` that they don't include. So `scripts/build-hap.sh` calls the
 OpenHarmony SDK's tools instead, and packs and signs the HAP with
 `tools/ohos/pack-hap`, as the TypeScript binding's ArkTS suite does. ets-loader
-compiles the pages with its webpack configuration, which doesn't rewrite
-`@kit.*` imports. The example imports the `@ohos.*` modules instead.
-`scripts/webpack.config.cjs` gives that configuration the app's API floor, so
-ArkTS linter errors fail the build as they do in DevEco Studio.
+compiles the pages with its webpack configuration. `scripts/webpack.config.cjs`
+gives that configuration the app's API floor, so ArkTS linter errors fail the
+build as they do in DevEco Studio. In SDK 6.1, the configuration has these
+limits:
+
+- It doesn't rewrite `@kit.*` imports, so the example imports the `@ohos.*`
+  modules instead.
+- It doesn't compile imported `@ComponentV2` structs, source HARs, or sources in
+  `oh_modules`.
+- Its `tsconfig.esm.json` lacks `NodeContainer`, `ContentSlot`, `SymbolGlyph`,
+  `FolderStack`, and `MovingPhotoView`.
+- Its `components/common_attrs.json` lacks `layoutGravity`.
+- `$r()` needs the resource table that restool makes, and the build doesn't run
+  restool.
