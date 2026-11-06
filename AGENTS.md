@@ -28,7 +28,9 @@ require one. Don't repeat validation that native code already does.
 The engine is the `third_party/maplibre-native` submodule at its pinned commit,
 with the patches in `patches/maplibre-native/` applied. Answer questions about
 engine behavior from that source. If the submodule is empty, run `mise deps` to
-check it out and apply the patches.
+check it out and apply the patches. Every `mise run`, `mise exec`, and commit
+hook does the same, which discards submodule edits that no patch holds. Save an
+engine change to its patch before you run any of them.
 
 After a rebase, run `mise deps` before you stage anything.
 `git submodule update` skips this submodule. Before you push, check

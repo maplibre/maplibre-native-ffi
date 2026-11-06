@@ -119,6 +119,58 @@ public class CameraChangeMode(@get:JvmName("getRawValue") public val rawValue: U
 }
 
 /**
+ * What moved the camera.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_camera_change_source` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public class CameraChangeSource(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "COMMAND"
+      1u -> "GESTURE"
+      2u -> "MOMENTUM"
+      else -> "CameraChangeSource($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean =
+    other is CameraChangeSource && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /**
+     * A camera command outside a gesture, or the map itself, as when a resize keeps the camera
+     * within its bounds.
+     */
+    @JvmField public val COMMAND: CameraChangeSource = CameraChangeSource(COMMAND_VALUE)
+    /** The `rawValue` of [COMMAND]. */
+    public const val COMMAND_VALUE: UInt = 0u
+    /** A camera command with a gesture phase. */
+    @JvmField public val GESTURE: CameraChangeSource = CameraChangeSource(GESTURE_VALUE)
+    /** The `rawValue` of [GESTURE]. */
+    public const val GESTURE_VALUE: UInt = 1u
+    /** The momentum and bearing snap that a gesture's end started. */
+    @JvmField public val MOMENTUM: CameraChangeSource = CameraChangeSource(MOMENTUM_VALUE)
+    /** The `rawValue` of [MOMENTUM]. */
+    public const val MOMENTUM_VALUE: UInt = 2u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): CameraChangeSource =
+      when (rawValue) {
+        COMMAND_VALUE -> COMMAND
+        GESTURE_VALUE -> GESTURE
+        MOMENTUM_VALUE -> MOMENTUM
+        else -> CameraChangeSource(rawValue)
+      }
+  }
+}
+
+/**
  * How a camera change ended.
  *
  * A change that ends in more than one way reports `CameraTransitionOutcome.CANCELLED` if any of it
@@ -989,6 +1041,56 @@ public class MapMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
         STATIC_VALUE -> STATIC
         TILE_VALUE -> TILE
         else -> MapMode(rawValue)
+      }
+  }
+}
+
+/**
+ * How a part of a gesture's momentum slows from its release speed.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_momentum_decay_model` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "FRICTION"
+      1u -> "EASE"
+      else -> "MomentumDecayModel($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean =
+    other is MomentumDecayModel && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /**
+     * The speed halves every `half_life_ms`, until it drops to `stop_speed`. UIScrollView's normal
+     * deceleration is a half-life of 346 ms, and its fast deceleration 69 ms.
+     */
+    @JvmField public val FRICTION: MomentumDecayModel = MomentumDecayModel(FRICTION_VALUE)
+    /** The `rawValue` of [FRICTION]. */
+    public const val FRICTION_VALUE: UInt = 0u
+    /**
+     * The part eases `distance` over `duration_ms`, along `easing`, as a camera animation does. The
+     * caller plans the glide, for example from the platform's own fling physics, such as Android's
+     * OverScroller.
+     */
+    @JvmField public val EASE: MomentumDecayModel = MomentumDecayModel(EASE_VALUE)
+    /** The `rawValue` of [EASE]. */
+    public const val EASE_VALUE: UInt = 1u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): MomentumDecayModel =
+      when (rawValue) {
+        FRICTION_VALUE -> FRICTION
+        EASE_VALUE -> EASE
+        else -> MomentumDecayModel(rawValue)
       }
   }
 }
@@ -4730,6 +4832,249 @@ public data class UnitBezier(
 }
 
 /**
+ * How one part of a gesture's momentum slows from its release speed.
+ *
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom levels for zoom, and
+ * degrees for bearing and pitch. A setting whose bit isn't set takes the part's default, which
+ * `GestureMomentum` lists. `min_speed` is finite and not negative, and every other number is finite
+ * and positive. A friction decay can serve every release, as a preset that matches a platform's
+ * scrolling. An eased glide takes its direction from the part's velocity, and its distance and
+ * duration from the caller's plan.
+ *
+ * See `mln_momentum_decay` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MomentumDecay(
+  public val model: MomentumDecayModel? = null,
+  /** For `MomentumDecayModel.FRICTION`, how long the speed takes to halve. */
+  public val halfLifeMs: Double? = null,
+  /** For `MomentumDecayModel.FRICTION`, the speed at which it ends. */
+  public val stopSpeed: Double? = null,
+  /** Required for `MomentumDecayModel.EASE`. */
+  public val distance: Double? = null,
+  /** Required for `MomentumDecayModel.EASE`. */
+  public val durationMs: Double? = null,
+  /**
+   * For `MomentumDecayModel.EASE`, the share of `distance` covered over the share of `duration_ms`.
+   * Its control points are between 0 and 1, so the glide never passes its distance. Defaults to (0,
+   * 0, 0.25, 1), the curve that camera animations ease along by default. Android's scroll fling
+   * follows (0.175, 0.5, 0.35, 1).
+   */
+  public val easing: UnitBezier? = null,
+  /** A slower release starts no momentum. */
+  public val minSpeed: Double? = null,
+  /** For `MomentumDecayModel.FRICTION`, a faster release counts as this. */
+  public val maxSpeed: Double? = null,
+  /**
+   * The farthest the part moves. A friction release that would move farther starts slower, so it
+   * ends sooner, and a planned glide moves at most this far over its duration.
+   */
+  public val maxDistance: Double? = null,
+) {
+  @PublishedApi
+  internal fun withModel(model: MomentumDecayModel): MomentumDecay = copy(model = model)
+
+  @PublishedApi
+  internal fun withHalfLifeMs(halfLifeMs: Double): MomentumDecay = copy(halfLifeMs = halfLifeMs)
+
+  @PublishedApi
+  internal fun withStopSpeed(stopSpeed: Double): MomentumDecay = copy(stopSpeed = stopSpeed)
+
+  @PublishedApi
+  internal fun withDistance(distance: Double): MomentumDecay = copy(distance = distance)
+
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): MomentumDecay = copy(durationMs = durationMs)
+
+  @PublishedApi internal fun withEasing(easing: UnitBezier): MomentumDecay = copy(easing = easing)
+
+  @PublishedApi
+  internal fun withMinSpeed(minSpeed: Double): MomentumDecay = copy(minSpeed = minSpeed)
+
+  @PublishedApi
+  internal fun withMaxSpeed(maxSpeed: Double): MomentumDecay = copy(maxSpeed = maxSpeed)
+
+  @PublishedApi
+  internal fun withMaxDistance(maxDistance: Double): MomentumDecay = copy(maxDistance = maxDistance)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MomentumDecay = MomentumDecay()
+  }
+}
+
+/**
+ * How a gesture's pan keeps moving the map's content after release.
+ *
+ * See `mln_pan_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class PanMomentum(
+  /**
+   * How fast the map's content moved on the screen at release, in logical pixels per second. The
+   * pan moves only when this is set.
+   */
+  public val velocity: ScreenPoint? = null,
+  public val decay: MomentumDecay = MomentumDecay(),
+) {
+  @PublishedApi
+  internal fun withVelocity(velocity: ScreenPoint): PanMomentum = copy(velocity = velocity)
+
+  @PublishedApi internal fun withDecay(decay: MomentumDecay): PanMomentum = copy(decay = decay)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): PanMomentum = PanMomentum()
+  }
+}
+
+/**
+ * Where a part settles after a gesture that changed it.
+ *
+ * The targets are every `spacing` from `offset`, in the part's unit. Bearing targets wrap around
+ * the circle. Once the part's glide ends, or right away when it doesn't move, the part eases to the
+ * nearest target if it is within `tolerance` of it, and otherwise stays where it is. A setting
+ * whose bit isn't set takes the part's default, which `GestureMomentum` lists.
+ *
+ * See `mln_momentum_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MomentumSnap(
+  /** Positive. */
+  public val spacing: Double? = null,
+  /** Defaults to 0. */
+  public val offset: Double? = null,
+  /** Not negative. */
+  public val tolerance: Double? = null,
+  /** Zero settles without easing. Defaults to 300. */
+  public val durationMs: Double? = null,
+) {
+  @PublishedApi internal fun withSpacing(spacing: Double): MomentumSnap = copy(spacing = spacing)
+
+  @PublishedApi internal fun withOffset(offset: Double): MomentumSnap = copy(offset = offset)
+
+  @PublishedApi
+  internal fun withTolerance(tolerance: Double): MomentumSnap = copy(tolerance = tolerance)
+
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): MomentumSnap = copy(durationMs = durationMs)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MomentumSnap = MomentumSnap()
+  }
+}
+
+/**
+ * How a gesture's zoom, bearing, or pitch keeps changing after release.
+ *
+ * See `mln_anchored_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class AnchoredMomentum(
+  /**
+   * How fast the value changed at release: zoom levels per second for zoom, and degrees per second
+   * for bearing and pitch. The part moves only when this is set.
+   */
+  public val velocity: Double? = null,
+  /**
+   * The screen point that the change keeps in place. Without one, the change keeps the center of
+   * the view in place.
+   */
+  public val anchor: ScreenPoint? = null,
+  public val decay: MomentumDecay = MomentumDecay(),
+  /** Where the part settles. Without this, it stays where the gesture and its glide leave it. */
+  public val snap: MomentumSnap? = null,
+) {
+  @PublishedApi
+  internal fun withVelocity(velocity: Double): AnchoredMomentum = copy(velocity = velocity)
+
+  @PublishedApi
+  internal fun withAnchor(anchor: ScreenPoint): AnchoredMomentum = copy(anchor = anchor)
+
+  @PublishedApi internal fun withDecay(decay: MomentumDecay): AnchoredMomentum = copy(decay = decay)
+
+  @PublishedApi internal fun withSnap(snap: MomentumSnap): AnchoredMomentum = copy(snap = snap)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): AnchoredMomentum = AnchoredMomentum()
+  }
+}
+
+/**
+ * How a gesture keeps moving the camera after the user lets go.
+ *
+ * A part moves only when its velocity is set, and each part slows on its own. Every part defaults
+ * to `MomentumDecayModel.FRICTION` with a half-life of 140 ms, and these other defaults:
+ *
+ * - Pan stops at 10 logical pixels per second, needs a release of at least 200, and counts a
+ *   release faster than 10000 as 10000.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap settles on the
+ *   nearest whole level.
+ * - Bearing stops at 1 degree per second and needs a release of at least 60. Its snap settles on
+ *   north within 7 degrees.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its snap settles flat
+ *   within 7 degrees.
+ *
+ * See `mln_gesture_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class GestureMomentum(
+  public val pan: PanMomentum = PanMomentum(),
+  public val zoom: AnchoredMomentum = AnchoredMomentum(),
+  public val bearing: AnchoredMomentum = AnchoredMomentum(),
+  public val pitch: AnchoredMomentum = AnchoredMomentum(),
+) {
+  @PublishedApi internal fun withPan(pan: PanMomentum): GestureMomentum = copy(pan = pan)
+
+  @PublishedApi internal fun withZoom(zoom: AnchoredMomentum): GestureMomentum = copy(zoom = zoom)
+
+  @PublishedApi
+  internal fun withBearing(bearing: AnchoredMomentum): GestureMomentum = copy(bearing = bearing)
+
+  @PublishedApi
+  internal fun withPitch(pitch: AnchoredMomentum): GestureMomentum = copy(pitch = pitch)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GestureMomentum = GestureMomentum()
+  }
+}
+
+/**
+ * How fast each part of a camera change moves.
+ *
+ * See `mln_camera_velocity` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraVelocity(
+  /** How fast the map's content moves on the screen, in logical pixels per second. */
+  public val pan: ScreenPoint,
+  /** In zoom levels per second. */
+  public val zoom: Double,
+  /** In degrees per second. */
+  public val bearing: Double,
+  /** In degrees per second. */
+  public val pitch: Double,
+)
+
+/**
  * The end of a camera change.
  *
  * See `mln_camera_transition_end` in the
@@ -4742,13 +5087,22 @@ public data class CameraTransitionEnd(
    * the map closed first.
    */
   @get:JvmName("getGeneration") public val generation: ULong,
+  /**
+   * How fast a gesture's momentum still moved when it was cancelled, which the next gesture can add
+   * to its own release velocities. Zero for every other end.
+   */
+  public val velocity: CameraVelocity,
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
     @PublishedApi
-    internal fun of(outcome: CameraTransitionOutcome, generation: Long): CameraTransitionEnd =
-      CameraTransitionEnd(outcome = outcome, generation = generation.toULong())
+    internal fun of(
+      outcome: CameraTransitionOutcome,
+      generation: Long,
+      velocity: CameraVelocity,
+    ): CameraTransitionEnd =
+      CameraTransitionEnd(outcome = outcome, generation = generation.toULong(), velocity = velocity)
   }
 }
 
@@ -4825,6 +5179,11 @@ public data class CameraDelta(
    * it combines with `offset` only in a delta without a duration.
    */
   public val anchor: ScreenPoint? = null,
+  /**
+   * How the gesture keeps moving after this delta. Only a delta in the `GesturePhase.END` phase
+   * carries it.
+   */
+  public val momentum: GestureMomentum? = null,
   public val animation: AnimationOptions = AnimationOptions(),
   public val gesturePhase: GesturePhase = GesturePhase.NONE,
 ) {
@@ -4837,6 +5196,9 @@ public data class CameraDelta(
   @PublishedApi internal fun withPitch(pitch: Double): CameraDelta = copy(pitch = pitch)
 
   @PublishedApi internal fun withAnchor(anchor: ScreenPoint): CameraDelta = copy(anchor = anchor)
+
+  @PublishedApi
+  internal fun withMomentum(momentum: GestureMomentum): CameraDelta = copy(momentum = momentum)
 
   @PublishedApi
   internal fun withAnimation(animation: AnimationOptions): CameraDelta = copy(animation = animation)
@@ -7735,6 +8097,7 @@ public data class OfflineRegionStatus(
  */
 public data class RuntimeEventCameraChange(
   public val mode: CameraChangeMode,
+  public val source: CameraChangeSource,
 )
 
 /**

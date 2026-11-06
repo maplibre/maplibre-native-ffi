@@ -88,6 +88,19 @@ MLN_API mln_status mln_map_update_camera(
  * A delta that replaces an animated one starts from where that animation left
  * the camera, so the rest of the replaced change never happens. To reach an
  * exact camera, use mln_map_update_camera().
+ *
+ * A delta in the end phase can carry momentum, which keeps the camera moving
+ * from the gesture's release velocities and slows it on each rendered frame.
+ * The gesture lasts until the momentum ends: the snapshot keeps
+ * `gesture_in_progress` set, and camera events report
+ * MLN_CAMERA_CHANGE_SOURCE_MOMENTUM. With momentum, `animation` sets only
+ * `transition_id` and the end handler, which runs when the gesture ends.
+ *
+ * A delta in the begin phase, mln_map_cancel_camera_transitions(), or a
+ * cancellation by that ID stops the momentum. A later command that sets a
+ * field stops only the parts of the momentum that move that field. On a tilted
+ * map, the pan moves the map's content the same distance on the screen in
+ * every direction.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_apply_camera_delta(

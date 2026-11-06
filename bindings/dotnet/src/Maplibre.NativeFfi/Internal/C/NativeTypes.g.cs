@@ -31,6 +31,15 @@ internal readonly record struct MlnStyleExpression(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnVulkanDevice(ulong Value) : IMlnHandle;
 
+internal unsafe struct mln_anchored_momentum
+{
+    public mln_anchored_momentum_field fields;
+    public double velocity;
+    public mln_screen_point anchor;
+    public mln_momentum_decay decay;
+    public mln_momentum_snap snap;
+}
+
 internal unsafe struct mln_android_hardware_buffer_frame
 {
     public uint size;
@@ -126,6 +135,7 @@ internal unsafe struct mln_camera_delta
     public double bearing;
     public double pitch;
     public mln_screen_point anchor;
+    public mln_gesture_momentum momentum;
     public mln_animation_options animation;
     public mln_gesture_phase gesture_phase;
     public uint reserved;
@@ -174,6 +184,7 @@ internal unsafe struct mln_camera_transition_end
     public uint size;
     public mln_camera_transition_outcome outcome;
     public ulong generation;
+    public mln_camera_velocity velocity;
 }
 
 internal unsafe struct mln_camera_transition_handler
@@ -192,6 +203,14 @@ internal unsafe struct mln_camera_update
     public mln_animation_options animation;
     public mln_gesture_phase gesture_phase;
     public uint reserved;
+}
+
+internal unsafe struct mln_camera_velocity
+{
+    public mln_screen_point pan;
+    public double zoom;
+    public double bearing;
+    public double pitch;
 }
 
 internal unsafe struct mln_canonical_tile_id
@@ -437,6 +456,14 @@ internal unsafe struct mln_geo_json_source_options
     public ulong cluster_min_points;
     public byte line_metrics;
     public byte cluster;
+}
+
+internal unsafe struct mln_gesture_momentum
+{
+    public mln_pan_momentum pan;
+    public mln_anchored_momentum zoom;
+    public mln_anchored_momentum bearing;
+    public mln_anchored_momentum pitch;
 }
 
 internal unsafe struct mln_gpu_sync
@@ -698,6 +725,29 @@ internal unsafe struct mln_metal_texture_frame
     public ulong pixel_format;
 }
 
+internal unsafe struct mln_momentum_decay
+{
+    public mln_momentum_decay_field fields;
+    public mln_momentum_decay_model model;
+    public double half_life_ms;
+    public double stop_speed;
+    public double distance;
+    public double duration_ms;
+    public mln_unit_bezier easing;
+    public double min_speed;
+    public double max_speed;
+    public double max_distance;
+}
+
+internal unsafe struct mln_momentum_snap
+{
+    public mln_momentum_snap_field fields;
+    public double spacing;
+    public double offset;
+    public double tolerance;
+    public double duration_ms;
+}
+
 internal unsafe struct mln_offline_geometry_region_definition
 {
     public mln_buffer_view style_url;
@@ -858,6 +908,13 @@ internal unsafe struct mln_open_gl_texture_frame
     public uint slot;
     public uint texture;
     public uint target;
+}
+
+internal unsafe struct mln_pan_momentum
+{
+    public mln_pan_momentum_field fields;
+    public mln_screen_point velocity;
+    public mln_momentum_decay decay;
 }
 
 internal unsafe struct mln_premultiplied_rgba8_image
@@ -1139,6 +1196,7 @@ internal unsafe struct mln_runtime_event
 internal unsafe struct mln_runtime_event_camera_change
 {
     public mln_camera_change_mode mode;
+    public mln_camera_change_source source;
 }
 
 internal unsafe struct mln_runtime_event_glyphs
@@ -1648,6 +1706,13 @@ internal unsafe struct mln_win32_window_replacement
     public void* window;
 }
 
+internal enum mln_anchored_momentum_field : uint
+{
+    MLN_ANCHORED_MOMENTUM_VELOCITY = 1,
+    MLN_ANCHORED_MOMENTUM_ANCHOR = 2,
+    MLN_ANCHORED_MOMENTUM_SNAP = 4,
+}
+
 internal enum mln_animation_option_field : uint
 {
     MLN_ANIMATION_OPTION_DURATION = 1,
@@ -1681,6 +1746,13 @@ internal enum mln_camera_change_mode : uint
     MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
 }
 
+internal enum mln_camera_change_source : uint
+{
+    MLN_CAMERA_CHANGE_SOURCE_COMMAND = 0,
+    MLN_CAMERA_CHANGE_SOURCE_GESTURE = 1,
+    MLN_CAMERA_CHANGE_SOURCE_MOMENTUM = 2,
+}
+
 internal enum mln_camera_delta_field : uint
 {
     MLN_CAMERA_DELTA_OFFSET = 1,
@@ -1688,6 +1760,7 @@ internal enum mln_camera_delta_field : uint
     MLN_CAMERA_DELTA_BEARING = 4,
     MLN_CAMERA_DELTA_PITCH = 8,
     MLN_CAMERA_DELTA_ANCHOR = 16,
+    MLN_CAMERA_DELTA_MOMENTUM = 32,
 }
 
 internal enum mln_camera_fit_option_field : uint
@@ -1910,6 +1983,33 @@ internal enum mln_map_viewport_option_field : uint
     MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8,
 }
 
+internal enum mln_momentum_decay_field : uint
+{
+    MLN_MOMENTUM_DECAY_MODEL = 1,
+    MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 2,
+    MLN_MOMENTUM_DECAY_STOP_SPEED = 4,
+    MLN_MOMENTUM_DECAY_DISTANCE = 8,
+    MLN_MOMENTUM_DECAY_DURATION_MS = 16,
+    MLN_MOMENTUM_DECAY_EASING = 32,
+    MLN_MOMENTUM_DECAY_MIN_SPEED = 64,
+    MLN_MOMENTUM_DECAY_MAX_SPEED = 128,
+    MLN_MOMENTUM_DECAY_MAX_DISTANCE = 256,
+}
+
+internal enum mln_momentum_decay_model : uint
+{
+    MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0,
+    MLN_MOMENTUM_DECAY_MODEL_EASE = 1,
+}
+
+internal enum mln_momentum_snap_field : uint
+{
+    MLN_MOMENTUM_SNAP_SPACING = 1,
+    MLN_MOMENTUM_SNAP_OFFSET = 2,
+    MLN_MOMENTUM_SNAP_TOLERANCE = 4,
+    MLN_MOMENTUM_SNAP_DURATION_MS = 8,
+}
+
 internal enum mln_network_status : uint
 {
     MLN_NETWORK_STATUS_ONLINE = 1,
@@ -1969,6 +2069,11 @@ internal enum mln_open_gl_context_provider_flag : uint
     MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1,
     MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 2,
     MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4,
+}
+
+internal enum mln_pan_momentum_field : uint
+{
+    MLN_PAN_MOMENTUM_VELOCITY = 1,
 }
 
 internal enum mln_projection_mode_option_field : uint

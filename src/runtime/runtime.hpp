@@ -65,6 +65,7 @@ struct EndedCameraTransition {
   std::shared_ptr<CameraTransitionEnd> end;
   mln_camera_transition_outcome outcome =
     MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED;
+  mln_camera_velocity velocity{};
 };
 
 // The camera transitions that the C API is cancelling, so that their finish
@@ -123,6 +124,20 @@ struct MapEventState {
   std::vector<EndedCameraTransition> ended_transitions;
   CameraTransitionCancellation cancelling_transitions;
   CameraTransitionReplacement replacing_transitions;
+  // What the camera changes of the command that runs now report.
+  mln_camera_change_source command_source = MLN_CAMERA_CHANGE_SOURCE_COMMAND;
+  // What the camera change that ends the transition MapLibre is finishing
+  // reports. Its finish callback sets this just before that change.
+  std::optional<mln_camera_change_source> finishing_source;
+  // The gesture that the camera commands' phases describe. A gesture starts
+  // with its first phase after the previous one ended, and its momentum can
+  // outlast it.
+  bool gesture_active = false;
+  // Which fields the gesture changed, so that only those parts settle.
+  bool gesture_changed_zoom = false;
+  bool gesture_changed_bearing = false;
+  bool gesture_changed_pitch = false;
+  uint64_t gesture_serial = 0;
 
   [[nodiscard]] auto in_transaction() const noexcept -> bool {
     return transaction_depth != 0;

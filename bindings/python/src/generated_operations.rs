@@ -138,6 +138,10 @@ fn generated_copy_mln_camera_transition_end(
     let dict = PyDict::new(py);
     dict.set_item("outcome", generated_value(py, value.outcome)?)?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
+    dict.set_item(
+        "velocity",
+        generated_copy_mln_camera_velocity(py, &value.velocity)?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -164,6 +168,18 @@ unsafe extern "C" fn generated_callback_mln_camera_transition_handler_callback(
         },
     );
     outcome
+}
+
+fn generated_copy_mln_camera_velocity(
+    py: Python<'_>,
+    value: &sys::mln_camera_velocity,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("pan", generated_copy_mln_screen_point(py, &value.pan)?)?;
+    dict.set_item("zoom", generated_value(py, value.zoom)?)?;
+    dict.set_item("bearing", generated_value(py, value.bearing)?)?;
+    dict.set_item("pitch", generated_value(py, value.pitch)?)?;
+    Ok(dict.into_any().unbind())
 }
 
 fn generated_copy_mln_canonical_tile_id(
@@ -1179,6 +1195,7 @@ fn generated_copy_mln_runtime_event_camera_change(
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("mode", generated_value(py, value.mode)?)?;
+    dict.set_item("source", generated_value(py, value.source)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1671,6 +1688,28 @@ unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::f
     outcome
 }
 
+fn generated_input_mln_anchored_momentum<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_anchored_momentum> {
+    let mut raw: sys::mln_anchored_momentum = unsafe { std::mem::zeroed() };
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "velocity")? {
+        raw.velocity = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_ANCHORED_MOMENTUM_VELOCITY;
+    }
+    if let Some(field) = generated_present(value, "anchor")? {
+        raw.anchor = generated_input_mln_screen_point(&field, storage)?;
+        raw.fields |= sys::MLN_ANCHORED_MOMENTUM_ANCHOR;
+    }
+    raw.decay = generated_input_mln_momentum_decay(&value.getattr("decay")?, storage)?;
+    if let Some(field) = generated_present(value, "snap")? {
+        raw.snap = generated_input_mln_momentum_snap(&field, storage)?;
+        raw.fields |= sys::MLN_ANCHORED_MOMENTUM_SNAP;
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_android_hardware_buffer_ring_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -1817,6 +1856,10 @@ fn generated_input_mln_camera_delta<'py>(
     if let Some(field) = generated_present(value, "anchor")? {
         raw.anchor = generated_input_mln_screen_point(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_DELTA_ANCHOR;
+    }
+    if let Some(field) = generated_present(value, "momentum")? {
+        raw.momentum = generated_input_mln_gesture_momentum(&field, storage)?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_MOMENTUM;
     }
     raw.animation = generated_input_mln_animation_options(&value.getattr("animation")?, storage)?;
     raw.gesture_phase = value
@@ -2259,6 +2302,18 @@ fn generated_input_mln_geo_json_source_options<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_gesture_momentum<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_momentum> {
+    let mut raw: sys::mln_gesture_momentum = unsafe { std::mem::zeroed() };
+    raw.pan = generated_input_mln_pan_momentum(&value.getattr("pan")?, storage)?;
+    raw.zoom = generated_input_mln_anchored_momentum(&value.getattr("zoom")?, storage)?;
+    raw.bearing = generated_input_mln_anchored_momentum(&value.getattr("bearing")?, storage)?;
+    raw.pitch = generated_input_mln_anchored_momentum(&value.getattr("pitch")?, storage)?;
+    Ok(raw)
+}
+
 fn generated_input_mln_gpu_sync<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2625,6 +2680,77 @@ fn generated_input_mln_metal_surface_replacement<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_momentum_decay<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_momentum_decay> {
+    let mut raw: sys::mln_momentum_decay = unsafe { std::mem::zeroed() };
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "model")? {
+        raw.model = field.extract::<sys::mln_momentum_decay_model>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_MODEL;
+    }
+    if let Some(field) = generated_present(value, "half_life_ms")? {
+        raw.half_life_ms = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
+    }
+    if let Some(field) = generated_present(value, "stop_speed")? {
+        raw.stop_speed = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_STOP_SPEED;
+    }
+    if let Some(field) = generated_present(value, "distance")? {
+        raw.distance = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_DISTANCE;
+    }
+    if let Some(field) = generated_present(value, "duration_ms")? {
+        raw.duration_ms = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_DURATION_MS;
+    }
+    if let Some(field) = generated_present(value, "easing")? {
+        raw.easing = generated_input_mln_unit_bezier(&field, storage)?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_EASING;
+    }
+    if let Some(field) = generated_present(value, "min_speed")? {
+        raw.min_speed = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_MIN_SPEED;
+    }
+    if let Some(field) = generated_present(value, "max_speed")? {
+        raw.max_speed = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_MAX_SPEED;
+    }
+    if let Some(field) = generated_present(value, "max_distance")? {
+        raw.max_distance = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_MAX_DISTANCE;
+    }
+    Ok(raw)
+}
+
+fn generated_input_mln_momentum_snap<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_momentum_snap> {
+    let _ = storage;
+    let mut raw: sys::mln_momentum_snap = unsafe { std::mem::zeroed() };
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "spacing")? {
+        raw.spacing = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_SNAP_SPACING;
+    }
+    if let Some(field) = generated_present(value, "offset")? {
+        raw.offset = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_SNAP_OFFSET;
+    }
+    if let Some(field) = generated_present(value, "tolerance")? {
+        raw.tolerance = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_SNAP_TOLERANCE;
+    }
+    if let Some(field) = generated_present(value, "duration_ms")? {
+        raw.duration_ms = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_SNAP_DURATION_MS;
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_offline_geometry_region_definition<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2814,6 +2940,20 @@ fn generated_input_mln_open_gl_surface_replacement<'py>(
     raw.size = std::mem::size_of::<sys::mln_open_gl_surface_replacement>() as _;
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_pan_momentum<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_pan_momentum> {
+    let mut raw: sys::mln_pan_momentum = unsafe { std::mem::zeroed() };
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "velocity")? {
+        raw.velocity = generated_input_mln_screen_point(&field, storage)?;
+        raw.fields |= sys::MLN_PAN_MOMENTUM_VELOCITY;
+    }
+    raw.decay = generated_input_mln_momentum_decay(&value.getattr("decay")?, storage)?;
     Ok(raw)
 }
 

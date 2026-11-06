@@ -111,6 +111,31 @@ GType maplibre_native_ffi_camera_change_mode_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_camera_change_mode_get_type())
 
 /**
+ * MaplibreNativeFfiCameraChangeSource:
+ * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_COMMAND: A camera command outside a
+ *   gesture, or the map itself, as when a resize keeps the camera within its
+ *   bounds.
+ * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_GESTURE: A camera command with a
+ *   gesture phase.
+ * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_MOMENTUM: The momentum and bearing
+ *   snap that a gesture's end started.
+ *
+ * What moved the camera.
+ *
+ * See `mln_camera_change_source` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_COMMAND = 0,
+  MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_GESTURE = 1,
+  MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_MOMENTUM = 2,
+} MaplibreNativeFfiCameraChangeSource;
+
+GType maplibre_native_ffi_camera_change_source_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CAMERA_CHANGE_SOURCE \
+  (maplibre_native_ffi_camera_change_source_get_type())
+
+/**
  * MaplibreNativeFfiCameraTransitionOutcome:
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_COMPLETED: The camera finished
  *   the change.
@@ -505,6 +530,30 @@ typedef enum {
 GType maplibre_native_ffi_map_mode_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_MAP_MODE \
   (maplibre_native_ffi_map_mode_get_type())
+
+/**
+ * MaplibreNativeFfiMomentumDecayModel:
+ * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_FRICTION: The speed halves every
+ *   `half_life_ms`, until it drops to `stop_speed`. UIScrollView's normal
+ *   deceleration is a half-life of 346 ms, and its fast deceleration 69 ms.
+ * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE: The part eases `distance`
+ *   over `duration_ms`, along `easing`, as a camera animation does. The caller
+ *   plans the glide, for example from the platform's own fling physics, such as
+ *   Android's OverScroller.
+ *
+ * How a part of a gesture's momentum slows from its release speed.
+ *
+ * See `mln_momentum_decay_model` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_FRICTION = 0,
+  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE = 1,
+} MaplibreNativeFfiMomentumDecayModel;
+
+GType maplibre_native_ffi_momentum_decay_model_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY_MODEL \
+  (maplibre_native_ffi_momentum_decay_model_get_type())
 
 /**
  * MaplibreNativeFfiNetworkStatus:

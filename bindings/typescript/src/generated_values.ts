@@ -11,6 +11,32 @@ import {
 } from "./internal/native_registrations.ts";
 
 /**
+ * How a gesture's zoom, bearing, or pitch keeps changing after release.
+ *
+ * See `mln_anchored_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface AnchoredMomentum {
+  /**
+   * How fast the value changed at release: zoom levels per second for zoom, and
+   * degrees per second for bearing and pitch. The part moves only when this is
+   * set.
+   */
+  velocity?: number;
+  /**
+   * The screen point that the change keeps in place. Without one, the change
+   * keeps the center of the view in place.
+   */
+  anchor?: ScreenPoint;
+  decay?: MomentumDecay;
+  /**
+   * Where the part settles. Without this, it stays where the gesture and its
+   * glide leave it.
+   */
+  snap?: MomentumSnap;
+}
+
+/**
  * The Android hardware buffer of an acquired frame.
  *
  * See `mln_android_hardware_buffer_frame` in the
@@ -295,6 +321,32 @@ export type CameraChangeMode =
   | (number & {});
 
 /**
+ * What moved the camera.
+ *
+ * See `mln_camera_change_source` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+export const CameraChangeSource = {
+  /**
+   * A camera command outside a gesture, or the map itself, as when a resize
+   * keeps the camera within its bounds.
+   */
+  command: 0,
+  /**
+   * A camera command with a gesture phase.
+   */
+  gesture: 1,
+  /**
+   * The momentum and bearing snap that a gesture's end started.
+   */
+  momentum: 2,
+} as const;
+/** One of the CameraChangeSource values, or a value this binding does not know. */
+export type CameraChangeSource =
+  | (typeof CameraChangeSource)[keyof typeof CameraChangeSource]
+  | (number & {});
+
+/**
  * A change to the camera from where it is now, for gestures.
  *
  * See `mln_camera_delta` in the
@@ -323,6 +375,11 @@ export interface CameraDelta {
    * duration.
    */
   anchor?: ScreenPoint;
+  /**
+   * How the gesture keeps moving after this delta. Only a delta in the
+   * `GesturePhase.end` phase carries it.
+   */
+  momentum?: GestureMomentum;
   animation?: AnimationOptions;
   gesturePhase?: GesturePhase;
 }
@@ -429,6 +486,12 @@ export interface CameraTransitionEnd {
    * the camera, or 0 when the map closed first.
    */
   readonly generation: bigint;
+  /**
+   * How fast a gesture's momentum still moved when it was cancelled, which the
+   * next gesture can add to its own release velocities. Zero for every other
+   * end.
+   */
+  readonly velocity: CameraVelocity;
 }
 
 /**
@@ -528,6 +591,32 @@ export const CameraUpdateMode = {
 export type CameraUpdateMode =
   | (typeof CameraUpdateMode)[keyof typeof CameraUpdateMode]
   | (number & {});
+
+/**
+ * How fast each part of a camera change moves.
+ *
+ * See `mln_camera_velocity` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface CameraVelocity {
+  /**
+   * How fast the map's content moves on the screen, in logical pixels per
+   * second.
+   */
+  readonly pan: ScreenPoint;
+  /**
+   * In zoom levels per second.
+   */
+  readonly zoom: number;
+  /**
+   * In degrees per second.
+   */
+  readonly bearing: number;
+  /**
+   * In degrees per second.
+   */
+  readonly pitch: number;
+}
 
 /**
  * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
@@ -964,6 +1053,32 @@ export interface GeoJsonSourceOptions {
   clusterMinPoints?: bigint;
   lineMetrics?: boolean;
   cluster?: boolean;
+}
+
+/**
+ * How a gesture keeps moving the camera after the user lets go.
+ *
+ * A part moves only when its velocity is set, and each part slows on its own.
+ * Every part defaults to `MomentumDecayModel.friction` with a half-life of 140
+ * ms, and these other defaults:
+ *
+ * - Pan stops at 10 logical pixels per second, needs a release of at least 200,
+ *   and counts a release faster than 10000 as 10000.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap
+ *   settles on the nearest whole level.
+ * - Bearing stops at 1 degree per second and needs a release of at least 60.
+ *   Its snap settles on north within 7 degrees.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+ *   snap settles flat within 7 degrees.
+ *
+ * See `mln_gesture_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface GestureMomentum {
+  pan?: PanMomentum;
+  zoom?: AnchoredMomentum;
+  bearing?: AnchoredMomentum;
+  pitch?: AnchoredMomentum;
 }
 
 /**
@@ -1697,6 +1812,118 @@ export interface MetalTextureFrame {
 }
 
 /**
+ * How one part of a gesture's momentum slows from its release speed.
+ *
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom
+ * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
+ * set takes the part's default, which `GestureMomentum` lists. `min_speed` is
+ * finite and not negative, and every other number is finite and positive. A
+ * friction decay can serve every release, as a preset that matches a platform's
+ * scrolling. An eased glide takes its direction from the part's velocity, and
+ * its distance and duration from the caller's plan.
+ *
+ * See `mln_momentum_decay` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface MomentumDecay {
+  model?: MomentumDecayModel;
+  /**
+   * For `MomentumDecayModel.friction`, how long the speed takes to halve.
+   */
+  halfLifeMs?: number;
+  /**
+   * For `MomentumDecayModel.friction`, the speed at which it ends.
+   */
+  stopSpeed?: number;
+  /**
+   * Required for `MomentumDecayModel.ease`.
+   */
+  distance?: number;
+  /**
+   * Required for `MomentumDecayModel.ease`.
+   */
+  durationMs?: number;
+  /**
+   * For `MomentumDecayModel.ease`, the share of `distance` covered over the
+   * share of `duration_ms`. Its control points are between 0 and 1, so the
+   * glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
+   * that camera animations ease along by default. Android's scroll fling
+   * follows (0.175, 0.5, 0.35, 1).
+   */
+  easing?: UnitBezier;
+  /**
+   * A slower release starts no momentum.
+   */
+  minSpeed?: number;
+  /**
+   * For `MomentumDecayModel.friction`, a faster release counts as this.
+   */
+  maxSpeed?: number;
+  /**
+   * The farthest the part moves. A friction release that would move farther
+   * starts slower, so it ends sooner, and a planned glide moves at most this
+   * far over its duration.
+   */
+  maxDistance?: number;
+}
+
+/**
+ * How a part of a gesture's momentum slows from its release speed.
+ *
+ * See `mln_momentum_decay_model` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export const MomentumDecayModel = {
+  /**
+   * The speed halves every `half_life_ms`, until it drops to `stop_speed`.
+   * UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
+   * deceleration 69 ms.
+   */
+  friction: 0,
+  /**
+   * The part eases `distance` over `duration_ms`, along `easing`, as a camera
+   * animation does. The caller plans the glide, for example from the platform's
+   * own fling physics, such as Android's OverScroller.
+   */
+  ease: 1,
+} as const;
+/** One of the MomentumDecayModel values, or a value this binding does not know. */
+export type MomentumDecayModel =
+  | (typeof MomentumDecayModel)[keyof typeof MomentumDecayModel]
+  | (number & {});
+
+/**
+ * Where a part settles after a gesture that changed it.
+ *
+ * The targets are every `spacing` from `offset`, in the part's unit. Bearing
+ * targets wrap around the circle. Once the part's glide ends, or right away
+ * when it doesn't move, the part eases to the nearest target if it is within
+ * `tolerance` of it, and otherwise stays where it is. A setting whose bit isn't
+ * set takes the part's default, which `GestureMomentum` lists.
+ *
+ * See `mln_momentum_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface MomentumSnap {
+  /**
+   * Positive.
+   */
+  spacing?: number;
+  /**
+   * Defaults to 0.
+   */
+  offset?: number;
+  /**
+   * Not negative.
+   */
+  tolerance?: number;
+  /**
+   * Zero settles without easing. Defaults to 300.
+   */
+  durationMs?: number;
+}
+
+/**
  * Whether the library may use the network.
  *
  * See `mln_network_status` in the
@@ -2130,6 +2357,21 @@ export interface OpenGlTextureFrame {
   readonly slot: number;
   readonly texture: number;
   readonly target: number;
+}
+
+/**
+ * How a gesture's pan keeps moving the map's content after release.
+ *
+ * See `mln_pan_momentum` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface PanMomentum {
+  /**
+   * How fast the map's content moved on the screen at release, in logical
+   * pixels per second. The pan moves only when this is set.
+   */
+  velocity?: ScreenPoint;
+  decay?: MomentumDecay;
 }
 
 /**
@@ -2992,6 +3234,7 @@ export interface RuntimeEvent {
  */
 export interface RuntimeEventCameraChange {
   readonly mode: CameraChangeMode;
+  readonly source: CameraChangeSource;
 }
 
 /**

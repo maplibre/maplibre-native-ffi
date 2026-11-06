@@ -112,6 +112,16 @@ typedef mln_user_data_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_wake_callback = Pointer<NativeFunction<mln_wake_callbackFunction>>;
 typedef mln_wake_callbackFunction = Void Function(Pointer<Void> user_data);
 
+final class mln_anchored_momentum extends Struct {
+  @Uint32()
+  external int fields;
+  @Double()
+  external double velocity;
+  external mln_screen_point anchor;
+  external mln_momentum_decay decay;
+  external mln_momentum_snap snap;
+}
+
 final class mln_android_hardware_buffer_frame extends Struct {
   @Uint32()
   external int size;
@@ -235,6 +245,7 @@ final class mln_camera_delta extends Struct {
   @Double()
   external double pitch;
   external mln_screen_point anchor;
+  external mln_gesture_momentum momentum;
   external mln_animation_options animation;
   @Uint32()
   external int gesture_phase;
@@ -298,6 +309,7 @@ final class mln_camera_transition_end extends Struct {
   external int outcome;
   @Uint64()
   external int generation;
+  external mln_camera_velocity velocity;
 }
 
 final class mln_camera_transition_handler extends Struct {
@@ -319,6 +331,16 @@ final class mln_camera_update extends Struct {
   external int gesture_phase;
   @Uint32()
   external int reserved;
+}
+
+final class mln_camera_velocity extends Struct {
+  external mln_screen_point pan;
+  @Double()
+  external double zoom;
+  @Double()
+  external double bearing;
+  @Double()
+  external double pitch;
 }
 
 final class mln_canonical_tile_id extends Struct {
@@ -599,6 +621,13 @@ final class mln_geo_json_source_options extends Struct {
   external bool line_metrics;
   @Bool()
   external bool cluster;
+}
+
+final class mln_gesture_momentum extends Struct {
+  external mln_pan_momentum pan;
+  external mln_anchored_momentum zoom;
+  external mln_anchored_momentum bearing;
+  external mln_anchored_momentum pitch;
 }
 
 final class mln_gpu_sync extends Struct {
@@ -909,6 +938,41 @@ final class mln_metal_texture_frame extends Struct {
   external int pixel_format;
 }
 
+final class mln_momentum_decay extends Struct {
+  @Uint32()
+  external int fields;
+  @Uint32()
+  external int model;
+  @Double()
+  external double half_life_ms;
+  @Double()
+  external double stop_speed;
+  @Double()
+  external double distance;
+  @Double()
+  external double duration_ms;
+  external mln_unit_bezier easing;
+  @Double()
+  external double min_speed;
+  @Double()
+  external double max_speed;
+  @Double()
+  external double max_distance;
+}
+
+final class mln_momentum_snap extends Struct {
+  @Uint32()
+  external int fields;
+  @Double()
+  external double spacing;
+  @Double()
+  external double offset;
+  @Double()
+  external double tolerance;
+  @Double()
+  external double duration_ms;
+}
+
 final class mln_offline_geometry_region_definition extends Struct {
   external mln_buffer_view style_url;
   external mln_buffer_view geometry;
@@ -1093,6 +1157,13 @@ final class mln_open_gl_texture_frame extends Struct {
   external int texture;
   @Uint32()
   external int target;
+}
+
+final class mln_pan_momentum extends Struct {
+  @Uint32()
+  external int fields;
+  external mln_screen_point velocity;
+  external mln_momentum_decay decay;
 }
 
 final class mln_premultiplied_rgba8_image extends Struct {
@@ -1437,6 +1508,8 @@ final class mln_runtime_event extends Struct {
 final class mln_runtime_event_camera_change extends Struct {
   @Uint32()
   external int mode;
+  @Uint32()
+  external int source;
 }
 
 final class mln_runtime_event_glyphs extends Struct {
@@ -2014,6 +2087,11 @@ final class mln_win32_window_replacement extends Struct {
   external Pointer<Void> window;
 }
 
+// mln_anchored_momentum_field
+const MLN_ANCHORED_MOMENTUM_VELOCITY = 1;
+const MLN_ANCHORED_MOMENTUM_ANCHOR = 2;
+const MLN_ANCHORED_MOMENTUM_SNAP = 4;
+
 // mln_animation_option_field
 const MLN_ANIMATION_OPTION_DURATION = 1;
 const MLN_ANIMATION_OPTION_VELOCITY = 2;
@@ -2039,12 +2117,18 @@ const MLN_CACHE_DATABASE_OPERATION_RESET = 4;
 const MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0;
 const MLN_CAMERA_CHANGE_MODE_ANIMATED = 1;
 
+// mln_camera_change_source
+const MLN_CAMERA_CHANGE_SOURCE_COMMAND = 0;
+const MLN_CAMERA_CHANGE_SOURCE_GESTURE = 1;
+const MLN_CAMERA_CHANGE_SOURCE_MOMENTUM = 2;
+
 // mln_camera_delta_field
 const MLN_CAMERA_DELTA_OFFSET = 1;
 const MLN_CAMERA_DELTA_SCALE = 2;
 const MLN_CAMERA_DELTA_BEARING = 4;
 const MLN_CAMERA_DELTA_PITCH = 8;
 const MLN_CAMERA_DELTA_ANCHOR = 16;
+const MLN_CAMERA_DELTA_MOMENTUM = 32;
 
 // mln_camera_fit_option_field
 const MLN_CAMERA_FIT_OPTION_PADDING = 1;
@@ -2216,6 +2300,27 @@ const MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 2;
 const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4;
 const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
 
+// mln_momentum_decay_field
+const MLN_MOMENTUM_DECAY_MODEL = 1;
+const MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 2;
+const MLN_MOMENTUM_DECAY_STOP_SPEED = 4;
+const MLN_MOMENTUM_DECAY_DISTANCE = 8;
+const MLN_MOMENTUM_DECAY_DURATION_MS = 16;
+const MLN_MOMENTUM_DECAY_EASING = 32;
+const MLN_MOMENTUM_DECAY_MIN_SPEED = 64;
+const MLN_MOMENTUM_DECAY_MAX_SPEED = 128;
+const MLN_MOMENTUM_DECAY_MAX_DISTANCE = 256;
+
+// mln_momentum_decay_model
+const MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0;
+const MLN_MOMENTUM_DECAY_MODEL_EASE = 1;
+
+// mln_momentum_snap_field
+const MLN_MOMENTUM_SNAP_SPACING = 1;
+const MLN_MOMENTUM_SNAP_OFFSET = 2;
+const MLN_MOMENTUM_SNAP_TOLERANCE = 4;
+const MLN_MOMENTUM_SNAP_DURATION_MS = 8;
+
 // mln_network_status
 const MLN_NETWORK_STATUS_ONLINE = 1;
 const MLN_NETWORK_STATUS_OFFLINE = 2;
@@ -2258,6 +2363,9 @@ const MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL = 3;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 2;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4;
+
+// mln_pan_momentum_field
+const MLN_PAN_MOMENTUM_VELOCITY = 1;
 
 // mln_projection_mode_option_field
 const MLN_PROJECTION_MODE_OPTION_AXONOMETRIC = 1;

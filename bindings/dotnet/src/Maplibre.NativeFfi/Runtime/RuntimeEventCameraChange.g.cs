@@ -10,4 +10,7 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_runtime_event_camera_change</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-public readonly partial record struct RuntimeEventCameraChange(CameraChangeMode Mode);
+public readonly partial record struct RuntimeEventCameraChange(
+    CameraChangeMode Mode,
+    CameraChangeSource Source
+);

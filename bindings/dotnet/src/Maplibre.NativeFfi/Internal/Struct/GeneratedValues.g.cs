@@ -8,6 +8,28 @@ namespace Maplibre.NativeFfi.Internal.Struct;
 
 internal static unsafe class GeneratedValues
 {
+    internal static mln_anchored_momentum NativeAnchoredMomentum(AnchoredMomentum value)
+    {
+        Required(value.Decay, "AnchoredMomentum.Decay must not be null.");
+        var native = new mln_anchored_momentum();
+        native.fields = 0;
+        native.fields |= Put(value.Velocity, ref native.velocity, MLN_ANCHORED_MOMENTUM_VELOCITY);
+        native.fields |= Put(
+            value.Anchor,
+            ref native.anchor,
+            MLN_ANCHORED_MOMENTUM_ANCHOR,
+            NativeScreenPoint
+        );
+        native.decay = NativeMomentumDecay(value.Decay);
+        native.fields |= Put(
+            value.Snap,
+            ref native.snap,
+            MLN_ANCHORED_MOMENTUM_SNAP,
+            NativeMomentumSnap
+        );
+        return native;
+    }
+
     internal static AndroidHardwareBufferFrame CopyAndroidHardwareBufferFrame(
         mln_android_hardware_buffer_frame value
     ) =>
@@ -163,6 +185,12 @@ internal static unsafe class GeneratedValues
             MLN_CAMERA_DELTA_ANCHOR,
             NativeScreenPoint
         );
+        native.fields |= Put(
+            value.Momentum,
+            ref native.momentum,
+            MLN_CAMERA_DELTA_MOMENTUM,
+            NativeGestureMomentum
+        );
         native.animation = NativeAnimationOptions(value.Animation, scope);
         native.gesture_phase = (mln_gesture_phase)value.GesturePhase;
         return native;
@@ -261,7 +289,11 @@ internal static unsafe class GeneratedValues
         new(value.generation, CopyCamera(value.camera));
 
     internal static CameraTransitionEnd CopyCameraTransitionEnd(mln_camera_transition_end value) =>
-        new((global::Maplibre.NativeFfi.CameraTransitionOutcome)value.outcome, value.generation);
+        new(
+            (global::Maplibre.NativeFfi.CameraTransitionOutcome)value.outcome,
+            value.generation,
+            CopyCameraVelocity(value.velocity)
+        );
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCameraTransitionHandlerCallback(
@@ -310,6 +342,9 @@ internal static unsafe class GeneratedValues
         native.gesture_phase = (mln_gesture_phase)value.GesturePhase;
         return native;
     }
+
+    internal static CameraVelocity CopyCameraVelocity(mln_camera_velocity value) =>
+        new(CopyScreenPoint(value.pan), value.zoom, value.bearing, value.pitch);
 
     internal static CanonicalTileId CopyCanonicalTileId(mln_canonical_tile_id value) =>
         new(value.z, value.x, value.y);
@@ -803,6 +838,20 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static mln_gesture_momentum NativeGestureMomentum(GestureMomentum value)
+    {
+        Required(value.Pan, "GestureMomentum.Pan must not be null.");
+        Required(value.Zoom, "GestureMomentum.Zoom must not be null.");
+        Required(value.Bearing, "GestureMomentum.Bearing must not be null.");
+        Required(value.Pitch, "GestureMomentum.Pitch must not be null.");
+        var native = new mln_gesture_momentum();
+        native.pan = NativePanMomentum(value.Pan);
+        native.zoom = NativeAnchoredMomentum(value.Zoom);
+        native.bearing = NativeAnchoredMomentum(value.Bearing);
+        native.pitch = NativeAnchoredMomentum(value.Pitch);
+        return native;
+    }
+
     internal static GpuSync CopyGpuSync(mln_gpu_sync value) =>
         new((global::Maplibre.NativeFfi.GpuSyncKind)value.kind, value.handle, value.value);
 
@@ -1272,6 +1321,59 @@ internal static unsafe class GeneratedValues
             value.pixel_format
         );
 
+    internal static mln_momentum_decay NativeMomentumDecay(MomentumDecay value)
+    {
+        var native = new mln_momentum_decay();
+        native.fields = 0;
+        native.fields |= Put(
+            value.Model,
+            ref native.model,
+            MLN_MOMENTUM_DECAY_MODEL,
+            static present => (mln_momentum_decay_model)present
+        );
+        native.fields |= Put(
+            value.HalfLifeMs,
+            ref native.half_life_ms,
+            MLN_MOMENTUM_DECAY_HALF_LIFE_MS
+        );
+        native.fields |= Put(value.StopSpeed, ref native.stop_speed, MLN_MOMENTUM_DECAY_STOP_SPEED);
+        native.fields |= Put(value.Distance, ref native.distance, MLN_MOMENTUM_DECAY_DISTANCE);
+        native.fields |= Put(
+            value.DurationMs,
+            ref native.duration_ms,
+            MLN_MOMENTUM_DECAY_DURATION_MS
+        );
+        native.fields |= Put(
+            value.Easing,
+            ref native.easing,
+            MLN_MOMENTUM_DECAY_EASING,
+            NativeUnitBezier
+        );
+        native.fields |= Put(value.MinSpeed, ref native.min_speed, MLN_MOMENTUM_DECAY_MIN_SPEED);
+        native.fields |= Put(value.MaxSpeed, ref native.max_speed, MLN_MOMENTUM_DECAY_MAX_SPEED);
+        native.fields |= Put(
+            value.MaxDistance,
+            ref native.max_distance,
+            MLN_MOMENTUM_DECAY_MAX_DISTANCE
+        );
+        return native;
+    }
+
+    internal static mln_momentum_snap NativeMomentumSnap(MomentumSnap value)
+    {
+        var native = new mln_momentum_snap();
+        native.fields = 0;
+        native.fields |= Put(value.Spacing, ref native.spacing, MLN_MOMENTUM_SNAP_SPACING);
+        native.fields |= Put(value.Offset, ref native.offset, MLN_MOMENTUM_SNAP_OFFSET);
+        native.fields |= Put(value.Tolerance, ref native.tolerance, MLN_MOMENTUM_SNAP_TOLERANCE);
+        native.fields |= Put(
+            value.DurationMs,
+            ref native.duration_ms,
+            MLN_MOMENTUM_SNAP_DURATION_MS
+        );
+        return native;
+    }
+
     internal static OfflineGeometryRegionDefinition CopyOfflineGeometryRegionDefinition(
         mln_offline_geometry_region_definition value
     ) =>
@@ -1535,6 +1637,21 @@ internal static unsafe class GeneratedValues
 
     internal static OpenGlTextureFrame CopyOpenGlTextureFrame(mln_open_gl_texture_frame value) =>
         new(value.width, value.height, value.scale_factor, value.slot, value.texture, value.target);
+
+    internal static mln_pan_momentum NativePanMomentum(PanMomentum value)
+    {
+        Required(value.Decay, "PanMomentum.Decay must not be null.");
+        var native = new mln_pan_momentum();
+        native.fields = 0;
+        native.fields |= Put(
+            value.Velocity,
+            ref native.velocity,
+            MLN_PAN_MOMENTUM_VELOCITY,
+            NativeScreenPoint
+        );
+        native.decay = NativeMomentumDecay(value.Decay);
+        return native;
+    }
 
     internal static mln_premultiplied_rgba8_image NativePremultipliedRgba8Image(
         PremultipliedRgba8Image value,
@@ -2147,7 +2264,11 @@ internal static unsafe class GeneratedValues
 
     internal static RuntimeEventCameraChange CopyRuntimeEventCameraChange(
         mln_runtime_event_camera_change value
-    ) => new((global::Maplibre.NativeFfi.CameraChangeMode)value.mode);
+    ) =>
+        new(
+            (global::Maplibre.NativeFfi.CameraChangeMode)value.mode,
+            (global::Maplibre.NativeFfi.CameraChangeSource)value.source
+        );
 
     internal static RuntimeEventGlyphs CopyRuntimeEventGlyphs(mln_runtime_event_glyphs value) =>
         default(RuntimeEventGlyphs) with

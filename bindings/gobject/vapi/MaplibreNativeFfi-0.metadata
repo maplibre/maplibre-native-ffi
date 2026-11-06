@@ -3,6 +3,7 @@ Camera struct
 CameraBounds struct
 CameraQueryResult struct
 CameraTransitionEnd struct
+CameraVelocity struct
 CanonicalTileId struct
 DmaBufFormat struct
 DmaBufPlane struct
@@ -51,6 +52,7 @@ Vec3 struct
 VulkanBorrowedTexture struct
 VulkanSurfaceReplacement struct
 CommandCompletion struct
+AnchoredMomentum.anchor#property no_accessor_method
 AnimationOptions.easing#property no_accessor_method
 BoundOptions.bounds#property no_accessor_method
 CameraDelta.anchor#property no_accessor_method
@@ -69,11 +71,13 @@ MetalBorrowedTextureDescriptor.logical_size#property no_accessor_method
 MetalBorrowedTextureReplacement.logical_size#property no_accessor_method
 MetalSurfaceDescriptor.logical_size#property no_accessor_method
 MetalSurfaceReplacement.logical_size#property no_accessor_method
+MomentumDecay.easing#property no_accessor_method
 OfflineTilePyramidRegionDefinition.bounds#property no_accessor_method
 OpenGlBorrowedTextureDescriptor.logical_size#property no_accessor_method
 OpenGlBorrowedTextureReplacement.logical_size#property no_accessor_method
 OpenGlSurfaceDescriptor.logical_size#property no_accessor_method
 OpenGlSurfaceReplacement.logical_size#property no_accessor_method
+PanMomentum.velocity#property no_accessor_method
 RenderedFeatureQueryOptions.layer_ids#property no_accessor_method
 SourceFeatureQueryOptions.source_layer_ids#property no_accessor_method
 StyleExpressionInputs.available_images#property no_accessor_method

@@ -9,9 +9,44 @@
 
 G_BEGIN_DECLS
 
+G_GNUC_INTERNAL void maplibre_native_ffi_screen_point_to_native(
+  const MaplibreNativeFfiScreenPoint* self, mln_screen_point* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiScreenPoint*
+maplibre_native_ffi_screen_point_from_native(const mln_screen_point* in);
+G_GNUC_INTERNAL void maplibre_native_ffi_screen_point_read(
+  MaplibreNativeFfiScreenPoint* out, const mln_screen_point* in
+);
+G_GNUC_INTERNAL gpointer
+maplibre_native_ffi_screen_point_copy_func(gconstpointer self, gpointer data);
 G_GNUC_INTERNAL void maplibre_native_ffi_unit_bezier_to_native(
   const MaplibreNativeFfiUnitBezier* self, mln_unit_bezier* out,
   MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_momentum_decay_to_native(
+  const MaplibreNativeFfiMomentumDecay* self, mln_momentum_decay* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMomentumDecay*
+maplibre_native_ffi_momentum_decay_copy(
+  const MaplibreNativeFfiMomentumDecay* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_momentum_snap_to_native(
+  const MaplibreNativeFfiMomentumSnap* self, mln_momentum_snap* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMomentumSnap*
+maplibre_native_ffi_momentum_snap_copy(
+  const MaplibreNativeFfiMomentumSnap* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_anchored_momentum_to_native(
+  const MaplibreNativeFfiAnchoredMomentum* self, mln_anchored_momentum* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiAnchoredMomentum*
+maplibre_native_ffi_anchored_momentum_copy(
+  const MaplibreNativeFfiAnchoredMomentum* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_transition_handler_to_native(
   const MaplibreNativeFfiCameraTransitionHandler* self,
@@ -71,17 +106,20 @@ maplibre_native_ffi_camera_bounds_from_native(const mln_camera_bounds* in);
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_bounds_read(
   MaplibreNativeFfiCameraBounds* out, const mln_camera_bounds* in
 );
-G_GNUC_INTERNAL void maplibre_native_ffi_screen_point_to_native(
-  const MaplibreNativeFfiScreenPoint* self, mln_screen_point* out,
+G_GNUC_INTERNAL void maplibre_native_ffi_pan_momentum_to_native(
+  const MaplibreNativeFfiPanMomentum* self, mln_pan_momentum* out,
   MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL MaplibreNativeFfiScreenPoint*
-maplibre_native_ffi_screen_point_from_native(const mln_screen_point* in);
-G_GNUC_INTERNAL void maplibre_native_ffi_screen_point_read(
-  MaplibreNativeFfiScreenPoint* out, const mln_screen_point* in
+G_GNUC_INTERNAL MaplibreNativeFfiPanMomentum*
+maplibre_native_ffi_pan_momentum_copy(const MaplibreNativeFfiPanMomentum* self);
+G_GNUC_INTERNAL void maplibre_native_ffi_gesture_momentum_to_native(
+  const MaplibreNativeFfiGestureMomentum* self, mln_gesture_momentum* out,
+  MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL gpointer
-maplibre_native_ffi_screen_point_copy_func(gconstpointer self, gpointer data);
+G_GNUC_INTERNAL MaplibreNativeFfiGestureMomentum*
+maplibre_native_ffi_gesture_momentum_copy(
+  const MaplibreNativeFfiGestureMomentum* self
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_delta_to_native(
   const MaplibreNativeFfiCameraDelta* self, mln_camera_delta* out,
   MaplibreNativeFfiCall* call
@@ -114,6 +152,11 @@ maplibre_native_ffi_camera_query_result_from_native(
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_query_result_read(
   MaplibreNativeFfiCameraQueryResult* out, const mln_camera_query_result* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiCameraVelocity*
+maplibre_native_ffi_camera_velocity_from_native(const mln_camera_velocity* in);
+G_GNUC_INTERNAL void maplibre_native_ffi_camera_velocity_read(
+  MaplibreNativeFfiCameraVelocity* out, const mln_camera_velocity* in
 );
 G_GNUC_INTERNAL MaplibreNativeFfiCameraTransitionEnd*
 maplibre_native_ffi_camera_transition_end_from_native(

@@ -2,6 +2,7 @@
 global using System.Collections.Immutable;
 global using Maplibre.NativeFfi.Internal;
 global using Maplibre.NativeFfi.Internal.C;
+global using static Maplibre.NativeFfi.Internal.C.mln_anchored_momentum_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_animation_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_bound_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_camera_delta_field;
@@ -16,7 +17,10 @@ global using static Maplibre.NativeFfi.Internal.C.mln_geo_json_source_option_fie
 global using static Maplibre.NativeFfi.Internal.C.mln_map_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_map_tile_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_map_viewport_option_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_momentum_decay_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_momentum_snap_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_offscreen_device_option_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_pan_momentum_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_projection_mode_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_rendered_feature_query_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_resource_request_field;

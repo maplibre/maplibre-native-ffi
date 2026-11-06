@@ -151,6 +151,9 @@ napi_value mln_ts_read_camera_query_result(
 napi_value mln_ts_read_camera_transition_end(
   napi_env env, const mln_camera_transition_end* source, size_t size
 );
+napi_value mln_ts_read_camera_velocity(
+  napi_env env, const mln_camera_velocity* source, size_t size
+);
 napi_value mln_ts_read_canonical_tile_id(
   napi_env env, const mln_canonical_tile_id* source, size_t size
 );
@@ -388,6 +391,10 @@ napi_value mln_ts_read_vulkan_texture_frame(
 napi_value mln_ts_read_web_gpu_texture_frame(
   napi_env env, const mln_web_gpu_texture_frame* source, size_t size
 );
+bool mln_ts_write_anchored_momentum(
+  mln_ts_call* call, napi_value value, mln_anchored_momentum* out,
+  const char* path
+);
 bool mln_ts_write_android_hardware_buffer_ring_descriptor(
   mln_ts_call* call, napi_value value,
   mln_android_hardware_buffer_ring_descriptor* out, const char* path
@@ -481,6 +488,10 @@ bool mln_ts_write_free_camera_options(
 );
 bool mln_ts_write_geo_json_source_options(
   mln_ts_call* call, napi_value value, mln_geo_json_source_options* out,
+  const char* path
+);
+bool mln_ts_write_gesture_momentum(
+  mln_ts_call* call, napi_value value, mln_gesture_momentum* out,
   const char* path
 );
 bool mln_ts_write_gpu_sync(
@@ -619,6 +630,12 @@ bool mln_ts_write_metal_surface_replacement(
   mln_ts_call* call, napi_value value, mln_metal_surface_replacement* out,
   const char* path
 );
+bool mln_ts_write_momentum_decay(
+  mln_ts_call* call, napi_value value, mln_momentum_decay* out, const char* path
+);
+bool mln_ts_write_momentum_snap(
+  mln_ts_call* call, napi_value value, mln_momentum_snap* out, const char* path
+);
 bool mln_ts_write_offline_geometry_region_definition(
   mln_ts_call* call, napi_value value,
   mln_offline_geometry_region_definition* out, const char* path
@@ -670,6 +687,9 @@ bool mln_ts_write_open_gl_surface_descriptor(
 bool mln_ts_write_open_gl_surface_replacement(
   mln_ts_call* call, napi_value value, mln_open_gl_surface_replacement* out,
   const char* path
+);
+bool mln_ts_write_pan_momentum(
+  mln_ts_call* call, napi_value value, mln_pan_momentum* out, const char* path
 );
 bool mln_ts_write_premultiplied_rgba8_image(
   mln_ts_call* call, napi_value value, mln_premultiplied_rgba8_image* out,

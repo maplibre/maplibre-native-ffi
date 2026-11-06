@@ -311,6 +311,18 @@ class CameraChangeMode(UnknownIntEnum):
     ANIMATED = 1
 
 
+class CameraChangeSource(UnknownIntEnum):
+    """What moved the camera.
+
+    See `mln_camera_change_source` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    COMMAND = 0
+    GESTURE = 1
+    MOMENTUM = 2
+
+
 class CameraTransitionOutcome(UnknownIntEnum):
     """How a camera change ended.
 
@@ -513,6 +525,17 @@ class MapMode(UnknownIntEnum):
     CONTINUOUS = 0
     STATIC = 1
     TILE = 2
+
+
+class MomentumDecayModel(UnknownIntEnum):
+    """How a part of a gesture's momentum slows from its release speed.
+
+    See `mln_momentum_decay_model` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    FRICTION = 0
+    EASE = 1
 
 
 class NetworkStatus(UnknownIntEnum):
@@ -1068,6 +1091,42 @@ class WebGlContextKind(UnknownIntEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class AnchoredMomentum:
+    """How a gesture's zoom, bearing, or pitch keeps changing after release.
+
+    See `mln_anchored_momentum` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    velocity: float | None = None
+    """How fast the value changed at release: zoom levels per second for zoom,
+    and degrees per second for bearing and pitch. The part moves only when
+    this is set.
+    """
+
+    anchor: ScreenPoint | None = None
+    """The screen point that the change keeps in place. Without one, the change
+    keeps the center of the view in place.
+    """
+
+    decay: MomentumDecay = field(default_factory=lambda: MomentumDecay())
+
+    snap: MomentumSnap | None = None
+    """Where the part settles. Without this, it stays where the gesture and its
+    glide leave it.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            velocity=raw["velocity"],
+            anchor=_maybe(ScreenPoint._from_native, raw["anchor"]),
+            decay=MomentumDecay._from_native(raw["decay"]),
+            snap=_maybe(MomentumSnap._from_native, raw["snap"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class AndroidHardwareBufferFrame:
     """The Android hardware buffer of an acquired frame.
 
@@ -1400,6 +1459,11 @@ class CameraDelta:
     a duration.
     """
 
+    momentum: GestureMomentum | None = None
+    """How the gesture keeps moving after this delta. Only a delta in the
+    `GesturePhase.END` phase carries it.
+    """
+
     animation: AnimationOptions = field(default_factory=lambda: AnimationOptions())
 
     gesture_phase: GesturePhase = GesturePhase.NONE
@@ -1412,6 +1476,7 @@ class CameraDelta:
             bearing=raw["bearing"],
             pitch=raw["pitch"],
             anchor=_maybe(ScreenPoint._from_native, raw["anchor"]),
+            momentum=_maybe(GestureMomentum._from_native, raw["momentum"]),
             animation=AnimationOptions._from_native(raw["animation"]),
             gesture_phase=GesturePhase(raw["gesture_phase"]),
         )
@@ -1556,11 +1621,18 @@ class CameraTransitionEnd:
     the camera, or 0 when the map closed first.
     """
 
+    velocity: CameraVelocity
+    """How fast a gesture's momentum still moved when it was cancelled, which
+    the next gesture can add to its own release velocities. Zero for every
+    other end.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
             outcome=CameraTransitionOutcome(raw["outcome"]),
             generation=raw["generation"],
+            velocity=CameraVelocity._from_native(raw["velocity"]),
         )
 
 
@@ -1609,6 +1681,38 @@ class CameraUpdate:
             camera=CameraOptions._from_native(raw["camera"]),
             animation=AnimationOptions._from_native(raw["animation"]),
             gesture_phase=GesturePhase(raw["gesture_phase"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CameraVelocity:
+    """How fast each part of a camera change moves.
+
+    See `mln_camera_velocity` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    pan: ScreenPoint
+    """How fast the map's content moves on the screen, in logical pixels per
+    second.
+    """
+
+    zoom: float
+    """In zoom levels per second."""
+
+    bearing: float
+    """In degrees per second."""
+
+    pitch: float
+    """In degrees per second."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            pan=ScreenPoint._from_native(raw["pan"]),
+            zoom=raw["zoom"],
+            bearing=raw["bearing"],
+            pitch=raw["pitch"],
         )
 
 
@@ -2140,6 +2244,45 @@ class GeoJsonSourceOptions:
             cluster_min_points=raw["cluster_min_points"],
             line_metrics=raw["line_metrics"],
             cluster=raw["cluster"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GestureMomentum:
+    """How a gesture keeps moving the camera after the user lets go.
+
+    A part moves only when its velocity is set, and each part slows on its
+    own. Every part defaults to `MomentumDecayModel.FRICTION` with a
+    half-life of 140 ms, and these other defaults:
+
+    - Pan stops at 10 logical pixels per second, needs a release of at least
+      200, and counts a release faster than 10000 as 10000.
+    - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+      snap settles on the nearest whole level.
+    - Bearing stops at 1 degree per second and needs a release of at least
+      60. Its snap settles on north within 7 degrees.
+    - Pitch stops at 1 degree per second and needs a release of at least 5.
+      Its snap settles flat within 7 degrees.
+
+    See `mln_gesture_momentum` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    pan: PanMomentum = field(default_factory=lambda: PanMomentum())
+
+    zoom: AnchoredMomentum = field(default_factory=lambda: AnchoredMomentum())
+
+    bearing: AnchoredMomentum = field(default_factory=lambda: AnchoredMomentum())
+
+    pitch: AnchoredMomentum = field(default_factory=lambda: AnchoredMomentum())
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            pan=PanMomentum._from_native(raw["pan"]),
+            zoom=AnchoredMomentum._from_native(raw["zoom"]),
+            bearing=AnchoredMomentum._from_native(raw["bearing"]),
+            pitch=AnchoredMomentum._from_native(raw["pitch"]),
         )
 
 
@@ -2910,6 +3053,109 @@ class MetalTextureFrame:
 
 
 @dataclass(frozen=True, slots=True)
+class MomentumDecay:
+    """How one part of a gesture's momentum slows from its release speed.
+
+    Speeds and distances are in the part's unit: logical pixels for pan, zoom
+    levels for zoom, and degrees for bearing and pitch. A setting whose bit
+    isn't set takes the part's default, which `GestureMomentum` lists.
+    `min_speed` is finite and not negative, and every other number is finite
+    and positive. A friction decay can serve every release, as a preset that
+    matches a platform's scrolling. An eased glide takes its direction from
+    the part's velocity, and its distance and duration from the caller's
+    plan.
+
+    See `mln_momentum_decay` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    model: MomentumDecayModel | None = None
+
+    half_life_ms: float | None = None
+    """For `MomentumDecayModel.FRICTION`, how long the speed takes to halve."""
+
+    stop_speed: float | None = None
+    """For `MomentumDecayModel.FRICTION`, the speed at which it ends."""
+
+    distance: float | None = None
+    """Required for `MomentumDecayModel.EASE`."""
+
+    duration_ms: float | None = None
+    """Required for `MomentumDecayModel.EASE`."""
+
+    easing: UnitBezier | None = None
+    """For `MomentumDecayModel.EASE`, the share of `distance` covered over the
+    share of `duration_ms`. Its control points are between 0 and 1, so the
+    glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
+    that camera animations ease along by default. Android's scroll fling
+    follows (0.175, 0.5, 0.35, 1).
+    """
+
+    min_speed: float | None = None
+    """A slower release starts no momentum."""
+
+    max_speed: float | None = None
+    """For `MomentumDecayModel.FRICTION`, a faster release counts as this."""
+
+    max_distance: float | None = None
+    """The farthest the part moves. A friction release that would move farther
+    starts slower, so it ends sooner, and a planned glide moves at most this
+    far over its duration.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            model=_maybe(MomentumDecayModel, raw["model"]),
+            half_life_ms=raw["half_life_ms"],
+            stop_speed=raw["stop_speed"],
+            distance=raw["distance"],
+            duration_ms=raw["duration_ms"],
+            easing=_maybe(UnitBezier._from_native, raw["easing"]),
+            min_speed=raw["min_speed"],
+            max_speed=raw["max_speed"],
+            max_distance=raw["max_distance"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MomentumSnap:
+    """Where a part settles after a gesture that changed it.
+
+    The targets are every `spacing` from `offset`, in the part's unit.
+    Bearing targets wrap around the circle. Once the part's glide ends, or
+    right away when it doesn't move, the part eases to the nearest target if
+    it is within `tolerance` of it, and otherwise stays where it is. A
+    setting whose bit isn't set takes the part's default, which
+    `GestureMomentum` lists.
+
+    See `mln_momentum_snap` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    spacing: float | None = None
+    """Positive."""
+
+    offset: float | None = None
+    """Defaults to 0."""
+
+    tolerance: float | None = None
+    """Not negative."""
+
+    duration_ms: float | None = None
+    """Zero settles without easing. Defaults to 300."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            spacing=raw["spacing"],
+            offset=raw["offset"],
+            tolerance=raw["tolerance"],
+            duration_ms=raw["duration_ms"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class OfflineGeometryRegionDefinition:
     """An offline region that covers a GeoJSON geometry.
 
@@ -3349,6 +3595,29 @@ class OpenGlTextureFrame:
             slot=raw["slot"],
             texture=raw["texture"],
             target=raw["target"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PanMomentum:
+    """How a gesture's pan keeps moving the map's content after release.
+
+    See `mln_pan_momentum` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    velocity: ScreenPoint | None = None
+    """How fast the map's content moved on the screen at release, in logical
+    pixels per second. The pan moves only when this is set.
+    """
+
+    decay: MomentumDecay = field(default_factory=lambda: MomentumDecay())
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            velocity=_maybe(ScreenPoint._from_native, raw["velocity"]),
+            decay=MomentumDecay._from_native(raw["decay"]),
         )
 
 
@@ -4199,9 +4468,13 @@ class RuntimeEventCameraChange:
 
     mode: CameraChangeMode
 
+    source: CameraChangeSource
+
     @classmethod
     def _from_native(cls, raw):
-        return cls(mode=CameraChangeMode(raw["mode"]))
+        return cls(
+            mode=CameraChangeMode(raw["mode"]), source=CameraChangeSource(raw["source"])
+        )
 
 
 @dataclass(frozen=True, slots=True)

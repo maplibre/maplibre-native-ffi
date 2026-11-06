@@ -37,6 +37,12 @@ public sealed record CameraDelta
     /// only in a delta without a duration.
     /// </summary>
     public ScreenPoint? Anchor { get; init; }
+
+    /// <summary>
+    /// How the gesture keeps moving after this delta. Only a delta in the
+    /// <c>GesturePhase.End</c> phase carries it.
+    /// </summary>
+    public GestureMomentum? Momentum { get; init; }
     public AnimationOptions Animation { get; init; } = new();
     public GesturePhase GesturePhase { get; init; }
 }

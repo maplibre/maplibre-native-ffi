@@ -489,6 +489,19 @@ pub const Map = struct {
     /// the camera, so the rest of the replaced change never happens. To reach an
     /// exact camera, use `Map.updateCamera()`.
     ///
+    /// A delta in the end phase can carry momentum, which keeps the camera moving
+    /// from the gesture's release velocities and slows it on each rendered frame.
+    /// The gesture lasts until the momentum ends: the snapshot keeps
+    /// `gesture_in_progress` set, and camera events report
+    /// `CameraChangeSource.momentum`. With momentum, `animation` sets only
+    /// `transition_id` and the end handler, which runs when the gesture ends.
+    ///
+    /// A delta in the begin phase, `Map.cancelCameraTransitions()`, or a
+    /// cancellation by that ID stops the momentum. A later command that sets a
+    /// field stops only the parts of the momentum that move that field. On a tilted
+    /// map, the pan moves the map's content the same distance on the screen in
+    /// every direction.
+    ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
     pub fn applyCameraDelta(self: Map, delta: CameraDelta, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
@@ -3256,6 +3269,41 @@ pub const VulkanDevice = struct {
     }
 };
 
+/// How a gesture's zoom, bearing, or pitch keeps changing after release.
+///
+/// See `mln_anchored_momentum` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const AnchoredMomentum = struct {
+    /// How fast the value changed at release: zoom levels per second for zoom,
+    /// and degrees per second for bearing and pitch. The part moves only when
+    /// this is set.
+    velocity: ?f64 = null,
+    /// The screen point that the change keeps in place. Without one, the change
+    /// keeps the center of the view in place.
+    anchor: ?ScreenPoint = null,
+    decay: MomentumDecay = .{},
+    /// Where the part settles. Without this, it stays where the gesture and its
+    /// glide leave it.
+    snap: ?MomentumSnap = null,
+    pub fn toNative(self: AnchoredMomentum) c.mln_anchored_momentum {
+        var raw = std.mem.zeroes(c.mln_anchored_momentum);
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_VELOCITY, &raw.velocity, self.velocity);
+        marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_ANCHOR, &raw.anchor, self.anchor);
+        raw.decay = self.decay.toNative();
+        marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_SNAP, &raw.snap, self.snap);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_anchored_momentum) AnchoredMomentum {
+        return .{
+            .velocity = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_VELOCITY != 0) raw.velocity else null,
+            .anchor = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
+            .decay = MomentumDecay.fromNative(raw.decay),
+            .snap = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_SNAP != 0) MomentumSnap.fromNative(raw.snap) else null,
+        };
+    }
+};
+
 /// The Android hardware buffer of an acquired frame.
 ///
 /// See `mln_android_hardware_buffer_frame` in the
@@ -3590,6 +3638,23 @@ pub const CameraChangeMode = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// What moved the camera.
+///
+/// See `mln_camera_change_source` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const CameraChangeSource = enum(u32) {
+    /// A camera command outside a gesture, or the map itself, as when a resize
+    /// keeps the camera within its bounds.
+    command = 0,
+    /// A camera command with a gesture phase.
+    gesture = 1,
+    /// The momentum and bearing snap that a gesture's end started.
+    momentum = 2,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
 /// A change to the camera from where it is now, for gestures.
 ///
 /// See `mln_camera_delta` in the
@@ -3607,6 +3672,9 @@ pub const CameraDelta = struct {
     /// needs one of them, and it combines with `offset` only in a delta without
     /// a duration.
     anchor: ?ScreenPoint = null,
+    /// How the gesture keeps moving after this delta. Only a delta in the
+    /// `GesturePhase.end` phase carries it.
+    momentum: ?GestureMomentum = null,
     animation: AnimationOptions = .{},
     gesture_phase: GesturePhase = .none,
     pub fn toNative(self: CameraDelta, roots: *callbacks.Roots) status.Error!c.mln_camera_delta {
@@ -3618,6 +3686,7 @@ pub const CameraDelta = struct {
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_BEARING, &raw.bearing, self.bearing);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_PITCH, &raw.pitch, self.pitch);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, self.anchor);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_MOMENTUM, &raw.momentum, self.momentum);
         raw.animation = try self.animation.toNative(roots);
         raw.gesture_phase = self.gesture_phase.toNative();
         return raw;
@@ -3630,6 +3699,7 @@ pub const CameraDelta = struct {
             .bearing = if (raw.fields & c.MLN_CAMERA_DELTA_BEARING != 0) raw.bearing else null,
             .pitch = if (raw.fields & c.MLN_CAMERA_DELTA_PITCH != 0) raw.pitch else null,
             .anchor = if (raw.fields & c.MLN_CAMERA_DELTA_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
+            .momentum = if (raw.fields & c.MLN_CAMERA_DELTA_MOMENTUM != 0) GestureMomentum.fromNative(raw.momentum) else null,
             .animation = try AnimationOptions.fromNative(allocator, raw.animation),
             .gesture_phase = GesturePhase.fromNative(raw.gesture_phase),
         };
@@ -3772,10 +3842,15 @@ pub const CameraTransitionEnd = struct {
     /// The generation of the first map snapshot that shows where the change
     /// left the camera, or 0 when the map closed first.
     generation: u64 = 0,
+    /// How fast a gesture's momentum still moved when it was cancelled, which
+    /// the next gesture can add to its own release velocities. Zero for every
+    /// other end.
+    velocity: CameraVelocity = .{},
     pub fn fromNative(raw: c.mln_camera_transition_end) CameraTransitionEnd {
         return .{
             .outcome = CameraTransitionOutcome.fromNative(raw.outcome),
             .generation = raw.generation,
+            .velocity = CameraVelocity.fromNative(raw.velocity),
         };
     }
 };
@@ -3919,6 +3994,30 @@ pub const CameraUpdateMode = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// How fast each part of a camera change moves.
+///
+/// See `mln_camera_velocity` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const CameraVelocity = struct {
+    /// How fast the map's content moves on the screen, in logical pixels per
+    /// second.
+    pan: ScreenPoint = .{},
+    /// In zoom levels per second.
+    zoom: f64 = 0,
+    /// In degrees per second.
+    bearing: f64 = 0,
+    /// In degrees per second.
+    pitch: f64 = 0,
+    pub fn fromNative(raw: c.mln_camera_velocity) CameraVelocity {
+        return .{
+            .pan = ScreenPoint.fromNative(raw.pan),
+            .zoom = raw.zoom,
+            .bearing = raw.bearing,
+            .pitch = raw.pitch,
+        };
+    }
 };
 
 /// A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
@@ -4633,6 +4732,46 @@ pub const GeoJsonSourceOptions = struct {
             .cluster_min_points = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0) raw.cluster_min_points else null,
             .line_metrics = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS != 0) raw.line_metrics else null,
             .cluster = if (raw.fields & c.MLN_GEO_JSON_SOURCE_OPTION_CLUSTER != 0) raw.cluster else null,
+        };
+    }
+};
+
+/// How a gesture keeps moving the camera after the user lets go.
+///
+/// A part moves only when its velocity is set, and each part slows on its own.
+/// Every part defaults to `MomentumDecayModel.friction` with a half-life of 140
+/// ms, and these other defaults:
+///
+/// - Pan stops at 10 logical pixels per second, needs a release of at least
+///   200, and counts a release faster than 10000 as 10000.
+/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
+///   snap settles on the nearest whole level.
+/// - Bearing stops at 1 degree per second and needs a release of at least 60.
+///   Its snap settles on north within 7 degrees.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+///   snap settles flat within 7 degrees.
+///
+/// See `mln_gesture_momentum` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const GestureMomentum = struct {
+    pan: PanMomentum = .{},
+    zoom: AnchoredMomentum = .{},
+    bearing: AnchoredMomentum = .{},
+    pitch: AnchoredMomentum = .{},
+    pub fn toNative(self: GestureMomentum) c.mln_gesture_momentum {
+        var raw = std.mem.zeroes(c.mln_gesture_momentum);
+        raw.pan = self.pan.toNative();
+        raw.zoom = self.zoom.toNative();
+        raw.bearing = self.bearing.toNative();
+        raw.pitch = self.pitch.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_gesture_momentum) GestureMomentum {
+        return .{
+            .pan = PanMomentum.fromNative(raw.pan),
+            .zoom = AnchoredMomentum.fromNative(raw.zoom),
+            .bearing = AnchoredMomentum.fromNative(raw.bearing),
+            .pitch = AnchoredMomentum.fromNative(raw.pitch),
         };
     }
 };
@@ -5734,6 +5873,127 @@ pub const MetalTextureFrame = struct {
     }
 };
 
+/// How one part of a gesture's momentum slows from its release speed.
+///
+/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
+/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists.
+/// `min_speed` is finite and not negative, and every other number is finite and
+/// positive. A friction decay can serve every release, as a preset that matches
+/// a platform's scrolling. An eased glide takes its direction from the part's
+/// velocity, and its distance and duration from the caller's plan.
+///
+/// See `mln_momentum_decay` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const MomentumDecay = struct {
+    model: ?MomentumDecayModel = null,
+    /// For `MomentumDecayModel.friction`, how long the speed takes to halve.
+    half_life_ms: ?f64 = null,
+    /// For `MomentumDecayModel.friction`, the speed at which it ends.
+    stop_speed: ?f64 = null,
+    /// Required for `MomentumDecayModel.ease`.
+    distance: ?f64 = null,
+    /// Required for `MomentumDecayModel.ease`.
+    duration_ms: ?f64 = null,
+    /// For `MomentumDecayModel.ease`, the share of `distance` covered over the
+    /// share of `duration_ms`. Its control points are between 0 and 1, so the
+    /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
+    /// that camera animations ease along by default. Android's scroll fling
+    /// follows (0.175, 0.5, 0.35, 1).
+    easing: ?UnitBezier = null,
+    /// A slower release starts no momentum.
+    min_speed: ?f64 = null,
+    /// For `MomentumDecayModel.friction`, a faster release counts as this.
+    max_speed: ?f64 = null,
+    /// The farthest the part moves. A friction release that would move farther
+    /// starts slower, so it ends sooner, and a planned glide moves at most this
+    /// far over its duration.
+    max_distance: ?f64 = null,
+    pub fn toNative(self: MomentumDecay) c.mln_momentum_decay {
+        var raw = std.mem.zeroes(c.mln_momentum_decay);
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MODEL, &raw.model, self.model);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_HALF_LIFE_MS, &raw.half_life_ms, self.half_life_ms);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_STOP_SPEED, &raw.stop_speed, self.stop_speed);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DISTANCE, &raw.distance, self.distance);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DURATION_MS, &raw.duration_ms, self.duration_ms);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_EASING, &raw.easing, self.easing);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MIN_SPEED, &raw.min_speed, self.min_speed);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MAX_SPEED, &raw.max_speed, self.max_speed);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MAX_DISTANCE, &raw.max_distance, self.max_distance);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_momentum_decay) MomentumDecay {
+        return .{
+            .model = if (raw.fields & c.MLN_MOMENTUM_DECAY_MODEL != 0) MomentumDecayModel.fromNative(raw.model) else null,
+            .half_life_ms = if (raw.fields & c.MLN_MOMENTUM_DECAY_HALF_LIFE_MS != 0) raw.half_life_ms else null,
+            .stop_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_STOP_SPEED != 0) raw.stop_speed else null,
+            .distance = if (raw.fields & c.MLN_MOMENTUM_DECAY_DISTANCE != 0) raw.distance else null,
+            .duration_ms = if (raw.fields & c.MLN_MOMENTUM_DECAY_DURATION_MS != 0) raw.duration_ms else null,
+            .easing = if (raw.fields & c.MLN_MOMENTUM_DECAY_EASING != 0) UnitBezier.fromNative(raw.easing) else null,
+            .min_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_MIN_SPEED != 0) raw.min_speed else null,
+            .max_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_MAX_SPEED != 0) raw.max_speed else null,
+            .max_distance = if (raw.fields & c.MLN_MOMENTUM_DECAY_MAX_DISTANCE != 0) raw.max_distance else null,
+        };
+    }
+};
+
+/// How a part of a gesture's momentum slows from its release speed.
+///
+/// See `mln_momentum_decay_model` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const MomentumDecayModel = enum(u32) {
+    /// The speed halves every `half_life_ms`, until it drops to `stop_speed`.
+    /// UIScrollView's normal deceleration is a half-life of 346 ms, and its
+    /// fast deceleration 69 ms.
+    friction = 0,
+    /// The part eases `distance` over `duration_ms`, along `easing`, as a
+    /// camera animation does. The caller plans the glide, for example from the
+    /// platform's own fling physics, such as Android's OverScroller.
+    ease = 1,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// Where a part settles after a gesture that changed it.
+///
+/// The targets are every `spacing` from `offset`, in the part's unit. Bearing
+/// targets wrap around the circle. Once the part's glide ends, or right away
+/// when it doesn't move, the part eases to the nearest target if it is within
+/// `tolerance` of it, and otherwise stays where it is. A setting whose bit
+/// isn't set takes the part's default, which `GestureMomentum` lists.
+///
+/// See `mln_momentum_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const MomentumSnap = struct {
+    /// Positive.
+    spacing: ?f64 = null,
+    /// Defaults to 0.
+    offset: ?f64 = null,
+    /// Not negative.
+    tolerance: ?f64 = null,
+    /// Zero settles without easing. Defaults to 300.
+    duration_ms: ?f64 = null,
+    pub fn toNative(self: MomentumSnap) c.mln_momentum_snap {
+        var raw = std.mem.zeroes(c.mln_momentum_snap);
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_SNAP_SPACING, &raw.spacing, self.spacing);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_SNAP_OFFSET, &raw.offset, self.offset);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_SNAP_TOLERANCE, &raw.tolerance, self.tolerance);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_SNAP_DURATION_MS, &raw.duration_ms, self.duration_ms);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_momentum_snap) MomentumSnap {
+        return .{
+            .spacing = if (raw.fields & c.MLN_MOMENTUM_SNAP_SPACING != 0) raw.spacing else null,
+            .offset = if (raw.fields & c.MLN_MOMENTUM_SNAP_OFFSET != 0) raw.offset else null,
+            .tolerance = if (raw.fields & c.MLN_MOMENTUM_SNAP_TOLERANCE != 0) raw.tolerance else null,
+            .duration_ms = if (raw.fields & c.MLN_MOMENTUM_SNAP_DURATION_MS != 0) raw.duration_ms else null,
+        };
+    }
+};
+
 /// Whether the library may use the network.
 ///
 /// See `mln_network_status` in the
@@ -6347,6 +6607,30 @@ pub const OpenGlTextureFrame = struct {
             .slot = raw.slot,
             .texture = raw.texture,
             .target = raw.target,
+        };
+    }
+};
+
+/// How a gesture's pan keeps moving the map's content after release.
+///
+/// See `mln_pan_momentum` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const PanMomentum = struct {
+    /// How fast the map's content moved on the screen at release, in logical
+    /// pixels per second. The pan moves only when this is set.
+    velocity: ?ScreenPoint = null,
+    decay: MomentumDecay = .{},
+    pub fn toNative(self: PanMomentum) c.mln_pan_momentum {
+        var raw = std.mem.zeroes(c.mln_pan_momentum);
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_PAN_MOMENTUM_VELOCITY, &raw.velocity, self.velocity);
+        raw.decay = self.decay.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_pan_momentum) PanMomentum {
+        return .{
+            .velocity = if (raw.fields & c.MLN_PAN_MOMENTUM_VELOCITY != 0) ScreenPoint.fromNative(raw.velocity) else null,
+            .decay = MomentumDecay.fromNative(raw.decay),
         };
     }
 };
@@ -7558,9 +7842,11 @@ pub const RuntimeEvent = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventCameraChange = struct {
     mode: CameraChangeMode = .immediate,
+    source: CameraChangeSource = .command,
     pub fn fromNative(raw: c.mln_runtime_event_camera_change) RuntimeEventCameraChange {
         return .{
             .mode = CameraChangeMode.fromNative(raw.mode),
+            .source = CameraChangeSource.fromNative(raw.source),
         };
     }
 };

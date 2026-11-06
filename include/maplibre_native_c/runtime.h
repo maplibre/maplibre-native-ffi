@@ -263,6 +263,19 @@ typedef enum mln_camera_change_mode : uint32_t {
   MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
 } mln_camera_change_mode;
 
+/** What moved the camera. */
+typedef enum mln_camera_change_source : uint32_t {
+  /**
+   * A camera command outside a gesture, or the map itself, as when a resize
+   * keeps the camera within its bounds.
+   */
+  MLN_CAMERA_CHANGE_SOURCE_COMMAND = 0,
+  /** A camera command with a gesture phase. */
+  MLN_CAMERA_CHANGE_SOURCE_GESTURE = 1,
+  /** The momentum and bearing snap that a gesture's end started. */
+  MLN_CAMERA_CHANGE_SOURCE_MOMENTUM = 2,
+} mln_camera_change_source;
+
 /** Why a map failed to load a style. */
 typedef enum mln_map_load_error : uint32_t {
   MLN_MAP_LOAD_ERROR_UNKNOWN = 0,
@@ -418,6 +431,7 @@ typedef struct mln_runtime_event_render_frame {
  */
 typedef struct mln_runtime_event_camera_change {
   mln_camera_change_mode mode;
+  mln_camera_change_source source;
 } mln_runtime_event_camera_change;
 
 /** The details of MLN_RUNTIME_EVENT_MAP_LOADING_FAILED. */
