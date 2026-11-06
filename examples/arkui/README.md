@@ -29,7 +29,8 @@ gives the session each new surface, and paces its frames to the display, as the
 browser example in `examples/browser` and the React Native example in
 `examples/react-native` do. The session renders on a library thread, in a
 graphics context that the library makes for the window. `map/gestures.ets` turns
-touches into camera changes.
+ArkUI's pan, pinch, and rotation gestures into camera changes, and passes their
+speed at release so that the map keeps moving.
 
 DevEco Studio builds apps with hvigor. Its packages are on the OpenHarmony npm
 registry, but their license is unknown: their `package.json` names a
