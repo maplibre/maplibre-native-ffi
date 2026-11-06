@@ -19,41 +19,30 @@ private func expectDescription(
 
 /// A synchronous release is idempotent and marks the handle closed.
 /// Handles compare by id, so distinct handles key a set apart.
-@Test func aSecondReleaseIsANoOpAndTheHandleReportsItIsClosed() async throws {
-  try await withMapFixture { fixture in
-    try await fixture.map.setStyleJson(emptyStyle)
-    let data = try GeoJsonSourceDataHandle.create(
-      data: #"{"type":"FeatureCollection","features":[]}"#
-    )
-    let other = try GeoJsonSourceDataHandle
-      .create(
-        data: #"{"type":"FeatureCollection","features":[]}"#
-      )
-    #expect(Set([data, data, other]).count == 2)
-    #expect(data.id != 0)
-    #expect(!data.isClosed)
-    expectDescription(
-      of: data.description,
-      typeName: "GeoJsonSourceDataHandle",
-      id: data.id,
-      closed: false
-    )
-    data.release()
-    #expect(data.isClosed)
-    data.release()
-    #expect(data.isClosed)
-    other.release()
-    expectDescription(
-      of: String(describing: data),
-      typeName: "GeoJsonSourceDataHandle",
-      id: data.id,
-      closed: true
-    )
-
-    await expectMaplibreError(.invalidState) {
-      try await fixture.map.addGeoJsonSourceData("late", data: data)
-    }
-  }
+@Test func aSecondReleaseIsANoOpAndTheHandleReportsItIsClosed() throws {
+  let expression = try StyleExpressionHandle
+    .create(expression: #"["literal", 1]"#)
+  let other = try StyleExpressionHandle.create(expression: #"["literal", 1]"#)
+  #expect(Set([expression, expression, other]).count == 2)
+  #expect(expression.id != 0)
+  #expect(!expression.isClosed)
+  expectDescription(
+    of: expression.description,
+    typeName: "StyleExpressionHandle",
+    id: expression.id,
+    closed: false
+  )
+  expression.release()
+  #expect(expression.isClosed)
+  expression.release()
+  #expect(expression.isClosed)
+  other.release()
+  expectDescription(
+    of: String(describing: expression),
+    typeName: "StyleExpressionHandle",
+    id: expression.id,
+    closed: true
+  )
 }
 
 /// A dispose is idempotent and marks the handle closed, while an asynchronous

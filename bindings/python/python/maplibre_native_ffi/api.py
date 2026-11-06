@@ -24,7 +24,6 @@ from ._generated_operations import (
 from ._generated_owners import (
     AcquiredFrameHandle,
     FramePacerHandle,
-    GeoJsonSourceDataHandle,
     MapHandle,
     MapProjectionHandle,
     OffscreenDeviceHandle,
@@ -345,7 +344,6 @@ __all__ = [
     "FramePacerOptions",
     "FreeCamera",
     "FreeCameraOptions",
-    "GeoJsonSourceDataHandle",
     "GeoJsonSourceOptions",
     "GestureMomentum",
     "GesturePhase",

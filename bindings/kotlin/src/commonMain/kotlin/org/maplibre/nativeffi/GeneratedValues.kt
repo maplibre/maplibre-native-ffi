@@ -4457,84 +4457,6 @@ public data class LogicalSize(
 }
 
 /**
- * Options for a GeoJSON
- * &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/#geojson).
- *
- * Zoom levels are whole numbers.
- *
- * See `mln_geo_json_source_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class GeoJsonSourceOptions(
-  public val minZoom: Double? = null,
-  public val maxZoom: Double? = null,
-  public val tolerance: Double? = null,
-  /** The last zoom level that has clusters, at most 30. */
-  public val clusterMaxZoom: Double? = null,
-  /** The `clusterProperties` object, or empty for none. */
-  public val clusterProperties: String = "",
-  @get:JvmSynthetic public val buffer: UInt? = null,
-  @get:JvmSynthetic public val clusterRadius: UInt? = null,
-  /** At most 4294967295 on a 32-bit target. */
-  @get:JvmSynthetic public val clusterMinPoints: ULong? = null,
-  public val lineMetrics: Boolean? = null,
-  public val cluster: Boolean? = null,
-) {
-  @PublishedApi @JvmName("getBuffer") internal fun bufferForJava(): Int? = buffer?.toInt()
-
-  @PublishedApi
-  @JvmName("getClusterRadius")
-  internal fun clusterRadiusForJava(): Int? = clusterRadius?.toInt()
-
-  @PublishedApi
-  @JvmName("getClusterMinPoints")
-  internal fun clusterMinPointsForJava(): Long? = clusterMinPoints?.toLong()
-
-  @PublishedApi
-  internal fun withMinZoom(minZoom: Double): GeoJsonSourceOptions = copy(minZoom = minZoom)
-
-  @PublishedApi
-  internal fun withMaxZoom(maxZoom: Double): GeoJsonSourceOptions = copy(maxZoom = maxZoom)
-
-  @PublishedApi
-  internal fun withTolerance(tolerance: Double): GeoJsonSourceOptions = copy(tolerance = tolerance)
-
-  @PublishedApi
-  internal fun withClusterMaxZoom(clusterMaxZoom: Double): GeoJsonSourceOptions =
-    copy(clusterMaxZoom = clusterMaxZoom)
-
-  @PublishedApi
-  internal fun withClusterProperties(clusterProperties: String): GeoJsonSourceOptions =
-    copy(clusterProperties = clusterProperties)
-
-  @PublishedApi
-  internal fun withBuffer(buffer: Int): GeoJsonSourceOptions = copy(buffer = buffer.toUInt())
-
-  @PublishedApi
-  internal fun withClusterRadius(clusterRadius: Int): GeoJsonSourceOptions =
-    copy(clusterRadius = clusterRadius.toUInt())
-
-  @PublishedApi
-  internal fun withClusterMinPoints(clusterMinPoints: Long): GeoJsonSourceOptions =
-    copy(clusterMinPoints = clusterMinPoints.toULong())
-
-  @PublishedApi
-  internal fun withLineMetrics(lineMetrics: Boolean): GeoJsonSourceOptions =
-    copy(lineMetrics = lineMetrics)
-
-  @PublishedApi
-  internal fun withCluster(cluster: Boolean): GeoJsonSourceOptions = copy(cluster = cluster)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): GeoJsonSourceOptions = GeoJsonSourceOptions()
-  }
-}
-
-/**
  * A point in the Web Mercator projection, in meters.
  *
  * See `mln_projected_meters` in the
@@ -4753,6 +4675,84 @@ public data class VulkanDeviceOptions(
      * `withX` methods.
      */
     @JvmStatic @PublishedApi internal fun of(): VulkanDeviceOptions = VulkanDeviceOptions()
+  }
+}
+
+/**
+ * Options for a GeoJSON
+ * &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/#geojson).
+ *
+ * Zoom levels are whole numbers.
+ *
+ * See `mln_geo_json_source_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class GeoJsonSourceOptions(
+  public val minZoom: Double? = null,
+  public val maxZoom: Double? = null,
+  public val tolerance: Double? = null,
+  /** The last zoom level that has clusters, at most 30. */
+  public val clusterMaxZoom: Double? = null,
+  /** The `clusterProperties` object, or empty for none. */
+  public val clusterProperties: String = "",
+  @get:JvmSynthetic public val buffer: UInt? = null,
+  @get:JvmSynthetic public val clusterRadius: UInt? = null,
+  /** At most 4294967295 on a 32-bit target. */
+  @get:JvmSynthetic public val clusterMinPoints: ULong? = null,
+  public val lineMetrics: Boolean? = null,
+  public val cluster: Boolean? = null,
+) {
+  @PublishedApi @JvmName("getBuffer") internal fun bufferForJava(): Int? = buffer?.toInt()
+
+  @PublishedApi
+  @JvmName("getClusterRadius")
+  internal fun clusterRadiusForJava(): Int? = clusterRadius?.toInt()
+
+  @PublishedApi
+  @JvmName("getClusterMinPoints")
+  internal fun clusterMinPointsForJava(): Long? = clusterMinPoints?.toLong()
+
+  @PublishedApi
+  internal fun withMinZoom(minZoom: Double): GeoJsonSourceOptions = copy(minZoom = minZoom)
+
+  @PublishedApi
+  internal fun withMaxZoom(maxZoom: Double): GeoJsonSourceOptions = copy(maxZoom = maxZoom)
+
+  @PublishedApi
+  internal fun withTolerance(tolerance: Double): GeoJsonSourceOptions = copy(tolerance = tolerance)
+
+  @PublishedApi
+  internal fun withClusterMaxZoom(clusterMaxZoom: Double): GeoJsonSourceOptions =
+    copy(clusterMaxZoom = clusterMaxZoom)
+
+  @PublishedApi
+  internal fun withClusterProperties(clusterProperties: String): GeoJsonSourceOptions =
+    copy(clusterProperties = clusterProperties)
+
+  @PublishedApi
+  internal fun withBuffer(buffer: Int): GeoJsonSourceOptions = copy(buffer = buffer.toUInt())
+
+  @PublishedApi
+  internal fun withClusterRadius(clusterRadius: Int): GeoJsonSourceOptions =
+    copy(clusterRadius = clusterRadius.toUInt())
+
+  @PublishedApi
+  internal fun withClusterMinPoints(clusterMinPoints: Long): GeoJsonSourceOptions =
+    copy(clusterMinPoints = clusterMinPoints.toULong())
+
+  @PublishedApi
+  internal fun withLineMetrics(lineMetrics: Boolean): GeoJsonSourceOptions =
+    copy(lineMetrics = lineMetrics)
+
+  @PublishedApi
+  internal fun withCluster(cluster: Boolean): GeoJsonSourceOptions = copy(cluster = cluster)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GeoJsonSourceOptions = GeoJsonSourceOptions()
   }
 }
 
@@ -6719,10 +6719,7 @@ public data class StyleSourceInfo(
   @get:JvmSynthetic public val tileSize: UInt?,
   public val vectorEncoding: StyleVectorTileEncoding?,
   public val rasterEncoding: StyleRasterDemEncoding?,
-  /**
-   * A GeoJSON source's options, with every field set. Data prepared with them can replace the
-   * source's data.
-   */
+  /** A GeoJSON source's options, with every field set. */
   public val geoJson: GeoJsonSourceOptions?,
 ) {
   @PublishedApi @JvmName("getTileSize") internal fun tileSizeForJava(): Int? = tileSize?.toInt()

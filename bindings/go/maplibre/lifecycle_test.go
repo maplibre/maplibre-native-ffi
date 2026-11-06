@@ -62,17 +62,17 @@ func TestDisposeAndReleaseRetireOnce(t *testing.T) {
 	checkHandleMembers(t, f.m, "MapHandle", true)
 	checkHandleMembers(t, f.runtime, "RuntimeHandle", true)
 
-	data, err := NewGeoJSONSourceData(`{"type":"FeatureCollection","features":[]}`, nil)
+	expression, err := NewStyleExpression(`["literal", 1]`, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkHandleMembers(t, data, "GeoJSONSourceDataHandle", false)
+	checkHandleMembers(t, expression, "StyleExpressionHandle", false)
 	for range 2 {
-		if err := data.Release(); err != nil {
-			t.Fatalf("GeoJSONSourceDataHandle.Release: %v", err)
+		if err := expression.Release(); err != nil {
+			t.Fatalf("StyleExpressionHandle.Release: %v", err)
 		}
 	}
-	checkHandleMembers(t, data, "GeoJSONSourceDataHandle", true)
+	checkHandleMembers(t, expression, "StyleExpressionHandle", true)
 }
 
 // A runtime refuses a release while its map is live. The refusal leaves the
@@ -109,9 +109,8 @@ func TestHandleIDNamesItsEventsAndOutlivesItsRelease(t *testing.T) {
 }
 
 // A nil pointer or a zero value of a handle type fails with the binding's
-// error instead of reaching native, whether it is the receiver or an input,
-// and native reports a closed input handle stale.
-func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
+// error instead of reaching native, whether it is the receiver or an input.
+func TestNilAndZeroHandlesAreRejected(t *testing.T) {
 	for _, session := range []*RenderSessionHandle{nil, {}} {
 		if _, err := session.Capabilities(); !errors.Is(err, StatusInvalidArgument) {
 			t.Fatalf("receiver %#v: %v, want StatusInvalidArgument", session, err)
@@ -128,20 +127,9 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	}
 
 	f := newFixture(t)
-	for _, input := range []*GeoJSONSourceDataHandle{nil, {}} {
-		if future, err := f.m.AddGeoJSONSourceData("source", input, ""); future != nil || !errors.Is(err, StatusInvalidArgument) {
-			t.Fatalf("input %#v: (%v, %v), want nil and StatusInvalidArgument", input, future, err)
-		}
-	}
-	data, err := NewGeoJSONSourceData(`{"type":"FeatureCollection","features":[]}`, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := data.Release(); err != nil {
-		t.Fatal(err)
-	}
-	if future, err := f.m.AddGeoJSONSourceData("source", data, ""); future != nil || !errors.Is(err, StatusInvalidState) {
-		t.Fatalf("closed input: (%v, %v), want nil and StatusInvalidState", future, err)
+	session, ready, err := f.m.AttachOffscreen(OffscreenDescriptor{}, RenderSessionAttachOptions{}, &OffscreenDeviceHandle{})
+	if session != nil || ready != nil || !errors.Is(err, StatusInvalidArgument) {
+		t.Fatalf("zero input handle: (%v, %v, %v), want nil and StatusInvalidArgument", session, ready, err)
 	}
 }
 

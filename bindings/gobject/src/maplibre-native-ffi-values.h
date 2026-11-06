@@ -53,8 +53,6 @@ G_BEGIN_DECLS
 
 typedef struct _MaplibreNativeFfiAcquiredFrame MaplibreNativeFfiAcquiredFrame;
 typedef struct _MaplibreNativeFfiFramePacer MaplibreNativeFfiFramePacer;
-typedef struct _MaplibreNativeFfiGeoJsonSourceData
-  MaplibreNativeFfiGeoJsonSourceData;
 typedef struct _MaplibreNativeFfiMap MaplibreNativeFfiMap;
 typedef struct _MaplibreNativeFfiMapProjection MaplibreNativeFfiMapProjection;
 typedef struct _MaplibreNativeFfiOffscreenDevice
@@ -15186,8 +15184,7 @@ gboolean maplibre_native_ffi_style_source_info_has_raster_encoding(
 /**
  * maplibre_native_ffi_style_source_info_get_geo_json:
  *
- * A GeoJSON source's options, with every field set. Data prepared with them can
- * replace the source's data.
+ * A GeoJSON source's options, with every field set.
  *
  * Returns: (transfer none): the value
  */

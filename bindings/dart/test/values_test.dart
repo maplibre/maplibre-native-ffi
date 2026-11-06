@@ -8,11 +8,6 @@ import 'package:test/test.dart';
 
 import 'support/fixture.dart';
 
-const _featureCollection = {
-  'type': 'FeatureCollection',
-  'features': <Object?>[],
-};
-
 void main() {
   test('caller-sized text returns a result longer than its first storage', () {
     // The result outgrows the runtime's first storage, so the call runs
@@ -186,11 +181,14 @@ void main() {
     // A uint64_t crosses as its bit pattern, so -1 is the largest identity.
     const maximum = -1;
 
+    final fixture = await openRuntime();
+    final map = await fixture.openStyledMap();
+
     // A value outside a 32-bit field's range is rejected before it crosses,
     // rather than truncated into a valid one.
     expect(
-      () => GeoJsonSourceDataHandle.create(
-        _featureCollection,
+      () => map.discarding.addGeoJsonSource(
+        'points',
         options: GeoJsonSourceOptions(buffer: 4294967296),
       ),
       throwsA(
@@ -201,11 +199,9 @@ void main() {
         ),
       ),
     );
-    final fixture = await openRuntime();
 
     // Cancelling the largest identity ends the ease that carries it, so the
     // identity crossed whole both times.
-    final map = await fixture.openStyledMap();
     final ended = Completer<CameraTransitionEnd>();
     await expectCommitted(
       map.updateCamera(

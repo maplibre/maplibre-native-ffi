@@ -119,19 +119,18 @@ static void add_the_late_source(
 ) {
   (void)runtime;
   (void)fixture;
-  mln_geo_json_source_data data = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_geo_json_source_data_create(
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source(
+    map, MLN_BUFFER_LITERAL("late"), NULL, MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_data(
+    map, MLN_BUFFER_LITERAL("late"),
     MLN_BUFFER_LITERAL(
       "{\"type\":\"Feature\",\"properties\":{},\"geometry\":"
       "{\"type\":\"Point\",\"coordinates\":[0,0]}}"
     ),
-    NULL, &data, NULL
-  ));
-  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("late"), data, MLN_BUFFER_LITERAL(""),
     &completion.descriptor, NULL
   ));
-  mln_geo_json_source_data_release(data);
 }
 
 static void remove_the_swatch(
@@ -321,13 +320,13 @@ static void feature_state_stays_with_the_update_held_by_a_command_group(void) {
 }
 
 typedef struct update_state {
-  mln_geo_json_source_data data;
   mln_map_tile_settings initial_tile;
 } update_state;
 
 static void add_empty_geojson(mln_map map, update_state* state) {
-  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("geo"), state->data, MLN_BUFFER_LITERAL(""),
+  (void)state;
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source(
+    map, MLN_BUFFER_LITERAL("geo"), NULL, MLN_BUFFER_LITERAL(""),
     &completion.descriptor, NULL
   ));
 }
@@ -438,11 +437,11 @@ typedef struct update_row {
 // The map fence after each row orders the updates that its command publishes
 // before the count, which is what lets a row assert none. That holds only while
 // no row starts work that finishes on a worker: the style's GeoJSON is inline,
-// the added source takes data parsed before the call, and the image source
-// takes pixels, so nothing loads and publishes an update into a later row. A
-// row that fetched or parsed data asynchronously would need its own fence.
+// the added GeoJSON source has no data, and the image source takes pixels, so
+// nothing loads and publishes an update into a later row. A row that fetched
+// or parsed data asynchronously would need its own fence.
 static const update_row update_rows[] = {
-  {"inline GeoJSON added", add_empty_geojson, true},
+  {"a GeoJSON source added", add_empty_geojson, true},
   {"a source removed", remove_geojson, true},
   {"an image source added", add_image_source, true},
   {"a style image added", add_icon, true},
@@ -473,10 +472,6 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
   ));
   MLN_TEST_OK(mln_test_map_fence(map));
   update_state state = {0};
-  MLN_TEST_OK(mln_geo_json_source_data_create(
-    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
-    NULL, &state.data, NULL
-  ));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   state.initial_tile = snapshot.tile;
@@ -499,7 +494,6 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
     }
   }
 
-  mln_geo_json_source_data_release(state.data);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

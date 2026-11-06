@@ -237,65 +237,48 @@ static void a_geojson_source_reports_the_options_its_data_needs(void) {
   TEST_ASSERT_TRUE(options.cluster);
   TEST_ASSERT_NOT_NULL(strstr(probe.cluster_properties, "\"total\""));
 
-  // The reported options prepare data that the source takes, and min_zoom,
-  // which doesn't shape the prepared data, may differ.
-  static const char points[] =
-    "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
-    "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},"
-    "\"properties\":{\"weight\":2}}]}";
+  // The reported options add a source that reports them back.
   options.cluster_properties =
     mln_buffer_view_from_cstr(probe.cluster_properties);
-  for (int pass = 0; pass < 2; pass += 1) {
-    if (pass == 1) options.min_zoom = 0.0;
-    mln_geo_json_source_data data = MLN_HANDLE_NULL;
-    MLN_TEST_OK(mln_geo_json_source_data_create(
-      MLN_BUFFER_LITERAL(points), &options, &data, NULL
-    ));
-    MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_data(
-      map, MLN_BUFFER_LITERAL("clustered"), data, &completion.descriptor, NULL
-    ));
-    mln_geo_json_source_data_release(data);
-  }
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source(
+    map, MLN_BUFFER_LITERAL("copy"), &options, MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
+  ));
+  const source_copy copy = read_source(map, "copy");
+  TEST_ASSERT_EQUAL_HEX32(options.fields, copy.info.geo_json.fields);
+  TEST_ASSERT_EQUAL_DOUBLE(3.0, copy.info.geo_json.min_zoom);
+  TEST_ASSERT_EQUAL_UINT32(40, copy.info.geo_json.cluster_radius);
+  TEST_ASSERT_NOT_NULL(strstr(copy.cluster_properties, "\"total\""));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-// A GeoJSON source added with prepared data keeps its attribution when
-// prepared data replaces its data.
+// A GeoJSON source keeps the attribution it was added with when new data
+// replaces its data.
 static void a_geojson_source_keeps_the_attribution_it_was_added_with(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
 
-  mln_geo_json_source_data data = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_geo_json_source_data_create(
-    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
-    NULL, &data, NULL
-  ));
-  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("attributed"), data,
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source(
+    map, MLN_BUFFER_LITERAL("attributed"), NULL,
     MLN_BUFFER_LITERAL("Fixture data"), &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("plain"), data, (mln_buffer_view){0},
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source(
+    map, MLN_BUFFER_LITERAL("plain"), NULL, (mln_buffer_view){0},
     &completion.descriptor, NULL
   ));
-  mln_geo_json_source_data_release(data);
   TEST_ASSERT_EQUAL_STRING(
     "Fixture data", read_source(map, "attributed").attribution
   );
   TEST_ASSERT_EQUAL_size_t(0, read_source(map, "plain").info.attribution.size);
 
-  data = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_geo_json_source_data_create(
-    MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"), NULL,
-    &data, NULL
-  ));
   MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("attributed"), data, &completion.descriptor, NULL
+    map, MLN_BUFFER_LITERAL("attributed"),
+    MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"),
+    &completion.descriptor, NULL
   ));
-  mln_geo_json_source_data_release(data);
   TEST_ASSERT_EQUAL_STRING(
     "Fixture data", read_source(map, "attributed").attribution
   );
@@ -305,7 +288,7 @@ static void a_geojson_source_keeps_the_attribution_it_was_added_with(void) {
 }
 
 // The engine counts cluster points in a size_t, so a count past 32 bits
-// reports exactly and prepares data that the source takes. A 32-bit target
+// reports exactly and adds a source with the same count. A 32-bit target
 // can't hold one.
 #if SIZE_MAX > UINT32_MAX
 static void a_geojson_source_reports_its_full_cluster_min_points(void) {
@@ -327,15 +310,13 @@ static void a_geojson_source_reports_its_full_cluster_min_points(void) {
   const mln_geo_json_source_options options = probe.info.geo_json;
   TEST_ASSERT_EQUAL_UINT64(4294967296ULL, options.cluster_min_points);
 
-  mln_geo_json_source_data data = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_geo_json_source_data_create(
-    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
-    &options, &data, NULL
+  MLN_TEST_AWAIT_OK(mln_map_add_geo_json_source(
+    map, MLN_BUFFER_LITERAL("copy"), &options, MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_geo_json_source_data(
-    map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
-  ));
-  mln_geo_json_source_data_release(data);
+  TEST_ASSERT_EQUAL_UINT64(
+    4294967296ULL, read_source(map, "copy").info.geo_json.cluster_min_points
+  );
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

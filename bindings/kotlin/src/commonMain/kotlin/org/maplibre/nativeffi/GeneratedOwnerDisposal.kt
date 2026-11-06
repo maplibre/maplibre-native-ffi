@@ -17,11 +17,6 @@ internal object GeneratedOwnerDisposal {
   }
 
   @JvmSynthetic
-  fun geoJsonSourceData(handle: Long) {
-    C.mln_geo_json_source_data_release(handle)
-  }
-
-  @JvmSynthetic
   fun map(handle: Long) {
     NativeDiagnostics.check { diagnostic -> C.mln_map_dispose(handle, diagnostic) }
   }

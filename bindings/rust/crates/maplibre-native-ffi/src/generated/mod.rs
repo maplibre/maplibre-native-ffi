@@ -15,8 +15,6 @@ mod acquired_frame;
 pub use acquired_frame::*;
 mod frame_pacer;
 pub use frame_pacer::*;
-mod geo_json_source_data;
-pub use geo_json_source_data::*;
 mod map;
 pub use map::*;
 mod map_projection;
@@ -46,10 +44,6 @@ static_assertions::assert_not_impl_any!(AcquiredFrameHandle: Clone);
 static_assertions::assert_impl_all!(FramePacerHandle: Send, Sync);
 #[cfg(test)]
 static_assertions::assert_not_impl_any!(FramePacerHandle: Clone);
-#[cfg(test)]
-static_assertions::assert_impl_all!(GeoJsonSourceDataHandle: Send, Sync);
-#[cfg(test)]
-static_assertions::assert_not_impl_any!(GeoJsonSourceDataHandle: Clone);
 #[cfg(test)]
 static_assertions::assert_impl_all!(MapHandle: Send, Sync);
 #[cfg(test)]

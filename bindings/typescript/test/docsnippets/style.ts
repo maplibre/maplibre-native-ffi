@@ -2,7 +2,6 @@
 // tests, which never run them.
 
 import {
-  GeoJsonSourceDataHandle,
   type MapHandle,
   type PremultipliedRgba8Image,
   type RuntimeHandle,
@@ -41,21 +40,11 @@ export async function style(
   // #endregion add
 
   // #region geojson
-  const data = GeoJsonSourceDataHandle.create({
+  map.discarding.addGeoJsonSource("points");
+  map.discarding.setGeoJsonSourceData("points", {
     type: "Point",
     coordinates: [-122.4, 37.8],
   });
-  map.discarding.addGeoJsonSourceData("points", data);
-  // The source keeps its own reference to the data.
-  data.release();
-
-  // Later, prepare new data with the same options, and set it.
-  const next = GeoJsonSourceDataHandle.create({
-    type: "Point",
-    coordinates: [2.35, 48.86],
-  });
-  map.discarding.setGeoJsonSourceData("points", next);
-  next.release();
   // #endregion geojson
 
   // #region set-property

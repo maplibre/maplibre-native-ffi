@@ -30,7 +30,6 @@ enum class HandleKind : std::uint8_t {
   ResourceTransformRequest = 13,
   AcquiredFrame = 20,
   RenderFrameBatch = 21,
-  GeoJsonSourceData = 22,
   DeliveryQueue = 23,
   StyleExpression = 25,
   OffscreenDevice = 26,

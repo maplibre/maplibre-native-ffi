@@ -19,11 +19,6 @@ maplibre_native_ffi_frame_pacer_wrap(
   mln_frame_pacer handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready
 );
-G_GNUC_INTERNAL MaplibreNativeFfiGeoJsonSourceData*
-maplibre_native_ffi_geo_json_source_data_wrap(
-  mln_geo_json_source_data handle, gpointer parent, gboolean borrowed,
-  MaplibreNativeFfiReady* ready
-);
 G_GNUC_INTERNAL MaplibreNativeFfiMap* maplibre_native_ffi_map_wrap(
   mln_map handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready

@@ -12,7 +12,6 @@ const int MLN_C_VERSION = 0;
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_queue = Uint64;
 typedef mln_frame_pacer = Uint64;
-typedef mln_geo_json_source_data = Uint64;
 typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
 typedef mln_offscreen_device = Uint64;
@@ -2959,24 +2958,6 @@ external void mln_frame_pacer_release(int pacer);
 
 @Native<
   Int32 Function(
-    mln_buffer_view,
-    Pointer<mln_geo_json_source_options>,
-    Pointer<mln_geo_json_source_data>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_geo_json_source_data_create(
-  mln_buffer_view data,
-  Pointer<mln_geo_json_source_options> options,
-  Pointer<mln_geo_json_source_data> out_data,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Void Function(mln_geo_json_source_data)>()
-external void mln_geo_json_source_data_release(int data);
-
-@Native<
-  Int32 Function(
     Pointer<mln_http_header_transform_response>,
     mln_buffer_view,
     mln_buffer_view,
@@ -3071,16 +3052,16 @@ external int mln_map_add_custom_vector_source(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_geo_json_source_data,
+    Pointer<mln_geo_json_source_options>,
     mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_add_geo_json_source_data(
+external int mln_map_add_geo_json_source(
   int map,
   mln_buffer_view source_id,
-  int data,
+  Pointer<mln_geo_json_source_options> options,
   mln_buffer_view attribution,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
@@ -4304,7 +4285,7 @@ external int mln_map_set_free_camera_options(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_geo_json_source_data,
+    mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
@@ -4312,7 +4293,7 @@ external int mln_map_set_free_camera_options(
 external int mln_map_set_geo_json_source_data(
   int map,
   mln_buffer_view source_id,
-  int data,
+  mln_buffer_view data,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

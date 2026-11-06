@@ -121,6 +121,11 @@ enum class SyncPoint : std::uint8_t {
   // never reaches it. No lock is held, so a parked worker delays only the
   // slices queued behind it on the same worker.
   GeoJsonTileSlice,
+  // MapLibre's background pool is about to prepare data that
+  // mln_map_set_geo_json_source_data() set on a source that tiles in the
+  // background. No lock is held, so a parked thread delays only that
+  // preparation and the data that waits behind it.
+  GeoJsonDataPrepare,
   // A standalone projection call has leased its handle and is about to take
   // the projection's call lock. No lock is held.
   ProjectionCallLeased,

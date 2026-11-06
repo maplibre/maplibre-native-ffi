@@ -138,16 +138,6 @@ internal actual object C {
   @JvmStatic actual external fun mln_frame_pacer_release(pacer: Long): Unit
 
   @JvmStatic
-  actual external fun mln_geo_json_source_data_create(
-    data: Long,
-    options: Long,
-    outData: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic actual external fun mln_geo_json_source_data_release(data: Long): Unit
-
-  @JvmStatic
   actual external fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
@@ -196,10 +186,10 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_add_geo_json_source_data(
+  actual external fun mln_map_add_geo_json_source(
     map: Long,
     sourceId: Long,
-    data: Long,
+    options: Long,
     attribution: Long,
     completion: Long,
     outDiagnostic: Long,

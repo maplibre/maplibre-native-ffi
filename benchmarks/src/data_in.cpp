@@ -35,9 +35,9 @@ auto points_json(int count, int variant) -> std::string {
   return json;
 }
 
-// From mln_geo_json_source_data_create() on 1000 points until the first
+// From mln_map_set_geo_json_source_data() with 1000 points until the first
 // complete frame that shows them has finished on the GPU, with frames on the
-// display's clock.
+// display's clock. "call" is the time the caller's thread spends in the call.
 void geojson_replace(benchmark::State& state) {
   Scene scene;
   scene.create_map();
@@ -45,17 +45,18 @@ void geojson_replace(benchmark::State& state) {
   const std::array<std::string, 2> datasets{
     points_json(1000, 0), points_json(1000, 1)
   };
-  mln_geo_json_source_data data = MLN_HANDLE_NULL;
-  BENCH_CHECK(
-    mln_geo_json_source_data_create(view(datasets[1]), nullptr, &data, nullptr)
-  );
   Completion completion;
-  BENCH_CHECK(mln_map_add_geo_json_source_data(
-    scene.map(), view("points"), data, {nullptr, 0}, completion.descriptor(),
+  BENCH_CHECK(mln_map_add_geo_json_source(
+    scene.map(), view("points"), nullptr, {nullptr, 0}, completion.descriptor(),
     nullptr
   ));
-  mln_geo_json_source_data_release(data);
   finish(completion, "the GeoJSON source");
+  completion.reset();
+  BENCH_CHECK(mln_map_set_geo_json_source_data(
+    scene.map(), view("points"), view(datasets[1]), completion.descriptor(),
+    nullptr
+  ));
+  finish(completion, "the GeoJSON data");
   completion.reset();
   BENCH_CHECK(mln_map_add_style_layer_json(
     scene.map(),
@@ -72,21 +73,17 @@ void geojson_replace(benchmark::State& state) {
   scene.session().settle(scene.map());
 
   Meter meter{state};
-  auto& parse = meter.series("parse");
+  auto& call = meter.series("call");
   auto& latency = meter.series("latency");
   size_t index = 0;
   for (auto _ : state) {
     const auto start = Clock::now();
-    data = MLN_HANDLE_NULL;
-    BENCH_CHECK(mln_geo_json_source_data_create(
-      view(datasets[index++ & 1U]), nullptr, &data, nullptr
-    ));
-    parse.add_since(start);
     completion.reset();
     BENCH_CHECK(mln_map_set_geo_json_source_data(
-      scene.map(), view("points"), data, completion.descriptor(), nullptr
+      scene.map(), view("points"), view(datasets[index++ & 1U]),
+      completion.descriptor(), nullptr
     ));
-    mln_geo_json_source_data_release(data);
+    call.add_since(start);
     finish(completion, "the GeoJSON replacement", &scene.session());
     scene.session().present_until_full(completion.render_update_generation);
     latency.add_since(start);

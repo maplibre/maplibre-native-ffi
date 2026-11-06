@@ -5126,9 +5126,7 @@ class StyleSourceInfo:
     raster_encoding: StyleRasterDemEncoding | None
 
     geo_json: GeoJsonSourceOptions | None
-    """A GeoJSON source's options, with every field set. Data prepared with them
-    can replace the source's data.
-    """
+    """A GeoJSON source's options, with every field set."""
 
     @classmethod
     def _from_native(cls, raw):

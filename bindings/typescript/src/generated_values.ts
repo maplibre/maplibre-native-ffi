@@ -3945,8 +3945,7 @@ export interface StyleSourceInfo {
   readonly vectorEncoding?: StyleVectorTileEncoding;
   readonly rasterEncoding?: StyleRasterDemEncoding;
   /**
-   * A GeoJSON source's options, with every field set. Data prepared with them
-   * can replace the source's data.
+   * A GeoJSON source's options, with every field set.
    */
   readonly geoJson?: GeoJsonSourceOptions;
 }

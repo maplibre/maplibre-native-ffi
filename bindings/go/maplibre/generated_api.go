@@ -5841,8 +5841,7 @@ type StyleSourceInfo struct {
 	TileSize       *uint32
 	VectorEncoding *StyleVectorTileEncoding
 	RasterEncoding *StyleRasterDemEncoding
-	// A GeoJSON source's options, with every field set. Data prepared with them can
-	// replace the source's data.
+	// A GeoJSON source's options, with every field set.
 	GeoJSON *GeoJSONSourceOptions
 }
 
@@ -6821,38 +6820,6 @@ func (handle *FramePacerHandle) String() string {
 	return bindingDescribe("FramePacerHandle", handle.owner())
 }
 
-// GeoJSONSourceDataHandle corresponds to mln_geo_json_source_data. GeoJSON
-// data, parsed and ready to add to a GeoJSON source.
-//
-// See mln_geo_json_source_data in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type GeoJSONSourceDataHandle struct{ *bindingOwner }
-
-func adoptGeoJSONSourceDataHandle(raw uint64, parent any) *GeoJSONSourceDataHandle {
-	owner := &GeoJSONSourceDataHandle{bindingAdopt(raw, parent, "GeoJSONSourceDataHandle", func(raw uint64) { C.mln_geo_json_source_data_release(C.mln_geo_json_source_data(raw)) })}
-	return owner
-}
-
-func (handle *GeoJSONSourceDataHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
-// ID returns the native handle value. It stays readable after the handle
-// is released.
-func (handle *GeoJSONSourceDataHandle) ID() uint64 { return handle.owner().id() }
-
-// IsClosed reports whether the binding has accepted a release, dispose, or
-// discard of the handle. A nil handle is closed.
-func (handle *GeoJSONSourceDataHandle) IsClosed() bool { return handle.owner().isClosed() }
-
-// String formats the handle as GeoJSONSourceDataHandle(id=0x<hex>, closed=<true|false>).
-func (handle *GeoJSONSourceDataHandle) String() string {
-	return bindingDescribe("GeoJSONSourceDataHandle", handle.owner())
-}
-
 // MapHandle corresponds to mln_map. A map, with its style and camera.
 //
 // See mln_map in the C API reference:
@@ -7318,43 +7285,6 @@ func (receiver *FramePacerHandle) Release() error {
 	return err
 }
 
-// NewGeoJSONSourceData prepares GeoJSON data for GeoJSON sources.
-//
-// data is a GeoJSON feature collection, feature, or geometry. Preparing it can
-// be slow, but adding the result to a source is quick, and several sources can
-// share it.
-//
-// See mln_geo_json_source_data_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-//
-// Errors:
-//   - StatusInvalidArgument when data isn't valid GeoJSON, when an option in
-//     options is out of range, or when options turns on clustering and data
-//     isn't a feature collection of points.
-func NewGeoJSONSourceData(data string, options *GeoJSONSourceOptions) (*GeoJSONSourceDataHandle, error) {
-	var outData C.mln_geo_json_source_data
-	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_geo_json_source_data_create(bindingView(data, arena), bindingStoreOptional(options, arena, nativeGeoJSONSourceOptions), &outData, diagnostic))
-	}, func(arena *bindingArena) *GeoJSONSourceDataHandle {
-		adopted := adoptGeoJSONSourceDataHandle(uint64(outData), nil)
-		return adopted
-	})
-}
-
-// Release releases prepared GeoJSON data.
-//
-// Sources that use the data keep it.
-//
-// See mln_geo_json_source_data_release in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *GeoJSONSourceDataHandle) Release() error {
-	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_geo_json_source_data_release(C.mln_geo_json_source_data(raw))
-		return struct{}{}
-	})
-	return err
-}
-
 // SetHeader sets a header on the request that an HTTP header transform callback
 // handles.
 //
@@ -7481,25 +7411,27 @@ func (receiver *MapHandle) AddCustomVectorSource(sourceID string, options Custom
 	}, completionCommand)
 }
 
-// AddGeoJSONSourceData adds a GeoJSON source with prepared data.
+// AddGeoJSONSource adds a GeoJSON source with no data.
 //
-// The source uses the options that data was prepared with. data can be released
-// once this function returns.
+// Give it data with MapHandle.SetGeoJSONSourceData() or
+// MapHandle.SetGeoJSONSourceURL(). Its options stay fixed for as long as the
+// style holds it.
 //
 // attribution is the source's
 // [attribution](https://maplibre.org/maplibre-style-spec/sources/#attribution),
 // or empty for none.
 //
-// See mln_map_add_geo_json_source_data in the C API reference:
+// See mln_map_add_geo_json_source in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 //
 // Errors:
+//   - StatusInvalidArgument when an option in options is out of range.
 //   - StatusAlreadyExists when the style already has a source named sourceID.
 //   - StatusInvalidState while the style isn't loaded, as
 //     MapHandle.SetStyleURL() describes.
-func (receiver *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle, attribution string) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) AddGeoJSONSource(sourceID string, options *GeoJSONSourceOptions, attribution string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), bindingView(attribution, arena), completion, diagnostic))
+		return int32(C.mln_map_add_geo_json_source(C.mln_map(raw), bindingView(sourceID, arena), bindingStoreOptional(options, arena, nativeGeoJSONSourceOptions), bindingView(attribution, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -8643,9 +8575,15 @@ func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Fut
 
 // SetGeoJSONSourceData replaces the data of a GeoJSON source.
 //
-// data must have been prepared with the source's options, which
-// MapHandle.GetStyleSource() reports, though min_zoom may differ. data can be
-// released once this function returns.
+// data is a GeoJSON feature collection, feature, or geometry. The library
+// prepares it for the source with the source's options, off the threads that
+// the caller and the runtime use, and the command completes once the source
+// holds it. Later commands don't wait for it. While the source is still
+// preparing earlier data, only the newest data waits to follow it.
+//
+// With synchronous tiling on, as MapHandle.SetGeoJSONSourceSynchronousTiling()
+// describes, the command prepares data before later commands run, so the data
+// shows in the next frame.
 //
 // See mln_map_set_geo_json_source_data in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -8653,12 +8591,16 @@ func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Fut
 // Errors:
 //   - StatusNotFound when the style has no source named sourceID.
 //   - StatusInvalidArgument when the source named sourceID isn't a GeoJSON
-//     source, or data was prepared with other options.
+//     source, when data isn't valid GeoJSON, or when the source clusters and
+//     data isn't a feature collection of points. The source keeps its data.
+//   - StatusCancelled when newer data for the source replaces data while it
+//     waits, or when the source's URL, its removal, a style load, or the map's
+//     release replaces the source's data before data is ready.
 //   - StatusInvalidState while the style isn't loaded, as
 //     MapHandle.SetStyleURL() describes.
-func (receiver *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) SetGeoJSONSourceData(sourceID string, data string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), completion, diagnostic))
+		return int32(C.mln_map_set_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), bindingView(data, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -10261,10 +10203,10 @@ func (view MapHandleDiscarding) AddCustomVectorSource(sourceID string, options C
 	})
 }
 
-func (view MapHandleDiscarding) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle, attribution string) error {
+func (view MapHandleDiscarding) AddGeoJSONSource(sourceID string, options *GeoJSONSourceOptions, attribution string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_add_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), bindingView(attribution, arena), completion, diagnostic))
+		return int32(C.mln_map_add_geo_json_source(C.mln_map(raw), bindingView(sourceID, arena), bindingStoreOptional(options, arena, nativeGeoJSONSourceOptions), bindingView(attribution, arena), completion, diagnostic))
 	})
 }
 
@@ -10492,10 +10434,10 @@ func (view MapHandleDiscarding) SetFreeCameraOptions(options FreeCameraOptions) 
 	})
 }
 
-func (view MapHandleDiscarding) SetGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) error {
+func (view MapHandleDiscarding) SetGeoJSONSourceData(sourceID string, data string) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), C.mln_geo_json_source_data(arena.lease(data.owner())), completion, diagnostic))
+		return int32(C.mln_map_set_geo_json_source_data(C.mln_map(raw), bindingView(sourceID, arena), bindingView(data, arena), completion, diagnostic))
 	})
 }
 

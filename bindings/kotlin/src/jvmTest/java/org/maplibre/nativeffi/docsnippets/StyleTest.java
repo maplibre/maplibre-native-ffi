@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.Test;
-import org.maplibre.nativeffi.GeoJsonSourceDataHandle;
 import org.maplibre.nativeffi.MapHandle;
 import org.maplibre.nativeffi.MapMode;
 import org.maplibre.nativeffi.PremultipliedRgba8Image;
@@ -85,25 +84,13 @@ public class StyleTest {
     // #endregion add
 
     // #region geojson
-    GeoJsonSourceDataHandle data =
-        GeoJsonSourceDataHandle.create(
+    map.getDiscarding().addGeoJsonSource("points", null, null);
+    map.getDiscarding()
+        .setGeoJsonSourceData(
+            "points",
             """
             {"type": "Point", "coordinates": [-122.4, 37.8]}
-            """,
-            null);
-    map.getDiscarding().addGeoJsonSourceData("points", data, null);
-    // The source keeps its own reference to the data.
-    data.release();
-
-    // Later, prepare new data with the same options, and set it.
-    GeoJsonSourceDataHandle next =
-        GeoJsonSourceDataHandle.create(
-            """
-            {"type": "Point", "coordinates": [2.35, 48.86]}
-            """,
-            null);
-    map.getDiscarding().setGeoJsonSourceData("points", next);
-    next.release();
+            """);
     // #endregion geojson
 
     // #region set-property

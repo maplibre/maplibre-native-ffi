@@ -811,77 +811,6 @@ export class FramePacerHandle extends Owner {
 defineDisposers(FramePacerHandle, "release", "release");
 
 /**
- * GeoJSON data, parsed and ready to add to a GeoJSON source.
- *
- * See `mln_geo_json_source_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
- */
-export class GeoJsonSourceDataHandle extends Owner {
-  /**
-   * Created by the API, which passes a key that only it holds.
-   *
-   * @internal
-   */
-  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
-    super(key, handle, "GeoJsonSourceDataHandle", { registrations });
-  }
-  /**
-   * Calls `release()`, for `await using`.
-   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.asyncDispose]: () => Promise<void>;
-  /**
-   * Calls `release()`, for `using`.
-   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.dispose]: () => void;
-
-  /**
-   * Prepares GeoJSON data for GeoJSON sources.
-   *
-   * `data` is a GeoJSON feature collection, feature, or geometry. Preparing it
-   * can be slow, but adding the result to a source is quick, and several
-   * sources can share it.
-   *
-   * See `mln_geo_json_source_data_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.invalidArgument` when `data` isn't valid GeoJSON, when an option
-   *   in `options` is out of range, or when `options` turns on clustering and
-   *   `data` isn't a feature collection of points.
-   */
-  static create(
-    data: unknown,
-    options?: GeoJsonSourceOptions,
-  ): GeoJsonSourceDataHandle {
-    const handle = native.mln_geo_json_source_data_create(data, options);
-    return adopt(
-      handle,
-      () => new GeoJsonSourceDataHandle(ADOPT, handle),
-      (disposed) =>
-        native.mln_geo_json_source_data_release(disposed, undefined),
-    );
-  }
-
-  /**
-   * Releases prepared GeoJSON data.
-   *
-   * Sources that use the data keep it.
-   *
-   * See `mln_geo_json_source_data_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  release(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_geo_json_source_data_release(handle, token),
-    );
-  }
-}
-defineDisposers(GeoJsonSourceDataHandle, "release", "release");
-
-/**
  * A map, with its style and camera.
  *
  * See `mln_map` in the
@@ -994,35 +923,37 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Adds a GeoJSON source with prepared data.
+   * Adds a GeoJSON source with no data.
    *
-   * The source uses the options that `data` was prepared with. `data` can be
-   * released once this function returns.
+   * Give it data with `MapHandle.setGeoJsonSourceData()` or
+   * `MapHandle.setGeoJsonSourceUrl()`. Its options stay fixed for as long as
+   * the style holds it.
    *
    * `attribution` is the source's
    * &#91;attribution&#93;(https://maplibre.org/maplibre-style-spec/sources/#attribution),
    * or empty for none.
    *
-   * See `mln_map_add_geo_json_source_data` in the
+   * See `mln_map_add_geo_json_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
    * Errors:
    *
+   * - `Status.invalidArgument` when an option in `options` is out of range.
    * - `Status.alreadyExists` when the style already has a source named
    *   `sourceId`.
    * - `Status.invalidState` while the style isn't loaded, as
    *   `MapHandle.setStyleUrl()` describes.
    */
-  addGeoJsonSourceData(
+  addGeoJsonSource(
     sourceId: string,
-    data: GeoJsonSourceDataHandle,
+    options?: GeoJsonSourceOptions,
     attribution?: string,
   ): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_add_geo_json_source_data(
+      native.mln_map_add_geo_json_source(
         this.id,
         sourceId,
-        data.id,
+        options,
         attribution,
         completion,
       ),
@@ -3075,9 +3006,16 @@ export class MapHandle extends Owner {
   /**
    * Replaces the data of a GeoJSON source.
    *
-   * `data` must have been prepared with the source's options, which
-   * `MapHandle.getStyleSource()` reports, though `min_zoom` may differ. `data`
-   * can be released once this function returns.
+   * `data` is a GeoJSON feature collection, feature, or geometry. The library
+   * prepares it for the source with the source's options, off the threads that
+   * the caller and the runtime use, and the command completes once the source
+   * holds it. Later commands don't wait for it. While the source is still
+   * preparing earlier data, only the newest data waits to follow it.
+   *
+   * With synchronous tiling on, as
+   * `MapHandle.setGeoJsonSourceSynchronousTiling()` describes, the command
+   * prepares `data` before later commands run, so the data shows in the next
+   * frame.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3086,19 +3024,23 @@ export class MapHandle extends Owner {
    *
    * - `Status.notFound` when the style has no source named `sourceId`.
    * - `Status.invalidArgument` when the source named `sourceId` isn't a GeoJSON
-   *   source, or `data` was prepared with other options.
+   *   source, when `data` isn't valid GeoJSON, or when the source clusters and
+   *   `data` isn't a feature collection of points. The source keeps its data.
+   * - `Status.cancelled` when newer data for the source replaces `data` while
+   *   it waits, or when the source's URL, its removal, a style load, or the
+   *   map's release replaces the source's data before `data` is ready.
    * - `Status.invalidState` while the style isn't loaded, as
    *   `MapHandle.setStyleUrl()` describes.
    */
   setGeoJsonSourceData(
     sourceId: string,
-    data: GeoJsonSourceDataHandle,
+    data: unknown,
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_geo_json_source_data(
         this.id,
         sourceId,
-        data.id,
+        data,
         completion,
       ),
     );
@@ -3615,27 +3557,32 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Adds a GeoJSON source with prepared data.
+   * Adds a GeoJSON source with no data.
    *
-   * The source uses the options that `data` was prepared with. `data` can be
-   * released once this function returns.
+   * Give it data with `MapHandle.setGeoJsonSourceData()` or
+   * `MapHandle.setGeoJsonSourceUrl()`. Its options stay fixed for as long as
+   * the style holds it.
    *
    * `attribution` is the source's
    * &#91;attribution&#93;(https://maplibre.org/maplibre-style-spec/sources/#attribution),
    * or empty for none.
    *
-   * See `mln_map_add_geo_json_source_data` in the
+   * See `mln_map_add_geo_json_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when an option in `options` is out of range.
    */
-  addGeoJsonSourceData(
+  addGeoJsonSource(
     sourceId: string,
-    data: GeoJsonSourceDataHandle,
+    options?: GeoJsonSourceOptions,
     attribution?: string,
   ): void {
-    native.mln_map_add_geo_json_source_data(
+    native.mln_map_add_geo_json_source(
       this.#owner.id,
       sourceId,
-      data.id,
+      options,
       attribution,
       undefined,
     );
@@ -4191,18 +4138,25 @@ export class MapHandleDiscarding {
   /**
    * Replaces the data of a GeoJSON source.
    *
-   * `data` must have been prepared with the source's options, which
-   * `MapHandle.getStyleSource()` reports, though `min_zoom` may differ. `data`
-   * can be released once this function returns.
+   * `data` is a GeoJSON feature collection, feature, or geometry. The library
+   * prepares it for the source with the source's options, off the threads that
+   * the caller and the runtime use, and the command completes once the source
+   * holds it. Later commands don't wait for it. While the source is still
+   * preparing earlier data, only the newest data waits to follow it.
+   *
+   * With synchronous tiling on, as
+   * `MapHandle.setGeoJsonSourceSynchronousTiling()` describes, the command
+   * prepares `data` before later commands run, so the data shows in the next
+   * frame.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  setGeoJsonSourceData(sourceId: string, data: GeoJsonSourceDataHandle): void {
+  setGeoJsonSourceData(sourceId: string, data: unknown): void {
     native.mln_map_set_geo_json_source_data(
       this.#owner.id,
       sourceId,
-      data.id,
+      data,
       undefined,
     );
   }

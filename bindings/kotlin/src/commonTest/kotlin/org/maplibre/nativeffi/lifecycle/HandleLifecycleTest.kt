@@ -8,7 +8,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
-import org.maplibre.nativeffi.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MaplibreException
 import org.maplibre.nativeffi.RuntimeEventType
@@ -16,6 +15,7 @@ import org.maplibre.nativeffi.RuntimeFixture
 import org.maplibre.nativeffi.RuntimeHandle
 import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.Status
+import org.maplibre.nativeffi.StyleExpressionHandle
 import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.assertFailsWithStatus
 import org.maplibre.nativeffi.awaitWithin
@@ -28,9 +28,9 @@ import org.maplibre.nativeffi.useReleasing
 class HandleLifecycleTest {
   @Test
   fun releasingAHandleTwiceIsSafeAndLaterUseIsRefused() = runSuspendTest {
-    val data = GeoJsonSourceDataHandle.create(POINT_JSON)
-    data.release()
-    data.release()
+    val expression = StyleExpressionHandle.create(EXPRESSION_JSON)
+    expression.release()
+    expression.release()
 
     val runtime = RuntimeHandle.create(RuntimeOptions()).await()
     runtime.release().awaitWithin("the runtime teardown")
@@ -41,13 +41,13 @@ class HandleLifecycleTest {
 
   @Test
   fun aHandleNamesItsIdAndWhetherItIsClosed() {
-    val data = GeoJsonSourceDataHandle.create(POINT_JSON)
-    val id = "0x" + data.id.toString(16)
-    assertFalse(data.isClosed)
-    assertEquals("GeoJsonSourceDataHandle(id=$id, closed=false)", data.toString())
-    data.release()
-    assertTrue(data.isClosed)
-    assertEquals("GeoJsonSourceDataHandle(id=$id, closed=true)", data.toString())
+    val expression = StyleExpressionHandle.create(EXPRESSION_JSON)
+    val id = "0x" + expression.id.toString(16)
+    assertFalse(expression.isClosed)
+    assertEquals("StyleExpressionHandle(id=$id, closed=false)", expression.toString())
+    expression.release()
+    assertTrue(expression.isClosed)
+    assertEquals("StyleExpressionHandle(id=$id, closed=true)", expression.toString())
   }
 
   @Test
@@ -190,6 +190,6 @@ class HandleLifecycleTest {
   }
 
   private companion object {
-    const val POINT_JSON = """{"type":"Point","coordinates":[0,0]}"""
+    const val EXPRESSION_JSON = """["literal", 1]"""
   }
 }

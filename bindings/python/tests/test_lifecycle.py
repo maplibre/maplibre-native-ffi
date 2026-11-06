@@ -36,19 +36,17 @@ def test_a_released_handle_refuses_use_and_a_synchronous_release_repeats_safely(
     ):
         runtime.release()
 
-    data = mln.GeoJsonSourceDataHandle.create(
-        {"type": "FeatureCollection", "features": []}
-    )
-    _check_handle(data, closed=False)
-    data.release()
-    data.release()
-    with data:
+    expression = mln.StyleExpressionHandle.create(["literal", 1])
+    _check_handle(expression, closed=False)
+    expression.release()
+    expression.release()
+    with expression:
         pass
-    _check_handle(data, closed=True)
+    _check_handle(expression, closed=True)
 
 
 def _check_handle(
-    handle: mln.GeoJsonSourceDataHandle | mln.MapHandle | mln.RuntimeHandle,
+    handle: mln.StyleExpressionHandle | mln.MapHandle | mln.RuntimeHandle,
     *,
     closed: bool,
 ) -> None:

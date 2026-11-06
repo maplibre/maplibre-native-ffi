@@ -193,21 +193,6 @@ void mln_kw_mln_frame_pacer_release(int64_t pacer) {
   mln_frame_pacer_release((mln_frame_pacer)pacer);
 }
 
-int32_t mln_kw_mln_geo_json_source_data_create(
-  uintptr_t data, uintptr_t options, uintptr_t out_data,
-  uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_geo_json_source_data_create(
-    *(const mln_buffer_view*)(uintptr_t)data,
-    (const mln_geo_json_source_options*)options,
-    (mln_geo_json_source_data*)out_data, (mln_diagnostic*)out_diagnostic
-  );
-}
-
-void mln_kw_mln_geo_json_source_data_release(int64_t data) {
-  mln_geo_json_source_data_release((mln_geo_json_source_data)data);
-}
-
 int32_t mln_kw_mln_http_header_transform_response_set_header(
   uintptr_t response, uintptr_t name, uintptr_t value, uintptr_t out_diagnostic
 ) {
@@ -279,13 +264,13 @@ int32_t mln_kw_mln_map_add_custom_vector_source(
   );
 }
 
-int32_t mln_kw_mln_map_add_geo_json_source_data(
-  int64_t map, uintptr_t source_id, int64_t data, uintptr_t attribution,
+int32_t mln_kw_mln_map_add_geo_json_source(
+  int64_t map, uintptr_t source_id, uintptr_t options, uintptr_t attribution,
   uintptr_t completion, uintptr_t out_diagnostic
 ) {
-  return (int32_t)mln_map_add_geo_json_source_data(
+  return (int32_t)mln_map_add_geo_json_source(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
-    (mln_geo_json_source_data)data,
+    (const mln_geo_json_source_options*)options,
     *(const mln_buffer_view*)(uintptr_t)attribution,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
   );
@@ -1148,12 +1133,12 @@ int32_t mln_kw_mln_map_set_free_camera_options(
 }
 
 int32_t mln_kw_mln_map_set_geo_json_source_data(
-  int64_t map, uintptr_t source_id, int64_t data, uintptr_t completion,
+  int64_t map, uintptr_t source_id, uintptr_t data, uintptr_t completion,
   uintptr_t out_diagnostic
 ) {
   return (int32_t)mln_map_set_geo_json_source_data(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)source_id,
-    (mln_geo_json_source_data)data, (const mln_completion*)completion,
+    *(const mln_buffer_view*)(uintptr_t)data, (const mln_completion*)completion,
     (mln_diagnostic*)out_diagnostic
   );
 }

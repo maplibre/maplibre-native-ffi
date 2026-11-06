@@ -3773,13 +3773,6 @@ unsafe extern "C" fn generated_dispose_mln_frame_pacer(
     sys::MLN_STATUS_OK
 }
 
-unsafe extern "C" fn generated_dispose_mln_geo_json_source_data(
-    handle: sys::mln_geo_json_source_data,
-) -> sys::mln_status {
-    unsafe { sys::mln_geo_json_source_data_release(handle) };
-    sys::MLN_STATUS_OK
-}
-
 unsafe extern "C" fn generated_dispose_mln_map(handle: sys::mln_map) -> sys::mln_status {
     unsafe { sys::mln_map_dispose(handle, std::ptr::null_mut()) }
 }
@@ -4028,59 +4021,6 @@ impl FramePacerHandle {
 }
 
 #[pymethods]
-impl GeoJsonSourceDataHandle {
-    #[staticmethod]
-    #[pyo3(signature = (data, options=None))]
-    fn create(
-        py: Python<'_>,
-        data: &Bound<'_, PyAny>,
-        options: Option<Bound<'_, PyAny>>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let data_value = storage.json(data.clone(), false)?;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_geo_json_source_options(&options, storage)
-        })?;
-        let mut out_data: sys::mln_geo_json_source_data = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_geo_json_source_data_create(
-                    data_value,
-                    generated_pointer(&options_value),
-                    &mut out_data,
-                    diagnostic,
-                )
-            })
-        }?;
-        unsafe { GeoJsonSourceDataHandle::adopt(py, out_data, Vec::new()) }
-    }
-    #[pyo3(signature = ())]
-    fn _dispose(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_geo_json_source_data_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-    #[pyo3(signature = ())]
-    fn release(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_geo_json_source_data_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-}
-
-#[pymethods]
 impl MapHandle {
     #[pyo3(signature = (source_id, options))]
     fn add_custom_geometry_source(
@@ -4194,27 +4134,30 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (source_id, data, attribution=None))]
-    fn add_geo_json_source_data(
+    #[pyo3(signature = (source_id, options=None, attribution=None))]
+    fn add_geo_json_source(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeoJsonSourceDataHandle,
+        options: Option<Bound<'_, PyAny>>,
         attribution: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data.input();
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_geo_json_source_options(&options, storage)
+        })?;
         let attribution = attribution.unwrap_or_else(|| py.None().into_bound(py));
         let attribution_value = storage.buffer(attribution.clone(), true)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_add_geo_json_source_data(
+                sys::mln_map_add_geo_json_source(
                     handle,
                     source_id_value,
-                    data_handle,
+                    generated_pointer(&options_value),
                     attribution_value,
                     completion,
                     diagnostic,
@@ -4222,27 +4165,30 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (source_id, data, attribution=None))]
-    fn _discard_add_geo_json_source_data(
+    #[pyo3(signature = (source_id, options=None, attribution=None))]
+    fn _discard_add_geo_json_source(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeoJsonSourceDataHandle,
+        options: Option<Bound<'_, PyAny>>,
         attribution: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data.input();
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_geo_json_source_options(&options, storage)
+        })?;
         let attribution = attribution.unwrap_or_else(|| py.None().into_bound(py));
         let attribution_value = storage.buffer(attribution.clone(), true)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_add_geo_json_source_data(
+                sys::mln_map_add_geo_json_source(
                     handle,
                     source_id_value,
-                    data_handle,
+                    generated_pointer(&options_value),
                     attribution_value,
                     completion,
                     diagnostic,
@@ -6680,19 +6626,19 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeoJsonSourceDataHandle,
+        data: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data.input();
+        let data_value = storage.json(data.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_geo_json_source_data(
                     handle,
                     source_id_value,
-                    data_handle,
+                    data_value,
                     completion,
                     diagnostic,
                 )
@@ -6704,19 +6650,19 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
-        data: &GeoJsonSourceDataHandle,
+        data: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data.input();
+        let data_value = storage.json(data.clone(), false)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_geo_json_source_data(
                     handle,
                     source_id_value,
-                    data_handle,
+                    data_value,
                     completion,
                     diagnostic,
                 )
@@ -9480,12 +9426,6 @@ generated_owner!(
     Some(generated_dispose_mln_frame_pacer)
 );
 generated_owner!(
-    GeoJsonSourceDataHandle,
-    "_GeoJsonSourceDataHandle",
-    mln_geo_json_source_data,
-    Some(generated_dispose_mln_geo_json_source_data)
-);
-generated_owner!(
     MapHandle,
     "_MapHandle",
     mln_map,
@@ -9769,7 +9709,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
     module.add_class::<FramePacerHandle>()?;
-    module.add_class::<GeoJsonSourceDataHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
     module.add_class::<OffscreenDeviceHandle>()?;

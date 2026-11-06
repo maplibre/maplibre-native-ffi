@@ -58,35 +58,37 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a GeoJSON source with prepared data.
+  /// Adds a GeoJSON source with no data.
   ///
-  /// The source uses the options that `data` was prepared with. `data` can be
-  /// released once this function returns.
+  /// Give it data with `MapHandle.setGeoJsonSourceData()` or
+  /// `MapHandle.setGeoJsonSourceUrl()`. Its options stay fixed for as long as
+  /// the style holds it.
   ///
   /// `attribution` is the source's
   /// \[attribution\](https://maplibre.org/maplibre-style-spec/sources/#attribution),
   /// or empty for none.
   ///
-  /// See `mln_map_add_geo_json_source_data` in the
+  /// See `mln_map_add_geo_json_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   ///
   /// Errors:
   ///
+  /// - `Status.invalidArgument` when an option in `options` is out of range.
   /// - `Status.alreadyExists` when the style already has a source named
   ///   `sourceId`.
   /// - `Status.invalidState` while the style isn't loaded, as
   ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
-  func addGeoJsonSourceData(
+  func addGeoJsonSource(
     _ bindingArg0: String,
-    data bindingArg1: GeoJsonSourceDataHandle,
+    options bindingArg1: GeoJsonSourceOptions? = nil,
     attribution bindingArg2: String? = nil
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_add_geo_json_source_data(
+      try mln_map_add_geo_json_source(
         raw,
         arena.view(bindingArg0),
-        arena.use(bindingArg1.handle),
+        bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
         bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
         completion,
         diagnostic
@@ -770,9 +772,16 @@ public extension MapHandle {
 
   /// Replaces the data of a GeoJSON source.
   ///
-  /// `data` must have been prepared with the source's options, which
-  /// `MapHandle.getStyleSource()` reports, though `min_zoom` may differ. `data`
-  /// can be released once this function returns.
+  /// `data` is a GeoJSON feature collection, feature, or geometry. The library
+  /// prepares it for the source with the source's options, off the threads that
+  /// the caller and the runtime use, and the command completes once the source
+  /// holds it. Later commands don't wait for it. While the source is still
+  /// preparing earlier data, only the newest data waits to follow it.
+  ///
+  /// With synchronous tiling on, as
+  /// `MapHandle.setGeoJsonSourceSynchronousTiling()` describes, the command
+  /// prepares `data` before later commands run, so the data shows in the next
+  /// frame.
   ///
   /// See `mln_map_set_geo_json_source_data` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -781,19 +790,24 @@ public extension MapHandle {
   ///
   /// - `Status.notFound` when the style has no source named `sourceId`.
   /// - `Status.invalidArgument` when the source named `sourceId` isn't a
-  ///   GeoJSON source, or `data` was prepared with other options.
+  ///   GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+  ///   clusters and `data` isn't a feature collection of points. The source
+  ///   keeps its data.
+  /// - `Status.cancelled` when newer data for the source replaces `data` while
+  ///   it waits, or when the source's URL, its removal, a style load, or the
+  ///   map's release replaces the source's data before `data` is ready.
   /// - `Status.invalidState` while the style isn't loaded, as
   ///   `MapHandle.setStyleUrl()` describes.
   @discardableResult
   func setGeoJsonSourceData(
     _ bindingArg0: String,
-    data bindingArg1: GeoJsonSourceDataHandle
+    data bindingArg1: String
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_geo_json_source_data(
         raw,
         arena.view(bindingArg0),
-        arena.use(bindingArg1.handle),
+        arena.view(bindingArg1),
         completion,
         diagnostic
       )
@@ -1172,22 +1186,20 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func addGeoJsonSourceData(
+  func addGeoJsonSource(
     _ bindingArg0: String,
-    data bindingArg1: GeoJsonSourceDataHandle,
+    options bindingArg1: GeoJsonSourceOptions? = nil,
     attribution bindingArg2: String? = nil
   ) throws {
     try owner
-      .nativeInvoke { raw, arena, diagnostic in
-        mln_map_add_geo_json_source_data(
-          raw,
-          arena.view(bindingArg0),
-          arena.use(bindingArg1.handle),
-          bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
-          nil,
-          diagnostic
-        )
-      }
+      .nativeInvoke { raw, arena, diagnostic in try mln_map_add_geo_json_source(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
+        bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
+        nil,
+        diagnostic
+      ) }
   }
 
   func addImageSourceImage(
@@ -1420,14 +1432,14 @@ public extension MapHandleDiscarding {
 
   func setGeoJsonSourceData(
     _ bindingArg0: String,
-    data bindingArg1: GeoJsonSourceDataHandle
+    data bindingArg1: String
   ) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in
         mln_map_set_geo_json_source_data(
           raw,
           arena.view(bindingArg0),
-          arena.use(bindingArg1.handle),
+          arena.view(bindingArg1),
           nil,
           diagnostic
         )

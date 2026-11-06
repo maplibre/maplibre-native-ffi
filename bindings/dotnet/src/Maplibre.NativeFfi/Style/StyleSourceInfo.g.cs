@@ -28,8 +28,7 @@ public sealed record StyleSourceInfo
     public StyleRasterDemEncoding? RasterEncoding { get; init; }
 
     /// <summary>
-    /// A GeoJSON source's options, with every field set. Data prepared with
-    /// them can replace the source's data.
+    /// A GeoJSON source's options, with every field set.
     /// </summary>
     public GeoJsonSourceOptions? GeoJson { get; init; }
 }

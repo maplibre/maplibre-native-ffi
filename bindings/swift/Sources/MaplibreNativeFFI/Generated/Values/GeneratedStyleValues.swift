@@ -797,8 +797,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   public var tileSize: UInt32?
   public var vectorEncoding: StyleVectorTileEncoding?
   public var rasterEncoding: StyleRasterDemEncoding?
-  /// A GeoJSON source's options, with every field set. Data prepared with them
-  /// can replace the source's data.
+  /// A GeoJSON source's options, with every field set.
   public var geoJson: GeoJsonSourceOptions?
   public init(
     id: String = "",

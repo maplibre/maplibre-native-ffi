@@ -40,11 +40,12 @@ top, unless you give the ID of a layer to draw it under. See
 
 <Snippet page="style" region="add" />
 
-For GeoJSON data in memory, prepare it as [](api:mln_geo_json_source_data)
-first, then add a GeoJSON source with [](api:mln_map_add_geo_json_source_data).
-Preparing processes the data before it reaches the map, so you can do it on any
-thread, off your event loop. To update the source, set new prepared data with
-[](api:mln_map_set_geo_json_source_data).
+For GeoJSON data in memory, add a GeoJSON source with
+[](api:mln_map_add_geo_json_source), then set its data with
+[](api:mln_map_set_geo_json_source_data). The library processes the data in the
+background, so a large document doesn't hold up your thread or the map. Set new
+data the same way to update the source. When updates come faster than the source
+can take them, it skips to the newest.
 
 <Snippet page="style" region="geojson" />
 

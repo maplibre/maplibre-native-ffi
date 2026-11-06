@@ -2159,9 +2159,6 @@ pub type mln_frame_demand_flags = u32;
 pub struct mln_frame_pacer(pub u64);
 pub type mln_frame_pacer_option_fields = u32;
 pub type mln_free_camera_option_fields = u32;
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_geo_json_source_data(pub u64);
 pub type mln_geo_json_source_option_fields = u32;
 pub type mln_gpu_sync_kind_flags = u32;
 pub type mln_http_header_transform_callback = Option<
@@ -2268,7 +2265,6 @@ native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
     mln_frame_pacer,
-    mln_geo_json_source_data,
     mln_map,
     mln_map_projection,
     mln_offscreen_device,
@@ -2394,13 +2390,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_delivery_queue_release(queue: mln_delivery_queue);
     pub fn mln_frame_pacer_release(pacer: mln_frame_pacer);
-    pub fn mln_geo_json_source_data_create(
-        data: mln_buffer_view,
-        options: *const mln_geo_json_source_options,
-        out_data: *mut mln_geo_json_source_data,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_geo_json_source_data_release(data: mln_geo_json_source_data);
     pub fn mln_http_header_transform_response_set_header(
         response: *mut mln_http_header_transform_response,
         name: mln_buffer_view,
@@ -2441,10 +2430,10 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_add_geo_json_source_data(
+    pub fn mln_map_add_geo_json_source(
         map: mln_map,
         source_id: mln_buffer_view,
-        data: mln_geo_json_source_data,
+        options: *const mln_geo_json_source_options,
         attribution: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
@@ -2996,7 +2985,7 @@ unsafe extern "C" {
     pub fn mln_map_set_geo_json_source_data(
         map: mln_map,
         source_id: mln_buffer_view,
-        data: mln_geo_json_source_data,
+        data: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

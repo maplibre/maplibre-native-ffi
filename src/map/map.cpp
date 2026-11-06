@@ -95,6 +95,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
+#include "geojson/geojson_source_data.hpp"
 #include "handles/handle_table.hpp"
 #include "map/logical_extent.hpp"
 #include "map/map_internal.hpp"
@@ -3872,6 +3873,7 @@ auto finish_map_retirement(RetirementTask* task) noexcept -> void {
   // after cancellation.
   close_camera_transitions(*map.event_state);
   cancel_pending_style_load(map, "map was released");
+  cancel_geojson_source_updates(map, "map was released");
   map.map.reset();
   map.callback_sources->release_all();
   if (auto completion = std::move(map.release_completion)) {
@@ -3894,6 +3896,7 @@ auto begin_map_retirement(RetirementTask* task) noexcept -> void {
   }
   close_camera_transitions(*map.event_state);
   cancel_pending_style_load(map, "map was released");
+  cancel_geojson_source_updates(map, "map was released");
   if (auto release = std::exchange(map.still_image_release_submission, {}))
     release();
   task->run = finish_map_retirement;
@@ -4354,6 +4357,7 @@ struct StyleLoadTask final : MapCommandTask {
       // or a failure during this transaction belongs to the new load.
       replaced_pending = std::exchange(live.style_load_pending, false);
       replaced = std::exchange(live.style_load_completion, {});
+      cancel_geojson_source_updates(live, "a style load replaced the source");
       auto& events = *live.event_state;
       events.style_load_failed = false;
       events.style_load_failure.clear();
@@ -4398,6 +4402,299 @@ auto submit_map_style_load(
   const auto status = submit_runtime_command_task(runtime, *task);
   if (status == MLN_STATUS_OK) static_cast<void>(task.release());
   return status;
+}
+
+namespace {
+
+constexpr auto replaced_by_newer_data = "newer data replaced this data";
+
+// Completes each cancelled command from a later task, since cancelling runs
+// inside a map transaction or a MapLibre callback.
+auto complete_cancelled(
+  MapObject& live, std::vector<std::shared_ptr<Completion>> completions,
+  const char* reason
+) noexcept -> void {
+  if (completions.empty()) return;
+  try {
+    live.runtime_state->executor.invoke(
+      [completions, reason]() noexcept -> void {
+        for (const auto& completion : completions) {
+          complete_command(completion, MLN_STATUS_CANCELLED, {}, reason);
+        }
+      }
+    );
+  } catch (...) {
+    for (const auto& completion : completions) {
+      complete_command(completion, MLN_STATUS_CANCELLED, {}, reason);
+    }
+  }
+}
+
+auto take_completions(
+  GeoJsonSourceUpdate& update, std::vector<std::shared_ptr<Completion>>& out
+) -> void {
+  if (update.preparing != 0)
+    out.push_back(std::move(update.preparing_completion));
+  if (update.waiting) out.push_back(std::move(update.waiting_completion));
+}
+
+auto submit_geojson_source_install(
+  mln_map map, std::string source_id, uint64_t preparation,
+  PreparedGeoJsonSourceData prepared
+) noexcept -> void;
+
+// Prepares `data` on MapLibre's background pool, then installs it with a map
+// command. On failure, completes `completion` and leaves `update` idle.
+auto start_geojson_source_preparation(
+  MapObject& live, const std::string& source_id, GeoJsonSourceUpdate& update,
+  std::string data, mln::Immutable<mln::style::GeoJSONOptions> options,
+  std::shared_ptr<Completion> completion
+) noexcept -> void {
+  const auto preparation = live.next_geojson_update++;
+  try {
+    mln::Scheduler::GetBackground()->schedule(
+      [map = live.self, source_id, preparation, data = std::move(data),
+       options = std::move(options)]() mutable -> void {
+        mln::testing::hit(mln::testing::SyncPoint::GeoJsonDataPrepare);
+        auto prepared = prepare_geojson_source_data(data, options);
+        data = std::string{};
+        submit_geojson_source_install(
+          map, std::move(source_id), preparation, std::move(prepared)
+        );
+      }
+    );
+  } catch (const std::exception& exception) {
+    complete_command(completion, MLN_STATUS_NATIVE_ERROR, {}, exception.what());
+    return;
+  } catch (...) {
+    complete_command(
+      completion, MLN_STATUS_NATIVE_ERROR, {},
+      "GeoJSON data preparation failed to start"
+    );
+    return;
+  }
+  update.preparing = preparation;
+  update.preparing_completion = std::move(completion);
+}
+
+// Starts the data that waits for the source's preparation once that is done,
+// or forgets the source when nothing waits.
+auto start_waiting_geojson_source_update(
+  MapObject& live, const std::string& source_id
+) noexcept -> void {
+  const auto found = live.geojson_updates.find(source_id);
+  if (found == live.geojson_updates.end()) return;
+  auto& update = found->second;
+  if (update.preparing == 0 && update.waiting) {
+    update.waiting = false;
+    auto data = std::exchange(update.waiting_data, {});
+    auto options = std::move(*update.waiting_options);
+    update.waiting_options.reset();
+    start_geojson_source_preparation(
+      live, source_id, update, std::move(data), std::move(options),
+      std::exchange(update.waiting_completion, {})
+    );
+  }
+  if (update.preparing == 0 && !update.waiting) {
+    live.geojson_updates.erase(found);
+  }
+}
+
+// Leaves new data for a source on the map. Only the newest data waits behind
+// the source's preparation in flight.
+auto queue_geojson_source_update(
+  MapObject& live, const std::string& source_id, std::string data,
+  mln::Immutable<mln::style::GeoJSONOptions> options,
+  std::shared_ptr<Completion> completion
+) noexcept -> void {
+  try {
+    auto& update = live.geojson_updates[source_id];
+    if (update.preparing == 0) {
+      start_geojson_source_preparation(
+        live, source_id, update, std::move(data), std::move(options),
+        std::move(completion)
+      );
+      if (update.preparing == 0) live.geojson_updates.erase(source_id);
+      return;
+    }
+    auto replaced = std::vector<std::shared_ptr<Completion>>{};
+    if (update.waiting)
+      replaced.push_back(std::move(update.waiting_completion));
+    update.waiting = true;
+    update.waiting_data = std::move(data);
+    update.waiting_options.emplace(std::move(options));
+    update.waiting_completion = std::move(completion);
+    complete_cancelled(live, std::move(replaced), replaced_by_newer_data);
+  } catch (const std::exception& exception) {
+    complete_command(completion, MLN_STATUS_NATIVE_ERROR, {}, exception.what());
+  } catch (...) {
+    complete_command(
+      completion, MLN_STATUS_NATIVE_ERROR, {}, "GeoJSON data could not wait"
+    );
+  }
+}
+
+// Replaces a GeoJSON source's data. A source that tiles synchronously
+// prepares and installs the data in this command's transaction. Any other
+// source leaves the data on the map, and the command completes once a
+// background preparation installs it or something cancels it.
+struct GeoJsonSourceDataTask final : MapCommandTask {
+  std::string source_id;
+  std::string data;
+
+  GeoJsonSourceDataTask(std::string id, std::string value)
+      : source_id(std::move(id)), data(std::move(value)) {
+    command = true;
+    run = [](ExecutorTask* base) noexcept {
+      auto owner = std::unique_ptr<GeoJsonSourceDataTask>{
+        static_cast<GeoJsonSourceDataTask*>(base)
+      };
+      run_runtime_command_task(*owner);
+    };
+    work = [](RuntimeCommandTask& base) {
+      static_cast<GeoJsonSourceDataTask&>(base).execute();
+    };
+    clear_work = [](RuntimeCommandTask& base) noexcept {
+      auto& self = static_cast<GeoJsonSourceDataTask&>(base);
+      self.data = std::string{};
+      self.map_lease.reset();
+      self.map.reset();
+    };
+  }
+
+  auto execute() -> void {
+    auto target = GeoJsonSourceTarget{};
+    auto outcome = run_map_transaction(map, [&](MapObject& live) -> mln_status {
+      const auto loaded = require_style_loaded(live);
+      if (loaded != MLN_STATUS_OK) return loaded;
+      const auto found = map_find_geojson_source(live, source_id, target);
+      if (found != MLN_STATUS_OK || !target.synchronous) return found;
+      cancel_geojson_source_update(live, source_id, replaced_by_newer_data);
+      auto prepared = prepare_geojson_source_data(data, *target.options);
+      if (prepared.status != MLN_STATUS_OK) {
+        set_thread_error(prepared.message.c_str());
+        return prepared.status;
+      }
+      return map_install_geojson_source_data(
+        live, source_id, std::move(prepared.data)
+      );
+    });
+    if (outcome.status != MLN_STATUS_OK || target.synchronous) {
+      complete_map_command(completion, std::move(outcome));
+      return;
+    }
+    completion = nullptr;
+    queue_geojson_source_update(
+      *map, source_id, std::move(data), std::move(*target.options),
+      std::move(retained_completion)
+    );
+  }
+};
+
+// Runs on the runtime worker. Installs data that a background preparation
+// finished, unless something cancelled the preparation meanwhile, then starts
+// the data that waits.
+auto install_geojson_source_data(
+  const std::shared_ptr<MapObject>& map, const std::string& source_id,
+  uint64_t preparation, PreparedGeoJsonSourceData prepared
+) -> void {
+  auto& live = *map;
+  const auto found = live.geojson_updates.find(source_id);
+  if (
+    found == live.geojson_updates.end() ||
+    found->second.preparing != preparation
+  ) {
+    return;
+  }
+  const auto finished = std::exchange(found->second.preparing_completion, {});
+  found->second.preparing = 0;
+  auto outcome = run_map_transaction(map, [&](MapObject& target) -> mln_status {
+    if (prepared.status != MLN_STATUS_OK) {
+      set_thread_error(prepared.message.c_str());
+      return prepared.status;
+    }
+    return map_install_geojson_source_data(
+      target, source_id, std::move(prepared.data)
+    );
+  });
+  complete_map_command(finished.get(), std::move(outcome));
+  start_waiting_geojson_source_update(live, source_id);
+}
+
+// Runs on MapLibre's background pool. The install finishes a command that the
+// runtime already accepted, so it goes straight to the runtime worker instead
+// of through a new submission, which a disposed runtime would refuse. The
+// command's pending completion holds the runtime open until then. A map that
+// is gone, or a runtime that has stopped, cancelled the preparation already.
+auto submit_geojson_source_install(
+  mln_map map, std::string source_id, uint64_t preparation,
+  PreparedGeoJsonSourceData prepared
+) noexcept -> void {
+  try {
+    auto live = handle_table<MapObject>().lease(map);
+    if (live == nullptr) return;
+    const auto runtime = live->runtime_state;
+    runtime->executor.invoke(
+      [live = std::move(live), source_id = std::move(source_id), preparation,
+       prepared = std::move(prepared)]() mutable noexcept -> void {
+        try {
+          install_geojson_source_data(
+            live, source_id, preparation, std::move(prepared)
+          );
+        } catch (...) {
+        }
+      }
+    );
+  } catch (...) {
+  }
+}
+
+}  // namespace
+
+auto submit_geojson_source_data(
+  mln_map map, std::string source_id, std::string data,
+  const mln_completion* descriptor
+) -> mln_status {
+  auto task = std::make_unique<GeoJsonSourceDataTask>(
+    std::move(source_id), std::move(data)
+  );
+  const auto made =
+    make_command_completion(descriptor, task->retained_completion);
+  if (made != MLN_STATUS_OK) return made;
+  task->completion = task->retained_completion.get();
+  const auto prepared = prepare_map_command_task(map, *task, nullptr);
+  if (prepared != MLN_STATUS_OK) return prepared;
+  const auto runtime = task->map->runtime_state;
+  const auto status = submit_runtime_command_task(runtime, *task);
+  if (status == MLN_STATUS_OK) static_cast<void>(task.release());
+  return status;
+}
+
+auto cancel_geojson_source_update(
+  MapObject& live, const std::string& source_id, const char* reason
+) noexcept -> void {
+  const auto found = live.geojson_updates.find(source_id);
+  if (found == live.geojson_updates.end()) return;
+  auto cancelled = std::vector<std::shared_ptr<Completion>>{};
+  try {
+    take_completions(found->second, cancelled);
+  } catch (...) {
+  }
+  live.geojson_updates.erase(found);
+  complete_cancelled(live, std::move(cancelled), reason);
+}
+
+auto cancel_geojson_source_updates(MapObject& live, const char* reason) noexcept
+  -> void {
+  auto cancelled = std::vector<std::shared_ptr<Completion>>{};
+  try {
+    for (auto& [id, update] : live.geojson_updates) {
+      take_completions(update, cancelled);
+    }
+  } catch (...) {
+  }
+  live.geojson_updates.clear();
+  complete_cancelled(live, std::move(cancelled), reason);
 }
 
 auto map_set_style_url(MapObject& live, const char* url) -> mln_status {

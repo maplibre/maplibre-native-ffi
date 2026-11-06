@@ -5,8 +5,13 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
+
+#include <mln/style/sources/geojson_source.hpp>
+#include <mln/util/immutable.hpp>
 
 #include "execution/control_state.hpp"
 #include "execution/retirement.hpp"
@@ -28,6 +33,19 @@ class HeadlessObserver;
 struct MapEventState;
 class OperationObject;
 struct RuntimeObject;
+
+// Worker-owned. The data that mln_map_set_geo_json_source_data() prepares for
+// one GeoJSON source in the background, and the newest data that waits for it.
+// Each completion is null when the caller passed none.
+struct GeoJsonSourceUpdate {
+  // Names the preparation in flight, or 0 when none is.
+  uint64_t preparing = 0;
+  std::shared_ptr<Completion> preparing_completion;
+  bool waiting = false;
+  std::string waiting_data;
+  std::optional<mln::Immutable<mln::style::GeoJSONOptions>> waiting_options;
+  std::shared_ptr<Completion> waiting_completion;
+};
 
 struct MapObject {
   ControlState control;
@@ -77,6 +95,11 @@ struct MapObject {
   // newer style load or the map's release cancels it.
   bool style_load_pending = false;
   std::shared_ptr<Completion> style_load_completion;
+  // Worker-owned, by source ID. A source's entry lasts while it prepares
+  // data. Replacing the source's data another way, removing the source, a
+  // style load, and the map's release cancel it.
+  std::unordered_map<std::string, GeoJsonSourceUpdate> geojson_updates;
+  uint64_t next_geojson_update = 1;
   // Declared first so reverse-order destruction runs the release callbacks it
   // still owes after the mln::Map that could still reach a source is gone.
   std::shared_ptr<CallbackSourceRegistry> callback_sources;
