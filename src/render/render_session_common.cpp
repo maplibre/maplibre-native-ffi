@@ -956,12 +956,8 @@ auto run_frame_demand(
   const std::shared_ptr<const QueuedFrameDemand>& expected
 ) noexcept -> void;
 
-// Whether the map has applied the commands sent before the oldest queued
-// demand, which the work for `expected` runs next. Until it has, that work
-// waits at the front of the driver's queue, with the driver work behind it, so
-// the frame shows those commands and driver work keeps its order. The map's
-// commands notice then wakes the driver. Work whose demand already ended runs
-// nothing, so it doesn't wait.
+// Whether the map has applied the commands sent before the demand that the
+// work for `expected` runs next. Work whose demand ended runs nothing.
 auto map_commands_ready_locked(
   mln_render_session_object& session,
   const std::shared_ptr<const QueuedFrameDemand>& expected
@@ -1073,8 +1069,7 @@ auto arm_still_image_demand_locked(
   try {
     reserve_frame_result_locked(session);
     session.demands.push_back(
-      // The map requested the image after the commands sent before it, so
-      // the demand waits for none.
+      // The map requested the image itself.
       std::make_shared<const QueuedFrameDemand>(QueuedFrameDemand{
         {
           .size = sizeof(mln_frame_demand),
@@ -1989,8 +1984,7 @@ auto notify_render_session_map_commands(
   const auto lock = std::scoped_lock{session->control_mutex};
   // Detach and abandon leave this state before they drop the map.
   if (session->state != MLN_RENDER_SESSION_STATE_ATTACHED) return;
-  // Demand work that still waits sets the flag again when the driver checks
-  // it, so a command that finishes after this still sends a notice.
+  // Work that still waits sets the flag again when the driver checks it.
   map_set_commands_awaited(*session->map_object, false);
   publish_driver_work_locked(*session, wakes);
 }
@@ -3140,9 +3134,8 @@ auto run_frame_demand(
     .view = {},
     .mode = MLN_RENDER_MODE_PARTIAL,
   };
-  // Only a detaching session lets demand work run before the map applies the
-  // demand's commands, and a frame then would miss them. The detach work
-  // behind this keeps the map until it runs.
+  // Only a detaching session runs a demand before its commands apply. Its
+  // detach work, queued behind this, still holds the map.
   if (map_commands_applied(*session->map_object) < demand->map_commands) {
     result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
     publish_frame_result(session, result);

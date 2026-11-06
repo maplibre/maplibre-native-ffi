@@ -1334,7 +1334,6 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     if (notify_session) notify_session(generation);
   }
 
-  // Tells the session that the map finished a command.
   auto announce_commands() noexcept -> void {
     auto notify_session = std::function<void()>{};
     try {
@@ -3407,12 +3406,11 @@ auto prepare_map_command_task(
 
 namespace {
 
-// Runs on the runtime worker after a command's work, once its update is
-// stored.
+// Runs on the runtime worker after a command's work.
 auto finish_map_command(MapObject& live) noexcept -> void {
   live.commands_applied.fetch_add(1);
-  // Pairs with the session, which sets the flag and then reads the applied
-  // count, so one of the two sees the other.
+  // The session sets the flag before it rereads the count, so one of the two
+  // sees the other.
   if (!live.commands_awaited.load() || live.frontend == nullptr) return;
   live.frontend->announce_commands();
 }

@@ -284,6 +284,8 @@ static void webgpu_a_demand_behind_unfinished_frames_wakes_the_driver(void) {
     mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
   );
   const uint64_t depth = capabilities.texture_ring_depth;
+  // The demands wait for the map to apply the commands that set it up.
+  MLN_TEST_OK(mln_test_map_fence(map));
   for (uint64_t token = 1; token <= depth; token += 1) {
     mln_test_render_demand_forced(&fixture, token);
   }

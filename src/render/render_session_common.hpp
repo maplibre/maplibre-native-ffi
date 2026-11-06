@@ -890,8 +890,7 @@ struct RenderTextureState {
   bool gpu_wait_pending = false;
 };
 
-// An accepted frame demand, with the number of map commands sent before it.
-// It renders once the map has applied that many.
+// An accepted demand, and how many map commands were sent before it.
 struct QueuedFrameDemand : mln_frame_demand {
   std::uint64_t map_commands = 0;
 };

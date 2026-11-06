@@ -9107,8 +9107,8 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 
 // DemandFrame asks the session to render a frame.
 //
-// The frame shows the map commands that you sent before the call. The demand
-// waits for the map to apply them, but not for an open command group to end.
+// The frame shows the map commands that you sent before the call, except the
+// changes that an open command group holds back.
 //
 // You can call it once the attach call returns. While the attach runs, the
 // demand waits for it to complete. Every demand finishes with one frame result
