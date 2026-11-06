@@ -1504,6 +1504,11 @@ impl MapHandle {
     ///
     /// See `mln_map_get_snapshot` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidState` until `RuntimeHandle::create_map()` completes
+    ///   with `Status::Ok`.
     pub fn get_snapshot(&self) -> Result<MapSnapshot> {
         let mut call = self.inner.call();
         let mut out_snapshot: sys::mln_map_snapshot = unsafe { std::mem::zeroed() };

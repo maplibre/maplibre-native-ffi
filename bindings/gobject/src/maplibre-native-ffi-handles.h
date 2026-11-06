@@ -1582,6 +1582,11 @@ char* maplibre_native_ffi_map_get_loaded_style_json_finish(
  * See `mln_map_get_snapshot` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` until
+ *   `maplibre_native_ffi_runtime_create_map()` completes with `0`.
+ *
  * Returns: (transfer full): the value
  */
 MaplibreNativeFfiMapSnapshot* maplibre_native_ffi_map_get_snapshot(
@@ -5302,6 +5307,9 @@ MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(
  * maplibre_native_ffi_runtime_create_map:
  *
  * Creates a map on `runtime`.
+ *
+ * Asynchronous calls on the map before the completion runs wait for it, and
+ * complete with `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when creation fails.
  *
  * The object is ready once `maplibre_native_ffi_map_ready_async` finishes,
  * which fails with the errors that the completion reports.

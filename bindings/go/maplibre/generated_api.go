@@ -7697,6 +7697,10 @@ func (receiver *MapHandle) GetLoadedStyleJSON() (*Future[string], error) {
 //
 // See mln_map_get_snapshot in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+//
+// Errors:
+//   - StatusInvalidState until RuntimeHandle.CreateMap() completes with
+//     StatusOk.
 func (receiver *MapHandle) Snapshot() (MapSnapshot, error) {
 	var outSnapshot C.mln_map_snapshot
 	outSnapshot.size = C.uint32_t(unsafe.Sizeof(outSnapshot))
@@ -9507,6 +9511,9 @@ func NewRuntime(options *RuntimeOptions) (*RuntimeHandle, error) {
 }
 
 // CreateMap creates a map on runtime.
+//
+// Asynchronous calls on the map before the completion runs wait for it, and
+// complete with StatusInvalidState when creation fails.
 //
 // See mln_runtime_create_map in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html

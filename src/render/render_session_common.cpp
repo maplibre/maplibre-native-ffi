@@ -1797,6 +1797,18 @@ auto start_attach_render_session(
   // throw into the unwind.
   auto attach_work = RenderDriverWork{
     [session, attach_operation = async.operation]() {
+      auto map_created = false;
+      {
+        const auto lock = std::scoped_lock{session->control_mutex};
+        map_created = session->map_created.value_or(false);
+      }
+      if (!map_created) {
+        fail_session(session, MLN_STATUS_INVALID_STATE, "map creation failed");
+        attach_operation->complete(
+          MLN_STATUS_INVALID_STATE, session->failure.message, {}
+        );
+        return;
+      }
       if (session->initialize_backend) {
         const auto initialize_status = session->initialize_backend(*session);
         if (initialize_status != MLN_STATUS_OK) {
@@ -1862,8 +1874,25 @@ auto start_attach_render_session(
       }
       attach_operation->complete(MLN_STATUS_OK, {}, {});
     },
-    cancel_operation(async.operation)
+    cancel_operation(async.operation),
+    // The attach, and the work behind it, wait for the map's creation, as
+    // map commands do.
+    [raw = session.get()]() { return raw->map_created.has_value(); }
   };
+  const auto creation_status = map_post_after_creation(
+    session->map, [weak = weak_session](bool created) noexcept {
+      const auto live = weak.lock();
+      if (live == nullptr) return;
+      {
+        const auto lock = std::scoped_lock{live->control_mutex};
+        live->map_created = created;
+      }
+      resume_driver_work(live);
+    }
+  );
+  if (creation_status != MLN_STATUS_OK) {
+    return creation_status;
+  }
   {
     // Allocate the queue node before committing the attachment under the
     // lock. The wakes and the completion are accepted before the driver can

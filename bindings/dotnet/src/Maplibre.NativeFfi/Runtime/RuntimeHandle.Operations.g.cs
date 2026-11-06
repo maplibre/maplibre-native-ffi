@@ -180,8 +180,11 @@ public sealed unsafe partial class RuntimeHandle
     /// Creates a map on <c>runtime</c>.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_runtime_create_map</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// <para>Asynchronous calls on the map before the completion runs wait for
+    /// it, and complete with <c>Status.InvalidState</c> when creation
+    /// fails.</para>
+    /// <para>See <c>mln_runtime_create_map</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// </remarks>
     public MapHandle CreateMap(MapOptions options)
     {

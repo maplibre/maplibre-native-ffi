@@ -93,6 +93,9 @@ private constructor(
   /**
    * Creates a map on `runtime`.
    *
+   * Asynchronous calls on the map before the completion runs wait for it, and complete with
+   * `Status.INVALID_STATE` when creation fails.
+   *
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */

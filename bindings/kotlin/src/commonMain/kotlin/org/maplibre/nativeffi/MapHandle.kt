@@ -22,7 +22,7 @@ private constructor(
   @Suppress("unused") private val parent: RuntimeHandle?,
   /**
    * Completes once the map is ready, and fails with a [MaplibreException] when it fails to become
-   * ready. The map takes calls before then.
+   * ready. Asynchronous calls on the map before then wait for it.
    */
   public val ready: Completion<Unit>,
   borrowed: Boolean,
@@ -726,6 +726,10 @@ private constructor(
    *
    * See `mln_map_get_snapshot` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` until `RuntimeHandle.createMap()` completes with `Status.OK`.
    */
   public fun getSnapshot(): MapSnapshot =
     nativeCall(this, binding) {

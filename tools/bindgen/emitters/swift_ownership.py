@@ -203,8 +203,9 @@ def owner_declarations(bound):
                 f"  /// {line}\n"
                 for line in textwrap.wrap(
                     f"Returns once the {readied} is ready, and throws a "
-                    "``MaplibreError`` when it fails to become ready. The "
-                    f"{readied} takes calls before then.",
+                    "``MaplibreError`` when it fails to become ready. "
+                    f"Asynchronous calls on the {readied} before then wait "
+                    "for it.",
                     74,
                 )
             )

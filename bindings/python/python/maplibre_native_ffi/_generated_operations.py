@@ -1256,6 +1256,11 @@ class _MapHandleOperations(GeneratedOperations):
 
         See `mln_map_get_snapshot` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` until `RuntimeHandle.create_map()` completes
+          with `Status.OK`.
         """
         return MapSnapshot._from_native(self._native.get_snapshot())
 
@@ -3031,6 +3036,9 @@ class _RuntimeHandleOperations(GeneratedOperations):
 
     def create_map(self, options: MapOptions) -> MapHandle:
         """Creates a map on `runtime`.
+
+        Asynchronous calls on the map before the completion runs wait for it,
+        and complete with `Status.INVALID_STATE` when creation fails.
 
         See `mln_runtime_create_map` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

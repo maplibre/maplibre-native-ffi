@@ -1201,9 +1201,10 @@ def lower(api: Api | BoundApi) -> Lowered:
         \"\"\"Completes once the """
             + readied
             + """ is ready, and fails with `MaplibreError` when it
-        fails to become ready. The """
+        fails to become ready. Asynchronous calls on the """
             + readied
-            + """ takes calls before then.\"\"\"
+            + """ before then wait
+        for it.\"\"\"
         return self._ready
 """
             if readied

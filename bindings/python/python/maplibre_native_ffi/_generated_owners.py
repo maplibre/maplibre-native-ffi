@@ -123,7 +123,8 @@ class MapHandle(_MapHandleOperations, ScopedHandleMixin):
     @property
     def ready(self) -> Future[None]:
         """Completes once the map is ready, and fails with `MaplibreError` when it
-        fails to become ready. The map takes calls before then."""
+        fails to become ready. Asynchronous calls on the map before then wait
+        for it."""
         return self._ready
 
     @property
@@ -224,7 +225,8 @@ class RenderSessionHandle(_RenderSessionHandleOperations, ScopedHandleMixin):
     @property
     def ready(self) -> Future[None]:
         """Completes once the session is ready, and fails with `MaplibreError` when it
-        fails to become ready. The session takes calls before then."""
+        fails to become ready. Asynchronous calls on the session before then wait
+        for it."""
         return self._ready
 
     @property

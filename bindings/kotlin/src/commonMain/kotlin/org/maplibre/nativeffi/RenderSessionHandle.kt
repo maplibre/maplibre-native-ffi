@@ -22,7 +22,7 @@ private constructor(
   @Suppress("unused") private val parent: MapHandle,
   /**
    * Completes once the session is ready, and fails with a [MaplibreException] when it fails to
-   * become ready. The session takes calls before then.
+   * become ready. Asynchronous calls on the session before then wait for it.
    */
   public val ready: Completion<Unit>,
 ) : AsyncReleasable, AutoCloseable {

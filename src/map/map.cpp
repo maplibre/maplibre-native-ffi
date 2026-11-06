@@ -3028,11 +3028,6 @@ auto validate_map_live_locked(mln_map map, MapObject*& out_map) -> mln_status {
       HandleTraits<MapObject>::kind, map, HandleFault::Stale
     );
   }
-  if (!out_map->created.load(std::memory_order_acquire)) {
-    out_map = nullptr;
-    set_thread_error("map creation has not succeeded");
-    return MLN_STATUS_INVALID_STATE;
-  }
   return MLN_STATUS_OK;
 }
 
@@ -3574,6 +3569,9 @@ auto construct_map(MapObject& live, const mln_map_options& effective) -> void {
     close_map_transaction(live, publish_map_snapshot(live));
   } catch (...) {
     live.callback_sources->detach();
+    // The constructor may have given the frontend an observer that forwards
+    // to the map it destroys, and a session can still attach to the map.
+    live.frontend->close_renderer_observer();
     live.map.reset();
     if (live.event_state->in_transaction()) {
       try {
@@ -4137,6 +4135,30 @@ auto map_post_resize(
   return submit_map_resize(
     map, mln_logical_size{.width = width, .height = height}, completion, true
   );
+}
+
+auto map_post_after_creation(mln_map map, std::function<void(bool)> settled)
+  -> mln_status {
+  const auto live = lease_map(map);
+  if (live == nullptr) return recorded_handle_fault_status();
+  if (live->created.load(std::memory_order_acquire)) {
+    settled(true);
+    return MLN_STATUS_OK;
+  }
+  try {
+    // Creation is the map's first task on the worker, so this runs after it.
+    live->runtime_state->executor.invoke(
+      [weak = std::weak_ptr<MapObject>{live},
+       settled = std::move(settled)]() -> void {
+        const auto owner = weak.lock();
+        settled(owner != nullptr && owner->map != nullptr);
+      }
+    );
+  } catch (const std::exception& exception) {
+    set_thread_error(exception);
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  return MLN_STATUS_OK;
 }
 
 auto map_post_trigger_repaint(mln_map map) -> mln_status {
