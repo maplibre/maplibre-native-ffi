@@ -91,7 +91,7 @@ public class StyleTest {
             {"type": "Point", "coordinates": [-122.4, 37.8]}
             """,
             null);
-    map.getDiscarding().addGeoJsonSourceData("points", data);
+    map.getDiscarding().addGeoJsonSourceData("points", data, null);
     // The source keeps its own reference to the data.
     data.release();
 
