@@ -333,7 +333,7 @@ internal fun NativeArena.writePremultipliedRgba8Image(value: PremultipliedRgba8I
 
 @JvmSynthetic
 internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
-  writeU32(target, w(672, 680, 656).toUInt())
+  writeU32(target, w(504, 512, 492).toUInt())
   var fields = 0u
   value.offset?.let {
     fields = fields or 1u
@@ -359,14 +359,14 @@ internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
     fields = fields or 32u
     putGestureMomentum(target + 64, it)
   }
-  putAnimationOptions(target + w(568, 568, 560), value.animation)
-  writeU32(target + w(664, 672, 648), value.gesturePhase.rawValue)
+  putAnimationOptions(target + w(400, 400, 396), value.animation)
+  writeU32(target + w(496, 504, 484), value.gesturePhase.rawValue)
   writeU32(target + 4, fields)
 }
 
 @JvmSynthetic
 internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
-  allocate(w(672, 680, 656), w(8, 8, 4)).also { putCameraDelta(it, value) }
+  allocate(w(504, 512, 492), w(8, 8, 4)).also { putCameraDelta(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putAndroidHardwareBufferRingDescriptor(
@@ -1907,23 +1907,19 @@ internal fun NativeArena.putGestureMomentum(target: Long, value: GestureMomentum
     putScreenPoint(target + w(64, 64, 60), it)
   }
   putMomentumOptions(target + w(80, 80, 76), value.pan)
-  putMomentumOptions(target + w(176, 176, 172), value.zoom)
-  putMomentumOptions(target + w(272, 272, 268), value.bearing)
-  putMomentumOptions(target + w(368, 368, 364), value.pitch)
-  value.panFollowsZoom?.let {
-    fields = fields or 64u
-    writeBool(target + w(464, 464, 460), it)
-  }
+  putMomentumOptions(target + w(136, 136, 132), value.zoom)
+  putMomentumOptions(target + w(192, 192, 188), value.bearing)
+  putMomentumOptions(target + w(248, 248, 244), value.pitch)
   value.bearingSnap?.let {
-    fields = fields or 128u
-    putBearingSnap(target + w(472, 472, 464), it)
+    fields = fields or 64u
+    putBearingSnap(target + w(304, 304, 300), it)
   }
   writeU32(target, fields)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeGestureMomentum(value: GestureMomentum): Long =
-  allocate(w(504, 504, 496), w(8, 8, 4)).also { putGestureMomentum(it, value) }
+  allocate(w(336, 336, 332), w(8, 8, 4)).also { putGestureMomentum(it, value) }
 
 @JvmSynthetic
 internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
@@ -2470,56 +2466,36 @@ internal fun NativeArena.putMomentumOptions(target: Long, value: MomentumOptions
     fields = fields or 1u
     writeU32(target + 4, it.rawValue)
   }
-  value.speedScale?.let {
+  value.halfLifeMs?.let {
     fields = fields or 2u
     writeF64(target + 8, it)
   }
-  value.minSpeed?.let {
+  value.stopSpeed?.let {
     fields = fields or 4u
     writeF64(target + 16, it)
   }
-  value.maxSpeed?.let {
+  value.scrollFriction?.let {
     fields = fields or 8u
     writeF64(target + 24, it)
   }
-  value.exponent?.let {
+  value.minSpeed?.let {
     fields = fields or 16u
     writeF64(target + 32, it)
   }
-  value.baseDurationMs?.let {
+  value.maxSpeed?.let {
     fields = fields or 32u
     writeF64(target + 40, it)
   }
-  value.durationMsPerSpeed?.let {
+  value.maxDistance?.let {
     fields = fields or 64u
     writeF64(target + 48, it)
-  }
-  value.decayRate?.let {
-    fields = fields or 128u
-    writeF64(target + 56, it)
-  }
-  value.stopSpeed?.let {
-    fields = fields or 256u
-    writeF64(target + 64, it)
-  }
-  value.durationScale?.let {
-    fields = fields or 512u
-    writeF64(target + 72, it)
-  }
-  value.maxDurationMs?.let {
-    fields = fields or 1024u
-    writeF64(target + 80, it)
-  }
-  value.maxDistance?.let {
-    fields = fields or 2048u
-    writeF64(target + 88, it)
   }
   writeU32(target, fields)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeMomentumOptions(value: MomentumOptions): Long =
-  allocate(96, w(8, 8, 4)).also { putMomentumOptions(it, value) }
+  allocate(56, w(8, 8, 4)).also { putMomentumOptions(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putBearingSnap(target: Long, value: BearingSnap) {

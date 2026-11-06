@@ -657,19 +657,19 @@ static void delta_momentum_negative_option(void* descriptor) {
   delta->momentum.pan.fields = MLN_MOMENTUM_OPTION_MIN_SPEED;
   delta->momentum.pan.min_speed = -1.0;
 }
-static void delta_momentum_small_exponent(void* descriptor) {
+static void delta_momentum_zero_half_life(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.zoom.fields = MLN_MOMENTUM_OPTION_EXPONENT;
-  delta->momentum.zoom.exponent = 0.5;
+  delta->momentum.zoom.fields = MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
+  delta->momentum.zoom.half_life_ms = 0.0;
 }
-static void delta_momentum_exponential_without_rate(void* descriptor) {
+static void delta_momentum_spline_zoom(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->fields = MLN_CAMERA_DELTA_MOMENTUM;
   delta->gesture_phase = MLN_GESTURE_PHASE_END;
-  delta->momentum.pitch.fields = MLN_MOMENTUM_OPTION_DECAY;
-  delta->momentum.pitch.decay = MLN_MOMENTUM_DECAY_EXPONENTIAL;
+  delta->momentum.zoom.fields = MLN_MOMENTUM_OPTION_DECAY;
+  delta->momentum.zoom.decay = MLN_MOMENTUM_DECAY_SPLINE;
 }
 static void delta_momentum_snap_without_targets(void* descriptor) {
   mln_camera_delta* delta = descriptor;
@@ -714,11 +714,11 @@ static const mln_test_validation_case delta_cases[] = {
   {"infinite momentum velocity", delta_momentum_infinite_velocity,
    MLN_STATUS_INVALID_ARGUMENT, "velocities must be finite"},
   {"negative momentum option", delta_momentum_negative_option,
-   MLN_STATUS_INVALID_ARGUMENT, "finite and not negative"},
-  {"momentum exponent below 1", delta_momentum_small_exponent,
-   MLN_STATUS_INVALID_ARGUMENT, "exponent of at least 1"},
-  {"exponential decay without a rate", delta_momentum_exponential_without_rate,
-   MLN_STATUS_INVALID_ARGUMENT, "positive decay_rate and stop_speed"},
+   MLN_STATUS_INVALID_ARGUMENT, "isn't negative"},
+  {"zero momentum half-life", delta_momentum_zero_half_life,
+   MLN_STATUS_INVALID_ARGUMENT, "positive half-life"},
+  {"spline decay outside pan", delta_momentum_spline_zoom,
+   MLN_STATUS_INVALID_ARGUMENT, "only pan can use"},
   {"bearing snap without targets", delta_momentum_snap_without_targets,
    MLN_STATUS_INVALID_ARGUMENT, "needs a target"},
   {"unselected momentum fields stay unread", delta_momentum_unselected_garbage,

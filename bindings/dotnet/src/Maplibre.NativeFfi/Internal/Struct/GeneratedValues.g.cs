@@ -885,12 +885,6 @@ internal static unsafe class GeneratedValues
         native.bearing = NativeMomentumOptions(value.Bearing);
         native.pitch = NativeMomentumOptions(value.Pitch);
         native.fields |= Put(
-            value.PanFollowsZoom,
-            ref native.pan_follows_zoom,
-            MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM,
-            static present => (byte)(present ? 1 : 0)
-        );
-        native.fields |= Put(
             value.BearingSnap,
             ref native.bearing_snap,
             MLN_GESTURE_MOMENTUM_BEARING_SNAP,
@@ -1379,27 +1373,9 @@ internal static unsafe class GeneratedValues
             static present => (mln_momentum_decay)present
         );
         native.fields |= Put(
-            value.SpeedScale,
-            ref native.speed_scale,
-            MLN_MOMENTUM_OPTION_SPEED_SCALE
-        );
-        native.fields |= Put(value.MinSpeed, ref native.min_speed, MLN_MOMENTUM_OPTION_MIN_SPEED);
-        native.fields |= Put(value.MaxSpeed, ref native.max_speed, MLN_MOMENTUM_OPTION_MAX_SPEED);
-        native.fields |= Put(value.Exponent, ref native.exponent, MLN_MOMENTUM_OPTION_EXPONENT);
-        native.fields |= Put(
-            value.BaseDurationMs,
-            ref native.base_duration_ms,
-            MLN_MOMENTUM_OPTION_BASE_DURATION_MS
-        );
-        native.fields |= Put(
-            value.DurationMsPerSpeed,
-            ref native.duration_ms_per_speed,
-            MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED
-        );
-        native.fields |= Put(
-            value.DecayRate,
-            ref native.decay_rate,
-            MLN_MOMENTUM_OPTION_DECAY_RATE
+            value.HalfLifeMs,
+            ref native.half_life_ms,
+            MLN_MOMENTUM_OPTION_HALF_LIFE_MS
         );
         native.fields |= Put(
             value.StopSpeed,
@@ -1407,15 +1383,12 @@ internal static unsafe class GeneratedValues
             MLN_MOMENTUM_OPTION_STOP_SPEED
         );
         native.fields |= Put(
-            value.DurationScale,
-            ref native.duration_scale,
-            MLN_MOMENTUM_OPTION_DURATION_SCALE
+            value.ScrollFriction,
+            ref native.scroll_friction,
+            MLN_MOMENTUM_OPTION_SCROLL_FRICTION
         );
-        native.fields |= Put(
-            value.MaxDurationMs,
-            ref native.max_duration_ms,
-            MLN_MOMENTUM_OPTION_MAX_DURATION_MS
-        );
+        native.fields |= Put(value.MinSpeed, ref native.min_speed, MLN_MOMENTUM_OPTION_MIN_SPEED);
+        native.fields |= Put(value.MaxSpeed, ref native.max_speed, MLN_MOMENTUM_OPTION_MAX_SPEED);
         native.fields |= Put(
             value.MaxDistance,
             ref native.max_distance,

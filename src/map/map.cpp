@@ -4795,58 +4795,34 @@ constexpr auto camera_delta_anchored_fields =
   static_cast<uint32_t>(MLN_CAMERA_DELTA_SCALE) | MLN_CAMERA_DELTA_BEARING |
   MLN_CAMERA_DELTA_PITCH;
 
-// The settings of one part of a gesture's momentum, with every default
-// applied.
-struct MomentumSettings {
-  mln_momentum_decay decay = MLN_MOMENTUM_DECAY_POWER;
-  double speed_scale = 1.0;
-  double min_speed = 0.0;
-  double max_speed = std::numeric_limits<double>::infinity();
-  double exponent = 4.0;
-  double base_duration_ms = 0.0;
-  double duration_ms_per_speed = 0.0;
-  double decay_rate = 0.0;
-  double stop_speed = 0.0;
-  double duration_scale = 1.0;
-  double max_duration_ms = std::numeric_limits<double>::infinity();
-  double max_distance = std::numeric_limits<double>::infinity();
-};
+// A part's defaults. They follow Apple Maps, whose glide is plain friction on
+// every platform, and whose half-life sits between UIScrollView's and
+// Android's.
+auto momentum_defaults(
+  double stop_speed, double min_speed,
+  double max_speed = std::numeric_limits<double>::infinity(),
+  double max_distance = std::numeric_limits<double>::infinity()
+) -> mln::MomentumDecay {
+  auto decay = mln::MomentumDecay{};
+  decay.halfLife = std::chrono::milliseconds(140);
+  decay.stopSpeed = stop_speed;
+  decay.minSpeed = min_speed;
+  decay.maxSpeed = max_speed;
+  decay.maxDistance = max_distance;
+  return decay;
+}
 
-// The defaults follow MapLibre Compose, which took the pan's from the MapLibre
-// Android SDK.
-constexpr auto pan_momentum_defaults = MomentumSettings{
-  .speed_scale = 0.56,
-  .min_speed = 250.0,
-  .exponent = 2.0,
-  .base_duration_ms = 150.0,
-  .duration_ms_per_speed = 1.0 / 10.5,
-};
-constexpr auto zoom_momentum_defaults = MomentumSettings{
-  .base_duration_ms = 600.0,
-  .max_duration_ms = 600.0,
-  .max_distance = 2.5,
-};
-constexpr auto bearing_momentum_defaults = MomentumSettings{
-  .base_duration_ms = 600.0,
-  .max_duration_ms = 600.0,
-};
-constexpr auto pitch_momentum_defaults = MomentumSettings{
-  .min_speed = 5.0,
-  .base_duration_ms = 300.0,
-};
-
-auto resolve_momentum_settings(
-  const mln_momentum_options& options, MomentumSettings settings,
-  std::string_view part
-) -> std::optional<MomentumSettings> {
+// Applies `options` over a part's defaults, or returns nothing and sets the
+// thread error when an option is invalid.
+auto resolve_momentum_decay(
+  const mln_momentum_options& options, mln::MomentumDecay decay,
+  std::string_view part, bool spline_allowed
+) -> std::optional<mln::MomentumDecay> {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_MOMENTUM_OPTION_DECAY) |
-    MLN_MOMENTUM_OPTION_SPEED_SCALE | MLN_MOMENTUM_OPTION_MIN_SPEED |
-    MLN_MOMENTUM_OPTION_MAX_SPEED | MLN_MOMENTUM_OPTION_EXPONENT |
-    MLN_MOMENTUM_OPTION_BASE_DURATION_MS |
-    MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED | MLN_MOMENTUM_OPTION_DECAY_RATE |
-    MLN_MOMENTUM_OPTION_STOP_SPEED | MLN_MOMENTUM_OPTION_DURATION_SCALE |
-    MLN_MOMENTUM_OPTION_MAX_DURATION_MS | MLN_MOMENTUM_OPTION_MAX_DISTANCE;
+    MLN_MOMENTUM_OPTION_HALF_LIFE_MS | MLN_MOMENTUM_OPTION_STOP_SPEED |
+    MLN_MOMENTUM_OPTION_SCROLL_FRICTION | MLN_MOMENTUM_OPTION_MIN_SPEED |
+    MLN_MOMENTUM_OPTION_MAX_SPEED | MLN_MOMENTUM_OPTION_MAX_DISTANCE;
   const auto fields = options.fields;
   const auto fail = [part](std::string_view problem) {
     const auto message = std::string{"momentum options for "} +
@@ -4854,119 +4830,55 @@ auto resolve_momentum_settings(
     set_thread_error(message.c_str());
     return std::nullopt;
   };
+  const auto has = [fields](uint32_t bit) { return (fields & bit) != 0U; };
   if ((fields & ~known_fields) != 0U) return fail("contain unknown bits");
-  if ((fields & MLN_MOMENTUM_OPTION_DECAY) != 0U) {
-    if (options.decay > MLN_MOMENTUM_DECAY_EXPONENTIAL) {
+  if (has(MLN_MOMENTUM_OPTION_DECAY)) {
+    if (options.decay > MLN_MOMENTUM_DECAY_SPLINE) {
       return fail("have an invalid decay");
     }
-    settings.decay = options.decay;
+    if (options.decay == MLN_MOMENTUM_DECAY_SPLINE && !spline_allowed) {
+      return fail("can't use the spline decay, which only pan can use");
+    }
+    decay.model = options.decay == MLN_MOMENTUM_DECAY_SPLINE
+                    ? mln::MomentumDecay::Model::Spline
+                    : mln::MomentumDecay::Model::Friction;
   }
-  const auto take = [&](uint32_t bit, double value, double& out) -> bool {
-    if ((fields & bit) == 0U) return true;
-    if (!std::isfinite(value) || value < 0.0) return false;
-    out = value;
-    return true;
+  const auto positive = [](double value) {
+    return std::isfinite(value) && value > 0.0;
   };
+  if (has(MLN_MOMENTUM_OPTION_HALF_LIFE_MS)) {
+    if (
+      !positive(options.half_life_ms) ||
+      !is_native_duration_ms(options.half_life_ms)
+    ) {
+      return fail("need a positive half-life in the native duration range");
+    }
+    decay.halfLife = duration_from_milliseconds(options.half_life_ms);
+  }
   if (
-    !take(
-      MLN_MOMENTUM_OPTION_SPEED_SCALE, options.speed_scale, settings.speed_scale
-    ) ||
-    !take(
-      MLN_MOMENTUM_OPTION_MIN_SPEED, options.min_speed, settings.min_speed
-    ) ||
-    !take(
-      MLN_MOMENTUM_OPTION_MAX_SPEED, options.max_speed, settings.max_speed
-    ) ||
-    !take(MLN_MOMENTUM_OPTION_EXPONENT, options.exponent, settings.exponent) ||
-    !take(
-      MLN_MOMENTUM_OPTION_BASE_DURATION_MS, options.base_duration_ms,
-      settings.base_duration_ms
-    ) ||
-    !take(
-      MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED, options.duration_ms_per_speed,
-      settings.duration_ms_per_speed
-    ) ||
-    !take(
-      MLN_MOMENTUM_OPTION_DECAY_RATE, options.decay_rate, settings.decay_rate
-    ) ||
-    !take(
-      MLN_MOMENTUM_OPTION_STOP_SPEED, options.stop_speed, settings.stop_speed
-    ) ||
-    !take(
-      MLN_MOMENTUM_OPTION_DURATION_SCALE, options.duration_scale,
-      settings.duration_scale
-    ) ||
-    !take(
-      MLN_MOMENTUM_OPTION_MAX_DURATION_MS, options.max_duration_ms,
-      settings.max_duration_ms
-    ) ||
-    !take(
-      MLN_MOMENTUM_OPTION_MAX_DISTANCE, options.max_distance,
-      settings.max_distance
-    )
+    (has(MLN_MOMENTUM_OPTION_STOP_SPEED) && !positive(options.stop_speed)) ||
+    (has(MLN_MOMENTUM_OPTION_SCROLL_FRICTION) &&
+     !positive(options.scroll_friction)) ||
+    (has(MLN_MOMENTUM_OPTION_MIN_SPEED) &&
+     !(std::isfinite(options.min_speed) && options.min_speed >= 0.0)) ||
+    (has(MLN_MOMENTUM_OPTION_MAX_SPEED) && !positive(options.max_speed)) ||
+    (has(MLN_MOMENTUM_OPTION_MAX_DISTANCE) && !positive(options.max_distance))
   ) {
-    return fail("must be finite and not negative");
-  }
-  if (settings.exponent < 1.0) return fail("need an exponent of at least 1");
-  if (
-    settings.decay == MLN_MOMENTUM_DECAY_EXPONENTIAL &&
-    ((fields & MLN_MOMENTUM_OPTION_DECAY_RATE) == 0U ||
-     (fields & MLN_MOMENTUM_OPTION_STOP_SPEED) == 0U ||
-     settings.decay_rate <= 0.0 || settings.stop_speed <= 0.0)
-  ) {
-    return fail("need a positive decay_rate and stop_speed");
-  }
-  return settings;
-}
-
-// How one part of a momentum moves: its distance in its unit, its curve, and
-// the share of the distance per second that it starts at.
-struct MomentumPlan {
-  double distance = 0.0;
-  mln::MomentumCurve curve;
-  double start_rate = 0.0;
-};
-
-// Plans the part for a release at `speed`, or returns nothing when the part
-// doesn't move.
-auto plan_momentum(double speed, const MomentumSettings& settings)
-  -> std::optional<MomentumPlan> {
-  if (!(speed > 0.0) || speed < settings.min_speed) return std::nullopt;
-  const auto release = std::min(speed, settings.max_speed);
-  const auto start = settings.speed_scale * release;
-  if (!(start > 0.0) || !(settings.duration_scale > 0.0)) return std::nullopt;
-  auto plan = MomentumPlan{};
-  auto milliseconds = 0.0;
-  if (settings.decay == MLN_MOMENTUM_DECAY_POWER) {
-    milliseconds = std::min(
-      (settings.base_duration_ms + settings.duration_ms_per_speed * release) *
-        settings.duration_scale,
-      settings.max_duration_ms
+    return fail(
+      "need a finite minimum speed that isn't negative, and finite positive "
+      "values for the rest"
     );
-    if (!(milliseconds > 0.0)) return std::nullopt;
-    const auto seconds = milliseconds / 1000.0;
-    plan.distance = start * seconds / settings.exponent;
-    plan.curve.exponent = settings.exponent;
-    plan.start_rate = settings.exponent / seconds;
-  } else {
-    if (start <= settings.stop_speed) return std::nullopt;
-    const auto rate = settings.decay_rate / settings.duration_scale;
-    milliseconds = std::min(
-      std::log(start / settings.stop_speed) / rate * 1000.0,
-      settings.max_duration_ms
-    );
-    if (!(milliseconds > 0.0)) return std::nullopt;
-    const auto covered = -std::expm1(-rate * milliseconds / 1000.0);
-    plan.distance = start * covered / rate;
-    plan.curve.decayRate = rate;
-    plan.start_rate = rate / covered;
   }
-  plan.distance = std::min(plan.distance, settings.max_distance);
-  if (!(plan.distance > 0.0) || !is_native_duration_ms(milliseconds)) {
-    return std::nullopt;
+  if (has(MLN_MOMENTUM_OPTION_STOP_SPEED)) decay.stopSpeed = options.stop_speed;
+  if (has(MLN_MOMENTUM_OPTION_SCROLL_FRICTION)) {
+    decay.scrollFriction = options.scroll_friction;
   }
-  plan.curve.duration = duration_from_milliseconds(milliseconds);
-  return plan;
+  if (has(MLN_MOMENTUM_OPTION_MIN_SPEED)) decay.minSpeed = options.min_speed;
+  if (has(MLN_MOMENTUM_OPTION_MAX_SPEED)) decay.maxSpeed = options.max_speed;
+  if (has(MLN_MOMENTUM_OPTION_MAX_DISTANCE)) {
+    decay.maxDistance = options.max_distance;
+  }
+  return decay;
 }
 
 auto validate_bearing_snap(const mln_bearing_snap& snap)
@@ -5008,29 +4920,16 @@ auto validate_bearing_snap(const mln_bearing_snap& snap)
   return result;
 }
 
-// The change that `snap` makes to `bearing`, or zero when the bearing stays.
-// MapLibre Native's momentum settles with the same rule.
-auto bearing_snap_delta(double bearing, const mln::BearingSnap& snap)
-  -> double {
-  const auto spacing = 360.0 / snap.targetCount;
-  const auto target =
-    snap.targetOffset +
-    std::round((bearing - snap.targetOffset) / spacing) * spacing;
-  const auto delta =
-    target - bearing - 360.0 * std::floor((target - bearing + 180.0) / 360.0);
-  return std::abs(delta) <= snap.tolerance ? delta : 0.0;
-}
-
-// Plans a gesture's momentum on the caller's thread, so that invalid input
-// fails the call. The plan leaves out finishFn, which the worker sets.
-auto plan_gesture_momentum(const mln_gesture_momentum& momentum)
+// Converts a gesture's momentum on the caller's thread, so that invalid input
+// fails the call. MapLibre plans each part from its velocity. The result
+// leaves out finishFn, which the worker sets.
+auto to_native_gesture_momentum(const mln_gesture_momentum& momentum)
   -> std::optional<mln::CameraMomentum> {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_GESTURE_MOMENTUM_PAN_VELOCITY) |
     MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY | MLN_GESTURE_MOMENTUM_BEARING_VELOCITY |
     MLN_GESTURE_MOMENTUM_PITCH_VELOCITY | MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR |
-    MLN_GESTURE_MOMENTUM_BEARING_ANCHOR |
-    MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM | MLN_GESTURE_MOMENTUM_BEARING_SNAP;
+    MLN_GESTURE_MOMENTUM_BEARING_ANCHOR | MLN_GESTURE_MOMENTUM_BEARING_SNAP;
   const auto fields = momentum.fields;
   if ((fields & ~known_fields) != 0U) {
     set_thread_error("mln_gesture_momentum.fields contains unknown bits");
@@ -5058,84 +4957,47 @@ auto plan_gesture_momentum(const mln_gesture_momentum& momentum)
   ) {
     return std::nullopt;
   }
-  const auto pan =
-    resolve_momentum_settings(momentum.pan, pan_momentum_defaults, "pan");
-  if (!pan) return std::nullopt;
-  const auto zoom =
-    resolve_momentum_settings(momentum.zoom, zoom_momentum_defaults, "zoom");
-  if (!zoom) return std::nullopt;
-  const auto bearing = resolve_momentum_settings(
-    momentum.bearing, bearing_momentum_defaults, "bearing"
-  );
-  if (!bearing) return std::nullopt;
-  const auto pitch =
-    resolve_momentum_settings(momentum.pitch, pitch_momentum_defaults, "pitch");
-  if (!pitch) return std::nullopt;
-
   auto result = mln::CameraMomentum{};
+  const auto pan = resolve_momentum_decay(
+    momentum.pan, momentum_defaults(10.0, 200.0, 10000.0), "pan", true
+  );
+  const auto zoom = resolve_momentum_decay(
+    momentum.zoom,
+    momentum_defaults(0.01, 0.0, std::numeric_limits<double>::infinity(), 2.5),
+    "zoom", false
+  );
+  const auto bearing = resolve_momentum_decay(
+    momentum.bearing, momentum_defaults(1.0, 60.0), "bearing", false
+  );
+  const auto pitch = resolve_momentum_decay(
+    momentum.pitch, momentum_defaults(1.0, 5.0), "pitch", false
+  );
+  if (!pan || !zoom || !bearing || !pitch) return std::nullopt;
+  result.panDecay = *pan;
+  result.zoomDecay = *zoom;
+  result.bearingDecay = *bearing;
+  result.pitchDecay = *pitch;
   if (has(MLN_GESTURE_MOMENTUM_BEARING_SNAP)) {
     result.bearingSnap = validate_bearing_snap(momentum.bearing_snap);
     if (!result.bearingSnap) return std::nullopt;
   }
-
-  const auto signed_plan = [](
-                             double velocity, const MomentumSettings& settings
-                           ) -> std::optional<std::pair<double, MomentumPlan>> {
-    const auto plan = plan_momentum(std::abs(velocity), settings);
-    if (!plan) return std::nullopt;
-    return std::pair{velocity < 0.0 ? -1.0 : 1.0, *plan};
-  };
-  auto pan_plan = std::optional<MomentumPlan>{};
-  auto pan_speed = 0.0;
   if (has(MLN_GESTURE_MOMENTUM_PAN_VELOCITY)) {
-    pan_speed = std::hypot(momentum.pan_velocity.x, momentum.pan_velocity.y);
-    pan_plan = plan_momentum(pan_speed, *pan);
+    result.panVelocity = to_native_screen_point(momentum.pan_velocity);
   }
-  auto zoom_plan = std::optional<std::pair<double, MomentumPlan>>{};
   if (has(MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY)) {
-    zoom_plan = signed_plan(momentum.zoom_velocity, *zoom);
-  }
-  if (
-    pan_plan && zoom_plan &&
-    (!has(MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM) || momentum.pan_follows_zoom)
-  ) {
-    // Keep the pan's starting speed on the zoom's curve, without moving it
-    // farther than it would move alone.
-    const auto& zoom_curve = zoom_plan->second;
-    const auto start_speed = pan_plan->distance * pan_plan->start_rate;
-    pan_plan->distance =
-      std::min(pan_plan->distance, start_speed / zoom_curve.start_rate);
-    pan_plan->curve = zoom_curve.curve;
-    pan_plan->start_rate = zoom_curve.start_rate;
-  }
-  if (pan_plan) {
-    const auto scale = pan_plan->distance / pan_speed;
-    result.pan = mln::ScreenCoordinate{
-      momentum.pan_velocity.x * scale, momentum.pan_velocity.y * scale
-    };
-    result.panCurve = pan_plan->curve;
-  }
-  if (zoom_plan) {
-    result.zoom = zoom_plan->first * zoom_plan->second.distance;
-    result.zoomCurve = zoom_plan->second.curve;
-    if (has(MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR)) {
-      result.zoomAnchor = to_native_screen_point(momentum.zoom_anchor);
-    }
+    result.zoomVelocity = momentum.zoom_velocity;
   }
   if (has(MLN_GESTURE_MOMENTUM_BEARING_VELOCITY)) {
-    if (const auto plan = signed_plan(momentum.bearing_velocity, *bearing)) {
-      result.bearing = plan->first * plan->second.distance;
-      result.bearingCurve = plan->second.curve;
-      if (has(MLN_GESTURE_MOMENTUM_BEARING_ANCHOR)) {
-        result.bearingAnchor = to_native_screen_point(momentum.bearing_anchor);
-      }
-    }
+    result.bearingVelocity = momentum.bearing_velocity;
   }
   if (has(MLN_GESTURE_MOMENTUM_PITCH_VELOCITY)) {
-    if (const auto plan = signed_plan(momentum.pitch_velocity, *pitch)) {
-      result.pitch = plan->first * plan->second.distance;
-      result.pitchCurve = plan->second.curve;
-    }
+    result.pitchVelocity = momentum.pitch_velocity;
+  }
+  if (has(MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR)) {
+    result.zoomAnchor = to_native_screen_point(momentum.zoom_anchor);
+  }
+  if (has(MLN_GESTURE_MOMENTUM_BEARING_ANCHOR)) {
+    result.bearingAnchor = to_native_screen_point(momentum.bearing_anchor);
   }
   return result;
 }
@@ -5259,27 +5121,21 @@ auto from_native_momentum_velocity(const mln::MomentumVelocity& velocity)
 // Starts the momentum that a gesture's end carries, when any part of it moves
 // or its bearing settles, and returns whether it started. The gesture stays in
 // progress until the momentum ends, unless another gesture started first.
+// Starts the momentum that a gesture's end carries. The end phase ends the
+// gesture's input, and the gesture stays in progress until the momentum ends,
+// unless another gesture started first. A momentum that doesn't move ends at
+// once.
 auto start_gesture_momentum(
   MapObject& live, mln::CameraMomentum momentum,
   const mln::AnimationOptions& animation,
   const std::shared_ptr<CommandTransitions>& command,
   const std::shared_ptr<CameraTransitionEnd>& end
-) -> bool {
+) -> void {
   auto& events = *live.event_state;
   if (momentum.bearingSnap && !events.gesture_changed_bearing) {
     momentum.bearingSnap.reset();
   }
-  const auto moves =
-    momentum.pan || momentum.zoom || momentum.bearing || momentum.pitch;
-  if (
-    !moves && momentum.bearingSnap &&
-    bearing_snap_delta(
-      live.map->getCameraOptions().bearing.value_or(0.0), *momentum.bearingSnap
-    ) == 0.0
-  ) {
-    momentum.bearingSnap.reset();
-  }
-  if (!moves && !momentum.bearingSnap) return false;
+  events.gesture_active = false;
   momentum.finishFn = [event_state = live.event_state, command,
                        serial =
                          events.gesture_serial](const mln::MomentumEnd& ended) {
@@ -5298,7 +5154,6 @@ auto start_gesture_momentum(
     CameraSourceScope{events, MLN_CAMERA_CHANGE_SOURCE_MOMENTUM};
   const auto replacing = TransitionReplacementScope{events, end};
   live.map->startMomentum(momentum, animation);
-  return true;
 }
 
 }  // namespace
@@ -5311,7 +5166,7 @@ auto map_apply_camera_delta(
   const auto copied = *delta;
   auto momentum = std::optional<mln::CameraMomentum>{};
   if ((copied.fields & MLN_CAMERA_DELTA_MOMENTUM) != 0U) {
-    momentum = plan_gesture_momentum(copied.momentum);
+    momentum = to_native_gesture_momentum(copied.momentum);
     if (!momentum) return MLN_STATUS_INVALID_ARGUMENT;
   }
   return submit_with_transition_end(
@@ -5364,17 +5219,16 @@ auto map_apply_camera_delta(
               TransitionReplacementScope{*live.event_state, end};
             live.map->easeTo(camera_delta_target(*live.map, copied), parts);
           }
-          auto continues = false;
           if (momentum) {
-            continues =
-              start_gesture_momentum(live, *momentum, animation, command, end);
-            if (!continues) animation.transitionFinishFn();
+            start_gesture_momentum(live, *momentum, animation, command, end);
           } else if (transitions == 0) {
             // A delta without components starts no transition, so it ends
             // its command here, as an empty camera update does.
             animation.transitionFinishFn();
           }
-          apply_gesture_phase_after(live, copied.gesture_phase, continues);
+          apply_gesture_phase_after(
+            live, copied.gesture_phase, momentum.has_value()
+          );
         },
         completion
       );

@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// How a part of a gesture's momentum slows to a stop.
+/// How a part of a gesture's momentum slows from its release speed.
 /// </summary>
 /// <remarks>
 /// See <c>mln_momentum_decay</c> in the <see
@@ -11,15 +11,15 @@ namespace Maplibre.NativeFfi;
 public enum MomentumDecay : uint
 {
     /// <summary>
-    /// The share of the distance traveled is 1 - (1 - t)^<c>exponent</c>, where
-    /// t goes from 0 to 1 over the momentum's duration. An exponent of 2 slows
-    /// at a constant rate.
+    /// The speed halves every <c>half_life_ms</c>, until it drops to
+    /// <c>stop_speed</c>. UIScrollView's normal deceleration is a half-life of
+    /// 346 ms, and its fast deceleration 69 ms.
     /// </summary>
-    Power = 0,
+    Friction = 0,
 
     /// <summary>
-    /// The speed falls to e^-<c>decay_rate</c> of itself each second, until it
-    /// drops below <c>stop_speed</c>.
+    /// Android's scroll fling, as OverScroller computes it with
+    /// <c>scroll_friction</c>. Only pan can use it.
     /// </summary>
-    Exponential = 1,
+    Spline = 1,
 }

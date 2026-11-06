@@ -7,14 +7,19 @@ namespace Maplibre.NativeFfi;
 /// </summary>
 /// <remarks>
 /// <para>A part moves only when its velocity is set, and each part slows on its
-/// own clock. The parts' defaults are:</para>
-/// <para>| Part | Exponent | Speed scale | Base ms | ms per speed | Other | |
-/// ------- | -------- | ----------- | ------- | ------------ | ---------------
-/// | | pan | 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0
-/// | max 600 ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 |
-/// 1 | 300 | 0 | min speed 5 |</para>
-/// <para>Every part defaults to <c>MomentumDecay.Power</c>, and the zoom moves
-/// at most 2.5 levels.</para>
+/// own. Every part defaults to <c>MomentumDecay.Friction</c> with a half-life
+/// of 140 ms, and these other defaults:</para>
+/// <list type="bullet">
+/// <item><description>Pan stops at 10 logical pixels per second, needs a
+/// release of at least 200, and counts a release faster than 10000 as
+/// 10000.</description></item>
+/// <item><description>Zoom stops at 0.01 levels per second and moves at most
+/// 2.5 levels.</description></item>
+/// <item><description>Bearing stops at 1 degree per second and needs a release
+/// of at least 60.</description></item>
+/// <item><description>Pitch stops at 1 degree per second and needs a release of
+/// at least 5.</description></item>
+/// </list>
 /// <para>See <c>mln_gesture_momentum</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
 /// </remarks>
@@ -56,13 +61,6 @@ public sealed record GestureMomentum
     public MomentumOptions Zoom { get; init; } = new();
     public MomentumOptions Bearing { get; init; } = new();
     public MomentumOptions Pitch { get; init; } = new();
-
-    /// <summary>
-    /// When pan and zoom momentum both start, the pan slows over the zoom's
-    /// duration and curve, starts no faster, and moves no farther than it would
-    /// alone. Defaults to true.
-    /// </summary>
-    public bool? PanFollowsZoom { get; init; }
 
     /// <summary>
     /// Where the bearing settles after a gesture that changed it, once the rest

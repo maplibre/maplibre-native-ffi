@@ -1347,32 +1347,22 @@ struct _MaplibreNativeFfiMomentumOptions {
   GObject parent_instance;
   guint64 fields;
   MaplibreNativeFfiMomentumDecay decay;
-  gdouble speed_scale;
+  gdouble half_life_ms;
+  gdouble stop_speed;
+  gdouble scroll_friction;
   gdouble min_speed;
   gdouble max_speed;
-  gdouble exponent;
-  gdouble base_duration_ms;
-  gdouble duration_ms_per_speed;
-  gdouble decay_rate;
-  gdouble stop_speed;
-  gdouble duration_scale;
-  gdouble max_duration_ms;
   gdouble max_distance;
 };
 
 enum {
   MOMENTUM_OPTIONS_PROP_0,
   MOMENTUM_OPTIONS_PROP_DECAY,
-  MOMENTUM_OPTIONS_PROP_SPEED_SCALE,
+  MOMENTUM_OPTIONS_PROP_HALF_LIFE_MS,
+  MOMENTUM_OPTIONS_PROP_STOP_SPEED,
+  MOMENTUM_OPTIONS_PROP_SCROLL_FRICTION,
   MOMENTUM_OPTIONS_PROP_MIN_SPEED,
   MOMENTUM_OPTIONS_PROP_MAX_SPEED,
-  MOMENTUM_OPTIONS_PROP_EXPONENT,
-  MOMENTUM_OPTIONS_PROP_BASE_DURATION_MS,
-  MOMENTUM_OPTIONS_PROP_DURATION_MS_PER_SPEED,
-  MOMENTUM_OPTIONS_PROP_DECAY_RATE,
-  MOMENTUM_OPTIONS_PROP_STOP_SPEED,
-  MOMENTUM_OPTIONS_PROP_DURATION_SCALE,
-  MOMENTUM_OPTIONS_PROP_MAX_DURATION_MS,
   MOMENTUM_OPTIONS_PROP_MAX_DISTANCE,
   MOMENTUM_OPTIONS_N_PROPERTIES
 };
@@ -1393,35 +1383,20 @@ static void maplibre_native_ffi_momentum_options_get_property(
     case MOMENTUM_OPTIONS_PROP_DECAY:
       g_value_set_enum(value, self->decay);
       break;
-    case MOMENTUM_OPTIONS_PROP_SPEED_SCALE:
-      g_value_set_double(value, self->speed_scale);
+    case MOMENTUM_OPTIONS_PROP_HALF_LIFE_MS:
+      g_value_set_double(value, self->half_life_ms);
+      break;
+    case MOMENTUM_OPTIONS_PROP_STOP_SPEED:
+      g_value_set_double(value, self->stop_speed);
+      break;
+    case MOMENTUM_OPTIONS_PROP_SCROLL_FRICTION:
+      g_value_set_double(value, self->scroll_friction);
       break;
     case MOMENTUM_OPTIONS_PROP_MIN_SPEED:
       g_value_set_double(value, self->min_speed);
       break;
     case MOMENTUM_OPTIONS_PROP_MAX_SPEED:
       g_value_set_double(value, self->max_speed);
-      break;
-    case MOMENTUM_OPTIONS_PROP_EXPONENT:
-      g_value_set_double(value, self->exponent);
-      break;
-    case MOMENTUM_OPTIONS_PROP_BASE_DURATION_MS:
-      g_value_set_double(value, self->base_duration_ms);
-      break;
-    case MOMENTUM_OPTIONS_PROP_DURATION_MS_PER_SPEED:
-      g_value_set_double(value, self->duration_ms_per_speed);
-      break;
-    case MOMENTUM_OPTIONS_PROP_DECAY_RATE:
-      g_value_set_double(value, self->decay_rate);
-      break;
-    case MOMENTUM_OPTIONS_PROP_STOP_SPEED:
-      g_value_set_double(value, self->stop_speed);
-      break;
-    case MOMENTUM_OPTIONS_PROP_DURATION_SCALE:
-      g_value_set_double(value, self->duration_scale);
-      break;
-    case MOMENTUM_OPTIONS_PROP_MAX_DURATION_MS:
-      g_value_set_double(value, self->max_duration_ms);
       break;
     case MOMENTUM_OPTIONS_PROP_MAX_DISTANCE:
       g_value_set_double(value, self->max_distance);
@@ -1442,8 +1417,18 @@ static void maplibre_native_ffi_momentum_options_set_property(
         self, g_value_get_enum(value)
       );
       break;
-    case MOMENTUM_OPTIONS_PROP_SPEED_SCALE:
-      maplibre_native_ffi_momentum_options_set_speed_scale(
+    case MOMENTUM_OPTIONS_PROP_HALF_LIFE_MS:
+      maplibre_native_ffi_momentum_options_set_half_life_ms(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_OPTIONS_PROP_STOP_SPEED:
+      maplibre_native_ffi_momentum_options_set_stop_speed(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_OPTIONS_PROP_SCROLL_FRICTION:
+      maplibre_native_ffi_momentum_options_set_scroll_friction(
         self, g_value_get_double(value)
       );
       break;
@@ -1454,41 +1439,6 @@ static void maplibre_native_ffi_momentum_options_set_property(
       break;
     case MOMENTUM_OPTIONS_PROP_MAX_SPEED:
       maplibre_native_ffi_momentum_options_set_max_speed(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_OPTIONS_PROP_EXPONENT:
-      maplibre_native_ffi_momentum_options_set_exponent(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_OPTIONS_PROP_BASE_DURATION_MS:
-      maplibre_native_ffi_momentum_options_set_base_duration_ms(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_OPTIONS_PROP_DURATION_MS_PER_SPEED:
-      maplibre_native_ffi_momentum_options_set_duration_ms_per_speed(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_OPTIONS_PROP_DECAY_RATE:
-      maplibre_native_ffi_momentum_options_set_decay_rate(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_OPTIONS_PROP_STOP_SPEED:
-      maplibre_native_ffi_momentum_options_set_stop_speed(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_OPTIONS_PROP_DURATION_SCALE:
-      maplibre_native_ffi_momentum_options_set_duration_scale(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_OPTIONS_PROP_MAX_DURATION_MS:
-      maplibre_native_ffi_momentum_options_set_max_duration_ms(
         self, g_value_get_double(value)
       );
       break;
@@ -1514,9 +1464,17 @@ static void maplibre_native_ffi_momentum_options_class_init(
     "decay", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY, 0,
     PROPERTY_FLAGS
   );
-  momentum_options_properties[MOMENTUM_OPTIONS_PROP_SPEED_SCALE] =
+  momentum_options_properties[MOMENTUM_OPTIONS_PROP_HALF_LIFE_MS] =
     g_param_spec_double(
-      "speed-scale", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+      "half-life-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_options_properties[MOMENTUM_OPTIONS_PROP_STOP_SPEED] =
+    g_param_spec_double(
+      "stop-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_options_properties[MOMENTUM_OPTIONS_PROP_SCROLL_FRICTION] =
+    g_param_spec_double(
+      "scroll-friction", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
     );
   momentum_options_properties[MOMENTUM_OPTIONS_PROP_MIN_SPEED] =
     g_param_spec_double(
@@ -1525,35 +1483,6 @@ static void maplibre_native_ffi_momentum_options_class_init(
   momentum_options_properties[MOMENTUM_OPTIONS_PROP_MAX_SPEED] =
     g_param_spec_double(
       "max-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_options_properties[MOMENTUM_OPTIONS_PROP_EXPONENT] =
-    g_param_spec_double(
-      "exponent", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_options_properties[MOMENTUM_OPTIONS_PROP_BASE_DURATION_MS] =
-    g_param_spec_double(
-      "base-duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_options_properties[MOMENTUM_OPTIONS_PROP_DURATION_MS_PER_SPEED] =
-    g_param_spec_double(
-      "duration-ms-per-speed", NULL, NULL, -INFINITY, INFINITY, 0,
-      PROPERTY_FLAGS
-    );
-  momentum_options_properties[MOMENTUM_OPTIONS_PROP_DECAY_RATE] =
-    g_param_spec_double(
-      "decay-rate", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_options_properties[MOMENTUM_OPTIONS_PROP_STOP_SPEED] =
-    g_param_spec_double(
-      "stop-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_options_properties[MOMENTUM_OPTIONS_PROP_DURATION_SCALE] =
-    g_param_spec_double(
-      "duration-scale", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_options_properties[MOMENTUM_OPTIONS_PROP_MAX_DURATION_MS] =
-    g_param_spec_double(
-      "max-duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
     );
   momentum_options_properties[MOMENTUM_OPTIONS_PROP_MAX_DISTANCE] =
     g_param_spec_double(
@@ -1607,32 +1536,90 @@ void maplibre_native_ffi_momentum_options_set_decay(
     );
 }
 
-gdouble maplibre_native_ffi_momentum_options_get_speed_scale(
+gdouble maplibre_native_ffi_momentum_options_get_half_life_ms(
   MaplibreNativeFfiMomentumOptions* self
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
-  return self->speed_scale;
+  return self->half_life_ms;
 }
 
-gboolean maplibre_native_ffi_momentum_options_has_speed_scale(
+gboolean maplibre_native_ffi_momentum_options_has_half_life_ms(
   MaplibreNativeFfiMomentumOptions* self
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_OPTION_SPEED_SCALE) != 0;
+  return (self->fields & MLN_MOMENTUM_OPTION_HALF_LIFE_MS) != 0;
 }
 
-void maplibre_native_ffi_momentum_options_set_speed_scale(
+void maplibre_native_ffi_momentum_options_set_half_life_ms(
   MaplibreNativeFfiMomentumOptions* self, gdouble value
 ) {
   g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_SPEED_SCALE) != 0;
-  gboolean changed = self->speed_scale != value;
-  self->speed_scale = value;
-  self->fields |= MLN_MOMENTUM_OPTION_SPEED_SCALE;
+  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_HALF_LIFE_MS) != 0;
+  gboolean changed = self->half_life_ms != value;
+  self->half_life_ms = value;
+  self->fields |= MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
   if (changed || !was_set)
     g_object_notify_by_pspec(
       G_OBJECT(self),
-      momentum_options_properties[MOMENTUM_OPTIONS_PROP_SPEED_SCALE]
+      momentum_options_properties[MOMENTUM_OPTIONS_PROP_HALF_LIFE_MS]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_options_get_stop_speed(
+  MaplibreNativeFfiMomentumOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
+  return self->stop_speed;
+}
+
+gboolean maplibre_native_ffi_momentum_options_has_stop_speed(
+  MaplibreNativeFfiMomentumOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_OPTION_STOP_SPEED) != 0;
+}
+
+void maplibre_native_ffi_momentum_options_set_stop_speed(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_STOP_SPEED) != 0;
+  gboolean changed = self->stop_speed != value;
+  self->stop_speed = value;
+  self->fields |= MLN_MOMENTUM_OPTION_STOP_SPEED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      momentum_options_properties[MOMENTUM_OPTIONS_PROP_STOP_SPEED]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_options_get_scroll_friction(
+  MaplibreNativeFfiMomentumOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
+  return self->scroll_friction;
+}
+
+gboolean maplibre_native_ffi_momentum_options_has_scroll_friction(
+  MaplibreNativeFfiMomentumOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_OPTION_SCROLL_FRICTION) != 0;
+}
+
+void maplibre_native_ffi_momentum_options_set_scroll_friction(
+  MaplibreNativeFfiMomentumOptions* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_SCROLL_FRICTION) != 0;
+  gboolean changed = self->scroll_friction != value;
+  self->scroll_friction = value;
+  self->fields |= MLN_MOMENTUM_OPTION_SCROLL_FRICTION;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      momentum_options_properties[MOMENTUM_OPTIONS_PROP_SCROLL_FRICTION]
     );
 }
 
@@ -1694,210 +1681,6 @@ void maplibre_native_ffi_momentum_options_set_max_speed(
     );
 }
 
-gdouble maplibre_native_ffi_momentum_options_get_exponent(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
-  return self->exponent;
-}
-
-gboolean maplibre_native_ffi_momentum_options_has_exponent(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_OPTION_EXPONENT) != 0;
-}
-
-void maplibre_native_ffi_momentum_options_set_exponent(
-  MaplibreNativeFfiMomentumOptions* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_EXPONENT) != 0;
-  gboolean changed = self->exponent != value;
-  self->exponent = value;
-  self->fields |= MLN_MOMENTUM_OPTION_EXPONENT;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_options_properties[MOMENTUM_OPTIONS_PROP_EXPONENT]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_options_get_base_duration_ms(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
-  return self->base_duration_ms;
-}
-
-gboolean maplibre_native_ffi_momentum_options_has_base_duration_ms(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_OPTION_BASE_DURATION_MS) != 0;
-}
-
-void maplibre_native_ffi_momentum_options_set_base_duration_ms(
-  MaplibreNativeFfiMomentumOptions* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_BASE_DURATION_MS) != 0;
-  gboolean changed = self->base_duration_ms != value;
-  self->base_duration_ms = value;
-  self->fields |= MLN_MOMENTUM_OPTION_BASE_DURATION_MS;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_options_properties[MOMENTUM_OPTIONS_PROP_BASE_DURATION_MS]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_options_get_duration_ms_per_speed(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
-  return self->duration_ms_per_speed;
-}
-
-gboolean maplibre_native_ffi_momentum_options_has_duration_ms_per_speed(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED) != 0;
-}
-
-void maplibre_native_ffi_momentum_options_set_duration_ms_per_speed(
-  MaplibreNativeFfiMomentumOptions* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
-  gboolean was_set =
-    (self->fields & MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED) != 0;
-  gboolean changed = self->duration_ms_per_speed != value;
-  self->duration_ms_per_speed = value;
-  self->fields |= MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_options_properties[MOMENTUM_OPTIONS_PROP_DURATION_MS_PER_SPEED]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_options_get_decay_rate(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
-  return self->decay_rate;
-}
-
-gboolean maplibre_native_ffi_momentum_options_has_decay_rate(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_OPTION_DECAY_RATE) != 0;
-}
-
-void maplibre_native_ffi_momentum_options_set_decay_rate(
-  MaplibreNativeFfiMomentumOptions* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_DECAY_RATE) != 0;
-  gboolean changed = self->decay_rate != value;
-  self->decay_rate = value;
-  self->fields |= MLN_MOMENTUM_OPTION_DECAY_RATE;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_options_properties[MOMENTUM_OPTIONS_PROP_DECAY_RATE]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_options_get_stop_speed(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
-  return self->stop_speed;
-}
-
-gboolean maplibre_native_ffi_momentum_options_has_stop_speed(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_OPTION_STOP_SPEED) != 0;
-}
-
-void maplibre_native_ffi_momentum_options_set_stop_speed(
-  MaplibreNativeFfiMomentumOptions* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_STOP_SPEED) != 0;
-  gboolean changed = self->stop_speed != value;
-  self->stop_speed = value;
-  self->fields |= MLN_MOMENTUM_OPTION_STOP_SPEED;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_options_properties[MOMENTUM_OPTIONS_PROP_STOP_SPEED]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_options_get_duration_scale(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
-  return self->duration_scale;
-}
-
-gboolean maplibre_native_ffi_momentum_options_has_duration_scale(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_OPTION_DURATION_SCALE) != 0;
-}
-
-void maplibre_native_ffi_momentum_options_set_duration_scale(
-  MaplibreNativeFfiMomentumOptions* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_DURATION_SCALE) != 0;
-  gboolean changed = self->duration_scale != value;
-  self->duration_scale = value;
-  self->fields |= MLN_MOMENTUM_OPTION_DURATION_SCALE;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_options_properties[MOMENTUM_OPTIONS_PROP_DURATION_SCALE]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_options_get_max_duration_ms(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), 0);
-  return self->max_duration_ms;
-}
-
-gboolean maplibre_native_ffi_momentum_options_has_max_duration_ms(
-  MaplibreNativeFfiMomentumOptions* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_OPTION_MAX_DURATION_MS) != 0;
-}
-
-void maplibre_native_ffi_momentum_options_set_max_duration_ms(
-  MaplibreNativeFfiMomentumOptions* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_OPTIONS(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_OPTION_MAX_DURATION_MS) != 0;
-  gboolean changed = self->max_duration_ms != value;
-  self->max_duration_ms = value;
-  self->fields |= MLN_MOMENTUM_OPTION_MAX_DURATION_MS;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_options_properties[MOMENTUM_OPTIONS_PROP_MAX_DURATION_MS]
-    );
-}
-
 gdouble maplibre_native_ffi_momentum_options_get_max_distance(
   MaplibreNativeFfiMomentumOptions* self
 ) {
@@ -1934,16 +1717,11 @@ MaplibreNativeFfiMomentumOptions* maplibre_native_ffi_momentum_options_copy(
     maplibre_native_ffi_momentum_options_new();
   copy->fields = self->fields;
   copy->decay = self->decay;
-  copy->speed_scale = self->speed_scale;
+  copy->half_life_ms = self->half_life_ms;
+  copy->stop_speed = self->stop_speed;
+  copy->scroll_friction = self->scroll_friction;
   copy->min_speed = self->min_speed;
   copy->max_speed = self->max_speed;
-  copy->exponent = self->exponent;
-  copy->base_duration_ms = self->base_duration_ms;
-  copy->duration_ms_per_speed = self->duration_ms_per_speed;
-  copy->decay_rate = self->decay_rate;
-  copy->stop_speed = self->stop_speed;
-  copy->duration_scale = self->duration_scale;
-  copy->max_duration_ms = self->max_duration_ms;
   copy->max_distance = self->max_distance;
   return copy;
 }
@@ -1956,16 +1734,11 @@ void maplibre_native_ffi_momentum_options_to_native(
   memset(out, 0, sizeof *out);
   out->fields = (mln_momentum_option_fields)self->fields;
   out->decay = (mln_momentum_decay)(self->decay);
-  out->speed_scale = (double)(self->speed_scale);
+  out->half_life_ms = (double)(self->half_life_ms);
+  out->stop_speed = (double)(self->stop_speed);
+  out->scroll_friction = (double)(self->scroll_friction);
   out->min_speed = (double)(self->min_speed);
   out->max_speed = (double)(self->max_speed);
-  out->exponent = (double)(self->exponent);
-  out->base_duration_ms = (double)(self->base_duration_ms);
-  out->duration_ms_per_speed = (double)(self->duration_ms_per_speed);
-  out->decay_rate = (double)(self->decay_rate);
-  out->stop_speed = (double)(self->stop_speed);
-  out->duration_scale = (double)(self->duration_scale);
-  out->max_duration_ms = (double)(self->max_duration_ms);
   out->max_distance = (double)(self->max_distance);
 }
 
@@ -1982,7 +1755,6 @@ struct _MaplibreNativeFfiGestureMomentum {
   MaplibreNativeFfiMomentumOptions* zoom;
   MaplibreNativeFfiMomentumOptions* bearing;
   MaplibreNativeFfiMomentumOptions* pitch;
-  gboolean pan_follows_zoom;
   MaplibreNativeFfiBearingSnap* bearing_snap;
 };
 
@@ -1998,7 +1770,6 @@ enum {
   GESTURE_MOMENTUM_PROP_ZOOM,
   GESTURE_MOMENTUM_PROP_BEARING,
   GESTURE_MOMENTUM_PROP_PITCH,
-  GESTURE_MOMENTUM_PROP_PAN_FOLLOWS_ZOOM,
   GESTURE_MOMENTUM_PROP_BEARING_SNAP,
   GESTURE_MOMENTUM_N_PROPERTIES
 };
@@ -2057,9 +1828,6 @@ static void maplibre_native_ffi_gesture_momentum_get_property(
       break;
     case GESTURE_MOMENTUM_PROP_PITCH:
       g_value_set_object(value, self->pitch);
-      break;
-    case GESTURE_MOMENTUM_PROP_PAN_FOLLOWS_ZOOM:
-      g_value_set_boolean(value, self->pan_follows_zoom);
       break;
     case GESTURE_MOMENTUM_PROP_BEARING_SNAP:
       g_value_set_object(value, self->bearing_snap);
@@ -2125,11 +1893,6 @@ static void maplibre_native_ffi_gesture_momentum_set_property(
         self, g_value_get_object(value)
       );
       break;
-    case GESTURE_MOMENTUM_PROP_PAN_FOLLOWS_ZOOM:
-      maplibre_native_ffi_gesture_momentum_set_pan_follows_zoom(
-        self, g_value_get_boolean(value)
-      );
-      break;
     case GESTURE_MOMENTUM_PROP_BEARING_SNAP:
       maplibre_native_ffi_gesture_momentum_set_bearing_snap(
         self, g_value_get_object(value)
@@ -2193,8 +1956,6 @@ static void maplibre_native_ffi_gesture_momentum_class_init(
       "pitch", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_OPTIONS,
       PROPERTY_FLAGS
     );
-  gesture_momentum_properties[GESTURE_MOMENTUM_PROP_PAN_FOLLOWS_ZOOM] =
-    g_param_spec_boolean("pan-follows-zoom", NULL, NULL, FALSE, PROPERTY_FLAGS);
   gesture_momentum_properties[GESTURE_MOMENTUM_PROP_BEARING_SNAP] =
     g_param_spec_object(
       "bearing-snap", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_BEARING_SNAP,
@@ -2494,36 +2255,6 @@ void maplibre_native_ffi_gesture_momentum_set_pitch(
   );
 }
 
-gboolean maplibre_native_ffi_gesture_momentum_get_pan_follows_zoom(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self), FALSE);
-  return self->pan_follows_zoom;
-}
-
-gboolean maplibre_native_ffi_gesture_momentum_has_pan_follows_zoom(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self), FALSE);
-  return (self->fields & MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM) != 0;
-}
-
-void maplibre_native_ffi_gesture_momentum_set_pan_follows_zoom(
-  MaplibreNativeFfiGestureMomentum* self, gboolean value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self));
-  gboolean was_set =
-    (self->fields & MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM) != 0;
-  gboolean changed = self->pan_follows_zoom != value;
-  self->pan_follows_zoom = value;
-  self->fields |= MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      gesture_momentum_properties[GESTURE_MOMENTUM_PROP_PAN_FOLLOWS_ZOOM]
-    );
-}
-
 MaplibreNativeFfiBearingSnap*
 maplibre_native_ffi_gesture_momentum_get_bearing_snap(
   MaplibreNativeFfiGestureMomentum* self
@@ -2582,7 +2313,6 @@ MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_gesture_momentum_copy(
   copy->pitch = self->pitch != NULL
                   ? maplibre_native_ffi_momentum_options_copy(self->pitch)
                   : NULL;
-  copy->pan_follows_zoom = self->pan_follows_zoom;
   g_clear_object(&copy->bearing_snap);
   copy->bearing_snap =
     self->bearing_snap != NULL
@@ -2623,7 +2353,6 @@ void maplibre_native_ffi_gesture_momentum_to_native(
     maplibre_native_ffi_momentum_options_to_native(
       self->pitch, &out->pitch, call
     );
-  out->pan_follows_zoom = (self->pan_follows_zoom) != FALSE;
   if (self->bearing_snap != NULL)
     maplibre_native_ffi_bearing_snap_to_native(
       self->bearing_snap, &out->bearing_snap, call

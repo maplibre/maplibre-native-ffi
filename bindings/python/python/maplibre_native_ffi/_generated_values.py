@@ -528,14 +528,14 @@ class MapMode(UnknownIntEnum):
 
 
 class MomentumDecay(UnknownIntEnum):
-    """How a part of a gesture's momentum slows to a stop.
+    """How a part of a gesture's momentum slows from its release speed.
 
     See `mln_momentum_decay` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    POWER = 0
-    EXPONENTIAL = 1
+    FRICTION = 0
+    SPLINE = 1
 
 
 class NetworkStatus(UnknownIntEnum):
@@ -1285,7 +1285,7 @@ class BearingSnap:
     """In degrees, from 0 to 180. Defaults to 7."""
 
     duration_ms: float | None = None
-    """Defaults to 300."""
+    """Zero settles at once. Defaults to 300."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2249,16 +2249,15 @@ class GestureMomentum:
     """How a gesture keeps moving the camera after its last contact lifts.
 
     A part moves only when its velocity is set, and each part slows on its
-    own clock. The parts' defaults are:
+    own. Every part defaults to `MomentumDecay.FRICTION` with a half-life of
+    140 ms, and these other defaults:
 
-    | Part | Exponent | Speed scale | Base ms | ms per speed | Other | |
-    ------- | -------- | ----------- | ------- | ------------ |
-    --------------- | | pan | 2 | 0.56 | 150 | 1/10.5 | min speed 250 | |
-    zoom | 4 | 1 | 600 | 0 | max 600 ms, 2.5 | | bearing | 4 | 1 | 600 | 0 |
-    max 600 ms | | pitch | 4 | 1 | 300 | 0 | min speed 5 |
-
-    Every part defaults to `MomentumDecay.POWER`, and the zoom moves at most
-    2.5 levels.
+    - Pan stops at 10 logical pixels per second, needs a release of at least
+      200, and counts a release faster than 10000 as 10000.
+    - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+    - Bearing stops at 1 degree per second and needs a release of at least
+      60.
+    - Pitch stops at 1 degree per second and needs a release of at least 5.
 
     See `mln_gesture_momentum` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2296,12 +2295,6 @@ class GestureMomentum:
 
     pitch: MomentumOptions = field(default_factory=lambda: MomentumOptions())
 
-    pan_follows_zoom: bool | None = None
-    """When pan and zoom momentum both start, the pan slows over the zoom's
-    duration and curve, starts no faster, and moves no farther than it would
-    alone. Defaults to true.
-    """
-
     bearing_snap: BearingSnap | None = None
     """Where the bearing settles after a gesture that changed it, once the rest
     of the momentum ends. Without momentum, it settles at once. Without this,
@@ -2321,7 +2314,6 @@ class GestureMomentum:
             zoom=MomentumOptions._from_native(raw["zoom"]),
             bearing=MomentumOptions._from_native(raw["bearing"]),
             pitch=MomentumOptions._from_native(raw["pitch"]),
-            pan_follows_zoom=raw["pan_follows_zoom"],
             bearing_snap=_maybe(BearingSnap._from_native, raw["bearing_snap"]),
         )
 
@@ -3096,10 +3088,10 @@ class MetalTextureFrame:
 class MomentumOptions:
     """How one part of a gesture keeps moving after its release.
 
-    Speeds and distances are in the part's unit: logical pixels for pan, zoom
-    levels for zoom, and degrees for bearing and pitch. A setting whose bit
-    isn't set takes the part's default, which `GestureMomentum` lists. Every
-    setting is finite and not negative.
+    The part starts at its release speed. Speeds and distances are in the
+    part's unit: logical pixels for pan, zoom levels for zoom, and degrees
+    for bearing and pitch. A setting whose bit isn't set takes the part's
+    default, which `GestureMomentum` lists.
 
     See `mln_momentum_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3107,59 +3099,37 @@ class MomentumOptions:
 
     decay: MomentumDecay | None = None
 
-    speed_scale: float | None = None
-    """The momentum starts at this multiple of the release speed."""
-
-    min_speed: float | None = None
-    """A slower release starts no momentum."""
-
-    max_speed: float | None = None
-    """A faster release counts as this speed."""
-
-    exponent: float | None = None
-    """For `MomentumDecay.POWER`. At least 1."""
-
-    base_duration_ms: float | None = None
-    """For `MomentumDecay.POWER`, the duration is `base_duration_ms` plus
-    `duration_ms_per_speed` times the release speed.
-    """
-
-    duration_ms_per_speed: float | None = None
-
-    decay_rate: float | None = None
-    """Required for `MomentumDecay.EXPONENTIAL`, and positive."""
+    half_life_ms: float | None = None
+    """For `MomentumDecay.FRICTION`. Positive."""
 
     stop_speed: float | None = None
-    """Required for `MomentumDecay.EXPONENTIAL`, and positive."""
+    """For `MomentumDecay.FRICTION`, the speed at which it ends. Positive."""
 
-    duration_scale: float | None = None
-    """Stretches the momentum in time without changing its starting speed, so it
-    also scales the distance. 0 starts no momentum. A host can pass its
-    platform's animation duration scale here.
+    scroll_friction: float | None = None
+    """For `MomentumDecay.SPLINE`, Android's
+    `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
     """
 
-    max_duration_ms: float | None = None
-    """The longest duration, after `duration_scale` applies."""
+    min_speed: float | None = None
+    """A slower release starts no momentum. Not negative."""
+
+    max_speed: float | None = None
+    """A faster release counts as this speed. Positive."""
 
     max_distance: float | None = None
-    """The farthest the momentum moves. A momentum that would move farther slows
-    faster over the same duration.
+    """The farthest the part moves. A release that would move farther starts
+    slower, so it ends sooner. Positive.
     """
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
             decay=_maybe(MomentumDecay, raw["decay"]),
-            speed_scale=raw["speed_scale"],
+            half_life_ms=raw["half_life_ms"],
+            stop_speed=raw["stop_speed"],
+            scroll_friction=raw["scroll_friction"],
             min_speed=raw["min_speed"],
             max_speed=raw["max_speed"],
-            exponent=raw["exponent"],
-            base_duration_ms=raw["base_duration_ms"],
-            duration_ms_per_speed=raw["duration_ms_per_speed"],
-            decay_rate=raw["decay_rate"],
-            stop_speed=raw["stop_speed"],
-            duration_scale=raw["duration_scale"],
-            max_duration_ms=raw["max_duration_ms"],
             max_distance=raw["max_distance"],
         )
 

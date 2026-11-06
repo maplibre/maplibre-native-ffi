@@ -493,35 +493,30 @@ typedef enum mln_gesture_phase : uint32_t {
   MLN_GESTURE_PHASE_CANCEL = 4,
 } mln_gesture_phase;
 
-/** How a part of a gesture's momentum slows to a stop. */
+/** How a part of a gesture's momentum slows from its release speed. */
 typedef enum mln_momentum_decay : uint32_t {
   /**
-   * The share of the distance traveled is 1 - (1 - t)^`exponent`, where t goes
-   * from 0 to 1 over the momentum's duration. An exponent of 2 slows at a
-   * constant rate.
+   * The speed halves every `half_life_ms`, until it drops to `stop_speed`.
+   * UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
+   * deceleration 69 ms.
    */
-  MLN_MOMENTUM_DECAY_POWER = 0,
+  MLN_MOMENTUM_DECAY_FRICTION = 0,
   /**
-   * The speed falls to e^-`decay_rate` of itself each second, until it drops
-   * below `stop_speed`.
+   * Android's scroll fling, as OverScroller computes it with
+   * `scroll_friction`. Only pan can use it.
    */
-  MLN_MOMENTUM_DECAY_EXPONENTIAL = 1,
+  MLN_MOMENTUM_DECAY_SPLINE = 1,
 } mln_momentum_decay;
 
 /** The fields that mln_momentum_options sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_momentum_option_field : uint32_t {
   MLN_MOMENTUM_OPTION_DECAY = 1U << 0U,
-  MLN_MOMENTUM_OPTION_SPEED_SCALE = 1U << 1U,
-  MLN_MOMENTUM_OPTION_MIN_SPEED = 1U << 2U,
-  MLN_MOMENTUM_OPTION_MAX_SPEED = 1U << 3U,
-  MLN_MOMENTUM_OPTION_EXPONENT = 1U << 4U,
-  MLN_MOMENTUM_OPTION_BASE_DURATION_MS = 1U << 5U,
-  MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED = 1U << 6U,
-  MLN_MOMENTUM_OPTION_DECAY_RATE = 1U << 7U,
-  MLN_MOMENTUM_OPTION_STOP_SPEED = 1U << 8U,
-  MLN_MOMENTUM_OPTION_DURATION_SCALE = 1U << 9U,
-  MLN_MOMENTUM_OPTION_MAX_DURATION_MS = 1U << 10U,
-  MLN_MOMENTUM_OPTION_MAX_DISTANCE = 1U << 11U,
+  MLN_MOMENTUM_OPTION_HALF_LIFE_MS = 1U << 1U,
+  MLN_MOMENTUM_OPTION_STOP_SPEED = 1U << 2U,
+  MLN_MOMENTUM_OPTION_SCROLL_FRICTION = 1U << 3U,
+  MLN_MOMENTUM_OPTION_MIN_SPEED = 1U << 4U,
+  MLN_MOMENTUM_OPTION_MAX_SPEED = 1U << 5U,
+  MLN_MOMENTUM_OPTION_MAX_DISTANCE = 1U << 6U,
 } mln_momentum_option_field;
 
 /** A set of mln_momentum_option_field bits. */
@@ -530,51 +525,34 @@ typedef uint32_t mln_momentum_option_fields;
 /**
  * How one part of a gesture keeps moving after its release.
  *
- * Speeds and distances are in the part's unit: logical pixels for pan, zoom
- * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
- * set takes the part's default, which mln_gesture_momentum lists. Every
- * setting is finite and not negative.
+ * The part starts at its release speed. Speeds and distances are in the
+ * part's unit: logical pixels for pan, zoom levels for zoom, and degrees for
+ * bearing and pitch. A setting whose bit isn't set takes the part's default,
+ * which mln_gesture_momentum lists.
  */
 typedef struct mln_momentum_options {
   mln_momentum_option_fields fields;
   mln_momentum_decay decay
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_DECAY");
-  /** The momentum starts at this multiple of the release speed. */
-  double speed_scale
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_SPEED_SCALE");
-  /** A slower release starts no momentum. */
-  double min_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MIN_SPEED");
-  /** A faster release counts as this speed. */
-  double max_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MAX_SPEED");
-  /** For MLN_MOMENTUM_DECAY_POWER. At least 1. */
-  double exponent MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_EXPONENT");
-  /**
-   * For MLN_MOMENTUM_DECAY_POWER, the duration is `base_duration_ms` plus
-   * `duration_ms_per_speed` times the release speed.
-   */
-  double base_duration_ms
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_BASE_DURATION_MS");
-  double duration_ms_per_speed
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED");
-  /** Required for MLN_MOMENTUM_DECAY_EXPONENTIAL, and positive. */
-  double decay_rate
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_DECAY_RATE");
-  /** Required for MLN_MOMENTUM_DECAY_EXPONENTIAL, and positive. */
+  /** For MLN_MOMENTUM_DECAY_FRICTION. Positive. */
+  double half_life_ms
+    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_HALF_LIFE_MS");
+  /** For MLN_MOMENTUM_DECAY_FRICTION, the speed at which it ends. Positive. */
   double stop_speed
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_STOP_SPEED");
   /**
-   * Stretches the momentum in time without changing its starting speed, so it
-   * also scales the distance. 0 starts no momentum. A host can pass its
-   * platform's animation duration scale here.
+   * For MLN_MOMENTUM_DECAY_SPLINE, Android's
+   * `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
    */
-  double duration_scale
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_DURATION_SCALE");
-  /** The longest duration, after `duration_scale` applies. */
-  double max_duration_ms
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MAX_DURATION_MS");
+  double scroll_friction
+    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_SCROLL_FRICTION");
+  /** A slower release starts no momentum. Not negative. */
+  double min_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MIN_SPEED");
+  /** A faster release counts as this speed. Positive. */
+  double max_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MAX_SPEED");
   /**
-   * The farthest the momentum moves. A momentum that would move farther slows
-   * faster over the same duration.
+   * The farthest the part moves. A release that would move farther starts
+   * slower, so it ends sooner. Positive.
    */
   double max_distance
     MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_OPTION_MAX_DISTANCE");
@@ -608,7 +586,7 @@ typedef struct mln_bearing_snap {
     MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_TARGET_OFFSET");
   /** In degrees, from 0 to 180. Defaults to 7. */
   double tolerance MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_TOLERANCE");
-  /** Defaults to 300. */
+  /** Zero settles at once. Defaults to 300. */
   double duration_ms
     MLN_BINDING("mask=fields;bit=MLN_BEARING_SNAP_DURATION_MS");
 } mln_bearing_snap;
@@ -621,8 +599,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_gesture_momentum_field : uint32_t {
   MLN_GESTURE_MOMENTUM_PITCH_VELOCITY = 1U << 3U,
   MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR = 1U << 4U,
   MLN_GESTURE_MOMENTUM_BEARING_ANCHOR = 1U << 5U,
-  MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM = 1U << 6U,
-  MLN_GESTURE_MOMENTUM_BEARING_SNAP = 1U << 7U,
+  MLN_GESTURE_MOMENTUM_BEARING_SNAP = 1U << 6U,
 } mln_gesture_momentum_field;
 
 /** A set of mln_gesture_momentum_field bits. */
@@ -631,18 +608,15 @@ typedef uint32_t mln_gesture_momentum_fields;
 /**
  * How a gesture keeps moving the camera after its last contact lifts.
  *
- * A part moves only when its velocity is set, and each part slows on its own
- * clock. The parts' defaults are:
+ * A part moves only when its velocity is set, and each part slows on its own.
+ * Every part defaults to MLN_MOMENTUM_DECAY_FRICTION with a half-life of
+ * 140 ms, and these other defaults:
  *
- * | Part    | Exponent | Speed scale | Base ms | ms per speed | Other | |
- * ------- | -------- | ----------- | ------- | ------------ | --------------- |
- * | pan     | 2        | 0.56        | 150     | 1/10.5       | min speed 250 |
- * | zoom    | 4        | 1           | 600     | 0            | max 600 ms, 2.5
- * | | bearing | 4        | 1           | 600     | 0            | max 600 ms |
- * | pitch   | 4        | 1           | 300     | 0            | min speed 5 |
- *
- * Every part defaults to MLN_MOMENTUM_DECAY_POWER, and the zoom moves at most
- * 2.5 levels.
+ * - Pan stops at 10 logical pixels per second, needs a release of at least
+ *   200, and counts a release faster than 10000 as 10000.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+ * - Bearing stops at 1 degree per second and needs a release of at least 60.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5.
  */
 typedef struct mln_gesture_momentum {
   mln_gesture_momentum_fields fields;
@@ -677,13 +651,6 @@ typedef struct mln_gesture_momentum {
   mln_momentum_options zoom;
   mln_momentum_options bearing;
   mln_momentum_options pitch;
-  /**
-   * When pan and zoom momentum both start, the pan slows over the zoom's
-   * duration and curve, starts no faster, and moves no farther than it would
-   * alone. Defaults to true.
-   */
-  bool pan_follows_zoom
-    MLN_BINDING("mask=fields;bit=MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM");
   /**
    * Where the bearing settles after a gesture that changed it, once the rest
    * of the momentum ends. Without momentum, it settles at once. Without this,

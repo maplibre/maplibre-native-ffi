@@ -115,8 +115,7 @@ pub const MLN_GESTURE_MOMENTUM_BEARING_VELOCITY: mln_gesture_momentum_field = 4;
 pub const MLN_GESTURE_MOMENTUM_PITCH_VELOCITY: mln_gesture_momentum_field = 8;
 pub const MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR: mln_gesture_momentum_field = 16;
 pub const MLN_GESTURE_MOMENTUM_BEARING_ANCHOR: mln_gesture_momentum_field = 32;
-pub const MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM: mln_gesture_momentum_field = 64;
-pub const MLN_GESTURE_MOMENTUM_BEARING_SNAP: mln_gesture_momentum_field = 128;
+pub const MLN_GESTURE_MOMENTUM_BEARING_SNAP: mln_gesture_momentum_field = 64;
 pub type mln_gesture_phase = u32;
 pub const MLN_GESTURE_PHASE_NONE: mln_gesture_phase = 0;
 pub const MLN_GESTURE_PHASE_BEGIN: mln_gesture_phase = 1;
@@ -199,21 +198,16 @@ pub const MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE: mln_map_viewport_option_field 
 pub const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE: mln_map_viewport_option_field = 4;
 pub const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET: mln_map_viewport_option_field = 8;
 pub type mln_momentum_decay = u32;
-pub const MLN_MOMENTUM_DECAY_POWER: mln_momentum_decay = 0;
-pub const MLN_MOMENTUM_DECAY_EXPONENTIAL: mln_momentum_decay = 1;
+pub const MLN_MOMENTUM_DECAY_FRICTION: mln_momentum_decay = 0;
+pub const MLN_MOMENTUM_DECAY_SPLINE: mln_momentum_decay = 1;
 pub type mln_momentum_option_field = u32;
 pub const MLN_MOMENTUM_OPTION_DECAY: mln_momentum_option_field = 1;
-pub const MLN_MOMENTUM_OPTION_SPEED_SCALE: mln_momentum_option_field = 2;
-pub const MLN_MOMENTUM_OPTION_MIN_SPEED: mln_momentum_option_field = 4;
-pub const MLN_MOMENTUM_OPTION_MAX_SPEED: mln_momentum_option_field = 8;
-pub const MLN_MOMENTUM_OPTION_EXPONENT: mln_momentum_option_field = 16;
-pub const MLN_MOMENTUM_OPTION_BASE_DURATION_MS: mln_momentum_option_field = 32;
-pub const MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED: mln_momentum_option_field = 64;
-pub const MLN_MOMENTUM_OPTION_DECAY_RATE: mln_momentum_option_field = 128;
-pub const MLN_MOMENTUM_OPTION_STOP_SPEED: mln_momentum_option_field = 256;
-pub const MLN_MOMENTUM_OPTION_DURATION_SCALE: mln_momentum_option_field = 512;
-pub const MLN_MOMENTUM_OPTION_MAX_DURATION_MS: mln_momentum_option_field = 1024;
-pub const MLN_MOMENTUM_OPTION_MAX_DISTANCE: mln_momentum_option_field = 2048;
+pub const MLN_MOMENTUM_OPTION_HALF_LIFE_MS: mln_momentum_option_field = 2;
+pub const MLN_MOMENTUM_OPTION_STOP_SPEED: mln_momentum_option_field = 4;
+pub const MLN_MOMENTUM_OPTION_SCROLL_FRICTION: mln_momentum_option_field = 8;
+pub const MLN_MOMENTUM_OPTION_MIN_SPEED: mln_momentum_option_field = 16;
+pub const MLN_MOMENTUM_OPTION_MAX_SPEED: mln_momentum_option_field = 32;
+pub const MLN_MOMENTUM_OPTION_MAX_DISTANCE: mln_momentum_option_field = 64;
 pub type mln_network_status = u32;
 pub const MLN_NETWORK_STATUS_ONLINE: mln_network_status = 1;
 pub const MLN_NETWORK_STATUS_OFFLINE: mln_network_status = 2;
@@ -946,7 +940,6 @@ pub struct mln_gesture_momentum {
     pub zoom: mln_momentum_options,
     pub bearing: mln_momentum_options,
     pub pitch: mln_momentum_options,
-    pub pan_follows_zoom: bool,
     pub bearing_snap: mln_bearing_snap,
 }
 #[repr(C)]
@@ -1202,16 +1195,11 @@ pub struct mln_metal_texture_frame {
 pub struct mln_momentum_options {
     pub fields: mln_momentum_option_fields,
     pub decay: mln_momentum_decay,
-    pub speed_scale: f64,
+    pub half_life_ms: f64,
+    pub stop_speed: f64,
+    pub scroll_friction: f64,
     pub min_speed: f64,
     pub max_speed: f64,
-    pub exponent: f64,
-    pub base_duration_ms: f64,
-    pub duration_ms_per_speed: f64,
-    pub decay_rate: f64,
-    pub stop_speed: f64,
-    pub duration_scale: f64,
-    pub max_duration_ms: f64,
     pub max_distance: f64,
 }
 #[repr(C)]

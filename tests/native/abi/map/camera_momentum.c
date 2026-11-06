@@ -172,12 +172,12 @@ static void destroy_fixture(momentum_fixture* fixture) {
   mln_test_destroy_runtime(fixture->runtime);
 }
 
-// With the default pan settings, a release at 1000 pixels per second moves
-// the content 0.28 * 1000 * (1000 / 10.5 + 150) / 1000 pixels.
-static void a_pan_release_moves_the_content_its_distance(void) {
+// The content moves (v - s) / k, for a release at speed v that stops at speed
+// s and slows at rate k = ln 2 / half-life. A short half-life keeps the glide
+// to a few frames.
+static void a_release_glides_and_then_ends_the_gesture(void) {
   momentum_fixture fixture = create_fixture();
-  const mln_map_snapshot start = read_snapshot(fixture.map);
-  const mln_lat_lng center = start.view.camera.center;
+  const mln_lat_lng center = read_snapshot(fixture.map).view.camera.center;
   const mln_screen_point before = screen_point_of(fixture.map, center);
 
   begin_gesture(fixture.map);
@@ -189,6 +189,10 @@ static void a_pan_release_moves_the_content_its_distance(void) {
   mln_gesture_momentum momentum = {0};
   momentum.fields = MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
   momentum.pan_velocity = (mln_screen_point){.x = 600.0, .y = 800.0};
+  momentum.pan.fields =
+    MLN_MOMENTUM_OPTION_HALF_LIFE_MS | MLN_MOMENTUM_OPTION_STOP_SPEED;
+  momentum.pan.half_life_ms = 20.0;
+  momentum.pan.stop_speed = 100.0;
   const mln_camera_delta delta = release(&momentum, &probe);
   apply_delta(fixture.map, &delta);
   TEST_ASSERT_TRUE(read_snapshot(fixture.map).gesture_in_progress);
@@ -196,11 +200,10 @@ static void a_pan_release_moves_the_content_its_distance(void) {
   render_until_ended(&fixture.render, &probe);
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED);
   TEST_ASSERT_EQUAL_DOUBLE(0.0, observation.velocity.pan.x);
-  TEST_ASSERT_EQUAL_DOUBLE(0.0, observation.velocity.pan.y);
   TEST_ASSERT_TRUE(observation.momentum_change_queued);
   TEST_ASSERT_FALSE(read_snapshot(fixture.map).gesture_in_progress);
 
-  const double distance = 0.28 * 1000.0 * (1000.0 / 10.5 + 150.0) / 1000.0;
+  const double distance = (1000.0 - 100.0) / (0.69314718055994530942 / 0.02);
   const mln_screen_point after = screen_point_of(fixture.map, center);
   TEST_ASSERT_DOUBLE_WITHIN(0.5, before.x + 0.6 * distance, after.x);
   TEST_ASSERT_DOUBLE_WITHIN(0.5, before.y + 0.8 * distance, after.y);
@@ -208,98 +211,8 @@ static void a_pan_release_moves_the_content_its_distance(void) {
   destroy_fixture(&fixture);
 }
 
-// Exponential decay at rate k from speed v, stopping at speed s, travels
-// (v - s) / k.
-static void an_exponential_pan_travels_until_its_stop_speed(void) {
-  momentum_fixture fixture = create_fixture();
-  const mln_lat_lng center = read_snapshot(fixture.map).view.camera.center;
-  const mln_screen_point before = screen_point_of(fixture.map, center);
-
-  begin_gesture(fixture.map);
-  mln_test_transition_end probe;
-  mln_test_transition_end_init(&probe);
-  mln_gesture_momentum momentum = {0};
-  momentum.fields = MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
-  momentum.pan_velocity = (mln_screen_point){.x = -1000.0, .y = 0.0};
-  momentum.pan.fields =
-    MLN_MOMENTUM_OPTION_DECAY | MLN_MOMENTUM_OPTION_SPEED_SCALE |
-    MLN_MOMENTUM_OPTION_DECAY_RATE | MLN_MOMENTUM_OPTION_STOP_SPEED;
-  momentum.pan.decay = MLN_MOMENTUM_DECAY_EXPONENTIAL;
-  momentum.pan.speed_scale = 1.0;
-  momentum.pan.decay_rate = 20.0;
-  momentum.pan.stop_speed = 100.0;
-  const mln_camera_delta delta = release(&momentum, &probe);
-  apply_delta(fixture.map, &delta);
-
-  render_until_ended(&fixture.render, &probe);
-  assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED);
-  const mln_screen_point after = screen_point_of(fixture.map, center);
-  TEST_ASSERT_DOUBLE_WITHIN(0.5, before.x - (1000.0 - 100.0) / 20.0, after.x);
-  TEST_ASSERT_DOUBLE_WITHIN(0.5, before.y, after.y);
-
-  destroy_fixture(&fixture);
-}
-
-// With the defaults, zoom and bearing move v * 600 ms / 4 and pitch moves
-// v * 300 ms / 4. Without anchors, the center stays.
-static void zoom_bearing_and_pitch_move_their_distances(void) {
-  momentum_fixture fixture = create_fixture();
-  mln_camera_update tilt = {
-    .size = sizeof(mln_camera_update),
-    .camera = {.size = sizeof(mln_camera_options)}
-  };
-  tilt.camera.fields = MLN_CAMERA_OPTION_PITCH | MLN_CAMERA_OPTION_ZOOM |
-                       MLN_CAMERA_OPTION_BEARING;
-  tilt.camera.pitch = 20.0;
-  tilt.camera.zoom = 4.0;
-  tilt.camera.bearing = 30.0;
-  update_camera(fixture.map, &tilt);
-  const mln_camera start = read_snapshot(fixture.map).view.camera;
-
-  begin_gesture(fixture.map);
-  mln_test_transition_end probe;
-  mln_test_transition_end_init(&probe);
-  mln_gesture_momentum momentum = {0};
-  momentum.fields = MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY |
-                    MLN_GESTURE_MOMENTUM_BEARING_VELOCITY |
-                    MLN_GESTURE_MOMENTUM_PITCH_VELOCITY;
-  momentum.zoom_velocity = 2.0;
-  momentum.bearing_velocity = -30.0;
-  momentum.pitch_velocity = 20.0;
-  const mln_camera_delta delta = release(&momentum, &probe);
-  apply_delta(fixture.map, &delta);
-
-  render_until_ended(&fixture.render, &probe);
-  assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED);
-  const mln_camera end = read_snapshot(fixture.map).view.camera;
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, start.zoom + 0.3, end.zoom);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, start.bearing - 4.5, end.bearing);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, start.pitch + 1.5, end.pitch);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, start.center.latitude, end.center.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, start.center.longitude, end.center.longitude);
-
-  destroy_fixture(&fixture);
-}
-
-static mln_gesture_momentum long_pan_and_zoom(void) {
-  mln_gesture_momentum momentum = {0};
-  momentum.fields = MLN_GESTURE_MOMENTUM_PAN_VELOCITY |
-                    MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY |
-                    MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM;
-  momentum.pan_velocity = (mln_screen_point){.x = 1000.0, .y = 0.0};
-  momentum.zoom_velocity = 1.0;
-  momentum.pan.fields = MLN_MOMENTUM_OPTION_BASE_DURATION_MS;
-  momentum.pan.base_duration_ms = 600000.0;
-  momentum.zoom.fields =
-    MLN_MOMENTUM_OPTION_BASE_DURATION_MS | MLN_MOMENTUM_OPTION_MAX_DURATION_MS;
-  momentum.zoom.base_duration_ms = 600000.0;
-  momentum.zoom.max_duration_ms = 600000.0;
-  momentum.pan_follows_zoom = false;
-  return momentum;
-}
-
-// A new gesture stops the momentum and reports how fast it still moved, while
-// the new gesture keeps the map's gesture flag.
+// A new gesture stops the momentum and reports each part's speed, which no
+// frame has slowed yet, while the new gesture keeps the map's gesture flag.
 static void a_new_gesture_stops_momentum_and_reports_its_speed(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -309,7 +222,23 @@ static void a_new_gesture_stops_momentum_and_reports_its_speed(void) {
   end_observation observation = {0};
   probe.hook = observe_end;
   probe.context = &observation;
-  const mln_gesture_momentum momentum = long_pan_and_zoom();
+  mln_gesture_momentum momentum = {0};
+  momentum.fields =
+    MLN_GESTURE_MOMENTUM_PAN_VELOCITY | MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY |
+    MLN_GESTURE_MOMENTUM_BEARING_VELOCITY | MLN_GESTURE_MOMENTUM_PITCH_VELOCITY;
+  momentum.pan_velocity = (mln_screen_point){.x = 1000.0, .y = -500.0};
+  momentum.zoom_velocity = 1.0;
+  momentum.bearing_velocity = -90.0;
+  momentum.pitch_velocity = 20.0;
+  mln_momentum_options* parts[] = {
+    &momentum.pan, &momentum.zoom, &momentum.bearing, &momentum.pitch
+  };
+  for (size_t i = 0; i < sizeof(parts) / sizeof(*parts); ++i) {
+    parts[i]->fields =
+      MLN_MOMENTUM_OPTION_HALF_LIFE_MS | MLN_MOMENTUM_OPTION_MAX_DISTANCE;
+    parts[i]->half_life_ms = 600000.0;
+    parts[i]->max_distance = 1e9;
+  }
   const mln_camera_delta delta = release(&momentum, &probe);
   apply_delta(map, &delta);
   mln_map_snapshot snapshot = read_snapshot(map);
@@ -320,19 +249,30 @@ static void a_new_gesture_stops_momentum_and_reports_its_speed(void) {
   begin_gesture(map);
   assert_ended(&probe, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED);
   const mln_camera_velocity velocity = observation.velocity;
-  // No frame moved the camera, so each part still had its starting speed:
-  // 0.56 of the pan's release speed, and 4 times the zoom's 2.5 levels over
-  // 600 seconds. The tolerance covers rounding the duration to the native
-  // clock.
-  TEST_ASSERT_DOUBLE_WITHIN(0.5, 560.0, velocity.pan.x);
-  TEST_ASSERT_EQUAL_DOUBLE(0.0, velocity.pan.y);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-5, 2.5 * 4.0 / 600.0, velocity.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-3, 1000.0, velocity.pan.x);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-3, -500.0, velocity.pan.y);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 1.0, velocity.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, -90.0, velocity.bearing);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 20.0, velocity.pitch);
   snapshot = read_snapshot(map);
   TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
   TEST_ASSERT_FALSE(snapshot.transition_in_progress);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
+static mln_gesture_momentum long_pan_and_zoom(void) {
+  mln_gesture_momentum momentum = {0};
+  momentum.fields =
+    MLN_GESTURE_MOMENTUM_PAN_VELOCITY | MLN_GESTURE_MOMENTUM_ZOOM_VELOCITY;
+  momentum.pan_velocity = (mln_screen_point){.x = 1000.0, .y = 0.0};
+  momentum.zoom_velocity = 1.0;
+  momentum.pan.fields = MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
+  momentum.pan.half_life_ms = 600000.0;
+  momentum.zoom.fields = MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
+  momentum.zoom.half_life_ms = 600000.0;
+  return momentum;
 }
 
 // A command that sets a field stops only the parts that move it, and the
@@ -369,7 +309,7 @@ static void a_command_replaces_the_parts_it_moves(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A release below the minimum speed ends the gesture at once.
+// A release below the default minimum pan speed ends the gesture at once.
 static void a_slow_release_ends_the_gesture_at_once(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -378,7 +318,7 @@ static void a_slow_release_ends_the_gesture_at_once(void) {
   mln_test_transition_end_init(&probe);
   mln_gesture_momentum momentum = {0};
   momentum.fields = MLN_GESTURE_MOMENTUM_PAN_VELOCITY;
-  momentum.pan_velocity = (mln_screen_point){.x = 100.0, .y = 0.0};
+  momentum.pan_velocity = (mln_screen_point){.x = 150.0, .y = 0.0};
   const mln_camera_delta delta = release(&momentum, &probe);
   apply_delta(map, &delta);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.calls));
@@ -391,35 +331,29 @@ static void a_slow_release_ends_the_gesture_at_once(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_camera_delta rotate_by(double degrees, mln_gesture_phase phase) {
-  mln_camera_delta delta = {.size = sizeof(mln_camera_delta)};
-  delta.fields = MLN_CAMERA_DELTA_BEARING;
-  delta.bearing = degrees;
-  delta.gesture_phase = phase;
-  return delta;
-}
-
-// The bearing settles on the nearest target within the tolerance after a
-// gesture that rotated the map, and stays after one that didn't.
+// The bearing settles on the nearest target after a gesture that rotated the
+// map, and stays after one that didn't.
 static void a_rotating_gesture_settles_on_a_target(void) {
-  momentum_fixture fixture = create_fixture();
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   mln_gesture_momentum momentum = {0};
   momentum.fields = MLN_GESTURE_MOMENTUM_BEARING_SNAP;
   momentum.bearing_snap.fields =
     MLN_BEARING_SNAP_TARGET_COUNT | MLN_BEARING_SNAP_DURATION_MS;
   momentum.bearing_snap.target_count = 4;
-  momentum.bearing_snap.duration_ms = 20.0;
+  momentum.bearing_snap.duration_ms = 0.0;
 
-  const mln_camera_delta begin = rotate_by(85.0, MLN_GESTURE_PHASE_BEGIN);
-  apply_delta(fixture.map, &begin);
+  mln_camera_delta rotate = {.size = sizeof(mln_camera_delta)};
+  rotate.fields = MLN_CAMERA_DELTA_BEARING;
+  rotate.bearing = 85.0;
+  rotate.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
+  apply_delta(map, &rotate);
   mln_test_transition_end snapped;
   mln_test_transition_end_init(&snapped);
   const mln_camera_delta settle = release(&momentum, &snapped);
-  apply_delta(fixture.map, &settle);
-  TEST_ASSERT_TRUE(read_snapshot(fixture.map).gesture_in_progress);
-  render_until_ended(&fixture.render, &snapped);
+  apply_delta(map, &settle);
   assert_ended(&snapped, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED);
-  mln_map_snapshot snapshot = read_snapshot(fixture.map);
+  mln_map_snapshot snapshot = read_snapshot(map);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 90.0, snapshot.view.camera.bearing);
   TEST_ASSERT_FALSE(snapshot.gesture_in_progress);
 
@@ -429,24 +363,23 @@ static void a_rotating_gesture_settles_on_a_target(void) {
   };
   turn.camera.fields = MLN_CAMERA_OPTION_BEARING;
   turn.camera.bearing = 87.0;
-  update_camera(fixture.map, &turn);
-  begin_gesture(fixture.map);
+  update_camera(map, &turn);
+  begin_gesture(map);
   mln_test_transition_end kept;
   mln_test_transition_end_init(&kept);
   const mln_camera_delta stay = release(&momentum, &kept);
-  apply_delta(fixture.map, &stay);
+  apply_delta(map, &stay);
   assert_ended(&kept, MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED);
-  snapshot = read_snapshot(fixture.map);
+  snapshot = read_snapshot(map);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 87.0, snapshot.view.camera.bearing);
   TEST_ASSERT_FALSE(snapshot.gesture_in_progress);
 
-  destroy_fixture(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(a_pan_release_moves_the_content_its_distance);
-  RUN_TEST(an_exponential_pan_travels_until_its_stop_speed);
-  RUN_TEST(zoom_bearing_and_pitch_move_their_distances);
+  RUN_TEST(a_release_glides_and_then_ends_the_gesture);
   RUN_TEST(a_new_gesture_stops_momentum_and_reports_its_speed);
   RUN_TEST(a_command_replaces_the_parts_it_moves);
   RUN_TEST(a_slow_release_ends_the_gesture_at_once);

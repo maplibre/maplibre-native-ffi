@@ -533,20 +533,20 @@ GType maplibre_native_ffi_map_mode_get_type(void) G_GNUC_CONST;
 
 /**
  * MaplibreNativeFfiMomentumDecay:
- * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_POWER: The share of the distance traveled
- *   is 1 - (1 - t)^`exponent`, where t goes from 0 to 1 over the momentum's
- *   duration. An exponent of 2 slows at a constant rate.
- * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_EXPONENTIAL: The speed falls to
- *   e^-`decay_rate` of itself each second, until it drops below `stop_speed`.
+ * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_FRICTION: The speed halves every
+ *   `half_life_ms`, until it drops to `stop_speed`. UIScrollView's normal
+ *   deceleration is a half-life of 346 ms, and its fast deceleration 69 ms.
+ * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_SPLINE: Android's scroll fling, as
+ *   OverScroller computes it with `scroll_friction`. Only pan can use it.
  *
- * How a part of a gesture's momentum slows to a stop.
+ * How a part of a gesture's momentum slows from its release speed.
  *
  * See `mln_momentum_decay` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef enum {
-  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_POWER = 0,
-  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_EXPONENTIAL = 1,
+  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_FRICTION = 0,
+  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_SPLINE = 1,
 } MaplibreNativeFfiMomentumDecay;
 
 GType maplibre_native_ffi_momentum_decay_get_type(void) G_GNUC_CONST;

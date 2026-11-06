@@ -3450,7 +3450,7 @@ pub const BearingSnap = struct {
     target_offset: ?f64 = null,
     /// In degrees, from 0 to 180. Defaults to 7.
     tolerance: ?f64 = null,
-    /// Defaults to 300.
+    /// Zero settles at once. Defaults to 300.
     duration_ms: ?f64 = null,
     pub fn toNative(self: BearingSnap) c.mln_bearing_snap {
         var raw = std.mem.zeroes(c.mln_bearing_snap);
@@ -4736,17 +4736,15 @@ pub const GeoJsonSourceOptions = struct {
 
 /// How a gesture keeps moving the camera after its last contact lifts.
 ///
-/// A part moves only when its velocity is set, and each part slows on its own
-/// clock. The parts' defaults are:
+/// A part moves only when its velocity is set, and each part slows on its own.
+/// Every part defaults to `MomentumDecay.friction` with a half-life of 140 ms,
+/// and these other defaults:
 ///
-/// | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | -------
-/// | -------- | ----------- | ------- | ------------ | --------------- | | pan
-/// | 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0 | max
-/// 600 ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 | 1 |
-/// 300 | 0 | min speed 5 |
-///
-/// Every part defaults to `MomentumDecay.power`, and the zoom moves at most 2.5
-/// levels.
+/// - Pan stops at 10 logical pixels per second, needs a release of at least
+///   200, and counts a release faster than 10000 as 10000.
+/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+/// - Bearing stops at 1 degree per second and needs a release of at least 60.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5.
 ///
 /// See `mln_gesture_momentum` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4770,10 +4768,6 @@ pub const GestureMomentum = struct {
     zoom: MomentumOptions = .{},
     bearing: MomentumOptions = .{},
     pitch: MomentumOptions = .{},
-    /// When pan and zoom momentum both start, the pan slows over the zoom's
-    /// duration and curve, starts no faster, and moves no farther than it would
-    /// alone. Defaults to true.
-    pan_follows_zoom: ?bool = null,
     /// Where the bearing settles after a gesture that changed it, once the rest
     /// of the momentum ends. Without momentum, it settles at once. Without
     /// this, the bearing stays where the gesture leaves it.
@@ -4791,7 +4785,6 @@ pub const GestureMomentum = struct {
         raw.zoom = self.zoom.toNative();
         raw.bearing = self.bearing.toNative();
         raw.pitch = self.pitch.toNative();
-        marshal.present(&raw.fields, c.MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM, &raw.pan_follows_zoom, self.pan_follows_zoom);
         marshal.present(&raw.fields, c.MLN_GESTURE_MOMENTUM_BEARING_SNAP, &raw.bearing_snap, self.bearing_snap);
         return raw;
     }
@@ -4807,7 +4800,6 @@ pub const GestureMomentum = struct {
             .zoom = MomentumOptions.fromNative(raw.zoom),
             .bearing = MomentumOptions.fromNative(raw.bearing),
             .pitch = MomentumOptions.fromNative(raw.pitch),
-            .pan_follows_zoom = if (raw.fields & c.MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM != 0) raw.pan_follows_zoom else null,
             .bearing_snap = if (raw.fields & c.MLN_GESTURE_MOMENTUM_BEARING_SNAP != 0) BearingSnap.fromNative(raw.bearing_snap) else null,
         };
     }
@@ -5910,18 +5902,18 @@ pub const MetalTextureFrame = struct {
     }
 };
 
-/// How a part of a gesture's momentum slows to a stop.
+/// How a part of a gesture's momentum slows from its release speed.
 ///
 /// See `mln_momentum_decay` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MomentumDecay = enum(u32) {
-    /// The share of the distance traveled is 1 - (1 - t)^`exponent`, where t
-    /// goes from 0 to 1 over the momentum's duration. An exponent of 2 slows at
-    /// a constant rate.
-    power = 0,
-    /// The speed falls to e^-`decay_rate` of itself each second, until it drops
-    /// below `stop_speed`.
-    exponential = 1,
+    /// The speed halves every `half_life_ms`, until it drops to `stop_speed`.
+    /// UIScrollView's normal deceleration is a half-life of 346 ms, and its
+    /// fast deceleration 69 ms.
+    friction = 0,
+    /// Android's scroll fling, as OverScroller computes it with
+    /// `scroll_friction`. Only pan can use it.
+    spline = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -5929,70 +5921,49 @@ pub const MomentumDecay = enum(u32) {
 
 /// How one part of a gesture keeps moving after its release.
 ///
-/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
-/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
-/// isn't set takes the part's default, which `GestureMomentum` lists. Every
-/// setting is finite and not negative.
+/// The part starts at its release speed. Speeds and distances are in the part's
+/// unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
+/// and pitch. A setting whose bit isn't set takes the part's default, which
+/// `GestureMomentum` lists.
 ///
 /// See `mln_momentum_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MomentumOptions = struct {
     decay: ?MomentumDecay = null,
-    /// The momentum starts at this multiple of the release speed.
-    speed_scale: ?f64 = null,
-    /// A slower release starts no momentum.
-    min_speed: ?f64 = null,
-    /// A faster release counts as this speed.
-    max_speed: ?f64 = null,
-    /// For `MomentumDecay.power`. At least 1.
-    exponent: ?f64 = null,
-    /// For `MomentumDecay.power`, the duration is `base_duration_ms` plus
-    /// `duration_ms_per_speed` times the release speed.
-    base_duration_ms: ?f64 = null,
-    duration_ms_per_speed: ?f64 = null,
-    /// Required for `MomentumDecay.exponential`, and positive.
-    decay_rate: ?f64 = null,
-    /// Required for `MomentumDecay.exponential`, and positive.
+    /// For `MomentumDecay.friction`. Positive.
+    half_life_ms: ?f64 = null,
+    /// For `MomentumDecay.friction`, the speed at which it ends. Positive.
     stop_speed: ?f64 = null,
-    /// Stretches the momentum in time without changing its starting speed, so
-    /// it also scales the distance. 0 starts no momentum. A host can pass its
-    /// platform's animation duration scale here.
-    duration_scale: ?f64 = null,
-    /// The longest duration, after `duration_scale` applies.
-    max_duration_ms: ?f64 = null,
-    /// The farthest the momentum moves. A momentum that would move farther
-    /// slows faster over the same duration.
+    /// For `MomentumDecay.spline`, Android's
+    /// `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
+    scroll_friction: ?f64 = null,
+    /// A slower release starts no momentum. Not negative.
+    min_speed: ?f64 = null,
+    /// A faster release counts as this speed. Positive.
+    max_speed: ?f64 = null,
+    /// The farthest the part moves. A release that would move farther starts
+    /// slower, so it ends sooner. Positive.
     max_distance: ?f64 = null,
     pub fn toNative(self: MomentumOptions) c.mln_momentum_options {
         var raw = std.mem.zeroes(c.mln_momentum_options);
         raw.fields = 0;
         marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_DECAY, &raw.decay, self.decay);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_SPEED_SCALE, &raw.speed_scale, self.speed_scale);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_HALF_LIFE_MS, &raw.half_life_ms, self.half_life_ms);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_STOP_SPEED, &raw.stop_speed, self.stop_speed);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_SCROLL_FRICTION, &raw.scroll_friction, self.scroll_friction);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_MIN_SPEED, &raw.min_speed, self.min_speed);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_MAX_SPEED, &raw.max_speed, self.max_speed);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_EXPONENT, &raw.exponent, self.exponent);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_BASE_DURATION_MS, &raw.base_duration_ms, self.base_duration_ms);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED, &raw.duration_ms_per_speed, self.duration_ms_per_speed);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_DECAY_RATE, &raw.decay_rate, self.decay_rate);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_STOP_SPEED, &raw.stop_speed, self.stop_speed);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_DURATION_SCALE, &raw.duration_scale, self.duration_scale);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_MAX_DURATION_MS, &raw.max_duration_ms, self.max_duration_ms);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_OPTION_MAX_DISTANCE, &raw.max_distance, self.max_distance);
         return raw;
     }
     pub fn fromNative(raw: c.mln_momentum_options) MomentumOptions {
         return .{
             .decay = if (raw.fields & c.MLN_MOMENTUM_OPTION_DECAY != 0) MomentumDecay.fromNative(raw.decay) else null,
-            .speed_scale = if (raw.fields & c.MLN_MOMENTUM_OPTION_SPEED_SCALE != 0) raw.speed_scale else null,
+            .half_life_ms = if (raw.fields & c.MLN_MOMENTUM_OPTION_HALF_LIFE_MS != 0) raw.half_life_ms else null,
+            .stop_speed = if (raw.fields & c.MLN_MOMENTUM_OPTION_STOP_SPEED != 0) raw.stop_speed else null,
+            .scroll_friction = if (raw.fields & c.MLN_MOMENTUM_OPTION_SCROLL_FRICTION != 0) raw.scroll_friction else null,
             .min_speed = if (raw.fields & c.MLN_MOMENTUM_OPTION_MIN_SPEED != 0) raw.min_speed else null,
             .max_speed = if (raw.fields & c.MLN_MOMENTUM_OPTION_MAX_SPEED != 0) raw.max_speed else null,
-            .exponent = if (raw.fields & c.MLN_MOMENTUM_OPTION_EXPONENT != 0) raw.exponent else null,
-            .base_duration_ms = if (raw.fields & c.MLN_MOMENTUM_OPTION_BASE_DURATION_MS != 0) raw.base_duration_ms else null,
-            .duration_ms_per_speed = if (raw.fields & c.MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED != 0) raw.duration_ms_per_speed else null,
-            .decay_rate = if (raw.fields & c.MLN_MOMENTUM_OPTION_DECAY_RATE != 0) raw.decay_rate else null,
-            .stop_speed = if (raw.fields & c.MLN_MOMENTUM_OPTION_STOP_SPEED != 0) raw.stop_speed else null,
-            .duration_scale = if (raw.fields & c.MLN_MOMENTUM_OPTION_DURATION_SCALE != 0) raw.duration_scale else null,
-            .max_duration_ms = if (raw.fields & c.MLN_MOMENTUM_OPTION_MAX_DURATION_MS != 0) raw.max_duration_ms else null,
             .max_distance = if (raw.fields & c.MLN_MOMENTUM_OPTION_MAX_DISTANCE != 0) raw.max_distance else null,
         };
     }

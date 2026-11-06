@@ -2340,10 +2340,6 @@ fn generated_input_mln_gesture_momentum<'py>(
     raw.zoom = generated_input_mln_momentum_options(&value.getattr("zoom")?, storage)?;
     raw.bearing = generated_input_mln_momentum_options(&value.getattr("bearing")?, storage)?;
     raw.pitch = generated_input_mln_momentum_options(&value.getattr("pitch")?, storage)?;
-    if let Some(field) = generated_present(value, "pan_follows_zoom")? {
-        raw.pan_follows_zoom = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM;
-    }
     if let Some(field) = generated_present(value, "bearing_snap")? {
         raw.bearing_snap = generated_input_mln_bearing_snap(&field, storage)?;
         raw.fields |= sys::MLN_GESTURE_MOMENTUM_BEARING_SNAP;
@@ -2728,9 +2724,17 @@ fn generated_input_mln_momentum_options<'py>(
         raw.decay = field.extract::<sys::mln_momentum_decay>()?;
         raw.fields |= sys::MLN_MOMENTUM_OPTION_DECAY;
     }
-    if let Some(field) = generated_present(value, "speed_scale")? {
-        raw.speed_scale = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_OPTION_SPEED_SCALE;
+    if let Some(field) = generated_present(value, "half_life_ms")? {
+        raw.half_life_ms = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
+    }
+    if let Some(field) = generated_present(value, "stop_speed")? {
+        raw.stop_speed = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_OPTION_STOP_SPEED;
+    }
+    if let Some(field) = generated_present(value, "scroll_friction")? {
+        raw.scroll_friction = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_OPTION_SCROLL_FRICTION;
     }
     if let Some(field) = generated_present(value, "min_speed")? {
         raw.min_speed = field.extract::<f64>()?;
@@ -2739,34 +2743,6 @@ fn generated_input_mln_momentum_options<'py>(
     if let Some(field) = generated_present(value, "max_speed")? {
         raw.max_speed = field.extract::<f64>()?;
         raw.fields |= sys::MLN_MOMENTUM_OPTION_MAX_SPEED;
-    }
-    if let Some(field) = generated_present(value, "exponent")? {
-        raw.exponent = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_OPTION_EXPONENT;
-    }
-    if let Some(field) = generated_present(value, "base_duration_ms")? {
-        raw.base_duration_ms = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_OPTION_BASE_DURATION_MS;
-    }
-    if let Some(field) = generated_present(value, "duration_ms_per_speed")? {
-        raw.duration_ms_per_speed = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED;
-    }
-    if let Some(field) = generated_present(value, "decay_rate")? {
-        raw.decay_rate = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_OPTION_DECAY_RATE;
-    }
-    if let Some(field) = generated_present(value, "stop_speed")? {
-        raw.stop_speed = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_OPTION_STOP_SPEED;
-    }
-    if let Some(field) = generated_present(value, "duration_scale")? {
-        raw.duration_scale = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_OPTION_DURATION_SCALE;
-    }
-    if let Some(field) = generated_present(value, "max_duration_ms")? {
-        raw.max_duration_ms = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_OPTION_MAX_DURATION_MS;
     }
     if let Some(field) = generated_present(value, "max_distance")? {
         raw.max_distance = field.extract::<f64>()?;

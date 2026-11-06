@@ -471,7 +471,6 @@ internal unsafe struct mln_gesture_momentum
     public mln_momentum_options zoom;
     public mln_momentum_options bearing;
     public mln_momentum_options pitch;
-    public byte pan_follows_zoom;
     public mln_bearing_snap bearing_snap;
 }
 
@@ -738,16 +737,11 @@ internal unsafe struct mln_momentum_options
 {
     public mln_momentum_option_field fields;
     public mln_momentum_decay decay;
-    public double speed_scale;
+    public double half_life_ms;
+    public double stop_speed;
+    public double scroll_friction;
     public double min_speed;
     public double max_speed;
-    public double exponent;
-    public double base_duration_ms;
-    public double duration_ms_per_speed;
-    public double decay_rate;
-    public double stop_speed;
-    public double duration_scale;
-    public double max_duration_ms;
     public double max_distance;
 }
 
@@ -1871,8 +1865,7 @@ internal enum mln_gesture_momentum_field : uint
     MLN_GESTURE_MOMENTUM_PITCH_VELOCITY = 8,
     MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR = 16,
     MLN_GESTURE_MOMENTUM_BEARING_ANCHOR = 32,
-    MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM = 64,
-    MLN_GESTURE_MOMENTUM_BEARING_SNAP = 128,
+    MLN_GESTURE_MOMENTUM_BEARING_SNAP = 64,
 }
 
 internal enum mln_gesture_phase : uint
@@ -1994,24 +1987,19 @@ internal enum mln_map_viewport_option_field : uint
 
 internal enum mln_momentum_decay : uint
 {
-    MLN_MOMENTUM_DECAY_POWER = 0,
-    MLN_MOMENTUM_DECAY_EXPONENTIAL = 1,
+    MLN_MOMENTUM_DECAY_FRICTION = 0,
+    MLN_MOMENTUM_DECAY_SPLINE = 1,
 }
 
 internal enum mln_momentum_option_field : uint
 {
     MLN_MOMENTUM_OPTION_DECAY = 1,
-    MLN_MOMENTUM_OPTION_SPEED_SCALE = 2,
-    MLN_MOMENTUM_OPTION_MIN_SPEED = 4,
-    MLN_MOMENTUM_OPTION_MAX_SPEED = 8,
-    MLN_MOMENTUM_OPTION_EXPONENT = 16,
-    MLN_MOMENTUM_OPTION_BASE_DURATION_MS = 32,
-    MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED = 64,
-    MLN_MOMENTUM_OPTION_DECAY_RATE = 128,
-    MLN_MOMENTUM_OPTION_STOP_SPEED = 256,
-    MLN_MOMENTUM_OPTION_DURATION_SCALE = 512,
-    MLN_MOMENTUM_OPTION_MAX_DURATION_MS = 1024,
-    MLN_MOMENTUM_OPTION_MAX_DISTANCE = 2048,
+    MLN_MOMENTUM_OPTION_HALF_LIFE_MS = 2,
+    MLN_MOMENTUM_OPTION_STOP_SPEED = 4,
+    MLN_MOMENTUM_OPTION_SCROLL_FRICTION = 8,
+    MLN_MOMENTUM_OPTION_MIN_SPEED = 16,
+    MLN_MOMENTUM_OPTION_MAX_SPEED = 32,
+    MLN_MOMENTUM_OPTION_MAX_DISTANCE = 64,
 }
 
 internal enum mln_network_status : uint

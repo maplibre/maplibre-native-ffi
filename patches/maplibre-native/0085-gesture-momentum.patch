@@ -187,7 +187,7 @@ index 3e01d9a..77fe561 100644
      impl->transform.setGestureInProgress(inProgress);
      impl->onUpdate();
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index e2bb728..c2d471b 100644
+index e2bb728..c632cc9 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
 @@ -13,6 +13,8 @@
@@ -471,7 +471,7 @@ index e2bb728..c2d471b 100644
              const double t = std::clamp(std::chrono::duration<double>(now - transition->start) /
                                              std::chrono::duration<double>(transition->duration),
                                          0.0,
-@@ -719,6 +926,201 @@ void Transform::updateTransitions(const TimePoint& now) {
+@@ -719,6 +926,229 @@ void Transform::updateTransitions(const TimePoint& now) {
      finishTransitions(finished);
  }
  
@@ -541,7 +541,20 @@ index e2bb728..c2d471b 100644
 +    transition->start = latestTransitionStart = Clock::now();
 +    transition->duration = latestTransitionDuration = motion;
 +
-+    // A momentum that doesn't move ends at once, without a camera change.
++    // A momentum that doesn't move ends at once, without a camera change, and
++    // an instant snap without motion settles at once.
++    if (!moving && momentum->snapPending && options.bearingSnap->duration == Duration::zero()) {
++        const double bearing = -util::rad2deg(state.getBearing());
++        auto immediate = animation;
++        immediate.transitionFinishFn = [finish = options.finishFn,
++                                        ended = momentum->end(),
++                                        next = animation.transitionFinishFn] {
++            if (finish) finish(ended);
++            if (next) next();
++        };
++        easeTo(CameraOptions().withBearing(bearing + bearingSnapDelta(bearing, *options.bearingSnap)), immediate);
++        return;
++    }
 +    if (!transition->fields) {
 +        if (options.finishFn) options.finishFn(momentum->end());
 +        if (animation.transitionFinishFn) animation.transitionFinishFn();
@@ -571,17 +584,18 @@ index e2bb728..c2d471b 100644
 +        if (progress >= 1.0) part.moving = false;
 +        return fraction;
 +    };
++    // A part that bounds or limits hold in place stops.
 +    if (const double fraction = advance(momentum.pan); fraction != 0.0) {
-+        stepPan({momentum.panTotal.x * fraction, momentum.panTotal.y * fraction});
++        if (!stepPan({momentum.panTotal.x * fraction, momentum.panTotal.y * fraction})) momentum.pan.moving = false;
 +    }
 +    if (const double fraction = advance(momentum.zoom); fraction != 0.0) {
-+        stepZoom(momentum.zoomTotal * fraction, momentum.options.zoomAnchor);
++        if (!stepZoom(momentum.zoomTotal * fraction, momentum.options.zoomAnchor)) momentum.zoom.moving = false;
 +    }
 +    if (const double fraction = advance(momentum.bearing); fraction != 0.0) {
 +        stepBearing(momentum.bearingTotal * fraction, momentum.options.bearingAnchor);
 +    }
 +    if (const double fraction = advance(momentum.pitch); fraction != 0.0) {
-+        stepPitch(momentum.pitchTotal * fraction);
++        if (!stepPitch(momentum.pitchTotal * fraction)) momentum.pitch.moving = false;
 +    }
 +
 +    // The bearing settles once no part moves, which can be before the motion's
@@ -618,12 +632,14 @@ index e2bb728..c2d471b 100644
 +    transition.fields = momentum.retain(transition.fields);
 +}
 +
-+void Transform::stepPan(const ScreenCoordinate& offset) {
++bool Transform::stepPan(const ScreenCoordinate& offset) {
 +    // Each step moves the content no farther than a drag moves it in one
 +    // event, so the travel on screen stays even at high pitch.
 +    constexpr double maxStep = 16.0;
 +    const double distance = std::hypot(offset.x, offset.y);
-+    if (!(distance > 0.0)) return;
++    if (!(distance > 0.0)) return true;
++    const LatLng before = getLatLng(LatLng::Unwrapped);
++    const double altitude = state.getCenterAltitude();
 +    const double steps = std::ceil(distance / maxStep);
 +    const ScreenCoordinate step{offset.x / steps, offset.y / steps};
 +    const bool bounded = state.getLatLngBounds() != LatLngBounds();
@@ -636,9 +652,13 @@ index e2bb728..c2d471b 100644
 +        state.constrainCameraAndZoomToBounds(camera, zoom);
 +        state.setLatLngZoom(*camera.center, zoom);
 +    }
++    state.setCenterAltitude(altitude);
++    return getLatLng(LatLng::Unwrapped) != before;
 +}
 +
-+void Transform::stepZoom(double zoom, const std::optional<ScreenCoordinate>& anchor) {
++bool Transform::stepZoom(double zoom, const std::optional<ScreenCoordinate>& anchor) {
++    const double before = state.getZoom();
++    const double altitude = state.getCenterAltitude();
 +    std::optional<ScreenCoordinate> point;
 +    LatLng anchorLatLng;
 +    if (anchor) {
@@ -649,7 +669,14 @@ index e2bb728..c2d471b 100644
 +    CameraOptions camera = CameraOptions().withCenter(getLatLng(LatLng::Unwrapped));
 +    state.constrainCameraAndZoomToBounds(camera, target);
 +    state.setLatLngZoom(*camera.center, target);
-+    if (point) state.moveLatLng(anchorLatLng, *point);
++    // The altitude in meters holds before the anchor correction, which reads
++    // the projection, and through the correction's change of center.
++    state.setCenterAltitude(altitude);
++    if (point) {
++        state.moveLatLng(anchorLatLng, *point);
++        state.setCenterAltitude(altitude);
++    }
++    return state.getZoom() != before;
 +}
 +
 +void Transform::stepBearing(double bearing, const std::optional<ScreenCoordinate>& anchor) {
@@ -664,17 +691,18 @@ index e2bb728..c2d471b 100644
 +    if (point) state.moveLatLng(anchorLatLng, *point);
 +}
 +
-+void Transform::stepPitch(double pitch) {
-+    state.setPitch(util::clamp(state.getPitch() + util::deg2rad(pitch),
-+                               state.getMinPitch(),
-+                               getMaxPitchForEdgeInsets(state.getEdgeInsets())));
++bool Transform::stepPitch(double pitch) {
++    const double before = state.getPitch();
++    state.setPitch(util::clamp(
++        before + util::deg2rad(pitch), state.getMinPitch(), getMaxPitchForEdgeInsets(state.getEdgeInsets())));
++    return state.getPitch() != before;
 +}
 +
  void Transform::cancelTransitions() {
      auto finished = std::exchange(transitions, {});
      updateMovementFlags();
 diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
-index f767342..60f1e42 100644
+index f767342..e56aefb 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
 @@ -1,6 +1,7 @@
@@ -703,7 +731,7 @@ index f767342..60f1e42 100644
      struct Transition {
          explicit Transition(const AnimationOptions& options)
              : animation(options) {}
-@@ -182,9 +187,21 @@ private:
+@@ -182,9 +187,22 @@ private:
          std::function<CameraOptions(double)> frame;
          std::optional<ScreenCoordinate> anchor;
          LatLng anchorLatLng;
@@ -717,16 +745,17 @@ index f767342..60f1e42 100644
 +    std::vector<std::shared_ptr<Transition>> releaseFields(uint16_t fields);
      void applyTransitions(const std::vector<std::shared_ptr<Transition>>&, const TimePoint&);
 +    void advanceMomentum(Transition&, const TimePoint&);
-+    // Momentum steps, applied to the state as it stands.
-+    void stepPan(const ScreenCoordinate& offset);
-+    void stepZoom(double zoom, const std::optional<ScreenCoordinate>& anchor);
++    // Momentum steps, applied to the state as it stands. Each returns whether
++    // it moved the camera, which bounds and limits can prevent.
++    bool stepPan(const ScreenCoordinate& offset);
++    bool stepZoom(double zoom, const std::optional<ScreenCoordinate>& anchor);
 +    void stepBearing(double bearing, const std::optional<ScreenCoordinate>& anchor);
-+    void stepPitch(double pitch);
++    bool stepPitch(double pitch);
      void updateMovementFlags();
      void finishTransitions(const std::vector<std::shared_ptr<Transition>>&);
  
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index c15ea59..a6c9905 100644
+index c15ea59..338ab1c 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
 @@ -1619,3 +1619,229 @@ TEST(Transform, FlyDurationRange) {
@@ -902,7 +931,7 @@ index c15ea59..a6c9905 100644
 +    EXPECT_FALSE(transform.inTransition());
 +}
 +
-+TEST(Transform, MomentumSettlesTheBearingAfterItsMotion) {
++TEST(Transform, MomentumSettlesTheBearing) {
 +    Transform transform;
 +    transform.resize({1000, 1000});
 +    transform.jumpTo(CameraOptions().withBearing(84));
@@ -926,36 +955,36 @@ index c15ea59..a6c9905 100644
 +    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 90, 1e-9);
 +    EXPECT_EQ(finished, 1u);
 +
-+    // Outside the tolerance, a momentum with no motion ends at once.
-+    transform.jumpTo(CameraOptions().withBearing(30));
++    // Without motion, an instant snap settles at once, and a bearing outside
++    // the tolerance stays.
 +    CameraMomentum snapOnly;
-+    snapOnly.bearingSnap = BearingSnap{.targetCount = 1, .targetOffset = 0, .tolerance = 7, .duration = Milliseconds(200)};
++    snapOnly.bearingSnap = BearingSnap{.targetCount = 1, .targetOffset = 0, .tolerance = 7, .duration = Duration::zero()};
++    transform.jumpTo(CameraOptions().withBearing(5));
 +    transform.startMomentum(snapOnly, animation);
 +    EXPECT_EQ(finished, 2u);
++    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 0, 1e-9);
++    transform.jumpTo(CameraOptions().withBearing(30));
++    transform.startMomentum(snapOnly, animation);
++    EXPECT_EQ(finished, 3u);
 +    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 30, 1e-9);
 +    EXPECT_FALSE(transform.inTransition());
 +}
 +
-+TEST(Transform, MomentumSettlesOnceCommandsStopItsMotion) {
++TEST(Transform, MomentumStopsAPartThatLimitsHold) {
 +    Transform transform;
 +    transform.resize({1000, 1000});
-+    transform.jumpTo(CameraOptions().withBearing(85));
++    transform.setMaxZoom(10);
++    transform.jumpTo(CameraOptions().withZoom(10).withPitch(0));
 +    CameraMomentum momentum;
-+    momentum.panVelocity = ScreenCoordinate{1000, 0};
-+    momentum.panDecay = friction(Seconds(10), 1);
-+    momentum.bearingSnap = BearingSnap{.targetCount = 4, .targetOffset = 0, .tolerance = 7, .duration = Milliseconds(200)};
-+    unsigned finished = 0;
-+    AnimationOptions animation;
-+    animation.transitionFinishFn = [&] {
-+        ++finished;
-+    };
-+    transform.startMomentum(momentum, animation);
-+    const auto start = transform.getLatestTransitionStart();
-+    transform.jumpTo(CameraOptions().withCenter(LatLng{10, 20}));
-+    transform.updateTransitions(start + Milliseconds(100));
-+    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 85, 1e-9);
-+    transform.updateTransitions(start + Milliseconds(300));
-+    EXPECT_NEAR(util::rad2deg(-transform.getBearing()), 90, 1e-9);
-+    EXPECT_EQ(finished, 1u);
++    momentum.zoomVelocity = 1.0;
++    momentum.zoomDecay.stopSpeed = 0.01;
++    momentum.pitchVelocity = -20.0;
++    std::optional<MomentumEnd> ended;
++    momentum.finishFn = [&](const MomentumEnd& end) { ended = end; };
++    transform.startMomentum(momentum);
++    transform.updateTransitions(transform.getLatestTransitionStart() + Milliseconds(20));
 +    EXPECT_FALSE(transform.inTransition());
++    ASSERT_TRUE(ended);
++    EXPECT_EQ(ended->velocity.zoom, 0);
++    EXPECT_NEAR(transform.getZoom(), 10, 1e-9);
 +}

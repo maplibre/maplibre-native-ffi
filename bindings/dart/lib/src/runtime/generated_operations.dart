@@ -718,9 +718,17 @@ Pointer<raw.mln_momentum_options> _writeMomentumOptions(
     result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DECAY;
     result.ref.decay = value.decay!.rawValue;
   }
-  if (value.speedScale != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_SPEED_SCALE;
-    result.ref.speed_scale = value.speedScale!;
+  if (value.halfLifeMs != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_HALF_LIFE_MS;
+    result.ref.half_life_ms = value.halfLifeMs!;
+  }
+  if (value.stopSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_STOP_SPEED;
+    result.ref.stop_speed = value.stopSpeed!;
+  }
+  if (value.scrollFriction != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_SCROLL_FRICTION;
+    result.ref.scroll_friction = value.scrollFriction!;
   }
   if (value.minSpeed != null) {
     result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MIN_SPEED;
@@ -729,34 +737,6 @@ Pointer<raw.mln_momentum_options> _writeMomentumOptions(
   if (value.maxSpeed != null) {
     result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MAX_SPEED;
     result.ref.max_speed = value.maxSpeed!;
-  }
-  if (value.exponent != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_EXPONENT;
-    result.ref.exponent = value.exponent!;
-  }
-  if (value.baseDurationMs != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_BASE_DURATION_MS;
-    result.ref.base_duration_ms = value.baseDurationMs!;
-  }
-  if (value.durationMsPerSpeed != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED;
-    result.ref.duration_ms_per_speed = value.durationMsPerSpeed!;
-  }
-  if (value.decayRate != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DECAY_RATE;
-    result.ref.decay_rate = value.decayRate!;
-  }
-  if (value.stopSpeed != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_STOP_SPEED;
-    result.ref.stop_speed = value.stopSpeed!;
-  }
-  if (value.durationScale != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_DURATION_SCALE;
-    result.ref.duration_scale = value.durationScale!;
-  }
-  if (value.maxDurationMs != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MAX_DURATION_MS;
-    result.ref.max_duration_ms = value.maxDurationMs!;
   }
   if (value.maxDistance != null) {
     result.ref.fields |= raw.MLN_MOMENTUM_OPTION_MAX_DISTANCE;
@@ -827,10 +807,6 @@ Pointer<raw.mln_gesture_momentum> _writeGestureMomentum(
   result.ref.zoom = _writeMomentumOptions(value.zoom, arena).ref;
   result.ref.bearing = _writeMomentumOptions(value.bearing, arena).ref;
   result.ref.pitch = _writeMomentumOptions(value.pitch, arena).ref;
-  if (value.panFollowsZoom != null) {
-    result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM;
-    result.ref.pan_follows_zoom = value.panFollowsZoom!;
-  }
   if (value.bearingSnap != null) {
     result.ref.fields |= raw.MLN_GESTURE_MOMENTUM_BEARING_SNAP;
     result.ref.bearing_snap = _writeBearingSnap(value.bearingSnap!, arena).ref;

@@ -642,8 +642,6 @@ final class mln_gesture_momentum extends Struct {
   external mln_momentum_options zoom;
   external mln_momentum_options bearing;
   external mln_momentum_options pitch;
-  @Bool()
-  external bool pan_follows_zoom;
   external mln_bearing_snap bearing_snap;
 }
 
@@ -961,25 +959,15 @@ final class mln_momentum_options extends Struct {
   @Uint32()
   external int decay;
   @Double()
-  external double speed_scale;
+  external double half_life_ms;
+  @Double()
+  external double stop_speed;
+  @Double()
+  external double scroll_friction;
   @Double()
   external double min_speed;
   @Double()
   external double max_speed;
-  @Double()
-  external double exponent;
-  @Double()
-  external double base_duration_ms;
-  @Double()
-  external double duration_ms_per_speed;
-  @Double()
-  external double decay_rate;
-  @Double()
-  external double stop_speed;
-  @Double()
-  external double duration_scale;
-  @Double()
-  external double max_duration_ms;
   @Double()
   external double max_distance;
 }
@@ -2219,8 +2207,7 @@ const MLN_GESTURE_MOMENTUM_BEARING_VELOCITY = 4;
 const MLN_GESTURE_MOMENTUM_PITCH_VELOCITY = 8;
 const MLN_GESTURE_MOMENTUM_ZOOM_ANCHOR = 16;
 const MLN_GESTURE_MOMENTUM_BEARING_ANCHOR = 32;
-const MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM = 64;
-const MLN_GESTURE_MOMENTUM_BEARING_SNAP = 128;
+const MLN_GESTURE_MOMENTUM_BEARING_SNAP = 64;
 
 // mln_gesture_phase
 const MLN_GESTURE_PHASE_NONE = 0;
@@ -2316,22 +2303,17 @@ const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4;
 const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
 
 // mln_momentum_decay
-const MLN_MOMENTUM_DECAY_POWER = 0;
-const MLN_MOMENTUM_DECAY_EXPONENTIAL = 1;
+const MLN_MOMENTUM_DECAY_FRICTION = 0;
+const MLN_MOMENTUM_DECAY_SPLINE = 1;
 
 // mln_momentum_option_field
 const MLN_MOMENTUM_OPTION_DECAY = 1;
-const MLN_MOMENTUM_OPTION_SPEED_SCALE = 2;
-const MLN_MOMENTUM_OPTION_MIN_SPEED = 4;
-const MLN_MOMENTUM_OPTION_MAX_SPEED = 8;
-const MLN_MOMENTUM_OPTION_EXPONENT = 16;
-const MLN_MOMENTUM_OPTION_BASE_DURATION_MS = 32;
-const MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED = 64;
-const MLN_MOMENTUM_OPTION_DECAY_RATE = 128;
-const MLN_MOMENTUM_OPTION_STOP_SPEED = 256;
-const MLN_MOMENTUM_OPTION_DURATION_SCALE = 512;
-const MLN_MOMENTUM_OPTION_MAX_DURATION_MS = 1024;
-const MLN_MOMENTUM_OPTION_MAX_DISTANCE = 2048;
+const MLN_MOMENTUM_OPTION_HALF_LIFE_MS = 2;
+const MLN_MOMENTUM_OPTION_STOP_SPEED = 4;
+const MLN_MOMENTUM_OPTION_SCROLL_FRICTION = 8;
+const MLN_MOMENTUM_OPTION_MIN_SPEED = 16;
+const MLN_MOMENTUM_OPTION_MAX_SPEED = 32;
+const MLN_MOMENTUM_OPTION_MAX_DISTANCE = 64;
 
 // mln_network_status
 const MLN_NETWORK_STATUS_ONLINE = 1;

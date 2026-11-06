@@ -157,7 +157,7 @@ export interface BearingSnap {
    */
   tolerance?: number;
   /**
-   * Defaults to 300.
+   * Zero settles at once. Defaults to 300.
    */
   durationMs?: number;
 }
@@ -1060,17 +1060,15 @@ export interface GeoJsonSourceOptions {
 /**
  * How a gesture keeps moving the camera after its last contact lifts.
  *
- * A part moves only when its velocity is set, and each part slows on its own
- * clock. The parts' defaults are:
+ * A part moves only when its velocity is set, and each part slows on its own.
+ * Every part defaults to `MomentumDecay.friction` with a half-life of 140 ms,
+ * and these other defaults:
  *
- * | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | -------
- * | -------- | ----------- | ------- | ------------ | --------------- | | pan |
- * 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0 | max 600
- * ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 | 1 | 300 |
- * 0 | min speed 5 |
- *
- * Every part defaults to `MomentumDecay.power`, and the zoom moves at most 2.5
- * levels.
+ * - Pan stops at 10 logical pixels per second, needs a release of at least 200,
+ *   and counts a release faster than 10000 as 10000.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+ * - Bearing stops at 1 degree per second and needs a release of at least 60.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5.
  *
  * See `mln_gesture_momentum` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1107,12 +1105,6 @@ export interface GestureMomentum {
   zoom?: MomentumOptions;
   bearing?: MomentumOptions;
   pitch?: MomentumOptions;
-  /**
-   * When pan and zoom momentum both start, the pan slows over the zoom's
-   * duration and curve, starts no faster, and moves no farther than it would
-   * alone. Defaults to true.
-   */
-  panFollowsZoom?: boolean;
   /**
    * Where the bearing settles after a gesture that changed it, once the rest of
    * the momentum ends. Without momentum, it settles at once. Without this, the
@@ -1852,23 +1844,23 @@ export interface MetalTextureFrame {
 }
 
 /**
- * How a part of a gesture's momentum slows to a stop.
+ * How a part of a gesture's momentum slows from its release speed.
  *
  * See `mln_momentum_decay` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export const MomentumDecay = {
   /**
-   * The share of the distance traveled is 1 - (1 - t)^`exponent`, where t goes
-   * from 0 to 1 over the momentum's duration. An exponent of 2 slows at a
-   * constant rate.
+   * The speed halves every `half_life_ms`, until it drops to `stop_speed`.
+   * UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
+   * deceleration 69 ms.
    */
-  power: 0,
+  friction: 0,
   /**
-   * The speed falls to e^-`decay_rate` of itself each second, until it drops
-   * below `stop_speed`.
+   * Android's scroll fling, as OverScroller computes it with `scroll_friction`.
+   * Only pan can use it.
    */
-  exponential: 1,
+  spline: 1,
 } as const;
 /** One of the MomentumDecay values, or a value this binding does not know. */
 export type MomentumDecay =
@@ -1878,10 +1870,10 @@ export type MomentumDecay =
 /**
  * How one part of a gesture keeps moving after its release.
  *
- * Speeds and distances are in the part's unit: logical pixels for pan, zoom
- * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
- * set takes the part's default, which `GestureMomentum` lists. Every setting is
- * finite and not negative.
+ * The part starts at its release speed. Speeds and distances are in the part's
+ * unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
+ * and pitch. A setting whose bit isn't set takes the part's default, which
+ * `GestureMomentum` lists.
  *
  * See `mln_momentum_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1889,48 +1881,29 @@ export type MomentumDecay =
 export interface MomentumOptions {
   decay?: MomentumDecay;
   /**
-   * The momentum starts at this multiple of the release speed.
+   * For `MomentumDecay.friction`. Positive.
    */
-  speedScale?: number;
+  halfLifeMs?: number;
   /**
-   * A slower release starts no momentum.
-   */
-  minSpeed?: number;
-  /**
-   * A faster release counts as this speed.
-   */
-  maxSpeed?: number;
-  /**
-   * For `MomentumDecay.power`. At least 1.
-   */
-  exponent?: number;
-  /**
-   * For `MomentumDecay.power`, the duration is `base_duration_ms` plus
-   * `duration_ms_per_speed` times the release speed.
-   */
-  baseDurationMs?: number;
-  durationMsPerSpeed?: number;
-  /**
-   * Required for `MomentumDecay.exponential`, and positive.
-   */
-  decayRate?: number;
-  /**
-   * Required for `MomentumDecay.exponential`, and positive.
+   * For `MomentumDecay.friction`, the speed at which it ends. Positive.
    */
   stopSpeed?: number;
   /**
-   * Stretches the momentum in time without changing its starting speed, so it
-   * also scales the distance. 0 starts no momentum. A host can pass its
-   * platform's animation duration scale here.
+   * For `MomentumDecay.spline`, Android's
+   * `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
    */
-  durationScale?: number;
+  scrollFriction?: number;
   /**
-   * The longest duration, after `duration_scale` applies.
+   * A slower release starts no momentum. Not negative.
    */
-  maxDurationMs?: number;
+  minSpeed?: number;
   /**
-   * The farthest the momentum moves. A momentum that would move farther slows
-   * faster over the same duration.
+   * A faster release counts as this speed. Positive.
+   */
+  maxSpeed?: number;
+  /**
+   * The farthest the part moves. A release that would move farther starts
+   * slower, so it ends sooner. Positive.
    */
   maxDistance?: number;
 }

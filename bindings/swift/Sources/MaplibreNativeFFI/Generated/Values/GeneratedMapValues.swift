@@ -76,7 +76,7 @@ public struct BearingSnap: Equatable, Hashable, Sendable {
   public var targetOffset: Double?
   /// In degrees, from 0 to 180. Defaults to 7.
   public var tolerance: Double?
-  /// Defaults to 300.
+  /// Zero settles at once. Defaults to 300.
   public var durationMs: Double?
   public init(
     targetCount: UInt32? = nil,
@@ -1017,17 +1017,15 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
 
 /// How a gesture keeps moving the camera after its last contact lifts.
 ///
-/// A part moves only when its velocity is set, and each part slows on its own
-/// clock. The parts' defaults are:
+/// A part moves only when its velocity is set, and each part slows on its own.
+/// Every part defaults to `MomentumDecay.friction` with a half-life of 140 ms,
+/// and these other defaults:
 ///
-/// | Part | Exponent | Speed scale | Base ms | ms per speed | Other | | -------
-/// | -------- | ----------- | ------- | ------------ | --------------- | | pan
-/// | 2 | 0.56 | 150 | 1/10.5 | min speed 250 | | zoom | 4 | 1 | 600 | 0 | max
-/// 600 ms, 2.5 | | bearing | 4 | 1 | 600 | 0 | max 600 ms | | pitch | 4 | 1 |
-/// 300 | 0 | min speed 5 |
-///
-/// Every part defaults to `MomentumDecay.power`, and the zoom moves at most 2.5
-/// levels.
+/// - Pan stops at 10 logical pixels per second, needs a release of at least
+///   200, and counts a release faster than 10000 as 10000.
+/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels.
+/// - Bearing stops at 1 degree per second and needs a release of at least 60.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5.
 ///
 /// See `mln_gesture_momentum` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1051,10 +1049,6 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
   public var zoom: MomentumOptions
   public var bearing: MomentumOptions
   public var pitch: MomentumOptions
-  /// When pan and zoom momentum both start, the pan slows over the zoom's
-  /// duration and curve, starts no faster, and moves no farther than it would
-  /// alone. Defaults to true.
-  public var panFollowsZoom: Bool?
   /// Where the bearing settles after a gesture that changed it, once the rest
   /// of the momentum ends. Without momentum, it settles at once. Without this,
   /// the bearing stays where the gesture leaves it.
@@ -1070,7 +1064,6 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
     zoom: MomentumOptions = .init(),
     bearing: MomentumOptions = .init(),
     pitch: MomentumOptions = .init(),
-    panFollowsZoom: Bool? = nil,
     bearingSnap: BearingSnap? = nil
   ) {
     self.panVelocity = panVelocity
@@ -1083,7 +1076,6 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
     self.zoom = zoom
     self.bearing = bearing
     self.pitch = pitch
-    self.panFollowsZoom = panFollowsZoom
     self.bearingSnap = bearingSnap
   }
 
@@ -1104,8 +1096,6 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
     zoom = MomentumOptions(raw: raw.zoom)
     bearing = MomentumOptions(raw: raw.bearing)
     pitch = MomentumOptions(raw: raw.pitch)
-    panFollowsZoom = raw.fields & MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM
-      .rawValue != 0 ? raw.pan_follows_zoom : nil
     bearingSnap = raw.fields & MLN_GESTURE_MOMENTUM_BEARING_SNAP
       .rawValue != 0 ? BearingSnap(raw: raw.bearing_snap) : nil
   }
@@ -1141,10 +1131,6 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
     raw.zoom = zoom.nativeValue()
     raw.bearing = bearing.nativeValue()
     raw.pitch = pitch.nativeValue()
-    if let item = panFollowsZoom {
-      raw.fields |= MLN_GESTURE_MOMENTUM_PAN_FOLLOWS_ZOOM.rawValue; raw
-        .pan_follows_zoom = item
-    }
     if let item = bearingSnap {
       raw.fields |= MLN_GESTURE_MOMENTUM_BEARING_SNAP.rawValue; raw
         .bearing_snap = item.nativeValue()
@@ -1733,7 +1719,7 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// How a part of a gesture's momentum slows to a stop.
+/// How a part of a gesture's momentum slows from its release speed.
 ///
 /// See `mln_momentum_decay` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1745,17 +1731,17 @@ public struct MomentumDecay: RawRepresentable, CustomStringConvertible,
     self.rawValue = rawValue
   }
 
-  /// The share of the distance traveled is 1 - (1 - t)^`exponent`, where t goes
-  /// from 0 to 1 over the momentum's duration. An exponent of 2 slows at a
-  /// constant rate.
-  public static let power: MomentumDecay = .init(rawValue: 0)
-  /// The speed falls to e^-`decay_rate` of itself each second, until it drops
-  /// below `stop_speed`.
-  public static let exponential: MomentumDecay = .init(rawValue: 1)
+  /// The speed halves every `half_life_ms`, until it drops to `stop_speed`.
+  /// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
+  /// deceleration 69 ms.
+  public static let friction: MomentumDecay = .init(rawValue: 0)
+  /// Android's scroll fling, as OverScroller computes it with
+  /// `scroll_friction`. Only pan can use it.
+  public static let spline: MomentumDecay = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-    case 0: return "power"
-    case 1: return "exponential"
+    case 0: return "friction"
+    case 1: return "spline"
     default: return "MomentumDecay(\(rawValue))"
     }
   }
@@ -1763,91 +1749,60 @@ public struct MomentumDecay: RawRepresentable, CustomStringConvertible,
 
 /// How one part of a gesture keeps moving after its release.
 ///
-/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
-/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
-/// isn't set takes the part's default, which `GestureMomentum` lists. Every
-/// setting is finite and not negative.
+/// The part starts at its release speed. Speeds and distances are in the part's
+/// unit: logical pixels for pan, zoom levels for zoom, and degrees for bearing
+/// and pitch. A setting whose bit isn't set takes the part's default, which
+/// `GestureMomentum` lists.
 ///
 /// See `mln_momentum_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MomentumOptions: Equatable, Hashable, Sendable {
   public var decay: MomentumDecay?
-  /// The momentum starts at this multiple of the release speed.
-  public var speedScale: Double?
-  /// A slower release starts no momentum.
-  public var minSpeed: Double?
-  /// A faster release counts as this speed.
-  public var maxSpeed: Double?
-  /// For `MomentumDecay.power`. At least 1.
-  public var exponent: Double?
-  /// For `MomentumDecay.power`, the duration is `base_duration_ms` plus
-  /// `duration_ms_per_speed` times the release speed.
-  public var baseDurationMs: Double?
-  public var durationMsPerSpeed: Double?
-  /// Required for `MomentumDecay.exponential`, and positive.
-  public var decayRate: Double?
-  /// Required for `MomentumDecay.exponential`, and positive.
+  /// For `MomentumDecay.friction`. Positive.
+  public var halfLifeMs: Double?
+  /// For `MomentumDecay.friction`, the speed at which it ends. Positive.
   public var stopSpeed: Double?
-  /// Stretches the momentum in time without changing its starting speed, so it
-  /// also scales the distance. 0 starts no momentum. A host can pass its
-  /// platform's animation duration scale here.
-  public var durationScale: Double?
-  /// The longest duration, after `duration_scale` applies.
-  public var maxDurationMs: Double?
-  /// The farthest the momentum moves. A momentum that would move farther slows
-  /// faster over the same duration.
+  /// For `MomentumDecay.spline`, Android's
+  /// `ViewConfiguration.getScrollFriction()`. Positive, and 0.015 by default.
+  public var scrollFriction: Double?
+  /// A slower release starts no momentum. Not negative.
+  public var minSpeed: Double?
+  /// A faster release counts as this speed. Positive.
+  public var maxSpeed: Double?
+  /// The farthest the part moves. A release that would move farther starts
+  /// slower, so it ends sooner. Positive.
   public var maxDistance: Double?
   public init(
     decay: MomentumDecay? = nil,
-    speedScale: Double? = nil,
+    halfLifeMs: Double? = nil,
+    stopSpeed: Double? = nil,
+    scrollFriction: Double? = nil,
     minSpeed: Double? = nil,
     maxSpeed: Double? = nil,
-    exponent: Double? = nil,
-    baseDurationMs: Double? = nil,
-    durationMsPerSpeed: Double? = nil,
-    decayRate: Double? = nil,
-    stopSpeed: Double? = nil,
-    durationScale: Double? = nil,
-    maxDurationMs: Double? = nil,
     maxDistance: Double? = nil
   ) {
     self.decay = decay
-    self.speedScale = speedScale
+    self.halfLifeMs = halfLifeMs
+    self.stopSpeed = stopSpeed
+    self.scrollFriction = scrollFriction
     self.minSpeed = minSpeed
     self.maxSpeed = maxSpeed
-    self.exponent = exponent
-    self.baseDurationMs = baseDurationMs
-    self.durationMsPerSpeed = durationMsPerSpeed
-    self.decayRate = decayRate
-    self.stopSpeed = stopSpeed
-    self.durationScale = durationScale
-    self.maxDurationMs = maxDurationMs
     self.maxDistance = maxDistance
   }
 
   init(raw: mln_momentum_options) {
     decay = raw.fields & MLN_MOMENTUM_OPTION_DECAY
       .rawValue != 0 ? MomentumDecay(rawValue: raw.decay.rawValue) : nil
-    speedScale = raw.fields & MLN_MOMENTUM_OPTION_SPEED_SCALE
-      .rawValue != 0 ? raw.speed_scale : nil
+    halfLifeMs = raw.fields & MLN_MOMENTUM_OPTION_HALF_LIFE_MS
+      .rawValue != 0 ? raw.half_life_ms : nil
+    stopSpeed = raw.fields & MLN_MOMENTUM_OPTION_STOP_SPEED.rawValue != 0 ? raw
+      .stop_speed : nil
+    scrollFriction = raw.fields & MLN_MOMENTUM_OPTION_SCROLL_FRICTION
+      .rawValue != 0 ? raw.scroll_friction : nil
     minSpeed = raw.fields & MLN_MOMENTUM_OPTION_MIN_SPEED.rawValue != 0 ? raw
       .min_speed : nil
     maxSpeed = raw.fields & MLN_MOMENTUM_OPTION_MAX_SPEED.rawValue != 0 ? raw
       .max_speed : nil
-    exponent = raw.fields & MLN_MOMENTUM_OPTION_EXPONENT.rawValue != 0 ? raw
-      .exponent : nil
-    baseDurationMs = raw.fields & MLN_MOMENTUM_OPTION_BASE_DURATION_MS
-      .rawValue != 0 ? raw.base_duration_ms : nil
-    durationMsPerSpeed = raw.fields & MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED
-      .rawValue != 0 ? raw.duration_ms_per_speed : nil
-    decayRate = raw.fields & MLN_MOMENTUM_OPTION_DECAY_RATE.rawValue != 0 ? raw
-      .decay_rate : nil
-    stopSpeed = raw.fields & MLN_MOMENTUM_OPTION_STOP_SPEED.rawValue != 0 ? raw
-      .stop_speed : nil
-    durationScale = raw.fields & MLN_MOMENTUM_OPTION_DURATION_SCALE
-      .rawValue != 0 ? raw.duration_scale : nil
-    maxDurationMs = raw.fields & MLN_MOMENTUM_OPTION_MAX_DURATION_MS
-      .rawValue != 0 ? raw.max_duration_ms : nil
     maxDistance = raw.fields & MLN_MOMENTUM_OPTION_MAX_DISTANCE
       .rawValue != 0 ? raw.max_distance : nil
   }
@@ -1859,9 +1814,17 @@ public struct MomentumOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_MOMENTUM_OPTION_DECAY.rawValue; raw
         .decay = mln_momentum_decay(rawValue: item.rawValue)
     }
-    if let item = speedScale {
-      raw.fields |= MLN_MOMENTUM_OPTION_SPEED_SCALE.rawValue; raw
-        .speed_scale = item
+    if let item = halfLifeMs {
+      raw.fields |= MLN_MOMENTUM_OPTION_HALF_LIFE_MS.rawValue; raw
+        .half_life_ms = item
+    }
+    if let item = stopSpeed {
+      raw.fields |= MLN_MOMENTUM_OPTION_STOP_SPEED.rawValue; raw
+        .stop_speed = item
+    }
+    if let item = scrollFriction {
+      raw.fields |= MLN_MOMENTUM_OPTION_SCROLL_FRICTION.rawValue; raw
+        .scroll_friction = item
     }
     if let item = minSpeed {
       raw.fields |= MLN_MOMENTUM_OPTION_MIN_SPEED.rawValue; raw
@@ -1870,33 +1833,6 @@ public struct MomentumOptions: Equatable, Hashable, Sendable {
     if let item = maxSpeed {
       raw.fields |= MLN_MOMENTUM_OPTION_MAX_SPEED.rawValue; raw
         .max_speed = item
-    }
-    if let item = exponent {
-      raw.fields |= MLN_MOMENTUM_OPTION_EXPONENT.rawValue; raw.exponent = item
-    }
-    if let item = baseDurationMs {
-      raw.fields |= MLN_MOMENTUM_OPTION_BASE_DURATION_MS.rawValue; raw
-        .base_duration_ms = item
-    }
-    if let item = durationMsPerSpeed {
-      raw.fields |= MLN_MOMENTUM_OPTION_DURATION_MS_PER_SPEED.rawValue; raw
-        .duration_ms_per_speed = item
-    }
-    if let item = decayRate {
-      raw.fields |= MLN_MOMENTUM_OPTION_DECAY_RATE.rawValue; raw
-        .decay_rate = item
-    }
-    if let item = stopSpeed {
-      raw.fields |= MLN_MOMENTUM_OPTION_STOP_SPEED.rawValue; raw
-        .stop_speed = item
-    }
-    if let item = durationScale {
-      raw.fields |= MLN_MOMENTUM_OPTION_DURATION_SCALE.rawValue; raw
-        .duration_scale = item
-    }
-    if let item = maxDurationMs {
-      raw.fields |= MLN_MOMENTUM_OPTION_MAX_DURATION_MS.rawValue; raw
-        .max_duration_ms = item
     }
     if let item = maxDistance {
       raw.fields |= MLN_MOMENTUM_OPTION_MAX_DISTANCE.rawValue; raw
