@@ -115,7 +115,7 @@ auto string_from_view(mln_buffer_view string) -> std::string {
 }
 
 // Quotes an ID for a diagnostic, as in `source "water" does not exist`.
-auto quoted(std::string_view id) -> std::string {
+auto quote_id(std::string_view id) -> std::string {
   auto result = std::string{"\""};
   result.append(id);
   result.push_back('"');
@@ -125,13 +125,14 @@ auto quoted(std::string_view id) -> std::string {
 auto set_source_error(std::string_view source_id, std::string_view problem)
   -> void {
   const auto message =
-    "source " + quoted(source_id) + " " + std::string{problem};
+    "source " + quote_id(source_id) + " " + std::string{problem};
   mln::core::set_thread_error(message.c_str());
 }
 
 auto set_layer_error(std::string_view layer_id, std::string_view problem)
   -> void {
-  const auto message = "layer " + quoted(layer_id) + " " + std::string{problem};
+  const auto message =
+    "layer " + quote_id(layer_id) + " " + std::string{problem};
   mln::core::set_thread_error(message.c_str());
 }
 
@@ -1170,7 +1171,7 @@ auto map_add_style_source_json(
       string_from_view(source_json), error, id
     );
   if (!source) {
-    set_style_conversion_error(("style source " + quoted(id)).c_str(), error);
+    set_style_conversion_error(("style source " + quote_id(id)).c_str(), error);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -1198,7 +1199,7 @@ auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
         return layer->getSourceID() == id;
       }
     );
-    set_source_error(id, "is used by layer " + quoted((*user)->getID()));
+    set_source_error(id, "is used by layer " + quote_id((*user)->getID()));
     return MLN_STATUS_INVALID_STATE;
   }
   // The detached source is dropped before the release runs, so the style no
@@ -1343,7 +1344,7 @@ auto map_set_geojson_source_data(
     const auto message =
       "prepared GeoJSON data options do not match the options that GeoJSON "
       "source " +
-      quoted(id) + " was added with";
+      quote_id(id) + " was added with";
     set_thread_error(message.c_str());
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1726,7 +1727,7 @@ auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(image_id);
   if (!style.getImage(id).has_value()) {
-    const auto message = "style image " + quoted(id) + " does not exist";
+    const auto message = "style image " + quote_id(id) + " does not exist";
     set_thread_error(message.c_str());
     return MLN_STATUS_NOT_FOUND;
   }
@@ -1889,7 +1890,7 @@ auto map_add_style_layer_json(
     before = string_from_view(before_layer_id);
     if (style.getLayer(*before) == nullptr) {
       const auto message =
-        "before_layer_id " + quoted(*before) + " does not exist";
+        "before_layer_id " + quote_id(*before) + " does not exist";
       set_thread_error(message.c_str());
       return MLN_STATUS_NOT_FOUND;
     }
@@ -1917,7 +1918,7 @@ auto map_add_style_layer_json(
     const auto* source = style.getSource((*layer)->getSourceID());
     if (source == nullptr) {
       set_layer_error(
-        id, "uses source " + quoted((*layer)->getSourceID()) +
+        id, "uses source " + quote_id((*layer)->getSourceID()) +
               ", which does not exist"
       );
       return MLN_STATUS_NOT_FOUND;
@@ -1926,7 +1927,7 @@ auto map_add_style_layer_json(
       const auto& type = (*layer)->getTypeInfo()->type;
       set_source_error(
         (*layer)->getSourceID(),
-        "does not support " + std::string{type} + " layer " + quoted(id)
+        "does not support " + std::string{type} + " layer " + quote_id(id)
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -2006,7 +2007,7 @@ auto map_move_style_layer(
     }
     if (style.getLayer(*before) == nullptr) {
       const auto message =
-        "before_layer_id " + quoted(*before) + " does not exist";
+        "before_layer_id " + quote_id(*before) + " does not exist";
       set_thread_error(message.c_str());
       return MLN_STATUS_NOT_FOUND;
     }
@@ -2067,7 +2068,7 @@ auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status {
   const auto name = string_from_view(property_name);
-  const auto context = "style light property " + quoted(name);
+  const auto context = "style light property " + quote_id(name);
   auto document = mln::JSDocument{};
   if (!parse_json_document(value, context.c_str(), document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2176,7 +2177,7 @@ auto require_layer_takes_source(
     return true;
   }
   const auto message = std::string{layer.getTypeInfo()->type} + " layer " +
-                       quoted(layer.getID()) + " does not take a " + field;
+                       quote_id(layer.getID()) + " does not take a " + field;
   set_thread_error(message.c_str());
   return false;
 }
@@ -2189,7 +2190,8 @@ auto map_set_layer_property(
 ) -> mln_status {
   const auto id = string_from_view(layer_id);
   const auto name = string_from_view(property_name);
-  const auto context = "property " + quoted(name) + " of layer " + quoted(id);
+  const auto context =
+    "property " + quote_id(name) + " of layer " + quote_id(id);
   auto document = mln::JSDocument{};
   if (!parse_json_document(value, context.c_str(), document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
