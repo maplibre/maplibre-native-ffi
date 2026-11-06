@@ -70,6 +70,15 @@ struct MapObject {
   // Width and height follow resize on the runtime worker; scale_factor is
   // fixed at creation, so map_scale_factor() may read it from any thread.
   mln_logical_extent logical_extent{256, 256, 1.0};
+  // The map commands that callers sent, and those that the runtime worker
+  // finished. A frame demand waits until the finished count reaches the sent
+  // count at its call, so its frame shows those commands.
+  std::atomic<uint64_t> commands_sent = 0;
+  std::atomic<uint64_t> commands_applied = 0;
+  // Whether a demand of the attached session waits for commands. While it
+  // does, each finished command sends the session its commands notice. The
+  // session writes it under its control mutex.
+  std::atomic_bool commands_awaited = false;
   mutable std::mutex snapshot_mutex;
   mln_map_snapshot snapshot{};
   uint64_t next_snapshot_generation = 1;

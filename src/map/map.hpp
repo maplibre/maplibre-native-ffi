@@ -639,6 +639,9 @@ struct RenderSessionNotices {
   // Reports that a still image became pending or stopped being pending, which
   // map_still_image_generation() then tells.
   std::function<void()> still_image;
+  // Reports that the map finished a command while a demand awaited commands,
+  // which map_commands_applied() then counts.
+  std::function<void()> commands;
 };
 // Installs the session's notices; empty notices remove them.
 auto map_set_render_session_notices(mln_map map, RenderSessionNotices notices)
@@ -651,6 +654,15 @@ auto map_set_render_session_notices(mln_map map, RenderSessionNotices notices)
 auto map_latest_update(MapObject& map)
   -> std::shared_ptr<mln::UpdateParameters>;
 auto map_latest_update_generation(MapObject& map) noexcept -> uint64_t;
+// The number of commands that callers sent to the map, and the number that it
+// finished. Once the second reaches a value that the first returned, every
+// command sent before that call has finished.
+auto map_commands_sent(MapObject& map) noexcept -> uint64_t;
+auto map_commands_applied(MapObject& map) noexcept -> uint64_t;
+// Sets whether a demand of the attached session waits for commands, which
+// asks for the session's commands notice after each one. The session calls it
+// under its control mutex.
+auto map_set_commands_awaited(MapObject& map, bool awaited) noexcept -> void;
 struct RenderUpdateSnapshot {
   std::shared_ptr<mln::UpdateParameters> update;
   std::shared_ptr<const FeatureStateSnapshot> feature_state;

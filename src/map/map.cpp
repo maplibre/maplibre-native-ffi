@@ -1334,6 +1334,18 @@ class HeadlessFrontend final : public mln::RendererFrontend {
     if (notify_session) notify_session(generation);
   }
 
+  // Tells the session that the map finished a command.
+  auto announce_commands() noexcept -> void {
+    auto notify_session = std::function<void()>{};
+    try {
+      const std::scoped_lock lock(latest_update_mutex_);
+      notify_session = session_notices_.commands;
+    } catch (...) {
+      return;
+    }
+    if (notify_session) notify_session();
+  }
+
   // Command groups nest, and only map commands open or end one.
   auto begin_command_group() -> void { ++command_group_depth_; }
   auto end_command_group() -> bool {
@@ -3393,13 +3405,41 @@ auto prepare_map_command_task(
   return MLN_STATUS_OK;
 }
 
+namespace {
+
+// Runs on the runtime worker after a command's work, once its update is
+// stored.
+auto finish_map_command(MapObject& live) noexcept -> void {
+  live.commands_applied.fetch_add(1);
+  // Pairs with the session, which sets the flag and then reads the applied
+  // count, so one of the two sees the other.
+  if (!live.commands_awaited.load() || live.frontend == nullptr) return;
+  live.frontend->announce_commands();
+}
+
+}  // namespace
+
+auto submit_prepared_map_command_task(MapCommandTask& task) -> mln_status {
+  const auto map = task.map;
+  // Counted before it's queued, so a demand that counts this command also
+  // counts every command queued ahead of it.
+  map->commands_sent.fetch_add(1);
+  task.finish = [](RuntimeCommandTask& base) noexcept {
+    auto& self = static_cast<MapCommandTask&>(base);
+    if (self.map != nullptr) finish_map_command(*self.map);
+  };
+  const auto status = submit_runtime_command_task(map->runtime_state, task);
+  // A command that never runs counts as applied, so no demand waits for it.
+  if (status != MLN_STATUS_OK) map->commands_applied.fetch_add(1);
+  return status;
+}
+
 auto submit_map_command_task(
   mln_map map, MapCommandTask& task, const mln_completion* descriptor
 ) -> mln_status {
   const auto status = prepare_map_command_task(map, task, descriptor);
   if (status != MLN_STATUS_OK) return status;
-  const auto runtime = task.map->runtime_state;
-  return submit_runtime_command_task(runtime, task);
+  return submit_prepared_map_command_task(task);
 }
 
 auto start_style_operation(
@@ -3843,8 +3883,7 @@ auto submit_map_resize(
       return MLN_STATUS_INVALID_STATE;
     }
   }
-  const auto runtime = task->map->runtime_state;
-  const auto status = submit_runtime_command_task(runtime, *task);
+  const auto status = submit_prepared_map_command_task(*task);
   if (status == MLN_STATUS_OK) static_cast<void>(task.release());
   return status;
 }
@@ -4214,6 +4253,18 @@ auto map_latest_update_generation(MapObject& map) noexcept -> uint64_t {
   return map.frontend->latest_update_generation();
 }
 
+auto map_commands_sent(MapObject& map) noexcept -> uint64_t {
+  return map.commands_sent.load();
+}
+
+auto map_commands_applied(MapObject& map) noexcept -> uint64_t {
+  return map.commands_applied.load();
+}
+
+auto map_set_commands_awaited(MapObject& map, bool awaited) noexcept -> void {
+  map.commands_awaited.store(awaited);
+}
+
 auto map_latest_update_snapshot(MapObject& map) -> RenderUpdateSnapshot {
   return map.frontend->latest_update_snapshot();
 }
@@ -4398,8 +4449,7 @@ auto submit_map_style_load(
   task->completion = task->retained_completion.get();
   const auto prepared = prepare_map_command_task(map, *task, nullptr);
   if (prepared != MLN_STATUS_OK) return prepared;
-  const auto runtime = task->map->runtime_state;
-  const auto status = submit_runtime_command_task(runtime, *task);
+  const auto status = submit_prepared_map_command_task(*task);
   if (status == MLN_STATUS_OK) static_cast<void>(task.release());
   return status;
 }

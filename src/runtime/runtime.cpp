@@ -782,6 +782,7 @@ auto run_runtime_command_task(RuntimeCommandTask& task) noexcept -> void {
   } catch (...) {
     // The command implementation reports its own terminal failure event.
   }
+  if (task.finish != nullptr) task.finish(task);
   task.clear_work(task);
   task.lease.reset();
 }

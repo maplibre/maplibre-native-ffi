@@ -493,6 +493,8 @@ struct RuntimeCommandTask : ExecutorTask {
   Completion* completion = nullptr;
   std::shared_ptr<Completion> retained_completion;
   void (*work)(RuntimeCommandTask&) = nullptr;
+  // Runs after `work`, even when it threw, and before `clear_work`.
+  void (*finish)(RuntimeCommandTask&) noexcept = nullptr;
   void (*clear_work)(RuntimeCommandTask&) noexcept = nullptr;
 };
 
