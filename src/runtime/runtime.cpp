@@ -9,6 +9,7 @@
 #include <exception>
 #include <filesystem>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -734,6 +735,34 @@ auto database_source_for_runtime(RuntimeObject* runtime)
   return runtime->database_source;
 }
 
+// The engine opens the cache file when its database file source starts, but a
+// failure there only logs, and each later use of the database retries the
+// open. Using the database once here reports the failure from creation.
+auto open_cache_database(RuntimeObject* runtime) -> std::optional<std::string> {
+  const auto failure = [runtime](const std::string& reason) -> std::string {
+    return "cache_path '" + runtime->cache_path +
+           "' can't be opened: " + reason;
+  };
+  auto database = database_source_for_runtime(runtime);
+  if (database == nullptr) {
+    return failure("database file source is unavailable");
+  }
+  // The database thread runs the callback, so this thread can wait for it.
+  auto opened = std::make_shared<std::promise<std::exception_ptr>>();
+  auto result = opened->get_future();
+  database->listOfflineRegions(
+    [opened](
+      mln::expected<mln::OfflineRegions, std::exception_ptr> regions
+    ) -> void { opened->set_value(regions ? nullptr : regions.error()); }
+  );
+  const auto error = result.get();
+  if (error == nullptr) {
+    return std::nullopt;
+  }
+  runtime->database_source.reset();
+  return failure(exception_message(error, "unknown error"));
+}
+
 }  // namespace
 
 auto lease_runtime(mln_runtime runtime) -> std::shared_ptr<RuntimeObject> {
@@ -889,8 +918,11 @@ auto create_runtime(
   auto cache_path = string_from_view(options->cache_path);
 
   auto runtime = result.runtime;
+  auto cache_failure = std::optional<std::string>{};
+  // start() returns after the initializer has run, so it can write
+  // cache_failure.
   runtime->executor.start(
-    [runtime, asset_path = std::move(asset_path),
+    [runtime, &cache_failure, asset_path = std::move(asset_path),
      cache_path = std::move(cache_path)]() mutable -> void {
       runtime->event_state = std::make_shared<RuntimeEventState>();
       runtime->asset_path = std::move(asset_path);
@@ -906,8 +938,15 @@ auto create_runtime(
       runtime->resource_provider_state =
         std::make_shared<ResourceProviderState>();
       runtime->platform_context = reserve_platform_context();
+      if (!runtime->cache_path.empty()) {
+        cache_failure = open_cache_database(runtime.get());
+      }
     }
   );
+  if (cache_failure) {
+    set_thread_error(cache_failure->c_str());
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto handle = handle_table<RuntimeObject>().insert(runtime);
   runtime->self = handle;
   bind_platform_context(runtime->platform_context, handle);

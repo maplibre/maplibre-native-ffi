@@ -383,8 +383,9 @@ typedef struct mln_runtime_options {
    */
   mln_buffer_view asset_path;
   /**
-   * The cache database file, which holds the ambient cache and offline
-   * regions. Empty keeps them in memory.
+   * The path of the cache database file, which holds the ambient cache and
+   * offline regions. Its directory must be writable. Empty keeps the cache in
+   * memory.
    */
   mln_buffer_view cache_path;
 } mln_runtime_options;
@@ -962,6 +963,10 @@ typedef struct mln_resource_provider {
  * A runtime holds maps and the resource loading, cache, and offline regions
  * that they share. In a browser, create runtimes on a Web Worker, not on the
  * main thread.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when the cache database file that `options`
+ *   names can't be opened or created.
  */
 MLN_BINDING("blocks=thread_start")
 MLN_API mln_status mln_runtime_create(

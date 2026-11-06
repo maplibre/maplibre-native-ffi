@@ -1707,8 +1707,9 @@ public struct RuntimeOptions: Equatable, Hashable, Sendable {
   /// The directory that `asset://` URLs load from. Empty uses the working
   /// directory, or the app's assets on Android.
   public var assetPath: String
-  /// The cache database file, which holds the ambient cache and offline
-  /// regions. Empty keeps them in memory.
+  /// The path of the cache database file, which holds the ambient cache and
+  /// offline regions. Its directory must be writable. Empty keeps the cache in
+  /// memory.
   public var cachePath: String
   public init(assetPath: String = "", cachePath: String = "") {
     self.assetPath = assetPath

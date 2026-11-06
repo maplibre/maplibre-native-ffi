@@ -1196,8 +1196,8 @@ static void offline_submission_never_waits_for_the_runtime_worker(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The runtime's first offline operation opens its database, so a region it
-// creates is there for the next runtime that opens the same cache.
+// A region that an operation accepted before release creates is there for the
+// next runtime that opens the same cache.
 static void an_offline_operation_accepted_before_release_still_completes(void) {
   static const uint8_t metadata[] = {4, 2};
   char cache_path[1024];

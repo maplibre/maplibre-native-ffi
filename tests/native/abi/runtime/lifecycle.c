@@ -2,6 +2,8 @@
 // validation, stale and foreign handles, and release.
 
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "support/resources.h"
 #include "support/test_support.h"
@@ -47,6 +49,34 @@ static void runtime_creation_validates_its_options(void) {
   runtime = (mln_runtime)1;
   MLN_TEST_INVALID(mln_runtime_create(&defaults, &runtime, NULL));
   TEST_ASSERT_EQUAL_UINT64(1, runtime);
+}
+
+// Creation fails, naming the path, when the cache file can't be created, and
+// creates the file when it can.
+static void runtime_creation_opens_its_cache_database(void) {
+  char directory[1024];
+  mln_test_temp_path("missing-directory", directory, sizeof(directory));
+  char unwritable[1100];
+  (void)snprintf(unwritable, sizeof(unwritable), "%s/cache.db", directory);
+  mln_runtime_options options = {.size = sizeof(mln_runtime_options)};
+  options.cache_path = mln_buffer_view_from_cstr(unwritable);
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  MLN_TEST_INVALID(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), unwritable), mln_test_last_error()
+  );
+
+  char writable[1024];
+  mln_test_temp_path("lifecycle-cache.db", writable, sizeof(writable));
+  (void)remove(writable);
+  options.cache_path = mln_buffer_view_from_cstr(writable);
+  runtime = mln_test_create_runtime_with_options(options);
+  FILE* file = fopen(writable, "rb");
+  TEST_ASSERT_NOT_NULL_MESSAGE(file, "creation didn't create the cache file");
+  (void)fclose(file);
+  mln_test_destroy_runtime(runtime);
+  (void)remove(writable);
 }
 
 // Null options create a runtime with the defaults, which can host a map.
@@ -477,6 +507,7 @@ static void a_map_release_completion_can_release_its_runtime(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(runtime_creation_validates_its_options);
+  RUN_TEST(runtime_creation_opens_its_cache_database);
   RUN_TEST(null_options_create_a_runtime_with_the_defaults);
   RUN_TEST(runtime_calls_reject_a_value_that_names_no_runtime);
   RUN_TEST(map_creation_validates_its_options);

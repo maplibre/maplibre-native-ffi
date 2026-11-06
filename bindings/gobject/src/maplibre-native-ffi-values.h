@@ -12645,8 +12645,9 @@ void maplibre_native_ffi_runtime_options_set_asset_path(
 /**
  * MaplibreNativeFfiRuntimeOptions:cache-path: (setter set_cache_path) (getter get_cache_path)
  *
- * The cache database file, which holds the ambient cache and offline regions.
- * Empty keeps them in memory.
+ * The path of the cache database file, which holds the ambient cache and
+ * offline regions. Its directory must be writable. Empty keeps the cache in
+ * memory.
  */
 /**
  * maplibre_native_ffi_runtime_options_get_cache_path: (get-property cache-path)

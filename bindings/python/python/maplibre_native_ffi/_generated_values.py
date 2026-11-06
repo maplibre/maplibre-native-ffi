@@ -4436,8 +4436,9 @@ class RuntimeOptions:
     """
 
     cache_path: str = ""
-    """The cache database file, which holds the ambient cache and offline
-    regions. Empty keeps them in memory.
+    """The path of the cache database file, which holds the ambient cache and
+    offline regions. Its directory must be writable. Empty keeps the cache in
+    memory.
     """
 
     @classmethod

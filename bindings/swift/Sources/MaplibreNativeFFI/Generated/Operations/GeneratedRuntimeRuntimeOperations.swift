@@ -73,6 +73,11 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the cache database file that `options`
+  ///   names can't be opened or created.
   static func create(options bindingArg0: RuntimeOptions? = nil) throws
     -> RuntimeHandle
   {

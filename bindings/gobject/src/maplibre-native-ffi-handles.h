@@ -5287,6 +5287,11 @@ maplibre_native_ffi_runtime_clear_resource_transform_finish(
  * See `mln_runtime_create` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the cache database file
+ *   that `options` names can't be opened or created.
+ *
  * Returns: (transfer full): the object
  */
 MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(

@@ -5388,8 +5388,9 @@ pub struct RuntimeOptions<'a> {
     /// The directory that `asset://` URLs load from. Empty uses the working
     /// directory, or the app's assets on Android.
     pub asset_path: &'a str,
-    /// The cache database file, which holds the ambient cache and offline
-    /// regions. Empty keeps them in memory.
+    /// The path of the cache database file, which holds the ambient cache and
+    /// offline regions. Its directory must be writable. Empty keeps the cache
+    /// in memory.
     pub cache_path: &'a str,
 }
 impl<'a> ToNative<sys::mln_runtime_options> for RuntimeOptions<'a> {

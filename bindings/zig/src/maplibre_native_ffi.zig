@@ -2848,6 +2848,11 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when the cache database file that `options` names
+    ///   can't be opened or created.
     pub fn create(options: ?RuntimeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!Runtime {
         return call.invoke("mln_runtime_create", .none, {}, null, diagnostic, .{ options, call.adopt(Runtime) });
     }
@@ -7925,8 +7930,9 @@ pub const RuntimeOptions = struct {
     /// The directory that `asset://` URLs load from. Empty uses the working
     /// directory, or the app's assets on Android.
     asset_path: []const u8 = &.{},
-    /// The cache database file, which holds the ambient cache and offline
-    /// regions. Empty keeps them in memory.
+    /// The path of the cache database file, which holds the ambient cache and
+    /// offline regions. Its directory must be writable. Empty keeps the cache
+    /// in memory.
     cache_path: []const u8 = &.{},
     pub fn toNative(self: RuntimeOptions) status.Error!c.mln_runtime_options {
         var raw = std.mem.zeroes(c.mln_runtime_options);

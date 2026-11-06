@@ -67,6 +67,11 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the cache database file that `options`
+    ///   names can't be opened or created.
     pub fn create(options: Option<&RuntimeOptions<'_>>) -> Result<RuntimeHandle> {
         let mut call = Call::global();
         crate::abi::validate_abi_version()?;
