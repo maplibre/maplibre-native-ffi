@@ -6,8 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "harness.h"
+#if defined(__OHOS__)
+#include <unistd.h>
+#endif
 
+#include "harness.h"
 #include "support/test_support.h"
 #include "unity.h"
 
@@ -122,5 +125,14 @@ int main(int argc, char** argv) {
   // held past the entry point keeps the runtime alive and the process never
   // exits.
   mln_test_release_thread_gpu_resources();
+#if defined(__OHOS__)
+  // OpenHarmony's system libraries can crash in exit() after every case
+  // passed: NetStack's HTTP worker frees a cancelled request while exit runs,
+  // and the display allocator's destructor dereferences null. The suite skips
+  // their destructors. The native-exit programs still test a real exit.
+  fflush(NULL);
+  _exit(failures);
+#else
   return failures;
+#endif
 }
