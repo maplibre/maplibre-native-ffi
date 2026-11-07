@@ -21,7 +21,9 @@ if [[ "$1" == */* && "$1" != /* ]]; then
 fi
 
 case "$preset" in
-  *-egl) drivers=() ;;
+  # llvmpipe's rasterizer threads can unlock a freed mutex in Mesa 26.2, which
+  # segfaults on FreeBSD, so llvmpipe draws on the calling thread.
+  *-egl) drivers=(LP_NUM_THREADS=0) ;;
   # Mesa installs hardware drivers beside the software one, so the loader is
   # pointed at lavapipe alone.
   *-vulkan) drivers=(VK_DRIVER_FILES=/usr/local/share/vulkan/icd.d/lvp_icd.x86_64.json) ;;
