@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#MISE description="Archive the GObject library for a release, and test the archive against the native package."
+#MISE extends="ffi:preset"
+#MISE depends=[{ task = ":build", args = ["{{usage.preset}}"] }]
+#MISE shell="bash"
+set -euo pipefail
+
+preset="${usage_preset?}"
+archive="$MISE_MONOREPO_ROOT/build/packages/gobject/maplibre-native-ffi-gobject-${preset%-*}.tar.gz"
+native_archive="$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$preset.tar.gz"
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+
+uv run --project "$MISE_MONOREPO_ROOT" --no-sync meson install \
+  -C "$MISE_MONOREPO_ROOT/build/$preset/gobject" \
+  --destdir "$scratch/stage" --strip --quiet
+root="$scratch/stage$MISE_MONOREPO_ROOT/build/$preset/install"
+python3 "$MISE_MONOREPO_ROOT/tools/release/binding_sbom.py" package \
+  --name maplibre-native-ffi-gobject --version 0.0.0 --ecosystem generic \
+  --output "$root/share/maplibre-native-ffi-gobject/sbom.cdx.json"
+
+runpath="$(readelf -d "$root/lib/libmaplibre-native-ffi-gobject-0.so.0" |
+  sed -n 's/.*(RUNPATH).*\[\(.*\)\]$/\1/p')"
+# shellcheck disable=SC2016 # $ORIGIN is literal.
+if [[ "$runpath" != '$ORIGIN' ]]; then
+  echo "the library's run path is '$runpath', not '\$ORIGIN'" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$archive")"
+tar -C "$root" --sort=name --owner=0 --group=0 --numeric-owner \
+  -czf "$archive" include lib share
+
+prefix="$scratch/test/maplibre-native-c-$preset"
+mkdir "$scratch/test"
+tar -xzf "$native_archive" -C "$scratch/test"
+tar -xzf "$archive" -C "$prefix"
+MLN_FFI_GOBJECT_PREFIX="$prefix" bash .mise/tasks/package

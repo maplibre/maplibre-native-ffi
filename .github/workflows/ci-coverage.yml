@@ -326,6 +326,14 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Upload GObject archive
+        if: matrix.gobject_archive != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gobject-package-${{ matrix.preset }}-${{ github.sha }}
+          path: build/packages/gobject/${{ matrix.gobject_archive }}
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Upload TypeScript addon
         if: matrix.addon == 'typescript'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

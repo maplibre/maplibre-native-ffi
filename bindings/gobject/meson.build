@@ -27,6 +27,13 @@ package = 'maplibre-native-ffi-gobject-' + api_version
 glib_version = '>= 2.80'
 gio = dependency('gio-2.0', version: glib_version)
 native = dependency('maplibre-native-c')
+# The C library's pkg-config file adds an absolute rpath, which an installed
+# library must not keep.
+native_libdir = native.get_variable(pkgconfig: 'libdir')
+native_link = declare_dependency(
+  dependencies: native.partial_dependency(compile_args: true, includes: true),
+  link_args: ['-L' + native_libdir, '-lmaplibre-native-c'],
+)
 add_project_arguments(
   '-DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_80',
   '-DGLIB_VERSION_MAX_ALLOWED=GLIB_VERSION_2_80',
@@ -46,10 +53,11 @@ library = shared_library(
   'src/maplibre-native-ffi-enums.c',
   'src/maplibre-native-ffi-handles.c',
   'src/maplibre-native-ffi-values.c',
-  dependencies: [gio, native],
+  dependencies: [gio, native_link],
   soversion: api_version,
   # The C library sits beside this one, so it loads from there wherever the
   # prefix moves, as the C library's own dependencies do.
+  build_rpath: native_libdir,
   install_rpath: host_machine.system() == 'darwin' ? '@loader_path' : '$ORIGIN',
   install: true,
 )

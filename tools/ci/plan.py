@@ -19,7 +19,7 @@ import json
 import pathlib
 
 from tools.ci import gaps
-from tools.ci.suites import target_suites
+from tools.ci.suites import gobject_archive, target_suites
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 VENDOR = "maplibre-native-ffi"
@@ -365,6 +365,7 @@ def row(target: Target, save_toolchains: bool) -> dict[str, object]:
         "device_command": target.device["command"] if target.device else "",
         "addon": addon(target),
         "python_wheel": python_wheel(target),
+        "gobject_archive": gobject_archive(target.preset) or "",
         # devices-cli writes the logs of the Android emulators it boots.
         "emulator_logs": target.platform == "android" and target.device is not None,
     }
