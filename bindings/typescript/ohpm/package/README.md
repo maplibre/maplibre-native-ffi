@@ -8,7 +8,8 @@ The C API embeds the
 Install the binding and one backend:
 
 ```bash
-ohpm install @maplibre/native-ffi @maplibre/native-ffi-opengl
+ohpm install @maplibre/native-ffi
+ohpm install @maplibre/native-ffi-opengl
 ```
 
 For Vulkan, replace `@maplibre/native-ffi-opengl` with

@@ -327,8 +327,8 @@ jobs:
           rm "$RUNNER_TEMP/tools.zip"
           echo "$RUNNER_TEMP/command-line-tools/ohpm/bin" >> "$GITHUB_PATH"
       # ohpm checks each package as the registry will before any of them
-      # publishes. A version that OHPM already lists is skipped, so a rerun
-      # after a partial publish resumes where it stopped.
+      # publishes. A version that OHPM already lists is skipped, but OHPM lists
+      # a version only after its review, so see ohpm_publish.py before a rerun.
       - name: Publish
         env:
           OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
@@ -346,50 +346,19 @@ jobs:
           done
 
   # The release tag versions the Go binding's module. Each preset's native
-  # library is a Go module of its own, which this job publishes from the
-  # release's archives.
+  # library is a Go module of its own, whose files the native release holds.
+  # The proxy that serves them lists the new version once the release is out.
   go:
     name: Go
     needs:
       - source
       - native
-    runs-on: blacksmith-2vcpu-ubuntu-2404
-    timeout-minutes: 60
     permissions:
-      contents: write
-    env:
-      MISE_NO_HOOKS: "1"
-      GH_REPO: ${{ github.repository }}
-      PUBLISH_SHA: ${{ needs.source.outputs.sha }}
-      PUBLISH_TAG: ${{ github.ref_name }}
-    steps:
-      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
-        with:
-          ref: ${{ env.PUBLISH_SHA }}
-          persist-credentials: false
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
-        with:
-          cache: false
-          install_args: python
-      - name: Download the preset archives
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          patterns=(--pattern SHA256SUMS)
-          while IFS= read -r preset; do
-            patterns+=(--pattern "maplibre-native-c-$preset.tar.gz")
-          done < <(jq -r '.[]' bindings/go/presets.json)
-          gh release download "$PUBLISH_TAG" "${patterns[@]}" --dir "$RUNNER_TEMP/assets"
-          cd "$RUNNER_TEMP/assets"
-          sha256sum --check --ignore-missing --strict SHA256SUMS
-      # A rerun replaces each file with the same contents.
-      - name: Publish the preset modules
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          PYTHONPATH=tools/release python3 tools/release/go_native_modules.py
-          publish "$PUBLISH_TAG" "$PUBLISH_SHA" "$RUNNER_TEMP/assets"
+      contents: read
+    uses: ./.github/workflows/_go-native-proxy.yml
+    secrets: inherit
+    with:
+      sha: ${{ needs.source.outputs.sha }}
 
   # SwiftPM, vcpkg, Conan, and xmake consume the distribution repository. Each
   # release commits its packages and registry versions together, then tags the
@@ -591,11 +560,15 @@ jobs:
         with:
           skip-existing: true
 
-  # OHPM lists a version only after its review, so the docs do not wait for it.
+  # The docs follow the packages, so the versions they quote are out, but need
+  # only the release itself: a package that fails to publish, which a rerun
+  # publishes, does not hold them back. OHPM lists a version only after its
+  # review, so the docs do not wait for it.
   docs:
     name: Docs Pages
     needs:
       - source
+      - native
       - dart
       - distribution
       - dotnet
@@ -604,76 +577,16 @@ jobs:
       - python
       - rust
       - typescript
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 60
+    if: >-
+      !cancelled() && needs.source.result == 'success' && needs.native.result ==
+      'success'
     permissions:
       actions: read
       contents: read
-    env:
-      RELEASE_SHA: ${{ needs.source.outputs.sha }}
-      DOCS_VERSION: ${{ needs.source.outputs.version }}
-    steps:
-      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
-        with:
-          ref: ${{ env.RELEASE_SHA }}
-          persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
-      - name: Read the Android compile SDK
-        id: android
-        shell: bash
-        run: |
-          sdk="$(sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)" *$/\1/p' gradle/libs.versions.toml)"
-          test -n "$sdk" || { echo "android-compileSdk missing from gradle/libs.versions.toml" >&2; exit 1; }
-          echo "compile-sdk=$sdk" >> "$GITHUB_OUTPUT"
-      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
-        with:
-          packages:
-            platform-tools platforms;android-${{
-            steps.android.outputs.compile-sdk }}
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.source.outputs.run_id }}
-          name: native-package-linux-gnu-x64-vulkan-${{ env.RELEASE_SHA }}
-          path: build/packages/native/docs-input
-      - name: Install packaged native artifact
-        run: >-
-          mise run install-native-package linux-gnu-x64-vulkan
-          build/packages/native/docs-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
-      # The live demo loads the browser modules that the CI run built and
-      # tested, from where the binding's build installs them.
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.source.outputs.run_id }}
-          name: typescript-addon-emscripten-wasm32-webgl-${{ env.RELEASE_SHA }}
-          path: bindings/typescript/native/build/emscripten-wasm32-webgl/install
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.source.outputs.run_id }}
-          name: typescript-addon-emscripten-wasm32-webgpu-${{ env.RELEASE_SHA }}
-          path: bindings/typescript/native/build/emscripten-wasm32-webgpu/install
-      - run: mise run //examples/browser:build
-      - run: mise run //docs:build
-        env:
-          MISE_TASK_SKIP: "//:build"
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: docs/dist
-
-  deploy-docs:
-    name: Deploy Docs Pages
-    needs:
-      - docs
-    runs-on: blacksmith-2vcpu-ubuntu-2404
-    timeout-minutes: 10
-    permissions:
-      pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      pages: write
+    uses: ./.github/workflows/_docs-pages.yml
+    with:
+      run_id: ${{ needs.source.outputs.run_id }}
+      sha: ${{ needs.source.outputs.sha }}
+      version: ${{ needs.source.outputs.version }}

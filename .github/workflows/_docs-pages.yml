@@ -1,0 +1,102 @@
+name: "↳ Docs Pages"
+
+on:
+  workflow_call:
+    inputs:
+      run_id:
+        description: Successful main CI run that built the commit's artifacts
+        required: true
+        type: string
+      sha:
+        description: Commit whose docs to build
+        required: true
+        type: string
+      version:
+        description:
+          Release version that the pages quote; the latest release tag's if
+          empty
+        default: ""
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Docs Pages
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+    env:
+      RELEASE_SHA: ${{ inputs.sha }}
+      DOCS_VERSION: ${{ inputs.version }}
+    steps:
+      # Without a version, the pages quote the latest release tag's.
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-tags: true
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - name: Read the Android compile SDK
+        id: android
+        shell: bash
+        run: |
+          sdk="$(sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)" *$/\1/p' gradle/libs.versions.toml)"
+          test -n "$sdk" || { echo "android-compileSdk missing from gradle/libs.versions.toml" >&2; exit 1; }
+          echo "compile-sdk=$sdk" >> "$GITHUB_OUTPUT"
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages:
+            platform-tools platforms;android-${{
+            steps.android.outputs.compile-sdk }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          name: native-package-linux-gnu-x64-vulkan-${{ env.RELEASE_SHA }}
+          path: build/packages/native/docs-input
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package linux-gnu-x64-vulkan
+          build/packages/native/docs-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
+      # The live demo loads the browser modules that the CI run built and
+      # tested, from where the binding's build installs them.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          name: typescript-addon-emscripten-wasm32-webgl-${{ env.RELEASE_SHA }}
+          path: bindings/typescript/native/build/emscripten-wasm32-webgl/install
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          name: typescript-addon-emscripten-wasm32-webgpu-${{ env.RELEASE_SHA }}
+          path: bindings/typescript/native/build/emscripten-wasm32-webgpu/install
+      - run: mise run //examples/browser:build
+      - run: mise run //docs:build
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/dist
+
+  deploy:
+    name: Deploy Docs Pages
+    needs:
+      - build
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

@@ -378,6 +378,29 @@ run = "pnpm dlx actions-up"
 description = "Prepare native package assets for a tagged release."
 run = 'python3 tools/release/native_package_release.py "$@"'
 
+[tasks."go-native:release"]
+description = "Write a release's Go preset modules beside its native archives, as release assets."
+usage = '''
+arg "<release_dir>" help="The release's assets, with SHA256SUMS"
+arg "<tag>" help="The release tag"
+arg "<sha>" help="The tagged commit, whose time the modules carry"
+'''
+run = 'python3 tools/release/go_native_modules.py release "$usage_release_dir" "$usage_tag" "$usage_sha"'
+
+[tasks."go-native:proxy"]
+description = "Write the Go preset modules' proxy site from the release tags."
+usage = 'arg "[out]" default="build/go-native-proxy"'
+run = 'python3 tools/release/go_native_modules.py site "$usage_out"'
+
+[tasks."go-native:deploy-proxy"]
+description = "Deploy the Go preset modules' proxy site to its Cloudflare Pages branch."
+tools = { "npm:wrangler" = "{{vars.wrangler_version}}" }
+usage = 'arg "[out]" default="build/go-native-proxy"'
+run = '''
+test -f "$usage_out/_redirects"
+wrangler pages deploy "$usage_out" --project-name=maplibre-native-ffi --branch=go
+'''
+
 [tasks."ci:release-version"]
 description = "Validate a release tag, or print the next release version."
 run = 'python3 tools/release/release_version.py "$@"'
