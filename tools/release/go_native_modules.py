@@ -259,9 +259,24 @@ def write_release(
     return paths
 
 
-def released_versions(repository: pathlib.Path = ROOT) -> dict[str, list[str]]:
-    """Each preset's versions in release order, from the release tags whose
-    commits have preset modules."""
+def published_tags() -> set[str]:
+    """The tags of the published GitHub releases. A release publishes only once
+    its assets are verified, so a tag whose release failed or is still running
+    has none."""
+    releases = subprocess.run(
+        ["gh", "release", "list", "--limit", "1000", "--json", "tagName,isDraft"],
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout
+    return {r["tagName"] for r in json.loads(releases) if not r["isDraft"]}
+
+
+def released_versions(
+    published: set[str], repository: pathlib.Path = ROOT
+) -> dict[str, list[str]]:
+    """Each preset's versions in release order, from the published release tags
+    whose commits have preset modules."""
     tags = subprocess.run(
         ["git", "tag", "--list", "v*"],
         cwd=repository,
@@ -269,6 +284,7 @@ def released_versions(repository: pathlib.Path = ROOT) -> dict[str, list[str]]:
         text=True,
         capture_output=True,
     ).stdout.split()
+    tags = [tag for tag in tags if tag in published]
     versions: dict[str, list[str]] = {}
     for tag in sorted(tags, key=lambda tag: parse_tag(tag)[0]):
         shown = subprocess.run(
@@ -301,7 +317,9 @@ def redirects() -> str:
     )
 
 
-def write_site(out: pathlib.Path, repository: pathlib.Path = ROOT) -> None:
+def write_site(
+    out: pathlib.Path, published: set[str], repository: pathlib.Path = ROOT
+) -> None:
     """Writes the proxy's Cloudflare Pages site: each preset's version list,
     and the redirects to each version's files."""
     if out.exists():
@@ -311,7 +329,7 @@ def write_site(out: pathlib.Path, repository: pathlib.Path = ROOT) -> None:
     # Without a 404 page, Pages answers a missing path with its index, but the
     # go command needs a 404 for what the proxy lacks, such as @latest.
     (out / "404.html").write_text("Not found\n", encoding="utf-8")
-    for preset, versions in released_versions(repository).items():
+    for preset, versions in released_versions(published, repository).items():
         directory = out / module_path(preset) / "@v"
         directory.mkdir(parents=True)
         (directory / "list").write_text("".join(f"{v}\n" for v in versions))
@@ -360,7 +378,7 @@ def main(arguments: list[str] | None = None) -> int:
         )
         print(f"Wrote {len(paths)} Go module files for {version}")
     else:
-        write_site(args.out)
+        write_site(args.out, published_tags())
         print(f"Wrote the Go module proxy to {args.out}")
     return 0
 

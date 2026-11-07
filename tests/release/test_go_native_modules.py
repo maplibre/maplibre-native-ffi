@@ -218,9 +218,15 @@ class GoNativeModulesTest(unittest.TestCase):
         release("v0.202611.0", ["linux-gnu-x64-vulkan"])
         release("v0.202611.10", ["linux-gnu-x64-vulkan", "macos-arm64-metal"])
         release("v0.202611.9", ["linux-gnu-x64-vulkan"])
+        # Its release has not published, so its files are not out yet.
+        release("v0.202611.11", ["linux-gnu-x64-vulkan"])
         out = self.directory / "site"
 
-        go.write_site(out, repository)
+        go.write_site(
+            out,
+            {"v0.202610.3", "v0.202611.0", "v0.202611.9", "v0.202611.10"},
+            repository,
+        )
 
         self.assertEqual((out / "_redirects").read_text(), go.redirects())
         self.assertEqual(

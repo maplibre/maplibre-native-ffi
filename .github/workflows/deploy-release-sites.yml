@@ -2,7 +2,7 @@ name: Deploy release sites
 
 # A release deploys its docs and the Go module proxy. When it could not, this
 # deploys them from main: the docs quote the latest release tag's version, and
-# the proxy lists every release tag's modules.
+# the proxy lists every published release's modules.
 on:
   workflow_dispatch:
     inputs:

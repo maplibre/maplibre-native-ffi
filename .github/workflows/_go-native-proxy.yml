@@ -39,7 +39,11 @@ jobs:
         with:
           cache: false
           install_args: python node
+      # The proxy lists only the releases that published.
       - run: mise run --no-deps go-native:proxy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
       - name: Deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
