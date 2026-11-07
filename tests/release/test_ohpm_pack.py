@@ -88,6 +88,10 @@ class OhpmPackTest(unittest.TestCase):
                         module["app"]["minAPIVersion"], manifest["compatibleSdkVersion"]
                     )
                     module_names.add(module["module"]["name"])
+                    # OHPM rejects a package whose README has no line that
+                    # installs it.
+                    readme = archive.extractfile("package/README.md").read().decode()
+                    self.assertIn(f"ohpm install @maplibre/{name}", readme.splitlines())
                     files = archive.getnames()
                     if name == "native-ffi":
                         self.assertIn("package/index.js", files)

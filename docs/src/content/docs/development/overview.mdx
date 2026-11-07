@@ -187,4 +187,14 @@ signed, annotated tag on a `main` commit whose CI passed. Its message is
 
 Kotlin snapshots publish to Maven Central from `main` daily. To publish one now,
 run the Publish snapshots workflow. Before a new PyPI distribution's first
-release, register its pending trusted publisher on PyPI.
+release, register its pending trusted publisher on PyPI. npm accepts a trusted
+publisher only for a package that exists, so publish a new npm package's first
+version by hand with a granular token. Then, from an interactive `npm login`
+session, since npm refuses trust changes from tokens that bypass 2FA, run
+`npm trust github <package> --repo maplibre/maplibre-native-ffi --file release.yml --env npm --allow-publish`.
+
+A release deploys the docs to GitHub Pages and the Go preset modules' proxy to
+the `go` branch of the Cloudflare Pages project. If either deploy didn't run,
+run the Deploy release sites workflow on `main`. Its docs quote the latest
+release tag's version. `mise run go-native:proxy` writes the proxy's site
+locally, to `build/go-native-proxy`.

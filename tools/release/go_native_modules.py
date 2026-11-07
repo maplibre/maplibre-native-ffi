@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """Packages a release's native archives as Go modules, one per preset, and
-publishes them through the Go module proxy protocol.
+writes the module proxy that serves them.
 
-Each docs page at a preset module's path names this repository's release
-downloads under `go/` as the module's proxy. A preset's GitHub release, tagged
-`go/<module>/@v`, holds the files that the go command fetches from
-`<proxy>/<module>/@v/`: `list`, and each version's `.info`, `.mod`, and `.zip`.
+Each docs page at a preset module's path names the proxy, a Cloudflare Pages
+site, as the module's source. The go command fetches `<proxy>/<module>/@v/list`,
+which the site holds, and each version's `.info`, `.mod`, and `.zip`, which the
+site redirects to assets of the version's GitHub release. A published release
+is immutable, so the native release job adds these assets to the draft release
+before it publishes it.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import io
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -63,13 +67,22 @@ GOARCH = {
 }
 
 
+PROXY_FILES = ("info", "mod", "zip")
+RELEASE_DOWNLOAD_URL = (
+    "https://github.com/maplibre/maplibre-native-ffi/releases/download"
+)
+# A release asset is named for the preset and its file in the proxy. The prefix
+# keeps the files apart from the release's native archives.
+ASSET_NAME = "go-native-{preset}-{file}"
+# The versions whose files are not in their own release: the tag of the release
+# that holds them, and its asset names. v0.202611.0 was published before its
+# files could join it, and a published release is immutable, so its files are
+# in a release of their own, named without the prefix.
+EXCEPTIONS = {"v0.202611.0": ("go-native/v0.202611.0", "{preset}-{file}")}
+
+
 def module_path(preset: str) -> str:
     return f"{MODULE_PREFIX}/{preset}"
-
-
-def proxy_tag(preset: str) -> str:
-    """The tag of the release that serves the preset's module."""
-    return f"go/{module_path(preset)}/@v"
 
 
 def presets(root: pathlib.Path = ROOT) -> list[str]:
@@ -214,64 +227,94 @@ def write_proxy(
     (directory / "list").write_text(f"{version}\n")
 
 
-def versions_list(existing: str, version: str) -> str:
-    versions = {line for line in existing.split() if line} | {version}
-    return "".join(
-        f"{v}\n"
-        for v in sorted(versions, key=lambda v: parse_version(v.removeprefix("v")))
-    )
-
-
-def gh(*arguments: str, check: bool = True, **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(["gh", *arguments], check=check, text=True, **kwargs)
-
-
-def publish_preset(
-    preset: str, version: str, sha: str, files: dict[str, bytes]
-) -> None:
-    """Uploads a version to the preset's release, creating the release first
-    if needed. A rerun replaces files with the same contents."""
-    tag = proxy_tag(preset)
-    if gh("release", "view", tag, check=False, capture_output=True).returncode:
-        gh(
-            "release",
-            "create",
-            tag,
-            "--target",
-            sha,
-            "--latest=false",
-            "--title",
-            f"Go module {module_path(preset)}",
-            "--notes",
-            f"Serves the Go module `{module_path(preset)}` to the go command. "
-            "Its versions follow the MapLibre Native FFI releases.",
-        )
-    listed = gh(
-        "release",
-        "download",
-        tag,
-        "--pattern",
-        "list",
-        "--output",
-        "-",
-        check=False,
-        capture_output=True,
-    )
-    with tempfile.TemporaryDirectory() as temporary:
-        paths = []
-        for name, content in {
-            **files,
-            "list": versions_list(
-                listed.stdout if listed.returncode == 0 else "", version
-            ).encode(),
-        }.items():
-            path = pathlib.Path(temporary, name)
+def write_release(
+    release_dir: pathlib.Path,
+    version: str,
+    time: str,
+    presets: list[str],
+    root: pathlib.Path = ROOT,
+) -> list[pathlib.Path]:
+    """Writes each preset's module files beside its archive as release assets,
+    and lists them in the release's SHA256SUMS."""
+    paths = []
+    for preset in presets:
+        archive = release_dir / f"{ARCHIVE_PREFIX}{preset}{ARCHIVE_SUFFIX}"
+        _, files = build(archive, version, time, root)
+        for name, content in files.items():
+            path = release_dir / ASSET_NAME.format(preset=preset, file=name)
             path.write_bytes(content)
-            paths.append(str(path))
-        # The list goes last, so the go command finds a version only once its
-        # files are in place.
-        gh("release", "upload", tag, "--clobber", *paths[:-1])
-        gh("release", "upload", tag, "--clobber", paths[-1])
+            paths.append(path)
+    checksums = release_dir / "SHA256SUMS"
+    names = {path.name for path in paths}
+    lines = [
+        line
+        for line in checksums.read_text(encoding="utf-8").splitlines()
+        if line.partition("  ")[2] not in names
+    ]
+    lines += [
+        f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}"
+        for path in paths
+    ]
+    checksums.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return paths
+
+
+def released_versions(repository: pathlib.Path = ROOT) -> dict[str, list[str]]:
+    """Each preset's versions in release order, from the release tags whose
+    commits have preset modules."""
+    tags = subprocess.run(
+        ["git", "tag", "--list", "v*"],
+        cwd=repository,
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.split()
+    versions: dict[str, list[str]] = {}
+    for tag in sorted(tags, key=lambda tag: parse_tag(tag)[0]):
+        shown = subprocess.run(
+            ["git", "show", f"{tag}:{PRESETS.as_posix()}"],
+            # A release before the preset modules has no presets.json.
+            check=False,
+            cwd=repository,
+            text=True,
+            capture_output=True,
+        )
+        if shown.returncode == 0:
+            for preset in json.loads(shown.stdout):
+                versions.setdefault(preset, []).append(tag)
+    return versions
+
+
+def redirects() -> str:
+    """Cloudflare Pages redirects from each module file's path in the proxy to
+    its release asset. Pages applies the first rule that matches, so each
+    exception comes before the rule for the versions that their tags name."""
+    rules = [
+        *((version, *release) for version, release in EXCEPTIONS.items()),
+        (":version", ":version", ASSET_NAME),
+    ]
+    return "".join(
+        f"/{MODULE_PREFIX}/:preset/@v/{version}.{file} {RELEASE_DOWNLOAD_URL}/"
+        f"{tag}/{name.format(preset=':preset', file=f'{version}.{file}')} 302\n"
+        for version, tag, name in rules
+        for file in PROXY_FILES
+    )
+
+
+def write_site(out: pathlib.Path, repository: pathlib.Path = ROOT) -> None:
+    """Writes the proxy's Cloudflare Pages site: each preset's version list,
+    and the redirects to each version's files."""
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
+    (out / "_redirects").write_text(redirects(), encoding="utf-8")
+    # Without a 404 page, Pages answers a missing path with its index, but the
+    # go command needs a 404 for what the proxy lacks, such as @latest.
+    (out / "404.html").write_text("Not found\n", encoding="utf-8")
+    for preset, versions in released_versions(repository).items():
+        directory = out / module_path(preset) / "@v"
+        directory.mkdir(parents=True)
+        (directory / "list").write_text("".join(f"{v}\n" for v in versions))
 
 
 def commit_time(sha: str) -> str:
@@ -295,26 +338,30 @@ def main(arguments: list[str] | None = None) -> int:
     build_parser.add_argument("archive", type=pathlib.Path)
     build_parser.add_argument("version")
     build_parser.add_argument("out", type=pathlib.Path)
-    publish_parser = commands.add_parser(
-        "publish", help="Publish every preset's module for a release"
+    release_parser = commands.add_parser(
+        "release", help="Write every preset's module files as release assets"
     )
-    publish_parser.add_argument("tag")
-    publish_parser.add_argument("sha")
-    publish_parser.add_argument("assets", type=pathlib.Path)
+    release_parser.add_argument("release_dir", type=pathlib.Path)
+    release_parser.add_argument("tag")
+    release_parser.add_argument("sha")
+    site_parser = commands.add_parser(
+        "site", help="Write the module proxy's site from the release tags"
+    )
+    site_parser.add_argument("out", type=pathlib.Path)
     args = parser.parse_args(arguments)
 
     if args.command == "build":
         preset, files = build(args.archive, args.version, "2026-01-01T00:00:00Z")
         write_proxy(args.out, preset, args.version, files)
-        return 0
-
-    version = "v" + parse_tag(args.tag)[1]
-    time = commit_time(args.sha)
-    for preset in presets():
-        archive = args.assets / f"{ARCHIVE_PREFIX}{preset}{ARCHIVE_SUFFIX}"
-        _, files = build(archive, version, time)
-        publish_preset(preset, version, args.sha, files)
-        print(f"Published {module_path(preset)}@{version}")
+    elif args.command == "release":
+        version = "v" + parse_tag(args.tag)[1]
+        paths = write_release(
+            args.release_dir, version, commit_time(args.sha), presets()
+        )
+        print(f"Wrote {len(paths)} Go module files for {version}")
+    else:
+        write_site(args.out)
+        print(f"Wrote the Go module proxy to {args.out}")
     return 0
 
 

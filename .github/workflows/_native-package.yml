@@ -116,6 +116,12 @@ jobs:
         run: >-
           mise run --no-deps ci:prepare-native-package
           build/packages/native/release "$PUBLISH_VERSION" --sign-apple-sdk
+      # The Go module proxy redirects to these files, so they join the release
+      # before it publishes and becomes immutable.
+      - name: Prepare the Go preset modules
+        run: >-
+          mise run --no-deps go-native:release build/packages/native/release
+          "$PUBLISH_TAG" "$PUBLISH_SHA"
       - name: Attest the release assets
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -125,6 +131,7 @@ jobs:
             build/packages/native/release/MaplibreNativeC.xcframework.zip
             build/packages/native/release/*.artifactbundle.zip
             build/packages/native/release/maplibre-native-c-artifacts.json
+            build/packages/native/release/go-native-*
             build/packages/native/release/SHA256SUMS
       # A tagged release remains a draft until every uploaded asset is verified.
       - name: Upload the release assets
@@ -145,6 +152,7 @@ jobs:
             build/packages/native/release/MaplibreNativeC.xcframework.zip
             build/packages/native/release/*.artifactbundle.zip
             build/packages/native/release/maplibre-native-c-artifacts.json
+            build/packages/native/release/go-native-*
       - name: Upload the checksums
         env:
           GH_TOKEN: ${{ github.token }}
@@ -169,6 +177,7 @@ jobs:
           assets+=(build/packages/native/release/MaplibreNativeC.xcframework.zip)
           assets+=(build/packages/native/release/*.artifactbundle.zip)
           assets+=(build/packages/native/release/maplibre-native-c-artifacts.json)
+          assets+=(build/packages/native/release/go-native-*)
           assets+=(build/packages/native/release/SHA256SUMS)
 
           for asset in "${assets[@]}"; do

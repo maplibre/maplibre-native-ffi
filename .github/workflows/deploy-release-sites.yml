@@ -1,0 +1,78 @@
+name: Deploy release sites
+
+# A release deploys its docs and the Go module proxy. When it could not, this
+# deploys them from main: the docs quote the latest release tag's version, and
+# the proxy lists every release tag's modules.
+on:
+  workflow_dispatch:
+    inputs:
+      docs:
+        description: Deploy the docs to GitHub Pages
+        type: boolean
+        default: true
+      go-proxy:
+        description: Deploy the Go module proxy to Cloudflare Pages
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    name: Source
+    if: github.ref == 'refs/heads/main'
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 240
+    permissions:
+      actions: write
+      contents: read
+    env:
+      MISE_NO_HOOKS: "1"
+    outputs:
+      run_id: ${{ steps.run.outputs.run_id }}
+    steps:
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+        with:
+          cache: false
+          install_args: python
+      # The docs install the commit's packaged native library and browser
+      # modules from its main CI run.
+      - name: Resolve the commit's CI run
+        id: run
+        if: inputs.docs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          echo "run_id=$(mise run --no-deps ci:resolve-publish-run "$GITHUB_SHA"
+          | jq -r .run_id)" >> "$GITHUB_OUTPUT"
+
+  docs:
+    name: Docs Pages
+    needs:
+      - source
+    if: inputs.docs
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      pages: write
+    uses: ./.github/workflows/_docs-pages.yml
+    with:
+      run_id: ${{ needs.source.outputs.run_id }}
+      sha: ${{ github.sha }}
+
+  go:
+    name: Go
+    needs:
+      - source
+    if: inputs.go-proxy
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_go-native-proxy.yml
+    secrets: inherit
+    with:
+      sha: ${{ github.sha }}

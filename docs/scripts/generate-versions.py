@@ -14,9 +14,8 @@ from tools.release.release_version import parse_version, release_tags
 
 
 def main() -> int:
-    version = os.environ.get("DOCS_VERSION")
-    if version is None:
-        version = latest_version()
+    # An empty version, as a workflow passes when it has none, means the latest.
+    version = os.environ.get("DOCS_VERSION") or latest_version()
     versions = {"version": str(parse_version(version))}
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(versions, indent=2) + "\n", encoding="utf-8")
