@@ -34,12 +34,15 @@ jobs:
       RELEASE_SHA: ${{ inputs.sha }}
       DOCS_VERSION: ${{ inputs.version }}
     steps:
-      # Without a version, the pages quote the latest release tag's.
       - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
         with:
           ref: ${{ env.RELEASE_SHA }}
-          fetch-tags: true
           persist-credentials: false
+      # Without a version, the pages quote the latest release tag's. A shallow
+      # checkout has only the tags on its own commit.
+      - name: Fetch the release tags
+        if: inputs.version == ''
+        run: git fetch --depth=1 --no-tags origin '+refs/tags/v*:refs/tags/v*'
       - uses: ./.github/actions/setup-ci-deps
       - name: Read the Android compile SDK
         id: android
