@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import pathlib
 import tempfile
@@ -103,6 +104,15 @@ class PythonReleaseTest(unittest.TestCase):
 
 
 class RuntimeWheelTest(unittest.TestCase):
+    def assert_record_lists_the_files(self, wheel: WheelFile) -> None:
+        # PyPI requires RECORD to list exactly the archive's files.
+        record = next(path for path in wheel.namelist() if path.endswith("/RECORD"))
+        rows = csv.reader(wheel.read(record).decode().splitlines())
+        self.assertEqual(
+            {row[0] for row in rows},
+            {path for path in wheel.namelist() if not path.endswith("/")},
+        )
+
     def test_mingw_and_msvc_wheels_with_the_same_tags_remain_distinct(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -162,6 +172,8 @@ class RuntimeWheelTest(unittest.TestCase):
                 f"{stem}.dist-info/licenses/icu.txt": b"ICU notices",
             }
             with WheelFile(wheel, "w") as source:
+                # uv writes directory entries, which RECORD must not list.
+                source.mkdir(f"{name}/")
                 for path, contents in files.items():
                     source.writestr(path, contents)
                 source.writestr(f"{stem}.dist-info/sboms/cargo.cdx.json", "{}")
@@ -179,9 +191,12 @@ class RuntimeWheelTest(unittest.TestCase):
             )
             inventory["metadata"]["component"]["properties"] = native["properties"]
             embed_wheel(wheel, inventory)
+            with WheelFile(wheel) as embedded:
+                self.assert_record_lists_the_files(embedded)
             for version in ("0.202610.3", "0.202611.0.dev202610291234"):
                 pack(inputs, output, version)
                 with WheelFile(output / f"{name}-{version}-{tags}.whl") as stamped:
+                    self.assert_record_lists_the_files(stamped)
                     self.assertEqual(
                         [path for path in stamped.namelist() if "/sboms/" in path],
                         [
