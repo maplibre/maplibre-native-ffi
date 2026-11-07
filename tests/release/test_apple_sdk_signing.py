@@ -26,6 +26,8 @@ class SigningIdentityTest(unittest.TestCase):
     def command(self, *args: str) -> str:
         if args[:2] == ("security", "find-identity"):
             return f'  1) {IDENTITY} "Apple Distribution: MapLibre ({TEAM})"\n'
+        if args == ("security", "list-keychains", "-d", "user"):
+            return '"login.keychain-db"\n"another keychain.keychain-db"\n'
         return ""
 
     def test_selects_the_publisher_and_deletes_its_keychain(self) -> None:
@@ -44,8 +46,20 @@ class SigningIdentityTest(unittest.TestCase):
             args for args in commands if args[:2] == ("codesign", "--verify")
         )
         self.assertIn(
-            f'anchor apple generic and certificate leaf[subject.OU] = "{TEAM}"',
+            f'=anchor apple generic and certificate leaf[subject.OU] = "{TEAM}"',
             verification,
+        )
+        self.assertEqual(
+            commands[-2],
+            (
+                "security",
+                "list-keychains",
+                "-d",
+                "user",
+                "-s",
+                "login.keychain-db",
+                "another keychain.keychain-db",
+            ),
         )
         self.assertEqual(commands[-1][:2], ("security", "delete-keychain"))
         self.assertFalse(pathlib.Path(commands[-1][-1]).parent.exists())

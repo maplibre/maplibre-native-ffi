@@ -8,6 +8,7 @@ import os
 import pathlib
 import re
 import secrets
+import shlex
 import subprocess
 import tempfile
 
@@ -27,7 +28,7 @@ def verify(bundle: pathlib.Path, team: str) -> None:
         "--strict",
         "--verbose=2",
         "-R",
-        f'anchor apple generic and certificate leaf[subject.OU] = "{team}"',
+        f'=anchor apple generic and certificate leaf[subject.OU] = "{team}"',
         str(bundle),
     )
 
@@ -58,8 +59,12 @@ def sign(bundle: pathlib.Path) -> None:
         certificate.chmod(0o600)
         keychain = str(work / "signing.keychain-db")
         password = secrets.token_urlsafe(32)
+        search_list = shlex.split(run("security", "list-keychains", "-d", "user"))
         run("security", "create-keychain", "-p", password, keychain)
         try:
+            run(
+                "security", "list-keychains", "-d", "user", "-s", *search_list, keychain
+            )
             run("security", "set-keychain-settings", "-lut", "3600", keychain)
             run("security", "unlock-keychain", "-p", password, keychain)
             run(
@@ -107,7 +112,10 @@ def sign(bundle: pathlib.Path) -> None:
             )
             verify(bundle, team)
         finally:
-            run("security", "delete-keychain", keychain)
+            try:
+                run("security", "list-keychains", "-d", "user", "-s", *search_list)
+            finally:
+                run("security", "delete-keychain", keychain)
 
 
 def sign_archive(archive: pathlib.Path) -> None:
