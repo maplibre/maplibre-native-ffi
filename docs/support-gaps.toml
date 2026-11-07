@@ -431,6 +431,15 @@ reason = "The API 30 x86 emulator aborts during Vulkan process cleanup with `Fai
 
 [[entry]]
 bindings = ["c"]
+platforms = ["freebsd"]
+archs = ["x64"]
+backends = ["opengl"]
+operations = ["test"]
+status = "blocked"
+reason = "Mesa 26.2's llvmpipe on FreeBSD 14.4 segfaults now and then in a rasterizer thread, which unlocks a mutex in freed memory, wherever a suite draws."
+
+[[entry]]
+bindings = ["c"]
 platforms = ["ios", "tvos", "visionos"]
 simulators = [false]
 operations = ["test"]
