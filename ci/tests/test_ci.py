@@ -195,7 +195,11 @@ class SuitesTest(unittest.TestCase):
             for arch in architectures
             for backend in ("egl", "vulkan")
         } | {"freebsd-x64-egl", "freebsd-x64-vulkan"}
-        build_only = {"linux-gnu-riscv64-egl", "linux-gnu-riscv64-vulkan"}
+        build_only = {
+            "linux-gnu-riscv64-egl",
+            "linux-gnu-riscv64-vulkan",
+            "freebsd-x64-egl",
+        }
         commands = {
             name: suite.task
             for name, target in self.targets.items()
