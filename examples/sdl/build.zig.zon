@@ -1,0 +1,21 @@
+// The example builds against the binding in this checkout. An app outside
+// this repository fetches the binding from a release instead; see the Zig
+// install guide.
+.{
+    .name = .maplibre_sdl_example,
+    .version = "0.0.0",
+    .fingerprint = 0x27d6377e6714980b,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{
+        .maplibre_native_ffi = .{ .path = "../.." },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=zig-0.17.x#cfac21f3199b2b02ce3fd7db652aa456421fe4ab",
+            .hash = "translate_c-2.0.2-Q_BUWvBNBwDnyehSiuAJmdFcMYHYGA-Jc3KiYdrV2Dqx",
+        },
+        .sdl = .{
+            .url = "git+https://github.com/castholm/SDL.git?ref=v0.6.1+3.4.20#ce475292f172d506468218f939ef607d9be5e083",
+            .hash = "sdl-0.6.1+3.4.20-SDL--rskqQH3W9l4AJX-kdZ93M9XuhsqLrUsd2fnUE_X",
+        },
+    },
+    .paths = .{ "build.zig", "build.zig.zon", "src" },
+}
