@@ -861,6 +861,89 @@ jobs:
           mise run --no-deps install-native-package windows-x64-vulkan
           build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
       - run: mise run //examples/wpf:build windows-x64-vulkan
+  # The SDL example builds against the archive that a target job built and
+  # tested, on each platform's own runner. It doesn't run the app.
+  sdl-linux:
+    name: example / sdl linux
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'sdl-linux')
+    env:
+      MISE_TASK_SKIP: //:build
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          gradle: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist
+      - run: >-
+          mise run --no-deps install-native-package linux-gnu-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
+      - run: mise run //examples/sdl:build linux-gnu-x64-vulkan
+  sdl-windows:
+    name: example / sdl windows
+    runs-on: blacksmith-4vcpu-windows-2025
+    timeout-minutes: 30
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'sdl-windows')
+    env:
+      MISE_TASK_SKIP: //:build
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          gradle: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-package-windows-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist
+      - run: >-
+          mise run --no-deps install-native-package windows-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
+      - run: mise run //examples/sdl:build windows-x64-vulkan
+  sdl-macos:
+    name: example / sdl macos
+    runs-on: blacksmith-6vcpu-macos-26
+    timeout-minutes: 30
+    needs:
+      - plan
+      - target
+    if: contains(fromJSON(needs.plan.outputs.jobs), 'sdl-macos')
+    env:
+      MISE_TASK_SKIP: //:build
+    steps:
+      - name: Check out repository
+        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          persist-credentials: false
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          gradle: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-package-macos-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist
+      - run: >-
+          mise run --no-deps install-native-package macos-arm64-metal
+          build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
+      - run: mise run //examples/sdl:build macos-arm64-metal
   # The ArkUI example builds against the OHPM packages packed from the addon
   # that a target job built and tested. It doesn't run the app.
   arkui-hap:
@@ -921,6 +1004,9 @@ jobs:
       - compose-android
       - gtk-linux
       - wpf-windows
+      - sdl-linux
+      - sdl-windows
+      - sdl-macos
       - arkui-hap
       - support-matrix
     steps:

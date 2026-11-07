@@ -1,0 +1,69 @@
+# The SDL example for Linux and FreeBSD on Wayland, Windows, and macOS. Run it
+# with `mise run //examples/sdl:run`, or on Linux, which builds the Windows
+# preset with the MSVC SDK and runs the app under Wine, with
+# `mise -E msvc run //examples/sdl:run windows-x64-vulkan`.
+
+# CI builds the app with this, without running it.
+[tasks.build]
+description = "Build the C library for a preset, then build the SDL example against its install."
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}" {
+  choices "linux-gnu-x64-vulkan" "linux-gnu-x64-egl" "linux-gnu-arm64-vulkan" "linux-gnu-arm64-egl" "windows-x64-vulkan" "windows-x64-wgl" "macos-arm64-metal" "macos-x64-metal"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+zig_args=(
+  --prefix "$MISE_MONOREPO_ROOT/build/$usage_preset/sdl-example"
+  -Doptimize=ReleaseSafe
+  -Dlocal-build="$install_dir"
+)
+# A Windows preset that builds on Linux compiles against the MSVC runtime and
+# the Windows SDK that `mise -E msvc install` lays out.
+if [[ "$usage_preset" == windows-* && "$(uname -s)" == Linux ]]; then
+  if [[ ! -d "${MLN_FFI_WINSYSROOT:-}/VC/Tools/MSVC" ]]; then
+    echo "Building a Windows preset on Linux needs the MSVC SDK; run with mise -E msvc." >&2
+    exit 2
+  fi
+  arch=$(jq -r '.platform.zigTarget | split("-")[0] | if . == "x86_64" then "x64" else "arm64" end' \
+    "$install_dir/share/maplibre-native-c/artifact.json")
+  msvc=("$MLN_FFI_WINSYSROOT"/VC/Tools/MSVC/*)
+  sdk_include=("$MLN_FFI_WINSYSROOT/Windows Kits/10/Include"/*)
+  sdk_lib="$MLN_FFI_WINSYSROOT/Windows Kits/10/Lib/$(basename "${sdk_include[0]}")"
+  libc_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/zig"
+  mkdir -p "$libc_dir"
+  libc="$libc_dir/msvc-libc"
+  libc_tmp=$(mktemp "$libc.XXXXXX")
+  {
+    printf 'include_dir=%s\n' "${sdk_include[0]}/ucrt"
+    printf 'sys_include_dir=%s\n' "${msvc[0]}/include"
+    printf 'crt_dir=%s\n' "$sdk_lib/ucrt/$arch"
+    printf 'msvc_lib_dir=%s\n' "${msvc[0]}/lib/$arch"
+    printf 'kernel32_lib_dir=%s\n' "$sdk_lib/um/$arch"
+    printf 'gcc_dir=\n'
+    printf 'darwin_sdk_dir=\n'
+  } > "$libc_tmp"
+  mv "$libc_tmp" "$libc"
+  zig_args+=(-Dtarget-libc="$libc")
+fi
+cd "$MISE_MONOREPO_ROOT/examples/sdl"
+zig build "${zig_args[@]}"
+'''
+
+[tasks.run]
+description = "Build the SDL example for a preset and run it, under Wine for Windows on Linux."
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}" {
+  choices "linux-gnu-x64-vulkan" "linux-gnu-x64-egl" "linux-gnu-arm64-vulkan" "linux-gnu-arm64-egl" "windows-x64-vulkan" "windows-x64-wgl" "macos-arm64-metal" "macos-x64-metal"
+}
+'''
+depends = [{ task = "build", args = ["{{usage.preset}}"] }]
+run = '''
+app="$MISE_MONOREPO_ROOT/build/$usage_preset/sdl-example/bin/maplibre-sdl-example"
+if [[ "$usage_preset" == windows-* && "$(uname -s)" == Linux ]]; then
+  # A timeout of 0 lets the app run until you close it.
+  MLN_FFI_DEVICE_TIMEOUT=0 exec "$MISE_MONOREPO_ROOT/scripts/run-wine-test.sh" "$app.exe"
+fi
+exec "$app"
+'''

@@ -84,6 +84,10 @@ labels:
           rules:
             - if: { files: ["bindings/dotnet/**", "examples/wpf/**"] }
               then: apply
+        binding:zig:
+          rules:
+            - if: { files: ["bindings/zig/**", "examples/sdl/**"] }
+              then: apply
       guidance: >-
         Only for work specific to this binding. Work that several bindings pick
         up alike, such as a C API addition that every binding exposes, doesn't
@@ -698,6 +702,20 @@ ci:
         - if:
             files:
               - examples/wpf/**
+          then: apply
+    sdl:
+      covers: >-
+        Builds the SDL example for Linux x64, Windows x64, and macOS, each on
+        its own runner, against the archives that the Linux x64 Vulkan, Windows
+        x64 Vulkan, and macOS ARM64 Metal targets built, so it runs those
+        targets. It runs no app. Catches what breaks the example's Zig or its
+        build against the Zig binding and SDL: changes to the example, and to
+        the Zig binding's build script and the render session, Wayland, Win32,
+        and Metal API that it calls.
+      rules:
+        - if:
+            files:
+              - examples/sdl/**
           then: apply
     ohpm:
       covers: >-

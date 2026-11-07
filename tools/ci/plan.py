@@ -154,6 +154,19 @@ JOBS = {
         "wpf",
         lambda target: target.preset == "windows-x64-vulkan",
     ),
+    # The SDL example builds against one archive per platform.
+    "sdl-linux": (
+        "sdl",
+        lambda target: target.preset == "linux-gnu-x64-vulkan",
+    ),
+    "sdl-windows": (
+        "sdl",
+        lambda target: target.preset == "windows-x64-vulkan",
+    ),
+    "sdl-macos": (
+        "sdl",
+        lambda target: target.preset == "macos-arm64-metal",
+    ),
     # The ArkUI example packs its HARs from one addon.
     "arkui-hap": ("arkui", lambda target: target.preset == "ohos-x64-egl"),
     "swift-package": (
