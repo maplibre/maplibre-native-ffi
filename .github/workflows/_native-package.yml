@@ -170,7 +170,7 @@ jobs:
           assets+=(build/packages/native/release/*.artifactbundle.zip)
           assets+=(build/packages/native/release/maplibre-native-c-artifacts.json)
           assets+=(build/packages/native/release/SHA256SUMS)
-          expected="$(printf '%s\n' "${assets[@]##*/}" | sort | jq -R . | jq -c -s .)"
+          expected="$(printf '%s\n' "${assets[@]##*/}" | jq -R . | jq -c -s 'sort')"
           actual="$(jq -c '[.assets[].name] | sort' <<<"$release")"
           if [[ "$actual" != "$expected" ]]; then
             echo "release assets do not match the prepared native package set" >&2
