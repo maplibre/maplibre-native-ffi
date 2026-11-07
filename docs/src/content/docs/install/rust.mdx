@@ -55,24 +55,6 @@ calling thread's JNI environment and an Android `Context`:
 unsafe { maplibre_native_ffi::init_android(jni_env, context)? };
 ```
 
-## Snapshots
-
-The crate from crates.io downloads the C library of its own release. A Git
-dependency has no release to download from, so a snapshot takes two steps.
-First, depend on the crate from Git at the `unstable-native-snapshot` tag, which
-points at the commit that the snapshot was built from:
-
-```toml title="Cargo.toml"
-[dependencies]
-maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", tag = "unstable-native-snapshot" }
-```
-
-Then download the C library archive for your target from the
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
-unpack it, and [use it as your own build](#use-your-own-build). Each snapshot
-replaces the previous one, so to move to a newer one, run `cargo update` and
-download its archive.
-
 ## Use your own build
 
 To link a C library that you built or downloaded, set

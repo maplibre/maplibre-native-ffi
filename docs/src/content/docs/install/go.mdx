@@ -71,16 +71,3 @@ On Windows, cgo links the C library with MSYS2's Clang: MINGW64 on x64, or
 CLANGARM64 on ARM64. Set `CC` to that environment's `bin/clang.exe` and
 `PKG_CONFIG` to its `bin/pkgconf.exe`. Put the C library's `bin` directory and
 the environment's `bin` directory on `PATH`.
-
-## Snapshots
-
-Take the module at the `unstable-native-snapshot` tag, which points at the
-commit that the snapshot was built from:
-
-```bash frame="terminal"
-go get maplibre.org/maplibre-native-ffi/bindings/go/maplibre@unstable-native-snapshot
-```
-
-Then download the C library archive for your preset from the
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
-unpack it, and [use it as your own build](#use-your-own-build).

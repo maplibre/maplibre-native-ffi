@@ -78,17 +78,6 @@ calling thread's JNI environment and an Android `Context`:
 try maplibre.initAndroid(jni_env, context, null);
 ```
 
-## Snapshots
-
-The
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
-publishes the same package, built from `main` daily. Run the same command again
-to move to a newer snapshot:
-
-```bash frame="terminal"
-zig fetch --save https://github.com/maplibre/maplibre-native-ffi/releases/download/unstable-native-snapshot/maplibre-native-ffi-zig.tar.gz
-```
-
 ## Use your own build
 
 To link a C library that you built, pass its install prefix to the dependency as

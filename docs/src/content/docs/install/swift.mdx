@@ -49,32 +49,3 @@ try initAndroid(
   jniEnv: NativePointer(bitPattern: jniEnv),
   context: NativePointer(bitPattern: context))
 ```
-
-## Snapshots
-
-Depend on this repository at `main`, and install the C library from the
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot).
-SwiftPM names the package after the repository:
-
-```swift title="Package.swift"
-.package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
-```
-
-```swift title="Package.swift"
-.product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi")
-```
-
-Point pkg-config at the C library before you build:
-
-```bash frame="terminal"
-export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
-```
-
-On Linux, add the prefix's `lib` directory to the rpath:
-
-```bash frame="terminal"
-swift build -Xlinker -rpath -Xlinker <prefix>/lib
-```
-
-On Windows, put the prefix's `bin` directory on `PATH`, or copy the DLLs in it
-next to the executable.

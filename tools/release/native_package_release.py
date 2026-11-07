@@ -129,8 +129,7 @@ def pkg_config_bytes(content: bytes, archive: pathlib.Path, version: str) -> byt
 def bundle_version(version: str) -> str:
     """The release version as an Apple bundle version.
 
-    A bundle version is one to three period-separated integers, so a snapshot
-    version such as 0.0.0-dev.202608070101 keeps its numeric prefix.
+    A bundle version is one to three period-separated integers.
     """
     match = re.match(r"\d+(\.\d+){0,2}", version)
     if match is None:
@@ -412,7 +411,6 @@ def tag_notes(repository: pathlib.Path, tag: str) -> str:
 
 def write_notes(
     release_dir: pathlib.Path,
-    channel: str,
     sha: str,
     version: str,
     repository: pathlib.Path,
@@ -422,14 +420,10 @@ def write_notes(
         f"[CI run]({required_env('CI_RUN_URL')})",
         f"[Publishing run]({workflow_url()})",
     ]
-    if channel == "snapshot":
-        published = required_env("PUBLISH_TIMESTAMP")
-        notes = f"Unstable native package snapshot, published {published}."
-    else:
-        tag = required_env("PUBLISH_TAG")
-        notes = tag_notes(repository, tag) or f"MapLibre Native FFI {version}."
-        previous_tag = required_env("PUBLISH_PREVIOUS_TAG")
-        links.insert(0, f"[Full changelog]({compare_url(previous_tag, tag)})")
+    tag = required_env("PUBLISH_TAG")
+    notes = tag_notes(repository, tag) or f"MapLibre Native FFI {version}."
+    previous_tag = required_env("PUBLISH_PREVIOUS_TAG")
+    links.insert(0, f"[Full changelog]({compare_url(previous_tag, tag)})")
     (release_dir / RELEASE_NOTES_NAME).write_text(
         f"{notes}\n\n{' · '.join(links)}\n", encoding="utf-8"
     )
@@ -437,14 +431,12 @@ def write_notes(
 
 def prepare_assets(
     release_dir: pathlib.Path,
-    channel: str,
     version: str,
     repository: pathlib.Path | None = None,
     *,
     sign_apple_sdk: bool = False,
 ) -> None:
-    if channel == "release":
-        parse_version(version)
+    parse_version(version)
     root = repository or pathlib.Path(required_env("MISE_MONOREPO_ROOT"))
     sha = required_env("PUBLISH_SHA")
     archives = native_archives(release_dir, package_presets(root))
@@ -496,7 +488,7 @@ def prepare_assets(
             for archive in archives
         },
     )
-    write_notes(release_dir, channel, sha, version, root)
+    write_notes(release_dir, sha, version, root)
     write_checksums(
         release_dir,
         [
@@ -512,7 +504,6 @@ def prepare_assets(
 
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("channel", choices=("snapshot", "release"))
     parser.add_argument("release_dir", type=pathlib.Path)
     parser.add_argument("version")
     parser.add_argument("--sign-apple-sdk", action="store_true")
@@ -520,7 +511,6 @@ def main(arguments: list[str] | None = None) -> int:
     args = parser.parse_args(arguments)
     prepare_assets(
         args.release_dir,
-        args.channel,
         args.version,
         sign_apple_sdk=args.sign_apple_sdk,
     )
