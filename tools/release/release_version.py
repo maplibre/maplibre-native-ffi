@@ -129,7 +129,7 @@ def next_release(
     repository: pathlib.Path | None = None,
     now: datetime.datetime | None = None,
 ) -> ReleaseVersion:
-    """The version the next release would take, which snapshots build toward."""
+    """The version the next release would take."""
     current = now or datetime.datetime.now(datetime.UTC)
     month = int(current.strftime("%Y%m"))
     latest = max(
