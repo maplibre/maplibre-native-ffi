@@ -3,7 +3,7 @@
 # repository tasks.
 
 monorepo_root = true
-min_version = "2026.10.24"
+min_version = "2026.11.3"
 
 [settings]
 lockfile = true
@@ -74,14 +74,14 @@ java_version = "zulu-25.38.109.0"
 ohos_sdk_version = "7.0"
 python_version = "3.15.2"
 swift_version = "6.4.2"
-wrangler_version = "4.156.0"
+wrangler_version = "4.158.0"
 
 [tools]
 # hk.pkl beside this config pins hk's Pkl package and executable together.
 "aqua:jdx/hk" = "{{ read_file(path='hk.pkl') | split(pat='/hk@') | nth(n=1) | split(pat='#') | first }}" # Linter orchestration
 "aqua:dprint/dprint" = "0.64.3" # Formatter orchestration
 "github:sargunv/jvl" = "2026.05.03" # JSON validator
-"github:jdx/jactionlint" = "2.4.0" # GH Actions linter
+"github:jdx/jactionlint" = "2.5.0" # GH Actions linter
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by jactionlint)
 "aqua:jqlang/jq" = "1.8.2" # Reads JSON in shell tasks, such as artifact descriptors
 "aqua:Kitware/CMake" = "4.4.5"
@@ -91,30 +91,30 @@ ninja = "1.13.2"
 # Go, which the Go binding uses too. devices-cli runs on Linux and
 # macOS only.
 "core:go" = "{{vars.go_version}}"
-"go:github.com/sargunv/devices-cli" = { version = "v0.0.0-20261029084046-1fb50144e197", os = [
+"go:github.com/sargunv/devices-cli" = { version = "v0.0.0-20261106003834-2ffe4364873f", os = [
   "linux",
   "macos",
 ] }
 sccache = "0.19.0"
 # The FreeBSD suites run in a FreeBSD virtual machine that this QEMU launcher
 # boots on a Linux host. See tools/devices/freebsd-host.
-"http:anyvm" = { version = "0.7.5", url = "https://github.com/anyvm-org/anyvm/releases/download/v{{ version }}/anyvm.py", checksum = "sha256:c192b299b9bf1b9f07b1d5e5b3977b518f8f24a9af9c20da259cdca22271d9f5", os = [
+"http:anyvm" = { version = "0.7.6", url = "https://github.com/anyvm-org/anyvm/releases/download/v{{ version }}/anyvm.py", checksum = "sha256:cf39a76729308a9cc891fc9bc9954caf0b80c833f51c71c4ed9c6e1e70f6e7be", os = [
   "linux",
 ] }
 
 "core:node" = "26.13.0"
-"aqua:pnpm/pnpm" = "12.16.1"
+"aqua:pnpm/pnpm" = "12.18.0"
 
 # dprint formats Dart with the SDK's `dart format`, and the Dart binding builds
 # and tests with this same install.
 "core:dart" = "{{vars.dart_version}}"
 
 "core:python" = "{{vars.python_version}}"
-"aqua:astral-sh/uv" = "0.13.6"
+"aqua:astral-sh/uv" = "0.13.7"
 
 # SwiftFormat is a standalone repository formatter and does not require the
 # Swift compiler.
-"github:nicklockwood/SwiftFormat" = { version = "0.64.4", no_app = true, rename_exe = "swiftformat" }
+"github:nicklockwood/SwiftFormat" = { version = "0.64.6", no_app = true, rename_exe = "swiftformat" }
 
 # The native CMake build compiles the Rust platform support library, so Rust is
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten

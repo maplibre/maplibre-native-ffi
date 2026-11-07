@@ -265,7 +265,8 @@ Future<Uri> _download(
   );
   try {
     for (final entry in TarDecoder().decodeBytes(
-      GZipDecoder().decodeBytes(archive),
+      GZipDecoder().decodeBytes(archive, throwOnError: true),
+      throwOnError: true,
     )) {
       if (entry.isFile) {
         File.fromUri(scratch.uri.resolve(entry.name))

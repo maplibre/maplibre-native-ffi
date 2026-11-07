@@ -2,9 +2,9 @@
 // Repository-wide tools are installed at the root. Language-specific steps
 // enter their binding's mise context and install that toolchain on demand.
 
-amends "package://github.com/jdx/hk/releases/download/v2.10.0/hk@2.10.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.11.1/hk@2.11.1#/Config.pkl"
 
-import "package://github.com/jdx/hk/releases/download/v2.10.0/hk@2.10.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.11.1/hk@2.11.1#/Builtins.pkl"
 
 steps {
   ["dprint"] = (Builtins.dprint) {
@@ -63,6 +63,7 @@ steps {
     exclude = List("third_party/**")
     check = "uv run --no-sync ruff check {{files}}"
     fix = "uv run --no-sync ruff check --fix {{files}}"
+    diagnostic_format = "rustc"
   }
   ["ty"] {
     glob = List(
@@ -71,6 +72,7 @@ steps {
       "docs/scripts/**/*.py",
     )
     check = "uv run --no-sync ty check --error-on-warning {{files}}"
+    diagnostic_format = "rustc"
   }
   // The generator ignores no diagnostic. The Python emitters wait for their
   // rewrite onto the safe Rust crate.
@@ -78,5 +80,6 @@ steps {
     glob = List("tools/bindgen/**/*.py")
     exclude = List("tools/bindgen/emitters/python*.py")
     check = "uv run --no-sync ty check --error-on-warning {{files}}"
+    diagnostic_format = "rustc"
   }
 }
