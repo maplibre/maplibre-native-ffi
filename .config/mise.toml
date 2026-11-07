@@ -375,7 +375,7 @@ description = "Update and pin GitHub Actions steps."
 run = "pnpm dlx actions-up"
 
 [tasks."ci:prepare-native-package"]
-description = "Prepare native package snapshot or tagged release assets."
+description = "Prepare native package assets for a tagged release."
 run = 'python3 tools/release/native_package_release.py "$@"'
 
 [tasks."ci:release-version"]

@@ -44,33 +44,3 @@ calling thread's JNI environment and an Android `Context`:
 ```python title="main.py"
 maplibre_native_ffi.api.init_android(jni_env, context)
 ```
-
-## Snapshots
-
-Install both packages from the
-[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot).
-A snapshot is a development release of the next version, so pip needs `--pre`:
-
-```bash frame="terminal"
-pip install --pre maplibre-native-ffi maplibre-native-ffi-runtime-vulkan --find-links https://github.com/maplibre/maplibre-native-ffi/releases/expanded_assets/unstable-native-snapshot
-```
-
-With uv, name the snapshot release as a flat index for both packages:
-
-```toml title="pyproject.toml"
-[project]
-dependencies = ["maplibre-native-ffi", "maplibre-native-ffi-runtime-vulkan"]
-
-[[tool.uv.index]]
-name = "maplibre-snapshots"
-url = "https://github.com/maplibre/maplibre-native-ffi/releases/expanded_assets/unstable-native-snapshot"
-format = "flat"
-explicit = true
-
-[tool.uv.sources]
-maplibre-native-ffi = { index = "maplibre-snapshots" }
-maplibre-native-ffi-runtime-vulkan = { index = "maplibre-snapshots" }
-```
-
-The snapshot release holds only the latest snapshot, so a lockfile that names an
-older one fails to install once a newer one replaces it.

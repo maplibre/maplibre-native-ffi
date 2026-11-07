@@ -12,11 +12,6 @@ on:
         default: ""
         required: false
         type: string
-      release:
-        description: Publish an immutable tagged release
-        default: false
-        required: false
-        type: boolean
       run_id:
         description: CI run that produced the native packages
         required: true
@@ -51,7 +46,6 @@ jobs:
     env:
       CI_RUN_URL: ${{ inputs.ci_run_url }}
       MISE_NO_HOOKS: "1"
-      PUBLISH_CHANNEL: ${{ inputs.release && 'release' || 'snapshot' }}
       PUBLISH_SHA: ${{ inputs.sha }}
       PUBLISH_TAG: ${{ inputs.tag }}
       PUBLISH_VERSION: ${{ inputs.version }}
@@ -67,7 +61,6 @@ jobs:
           # Zig hashes each archive for the Zig package's manifest.
           install_args: core:zig python
       - name: Refuse an existing published release
-        if: ${{ inputs.release }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -102,14 +95,9 @@ jobs:
       # The release notes are the tag's message, so the tag object must be
       # local, not only the commit it names.
       - name: Fetch the release tag
-        if: ${{ inputs.release }}
         run: >-
           git fetch --quiet --force origin
           "refs/tags/${PUBLISH_TAG}:refs/tags/${PUBLISH_TAG}"
-      - name: Record the publish time
-        id: publish
-        run:
-          echo "timestamp=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
       - name: Prepare assets
         env:
           APPLE_SDK_TEAM_ID: ${{ vars.APPLE_SDK_TEAM_ID }}
@@ -118,9 +106,8 @@ jobs:
           APPLE_SDK_CERTIFICATE_PASSWORD:
             ${{ secrets.APPLE_SDK_CERTIFICATE_PASSWORD }}
           PUBLISH_PREVIOUS_TAG: ${{ inputs.previous_tag }}
-          PUBLISH_TIMESTAMP: ${{ steps.publish.outputs.timestamp }}
         run: >-
-          mise run --no-deps ci:prepare-native-package "$PUBLISH_CHANNEL"
+          mise run --no-deps ci:prepare-native-package
           build/packages/native/release "$PUBLISH_VERSION" --sign-apple-sdk
       - name: Attest the release assets
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -132,59 +119,16 @@ jobs:
             build/packages/native/release/*.artifactbundle.zip
             build/packages/native/release/maplibre-native-c-artifacts.json
             build/packages/native/release/SHA256SUMS
-      - name: Move the snapshot tag
-        if: ${{ !inputs.release }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${PUBLISH_TAG}" >/dev/null 2>&1; then
-            gh api \
-              --method PATCH \
-              "repos/${GITHUB_REPOSITORY}/git/refs/tags/${PUBLISH_TAG}" \
-              -f sha="$PUBLISH_SHA" \
-              -F force=true >/dev/null
-          else
-            gh api \
-              --method POST \
-              "repos/${GITHUB_REPOSITORY}/git/refs" \
-              -f ref="refs/tags/${PUBLISH_TAG}" \
-              -f sha="$PUBLISH_SHA" >/dev/null
-          fi
-      # The snapshot release also holds the binding packages, which their own
-      # jobs replace. SHA256SUMS lists every other native asset, so the one on
-      # the release names the native assets that this publish replaces. It
-      # uploads last, so a publish that fails before then leaves that list for
-      # its rerun.
-      - name: Record the replaced snapshot assets
-        if: ${{ !inputs.release }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          replaced=build/packages/native/replaced-assets
-          echo SHA256SUMS >"$replaced"
-          # The first snapshot finds no release, and a publish that failed while
-          # replacing SHA256SUMS leaves none; either way no earlier list exists.
-          assets="$(gh release view "$PUBLISH_TAG" --json assets --jq '.assets[].name' 2>/dev/null || true)"
-          if grep -qxF SHA256SUMS <<<"$assets"; then
-            gh release download "$PUBLISH_TAG" --pattern SHA256SUMS --output - |
-              cut -d ' ' -f 3- >>"$replaced"
-          fi
       # A tagged release remains a draft until every uploaded asset is verified.
       - name: Upload the release assets
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ inputs.tag }}
           target_commitish: ${{ inputs.sha }}
-          name:
-            ${{ inputs.release && inputs.tag || format('Native package snapshot
-            {0}', steps.publish.outputs.timestamp) }}
+          name: ${{ inputs.tag }}
           body_path: build/packages/native/release/RELEASE_NOTES.md
-          draft: ${{ inputs.release }}
-          prerelease: ${{ !inputs.release }}
+          draft: true
+          prerelease: false
           make_latest: false
           overwrite_files: true
           fail_on_unmatched_files: true
@@ -194,20 +138,6 @@ jobs:
             build/packages/native/release/MaplibreNativeC.xcframework.zip
             build/packages/native/release/*.artifactbundle.zip
             build/packages/native/release/maplibre-native-c-artifacts.json
-      - name: Remove stale snapshot assets
-        if: ${{ !inputs.release }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          release="$(gh release view "$PUBLISH_TAG" --json assets)"
-          while IFS= read -r name; do
-            if [[ ! -f "build/packages/native/release/$name" ]] &&
-              grep -qxF "$name" build/packages/native/replaced-assets; then
-              gh release delete-asset "$PUBLISH_TAG" "$name" --yes
-            fi
-          done < <(jq -r '.assets[].name' <<<"$release")
       - name: Upload the checksums
         env:
           GH_TOKEN: ${{ github.token }}
@@ -216,8 +146,6 @@ jobs:
           build/packages/native/release/SHA256SUMS --clobber
       - name: Verify the release assets
         env:
-          EXPECTED_DRAFT: ${{ inputs.release }}
-          EXPECTED_PRERELEASE: ${{ !inputs.release }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -226,12 +154,8 @@ jobs:
             gh release view "$PUBLISH_TAG" \
               --json assets,isDraft,isPrerelease,tagName
           )"
-          jq -e \
-            --arg tag "$PUBLISH_TAG" \
-            --argjson draft "$EXPECTED_DRAFT" \
-            --argjson prerelease "$EXPECTED_PRERELEASE" \
-            '.isDraft == $draft and .isPrerelease == $prerelease and
-             .tagName == $tag' \
+          jq -e --arg tag "$PUBLISH_TAG" \
+            '.isDraft and (.isPrerelease | not) and .tagName == $tag' \
             <<<"$release" >/dev/null
 
           assets=(build/packages/native/release/*.tar.gz build/packages/native/release/*.cdx.json)
@@ -239,16 +163,13 @@ jobs:
           assets+=(build/packages/native/release/*.artifactbundle.zip)
           assets+=(build/packages/native/release/maplibre-native-c-artifacts.json)
           assets+=(build/packages/native/release/SHA256SUMS)
-          # The binding jobs own the snapshot release's other assets.
-          if [[ "$PUBLISH_CHANNEL" == release ]]; then
-            expected="$(printf '%s\n' "${assets[@]##*/}" | sort | jq -R . | jq -c -s .)"
-            actual="$(jq -c '[.assets[].name] | sort' <<<"$release")"
-            if [[ "$actual" != "$expected" ]]; then
-              echo "release assets do not match the prepared native package set" >&2
-              jq -n --argjson expected "$expected" --argjson actual "$actual" \
-                '{expected: $expected, actual: $actual}' >&2
-              exit 1
-            fi
+          expected="$(printf '%s\n' "${assets[@]##*/}" | sort | jq -R . | jq -c -s .)"
+          actual="$(jq -c '[.assets[].name] | sort' <<<"$release")"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "release assets do not match the prepared native package set" >&2
+            jq -n --argjson expected "$expected" --argjson actual "$actual" \
+              '{expected: $expected, actual: $actual}' >&2
+            exit 1
           fi
 
           for asset in "${assets[@]}"; do
@@ -275,7 +196,6 @@ jobs:
             exit 1
           fi
       - name: Publish the verified tagged release
-        if: ${{ inputs.release }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

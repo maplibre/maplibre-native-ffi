@@ -346,7 +346,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         return archive
 
     def prepare(
-        self, channel: str, version: str | None = None, *, sign_apple_sdk: bool = False
+        self, version: str | None = None, *, sign_apple_sdk: bool = False
     ) -> None:
         environment = {
             "CI_RUN_URL": "https://github.com/maplibre/repo/actions/runs/1",
@@ -355,20 +355,18 @@ class NativePackageReleaseTest(unittest.TestCase):
             "PUBLISH_PREVIOUS_TAG": "v0.202607.0",
             "PUBLISH_SHA": self.sha,
             "PUBLISH_TAG": f"v{self.version}",
-            "PUBLISH_TIMESTAMP": "2026-08-07 01:01 UTC",
         }
         with mock.patch.dict(os.environ, environment, clear=False):
             prepare_assets(
                 self.release_dir,
-                channel,
                 version or self.version,
                 self.repository,
                 sign_apple_sdk=sign_apple_sdk,
             )
 
-    def assert_assets(self, channel: str, version: str, title: str) -> str:
+    def assert_assets(self, version: str, title: str) -> str:
         archive = self.archive()
-        self.prepare(channel, version)
+        self.prepare(version)
 
         with tarfile.open(archive, "r:gz") as package:
             pkg_config = package.extractfile(
@@ -446,8 +444,8 @@ class NativePackageReleaseTest(unittest.TestCase):
         self,
     ) -> None:
         archive = self.archive()
-        version = "0.0.0-dev.202610290101"
-        self.prepare("snapshot", version)
+        version = self.version
+        self.prepare()
         with tarfile.open(archive, "r:gz") as package:
             embedded = [
                 json.load(package.extractfile(member))
@@ -506,7 +504,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.archive()
         self.archive("linux-gnu-x64-egl", "opengl")
         self.write_presets(self.preset, "linux-gnu-x64-egl")
-        self.prepare("release")
+        self.prepare()
         root = "MaplibreNativeCVulkan.artifactbundle"
         with zipfile.ZipFile(self.release_dir / bundle_name("vulkan")) as bundle:
             info = json.loads(bundle.read(f"{root}/info.json"))
@@ -544,13 +542,13 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.archive()
 
         with self.assertRaisesRegex(SystemExit, "missing"):
-            self.prepare("release")
+            self.prepare()
 
     def test_published_archive_is_reproducible_and_preserves_its_payload(self) -> None:
         archive = self.archive()
-        self.prepare("release")
+        self.prepare()
         first_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-        self.prepare("release")
+        self.prepare()
 
         self.assertEqual(first_digest, hashlib.sha256(archive.read_bytes()).hexdigest())
         with tarfile.open(archive, "r:gz") as package:
@@ -565,18 +563,18 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.archive(backend="opengl")
 
         with self.assertRaisesRegex(SystemExit, "default backend, vulkan"):
-            self.prepare("release")
+            self.prepare()
 
     def test_refuses_a_release_without_the_xcframework(self) -> None:
         self.archive()
         self.xcframework.unlink()
 
         with self.assertRaisesRegex(SystemExit, f"missing {XCFRAMEWORK_NAME}"):
-            self.prepare("release")
+            self.prepare()
 
     def test_relabels_every_framework_with_the_bundle_version(self) -> None:
         archive = self.archive()
-        self.prepare("snapshot", "0.0.0-dev.202608070101")
+        self.prepare()
 
         with tarfile.open(archive, "r:gz") as package:
             packaged = plistlib.load(
@@ -594,15 +592,13 @@ class NativePackageReleaseTest(unittest.TestCase):
             link_target = xcframework.read(link)
 
         for plist in (packaged, *combined):
-            self.assertEqual(plist["CFBundleShortVersionString"], "0.0.0")
-            self.assertEqual(plist["CFBundleVersion"], "0.0.0")
+            self.assertEqual(plist["CFBundleShortVersionString"], self.version)
+            self.assertEqual(plist["CFBundleVersion"], self.version)
         self.assertTrue(stat.S_ISLNK(link.external_attr >> 16))
         self.assertEqual(link_target, b"Versions/Current/Headers")
 
     def test_release_assets_include_version_provenance_and_checksums(self) -> None:
-        notes = self.assert_assets(
-            "release", self.version, f"MapLibre Native FFI {self.version}."
-        )
+        notes = self.assert_assets(self.version, f"MapLibre Native FFI {self.version}.")
 
         self.assertIn(f"/compare/v0.202607.0...v{self.version}", notes)
 
@@ -622,7 +618,7 @@ class NativePackageReleaseTest(unittest.TestCase):
                 )
 
         with mock.patch("native_package_release.sign_archive", side_effect=sign):
-            self.prepare("release", sign_apple_sdk=True)
+            self.prepare(sign_apple_sdk=True)
         checksum = hashlib.sha256(self.xcframework.read_bytes()).hexdigest()
         self.assertIn(
             f"{checksum}  {XCFRAMEWORK_NAME}",
@@ -644,25 +640,15 @@ class NativePackageReleaseTest(unittest.TestCase):
         )
 
         notes = self.assert_assets(
-            "release",
             self.version,
             "A theme.\n\n## Fixes\n\n- A fix.\n\n[Full changelog]",
         )
 
         self.assertNotIn(f"MapLibre Native FFI {self.version}", notes)
 
-    def test_snapshot_assets_include_version_provenance_and_checksums(self) -> None:
-        notes = self.assert_assets(
-            "snapshot",
-            "0.0.0-dev.202608070101",
-            "Unstable native package snapshot, published 2026-08-07 01:01 UTC.",
-        )
-
-        self.assertNotIn("/compare/", notes)
-
     def test_zig_package_declares_each_native_archive_lazily(self) -> None:
         archive = self.archive()
-        self.prepare("release")
+        self.prepare()
 
         with tarfile.open(self.release_dir / ZIG_PACKAGE_NAME, "r:gz") as package:
             names = package.getnames()
@@ -703,12 +689,12 @@ class NativePackageReleaseTest(unittest.TestCase):
 
     def test_zig_fetches_the_zig_package(self) -> None:
         self.archive()
-        self.prepare("snapshot", "0.0.0-dev.202608070101")
+        self.prepare()
 
         package_hash = zig_hash(self.release_dir / ZIG_PACKAGE_NAME)
 
         self.assertTrue(
-            package_hash.startswith("maplibre_native_ffi-0.0.0-dev.202608070101-"),
+            package_hash.startswith(f"maplibre_native_ffi-{self.version}-"),
             package_hash,
         )
 
