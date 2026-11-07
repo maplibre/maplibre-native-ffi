@@ -164,6 +164,10 @@ def embed_wheel(wheel: pathlib.Path, inventory: dict) -> None:
         destination = pathlib.Path(temporary) / wheel.name
         with zipfile.ZipFile(wheel) as source, WheelFile(destination, "w") as target:
             for entry in source.infolist():
+                # WheelFile records every entry it writes, but RECORD must not
+                # list directories, which uv writes into its wheels.
+                if entry.is_dir():
+                    continue
                 # Maturin's Cargo-only inventory includes build dependencies and
                 # local Cargo IDs. Replace it with the composed runtime inventory.
                 if entry.filename != info + "RECORD" and not entry.filename.startswith(
@@ -206,7 +210,7 @@ def pack(wheels: pathlib.Path, output: pathlib.Path, version: str) -> None:
         with zipfile.ZipFile(wheel) as source, WheelFile(destination, "w") as target:
             source.getinfo(old_info + "sboms/maplibre-native-ffi.cdx.json")
             for entry in source.infolist():
-                if entry.filename == old_info + "RECORD":
+                if entry.is_dir() or entry.filename == old_info + "RECORD":
                     continue
                 data = source.read(entry)
                 if entry.filename == old_info + "METADATA":
