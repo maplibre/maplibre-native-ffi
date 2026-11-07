@@ -33,6 +33,7 @@ jobs:
       contents: write
       id-token: write
     uses: ./.github/workflows/_native-package.yml
+    secrets: inherit
     with:
       ci_run_url: ${{ needs.source.outputs.ci_run_url }}
       previous_tag: ${{ needs.source.outputs.previous_tag }}
@@ -194,6 +195,7 @@ jobs:
       actions: read
       contents: read
     uses: ./.github/workflows/_typescript-npm.yml
+    secrets: inherit
     with:
       tag: ${{ github.ref_name }}
       run_id: ${{ needs.source.outputs.run_id }}

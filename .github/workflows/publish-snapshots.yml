@@ -171,6 +171,7 @@ jobs:
       contents: write
       id-token: write
     uses: ./.github/workflows/_native-package.yml
+    secrets: inherit
     with:
       ci_run_url: ${{ needs.plan.outputs.ci_run_url }}
       run_id: ${{ needs.plan.outputs.run_id }}
