@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 import urllib.request
 import zipfile
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from apple_sdk_signing import sign_archive
 from release_version import parse_version
@@ -29,12 +29,15 @@ from zig_package import write_package as write_zig_package
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 from tools.ci import gaps
+from tools.ci.suites import GOBJECT_ARCHIVE_PREFIX, gobject_archive
 
 ARCHIVE_PREFIX = "maplibre-native-c-"
 ARCHIVE_SUFFIX = ".tar.gz"
 ARTIFACTS_NAME = "maplibre-native-c-artifacts.json"
 RELEASE_NOTES_NAME = "RELEASE_NOTES.md"
 XCFRAMEWORK_NAME = "MaplibreNativeC.xcframework.zip"
+GOBJECT_PKG_CONFIG = "share/pkgconfig/maplibre-native-ffi-gobject-0.pc"
+GOBJECT_SBOM = f"share/maplibre-native-ffi-gobject/{SBOM_NAME}"
 RELEASE_DOWNLOAD_URL = (
     "https://github.com/maplibre/maplibre-native-ffi/releases/download"
 )
@@ -75,15 +78,11 @@ def package_presets(repository: pathlib.Path) -> list[str]:
     return names
 
 
-def native_archives(
-    release_dir: pathlib.Path, presets: Iterable[str]
+def archive_set(
+    release_dir: pathlib.Path, expected: set[str], prefix: str
 ) -> list[pathlib.Path]:
-    expected = {
-        f"{ARCHIVE_PREFIX}{preset}{ARCHIVE_SUFFIX}" for preset in sorted(presets)
-    }
-    actual = {
-        path.name for path in release_dir.glob(f"{ARCHIVE_PREFIX}*{ARCHIVE_SUFFIX}")
-    }
+    """The archives named `expected`, refusing any other with their prefix."""
+    actual = {path.name for path in release_dir.glob(f"{prefix}*{ARCHIVE_SUFFIX}")}
     missing = sorted(expected - actual)
     unexpected = sorted(actual - expected)
     if missing or unexpected:
@@ -94,6 +93,21 @@ def native_archives(
             details.append(f"unexpected {', '.join(unexpected)}")
         raise SystemExit(f"invalid native package set: {'; '.join(details)}")
     return [release_dir / name for name in sorted(expected)]
+
+
+def native_archives(
+    release_dir: pathlib.Path, presets: Iterable[str]
+) -> list[pathlib.Path]:
+    expected = {f"{ARCHIVE_PREFIX}{preset}{ARCHIVE_SUFFIX}" for preset in presets}
+    return archive_set(release_dir, expected, ARCHIVE_PREFIX)
+
+
+def gobject_archives(
+    release_dir: pathlib.Path, presets: Iterable[str]
+) -> list[pathlib.Path]:
+    """The GObject archives that the jobs of `presets` publish."""
+    expected = {name for preset in presets if (name := gobject_archive(preset))}
+    return archive_set(release_dir, expected, GOBJECT_ARCHIVE_PREFIX)
 
 
 def write_pin(path: pathlib.Path, tag: str, index: pathlib.Path | None = None) -> None:
@@ -158,14 +172,17 @@ def sbom_bytes(content: bytes, version: str, sha: str) -> bytes:
     ).encode()
 
 
-def rewrite_archive(archive: pathlib.Path, version: str, sha: str) -> None:
-    root = archive.name.removesuffix(ARCHIVE_SUFFIX)
-    pkg_config_name = f"{root}/share/pkgconfig/maplibre-native-c.pc"
-    descriptor_name = f"{root}/share/maplibre-native-c/artifact.json"
-    found_pkg_config = False
-    found_descriptor = False
-    found_sbom = False
+def rewrite_tar(
+    archive: pathlib.Path,
+    rewrite: Callable[[str], Callable[[bytes], bytes] | None],
+    required: Iterable[str],
+) -> None:
+    """Rewrites `archive` in place, reproducibly.
 
+    `rewrite` gives the function that replaces a file's content, given the
+    file's name, or None to keep it. Each `required` file must be present.
+    """
+    missing = set(required)
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{archive.name}.", dir=archive.parent
     )
@@ -189,38 +206,51 @@ def rewrite_archive(archive: pathlib.Path, version: str, sha: str) -> None:
                 source_file = source.extractfile(member)
                 if source_file is None:
                     raise SystemExit(f"cannot read {member.name} from {archive.name}")
-                if member.name == pkg_config_name:
-                    content = pkg_config_bytes(source_file.read(), archive, version)
-                    member.size = len(content)
-                    output.addfile(member, io.BytesIO(content))
-                    found_pkg_config = True
-                elif member.name == descriptor_name:
-                    content = descriptor_bytes(source_file.read(), version, sha)
-                    member.size = len(content)
-                    output.addfile(member, io.BytesIO(content))
-                    found_descriptor = True
-                elif FRAMEWORK_INFO_PLIST.search(member.name):
-                    content = framework_plist_bytes(source_file.read(), version)
-                    member.size = len(content)
-                    output.addfile(member, io.BytesIO(content))
-                elif pathlib.PurePosixPath(member.name).name == SBOM_NAME:
-                    content = sbom_bytes(source_file.read(), version, sha)
-                    member.size = len(content)
-                    output.addfile(member, io.BytesIO(content))
-                    found_sbom |= (
-                        member.name == f"{root}/share/maplibre-native-c/{SBOM_NAME}"
-                    )
-                else:
+                missing.discard(member.name)
+                replace = rewrite(member.name)
+                if replace is None:
                     output.addfile(member, source_file)
-        if not found_pkg_config:
-            raise SystemExit(f"{archive.name} is missing maplibre-native-c.pc")
-        if not found_descriptor:
-            raise SystemExit(f"{archive.name} is missing artifact.json")
-        if not found_sbom:
-            raise SystemExit(f"{archive.name} is missing {SBOM_NAME}")
+                    continue
+                content = replace(source_file.read())
+                member.size = len(content)
+                output.addfile(member, io.BytesIO(content))
+        if missing:
+            name = pathlib.PurePosixPath(min(missing)).name
+            raise SystemExit(f"{archive.name} is missing {name}")
         os.replace(temporary_path, archive)
     finally:
         temporary_path.unlink(missing_ok=True)
+
+
+def rewrite_archive(archive: pathlib.Path, version: str, sha: str) -> None:
+    root = archive.name.removesuffix(ARCHIVE_SUFFIX)
+    pkg_config_name = f"{root}/share/pkgconfig/maplibre-native-c.pc"
+    descriptor_name = f"{root}/share/maplibre-native-c/artifact.json"
+    sbom_name = f"{root}/share/maplibre-native-c/{SBOM_NAME}"
+
+    def rewrite(name: str) -> Callable[[bytes], bytes] | None:
+        if name == pkg_config_name:
+            return lambda content: pkg_config_bytes(content, archive, version)
+        if name == descriptor_name:
+            return lambda content: descriptor_bytes(content, version, sha)
+        if FRAMEWORK_INFO_PLIST.search(name):
+            return lambda content: framework_plist_bytes(content, version)
+        if pathlib.PurePosixPath(name).name == SBOM_NAME:
+            return lambda content: sbom_bytes(content, version, sha)
+        return None
+
+    rewrite_tar(archive, rewrite, (pkg_config_name, descriptor_name, sbom_name))
+
+
+def rewrite_gobject_archive(archive: pathlib.Path, version: str, sha: str) -> None:
+    def rewrite(name: str) -> Callable[[bytes], bytes] | None:
+        if name == GOBJECT_PKG_CONFIG:
+            return lambda content: pkg_config_bytes(content, archive, version)
+        if name == GOBJECT_SBOM:
+            return lambda content: sbom_bytes(content, version, sha)
+        return None
+
+    rewrite_tar(archive, rewrite, (GOBJECT_PKG_CONFIG, GOBJECT_SBOM))
 
 
 def rewrite_xcframework(archive: pathlib.Path, version: str, sha: str) -> None:
@@ -273,6 +303,12 @@ def sbom_path(archive: pathlib.Path) -> pathlib.Path:
     return archive.with_name(
         archive.name.removesuffix(ARCHIVE_SUFFIX).removesuffix(".zip") + ".cdx.json"
     )
+
+
+def publish_embedded_inventory(archive: pathlib.Path, name: str, tag: str) -> None:
+    with tarfile.open(archive, "r:gz") as source:
+        inventory = json.load(source.extractfile(name))
+    publish_inventory(archive, inventory, tag)
 
 
 def publish_inventory(archive: pathlib.Path, inventory: dict, tag: str) -> None:
@@ -439,9 +475,13 @@ def prepare_assets(
     parse_version(version)
     root = repository or pathlib.Path(required_env("MISE_MONOREPO_ROOT"))
     sha = required_env("PUBLISH_SHA")
-    archives = native_archives(release_dir, package_presets(root))
+    presets = package_presets(root)
+    archives = native_archives(release_dir, presets)
+    gobjects = gobject_archives(release_dir, presets)
     for archive in archives:
         rewrite_archive(archive, version, sha)
+    for archive in gobjects:
+        rewrite_gobject_archive(archive, version, sha)
     xcframework = release_dir / XCFRAMEWORK_NAME
     if not xcframework.is_file():
         raise SystemExit(f"invalid native package set: missing {XCFRAMEWORK_NAME}")
@@ -451,13 +491,11 @@ def prepare_assets(
     tag = required_env("PUBLISH_TAG")
     for archive in archives:
         archive_root = archive.name.removesuffix(ARCHIVE_SUFFIX)
-        with tarfile.open(archive, "r:gz") as source:
-            inventory = json.load(
-                source.extractfile(
-                    f"{archive_root}/share/maplibre-native-c/{SBOM_NAME}"
-                )
-            )
-        publish_inventory(archive, inventory, tag)
+        publish_embedded_inventory(
+            archive, f"{archive_root}/share/maplibre-native-c/{SBOM_NAME}", tag
+        )
+    for archive in gobjects:
+        publish_embedded_inventory(archive, GOBJECT_SBOM, tag)
     with zipfile.ZipFile(xcframework) as source:
         inventories = [
             json.loads(source.read(name))
@@ -493,11 +531,15 @@ def prepare_assets(
         release_dir,
         [
             *archives,
+            *gobjects,
             xcframework,
             *bundles,
             zig_package,
             artifacts_path,
-            *(sbom_path(archive) for archive in [*archives, xcframework, *bundles]),
+            *(
+                sbom_path(archive)
+                for archive in [*archives, *gobjects, xcframework, *bundles]
+            ),
         ],
     )
 

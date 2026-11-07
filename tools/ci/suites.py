@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 # the Linux ARM64 KLIB, and the Linux ARM64 jobs leave Kotlin/Native out.
 LINUX_ARM64_KLIB = "//bindings/kotlin:linux-arm64-klib"
 
+GOBJECT_ARCHIVE_PREFIX = "maplibre-native-ffi-gobject-"
+
 # The CI steps that run before the suites. A suite after the archive and
 # install also needs those to have succeeded.
 BUILD = "build"
@@ -38,6 +40,16 @@ class Suite:
     @property
     def task(self) -> str:
         return self.command[2]
+
+
+def gobject_archive(preset: str) -> str | None:
+    """The GObject archive that a preset's job publishes, if any: one for each
+    platform and architecture, since the library is the same for every backend."""
+    target = gaps.target_from_name(preset)
+    if target.backend != "vulkan" or gaps.gap("gobject", target, "package"):
+        return None
+    platform, arch, _ = preset.rsplit("-", 2)
+    return f"{GOBJECT_ARCHIVE_PREFIX}{platform}-{arch}.tar.gz"
 
 
 def suite_id(task: str) -> str:
@@ -113,6 +125,10 @@ def consumer_commands(target: Target) -> list[list[str]]:
         ):
             commands.append(["mise", "run", "//bindings/kotlin:build", target.preset])
         commands.append(binding_command(binding, target))
+        if binding == "gobject" and gobject_archive(target.preset):
+            commands.append(
+                ["mise", "run", "//bindings/gobject:archive", target.preset]
+            )
         # These exercise additional contracts on one representative target.
         extra = None
         if target.preset == "linux-gnu-x64-vulkan":

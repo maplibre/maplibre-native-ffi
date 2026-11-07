@@ -187,6 +187,22 @@ status = "path-known"
 reason = "The macOS x64 suites run under Rosetta on ARM64 runners, whose Homebrew GLib and GJS are ARM64 only."
 
 [[entry]]
+bindings = ["gobject"]
+platforms = ["linux-musl", "freebsd"]
+archs = ["x64", "arm64"]
+operations = ["package"]
+status = "path-known"
+reason = "The library builds and runs its tests inside Alpine and the FreeBSD virtual machine, which return no build output for a release to publish."
+
+[[entry]]
+bindings = ["gobject"]
+platforms = ["macos"]
+archs = ["arm64"]
+operations = ["package"]
+status = "path-known"
+reason = "A prebuilt library would load GLib from Homebrew's prefix by absolute path, so it would serve only Homebrew installs, and no release publishes one yet."
+
+[[entry]]
 bindings = ["kotlin-jvm"]
 platforms = ["linux-gnu", "linux-musl"]
 archs = ["loongarch64"]

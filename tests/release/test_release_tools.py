@@ -170,6 +170,28 @@ def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> 
             )
 
 
+GOBJECT_ARCHIVE = "maplibre-native-ffi-gobject-linux-gnu-x64.tar.gz"
+GOBJECT_PKG_CONFIG = "share/pkgconfig/maplibre-native-ffi-gobject-0.pc"
+GOBJECT_LIBRARY = "lib/libmaplibre-native-ffi-gobject-0.so.0"
+
+
+def create_gobject_archive(path: pathlib.Path) -> None:
+    root = component("maplibre-native-ffi-gobject", "0.0.0", "BSD-2-Clause")
+    root["group"] = "org.maplibre.nativeffi"
+    with tarfile.open(path, "w:gz") as archive:
+        add_bytes(
+            archive,
+            GOBJECT_PKG_CONFIG,
+            b"Name: maplibre-native-ffi-gobject-0\nVersion: 0.0.0\n",
+        )
+        add_bytes(archive, GOBJECT_LIBRARY, b"binary")
+        add_bytes(
+            archive,
+            f"share/maplibre-native-ffi-gobject/{SBOM_NAME}",
+            json.dumps(document(root, [], {root["bom-ref"]: set()})).encode(),
+        )
+
+
 class ReleaseVersionTest(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
@@ -274,6 +296,8 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.write_presets(self.preset)
         self.xcframework = self.release_dir / XCFRAMEWORK_NAME
         create_xcframework(self.xcframework)
+        self.gobject = self.release_dir / GOBJECT_ARCHIVE
+        create_gobject_archive(self.gobject)
         self.write_zig_sources()
 
     def test_native_package_gaps_match_the_ci_package_planner(self) -> None:
@@ -394,11 +418,13 @@ class NativePackageReleaseTest(unittest.TestCase):
                 path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in (
                     archive,
+                    self.gobject,
                     self.xcframework,
                     self.release_dir / bundle_name("vulkan"),
                     self.release_dir / ZIG_PACKAGE_NAME,
                     self.release_dir / ARTIFACTS_NAME,
                     sbom_path(archive),
+                    sbom_path(self.gobject),
                     sbom_path(self.xcframework),
                     sbom_path(self.release_dir / bundle_name("vulkan")),
                 )
@@ -544,6 +570,33 @@ class NativePackageReleaseTest(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "missing"):
             self.prepare()
 
+    def test_refuses_a_release_without_a_gobject_archive(self) -> None:
+        self.archive()
+        self.gobject.unlink()
+
+        with self.assertRaisesRegex(SystemExit, f"missing {GOBJECT_ARCHIVE}"):
+            self.prepare()
+
+    def test_gobject_archive_carries_the_release_version(self) -> None:
+        self.archive()
+        self.prepare()
+
+        with tarfile.open(self.gobject, "r:gz") as package:
+            pkg_config = package.extractfile(GOBJECT_PKG_CONFIG).read()
+            library = package.extractfile(GOBJECT_LIBRARY).read()
+        root = json.loads(sbom_path(self.gobject).read_text())["metadata"]["component"]
+
+        self.assertIn(f"Version: {self.version}".encode(), pkg_config)
+        self.assertEqual(library, b"binary")
+        self.assertEqual(root["version"], self.version)
+        self.assertIn(
+            {"name": "maplibre:source-commit", "value": self.sha}, root["properties"]
+        )
+        self.assertEqual(
+            root["externalReferences"][-1]["hashes"][0]["content"],
+            hashlib.sha256(self.gobject.read_bytes()).hexdigest(),
+        )
+
     def test_published_archive_is_reproducible_and_preserves_its_payload(self) -> None:
         archive = self.archive()
         self.prepare()
@@ -561,6 +614,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.preset = "linux-gnu-x64-egl"
         self.write_presets(self.preset)
         self.archive(backend="opengl")
+        self.gobject.unlink()
 
         with self.assertRaisesRegex(SystemExit, "default backend, vulkan"):
             self.prepare()
