@@ -25,7 +25,7 @@ class PublishedRuntimeTest {
         val expected =
           if (backend() == "webgl") RenderBackendFlag.OPEN_GL else RenderBackendFlag.WEB_GPU
         assertEquals(expected, supportedRenderBackendMask())
-        RuntimeHandle.create(RuntimeOptions()).release().await()
+        RuntimeHandle.create(RuntimeOptions()).await().release().await()
       }
     }
 }
