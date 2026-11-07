@@ -14,6 +14,9 @@ passphrase.
 
 A published version waits for OHPM's review before the registry lists it, so
 a rerun after a publish that succeeded fails in ohpm rather than skipping it.
+No one has seen the error that ohpm gives for a version under review, so this
+can't tell it from another failure. After a partial publish, publish the
+remaining HARs by hand, or rerun once OHPM's review lists the published ones.
 """
 
 from __future__ import annotations

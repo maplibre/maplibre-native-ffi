@@ -42,6 +42,16 @@ prepare_package() {
   mkdir -p "$package/src/main"
   cp "$binding/ohpm/package/README.md" "$binding/ohpm/package/CHANGELOG.md" \
     "$binding/../../LICENSE" "$package/"
+  # OHPM rejects a package whose README has no line that installs it. The
+  # README installs the OpenGL backend, so the Vulkan one's swaps the backends.
+  if [[ $kind == vulkan ]]; then
+    sed -e 's/native-ffi-opengl/native-ffi-@backend@/g' \
+      -e 's/native-ffi-vulkan/native-ffi-opengl/g' \
+      -e 's/native-ffi-@backend@/native-ffi-vulkan/g' \
+      -e 's/For Vulkan, replace/For OpenGL, replace/' \
+      -e 's/the OpenGL package/the Vulkan package/' \
+      "$binding/ohpm/package/README.md" >"$package/README.md"
+  fi
   jq --arg name "$name" --arg version "$version" --arg kind "$kind" \
     --argjson api "$api" '
       .name = $name | .version = $version | .compatibleSdkVersion = $api

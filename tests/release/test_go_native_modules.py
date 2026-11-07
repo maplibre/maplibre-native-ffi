@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import pathlib
+import re
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -106,11 +109,156 @@ class GoNativeModulesTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             go.build(archive(self.directory, headers), "v0.202610.2", "")
 
-    def test_lists_versions_in_release_order(self) -> None:
+    def test_release_assets_are_reproducible_and_listed_in_the_checksums(
+        self,
+    ) -> None:
+        archive(self.directory, go.binding_headers(ROOT))
+        checksums = self.directory / "SHA256SUMS"
+        checksums.write_text("0  maplibre-native-c-macos-arm64-metal.tar.gz\n")
+
+        def release() -> dict[str, bytes]:
+            paths = go.write_release(
+                self.directory,
+                "v0.202612.0",
+                "2026-12-01T00:00:00Z",
+                ["macos-arm64-metal"],
+            )
+            return {path.name: path.read_bytes() for path in paths}
+
+        first = release()
+        second = release()
+
+        self.assertEqual(first, second)
         self.assertEqual(
-            go.versions_list("v0.202610.9\nv0.202609.0\n", "v0.202610.10"),
-            "v0.202609.0\nv0.202610.9\nv0.202610.10\n",
+            sorted(first),
+            [
+                f"go-native-macos-arm64-metal-v0.202612.0.{file}"
+                for file in ("info", "mod", "zip")
+            ],
         )
+        self.assertEqual(
+            json.loads(first["go-native-macos-arm64-metal-v0.202612.0.info"]),
+            {"Version": "v0.202612.0", "Time": "2026-12-01T00:00:00Z"},
+        )
+        self.assertEqual(
+            checksums.read_text().splitlines(),
+            ["0  maplibre-native-c-macos-arm64-metal.tar.gz"]
+            + [
+                f"{hashlib.sha256(content).hexdigest()}  {name}"
+                for name, content in first.items()
+            ],
+        )
+
+    def test_redirects_each_version_to_the_release_that_holds_its_files(
+        self,
+    ) -> None:
+        download = "https://github.com/maplibre/maplibre-native-ffi/releases/download"
+        for version, url in (
+            (
+                "v0.202611.0",
+                f"{download}/go-native/v0.202611.0/linux-gnu-x64-vulkan-v0.202611.0",
+            ),
+            (
+                "v0.202612.3",
+                f"{download}/v0.202612.3/go-native-linux-gnu-x64-vulkan-v0.202612.3",
+            ),
+        ):
+            for file in ("info", "mod", "zip"):
+                with self.subTest(version=version, file=file):
+                    self.assertEqual(
+                        redirect(
+                            go.redirects(),
+                            f"/{go.MODULE_PREFIX}/linux-gnu-x64-vulkan/@v/"
+                            f"{version}.{file}",
+                        ),
+                        f"{url}.{file}",
+                    )
+        self.assertIsNone(
+            redirect(
+                go.redirects(), f"/{go.MODULE_PREFIX}/linux-gnu-x64-vulkan/@v/list"
+            )
+        )
+
+    def test_the_proxy_lists_each_presets_released_versions(self) -> None:
+        repository = self.directory / "repository"
+        repository.mkdir()
+
+        def git(*arguments: str) -> None:
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "-c",
+                    "commit.gpgSign=false",
+                    "-c",
+                    "tag.gpgSign=false",
+                    *arguments,
+                ],
+                cwd=repository,
+                check=True,
+                capture_output=True,
+            )
+
+        def release(tag: str, presets: list[str] | None) -> None:
+            path = repository / go.PRESETS
+            if presets is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(presets))
+            git("add", "-A")
+            git("commit", "--quiet", "--allow-empty", "-m", tag)
+            git("tag", tag)
+
+        git("init", "--quiet")
+        release("v0.202610.3", None)
+        release("v0.202611.0", ["linux-gnu-x64-vulkan"])
+        release("v0.202611.10", ["linux-gnu-x64-vulkan", "macos-arm64-metal"])
+        release("v0.202611.9", ["linux-gnu-x64-vulkan"])
+        # Its release has not published, so its files are not out yet.
+        release("v0.202611.11", ["linux-gnu-x64-vulkan"])
+        out = self.directory / "site"
+
+        go.write_site(
+            out,
+            {"v0.202610.3", "v0.202611.0", "v0.202611.9", "v0.202611.10"},
+            repository,
+        )
+
+        self.assertEqual((out / "_redirects").read_text(), go.redirects())
+        self.assertEqual(
+            {
+                path.relative_to(out).as_posix(): path.read_text()
+                for path in out.rglob("list")
+            },
+            {
+                f"{go.MODULE_PREFIX}/linux-gnu-x64-vulkan/@v/list": (
+                    "v0.202611.0\nv0.202611.9\nv0.202611.10\n"
+                ),
+                f"{go.MODULE_PREFIX}/macos-arm64-metal/@v/list": "v0.202611.10\n",
+            },
+        )
+
+
+def redirect(rules: str, path: str) -> str | None:
+    """Where Cloudflare Pages redirects `path`, or None. Pages applies the first
+    rule that matches, and a placeholder matches anything but a slash."""
+    for line in rules.splitlines():
+        source, destination, status = line.split()
+        assert status == "302"
+        pattern = "".join(
+            f"(?P<{part[1:]}>[^/]+)" if part.startswith(":") else re.escape(part)
+            for part in re.split(r"(:[A-Za-z]\w*)", source)
+        )
+        match = re.fullmatch(pattern, path)
+        if match:
+            for name, value in match.groupdict().items():
+                destination = destination.replace(f":{name}", value)
+            return destination
+    return None
 
 
 if __name__ == "__main__":

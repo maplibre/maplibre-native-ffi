@@ -44,12 +44,17 @@ class VersionsTest(unittest.TestCase):
             "v0.202610.0": parse_version("0.202610.0"),
             "v0.202610.1": parse_version("0.202610.1"),
         }
-        with (
-            mock.patch.dict(os.environ, {}, clear=True),
-            mock.patch.object(self.module, "release_tags", return_value=tags),
-        ):
-            self.module.main()
-        self.assertEqual(json.loads(self.output.read_text()), {"version": "0.202610.1"})
+        # A workflow without a release version passes an empty one.
+        for environment in ({}, {"DOCS_VERSION": ""}):
+            with (
+                self.subTest(environment=environment),
+                mock.patch.dict(os.environ, environment, clear=True),
+                mock.patch.object(self.module, "release_tags", return_value=tags),
+            ):
+                self.module.main()
+                self.assertEqual(
+                    json.loads(self.output.read_text()), {"version": "0.202610.1"}
+                )
 
 
 class DeploymentTest(unittest.TestCase):

@@ -1,0 +1,51 @@
+name: "↳ Go module proxy"
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: Commit whose generator writes the proxy
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy the Go module proxy
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 15
+    # A deploy replaces the whole site, so deploys run one at a time.
+    concurrency:
+      group: go-native-proxy
+      cancel-in-progress: false
+    environment:
+      name: cloudflare-pages
+      url: https://go.maplibre-native-ffi.pages.dev/
+    permissions:
+      contents: read
+    env:
+      MISE_NO_HOOKS: "1"
+    steps:
+      # The proxy lists each release tag whose commit has preset modules, so it
+      # reads every tag's tree.
+      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+        with:
+          cache: false
+          install_args: python node
+      # The proxy lists only the releases that published.
+      - run: mise run --no-deps go-native:proxy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+      - name: Deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: mise run --no-deps go-native:deploy-proxy
