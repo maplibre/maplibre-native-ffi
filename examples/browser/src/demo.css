@@ -96,3 +96,84 @@ nav a[aria-current="page"] {
 .attribution a {
   color: inherit;
 }
+
+.toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+/*
+ * The comparison. The GL JS map covers the page, clipped to the right of the
+ * divider, so input left of it falls through to the native map.
+ */
+
+#gl-map {
+  position: fixed;
+  inset: 0;
+  clip-path: inset(0 0 0 var(--split));
+}
+
+.divider {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: var(--split);
+  width: 24px;
+  margin-left: -12px;
+  cursor: ew-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 11px;
+  width: 2px;
+  background: white;
+  box-shadow: 0 0 4px rgb(0 0 0 / 0.4);
+}
+
+.divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: -12px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
+}
+
+.divider:focus-visible::after {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.compare-label {
+  position: fixed;
+  bottom: 36px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.compare-label.native {
+  right: calc(100% - var(--split) + 16px);
+}
+
+.compare-label.gl {
+  left: calc(var(--split) + 16px);
+}

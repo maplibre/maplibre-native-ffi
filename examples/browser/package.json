@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@maplibre/native-ffi": "workspace:*",
-    "coi-serviceworker": "0.1.7"
+    "coi-serviceworker": "0.1.7",
+    "maplibre-gl": "6.16.0"
   }
 }

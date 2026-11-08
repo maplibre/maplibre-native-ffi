@@ -20,6 +20,8 @@ import {
   type ScreenPoint,
 } from "@maplibre/native-ffi";
 
+import type { Comparison } from "./compare.ts";
+
 import "./demo.css";
 
 const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
@@ -107,6 +109,7 @@ async function start(backend: Backend): Promise<void> {
       RuntimeEventFlag.mapStyleLoaded |
       RuntimeEventFlag.mapLoadingFailed |
       RuntimeEventFlag.mapRenderError |
+      RuntimeEventFlag.mapCameraIsChanging |
       RuntimeEventFlag.mapCameraDidChange,
   });
   runtime.discarding.setEventHandler({
@@ -121,7 +124,11 @@ async function start(backend: Backend): Promise<void> {
           case RuntimeEventType.mapRenderError:
             showError(event.message);
             break;
+          case RuntimeEventType.mapCameraIsChanging:
+            comparison?.nativeCameraChanged();
+            break;
           case RuntimeEventType.mapCameraDidChange:
+            comparison?.nativeCameraChanged();
             scheduleHashUpdate(map);
             break;
         }
@@ -174,7 +181,54 @@ async function start(backend: Backend): Promise<void> {
   }).observe(canvas);
 
   addGestures(map);
+  addCompareToggle(map);
   canvas.focus();
+}
+
+// The comparison with MapLibre GL JS, while the page shows it. The page loads
+// GL JS only for the comparison, and keeps it in the URL as ?compare.
+
+let comparison: Comparison | undefined;
+
+function addCompareToggle(map: MapHandle): void {
+  const toggle = document.querySelector<HTMLInputElement>("#compare")!;
+  const update = async () => {
+    history.replaceState(
+      null,
+      "",
+      toggle.checked
+        ? "?compare" + location.hash
+        : location.pathname + location.hash,
+    );
+    updateBackendLinks();
+    comparison?.remove();
+    comparison = undefined;
+    if (!toggle.checked) return;
+    const { compare } = await import("./compare.ts");
+    // The toggle may have changed while GL JS loaded.
+    if (toggle.checked && comparison === undefined) {
+      comparison = compare(map, canvas, styleUrl);
+    }
+  };
+  const change = () =>
+    update().catch((error: unknown) => {
+      console.error(error);
+      showError(error instanceof Error ? error.message : String(error));
+    });
+  toggle.checked = new URLSearchParams(location.search).has("compare");
+  toggle.disabled = false;
+  toggle.addEventListener("change", change);
+  if (toggle.checked) void change();
+}
+
+/** Points the backend links at this page's view, so a switch keeps it. */
+function updateBackendLinks(): void {
+  for (const link of document.querySelectorAll<HTMLAnchorElement>(
+    "nav a[data-backend]",
+  )) {
+    link.search = location.search;
+    link.hash = location.hash;
+  }
 }
 
 // The map's scale factor, which stays fixed for its life.
@@ -232,11 +286,7 @@ function scheduleHashUpdate(map: MapHandle): void {
         : [bearing.toFixed(1), pitch.toFixed(1)]),
     ].join("/");
     history.replaceState(null, "", `#${hash}`);
-    for (const link of document.querySelectorAll<HTMLAnchorElement>(
-      "nav a[data-backend]",
-    )) {
-      link.hash = hash;
-    }
+    updateBackendLinks();
   }, 250);
 }
 
