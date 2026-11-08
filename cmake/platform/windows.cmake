@@ -6,7 +6,14 @@
 # VsDevCmd names the redistributable's directory in VCToolsRedistDir. Another
 # host's /winsysroot tree has none, so a cross build installs no runtime unless
 # that variable names a copy, and the package check refuses its package.
-set(MLN_FFI_MSVC_RUNTIME_DLLS vcruntime140.dll vcruntime140_1.dll msvcp140.dll
+#
+# Each list names the runtime DLLs that the DLL and the runtime itself import on
+# that architecture. ARM64 code imports no vcruntime140_1.dll. The one in the
+# ARM64 Microsoft.VC*.CRT directory is ARM64EC, for x64-compatible code, and an
+# ARM64 process can't load it.
+set(MLN_FFI_MSVC_RUNTIME_DLLS_x64 vcruntime140.dll vcruntime140_1.dll
+    msvcp140.dll msvcp140_codecvt_ids.dll)
+set(MLN_FFI_MSVC_RUNTIME_DLLS_arm64 vcruntime140.dll msvcp140.dll
     msvcp140_codecvt_ids.dll)
 
 function(mln_ffi_bundle_msvc_runtime target)
@@ -33,10 +40,11 @@ function(mln_ffi_bundle_msvc_runtime target)
         "${redist}/${MLN_FFI_TARGET_ARCHITECTURE}")
   endif()
   set(runtime_dlls "")
-  foreach(dll IN LISTS MLN_FFI_MSVC_RUNTIME_DLLS)
-    if(EXISTS "${crt_dirs}/${dll}")
-      list(APPEND runtime_dlls "${crt_dirs}/${dll}")
+  foreach(dll IN LISTS MLN_FFI_MSVC_RUNTIME_DLLS_${MLN_FFI_TARGET_ARCHITECTURE})
+    if(NOT EXISTS "${crt_dirs}/${dll}")
+      message(FATAL_ERROR "${crt_dirs} has no ${dll}")
     endif()
+    list(APPEND runtime_dlls "${crt_dirs}/${dll}")
   endforeach()
   set_property(
     TARGET ${target}
