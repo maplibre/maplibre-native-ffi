@@ -7,10 +7,17 @@
 // each other's changes.
 
 import { CameraUpdateMode, type MapHandle } from "@maplibre/native-ffi";
-import { getVersion, Map as GlMap, setWorkerUrl } from "maplibre-gl";
+import {
+  getVersion,
+  Map as GlMap,
+  setWorkerUrl,
+  type StyleSpecification,
+} from "maplibre-gl";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
+
+import type { Style } from "./styles.ts";
 
 // The bundle moves GL JS away from its worker, so the page tells it where the
 // worker is.
@@ -19,18 +26,20 @@ setWorkerUrl(workerUrl);
 export interface Comparison {
   /** Moves the GL JS map to the native map's camera, if the native map leads. */
   readonly nativeCameraChanged: () => void;
+  /** Gives the GL JS map `style`. */
+  readonly setStyle: (style: Style) => void;
   /** Removes the GL JS map and the divider. */
   readonly remove: () => void;
 }
 
 /**
- * Shows a GL JS map with `styleUrl` over the native map's `canvas`, and keeps
+ * Shows a GL JS map with `style` over the native map's `canvas`, and keeps
  * the two cameras together.
  */
 export function compare(
   map: MapHandle,
   canvas: HTMLCanvasElement,
-  styleUrl: string,
+  style: Style,
 ): Comparison {
   const container = document.createElement("div");
   container.id = "gl-map";
@@ -49,7 +58,7 @@ export function compare(
   const { center, zoom, bearing, pitch, roll } = view.camera;
   const gl = new GlMap({
     container,
-    style: styleUrl,
+    style: glStyle(style),
     center: [center.longitude, center.latitude],
     zoom,
     bearing,
@@ -120,6 +129,9 @@ export function compare(
         roll,
       });
     },
+    setStyle(style) {
+      gl.setStyle(glStyle(style));
+    },
     remove() {
       listening.abort();
       gl.remove();
@@ -175,6 +187,10 @@ function addDividerHandlers(divider: HTMLElement, signal: AbortSignal): void {
     },
     { signal },
   );
+}
+
+function glStyle(style: Style): string | StyleSpecification {
+  return style.url ?? (style.json as StyleSpecification);
 }
 
 function label(className: string, text: string): HTMLElement {

@@ -21,10 +21,10 @@ import {
 } from "@maplibre/native-ffi";
 
 import type { Comparison } from "./compare.ts";
+import { addCollapse, addStylePicker, showAttributions } from "./panel.ts";
+import { defaultStyle, type Style, styles } from "./styles.ts";
 
 import "./demo.css";
-
-const styleUrl = "https://tiles.openfreemap.org/styles/liberty";
 
 /** How a backend's page attaches a session to the canvas. */
 export interface Backend {
@@ -55,23 +55,54 @@ export interface Wakes {
 const status = document.querySelector<HTMLElement>("#status")!;
 const canvas = document.querySelector<HTMLCanvasElement>("#map")!;
 
-// Once the page shows an error, later progress doesn't replace it.
+// Once the page shows a fatal error, nothing replaces it. A style's error
+// lasts until the user picks another style.
 let failed = false;
 
 function showStatus(message: string): void {
   if (failed) return;
   status.textContent = message;
+  status.dataset.kind = "busy";
   status.hidden = message === "";
 }
 
-function showError(message: string): void {
-  showStatus(message);
-  status.classList.add("error");
-  failed = true;
+function showError(message: string, { fatal = true } = {}): void {
+  if (failed) return;
+  status.textContent = message;
+  status.dataset.kind = "error";
+  status.hidden = false;
+  failed = fatal;
+}
+
+// The style, as ?style=, so a link or a switch of backend keeps it.
+let style = styleFromUrl();
+
+function styleFromUrl(): Style {
+  const id = new URLSearchParams(location.search).get("style");
+  return styles.find((style) => style.id === id) ?? defaultStyle;
+}
+
+/** Sets a search parameter of the page's URL, or removes it for `null`. */
+function setSearchParam(name: string, value: string | null): void {
+  const url = new URL(location.href);
+  if (value === null) url.searchParams.delete(name);
+  else url.searchParams.set(name, value);
+  history.replaceState(null, "", url);
+  updateBackendLinks();
+}
+
+/** Matches the page to the style: its theme, and the canvas before a frame. */
+function showStyleTheme(style: Style): void {
+  document.documentElement.dataset.theme = style.dark ? "dark" : "light";
+  canvas.style.backgroundColor = style.swatch.land;
 }
 
 /** Runs the demo with `backend`, and reports a failure on the page. */
 export function run(backend: Backend): void {
+  showStyleTheme(style);
+  addCollapse();
+  addStylePicker(style, pickStyle);
+  updateBackendLinks();
   for (const link of document.querySelectorAll<HTMLAnchorElement>(
     "nav a[data-backend]",
   )) {
@@ -109,6 +140,7 @@ async function start(backend: Backend): Promise<void> {
       RuntimeEventFlag.mapStyleLoaded |
       RuntimeEventFlag.mapLoadingFailed |
       RuntimeEventFlag.mapRenderError |
+      RuntimeEventFlag.mapSourceChanged |
       RuntimeEventFlag.mapCameraIsChanging |
       RuntimeEventFlag.mapCameraDidChange,
   });
@@ -119,8 +151,15 @@ async function start(backend: Backend): Promise<void> {
         switch (event.type) {
           case RuntimeEventType.mapStyleLoaded:
             showStatus("");
+            updateAttributions(map);
+            break;
+          case RuntimeEventType.mapSourceChanged:
+            // A source's attribution arrives with its TileJSON.
+            updateAttributions(map);
             break;
           case RuntimeEventType.mapLoadingFailed:
+            showError(event.message, { fatal: false });
+            break;
           case RuntimeEventType.mapRenderError:
             showError(event.message);
             break;
@@ -145,8 +184,8 @@ async function start(backend: Backend): Promise<void> {
       pitch: 55,
     },
   });
-  map.discarding.setStyleUrl(styleUrl);
-  showStatus("Loading the style…");
+  styledMap = map;
+  setStyle(map, style);
 
   let session: RenderSessionHandle | undefined;
   // The binding calls both wakes on this thread. The session runs its
@@ -185,6 +224,43 @@ async function start(backend: Backend): Promise<void> {
   canvas.focus();
 }
 
+// The map, once it has taken its first style. The user can pick a style before
+// then, and the map starts with the latest pick.
+let styledMap: MapHandle | undefined;
+
+function pickStyle(picked: Style): void {
+  style = picked;
+  setSearchParam("style", style === defaultStyle ? null : style.id);
+  showStyleTheme(style);
+  if (styledMap === undefined) return;
+  setStyle(styledMap, style);
+  comparison?.setStyle(style);
+}
+
+function setStyle(map: MapHandle, style: Style): void {
+  showStyleTheme(style);
+  showAttributions([]);
+  // This replaces the last style's error, if it had one.
+  showStatus(`Loading ${style.name}…`);
+  if (style.url !== undefined) map.discarding.setStyleUrl(style.url);
+  else map.discarding.setStyleJson(style.json);
+}
+
+// Counts the attribution reads, so a slow read doesn't show the attributions
+// of a style the map has replaced.
+let attributionRead = 0;
+
+function updateAttributions(map: MapHandle): void {
+  const read = ++attributionRead;
+  map
+    .listStyleSources()
+    .then((sources) => {
+      if (read !== attributionRead) return;
+      showAttributions(sources.map((source) => source.attribution));
+    })
+    .catch((error: unknown) => console.error(error));
+}
+
 // The comparison with MapLibre GL JS, while the page shows it. The page loads
 // GL JS only for the comparison, and keeps it in the URL as ?compare.
 
@@ -193,21 +269,14 @@ let comparison: Comparison | undefined;
 function addCompareToggle(map: MapHandle): void {
   const toggle = document.querySelector<HTMLInputElement>("#compare")!;
   const update = async () => {
-    history.replaceState(
-      null,
-      "",
-      toggle.checked
-        ? "?compare" + location.hash
-        : location.pathname + location.hash,
-    );
-    updateBackendLinks();
+    setSearchParam("compare", toggle.checked ? "" : null);
     comparison?.remove();
     comparison = undefined;
     if (!toggle.checked) return;
     const { compare } = await import("./compare.ts");
     // The toggle may have changed while GL JS loaded.
     if (toggle.checked && comparison === undefined) {
-      comparison = compare(map, canvas, styleUrl);
+      comparison = compare(map, canvas, style);
     }
   };
   const change = () =>
