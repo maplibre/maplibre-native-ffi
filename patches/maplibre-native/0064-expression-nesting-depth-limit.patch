@@ -7,7 +7,7 @@ held about 95 levels
 Upstream: not proposed
 
 diff --git a/include/mln/style/expression/parsing_context.hpp b/include/mln/style/expression/parsing_context.hpp
-index b7bf456eb2..a17e3780bb 100644
+index b7bf456..a17e378 100644
 --- a/include/mln/style/expression/parsing_context.hpp
 +++ b/include/mln/style/expression/parsing_context.hpp
 @@ -4,6 +4,7 @@
@@ -65,7 +65,7 @@ index b7bf456eb2..a17e3780bb 100644
  
  bool isExpression(const std::string&) noexcept;
 diff --git a/src/mln/style/conversion/filter.cpp b/src/mln/style/conversion/filter.cpp
-index 4752c82a4f..b8750cc39b 100644
+index 4752c82..b8750cc 100644
 --- a/src/mln/style/conversion/filter.cpp
 +++ b/src/mln/style/conversion/filter.cpp
 @@ -15,9 +15,9 @@ namespace conversion {
@@ -160,7 +160,7 @@ index 4752c82a4f..b8750cc39b 100644
                  : *op == "!in"  ? createExpression("!", convertLegacyInFilter(values, error), error)
                  : *op == "has"  ? convertLegacyHasFilter(values, error)
 diff --git a/src/mln/style/expression/literal.cpp b/src/mln/style/expression/literal.cpp
-index 220d702f46..ffb6a8033e 100644
+index 220d702..ffb6a80 100644
 --- a/src/mln/style/expression/literal.cpp
 +++ b/src/mln/style/expression/literal.cpp
 @@ -16,8 +16,12 @@ std::optional<Value> checkNumber(T n) {
@@ -214,7 +214,7 @@ index 220d702f46..ffb6a8033e 100644
      }
  }
 diff --git a/src/mln/style/expression/parsing_context.cpp b/src/mln/style/expression/parsing_context.cpp
-index 9ea905a90c..19fe95e58e 100644
+index 9ea905a..19fe95e 100644
 --- a/src/mln/style/expression/parsing_context.cpp
 +++ b/src/mln/style/expression/parsing_context.cpp
 @@ -89,7 +89,7 @@ ParseResult ParsingContext::parse(const Convertible& value,
@@ -249,11 +249,19 @@ index 9ea905a90c..19fe95e58e 100644
          if (length == 0) {
              error(
 diff --git a/test/style/expression/expression.test.cpp b/test/style/expression/expression.test.cpp
-index 8855da3ef9..3ae4a966d3 100644
+index 8bf99e8..33b2e7d 100644
 --- a/test/style/expression/expression.test.cpp
 +++ b/test/style/expression/expression.test.cpp
-@@ -50,6 +50,31 @@ TEST(Expression, NestedOverloadFailureParsesEachLevelOnce) {
-     EXPECT_FALSE(parses(R"(["filter-id-<", )", R"(["filter-id-<"])", "]"));
+@@ -2,6 +2,7 @@
+ #include <mln/style/rapidjson_conversion.hpp>
+ #include <mln/style/expression/dsl.hpp>
+ #include <mln/style/expression/is_expression.hpp>
++#include <mln/style/expression/parsing_context.hpp>
+ #include <mln/test/util.hpp>
+ #include <mln/util/io.hpp>
+ #include <mln/util/rapidjson.hpp>
+@@ -32,6 +33,31 @@ TEST(Expression, IsExpression) {
+     }
  }
  
 +TEST(Expression, ParsingLimitsNestingDepth) {
@@ -285,7 +293,7 @@ index 8855da3ef9..3ae4a966d3 100644
  
  TEST_P(ExpressionEqualityTest, ExpressionEquality) {
 diff --git a/test/style/filter.test.cpp b/test/style/filter.test.cpp
-index 26b086022c..6ee9a7ebe9 100644
+index 26b0860..6ee9a7e 100644
 --- a/test/style/filter.test.cpp
 +++ b/test/style/filter.test.cpp
 @@ -384,3 +384,21 @@ TEST(Filter, LegacyExpressionInvalidType) {

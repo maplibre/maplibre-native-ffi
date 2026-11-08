@@ -7,6 +7,53 @@ signature instead of two overloads of the same arity
 (https://github.com/maplibre/maplibre-native-ffi/issues/1432).
 Upstream: https://github.com/maplibre/maplibre-native/pull/4924
 
+diff --git a/benchmark/CMakeLists.txt b/benchmark/CMakeLists.txt
+index cd6f315b4a..e260f99755 100644
+--- a/benchmark/CMakeLists.txt
++++ b/benchmark/CMakeLists.txt
+@@ -5,6 +5,7 @@ add_library(
+     ${PROJECT_SOURCE_DIR}/benchmark/function/camera_function.benchmark.cpp
+     ${PROJECT_SOURCE_DIR}/benchmark/function/composite_function.benchmark.cpp
+     ${PROJECT_SOURCE_DIR}/benchmark/function/source_function.benchmark.cpp
++    ${PROJECT_SOURCE_DIR}/benchmark/parse/expression.benchmark.cpp
+     ${PROJECT_SOURCE_DIR}/benchmark/parse/filter.benchmark.cpp
+     ${PROJECT_SOURCE_DIR}/benchmark/parse/tile_mask.benchmark.cpp
+     ${PROJECT_SOURCE_DIR}/benchmark/parse/vector_tile.benchmark.cpp
+diff --git a/benchmark/parse/expression.benchmark.cpp b/benchmark/parse/expression.benchmark.cpp
+new file mode 100644
+index 0000000000..7e930e6938
+--- /dev/null
++++ b/benchmark/parse/expression.benchmark.cpp
+@@ -0,0 +1,29 @@
++#include <benchmark/benchmark.h>
++
++#include <mln/style/expression/parsing_context.hpp>
++#include <mln/style/rapidjson_conversion.hpp>
++#include <mln/util/rapidjson.hpp>
++
++#include <string>
++
++using namespace mln;
++using namespace mln::style;
++
++// A chain of "-" calls whose innermost call fails to type-check.
++static void Parse_NestedFailingExpression(benchmark::State& state) {
++    std::string json = R"("a")";
++    for (int64_t i = 0; i < state.range(0); ++i) {
++        json = R"(["-", )" + json + ", 1]";
++    }
++    JSDocument document;
++    document.Parse<0>(json.c_str());
++    const JSValue* value = &document;
++
++    for (auto _ : state) {
++        expression::ParsingContext context;
++        benchmark::DoNotOptimize(context.parseExpression(conversion::Convertible(value)));
++    }
++    state.SetComplexityN(state.range(0));
++}
++
++BENCHMARK(Parse_NestedFailingExpression)->DenseRange(4, 16, 4)->Complexity();
 diff --git a/metrics/integration/expression-tests/join/non-array/test.json b/metrics/integration/expression-tests/join/non-array/test.json
 index 0c938bf5f7..adb2bcff01 100644
 --- a/metrics/integration/expression-tests/join/non-array/test.json
@@ -37,6 +84,27 @@ index d9de8ff0eb..50c63348e8 100644
          }
        ]
      }
+diff --git a/metrics/integration/expression-tests/minus/nested-failure/test.json b/metrics/integration/expression-tests/minus/nested-failure/test.json
+new file mode 100644
+index 0000000000..ae1f51da16
+--- /dev/null
++++ b/metrics/integration/expression-tests/minus/nested-failure/test.json
+@@ -0,0 +1,15 @@
++{
++  "expression": ["-", ["-", ["-", "a", 1], 1], 1],
++  "inputs": [[{}, {}]],
++  "expected": {
++    "compiled": {
++      "result": "error",
++      "errors": [
++        {
++          "key": "[1][1][1]",
++          "error": "Expected number but found string instead."
++        }
++      ]
++    }
++  }
++}
 diff --git a/src/mln/style/expression/compound_expression.cpp b/src/mln/style/expression/compound_expression.cpp
 index 39b0077c87..f0de5e1500 100644
 --- a/src/mln/style/expression/compound_expression.cpp
@@ -386,39 +454,3 @@ index a37cc2a9e4..9c71fa18eb 100644
              [1, "WARNING", "ParseStyle", "\"zoom\" expression may only be used as input to a top-level \"step\" or \"interpolate\" expression."],
              [1, "WARNING", "ParseStyle", "value must be a string"],
              [1, "WARNING", "ParseStyle", "Expected string but found boolean instead."],
-diff --git a/test/style/expression/expression.test.cpp b/test/style/expression/expression.test.cpp
-index 8bf99e89f7..8855da3ef9 100644
---- a/test/style/expression/expression.test.cpp
-+++ b/test/style/expression/expression.test.cpp
-@@ -2,6 +2,7 @@
- #include <mln/style/rapidjson_conversion.hpp>
- #include <mln/style/expression/dsl.hpp>
- #include <mln/style/expression/is_expression.hpp>
-+#include <mln/style/expression/parsing_context.hpp>
- #include <mln/test/util.hpp>
- #include <mln/util/io.hpp>
- #include <mln/util/rapidjson.hpp>
-@@ -32,6 +33,23 @@ TEST(Expression, IsExpression) {
-     }
- }
- 
-+TEST(Expression, NestedOverloadFailureParsesEachLevelOnce) {
-+    const auto parses = [](const std::string& open, const std::string& inner, const std::string& close) {
-+        std::string json = inner;
-+        for (int i = 0; i < 64; ++i) {
-+            json = open + json + close;
-+        }
-+        JSDocument document;
-+        document.Parse<0>(json);
-+        const JSValue* expression = &document;
-+        expression::ParsingContext ctx;
-+        return bool(ctx.parseExpression(conversion::Convertible(expression)));
-+    };
-+
-+    EXPECT_FALSE(parses(R"(["-", )", R"("a")", ", 1]"));
-+    EXPECT_FALSE(parses(R"(["filter-id-<", )", R"(["filter-id-<"])", "]"));
-+}
-+
- class ExpressionEqualityTest : public ::testing::TestWithParam<std::string> {};
- 
- TEST_P(ExpressionEqualityTest, ExpressionEquality) {
