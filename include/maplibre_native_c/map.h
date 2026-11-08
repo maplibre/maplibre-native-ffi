@@ -1348,6 +1348,14 @@ MLN_API mln_status mln_map_end_command_group(
  *
  * `state` is a JSON object. Its keys replace the same keys in the feature's
  * state, and the other keys stay.
+ *
+ * The map keeps the state until it is removed, its source leaves the style, or
+ * a style loads. mln_map_remove_style_source() removes the state of the
+ * source's features, and a style that loads removes the state of every source,
+ * so a later source with the same ID starts with no state. To set state for a
+ * new style's sources, wait until mln_map_set_style_url() or
+ * mln_map_set_style_json() completes. The style load removes state set before
+ * then.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_feature_state(
@@ -1359,7 +1367,9 @@ MLN_API mln_status mln_map_set_feature_state(
 /**
  * Reads the state of a feature, as a JSON object.
  *
- * The object is empty when the feature has no state.
+ * The object is empty when the feature has no state, including after its
+ * source leaves the style or a style loads, as mln_map_set_feature_state()
+ * describes.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_map_get_feature_state(
