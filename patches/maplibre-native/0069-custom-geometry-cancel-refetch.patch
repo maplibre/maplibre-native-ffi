@@ -2,7 +2,7 @@ Forgets a custom geometry tile when it's cancelled, as the custom vector loader
 already does, so the tile fetches again when it is next required. Before, the
 source told the provider to cancel the tile and never asked for it again
 (https://github.com/maplibre/maplibre-native-ffi/issues/778).
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4928
 
 diff --git a/src/mln/style/custom_tile_loader.cpp b/src/mln/style/custom_tile_loader.cpp
 index a7e306c..6b2d590 100644

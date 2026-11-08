@@ -2,7 +2,7 @@ Treats an empty tile URL list as a source with no tiles, so rendering does not
 throw while constructing a tile. Keeps empty sources available for later URL
 updates without changing style or TileJSON validation
 (https://github.com/maplibre/maplibre-native-ffi/issues/1385).
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4920
 
 diff --git a/src/mln/renderer/sources/render_tile_source.cpp b/src/mln/renderer/sources/render_tile_source.cpp
 index 9192c9d5e8..a4ab5165aa 100644

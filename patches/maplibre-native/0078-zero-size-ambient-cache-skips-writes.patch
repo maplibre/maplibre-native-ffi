@@ -7,7 +7,7 @@ disabled() already skips the write. Once a region exists, put() compressed the
 response, failed to make room for it, and logged "Unable to make space for
 entry" for every resource a map loaded. It now skips that work and the log. The
 result is the same: a cache with no room stores nothing.
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4931
 
 diff --git a/platform/default/src/mln/storage/offline_database.cpp b/platform/default/src/mln/storage/offline_database.cpp
 index 6ca2c98..16a3f74 100644

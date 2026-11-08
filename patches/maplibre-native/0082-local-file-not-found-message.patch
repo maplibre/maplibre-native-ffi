@@ -4,10 +4,10 @@ file:///nonexistent/style.json failed with "loading style failed: " and nothing
 after the colon. file://, asset://, and Android's local file sources all read
 through requestLocalFile.
 (https://github.com/maplibre/maplibre-native-ffi/issues/1708)
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4930
 
 diff --git a/platform/default/src/mln/storage/local_file_request.cpp b/platform/default/src/mln/storage/local_file_request.cpp
-index 8df2d09..29dbc46 100644
+index 8df2d09ea7..29dbc464c7 100644
 --- a/platform/default/src/mln/storage/local_file_request.cpp
 +++ b/platform/default/src/mln/storage/local_file_request.cpp
 @@ -23,8 +23,12 @@ void requestLocalFile(const std::string& path,
@@ -26,7 +26,7 @@ index 8df2d09..29dbc46 100644
          auto data = util::readFile(path, dataRange);
          if (!data) {
 diff --git a/test/storage/local_file_source.test.cpp b/test/storage/local_file_source.test.cpp
-index 85e4d80..791d403 100644
+index 85e4d80270..791d4031d5 100644
 --- a/test/storage/local_file_source.test.cpp
 +++ b/test/storage/local_file_source.test.cpp
 @@ -172,7 +172,8 @@ TEST(LocalFileSource, NonExistentFile) {
@@ -49,3 +49,16 @@ index 85e4d80..791d403 100644
          loop.stop();
      });
  
+diff --git a/test/storage/pmtiles_file_source.test.cpp b/test/storage/pmtiles_file_source.test.cpp
+index 856d328655..16172b9c49 100644
+--- a/test/storage/pmtiles_file_source.test.cpp
++++ b/test/storage/pmtiles_file_source.test.cpp
+@@ -39,7 +39,7 @@ TEST(PMTilesFileSource, NonExistentFile) {
+             req.reset();
+             ASSERT_NE(nullptr, res.error);
+             EXPECT_EQ(Response::Error::Reason::NotFound, res.error->reason);
+-            EXPECT_NE((res.error->message).find("path not found"), std::string::npos);
++            EXPECT_NE((res.error->message).find("Cannot find file"), std::string::npos);
+             ASSERT_FALSE(res.data.get());
+             loop.stop();
+         });

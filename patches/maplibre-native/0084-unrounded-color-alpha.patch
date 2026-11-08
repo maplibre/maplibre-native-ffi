@@ -5,11 +5,11 @@ GL JS's to-rgba returns alpha as is. Color::stringify, which backs to-string
 and style JSON, now matches GL JS's Color.toString: whole channels and alpha as
 is. Before, it wrote unrounded channels and rounded alpha.
 (https://github.com/maplibre/maplibre-native-ffi/issues/1707)
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4929
 
 diff --git a/metrics/integration/expression-tests/to-rgba/alpha-unrounded/test.json b/metrics/integration/expression-tests/to-rgba/alpha-unrounded/test.json
 new file mode 100644
-index 0000000..b17d73f
+index 0000000000..b17d73f10e
 --- /dev/null
 +++ b/metrics/integration/expression-tests/to-rgba/alpha-unrounded/test.json
 @@ -0,0 +1,14 @@
@@ -29,7 +29,7 @@ index 0000000..b17d73f
 +}
 diff --git a/metrics/integration/expression-tests/to-string/color-alpha/test.json b/metrics/integration/expression-tests/to-string/color-alpha/test.json
 new file mode 100644
-index 0000000..43a30d2
+index 0000000000..43a30d2a1e
 --- /dev/null
 +++ b/metrics/integration/expression-tests/to-string/color-alpha/test.json
 @@ -0,0 +1,14 @@
@@ -47,8 +47,39 @@ index 0000000..43a30d2
 +    "serialized": "rgba(255,0,0,0.125)"
 +  }
 +}
+diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/utils/ColorUtils.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/utils/ColorUtils.java
+index af5c6358ff..64714e470d 100644
+--- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/utils/ColorUtils.java
++++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/utils/ColorUtils.java
+@@ -126,8 +126,9 @@ public class ColorUtils {
+   @ColorInt
+   public static int rgbaToColor(@NonNull String value) {
+     // we need to accept and floor float values as well, as those can come from core
++    // Core writes a tiny alpha in exponent notation, such as 1e-07.
+     Pattern c = Pattern.compile("rgba?\\s*\\(\\s*(\\d+\\.?\\d*)\\s*,\\s*(\\d+\\.?\\d*)\\s*,\\s*(\\d+\\.?\\d*)\\s*,"
+-      + "?\\s*(\\d+\\.?\\d*)?\\s*\\)");
++      + "?\\s*(\\d+\\.?\\d*(?:[eE][-+]?\\d+)?)?\\s*\\)");
+     Matcher m = c.matcher(value);
+     if (m.matches() && m.groupCount() == 3) {
+       return Color.rgb((int) Float.parseFloat(m.group(1)), (int) Float.parseFloat(m.group(2)),
+diff --git a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/utils/ColorUtilsTest.kt b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/utils/ColorUtilsTest.kt
+index 64cbfce868..2081d2a374 100644
+--- a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/utils/ColorUtilsTest.kt
++++ b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/utils/ColorUtilsTest.kt
+@@ -20,4 +20,11 @@ class ColorUtilsTest : BaseTest() {
+         val result = ColorUtils.rgbaToColor(input)
+         Assert.assertEquals(Color.argb(255, 128, 0, (0.7 * 255).toInt()), result)
+     }
++
++    @Test
++    fun rgbaToColor_exponentAlpha() {
++        val input = "rgba(255,128,0,1e-07)"
++        val result = ColorUtils.rgbaToColor(input)
++        Assert.assertEquals(Color.argb(0, 255, 128, 0), result)
++    }
+ }
 diff --git a/src/mln/util/color.cpp b/src/mln/util/color.cpp
-index 132336c..4d676d4 100644
+index 132336c720..4d676d4a15 100644
 --- a/src/mln/util/color.cpp
 +++ b/src/mln/util/color.cpp
 @@ -173,8 +173,12 @@ std::optional<Color> Color::parse(const std::string& s) {
@@ -76,7 +107,7 @@ index 132336c..4d676d4 100644
      }
  }
 diff --git a/src/mln/util/color.rs.cpp b/src/mln/util/color.rs.cpp
-index dbf2331..d76dad0 100644
+index dbf23310cd..d76dad07d7 100644
 --- a/src/mln/util/color.rs.cpp
 +++ b/src/mln/util/color.rs.cpp
 @@ -21,8 +21,12 @@ std::optional<Color> Color::parse(const std::string& s) {
@@ -104,7 +135,7 @@ index dbf2331..d76dad0 100644
      }
  }
 diff --git a/test/util/color.test.cpp b/test/util/color.test.cpp
-index 8bb17bf..b086422 100644
+index 8bb17bf302..b086422885 100644
 --- a/test/util/color.test.cpp
 +++ b/test/util/color.test.cpp
 @@ -125,3 +125,16 @@ TEST(ColorInterpolate, RgbIsTheExistingInterpolation) {

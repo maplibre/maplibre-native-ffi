@@ -7,7 +7,7 @@ visitDrawables() called onRenderError() through that pointer. A browser module
 then trapped with "memory access out of bounds" and left a black canvas. The
 WebGPU context now sets the observer, and the pointer starts at the null
 observer, as gfx::Context's does, for a layer group that is never given one.
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4922
 
 diff --git a/include/mln/renderer/layer_group.hpp b/include/mln/renderer/layer_group.hpp
 index ee3e5a8..d0db7f0 100644
@@ -40,6 +40,28 @@ index b534ded..7e0c8c8 100644
      return layerGroup;
  }
  
+diff --git a/test/BUILD.bazel b/test/BUILD.bazel
+index 988db4e39b..51365bb0c9 100644
+--- a/test/BUILD.bazel
++++ b/test/BUILD.bazel
+@@ -58,9 +58,15 @@ cc_library(
+         [
+             "**/*.test.cpp",
+         ],
+-        exclude = ["renderer/wgsl_preprocessor.test.cpp"] + PLUGIN_API_TESTS,
++        exclude = [
++            "renderer/webgpu_layer_group.test.cpp",
++            "renderer/wgsl_preprocessor.test.cpp",
++        ] + PLUGIN_API_TESTS,
+     ) + select({
+-        "//:webgpu_renderer": ["renderer/wgsl_preprocessor.test.cpp"],
++        "//:webgpu_renderer": [
++            "renderer/webgpu_layer_group.test.cpp",
++            "renderer/wgsl_preprocessor.test.cpp",
++        ],
+         "//conditions:default": [],
+     }) + select({
+         "//:plugins_enabled": PLUGIN_API_TESTS,
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
 index 3d8e57b..dbd8904 100644
 --- a/test/CMakeLists.txt

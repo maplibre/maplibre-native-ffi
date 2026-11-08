@@ -1,6 +1,6 @@
 Builds line gradient, heatmap, and color relief ramps from the current update's
 global state, not the previous one.
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4933
 
 diff --git a/src/mln/renderer/layers/render_color_relief_layer.cpp b/src/mln/renderer/layers/render_color_relief_layer.cpp
 index 78d8564c01..7aef68f363 100644

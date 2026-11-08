@@ -5,7 +5,7 @@ libuv timer converts it to an unsigned millisecond count and never fires.
 Retry-After: 0 hits this whenever the clock crosses a second between parsing
 the response and scheduling the retry
 (https://github.com/maplibre/maplibre-native-ffi/actions/runs/42117577416/job/127561385076).
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4923
 
 diff --git a/src/mln/util/http_timeout.cpp b/src/mln/util/http_timeout.cpp
 index 52252a1..00282b8 100644
