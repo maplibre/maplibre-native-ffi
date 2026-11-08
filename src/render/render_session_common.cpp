@@ -4169,6 +4169,15 @@ struct DriverMapCompletion {
   }
 };
 
+// A resize accepted while the session attaches queues behind the attach work,
+// so it applies once the attach completes, and ends with the session if the
+// attach fails.
+auto accepts_extent_change_locked(const mln_render_session_object& session)
+  -> bool {
+  return session.state == MLN_RENDER_SESSION_STATE_ATTACHING ||
+         session.state == MLN_RENDER_SESSION_STATE_ATTACHED;
+}
+
 auto make_ordered_resize_work(
   const std::shared_ptr<mln_render_session_object>& session,
   const std::shared_ptr<DriverMapCompletion>& completion,
@@ -4242,7 +4251,7 @@ auto render_session_resize_start(
   auto runtime = std::shared_ptr<RuntimeObject>{};
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
+    if (!accepts_extent_change_locked(*live)) {
       set_thread_error("render session is not attached");
       return MLN_STATUS_INVALID_STATE;
     }
@@ -4320,7 +4329,7 @@ auto render_session_resize_start(
   {
     auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
-    if (live->state == MLN_RENDER_SESSION_STATE_ATTACHED) {
+    if (accepts_extent_change_locked(*live)) {
       auto work = make_ordered_resize_work(live, joined, logical_size);
       // Allocate the driver node before the map accepts its half. The lock
       // keeps the driver from taking it until both halves are published.

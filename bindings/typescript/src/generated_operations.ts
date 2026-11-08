@@ -5240,7 +5240,8 @@ export class RenderSessionHandle extends Owner {
    * Resizes the session's target and its map.
    *
    * The session renders at the map's scale factor. Release every acquired frame
-   * first.
+   * first. You can call it once the attach call returns. While the attach runs,
+   * the resize waits for it to complete.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5249,6 +5250,9 @@ export class RenderSessionHandle extends Owner {
    *
    * - `Status.unsupported` when the session renders into a borrowed ring. Give
    *   it new textures of the new size instead.
+   * - `Status.invalidState` while you hold one of the session's acquired
+   *   frames, or when the session failed, or you detached, abandoned, released,
+   *   or disposed it.
    * - `Status.targetLost` when the session loses its target before the resize
    *   applies.
    */
@@ -5633,7 +5637,8 @@ export class RenderSessionHandleDiscarding {
    * Resizes the session's target and its map.
    *
    * The session renders at the map's scale factor. Release every acquired frame
-   * first.
+   * first. You can call it once the attach call returns. While the attach runs,
+   * the resize waits for it to complete.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5642,6 +5647,9 @@ export class RenderSessionHandleDiscarding {
    *
    * - `Status.unsupported` when the session renders into a borrowed ring. Give
    *   it new textures of the new size instead.
+   * - `Status.invalidState` while you hold one of the session's acquired
+   *   frames, or when the session failed, or you detached, abandoned, released,
+   *   or disposed it.
    */
   resize(logicalSize: LogicalSize): void {
     native.mln_render_session_resize(this.#owner.id, logicalSize, undefined);

@@ -352,17 +352,18 @@ bool mln_test_render_fixture_create_borrowed_ring(
   );
 }
 
-mln_status mln_test_render_fixture_start_attach(
+static mln_status start_attach(
   mln_map map, const mln_render_session_attach_options* options,
-  const mln_completion* completion, mln_test_render_fixture* fixture
+  const mln_completion* completion, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach_target, uint32_t driver
 ) {
   mln_test_render_reserve_session();
   *fixture = (mln_test_render_fixture){0};
-  fixture->driver = mln_test_backend_driver();
+  fixture->driver = driver;
   mln_render_session_attach_options attach = *options;
   attach.driver = fixture->driver;
   mln_status status = MLN_STATUS_INVALID_STATE;
-  if (!mln_test_backend_attach_borrowed(
+  if (!attach_target(
         map, &attach, &fixture->backend_state, &fixture->session, completion,
         &status
       )) {
@@ -376,6 +377,26 @@ mln_status mln_test_render_fixture_start_attach(
   }
   mln_test_render_track_session(fixture);
   return MLN_STATUS_OK;
+}
+
+mln_status mln_test_render_fixture_start_attach(
+  mln_map map, const mln_render_session_attach_options* options,
+  const mln_completion* completion, mln_test_render_fixture* fixture
+) {
+  return start_attach(
+    map, options, completion, fixture, mln_test_backend_attach_borrowed,
+    mln_test_backend_driver()
+  );
+}
+
+mln_status mln_test_render_fixture_start_offscreen_attach(
+  mln_map map, const mln_render_session_attach_options* options,
+  const mln_completion* completion, mln_test_render_fixture* fixture
+) {
+  return start_attach(
+    map, options, completion, fixture, attach_offscreen,
+    MLN_RENDER_DRIVER_CORE_WORKER
+  );
 }
 
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {

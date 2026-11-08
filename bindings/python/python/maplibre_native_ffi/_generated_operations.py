@@ -2638,7 +2638,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """Resizes the session's target and its map.
 
         The session renders at the map's scale factor. Release every acquired
-        frame first.
+        frame first. You can call it once the attach call returns. While the
+        attach runs, the resize waits for it to complete.
 
         See `mln_render_session_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2647,6 +2648,9 @@ class _RenderSessionHandleOperations(GeneratedOperations):
 
         - `Status.UNSUPPORTED` when the session renders into a borrowed ring.
           Give it new textures of the new size instead.
+        - `Status.INVALID_STATE` while you hold one of the session's acquired
+          frames, or when the session failed, or you detached, abandoned,
+          released, or disposed it.
         - `Status.TARGET_LOST` when the session loses its target before the
           resize applies.
         """
@@ -4366,7 +4370,8 @@ class RenderSessionHandleDiscarding:
         """Resizes the session's target and its map.
 
         The session renders at the map's scale factor. Release every acquired
-        frame first.
+        frame first. You can call it once the attach call returns. While the
+        attach runs, the resize waits for it to complete.
 
         See `mln_render_session_resize` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4375,6 +4380,9 @@ class RenderSessionHandleDiscarding:
 
         - `Status.UNSUPPORTED` when the session renders into a borrowed ring.
           Give it new textures of the new size instead.
+        - `Status.INVALID_STATE` while you hold one of the session's acquired
+          frames, or when the session failed, or you detached, abandoned,
+          released, or disposed it.
         """
         return self._native._discard_resize(logical_size)
 

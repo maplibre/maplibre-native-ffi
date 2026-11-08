@@ -2382,7 +2382,8 @@ pub const RenderSession = struct {
     /// Resizes the session's target and its map.
     ///
     /// The session renders at the map's scale factor. Release every acquired frame
-    /// first.
+    /// first. You can call it once the attach call returns. While the attach runs,
+    /// the resize waits for it to complete.
     ///
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2391,6 +2392,9 @@ pub const RenderSession = struct {
     ///
     /// - `error.Unsupported` when the session renders into a borrowed ring. Give it
     ///   new textures of the new size instead.
+    /// - `error.InvalidState` while you hold one of the session's acquired frames,
+    ///   or when the session failed, or you detached, abandoned, released, or
+    ///   disposed it.
     /// - `error.TargetLost` when the session loses its target before the resize
     ///   applies.
     pub fn resize(self: RenderSession, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {

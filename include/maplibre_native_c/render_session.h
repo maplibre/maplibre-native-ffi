@@ -401,11 +401,15 @@ MLN_API void mln_acquired_frame_view_end(
  * Resizes the session's target and its map.
  *
  * The session renders at the map's scale factor. Release every acquired frame
- * first.
+ * first. You can call it once the attach call returns. While the attach runs,
+ * the resize waits for it to complete.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders into a borrowed ring. Give
  *   it new textures of the new size instead.
+ * - MLN_STATUS_INVALID_STATE while you hold one of the session's acquired
+ *   frames, or when the session failed, or you detached, abandoned, released,
+ *   or disposed it.
  *
  * Completes with:
  * - MLN_STATUS_TARGET_LOST when the session loses its target before the resize

@@ -106,6 +106,64 @@ void a_resize_queued_before_detach_completes_as_failed() {
   destroy_fixture(fixture);
 }
 
+// A host's surface can change size while its session attaches. Holding the
+// map's construction holds the attach, which waits for it, so the resize
+// reaches a session that is still attaching on every driver.
+void a_resize_while_attaching_applies_after_the_attach() {
+  auto points = SyncPointScope{};
+  const auto runtime = mln_test_create_runtime();
+  points.hold(SyncPoint::MapConstruction);
+  const auto map_options = mln_test_map_options();
+  auto created = mln_test_completion_default(0);
+  auto map = mln_map{MLN_HANDLE_NULL};
+  MLN_TEST_OK(mln_runtime_create_map(
+    runtime, &map_options, &map, &created.descriptor, nullptr
+  ));
+  TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::MapConstruction, 1));
+  auto options = mln_render_session_attach_options{
+    .size = sizeof(mln_render_session_attach_options)
+  };
+  options.frame_wake = mln_test_pulse_wake();
+  options.driver_work_wake = mln_test_pulse_wake();
+  auto attach = mln_test_completion_default(0);
+  auto render = mln_test_render_fixture{};
+  MLN_TEST_OK(mln_test_render_fixture_start_offscreen_attach(
+    map, &options, &attach.descriptor, &render
+  ));
+  auto snapshot =
+    mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(render.session, &snapshot, nullptr)
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHING, snapshot.state);
+
+  auto resize = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_resize(
+    render.session, mln_logical_size{32, 48}, &resize.descriptor, nullptr
+  ));
+  points.release(SyncPoint::MapConstruction);
+  MLN_TEST_OK(mln_test_completion_settle(&created));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&render, &attach));
+  mln_test_completion_destroy(&attach);
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&render, &resize));
+  mln_test_completion_destroy(&resize);
+
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(render.session, &snapshot, nullptr)
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
+  TEST_ASSERT_EQUAL_UINT32(32, snapshot.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(48, snapshot.extent.height);
+  auto map_snapshot = mln_map_snapshot{.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &map_snapshot, nullptr));
+  TEST_ASSERT_EQUAL_UINT32(32, map_snapshot.view.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(48, map_snapshot.view.extent.height);
+
+  mln_test_render_fixture_destroy(&render);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 struct RunningHook {
   mln::core::RenderSessionScheduler scheduler;
   mln_test_gate gate{};
@@ -2110,6 +2168,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_same_size_resize_redraws_after_an_earlier_queued_frame);
   RUN_TEST(a_failed_retarget_sizes_the_map_back_to_the_session);
   RUN_TEST(a_resize_queued_before_detach_completes_as_failed);
+  RUN_TEST(a_resize_while_attaching_applies_after_the_attach);
   RUN_TEST(a_hook_replacement_waits_for_the_running_hook);
   RUN_TEST(a_barrier_waits_for_an_ordered_operation_after_a_running_demand);
   RUN_TEST(a_release_waits_only_for_the_frame_in_flight);

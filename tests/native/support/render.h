@@ -72,6 +72,13 @@ mln_status mln_test_render_fixture_start_attach(
   const mln_completion* completion, mln_test_render_fixture* fixture
 );
 
+// mln_test_render_fixture_start_attach() for a 64x64 offscreen session, which
+// a core worker drives.
+mln_status mln_test_render_fixture_start_offscreen_attach(
+  mln_map map, const mln_render_session_attach_options* options,
+  const mln_completion* completion, mln_test_render_fixture* fixture
+);
+
 // Services driver work when the fixture's session uses the caller-driver, and
 // reports the service status. A core-worker session needs no service.
 mln_status mln_test_render_fixture_service(
