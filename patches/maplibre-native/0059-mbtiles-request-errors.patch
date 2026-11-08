@@ -2,7 +2,7 @@ Reports a failed MBTiles request instead of terminating the process when the
 file is not a readable MBTiles database or its metadata does not parse. Treats
 an empty mbtiles:// path as not absolute instead of throwing
 (https://github.com/maplibre/maplibre-native-ffi/issues/1435).
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4921
 
 diff --git a/platform/default/src/mln/storage/mbtiles_file_source.cpp b/platform/default/src/mln/storage/mbtiles_file_source.cpp
 index 3fa65775ea..c632de728c 100644

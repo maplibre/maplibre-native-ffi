@@ -2,7 +2,7 @@ Lets an offline region with an infinite maxZoom cover each source's zooms up to
 that source's maxzoom, as OfflineRegionDefinition documents. Converting the
 infinity to an integer is undefined, and x86-64 produces INT32_MIN, so such a
 region needed no tiles there.
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4925
 
 diff --git a/platform/default/src/mln/storage/offline_download.cpp b/platform/default/src/mln/storage/offline_download.cpp
 index 863dbf7dd2..cda5c3d66a 100644

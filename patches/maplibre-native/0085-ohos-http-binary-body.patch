@@ -5,7 +5,7 @@ reports the body's full length. A binary response, such as a PMTiles header
 or a PNG tile, then read past the end of the copy. The data callback passes
 each chunk with its length on every release since API 20.
 (https://github.com/maplibre/maplibre-native-ffi/issues/1692)
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4932
 
 diff --git a/platform/ohos/src/http_file_source.cpp b/platform/ohos/src/http_file_source.cpp
 index 50072a2..d9d78ee 100644

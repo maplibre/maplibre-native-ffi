@@ -2,7 +2,7 @@ Treats an empty image name as no image, as the style spec's reference
 implementation does, so an icon-image or *-pattern that evaluates to "" is
 neither requested nor reported missing
 (https://github.com/maplibre/maplibre-native-ffi/issues/819).
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4927
 
 diff --git a/src/mln/layout/pattern_layout.hpp b/src/mln/layout/pattern_layout.hpp
 index 14cfa79e78..732f1741e3 100644

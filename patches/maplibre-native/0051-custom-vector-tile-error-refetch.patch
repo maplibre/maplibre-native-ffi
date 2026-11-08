@@ -3,7 +3,7 @@ it, so invalidating the failed tile fetches it again. Before, setTileError
 dropped them, so invalidateTile found nothing, and the tile stayed failed until
 it left the view and came back
 (https://github.com/maplibre/maplibre-native-ffi/issues/782).
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4928
 
 diff --git a/src/mln/style/custom_vector_tile_loader.cpp b/src/mln/style/custom_vector_tile_loader.cpp
 index b2b4fea..db0a5b2 100644

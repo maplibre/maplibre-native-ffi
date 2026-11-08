@@ -4,7 +4,7 @@ file:///nonexistent/style.json failed with "loading style failed: " and nothing
 after the colon. file://, asset://, and Android's local file sources all read
 through requestLocalFile.
 (https://github.com/maplibre/maplibre-native-ffi/issues/1708)
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4930
 
 diff --git a/platform/default/src/mln/storage/local_file_request.cpp b/platform/default/src/mln/storage/local_file_request.cpp
 index 8df2d09..29dbc46 100644

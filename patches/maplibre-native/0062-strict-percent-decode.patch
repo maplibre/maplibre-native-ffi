@@ -3,7 +3,7 @@ percent sign as literal text, as the WHATWG URL Standard does. A file, asset,
 or mbtiles URL with a bare percent sign otherwise names a different path, with
 garbage or NUL bytes in it
 (https://github.com/maplibre/maplibre-native-ffi/issues/1435).
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4926
 
 diff --git a/src/mln/util/url.cpp b/src/mln/util/url.cpp
 index f8be4c7b86..4118d77f63 100644

@@ -5,7 +5,7 @@ GL JS's to-rgba returns alpha as is. Color::stringify, which backs to-string
 and style JSON, now matches GL JS's Color.toString: whole channels and alpha as
 is. Before, it wrote unrounded channels and rounded alpha.
 (https://github.com/maplibre/maplibre-native-ffi/issues/1707)
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4929
 
 diff --git a/metrics/integration/expression-tests/to-rgba/alpha-unrounded/test.json b/metrics/integration/expression-tests/to-rgba/alpha-unrounded/test.json
 new file mode 100644

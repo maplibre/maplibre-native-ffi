@@ -5,8 +5,38 @@ of parsing the arguments again for a combined message, as maplibre-style-spec
 does, and the legacy filter comparisons take a number or a string through one
 signature instead of two overloads of the same arity
 (https://github.com/maplibre/maplibre-native-ffi/issues/1432).
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4924
 
+diff --git a/metrics/integration/expression-tests/join/non-array/test.json b/metrics/integration/expression-tests/join/non-array/test.json
+index 0c938bf5f7..adb2bcff01 100644
+--- a/metrics/integration/expression-tests/join/non-array/test.json
++++ b/metrics/integration/expression-tests/join/non-array/test.json
+@@ -6,8 +6,8 @@
+       "result": "error",
+       "errors": [
+         {
+-          "key": "",
+-          "error": "Expected arguments of type (array<string>, string), but found (string, string) instead."
++          "key": "[1]",
++          "error": "Expected array<string> but found string instead."
+         }
+       ]
+     }
+diff --git a/metrics/integration/expression-tests/join/numbers/test.json b/metrics/integration/expression-tests/join/numbers/test.json
+index d9de8ff0eb..50c63348e8 100644
+--- a/metrics/integration/expression-tests/join/numbers/test.json
++++ b/metrics/integration/expression-tests/join/numbers/test.json
+@@ -6,8 +6,8 @@
+       "result": "error",
+       "errors": [
+         {
+-          "key": "",
+-          "error": "Expected arguments of type (array<string>, string), but found (array<number, 3>, string) instead."
++          "key": "[1]",
++          "error": "Expected array<string> but found array<number, 3> instead."
+         }
+       ]
+     }
 diff --git a/src/mln/style/expression/compound_expression.cpp b/src/mln/style/expression/compound_expression.cpp
 index 39b0077c87..f0de5e1500 100644
 --- a/src/mln/style/expression/compound_expression.cpp
