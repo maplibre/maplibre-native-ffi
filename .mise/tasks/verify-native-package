@@ -15,7 +15,8 @@
 - A complete ELF archive keeps no COMDAT group, since a consumer's link would
   discard its private copy of a runtime in favor of the consumer's own.
 - A Windows DLL carries each Visual C++ runtime DLL it imports, since a host
-  need not have the redistributable installed.
+  need not have the redistributable installed, and each one it carries is
+  built for the preset's architecture.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ import os
 import pathlib
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tarfile
@@ -58,6 +60,10 @@ PE_EXPORT = re.compile(r"^\s*Name: (?P<name>\S+)$")
 PE_IMPORT = PE_EXPORT
 # The Visual C++ redistributable's DLLs, which an MSVC package carries.
 MSVC_RUNTIME_DLL = re.compile(r"^(vcruntime|msvcp|concrt|vccorlib)140", re.IGNORECASE)
+# The COFF machine that each Windows architecture loads. An ARM64X image, as
+# the ARM64 redistributable ships, has the ARM64 machine in its header, and an
+# ARM64EC one has the x64 machine.
+PE_MACHINES = {"x64": 0x8664, "arm64": 0xAA64}
 
 # Loader names without the `lib` prefix, version, or extension.
 LOADER_NAMES = frozenset(
@@ -102,6 +108,7 @@ UNSTRIPPED = "keeps local symbols"
 MISSING_DSYM = "has no matching dSYM"
 COMDAT_GROUPS = "keeps COMDAT groups"
 MISSING_RUNTIME = "imports a runtime DLL it doesn't carry"
+FOREIGN_RUNTIME = "is built for another architecture"
 REMEDIES = {
     BUILD_HOST_PATH: (
         "The package only loads where these paths exist. Resolve the "
@@ -142,8 +149,13 @@ REMEDIES = {
     MISSING_RUNTIME: (
         "A host without the Visual C++ redistributable can't load the DLL. "
         "Build on a Windows host, where mln_ffi_bundle_msvc_runtime installs "
-        "the runtime DLLs beside it, and add any new one to "
-        "MLN_FFI_MSVC_RUNTIME_DLLS."
+        "the runtime DLLs beside it, and add any new one to the "
+        "architecture's MLN_FFI_MSVC_RUNTIME_DLLS list."
+    ),
+    FOREIGN_RUNTIME: (
+        "A process can't load a DLL built for another architecture. A "
+        "Microsoft.VC*.CRT directory can hold one for code under emulation, "
+        "so remove it from the architecture's MLN_FFI_MSVC_RUNTIME_DLLS list."
     ),
 }
 
@@ -242,6 +254,18 @@ def pe_problems(binary: pathlib.Path) -> list[tuple[str, str]]:
         if MSVC_RUNTIME_DLL.match(name) and name.lower() not in carried
     )
     return problems
+
+
+def pe_machine(binary: pathlib.Path) -> int:
+    """The COFF machine in a PE file's header."""
+    with binary.open("rb") as file:
+        header = file.read(0x40)
+        (offset,) = struct.unpack_from("<I", header, 0x3C)
+        file.seek(offset)
+        signature, machine = struct.unpack("<4sH", file.read(6))
+    if signature != b"PE\0\0":
+        raise SystemExit(f"{binary} has no PE header")
+    return machine
 
 
 def dsym_problems(binary: pathlib.Path, root: pathlib.Path) -> list[tuple[str, str]]:
@@ -404,6 +428,11 @@ def main() -> int:
                 and image == "pe"
                 and MSVC_RUNTIME_DLL.match(binary.name)
             ):
+                machine = pe_machine(binary)
+                if machine != PE_MACHINES[preset.split("-")[1]]:
+                    problems.append(
+                        (binary.name, FOREIGN_RUNTIME, f"machine {machine:#06x}")
+                    )
                 continue
             if (
                 binary.name != PACKAGED_FRAMEWORK_BINARY
