@@ -7,10 +7,10 @@ created buffers each frame, and new bindings reset its pipeline. The context
 now keeps one buffer of defaults per attribute type, grown as needed, which
 every drawable binds. With the patches before it, the browser demo creates
 about 20 buffers a frame while moving instead of 420.
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4938
 
 diff --git a/include/mln/webgpu/context.hpp b/include/mln/webgpu/context.hpp
-index bf66c6e..b12b2d3 100644
+index bf66c6e672..22b82c0526 100644
 --- a/include/mln/webgpu/context.hpp
 +++ b/include/mln/webgpu/context.hpp
 @@ -4,6 +4,7 @@
@@ -21,31 +21,29 @@ index bf66c6e..b12b2d3 100644
  #include <memory>
  #include <optional>
  #include <vector>
-@@ -88,6 +89,11 @@ public:
+@@ -88,6 +89,10 @@ public:
      const BufferResource& getTileVertexBuffer();
      const BufferResource& getTileIndexBuffer();
  
-+    /// A vertex buffer of at least `size` bytes that holds the default value of
-+    /// an attribute of `type`, which a drawable binds for an attribute that it
-+    /// doesn't provide. Drawables share it, and it lives as long as the context.
++    /// A shared vertex buffer of at least `size` bytes holding the default value of `type`,
++    /// for attributes a drawable doesn't provide
 +    const VertexBufferResource& getDefaultVertexBuffer(gfx::AttributeDataType type, std::size_t size);
 +
      // Tile clipping mask rendering
      bool renderTileClippingMasks(gfx::RenderPass& renderPass,
                                   RenderStaticData& staticData,
-@@ -121,6 +127,10 @@ private:
+@@ -121,6 +126,9 @@ private:
      std::optional<BufferResource> tileVertexBuffer;
      std::optional<BufferResource> tileIndexBuffer;
  
-+    // Default attribute buffers by type, largest last. A drawable's bindings
-+    // point at one, so a smaller one stays alive after a larger one replaces it.
++    // Default attribute buffers by type, largest last. Bindings may still point at the smaller ones.
 +    std::map<gfx::AttributeDataType, std::vector<std::unique_ptr<VertexBufferResource>>> defaultVertexBuffers;
 +
      // Cached clipping resources
      gfx::ShaderProgramBasePtr clipMaskShader;
      const gfx::Renderable* clipMaskRenderable = nullptr;
 diff --git a/src/mln/webgpu/context.cpp b/src/mln/webgpu/context.cpp
-index 7e0c8c8..6116744 100644
+index 7199094393..0cf52f66cc 100644
 --- a/src/mln/webgpu/context.cpp
 +++ b/src/mln/webgpu/context.cpp
 @@ -5,6 +5,7 @@
@@ -56,7 +54,7 @@ index 7e0c8c8..6116744 100644
  #include <array>
  #include <mln/gfx/depth_mode.hpp>
  #include <mln/webgpu/command_encoder.hpp>
-@@ -229,6 +230,31 @@ const BufferResource& Context::getTileVertexBuffer() {
+@@ -227,6 +228,24 @@ const BufferResource& Context::getTileVertexBuffer() {
      return *tileVertexBuffer;
  }
  
@@ -66,22 +64,15 @@ index 7e0c8c8..6116744 100644
 +        return *buffers.back();
 +    }
 +
-+    // Grow geometrically, so a context keeps few of these.
++    // Grow geometrically, so few of these are created.
 +    const std::size_t previous = buffers.empty() ? 0 : buffers.back()->getSizeInBytes();
-+    const std::size_t capacity = std::max<std::size_t>({size, previous * 2, 256});
++    const std::size_t capacity = std::max({size, previous * 2, std::size_t{256}});
 +
-+    // Colors default to opaque white and opacities to fully opaque. Every other
-+    // attribute defaults to zero.
-+    std::vector<uint8_t> data(capacity, 0);
-+    if (type == gfx::AttributeDataType::Float4 || type == gfx::AttributeDataType::Float2) {
-+        auto* const values = reinterpret_cast<float*>(data.data());
-+        std::fill(values, values + capacity / sizeof(float), 1.0f);
-+    }
-+    auto buffer = createBuffer(data.data(), capacity, WGPUBufferUsage_Vertex, false, true);
-+    if (!buffer.getBuffer()) {
-+        Log::Error(Event::Render, "WebGPU: Failed to create a default vertex buffer");
-+    }
-+    buffers.push_back(std::make_unique<VertexBufferResource>(std::move(buffer)));
++    // Colors and opacities default to 1, everything else to 0.
++    const bool ones = type == gfx::AttributeDataType::Float4 || type == gfx::AttributeDataType::Float2;
++    const std::vector<float> data((capacity + sizeof(float) - 1) / sizeof(float), ones ? 1.0f : 0.0f);
++    buffers.push_back(std::make_unique<VertexBufferResource>(
++        createBuffer(data.data(), data.size() * sizeof(float), WGPUBufferUsage_Vertex, false, true)));
 +    return *buffers.back();
 +}
 +
@@ -89,32 +80,24 @@ index 7e0c8c8..6116744 100644
  const BufferResource& Context::getTileIndexBuffer() {
      if (!tileIndexBuffer) {
 diff --git a/src/mln/webgpu/upload_pass.cpp b/src/mln/webgpu/upload_pass.cpp
-index 5921f85..fcf3a91 100644
+index 5921f8529e..90f1ce3d2d 100644
 --- a/src/mln/webgpu/upload_pass.cpp
 +++ b/src/mln/webgpu/upload_pass.cpp
-@@ -9,6 +9,7 @@
- #include <mln/gfx/vertex_vector.hpp>
- #include <mln/gfx/debug_group.hpp>
- #include <mln/util/logging.hpp>
-+#include <algorithm>
- #include <sstream>
- 
- namespace mln {
-@@ -133,7 +134,7 @@ gfx::AttributeBindingArray UploadPass::buildAttributeBindings(
+@@ -133,7 +133,7 @@ gfx::AttributeBindingArray UploadPass::buildAttributeBindings(
      const gfx::VertexAttributeArray& overrides,
      const gfx::BufferUsageType usage,
      const std::optional<std::chrono::duration<double>> lastUpdate,
 -    /*out*/ std::vector<std::unique_ptr<gfx::VertexBufferResource>>& vertexBuffers) {
-+    /*out*/ [[maybe_unused]] std::vector<std::unique_ptr<gfx::VertexBufferResource>>& vertexBuffers) {
++    [[maybe_unused]] /*out*/ std::vector<std::unique_ptr<gfx::VertexBufferResource>>& vertexBuffers) {
      gfx::AttributeBindingArray bindings;
      bindings.resize(defaults.allocatedSize());
  
-@@ -146,53 +147,19 @@ gfx::AttributeBindingArray UploadPass::buildAttributeBindings(
+@@ -146,53 +146,18 @@ gfx::AttributeBindingArray UploadPass::buildAttributeBindings(
  
          if (!override_) {
              // No attribute was provided. WebGPU requires all vertex attributes to have buffers bound,
 -            // so we create a dummy buffer with default values.
-+            // so bind the context's buffer of default values, which every drawable shares.
++            // so bind the context's shared buffer of default values.
              const auto stride = VertexAttribute::getStrideOf(defaultAttr.getDataType());
 -            const auto bufferSize = stride * vertexCount;
 -
@@ -150,8 +133,7 @@ index 5921f85..fcf3a91 100644
 -                                                          usage,
 -                                                          /*persistent=*/false);
 +            auto& context = static_cast<Context&>(getContext());
-+            const auto& defaultBuffer = context.getDefaultVertexBuffer(defaultAttr.getDataType(),
-+                                                                       stride * std::max<std::size_t>(vertexCount, 1));
++            const auto& defaultBuffer = context.getDefaultVertexBuffer(defaultAttr.getDataType(), stride * vertexCount);
  
              bindings[index] = {
                  /*.attribute = */ {defaultAttr.getDataType(), /*offset=*/0},

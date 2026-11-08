@@ -10,13 +10,26 @@ for another object, and rebuilds one only when they change. It writes the UBO
 index only when it changes, and a sampler is kept when its state is unchanged.
 With the patches after it, the browser demo builds about 22 bind groups a frame
 while moving instead of 535.
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4938
 
+diff --git a/include/mln/gfx/texture2d.hpp b/include/mln/gfx/texture2d.hpp
+index 3f96d309e0..8482a22178 100644
+--- a/include/mln/gfx/texture2d.hpp
++++ b/include/mln/gfx/texture2d.hpp
+@@ -29,6 +29,8 @@ public:
+ 
+         uint8_t maxAnisotropy{1};
+         bool mipmapped{false};
++
++        bool operator==(const SamplerState&) const = default;
+     };
+ 
+ public:
 diff --git a/src/mln/webgpu/drawable.cpp b/src/mln/webgpu/drawable.cpp
-index f03d554..0cb6025 100644
+index 37ea8e9d93..62cf5d4652 100644
 --- a/src/mln/webgpu/drawable.cpp
 +++ b/src/mln/webgpu/drawable.cpp
-@@ -196,11 +196,6 @@ Drawable::~Drawable() {
+@@ -193,13 +193,6 @@ Drawable::~Drawable() {
      // So we should NOT release it here
      impl->pipelineState = nullptr;
  
@@ -25,10 +38,12 @@ index f03d554..0cb6025 100644
 -            wgpuBindGroupRelease(record.handle);
 -        }
 -    }
-     impl->bindGroups.clear();
- 
+-    impl->bindGroups.clear();
+-
      // Uniform buffers are managed by UniformBufferArray
-@@ -301,6 +296,8 @@ void Drawable::setShader(gfx::ShaderProgramBasePtr value) {
+     // Vertex and index buffers are now managed through attributeBindings and indexes
+ }
+@@ -298,6 +291,8 @@ void Drawable::setShader(gfx::ShaderProgramBasePtr value) {
      }
      shader = std::move(value);
      impl->pipelineState = nullptr; // Reset pipeline when shader changes
@@ -37,7 +52,7 @@ index f03d554..0cb6025 100644
  }
  
  void Drawable::upload(gfx::UploadPass& uploadPass) {
-@@ -499,23 +496,11 @@ void Drawable::draw(PaintParameters& parameters) const {
+@@ -496,24 +491,9 @@ void Drawable::draw(PaintParameters& parameters) const {
          if (webgpuShader) {
              WGPUDevice deviceHandle = static_cast<WGPUDevice>(backend.getDevice());
  
@@ -58,13 +73,12 @@ index f03d554..0cb6025 100644
 -                        if (idx + 1 < groupOrder.size()) orderStr += ",";
 -                    }
 -                    loggedBindGroupOrder = true;
-+                if (impl->bindGroups.size() != groupOrder.size()) {
-+                    impl->bindGroups.clear();
-+                    impl->bindGroups.resize(groupOrder.size());
-                 }
+-                }
++                impl->bindGroups.resize(groupOrder.size());
                  const auto* globalBuffers = webgpuRenderPass.getGlobalUniformBuffers();
  
-@@ -546,13 +531,6 @@ void Drawable::draw(PaintParameters& parameters) const {
+                 const auto findTextureForBinding = [&](uint32_t binding, bool samplerBinding) -> Texture2D* {
+@@ -543,13 +523,6 @@ void Drawable::draw(PaintParameters& parameters) const {
                      }
  
                      const auto& bindingInfos = webgpuShader->getBindingInfosForGroup(group);
@@ -78,7 +92,7 @@ index f03d554..0cb6025 100644
                      std::vector<WGPUBindGroupEntry> entries;
                      entries.reserve(bindingInfos.size());
                      bool validBindings = true;
-@@ -568,10 +546,16 @@ void Drawable::draw(PaintParameters& parameters) const {
+@@ -565,10 +538,15 @@ void Drawable::draw(PaintParameters& parameters) const {
                                  std::shared_ptr<gfx::UniformBuffer> buffer = impl->uniformBuffers.get(
                                      bindingInfo.binding);
                                  if (bindingInfo.binding == shaders::idGlobalUBOIndex) {
@@ -86,8 +100,7 @@ index f03d554..0cb6025 100644
 -                                    indexData.value = getUBOIndex();
 -                                    context.emplaceOrUpdateUniformBuffer(
 -                                        impl->uboIndexUniform, &indexData, sizeof(indexData), false);
-+                                    // Most drawables keep their index from frame to frame, so
-+                                    // write it only when it changes.
++                                    // Write the index only when it changes.
 +                                    const auto uboIndex = static_cast<uint32_t>(getUBOIndex());
 +                                    if (!impl->uboIndexUniform || impl->uboIndexValue != uboIndex) {
 +                                        GlobalUBOIndexData indexData;
@@ -99,12 +112,11 @@ index f03d554..0cb6025 100644
                                      if (impl->uboIndexUniform) {
                                          impl->uniformBuffers.set(bindingInfo.binding, impl->uboIndexUniform);
                                          buffer = impl->uboIndexUniform;
-@@ -656,6 +640,13 @@ void Drawable::draw(PaintParameters& parameters) const {
+@@ -653,6 +631,12 @@ void Drawable::draw(PaintParameters& parameters) const {
                          return;
                      }
  
-+                    // Reuse the bind group while it binds the same resources. A tweaker
-+                    // updates a buffer's contents in place, which needs no new bind group.
++                    // Reuse the bind group while it binds the same resources.
 +                    auto& record = impl->bindGroups[slot];
 +                    if (record.matches(layout, entries)) {
 +                        continue;
@@ -113,7 +125,7 @@ index f03d554..0cb6025 100644
                      const std::string label = getName() + " bind-group " + std::to_string(group);
                      WGPUStringView labelView = {label.c_str(), label.length()};
  
-@@ -667,9 +658,10 @@ void Drawable::draw(PaintParameters& parameters) const {
+@@ -664,9 +648,10 @@ void Drawable::draw(PaintParameters& parameters) const {
  
                      WGPUBindGroup bindGroup = wgpuDeviceCreateBindGroup(deviceHandle, &descriptor);
                      if (!bindGroup) {
@@ -126,29 +138,31 @@ index f03d554..0cb6025 100644
              }
          }
 diff --git a/src/mln/webgpu/drawable_impl.hpp b/src/mln/webgpu/drawable_impl.hpp
-index 8fd9b5b..d404cda 100644
+index 8fd9b5bb66..6657fb868d 100644
 --- a/src/mln/webgpu/drawable_impl.hpp
 +++ b/src/mln/webgpu/drawable_impl.hpp
-@@ -17,6 +17,7 @@
+@@ -15,8 +15,10 @@
+ #include <mln/renderer/paint_parameters.hpp>
+ #include <mln/util/mat4.hpp>
  
++#include <algorithm>
  #include <cstdint>
  #include <memory>
-+#include <optional>
++#include <utility>
  #include <vector>
  
  namespace mln {
-@@ -63,11 +64,85 @@ public:
+@@ -63,11 +65,85 @@ public:
      WGPUDepthStencilState depthStencilState = {};
      gfx::StencilMode previousStencilMode;
  
 -    // WebGPU-specific resources needed for rendering
-+    // The uboIndex value that uboIndexUniform holds.
-+    std::optional<uint32_t> uboIndexValue;
++    // The UBO index that uboIndexUniform holds.
++    uint32_t uboIndexValue = 0;
 +
-+    // A bind group and what it was built from. A draw reuses it while its
-+    // layout and entries stay the same. The record holds a reference on each
-+    // entry's buffer, sampler, and view, so a handle it compares can't be freed
-+    // and reused for another object.
++    // A bind group and the layout and entries it was built from. It holds a
++    // reference on each entry's resource, so a handle it compares can't be
++    // freed and reused for another object.
      struct BindGroupRecord {
          uint32_t slot = 0;
          uint32_t group = 0;
@@ -157,37 +171,26 @@ index 8fd9b5b..d404cda 100644
 +        std::vector<WGPUBindGroupEntry> entries;
 +
 +        BindGroupRecord() = default;
-+        BindGroupRecord(const BindGroupRecord&) = delete;
-+        BindGroupRecord& operator=(const BindGroupRecord&) = delete;
-+        BindGroupRecord(BindGroupRecord&& other) noexcept { *this = std::move(other); }
-+        BindGroupRecord& operator=(BindGroupRecord&& other) noexcept {
-+            if (this != &other) {
-+                reset();
-+                slot = other.slot;
-+                group = other.group;
-+                layout = other.layout;
-+                handle = other.handle;
-+                entries = std::move(other.entries);
-+                other.handle = nullptr;
-+                other.entries.clear();
-+            }
-+            return *this;
-+        }
++        BindGroupRecord(BindGroupRecord&& other) noexcept
++            : slot(other.slot),
++              group(other.group),
++              layout(other.layout),
++              handle(std::exchange(other.handle, nullptr)),
++              entries(std::exchange(other.entries, {})) {}
++        BindGroupRecord& operator=(BindGroupRecord&&) = delete;
 +        ~BindGroupRecord() { reset(); }
 +
 +        bool matches(WGPUBindGroupLayout layout_, const std::vector<WGPUBindGroupEntry>& entries_) const {
-+            if (!handle || layout != layout_ || entries.size() != entries_.size()) {
-+                return false;
-+            }
-+            for (std::size_t i = 0; i < entries.size(); ++i) {
-+                const auto& a = entries[i];
-+                const auto& b = entries_[i];
-+                if (a.binding != b.binding || a.buffer != b.buffer || a.offset != b.offset || a.size != b.size ||
-+                    a.sampler != b.sampler || a.textureView != b.textureView) {
-+                    return false;
-+                }
-+            }
-+            return true;
++            return handle && layout == layout_ &&
++                   std::equal(entries.begin(),
++                              entries.end(),
++                              entries_.begin(),
++                              entries_.end(),
++                              [](const WGPUBindGroupEntry& a, const WGPUBindGroupEntry& b) {
++                                  return a.binding == b.binding && a.buffer == b.buffer && a.offset == b.offset &&
++                                         a.size == b.size && a.sampler == b.sampler &&
++                                         a.textureView == b.textureView;
++                              });
 +        }
 +
 +        void assign(uint32_t slot_,
@@ -202,17 +205,29 @@ index 8fd9b5b..d404cda 100644
 +            handle = handle_;
 +            entries = std::move(entries_);
 +            for (const auto& entry : entries) {
-+                if (entry.buffer) wgpuBufferAddRef(entry.buffer);
-+                if (entry.sampler) wgpuSamplerAddRef(entry.sampler);
-+                if (entry.textureView) wgpuTextureViewAddRef(entry.textureView);
++                if (entry.buffer) {
++                    wgpuBufferAddRef(entry.buffer);
++                }
++                if (entry.sampler) {
++                    wgpuSamplerAddRef(entry.sampler);
++                }
++                if (entry.textureView) {
++                    wgpuTextureViewAddRef(entry.textureView);
++                }
 +            }
 +        }
 +
 +        void reset() {
 +            for (const auto& entry : entries) {
-+                if (entry.buffer) wgpuBufferRelease(entry.buffer);
-+                if (entry.sampler) wgpuSamplerRelease(entry.sampler);
-+                if (entry.textureView) wgpuTextureViewRelease(entry.textureView);
++                if (entry.buffer) {
++                    wgpuBufferRelease(entry.buffer);
++                }
++                if (entry.sampler) {
++                    wgpuSamplerRelease(entry.sampler);
++                }
++                if (entry.textureView) {
++                    wgpuTextureViewRelease(entry.textureView);
++                }
 +            }
 +            entries.clear();
 +            if (handle) {
@@ -225,18 +240,15 @@ index 8fd9b5b..d404cda 100644
      std::vector<BindGroupRecord> bindGroups;
  };
 diff --git a/src/mln/webgpu/texture2d.cpp b/src/mln/webgpu/texture2d.cpp
-index 29cfcaa..54f8d07 100644
+index 29cfcaa302..64a8dcc301 100644
 --- a/src/mln/webgpu/texture2d.cpp
 +++ b/src/mln/webgpu/texture2d.cpp
-@@ -77,6 +77,13 @@ gfx::Texture2D& Texture2D::setSamplerConfiguration(const gfx::Texture2D::Sampler
+@@ -77,6 +77,10 @@ gfx::Texture2D& Texture2D::setSamplerConfiguration(const gfx::Texture2D::Sampler
      if (safeState.maxAnisotropy < 1) {
          safeState.maxAnisotropy = 1;
      }
-+    // Tweakers set the same state every frame. A new sampler would make every
-+    // drawable that samples this texture build a new bind group.
-+    if (sampler && safeState.filter == samplerState.filter && safeState.wrapU == samplerState.wrapU &&
-+        safeState.wrapV == samplerState.wrapV && safeState.maxAnisotropy == samplerState.maxAnisotropy &&
-+        safeState.mipmapped == samplerState.mipmapped) {
++    // Tweakers set the same state every frame, and a new sampler means new bind groups.
++    if (sampler && safeState == samplerState) {
 +        return *this;
 +    }
      samplerState = safeState;
