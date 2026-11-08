@@ -811,6 +811,11 @@ class HeadlessObserver final : public mln::MapObserver {
       // The style has dropped every runtime image by now. A load that fails
       // never gets here, so the images it leaves stay kept.
       if (map != nullptr) map->kept_style_images.clear();
+      // The new style's sources start with no state, as in MapLibre GL JS.
+      // The update that the parse published still carries the old state, so
+      // a repaint publishes the cleared state.
+      if (map != nullptr && map->feature_state.clear() && map->map != nullptr)
+        map->map->triggerRepaint();
       const auto pending = map != nullptr && map->style_load_pending;
       // The event is queued and the load completed before the
       // reconciliation, and the registry is held by a local share across it,

@@ -190,6 +190,25 @@ bool FeatureStateStore::remove(
   return true;
 }
 
+bool FeatureStateStore::remove_source(const std::string& source_id) {
+  const std::scoped_lock lock{mutex_};
+  if (!published_->sources.contains(source_id)) {
+    return false;
+  }
+  ensure_unique();
+  published_->sources.erase(source_id);
+  return true;
+}
+
+bool FeatureStateStore::clear() {
+  const std::scoped_lock lock{mutex_};
+  if (published_->sources.empty()) {
+    return false;
+  }
+  published_ = std::make_shared<FeatureStateSnapshot>();
+  return true;
+}
+
 auto FeatureStateStore::get(
   const std::string& source_id, const FeatureStateLayerId& source_layer_id,
   const std::string& feature_id

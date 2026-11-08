@@ -391,12 +391,18 @@ static void malformed_selectors_are_rejected_at_submission(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+#define POINT_SOURCE_JSON                                           \
+  "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\"," \
+  "\"features\":[{\"type\":\"Feature\",\"id\":\"feature-1\","       \
+  "\"properties\":{},\"geometry\":{\"type\":\"Point\","             \
+  "\"coordinates\":[0,0]}}]}}"
+#define CIRCLE_LAYER_JSON                                         \
+  "{\"id\":\"circle\",\"type\":\"circle\",\"source\":\"points\"," \
+  "\"paint\":{\"circle-radius\":8}}"
+
 static const char point_style_json[] =
-  "{\"version\":8,\"sources\":{\"points\":{\"type\":\"geojson\",\"data\":"
-  "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
-  "\"id\":\"feature-1\",\"properties\":{},\"geometry\":{\"type\":\"Point\","
-  "\"coordinates\":[0,0]}}]}}},\"layers\":[{\"id\":\"circle\",\"type\":"
-  "\"circle\",\"source\":\"points\",\"paint\":{\"circle-radius\":8}}]}";
+  "{\"version\":8,\"sources\":{\"points\":" POINT_SOURCE_JSON
+  "},\"layers\":[" CIRCLE_LAYER_JSON "]}";
 
 typedef struct rendered_query {
   const mln_test_render_fixture* fixture;
@@ -449,6 +455,86 @@ static void rendered_features_carry_state_from_the_last_frame(void) {
   );
   TEST_ASSERT_TRUE(feature_rendered(&query));
   TEST_ASSERT_FALSE(query.list.features[0].has_state);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// Renders until the one point shows, carrying its state when `has_state`.
+static void render_point(
+  const mln_test_render_fixture* fixture, rendered_query* query, bool has_state
+) {
+  TEST_ASSERT_TRUE(
+    mln_test_style_render_until(fixture, feature_rendered, query, "a feature")
+  );
+  TEST_ASSERT_EQUAL(has_state, query->list.features[0].has_state);
+}
+
+static void a_removed_source_takes_its_state_with_it(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(point_style_json));
+  const mln_feature_state_selector feature =
+    selector_for("points", NULL, "feature-1");
+  const mln_feature_state_selector other = selector_for("other", NULL, "1");
+  set_state(map, feature, "{\"hover\":true}");
+  set_state(map, other, "{\"n\":1}");
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  rendered_query query = {.fixture = &fixture};
+  render_point(&fixture, &query, true);
+
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_layer(
+    map, MLN_BUFFER_LITERAL("circle"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
+    map, MLN_BUFFER_LITERAL("points"), &completion.descriptor, NULL
+  ));
+  EXPECT_STATE("{}", map, feature);
+  EXPECT_STATE("{\"n\":1}", map, other);
+
+  // No frame renders between the removal and the new source, so the renderer
+  // keeps the source it drew under this ID.
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("points"), MLN_BUFFER_LITERAL(POINT_SOURCE_JSON),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map, MLN_BUFFER_LITERAL(CIRCLE_LAYER_JSON), MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
+  ));
+  EXPECT_STATE("{}", map, feature);
+  render_point(&fixture, &query, false);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void a_style_load_clears_every_source_state(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(point_style_json));
+  const mln_feature_state_selector feature =
+    selector_for("points", NULL, "feature-1");
+  const mln_feature_state_selector other = selector_for("other", NULL, "1");
+  set_state(map, feature, "{\"hover\":true}");
+  set_state(map, other, "{\"n\":1}");
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  rendered_query query = {.fixture = &fixture};
+  render_point(&fixture, &query, true);
+
+  // The new style has the same source, which the renderer keeps.
+  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(point_style_json));
+  EXPECT_STATE("{}", map, feature);
+  EXPECT_STATE("{}", map, other);
+  render_point(&fixture, &query, false);
+
+  // State set once the style has loaded reaches its source.
+  set_state(map, feature, "{\"hover\":true}");
+  render_point(&fixture, &query, true);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -528,5 +614,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_string_and_a_number_with_the_same_text_name_one_feature);
   RUN_TEST(malformed_selectors_are_rejected_at_submission);
   RUN_TEST(rendered_features_carry_state_from_the_last_frame);
+  RUN_TEST(a_removed_source_takes_its_state_with_it);
+  RUN_TEST(a_style_load_clears_every_source_state);
   RUN_TEST(typed_ids_reach_the_features_that_carry_them);
 }

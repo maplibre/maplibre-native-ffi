@@ -7854,7 +7854,8 @@ func (receiver *MapHandle) GetCamera() (*Future[CameraQueryResult], error) {
 
 // GetFeatureState reads the state of a feature, as a JSON object.
 //
-// The object is empty when the feature has no state.
+// The object is empty when the feature has no state, including after its source
+// leaves the style or a style loads, as MapHandle.SetFeatureState() describes.
 //
 // See mln_map_get_feature_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -8549,6 +8550,14 @@ func (receiver *MapHandle) SetEventMask(mask RuntimeEventFlag) (*Future[CommandC
 //
 // state is a JSON object. Its keys replace the same keys in the feature's
 // state, and the other keys stay.
+//
+// The map keeps the state until it is removed, its source leaves the style, or
+// a style loads. MapHandle.RemoveStyleSource() removes the state of the
+// source's features, and a style that loads removes the state of every source,
+// so a later source with the same ID starts with no state. To set state for a
+// new style's sources, wait until MapHandle.SetStyleURL() or
+// MapHandle.SetStyleJSON() completes. The style load removes state set before
+// then.
 //
 // See mln_map_set_feature_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html

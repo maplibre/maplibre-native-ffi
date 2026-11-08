@@ -1427,7 +1427,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Reads the state of a feature, as a JSON object.
     /// </summary>
     /// <remarks>
-    /// <para>The object is empty when the feature has no state.</para>
+    /// <para>The object is empty when the feature has no state, including after
+    /// its source leaves the style or a style loads, as
+    /// <c>MapHandle.SetFeatureStateAsync()</c> describes.</para>
     /// <para>See <c>mln_map_get_feature_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -2490,6 +2492,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <remarks>
     /// <para><c>state</c> is a JSON object. Its keys replace the same keys in
     /// the feature's state, and the other keys stay.</para>
+    /// <para>The map keeps the state until it is removed, its source leaves the
+    /// style, or a style loads. <c>MapHandle.RemoveStyleSourceAsync()</c>
+    /// removes the state of the source's features, and a style that loads
+    /// removes the state of every source, so a later source with the same ID
+    /// starts with no state. To set state for a new style's sources, wait until
+    /// <c>MapHandle.SetStyleUrlAsync()</c> or
+    /// <c>MapHandle.SetStyleJsonAsync()</c> completes. The style load removes
+    /// state set before then.</para>
     /// <para>See <c>mln_map_set_feature_state</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// </remarks>

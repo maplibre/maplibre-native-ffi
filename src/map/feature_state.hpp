@@ -52,6 +52,10 @@ class FeatureStateStore {
     std::string source_id, FeatureStateLayerId source_layer_id,
     std::optional<std::string> feature_id, std::optional<std::string> state_key
   );
+  // Removes every source layer's state under the source.
+  bool remove_source(const std::string& source_id);
+  // Removes the state of every source.
+  bool clear();
   [[nodiscard]] auto get(
     const std::string& source_id, const FeatureStateLayerId& source_layer_id,
     const std::string& feature_id

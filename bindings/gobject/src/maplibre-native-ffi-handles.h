@@ -1413,7 +1413,9 @@ MaplibreNativeFfiCameraQueryResult* maplibre_native_ffi_map_get_camera_finish(
  *
  * Reads the state of a feature, as a JSON object.
  *
- * The object is empty when the feature has no state.
+ * The object is empty when the feature has no state, including after its source
+ * leaves the style or a style loads, as
+ * `maplibre_native_ffi_map_set_feature_state_async()` describes.
  *
  * See `mln_map_get_feature_state` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2629,6 +2631,15 @@ maplibre_native_ffi_map_set_event_mask_finish(
  *
  * `state` is a JSON object. Its keys replace the same keys in the feature's
  * state, and the other keys stay.
+ *
+ * The map keeps the state until it is removed, its source leaves the style, or
+ * a style loads. `maplibre_native_ffi_map_remove_style_source_async()` removes
+ * the state of the source's features, and a style that loads removes the state
+ * of every source, so a later source with the same ID starts with no state. To
+ * set state for a new style's sources, wait until
+ * `maplibre_native_ffi_map_set_style_url_async()` or
+ * `maplibre_native_ffi_map_set_style_json_async()` completes. The style load
+ * removes state set before then.
  *
  * See `mln_map_set_feature_state` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

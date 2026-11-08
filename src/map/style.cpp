@@ -1208,6 +1208,10 @@ auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
   removed.reset();
   release_callback_source(live, id);
   cancel_geojson_source_update(live, id, "the source was removed");
+  // A later source with this ID starts with no state, as in MapLibre GL JS.
+  if (live.feature_state.remove_source(id)) {
+    map_native(live).triggerRepaint();
+  }
   return MLN_STATUS_OK;
 }
 
