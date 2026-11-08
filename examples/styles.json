@@ -1,0 +1,130 @@
+{
+  "default": "liberty",
+  "styles": [
+    {
+      "id": "liberty",
+      "name": "Liberty",
+      "provider": "OpenFreeMap",
+      "url": "https://tiles.openfreemap.org/styles/liberty",
+      "dark": false,
+      "swatch": { "land": "#f8f4f0", "water": "#9ebdff", "road": "#ffcc88" }
+    },
+    {
+      "id": "bright",
+      "name": "Bright",
+      "provider": "OpenFreeMap",
+      "url": "https://tiles.openfreemap.org/styles/bright",
+      "dark": false,
+      "swatch": { "land": "#f8f4f0", "water": "#aecfe2", "road": "#ffcc88" }
+    },
+    {
+      "id": "positron",
+      "name": "Positron",
+      "provider": "OpenFreeMap",
+      "url": "https://tiles.openfreemap.org/styles/positron",
+      "dark": false,
+      "swatch": { "land": "#f2f3f0", "water": "#c2c8ca", "road": "#ffffff" }
+    },
+    {
+      "id": "protomaps-light",
+      "name": "Light",
+      "provider": "Protomaps",
+      "url": "https://api.protomaps.com/styles/v5/light/en.json?key=73c45a97eddd43fb",
+      "dark": false,
+      "swatch": { "land": "#e2dfda", "water": "#80deea", "road": "#ffffff" }
+    },
+    {
+      "id": "protomaps-dark",
+      "name": "Dark",
+      "provider": "Protomaps",
+      "url": "https://api.protomaps.com/styles/v5/dark/en.json?key=73c45a97eddd43fb",
+      "dark": true,
+      "swatch": { "land": "#1f1f1f", "water": "#31353f", "road": "#3d3d3d" }
+    },
+    {
+      "id": "protomaps-white",
+      "name": "White",
+      "provider": "Protomaps",
+      "url": "https://api.protomaps.com/styles/v5/white/en.json?key=73c45a97eddd43fb",
+      "dark": false,
+      "swatch": { "land": "#ffffff", "water": "#dcdcdc", "road": "#ebebeb" }
+    },
+    {
+      "id": "protomaps-grayscale",
+      "name": "Grayscale",
+      "provider": "Protomaps",
+      "url": "https://api.protomaps.com/styles/v5/grayscale/en.json?key=73c45a97eddd43fb",
+      "dark": false,
+      "swatch": { "land": "#cccccc", "water": "#a3a3a3", "road": "#ebebeb" }
+    },
+    {
+      "id": "protomaps-black",
+      "name": "Black",
+      "provider": "Protomaps",
+      "url": "https://api.protomaps.com/styles/v5/black/en.json?key=73c45a97eddd43fb",
+      "dark": true,
+      "swatch": { "land": "#141414", "water": "#333333", "road": "#292929" }
+    },
+    {
+      "id": "versatiles-colorful",
+      "name": "Colorful",
+      "provider": "VersaTiles",
+      "url": "https://tiles.versatiles.org/assets/styles/colorful/style.json",
+      "dark": false,
+      "swatch": { "land": "#f8f4f0", "water": "#bed9f3", "road": "#ffcc88" }
+    },
+    {
+      "id": "versatiles-colorful-dark",
+      "name": "Colorful dark",
+      "provider": "VersaTiles",
+      "url": "https://tiles.versatiles.org/assets/styles/colorful-dark/style.json",
+      "dark": true,
+      "swatch": { "land": "#282725", "water": "#0c1c2a", "road": "#694710" }
+    },
+    {
+      "id": "versatiles-gray",
+      "name": "Gray",
+      "provider": "VersaTiles",
+      "url": "https://tiles.versatiles.org/assets/styles/gray/style.json",
+      "dark": false,
+      "swatch": { "land": "#f5f5f5", "water": "#d7d7d7", "road": "#d6d6d6" }
+    },
+    {
+      "id": "americana",
+      "name": "Americana",
+      "provider": "OpenStreetMap Americana",
+      "url": "https://americanamap.org/style.json",
+      "dark": false,
+      "swatch": { "land": "#f9f5f0", "water": "#c6d8ec", "road": "#e05c5c" }
+    },
+    {
+      "id": "mapeak-hike",
+      "name": "Mapeak",
+      "provider": "Mapeak",
+      "url": "https://mapeak.com/styles/mapeak-hike.json",
+      "dark": false,
+      "swatch": { "land": "#faf7e1", "water": "#8ebdf0", "road": "#ffe66b" }
+    },
+    {
+      "id": "osm-carto",
+      "name": "OpenStreetMap Carto",
+      "provider": "OpenStreetMap",
+      "json": {
+        "version": 8,
+        "name": "OpenStreetMap Carto",
+        "sources": {
+          "osm": {
+            "type": "raster",
+            "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            "tileSize": 256,
+            "maxzoom": 19,
+            "attribution": "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
+          }
+        },
+        "layers": [{ "id": "osm", "type": "raster", "source": "osm" }]
+      },
+      "dark": false,
+      "swatch": { "land": "#f2efe9", "water": "#aad3df", "road": "#e892a2" }
+    }
+  ]
+}

@@ -15,26 +15,59 @@
   </head>
   <body>
     <canvas id="map" tabindex="0" aria-label="Map"></canvas>
-    <header class="panel">
-      <h1>
-        <a href="/maplibre-native-ffi/">MapLibre Native FFI</a>
-      </h1>
-      <nav aria-label="Graphics backend">
-        <a href="../webgl/" data-backend="webgl">WebGL</a>
-        <a href="../webgpu/" data-backend="webgpu">WebGPU</a>
-      </nav>
-      <label class="toggle">
-        <input id="compare" type="checkbox" disabled />
-        Compare with MapLibre GL JS
-      </label>
-      <p id="status" role="status">Loading…</p>
-    </header>
-    <footer class="attribution">
-      <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a>
-      <a href="https://www.openmaptiles.org/" target="_blank">© OpenMapTiles</a>
-      Data from
-      <a href="https://www.openstreetmap.org/copyright" target="_blank"
-      >OpenStreetMap</a>
-    </footer>
+    <aside class="panel" aria-label="Map controls">
+      <header class="panel-head">
+        <h1><a href="/maplibre-native-ffi/">MapLibre Native FFI</a></h1>
+        <button
+          id="collapse"
+          class="icon-button"
+          type="button"
+          aria-expanded="true"
+          aria-controls="controls"
+          aria-label="Controls"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4 10l4-4 4 4" />
+          </svg>
+        </button>
+      </header>
+      <div id="controls" class="controls">
+        <p class="lede">
+          MapLibre Native, compiled to WebAssembly, drawing in this tab.
+        </p>
+        <div class="field">
+          <span class="field-label" id="style-label">Style</span>
+          <button
+            id="style-button"
+            class="style-button"
+            type="button"
+            aria-expanded="false"
+            aria-controls="styles"
+            aria-describedby="style-label"
+          >
+          </button>
+          <div id="styles" class="styles" hidden></div>
+        </div>
+        <div class="field inline">
+          <span class="field-label" id="renderer-label">Renderer</span>
+          <nav class="segmented" aria-labelledby="renderer-label">
+            <a href="../webgl/" data-backend="webgl">WebGL</a>
+            <a href="../webgpu/" data-backend="webgpu">WebGPU</a>
+          </nav>
+        </div>
+        <label class="field inline">
+          <span class="field-label">Compare with MapLibre GL JS</span>
+          <input
+            id="compare"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            disabled
+          />
+        </label>
+      </div>
+      <p id="status" class="status" role="status" data-kind="busy">Loading…</p>
+    </aside>
+    <footer id="attribution" class="attribution"></footer>
   </body>
 </html>

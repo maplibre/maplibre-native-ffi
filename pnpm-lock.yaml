@@ -250,6 +250,9 @@ importers:
 
   examples/browser:
     dependencies:
+      '@fontsource-variable/overpass':
+        specifier: 5.2.8
+        version: 5.2.8
       '@maplibre/native-ffi':
         specifier: workspace:*
         version: link:../../bindings/typescript
@@ -1303,6 +1306,9 @@ packages:
 
   '@expressive-code/plugin-text-markers@0.44.2':
     resolution: {integrity: sha512-SNI7EgUSiADqbqUzzMbj1ZeC/r2pa5eg3KyFOGAd3a7EsIA4qzjXQLp+ODWQtHVDKFCdGs4J3ovSJUqvKIK96g==}
+
+  '@fontsource-variable/overpass@5.2.8':
+    resolution: {integrity: sha512-7/gP2f9ylVFYEhdyeHl6JSEcmNQ5QBdDs5BuT4V+FqSvkk9XjwdikmtTJuNTRWevMAhBkTUWf/dm68G2SbMdjQ==}
 
   '@fontsource/alata@5.3.0':
     resolution: {integrity: sha512-W0coKKgkfbdsVIdEl38xObUD9B56oeCYUbIiiW4Men86Bi/aiEPnRGtpqwKqGgm45/3e4FL9B9bIgk/Q2VxPJQ==}
@@ -6636,6 +6642,8 @@ snapshots:
   '@expressive-code/plugin-text-markers@0.44.2':
     dependencies:
       '@expressive-code/core': 0.44.2
+
+  '@fontsource-variable/overpass@5.2.8': {}
 
   '@fontsource/alata@5.3.0': {}
 

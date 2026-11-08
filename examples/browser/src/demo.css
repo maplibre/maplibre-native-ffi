@@ -1,13 +1,40 @@
+/*
+ * The page follows the map: a dark style gets dark controls. Overpass, a
+ * descendant of the US highway sign face, sets every word.
+ */
+
+@import "@fontsource-variable/overpass";
+
 :root {
   color-scheme: light dark;
   font:
-    14px/1.4 system-ui,
+    13px/1.45 "Overpass Variable",
+    system-ui,
     sans-serif;
-  --panel: light-dark(rgb(255 255 255 / 0.92), rgb(24 24 27 / 0.92));
-  --text: light-dark(#18181b, #f4f4f5);
-  --muted: light-dark(#52525b, #a1a1aa);
-  --accent: #295daa;
-  --error: light-dark(#b91c1c, #f87171);
+  --paper: light-dark(rgb(247 248 250 / 0.94), rgb(25 29 36 / 0.94));
+  --raised: light-dark(#ffffff, #232934);
+  --ink: light-dark(#18202e, #e6eaf0);
+  --quiet: light-dark(#5e6878, #9aa3b2);
+  --rule: light-dark(#dde1e8, #343c4a);
+  --well: light-dark(rgb(24 32 46 / 0.07), rgb(230 234 240 / 0.08));
+  --signal: light-dark(#295daa, #8db0ee);
+  --on-signal: light-dark(#ffffff, #10213d);
+  --fault: light-dark(#b3261e, #f2b8b5);
+  --shadow:
+    0 1px 2px light-dark(rgb(24 32 46 / 0.12), rgb(0 0 0 / 0.4)),
+    0 10px 30px light-dark(rgb(24 32 46 / 0.14), rgb(0 0 0 / 0.35));
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 html,
@@ -15,7 +42,8 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  color: var(--text);
+  color: var(--ink);
+  background: var(--raised);
 }
 
 #map {
@@ -24,28 +52,51 @@ body {
   height: 100dvh;
   touch-action: none;
   outline: none;
-  background: light-dark(#e5e5e5, #27272a);
 }
 
-.panel,
-.attribution {
-  position: fixed;
-  background: var(--panel);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+button,
+input {
+  font: inherit;
+  color: inherit;
 }
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/* The panel. */
 
 .panel {
+  position: fixed;
   top: 12px;
   left: 12px;
-  max-width: min(320px, calc(100vw - 48px));
-  padding: 12px;
-  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(304px, calc(100vw - 24px));
+  max-height: calc(100dvh - 56px);
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--paper);
+  backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: var(--shadow);
+}
+
+.panel-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
 }
 
 h1 {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 h1 a {
@@ -53,55 +104,369 @@ h1 a {
   text-decoration: none;
 }
 
-nav {
-  display: flex;
-  padding: 2px;
-  border-radius: 7px;
-  background: light-dark(#e4e4e7, #3f3f46);
+h1 a:hover {
+  color: var(--signal);
 }
 
-nav a {
-  flex: 1;
-  padding: 4px 10px;
-  border-radius: 5px;
-  color: var(--muted);
-  text-align: center;
-  text-decoration: none;
+.icon-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--quiet);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--well);
+  color: var(--ink);
+}
+
+.icon-button svg,
+.chevron {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: rotate 160ms ease;
+}
+
+.icon-button[aria-expanded="false"] svg,
+.style-button[aria-expanded="true"] .chevron {
+  rotate: 180deg;
+}
+
+.controls {
+  /* Room for the focus rings that overflow would clip. */
+  margin: 0 -4px 0 -6px;
+  padding: 0 4px 2px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.lede {
+  margin: 2px 0 14px;
+  padding-right: 24px;
+  color: var(--quiet);
+  font-size: 12.5px;
+}
+
+.field {
+  display: block;
+  margin-top: 12px;
+}
+
+.field:first-of-type {
+  margin-top: 0;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--quiet);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.field.inline {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+}
+
+.field.inline .field-label {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
   font-weight: 500;
 }
 
-nav a[aria-current="page"] {
-  background: var(--accent);
-  color: white;
+label.field {
+  cursor: pointer;
 }
 
-#status {
-  margin: 10px 0 0;
-  color: var(--muted);
+/* The style picker. */
+
+.swatch {
+  display: block;
+  flex: none;
+  border-radius: 6px;
+  outline: 1px solid light-dark(rgb(24 32 46 / 0.14), rgb(230 234 240 / 0.16));
+  outline-offset: -1px;
 }
 
-#status.error {
-  color: var(--error);
+.style-button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 10px 5px 5px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--raised);
+  text-align: left;
+  cursor: pointer;
 }
+
+.style-button:hover {
+  border-color: var(--quiet);
+}
+
+.style-button .swatch {
+  width: 48px;
+  height: 32px;
+}
+
+.style-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.style-name {
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.style-provider {
+  overflow: hidden;
+  color: var(--quiet);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--quiet);
+}
+
+.styles {
+  margin-top: 10px;
+}
+
+.styles fieldset {
+  min-width: 0;
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+}
+
+.styles legend {
+  padding: 0 0 4px;
+  color: var(--quiet);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.style-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 8px;
+}
+
+.style-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.style-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.style-option .swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 1;
+  transition: outline-color 120ms ease;
+}
+
+.style-option:hover .swatch {
+  outline: 2px solid var(--rule);
+  outline-offset: 1px;
+}
+
+.style-option:has(input:checked) {
+  font-weight: 650;
+}
+
+.style-option:has(input:checked) .swatch {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.style-option:has(input:focus-visible) .swatch {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px
+    light-dark(rgb(41 93 170 / 0.25), rgb(141 176 238 / 0.3));
+}
+
+/* The renderer links. */
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--well);
+}
+
+.segmented a {
+  padding: 4px 12px 3px;
+  border-radius: 7px;
+  color: var(--quiet);
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+.segmented a:hover {
+  color: var(--ink);
+}
+
+.segmented a[aria-current="page"] {
+  background: var(--raised);
+  box-shadow: 0 1px 2px rgb(24 32 46 / 0.18);
+  color: var(--signal);
+}
+
+/* The comparison switch. */
+
+.switch {
+  flex: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 10px;
+  appearance: none;
+  background:
+    radial-gradient(circle, #fff 6.5px, transparent 7px) 0 0 / 20px 20px
+      no-repeat,
+    light-dark(rgb(24 32 46 / 0.22), rgb(230 234 240 / 0.22));
+  cursor: pointer;
+  transition: background-position 160ms ease;
+}
+
+.switch:checked {
+  background:
+    radial-gradient(circle, var(--on-signal) 6.5px, transparent 7px) 14px 0 /
+      20px 20px no-repeat,
+    var(--signal);
+}
+
+.switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The status line, while the map loads or after it fails. */
+
+.status {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 12px 0 0;
+  padding: 9px 4px 0 0;
+  border-top: 1px solid var(--rule);
+  color: var(--quiet);
+  font-size: 12.5px;
+}
+
+.status::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--signal);
+  translate: 0 -1px;
+}
+
+.status[data-kind="busy"]::before {
+  animation: pulse 1.1s ease-in-out infinite alternate;
+}
+
+.status[data-kind="error"] {
+  color: var(--fault);
+}
+
+.status[data-kind="error"]::before {
+  background: currentColor;
+}
+
+/* A collapsed panel keeps its status, without the rule above it. */
+.controls[hidden] + .status {
+  margin-top: 8px;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+
+  to {
+    opacity: 0.3;
+    scale: 0.7;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* The style's attribution. */
 
 .attribution {
+  position: fixed;
   right: 0;
   bottom: 0;
-  padding: 2px 8px;
-  border-top-left-radius: 6px;
-  font-size: 12px;
-  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  justify-content: flex-end;
+  max-width: calc(100vw - 20px);
+  padding: 3px 10px 2px;
+  border-top-left-radius: 8px;
+  background: var(--paper);
+  backdrop-filter: blur(14px);
+  color: var(--quiet);
+  font-size: 11.5px;
 }
 
 .attribution a {
   color: inherit;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 2px;
 }
 
-.toggle {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin-top: 10px;
+.attribution a:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
 }
 
 /*
@@ -134,7 +499,7 @@ nav a[aria-current="page"] {
   bottom: 0;
   left: 11px;
   width: 2px;
-  background: white;
+  background: #fff;
   box-shadow: 0 0 4px rgb(0 0 0 / 0.4);
 }
 
@@ -146,26 +511,28 @@ nav a[aria-current="page"] {
   width: 20px;
   height: 20px;
   margin-top: -12px;
-  border: 2px solid white;
+  border: 2px solid #fff;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--signal);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
 }
 
 .divider:focus-visible::after {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--signal);
   outline-offset: 2px;
 }
 
 .compare-label {
   position: fixed;
   bottom: 36px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--panel);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+  padding: 3px 9px 2px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--paper);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
 }
