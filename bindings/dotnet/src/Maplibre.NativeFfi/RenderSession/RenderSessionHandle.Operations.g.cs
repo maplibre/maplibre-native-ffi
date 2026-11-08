@@ -756,7 +756,8 @@ public sealed unsafe partial class RenderSessionHandle
     /// </summary>
     /// <remarks>
     /// <para>The session renders at the map's scale factor. Release every
-    /// acquired frame first.</para>
+    /// acquired frame first. You can call it once the attach call returns.
+    /// While the attach runs, the resize waits for it to complete.</para>
     /// <para>See <c>mln_render_session_resize</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -764,6 +765,9 @@ public sealed unsafe partial class RenderSessionHandle
     /// <item><description><c>Status.Unsupported</c> when the session renders
     /// into a borrowed ring. Give it new textures of the new size
     /// instead.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while you hold one of the
+    /// session's acquired frames, or when the session failed, or you detached,
+    /// abandoned, released, or disposed it.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session loses its
     /// target before the resize applies.</description></item>
     /// </list>
