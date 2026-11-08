@@ -15,6 +15,11 @@ public static unsafe partial class MaplibreNative
     /// <para>Call it on a thread with an <c>ALooper</c>, such as the app's main
     /// thread, and keep that thread running its looper while sessions use the
     /// pacer.</para>
+    /// <para><c>AChoreographer</c> can stop while the phone's display is off,
+    /// even while a Surface on another display, such as an Android Auto
+    /// projection, still shows the map. The pacer then keeps demanding frames
+    /// from a timer on the looper, within the frame rate limit, until vsyncs
+    /// arrive again.</para>
     /// <para>See <c>mln_android_frame_pacer_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
