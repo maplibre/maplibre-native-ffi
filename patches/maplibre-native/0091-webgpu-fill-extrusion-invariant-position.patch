@@ -6,7 +6,7 @@ the first pass wrote. The passes use different pipelines, and without
 invariance a shader compiler may compute the position differently in each, so
 the color pass fails in scattered blocks and stripes and buildings show holes.
 Chrome on macOS showed this. Chrome on Linux with Vulkan didn't.
-Upstream: not proposed
+Upstream: https://github.com/maplibre/maplibre-native/pull/4939
 
 diff --git a/include/mln/shaders/webgpu/fill_extrusion.hpp b/include/mln/shaders/webgpu/fill_extrusion.hpp
 index 79ffe8a..1fb670d 100644
