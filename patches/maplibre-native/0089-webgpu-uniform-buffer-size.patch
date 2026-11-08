@@ -1,0 +1,75 @@
+Makes a WebGPU uniform buffer report the size its caller asked for, as the
+other backends' do, and keeps the rounded-up size for the GPU buffer and its
+binding. UniformBufferArray::createOrUpdate() updates a buffer in place only
+when the sizes match, and getSize() returned the size rounded up to 256 bytes,
+so every update of a uniform block that isn't a multiple of 256 bytes created
+a new buffer. A layer's uniform blocks are shared by all of its drawables, so
+each of them then built new bind groups. In the browser demo, while moving,
+this takes bind groups from about 420 a frame to 125.
+Upstream: not proposed
+
+diff --git a/include/mln/webgpu/uniform_buffer.hpp b/include/mln/webgpu/uniform_buffer.hpp
+index 7f2779f..54d7746 100644
+--- a/include/mln/webgpu/uniform_buffer.hpp
++++ b/include/mln/webgpu/uniform_buffer.hpp
+@@ -25,9 +25,14 @@ public:
+ 
+     WGPUBuffer getBuffer() const { return buffer; }
+ 
++    /// The size of the GPU buffer, which getSize() rounds up to WebGPU's
++    /// uniform alignment.
++    std::size_t getAllocatedSize() const { return allocatedSize; }
++
+ private:
+     Context& context;
+     WGPUBuffer buffer = nullptr;
++    std::size_t allocatedSize = 0;
+ };
+ 
+ /// Stores a collection of uniform buffers by name
+diff --git a/src/mln/webgpu/drawable.cpp b/src/mln/webgpu/drawable.cpp
+index 0cb6025..80c703f 100644
+--- a/src/mln/webgpu/drawable.cpp
++++ b/src/mln/webgpu/drawable.cpp
+@@ -592,7 +592,7 @@ void Drawable::draw(PaintParameters& parameters) const {
+ 
+                                 entry.buffer = webgpuUniform->getBuffer();
+                                 entry.offset = 0;
+-                                entry.size = buffer->getSize();
++                                entry.size = webgpuUniform->getAllocatedSize();
+                                 break;
+                             }
+                             case ShaderProgram::BindingType::Sampler: {
+diff --git a/src/mln/webgpu/uniform_buffer.cpp b/src/mln/webgpu/uniform_buffer.cpp
+index b97a3b5..0c45de9 100644
+--- a/src/mln/webgpu/uniform_buffer.cpp
++++ b/src/mln/webgpu/uniform_buffer.cpp
+@@ -21,10 +21,15 @@ constexpr std::size_t alignedUniformSize(std::size_t size) {
+ }
+ } // namespace
+ 
++// getSize() is the size the caller asked for, as in the other backends.
++// UniformBufferArray::createOrUpdate() updates a buffer in place only when the
++// sizes match, so reporting the rounded size made every update allocate a new
++// buffer.
+ UniformBuffer::UniformBuffer(Context& context_, const void* data, std::size_t size_)
+-    : gfx::UniformBuffer(alignedUniformSize(size_)),
+-      context(context_) {
+-    const std::size_t alignedSize = getSize();
++    : gfx::UniformBuffer(size_),
++      context(context_),
++      allocatedSize(alignedUniformSize(size_)) {
++    const std::size_t alignedSize = allocatedSize;
+ 
+     auto& backend = static_cast<RendererBackend&>(context.getBackend());
+     WGPUDevice device = static_cast<WGPUDevice>(backend.getDevice());
+@@ -64,7 +69,8 @@ UniformBuffer UniformBuffer::clone() const {
+ UniformBuffer::UniformBuffer(UniformBuffer&& other) noexcept
+     : gfx::UniformBuffer(std::move(other)),
+       context(other.context),
+-      buffer(other.buffer) {
++      buffer(other.buffer),
++      allocatedSize(other.allocatedSize) {
+     other.buffer = nullptr;
+ }
+ 
