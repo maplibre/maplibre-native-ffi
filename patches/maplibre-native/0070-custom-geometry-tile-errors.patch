@@ -4,7 +4,7 @@ source keeps the failed tile registered, so invalidating it fetches it again
 Upstream: not proposed
 
 diff --git a/include/mln/style/sources/custom_geometry_source.hpp b/include/mln/style/sources/custom_geometry_source.hpp
-index 9a280fb..1975c87 100644
+index 9a280fbd36..1975c8769e 100644
 --- a/include/mln/style/sources/custom_geometry_source.hpp
 +++ b/include/mln/style/sources/custom_geometry_source.hpp
 @@ -43,6 +43,7 @@ public:
@@ -16,7 +16,7 @@ index 9a280fb..1975c87 100644
      void invalidateRegion(const LatLngBounds&);
      // Private implementation
 diff --git a/src/mln/style/custom_tile_loader.cpp b/src/mln/style/custom_tile_loader.cpp
-index 6b2d590..08611ed 100644
+index 6b2d590238..08611ed8b4 100644
 --- a/src/mln/style/custom_tile_loader.cpp
 +++ b/src/mln/style/custom_tile_loader.cpp
 @@ -72,6 +72,18 @@ void CustomTileLoader::setTileData(const CanonicalTileID& tileID, const GeoJSON&
@@ -39,7 +39,7 @@ index 6b2d590..08611ed 100644
      std::scoped_lock guard(dataMutex);
      auto tileCallbacks = tileCallbackMap.find(tileID);
 diff --git a/src/mln/style/custom_tile_loader.hpp b/src/mln/style/custom_tile_loader.hpp
-index b2f3f83..08c6f55 100644
+index b2f3f838fd..08c6f55d30 100644
 --- a/src/mln/style/custom_tile_loader.hpp
 +++ b/src/mln/style/custom_tile_loader.hpp
 @@ -28,6 +28,7 @@ public:
@@ -51,7 +51,7 @@ index b2f3f83..08c6f55 100644
      void invalidateTile(const CanonicalTileID&);
      void invalidateRegion(const LatLngBounds&, Range<uint8_t>);
 diff --git a/src/mln/style/sources/custom_geometry_source.cpp b/src/mln/style/sources/custom_geometry_source.cpp
-index 0cfb975..4ea2844 100644
+index 0cfb9751d8..4ea2844727 100644
 --- a/src/mln/style/sources/custom_geometry_source.cpp
 +++ b/src/mln/style/sources/custom_geometry_source.cpp
 @@ -39,6 +39,10 @@ void CustomGeometrySource::setTileData(const CanonicalTileID& tileID, const GeoJ
@@ -66,10 +66,10 @@ index 0cfb975..4ea2844 100644
      loader->self().invoke(&CustomTileLoader::invalidateTile, tileID);
  }
 diff --git a/src/mln/tile/custom_geometry_tile.cpp b/src/mln/tile/custom_geometry_tile.cpp
-index da35f25..1172ecc 100644
+index c9cefdf1e3..95f63ca6e8 100644
 --- a/src/mln/tile/custom_geometry_tile.cpp
 +++ b/src/mln/tile/custom_geometry_tile.cpp
-@@ -49,6 +49,11 @@ void CustomGeometryTile::setTileData(const GeoJSON& geoJSON) {
+@@ -57,6 +57,11 @@ void CustomGeometryTile::setTileData(const GeoJSON& geoJSON) {
      setData(std::make_unique<GeoJSONTileData>(std::move(featureData)));
  }
  
@@ -82,11 +82,11 @@ index da35f25..1172ecc 100644
      stale = true;
      observer->onTileChanged(*this);
 diff --git a/src/mln/tile/custom_geometry_tile.hpp b/src/mln/tile/custom_geometry_tile.hpp
-index 649edcf..1d83882 100644
+index 0c4c417407..61029d4803 100644
 --- a/src/mln/tile/custom_geometry_tile.hpp
 +++ b/src/mln/tile/custom_geometry_tile.hpp
-@@ -25,6 +25,7 @@ public:
-     ~CustomGeometryTile() override;
+@@ -27,6 +27,7 @@ public:
+     void cancel() override;
  
      void setTileData(const GeoJSON& geoJSON);
 +    void setTileError(std::exception_ptr error);
@@ -94,10 +94,10 @@ index 649edcf..1d83882 100644
  
      void setNecessity(TileNecessity) final;
 diff --git a/test/style/source.test.cpp b/test/style/source.test.cpp
-index ae2905a..6d3f242 100644
+index b7fd7734d9..a4e3af138d 100644
 --- a/test/style/source.test.cpp
 +++ b/test/style/source.test.cpp
-@@ -50,6 +50,7 @@
+@@ -51,6 +51,7 @@
  #include <gmock/gmock.h>
  
  #include <optional>
@@ -105,7 +105,7 @@ index ae2905a..6d3f242 100644
  
  using namespace mln;
  using SourceType = mln::style::SourceType;
-@@ -764,6 +765,35 @@ TEST(Source, CustomGeometrySourceSetTileData) {
+@@ -847,6 +848,35 @@ TEST(Source, CustomGeometrySourceSetTileData) {
  
      test.run();
  }
@@ -142,7 +142,7 @@ index ae2905a..6d3f242 100644
  
  class FakeTileSource;
 diff --git a/test/tile/custom_geometry_tile.test.cpp b/test/tile/custom_geometry_tile.test.cpp
-index c4c2e43..e86360a 100644
+index b26cc2e8e7..5ddca9c2d0 100644
 --- a/test/tile/custom_geometry_tile.test.cpp
 +++ b/test/tile/custom_geometry_tile.test.cpp
 @@ -18,6 +18,7 @@
