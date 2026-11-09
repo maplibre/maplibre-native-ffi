@@ -283,6 +283,29 @@ index bf4039d..2424099 100644
      Immutable<ImageImpls> images = makeMutable<ImageImpls>();
      CollectionWithPersistentOrder<Source> sources;
      Collection<Layer> layers;
+diff --git a/src/mln/text/glyph.cpp b/src/mln/text/glyph.cpp
+index e539e3d..5ccc36b 100644
+--- a/src/mln/text/glyph.cpp
++++ b/src/mln/text/glyph.cpp
+@@ -2,6 +2,7 @@
+ #include <mln/util/i18n.hpp>
+ 
+ #include <algorithm>
++#include <mutex>
+ 
+ namespace mln {
+ 
+@@ -37,6 +38,10 @@ GlyphIDType genNewGlyphIDType(const std::string &url,
+                               const FontStack &fontStack,
+                               const std::vector<std::pair<uint32_t, uint32_t>> &pairs) {
+     static std::map<std::string, std::map<std::string, std::map<std::size_t, GlyphIDType>>> glyphTypes;
++    // Maps parse their styles' font faces on their own threads, and an app can
++    // check fallback font faces on its thread, so the registry takes a lock.
++    static std::mutex glyphTypesMutex;
++    const std::scoped_lock lock(glyphTypesMutex);
+ 
+     std::size_t hash = 0;
+     for (auto &pair : pairs) {
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
 index 45a7a1e..eed0296 100644
 --- a/test/map/map.test.cpp
