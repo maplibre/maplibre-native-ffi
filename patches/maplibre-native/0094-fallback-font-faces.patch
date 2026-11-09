@@ -1,0 +1,348 @@
+Lets an app give a map font faces that every font stack falls back to, after
+the style's own font faces. A style's font-faces apply only to the fonts they
+name, and most styles have none, so a map had no font for the scripts that
+glyph PBFs can't shape, such as Myanmar and Devanagari, unless its style named
+one. Style::setFallbackFontFaces() takes the font files in the format of a style's
+font-faces entry, without a font name, and every style that loads afterwards
+uses them where its own faces don't cover a character.
+Issue: https://github.com/maplibre/maplibre-native/issues/4500
+Upstream: not proposed
+
+diff --git a/include/mln/style/style.hpp b/include/mln/style/style.hpp
+index 9a24fda..5ed11f9 100644
+--- a/include/mln/style/style.hpp
++++ b/include/mln/style/style.hpp
+@@ -82,6 +82,14 @@ public:
+     void addLayer(std::unique_ptr<Layer>, const std::optional<std::string>& beforeLayerID = std::nullopt);
+     std::unique_ptr<Layer> removeLayer(const std::string& layerID);
+ 
++    /// Sets the font faces that every font stack falls back to after the style's
++    /// own, for the styles that load after this call. `json` is an array of font
++    /// files, each an object with a `url` and an optional `unicode-range`, as in
++    /// a font face of a style's `font-faces`. Throws std::runtime_error if `json`
++    /// isn't such an array. Without HarfBuzz text shaping, the map ignores them,
++    /// as it ignores a style's `font-faces`.
++    void setFallbackFontFaces(const std::string& json);
++
+     // Private implementation
+     class Impl;
+     const std::unique_ptr<Impl> impl;
+diff --git a/include/mln/text/glyph.hpp b/include/mln/text/glyph.hpp
+index bc971d7..7934dd9 100644
+--- a/include/mln/text/glyph.hpp
++++ b/include/mln/text/glyph.hpp
+@@ -167,7 +167,8 @@ enum class WritingModeType : uint8_t {
+     Vertical = 1 << 1,
+ };
+ 
+-// style defined faces
++// style defined faces. A face without a name is a fallback, which every font
++// stack uses after the faces that name one of its fonts.
+ struct FontFace {
+     using Range = std::pair<uint32_t, uint32_t>;
+     GlyphIDType type;          // an unique glyph id
+diff --git a/src/mln/layout/symbol_layout.cpp b/src/mln/layout/symbol_layout.cpp
+index 1f2ee54..667139d 100644
+--- a/src/mln/layout/symbol_layout.cpp
++++ b/src/mln/layout/symbol_layout.cpp
+@@ -115,6 +115,15 @@ GlyphIDType getCharGlyphIDType(char16_t ch,
+         }
+     }
+ 
++    // A face without a name is a fallback for every font stack.
++    for (auto& face : *faces) {
++        if (face.name.empty()) {
++            for (auto& range : face.ranges) {
++                if (ch >= range.first && ch <= range.second) return face.type;
++            }
++        }
++    }
++
+     return GlyphIDType::FontPBF;
+ }
+ 
+diff --git a/src/mln/style/parser.cpp b/src/mln/style/parser.cpp
+index 27f0c69..be2a77d 100644
+--- a/src/mln/style/parser.cpp
++++ b/src/mln/style/parser.cpp
+@@ -26,6 +26,81 @@
+ namespace mln {
+ namespace style {
+ 
++namespace {
++
++// Reads a font file of a font face: an object with a `url`, and with an optional
++// `unicode-range` that limits the code points the font draws. Adds a warning for
++// each range it can't read, and skips the range.
++FontFace parseFontFile(const std::string& faceName, const JSValue& fontFile, std::vector<std::string>& warnings) {
++    FontFace fontFace(faceName, "", {{0, 0x10FFFF}});
++
++    if (fontFile.HasMember("url")) {
++        const JSValue& url = fontFile["url"];
++        if (url.IsString()) fontFace.url = url.GetString();
++    }
++
++    if (fontFile.HasMember("unicode-range")) {
++        const JSValue& unicodeRange = fontFile["unicode-range"];
++        fontFace.ranges.clear();
++        if (unicodeRange.IsArray()) {
++            for (const auto& range : unicodeRange.GetArray()) {
++                if (!range.IsString()) continue;
++                std::string rangeString = range.GetString();
++                if (rangeString.length() <= 2) continue;
++                rangeString = rangeString.substr(2);
++                const std::string::size_type pos = rangeString.find('-');
++                if (pos == std::string::npos) continue;
++                const std::string start = rangeString.substr(0, pos);
++                const std::string end = rangeString.substr(pos + 1);
++                if (start.empty() || end.empty()) continue;
++                auto startInt = util::parse<int>(start, 16);
++                auto endInt = util::parse<int>(end, 16);
++                if (startInt && endInt) {
++                    fontFace.ranges.emplace_back(*startInt, *endInt);
++                } else {
++                    warnings.push_back("Invalid unicode-range in font-face: " + rangeString);
++                }
++            }
++        }
++    }
++
++    return fontFace;
++}
++
++} // namespace
++
++std::shared_ptr<FontFaces> parseFallbackFontFaces(const std::string& json) {
++    rapidjson::GenericDocument<rapidjson::UTF8<>, rapidjson::CrtAllocator> document;
++    document.Parse<0>(json.c_str());
++    if (document.HasParseError()) {
++        throw std::runtime_error(formatJSONParseError(document));
++    }
++    if (!document.IsArray()) {
++        throw std::runtime_error("fallback font faces must be an array");
++    }
++
++    auto fontFaces = std::make_shared<FontFaces>();
++    for (const auto& fontFile : document.GetArray()) {
++        if (!fontFile.IsObject()) {
++            throw std::runtime_error("each fallback font face must be an object");
++        }
++        std::vector<std::string> warnings;
++        FontFace fontFace = parseFontFile("", fontFile, warnings);
++        if (!warnings.empty()) {
++            throw std::runtime_error(warnings.front());
++        }
++        if (fontFace.url.empty()) {
++            throw std::runtime_error("each fallback font face must have a url");
++        }
++        if (fontFace.ranges.empty()) {
++            throw std::runtime_error("each fallback font face must cover a unicode-range");
++        }
++        fontFace.type = genNewGlyphIDType(fontFace.url, FontStack{}, fontFace.ranges);
++        fontFaces->push_back(std::move(fontFace));
++    }
++    return fontFaces;
++}
++
+ Parser::~Parser() = default;
+ 
+ StyleParseResult Parser::parse(const std::string& json) {
+@@ -149,44 +224,10 @@ StyleParseResult Parser::parse(const std::string& json) {
+                     // If the face is an array, we assume it is a list of font file objects.
+                     for (const auto& fontFile : faceValue.GetArray()) {
+                         if (fontFile.IsObject()) {
+-                            FontFace fontFace(faceName, "", {{0, 0x10FFFF}});
+-
+-                            // Parse url
+-                            if (fontFile.HasMember("url")) {
+-                                const JSValue& url = fontFile["url"];
+-                                if (url.IsString()) fontFace.url = url.GetString();
+-                            }
+-
+-                            // Parse unicode-range
+-                            if (fontFile.HasMember("unicode-range")) {
+-                                const JSValue& unicodeRange = fontFile["unicode-range"];
+-                                fontFace.ranges.clear();
+-                                if (unicodeRange.IsArray()) {
+-                                    for (auto& range : unicodeRange.GetArray()) {
+-                                        if (range.IsString()) {
+-                                            std::string rangeString = range.GetString();
+-                                            if (rangeString.length() > 2) {
+-                                                rangeString = rangeString.substr(2);
+-                                                std::string::size_type pos = rangeString.find('-');
+-                                                if (pos != std::string::npos) {
+-                                                    std::string start = rangeString.substr(0, pos);
+-                                                    std::string end = rangeString.substr(pos + 1);
+-                                                    if (!start.empty() && !end.empty()) {
+-                                                        auto startInt = util::parse<int>(start, 16);
+-                                                        auto endInt = util::parse<int>(end, 16);
+-                                                        if (startInt && endInt) {
+-                                                            fontFace.ranges.emplace_back(*startInt, *endInt);
+-                                                        } else {
+-                                                            Log::Warning(
+-                                                                Event::ParseStyle,
+-                                                                "Invalid unicode-range in font-face: " + rangeString);
+-                                                        }
+-                                                    }
+-                                                }
+-                                            }
+-                                        }
+-                                    }
+-                                }
++                            std::vector<std::string> warnings;
++                            FontFace fontFace = parseFontFile(faceName, fontFile, warnings);
++                            for (const auto& warning : warnings) {
++                                Log::Warning(Event::ParseStyle, warning);
+                             }
+ 
+                             // If valid, generate a unique glyph ID type for this font face
+diff --git a/src/mln/style/parser.hpp b/src/mln/style/parser.hpp
+index d78c0e8..50e00b1 100644
+--- a/src/mln/style/parser.hpp
++++ b/src/mln/style/parser.hpp
+@@ -25,6 +25,11 @@ namespace style {
+ 
+ using StyleParseResult = std::exception_ptr;
+ 
++/// Reads fallback font faces from `json`, an array of font files in the format
++/// of a font face in a style's `font-faces`, without a font name. Throws
++/// std::runtime_error if `json` isn't such an array.
++std::shared_ptr<FontFaces> parseFallbackFontFaces(const std::string& json);
++
+ class Parser {
+ public:
+     ~Parser();
+diff --git a/src/mln/style/style.cpp b/src/mln/style/style.cpp
+index d14204c..c904d85 100644
+--- a/src/mln/style/style.cpp
++++ b/src/mln/style/style.cpp
+@@ -5,6 +5,7 @@
+ #include <mln/style/source.hpp>
+ #include <mln/style/style.hpp>
+ #include <mln/style/style_impl.hpp>
++#include <mln/style/parser.hpp>
+ #include <mln/util/exception.hpp>
+ #include <mln/util/instrumentation.hpp>
+ 
+@@ -60,6 +61,10 @@ TransitionOptions Style::getTransitionOptions() const {
+     return impl->getTransitionOptions();
+ }
+ 
++void Style::setFallbackFontFaces(const std::string& json) {
++    impl->setFallbackFontFaces(parseFallbackFontFaces(json));
++}
++
+ void Style::setTransitionOptions(const TransitionOptions& options) {
+     MLN_TRACE_FUNC();
+ 
+diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
+index 6240b41..af17e72 100644
+--- a/src/mln/style/style_impl.cpp
++++ b/src/mln/style/style_impl.cpp
+@@ -147,6 +147,12 @@ void Style::Impl::parse(const std::string& json_) {
+     }
+     glyphURL = parser.glyphURL;
+     fontFaces = parser.fontFaces;
++    if (fallbackFontFaces && !fallbackFontFaces->empty()) {
++        // The style's own faces come first, so they win where both cover a font.
++        auto merged = std::make_shared<FontFaces>(fontFaces ? *fontFaces : FontFaces{});
++        merged->insert(merged->end(), fallbackFontFaces->begin(), fallbackFontFaces->end());
++        fontFaces = std::move(merged);
++    }
+     loaded = true;
+     observer->onStyleLoaded();
+ }
+@@ -529,6 +535,10 @@ std::shared_ptr<FontFaces> Style::Impl::getFontFaces() const {
+     return fontFaces;
+ }
+ 
++void Style::Impl::setFallbackFontFaces(std::shared_ptr<FontFaces> faces) {
++    fallbackFontFaces = std::move(faces);
++}
++
+ Immutable<std::vector<Immutable<Image::Impl>>> Style::Impl::getImageImpls() const {
+     return images;
+ }
+diff --git a/src/mln/style/style_impl.hpp b/src/mln/style/style_impl.hpp
+index bf4039d..2424099 100644
+--- a/src/mln/style/style_impl.hpp
++++ b/src/mln/style/style_impl.hpp
+@@ -102,6 +102,7 @@ public:
+ 
+     const std::string& getGlyphURL() const;
+     std::shared_ptr<FontFaces> getFontFaces() const;
++    void setFallbackFontFaces(std::shared_ptr<FontFaces>);
+ 
+     using ImageImpls = std::vector<Immutable<Image::Impl>>;
+     Immutable<ImageImpls> getImageImpls() const;
+@@ -127,6 +128,7 @@ private:
+ 
+     std::string glyphURL;
+     std::shared_ptr<FontFaces> fontFaces;
++    std::shared_ptr<FontFaces> fallbackFontFaces;
+     Immutable<ImageImpls> images = makeMutable<ImageImpls>();
+     CollectionWithPersistentOrder<Source> sources;
+     Collection<Layer> layers;
+diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index 45a7a1e..eed0296 100644
+--- a/test/map/map.test.cpp
++++ b/test/map/map.test.cpp
+@@ -2858,6 +2858,33 @@ TEST(Map, TileSelectionOptionsPublishUpdates) {
+     check(&Map::setTileLodMode, &UpdateParameters::tileLodMode, TileLodMode::Distance);
+ }
+ 
++TEST(Map, FallbackFontFacesCoverEveryFontStack) {
++    MapTest<> test;
++    std::vector<std::string> requested;
++    test.fileSource->glyphsResponse = [&](const Resource& resource) {
++        requested.push_back(resource.url);
++        Response response;
++        response.error = std::make_unique<Response::Error>(Response::Error::Reason::NotFound, "not found");
++        return response;
++    };
++
++    test.map.getStyle().setFallbackFontFaces(R"([{"url": "fallback.ttf", "unicode-range": ["U+1000-109F"]}])");
++    test.map.getStyle().loadJSON(R"({
++        "version": 8,
++        "sources": {"point": {"type": "geojson", "data": {
++            "type": "Feature", "properties": {"name": "မြန်မာ"}, "geometry": {"type": "Point", "coordinates": [0, 0]}}}},
++        "glyphs": "{fontstack}/{range}.pbf",
++        "layers": [{"id": "symbol", "type": "symbol", "source": "point",
++                    "layout": {"text-field": ["get", "name"], "text-font": ["Any Font"]}}]
++    })");
++    try {
++        test.frontend.render(test.map);
++    } catch (...) {
++    }
++
++    EXPECT_NE(std::ranges::find(requested, "fallback.ttf"), requested.end());
++}
++
+ TEST(Map, UnrelatedImagePreservesTileLayoutAndCache) {
+     MapTest<> test;
+     test.frontend.setSize({128, 128});
+diff --git a/test/style/style_parser.test.cpp b/test/style/style_parser.test.cpp
+index a86ddac..a43b876 100644
+--- a/test/style/style_parser.test.cpp
++++ b/test/style/style_parser.test.cpp
+@@ -326,3 +326,20 @@ TEST(StyleParser, NestingDepthLimit) {
+     // Deep enough to overflow the stack if the parser recursed through it all.
+     EXPECT_EQ(parse(1000000), "Arrays and objects nest too deeply. at offset 256");
+ }
++
++TEST(StyleParser, FallbackFontFaces) {
++    auto faces = style::parseFallbackFontFaces(
++        R"([{"url": "a.ttf", "unicode-range": ["U+1000-109F", "U+A9E0-A9FF"]}, {"url": "b.ttf"}])");
++    ASSERT_EQ(faces->size(), 2u);
++    EXPECT_EQ((*faces)[0].name, "");
++    EXPECT_EQ((*faces)[0].url, "a.ttf");
++    EXPECT_EQ((*faces)[0].ranges, (std::vector<FontFace::Range>{{0x1000, 0x109F}, {0xA9E0, 0xA9FF}}));
++    EXPECT_EQ((*faces)[1].ranges, (std::vector<FontFace::Range>{{0, 0x10FFFF}}));
++    EXPECT_NE((*faces)[0].type, GlyphIDType::FontPBF);
++
++    EXPECT_THROW(style::parseFallbackFontFaces("{}"), std::runtime_error);
++    EXPECT_THROW(style::parseFallbackFontFaces("[1]"), std::runtime_error);
++    EXPECT_THROW(style::parseFallbackFontFaces(R"([{"unicode-range": ["U+0-FF"]}])"), std::runtime_error);
++    EXPECT_THROW(style::parseFallbackFontFaces(R"([{"url": "a.ttf", "unicode-range": ["U+XYZ-FF"]}])"),
++                 std::runtime_error);
++}

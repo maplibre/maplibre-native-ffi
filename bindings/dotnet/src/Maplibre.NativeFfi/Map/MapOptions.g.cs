@@ -34,4 +34,14 @@ public sealed record MapOptions
     /// show again without loading. Without it, the map keeps them.
     /// </summary>
     public bool? TileCacheEnabled { get; init; }
+
+    /// <summary>
+    /// Fonts for the text that a style's own fonts don't draw, such as scripts
+    /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+    /// font files, each an object with a <c>url</c> and an optional
+    /// <c>unicode-range</c>, as in a font face of a style's <c>font-faces</c>,
+    /// which every font stack uses after the style's own font faces. Empty for
+    /// none.
+    /// </summary>
+    public string FallbackFontFaces { get; init; } = "";
 }

@@ -7846,6 +7846,13 @@ public data class MapOptions(
    * loading. Without it, the map keeps them.
    */
   public val tileCacheEnabled: Boolean? = null,
+  /**
+   * Fonts for the text that a style's own fonts don't draw, such as scripts that need complex
+   * shaping, like Myanmar or Devanagari. A JSON array of font files, each an object with a `url`
+   * and an optional `unicode-range`, as in a font face of a style's `font-faces`, which every font
+   * stack uses after the style's own font faces. Empty for none.
+   */
+  public val fallbackFontFaces: String = "",
 ) {
   @PublishedApi internal fun withMapMode(mapMode: MapMode): MapOptions = copy(mapMode = mapMode)
 
@@ -7859,6 +7866,10 @@ public data class MapOptions(
   @PublishedApi
   internal fun withTileCacheEnabled(tileCacheEnabled: Boolean): MapOptions =
     copy(tileCacheEnabled = tileCacheEnabled)
+
+  @PublishedApi
+  internal fun withFallbackFontFaces(fallbackFontFaces: String): MapOptions =
+    copy(fallbackFontFaces = fallbackFontFaces)
 
   public companion object {
     /**

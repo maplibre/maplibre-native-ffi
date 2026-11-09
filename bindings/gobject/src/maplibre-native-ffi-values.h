@@ -7223,6 +7223,36 @@ void maplibre_native_ffi_map_options_set_tile_cache_enabled(
   MaplibreNativeFfiMapOptions* self, gboolean value
 );
 
+/**
+ * MaplibreNativeFfiMapOptions:fallback-font-faces: (setter set_fallback_font_faces) (getter get_fallback_font_faces)
+ *
+ * Fonts for the text that a style's own fonts don't draw, such as scripts that
+ * need complex shaping, like Myanmar or Devanagari. A JSON array of font files,
+ * each an object with a `url` and an optional `unicode-range`, as in a font
+ * face of a style's `font-faces`, which every font stack uses after the style's
+ * own font faces. Empty for none.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_fallback_font_faces: (get-property fallback-font-faces)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:fallback-font-faces`.
+ *
+ * Returns: (transfer none): the text
+ */
+const char* maplibre_native_ffi_map_options_get_fallback_font_faces(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_set_fallback_font_faces: (set-property fallback-font-faces)
+ * @value: the UTF-8 text
+ *
+ * Sets `MaplibreNativeFfiMapOptions:fallback-font-faces`.
+ */
+void maplibre_native_ffi_map_options_set_fallback_font_faces(
+  MaplibreNativeFfiMapOptions* self, const char* value
+);
+
 GType maplibre_native_ffi_map_projection_camera_result_get_type(
   void
 ) G_GNUC_CONST;

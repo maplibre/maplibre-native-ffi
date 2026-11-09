@@ -1272,31 +1272,29 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// Whether the map keeps tiles in memory after they leave the view, so they
   /// show again without loading. Without it, the map keeps them.
   public var tileCacheEnabled: Bool?
+  /// Fonts for the text that a style's own fonts don't draw, such as scripts
+  /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+  /// font files, each an object with a `url` and an optional `unicode-range`,
+  /// as in a font face of a style's `font-faces`, which every font stack uses
+  /// after the style's own font faces. Empty for none.
+  public var fallbackFontFaces: String
   public init(
     initialExtent: LogicalExtent,
     mapMode: MapMode = .init(rawValue: 0),
     fastPforEnabled: Bool = false,
     eventMask: RuntimeEventFlag? = nil,
-    tileCacheEnabled: Bool? = nil
+    tileCacheEnabled: Bool? = nil,
+    fallbackFontFaces: String = ""
   ) {
     self.initialExtent = initialExtent
     self.mapMode = mapMode
     self.fastPforEnabled = fastPforEnabled
     self.eventMask = eventMask
     self.tileCacheEnabled = tileCacheEnabled
+    self.fallbackFontFaces = fallbackFontFaces
   }
 
-  init(raw: mln_map_options) {
-    initialExtent = LogicalExtent(raw: raw.initial_extent)
-    mapMode = MapMode(rawValue: raw.map_mode.rawValue)
-    fastPforEnabled = raw.fast_pfor_enabled
-    eventMask = raw.fields & MLN_MAP_OPTION_EVENT_MASK
-      .rawValue != 0 ? RuntimeEventFlag(rawValue: raw.event_mask) : nil
-    tileCacheEnabled = raw.fields & MLN_MAP_OPTION_TILE_CACHE_ENABLED
-      .rawValue != 0 ? raw.tile_cache_enabled : nil
-  }
-
-  func nativeValue() -> mln_map_options {
+  func nativeValue(arena: NativeInputArena) throws -> mln_map_options {
     var raw = mln_map_options()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_map_options>.size)
@@ -1311,6 +1309,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_MAP_OPTION_TILE_CACHE_ENABLED.rawValue; raw
         .tile_cache_enabled = item
     }
+    raw.fallback_font_faces = arena.view(fallbackFontFaces)
     return raw
   }
 }

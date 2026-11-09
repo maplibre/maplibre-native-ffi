@@ -58,6 +58,7 @@
 #include <mln/style/layers/hillshade_layer.hpp>
 #include <mln/style/layers/location_indicator_layer.hpp>
 #include <mln/style/light.hpp>
+#include <mln/style/parser.hpp>
 #include <mln/style/rapidjson_conversion.hpp>
 #include <mln/style/source.hpp>
 #include <mln/style/sources/custom_geometry_source.hpp>
@@ -1540,6 +1541,27 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
     default:
       mln::core::set_thread_error("map_mode is invalid");
       return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto& faces = options->fallback_font_faces;
+  if (faces.size > 0) {
+    if (faces.data == nullptr) {
+      mln::core::set_thread_error(
+        "mln_map_options.fallback_font_faces must not be null"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    try {
+      mln::style::parseFallbackFontFaces(
+        std::string{static_cast<const char*>(faces.data), faces.size}
+      );
+    } catch (const std::exception& exception) {
+      const auto message =
+        std::string{"mln_map_options.fallback_font_faces is invalid: "} +
+        exception.what();
+      mln::core::set_thread_error(message.c_str());
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
   }
 
   return MLN_STATUS_OK;
@@ -3637,6 +3659,9 @@ auto construct_map(MapObject& live, const mln_map_options& effective) -> void {
       *live.frontend, *live.observer, map_options,
       resource_options_for_runtime(*live.runtime_state)
     );
+    if (!live.fallback_font_faces.empty()) {
+      live.map->getStyle().setFallbackFontFaces(live.fallback_font_faces);
+    }
     live.callback_sources->attach(*live.map);
     live.frontend->store_held_update();
     close_map_transaction(live, publish_map_snapshot(live));
@@ -3699,6 +3724,12 @@ auto create_map_start(
     (effective.fields & MLN_MAP_OPTION_TILE_CACHE_ENABLED) == 0U ||
     effective.tile_cache_enabled;
   owned_map->logical_extent = effective.initial_extent;
+  if (effective.fallback_font_faces.size > 0) {
+    owned_map->fallback_font_faces = std::string{
+      static_cast<const char*>(effective.fallback_font_faces.data),
+      effective.fallback_font_faces.size
+    };
+  }
   owned_map->event_state = std::make_shared<MapEventState>();
   owned_map->callback_sources = std::make_shared<CallbackSourceRegistry>();
   // An absent mask selects every event type.

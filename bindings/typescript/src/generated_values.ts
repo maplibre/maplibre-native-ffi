@@ -1530,6 +1530,14 @@ export interface MapOptions {
    * show again without loading. Without it, the map keeps them.
    */
   tileCacheEnabled?: boolean;
+  /**
+   * Fonts for the text that a style's own fonts don't draw, such as scripts
+   * that need complex shaping, like Myanmar or Devanagari. A JSON array of font
+   * files, each an object with a `url` and an optional `unicode-range`, as in a
+   * font face of a style's `font-faces`, which every font stack uses after the
+   * style's own font faces. Empty for none.
+   */
+  fallbackFontFaces?: string;
 }
 
 /**

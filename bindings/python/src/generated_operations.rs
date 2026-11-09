@@ -2500,6 +2500,7 @@ fn generated_input_mln_map_options<'py>(
         raw.tile_cache_enabled = field.extract::<bool>()?;
         raw.fields |= sys::MLN_MAP_OPTION_TILE_CACHE_ENABLED;
     }
+    raw.fallback_font_faces = storage.buffer(value.getattr("fallback_font_faces")?, true)?;
     Ok(raw)
 }
 

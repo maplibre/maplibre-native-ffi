@@ -1075,8 +1075,9 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_map_options NativeMapOptions(MapOptions value)
+    internal static mln_map_options NativeMapOptions(MapOptions value, NativeCallScope scope)
     {
+        Required(value.FallbackFontFaces, "MapOptions.FallbackFontFaces must not be null.");
         var native = new mln_map_options();
         native.fields = 0;
         native.size = (uint)sizeof(mln_map_options);
@@ -1095,6 +1096,7 @@ internal static unsafe class GeneratedValues
             MLN_MAP_OPTION_TILE_CACHE_ENABLED,
             static present => (byte)(present ? 1 : 0)
         );
+        native.fallback_font_faces = scope.Utf8(value.FallbackFontFaces);
         return native;
     }
 

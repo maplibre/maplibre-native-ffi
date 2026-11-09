@@ -1051,6 +1051,7 @@ pub struct mln_map_options {
     pub fast_pfor_enabled: bool,
     pub event_mask: mln_runtime_event_flags,
     pub tile_cache_enabled: bool,
+    pub fallback_font_faces: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

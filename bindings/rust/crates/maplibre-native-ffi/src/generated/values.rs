@@ -2557,8 +2557,8 @@ impl Default for MapMode {
 ///
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MapOptions {
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapOptions<'a> {
     /// The map's first size, and its scale factor. The scale factor stays fixed
     /// for the map's life, and every render session of the map renders at it.
     pub initial_extent: LogicalExtent,
@@ -2571,8 +2571,14 @@ pub struct MapOptions {
     /// Whether the map keeps tiles in memory after they leave the view, so they
     /// show again without loading. Without it, the map keeps them.
     pub tile_cache_enabled: Option<bool>,
+    /// Fonts for the text that a style's own fonts don't draw, such as scripts
+    /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+    /// font files, each an object with a `url` and an optional `unicode-range`,
+    /// as in a font face of a style's `font-faces`, which every font stack uses
+    /// after the style's own font faces. Empty for none.
+    pub fallback_font_faces: &'a str,
 }
-impl MapOptions {
+impl<'a> MapOptions<'a> {
     pub fn new(initial_extent: LogicalExtent) -> Self {
         Self {
             initial_extent,
@@ -2580,10 +2586,11 @@ impl MapOptions {
             fast_pfor_enabled: Default::default(),
             event_mask: None,
             tile_cache_enabled: None,
+            fallback_font_faces: Default::default(),
         }
     }
 }
-impl ToNative<sys::mln_map_options> for MapOptions {
+impl<'a> ToNative<sys::mln_map_options> for MapOptions<'a> {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_map_options> {
         let mut raw: sys::mln_map_options = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_map_options>() as _;
@@ -2599,6 +2606,7 @@ impl ToNative<sys::mln_map_options> for MapOptions {
             raw.fields |= sys::MLN_MAP_OPTION_TILE_CACHE_ENABLED;
             raw.tile_cache_enabled = *item;
         }
+        raw.fallback_font_faces = to_native(&self.fallback_font_faces, arena)?;
         Ok(raw)
     }
 }

@@ -185,11 +185,17 @@ public sealed unsafe partial class RuntimeHandle
     /// fails.</para>
     /// <para>See <c>mln_runtime_create_map</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when the
+    /// <c>fallback_font_faces</c> of <c>options</c> isn't an array of font
+    /// files.</description></item>
+    /// </list>
     /// </remarks>
     public MapHandle CreateMap(MapOptions options)
     {
         using var scope = new NativeCallScope(this);
-        var nativeOptions = NativeMapOptions(options);
+        var nativeOptions = NativeMapOptions(options, scope);
         MlnMap outMap = default;
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_create_map(

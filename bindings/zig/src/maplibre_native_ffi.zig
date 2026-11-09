@@ -2865,6 +2865,11 @@ pub const Runtime = struct {
     ///
     /// See `mln_runtime_create_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when the `fallback_font_faces` of `options` isn't
+    ///   an array of font files.
     pub fn createMap(self: Runtime, options: MapOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewMap {
         const started = try call.submit("mln_runtime_create_map", .handle, self, call.unit, null, diagnostic, .{ options, call.adopt(Map) });
         return .{ .map = started.outputs, .ready = started.ready };
@@ -5398,7 +5403,13 @@ pub const MapOptions = struct {
     /// Whether the map keeps tiles in memory after they leave the view, so they
     /// show again without loading. Without it, the map keeps them.
     tile_cache_enabled: ?bool = null,
-    pub fn toNative(self: MapOptions) c.mln_map_options {
+    /// Fonts for the text that a style's own fonts don't draw, such as scripts
+    /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+    /// font files, each an object with a `url` and an optional `unicode-range`,
+    /// as in a font face of a style's `font-faces`, which every font stack uses
+    /// after the style's own font faces. Empty for none.
+    fallback_font_faces: []const u8 = &.{},
+    pub fn toNative(self: MapOptions) status.Error!c.mln_map_options {
         var raw = std.mem.zeroes(c.mln_map_options);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_map_options);
@@ -5407,15 +5418,18 @@ pub const MapOptions = struct {
         raw.fast_pfor_enabled = self.fast_pfor_enabled;
         marshal.present(&raw.fields, c.MLN_MAP_OPTION_EVENT_MASK, &raw.event_mask, self.event_mask);
         marshal.present(&raw.fields, c.MLN_MAP_OPTION_TILE_CACHE_ENABLED, &raw.tile_cache_enabled, self.tile_cache_enabled);
+        raw.fallback_font_faces = marshal.view(self.fallback_font_faces);
         return raw;
     }
-    pub fn fromNative(raw: c.mln_map_options) MapOptions {
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_map_options) status.Error!MapOptions {
         return .{
             .initial_extent = LogicalExtent.fromNative(raw.initial_extent),
             .map_mode = MapMode.fromNative(raw.map_mode),
             .fast_pfor_enabled = raw.fast_pfor_enabled,
             .event_mask = if (raw.fields & c.MLN_MAP_OPTION_EVENT_MASK != 0) RuntimeEventFlag.fromNative(raw.event_mask) else null,
             .tile_cache_enabled = if (raw.fields & c.MLN_MAP_OPTION_TILE_CACHE_ENABLED != 0) raw.tile_cache_enabled else null,
+            .fallback_font_faces = try marshal.copyView(allocator, raw.fallback_font_faces),
         };
     }
 };

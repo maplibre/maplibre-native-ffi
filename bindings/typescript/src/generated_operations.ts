@@ -5992,6 +5992,11 @@ export class RuntimeHandle extends Owner {
    *
    * See `mln_runtime_create_map` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when the `fallback_font_faces` of `options`
+   *   isn't an array of font files.
    */
   createMap(options: MapOptions): MapHandle {
     return attach(

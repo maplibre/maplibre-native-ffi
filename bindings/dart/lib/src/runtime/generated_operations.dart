@@ -2573,6 +2573,10 @@ Pointer<raw.mln_map_options> _writeMapOptions(
     result.ref.fields |= raw.MLN_MAP_OPTION_TILE_CACHE_ENABLED;
     result.ref.tile_cache_enabled = value.tileCacheEnabled!;
   }
+  result.ref.fallback_font_faces = nativeStringView(
+    value.fallbackFontFaces,
+    arena,
+  ).value;
   return result;
 }
 
@@ -8727,6 +8731,11 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the `fallback_font_faces` of `options`
+  ///   isn't an array of font files.
   MapHandle createMap(MapOptions options) => _attach(
     (arena, completion, outMap) => raw.mln_runtime_create_map(
       _handle.raw,

@@ -770,6 +770,7 @@ final class mln_map_options extends Struct {
   external int event_mask;
   @Bool()
   external bool tile_cache_enabled;
+  external mln_buffer_view fallback_font_faces;
 }
 
 final class mln_map_projection_camera_result extends Struct {
