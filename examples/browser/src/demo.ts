@@ -20,6 +20,7 @@ import {
   type ScreenPoint,
 } from "@maplibre/native-ffi";
 
+import fallbackFontFaces from "../../fallback-font-faces.json";
 import type { Comparison } from "./compare.ts";
 import { addCollapse, addStylePicker, showAttributions } from "./panel.ts";
 import { defaultStyle, type Style, styles } from "./styles.ts";
@@ -143,6 +144,9 @@ async function start(backend: Backend): Promise<void> {
       RuntimeEventFlag.mapSourceChanged |
       RuntimeEventFlag.mapCameraIsChanging |
       RuntimeEventFlag.mapCameraDidChange,
+    // Fonts for the scripts that the styles' glyphs can't shape, which the
+    // map loads only when a label needs one.
+    fallbackFontFaces: JSON.stringify(fallbackFontFaces),
   });
   runtime.discarding.setEventHandler({
     callback: (events) => {

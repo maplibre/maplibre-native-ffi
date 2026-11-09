@@ -203,7 +203,11 @@ ci:
         - if: { files: ["docs/**"] }
           then: apply
         # The site serves the browser example as its live demo.
-        - if: { files: ["examples/browser/**", "examples/styles.json"] }
+        - if:
+            files:
+              - examples/browser/**
+              - examples/styles.json
+              - examples/fallback-font-faces.json
           then: apply
         # Pages show regions of these files, and the build fails on a missing
         # region.
@@ -583,6 +587,7 @@ ci:
               - bindings/kotlin/karma.config.d/**
               - examples/browser/**
               - examples/styles.json
+              - examples/fallback-font-faces.json
               - third_party/maplibre-native
           then: apply
     maven:
