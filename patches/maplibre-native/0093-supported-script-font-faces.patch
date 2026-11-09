@@ -450,3 +450,40 @@ index 5c351d6..1e62c80 100644
  bool isStringInSupportedScript(const std::string& input);
  
  bool isCharInComplexShapingScript(char16_t chr);
+diff --git a/test/style/expression/expression.test.cpp b/test/style/expression/expression.test.cpp
+index cbf17cc..c4ea4bf 100644
+--- a/test/style/expression/expression.test.cpp
++++ b/test/style/expression/expression.test.cpp
+@@ -3,6 +3,7 @@
+ #include <mln/style/expression/dsl.hpp>
+ #include <mln/style/expression/is_expression.hpp>
+ #include <mln/style/expression/parsing_context.hpp>
++#include <mln/text/glyph.hpp>
+ #include <mln/test/util.hpp>
+ #include <mln/util/io.hpp>
+ #include <mln/util/rapidjson.hpp>
+@@ -134,3 +135,24 @@ static std::vector<std::string> populateNames() {
+ }
+ 
+ INSTANTIATE_TEST_SUITE_P(Expression, ExpressionEqualityTest, ::testing::ValuesIn(populateNames()));
++
++TEST(Expression, IsSupportedScriptAcceptsScriptsThatFontFacesCover) {
++    const auto evaluate = [](const std::string& text, const std::vector<FontFace>* fontFaces) {
++        const std::string json = R"(["is-supported-script", ")" + text + R"("])";
++        JSDocument document;
++        document.Parse<0>(json);
++        const JSValue* value = &document;
++        expression::ParsingContext ctx;
++        auto parsed = ctx.parseExpression(conversion::Convertible(value));
++        EXPECT_TRUE(parsed);
++        const auto result = (*parsed)->evaluate(expression::EvaluationContext().withFontFaces(fontFaces));
++        EXPECT_TRUE(result);
++        return result && *result == expression::Value(true);
++    };
++    const std::vector<FontFace> myanmar{FontFace("Noto Sans Regular", "myanmar.ttf", {{0x1000, 0x109F}})};
++
++    EXPECT_FALSE(evaluate("မြန်မာ", nullptr));
++    EXPECT_TRUE(evaluate("မြန်မာ", &myanmar));
++    EXPECT_FALSE(evaluate("देवनागरी", &myanmar));
++    EXPECT_TRUE(evaluate("Yangon", &myanmar));
++}
