@@ -9,7 +9,7 @@ setGeoJSON, setGeoJSONData, and setURL.
 Upstream: not proposed
 
 diff --git a/include/mln/style/sources/geojson_source.hpp b/include/mln/style/sources/geojson_source.hpp
-index 77569ab..e4efa79 100644
+index 77569ab5c9..e4efa797ef 100644
 --- a/include/mln/style/sources/geojson_source.hpp
 +++ b/include/mln/style/sources/geojson_source.hpp
 @@ -8,6 +8,8 @@
@@ -32,7 +32,7 @@ index 77569ab..e4efa79 100644
  };
  class GeoJSONData {
 diff --git a/src/mln/style/conversion/geojson_options.cpp b/src/mln/style/conversion/geojson_options.cpp
-index 979e112..4226128 100644
+index 979e112b15..4226128dbb 100644
 --- a/src/mln/style/conversion/geojson_options.cpp
 +++ b/src/mln/style/conversion/geojson_options.cpp
 @@ -111,6 +111,16 @@ std::optional<GeoJSONOptions> Converter<GeoJSONOptions>::operator()(const Conver
@@ -53,7 +53,7 @@ index 979e112..4226128 100644
      if (clusterProperties) {
          if (!isObject(*clusterProperties)) {
 diff --git a/src/mln/style/sources/geojson_source_impl.cpp b/src/mln/style/sources/geojson_source_impl.cpp
-index 138329e..0cfd4df 100644
+index 138329e4f5..0cfd4dfdf6 100644
 --- a/src/mln/style/sources/geojson_source_impl.cpp
 +++ b/src/mln/style/sources/geojson_source_impl.cpp
 @@ -169,7 +169,7 @@ std::weak_ptr<GeoJSONData> GeoJSONSource::Impl::getData() const {
@@ -66,7 +66,7 @@ index 138329e..0cfd4df 100644
  
  bool GeoJSONSource::Impl::isUpdateSynchronous() const {
 diff --git a/test/style/source.test.cpp b/test/style/source.test.cpp
-index e1d101a..3fcdec5 100644
+index 0e8994ed45..ad2a3d7030 100644
 --- a/test/style/source.test.cpp
 +++ b/test/style/source.test.cpp
 @@ -12,6 +12,8 @@
@@ -76,9 +76,9 @@ index e1d101a..3fcdec5 100644
 +#include <mln/style/conversion/json.hpp>
 +#include <mln/style/conversion/source.hpp>
  #include <mln/style/source_impl.hpp>
+ #include <mln/style/sources/tile_source_impl.hpp>
  #include <mln/style/sources/custom_geometry_source.hpp>
- #include <mln/style/sources/geojson_source.hpp>
-@@ -1216,6 +1218,36 @@ TEST(Source, GeoJSONSourceSlicesInlineWhileABackgroundSliceRuns) {
+@@ -1299,6 +1301,36 @@ TEST(Source, GeoJSONSourceSlicesInlineWhileABackgroundSliceRuns) {
      EXPECT_TRUE(renderSource.isLoaded());
  }
  
