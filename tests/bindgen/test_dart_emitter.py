@@ -149,7 +149,7 @@ class DartEmitterTests(unittest.TestCase):
         self.assertIn(
             "const MapOptions({required this.initialExtent, this.mapMode = const "
             "MapMode.fromRawValue(0), this.fastPforEnabled = false, this.eventMask, "
-            "this.tileCacheEnabled});",
+            "this.tileCacheEnabled, this.fallbackFontFaces = ''});",
             values,
         )
         # A list member defaults to empty unless it is required.
