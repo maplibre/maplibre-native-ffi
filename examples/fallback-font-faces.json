@@ -1,0 +1,72 @@
+[
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansArabic/hinted/ttf/NotoSansArabic-Regular.ttf",
+    "unicode-range": [
+      "U+0600-06FF",
+      "U+0750-077F",
+      "U+0870-08FF",
+      "U+FB50-FDFF",
+      "U+FE70-FEFF"
+    ]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansDevanagari/hinted/ttf/NotoSansDevanagari-Regular.ttf",
+    "unicode-range": ["U+0900-097F", "U+A8E0-A8FF"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansBengali/hinted/ttf/NotoSansBengali-Regular.ttf",
+    "unicode-range": ["U+0980-09FF"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansGurmukhi/hinted/ttf/NotoSansGurmukhi-Regular.ttf",
+    "unicode-range": ["U+0A00-0A7F"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansGujarati/hinted/ttf/NotoSansGujarati-Regular.ttf",
+    "unicode-range": ["U+0A80-0AFF"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansOriya/hinted/ttf/NotoSansOriya-Regular.ttf",
+    "unicode-range": ["U+0B00-0B7F"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansTamil/hinted/ttf/NotoSansTamil-Regular.ttf",
+    "unicode-range": ["U+0B80-0BFF"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansTelugu/hinted/ttf/NotoSansTelugu-Regular.ttf",
+    "unicode-range": ["U+0C00-0C7F"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansKannada/hinted/ttf/NotoSansKannada-Regular.ttf",
+    "unicode-range": ["U+0C80-0CFF"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansMalayalam/hinted/ttf/NotoSansMalayalam-Regular.ttf",
+    "unicode-range": ["U+0D00-0D7F"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansSinhala/hinted/ttf/NotoSansSinhala-Regular.ttf",
+    "unicode-range": ["U+0D80-0DFF"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansThai/hinted/ttf/NotoSansThai-Regular.ttf",
+    "unicode-range": ["U+0E00-0E7F"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansLao/hinted/ttf/NotoSansLao-Regular.ttf",
+    "unicode-range": ["U+0E80-0EFF"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSerifTibetan/hinted/ttf/NotoSerifTibetan-Regular.ttf",
+    "unicode-range": ["U+0F00-0FFF"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansMyanmar/hinted/ttf/NotoSansMyanmar-Regular.ttf",
+    "unicode-range": ["U+1000-109F", "U+A9E0-A9FF", "U+AA60-AA7F"]
+  },
+  {
+    "url": "https://cdn.jsdelivr.net/gh/notofonts/notofonts.github.io@86ce02c0fe7890f5936c5dffb26fca0797d1be64/fonts/NotoSansKhmer/hinted/ttf/NotoSansKhmer-Regular.ttf",
+    "unicode-range": ["U+1780-17FF", "U+19E0-19FF"]
+  }
+]

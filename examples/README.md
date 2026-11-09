@@ -19,3 +19,10 @@ still load only `default`. Each style has:
 Add a style only if every file it loads, such as its TileJSON, tiles, glyphs,
 and sprites, allows cross-origin requests, since the browser example runs on
 another origin.
+
+## Fonts
+
+[`fallback-font-faces.json`](fallback-font-faces.json) lists Noto fonts for the
+scripts that a style's glyphs can't shape, such as Arabic, Devanagari, and
+Myanmar. It is the value of `mln_map_options.fallback_font_faces`, so an example
+passes it to the map as it is. A map loads a font only when a label needs it.
