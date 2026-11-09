@@ -231,6 +231,14 @@ typedef struct mln_map_options {
    */
   bool tile_cache_enabled
     MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_TILE_CACHE_ENABLED");
+  /**
+   * Fonts for the text that a style's own fonts don't draw, such as scripts
+   * that need complex shaping, like Myanmar or Devanagari. A JSON array of font
+   * files, each an object with a `url` and an optional `unicode-range`, as in
+   * a font face of a style's `font-faces`, which every font stack uses after
+   * the style's own font faces. Empty for none.
+   */
+  mln_buffer_view fallback_font_faces;
 } mln_map_options;
 
 /** A point on the screen, in logical pixels from the map's top-left corner. */
@@ -1273,6 +1281,10 @@ typedef struct mln_camera_query_result {
  *
  * Asynchronous calls on the map before the completion runs wait for it, and
  * complete with MLN_STATUS_INVALID_STATE when creation fails.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when the `fallback_font_faces` of `options`
+ *   isn't an array of font files.
  *
  * Lifetimes:
  * `out_map` receives the handle before the call returns, while the map is

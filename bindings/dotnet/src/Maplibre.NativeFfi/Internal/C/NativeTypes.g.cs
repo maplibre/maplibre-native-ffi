@@ -591,6 +591,7 @@ internal unsafe struct mln_map_options
     public byte fast_pfor_enabled;
     public ulong event_mask;
     public byte tile_cache_enabled;
+    public mln_buffer_view fallback_font_faces;
 }
 
 internal unsafe struct mln_map_projection_camera_result

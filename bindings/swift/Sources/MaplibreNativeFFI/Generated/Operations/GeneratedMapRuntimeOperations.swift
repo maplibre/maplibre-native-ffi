@@ -11,12 +11,17 @@ public extension RuntimeHandle {
   ///
   /// See `mln_runtime_create_map` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when the `fallback_font_faces` of `options`
+  ///   isn't an array of font files.
   func createMap(options bindingArg0: MapOptions) throws -> MapHandle {
     var value0: mln_map = 0
     return try nativeAttach { raw, arena, completion, diagnostic in
-      mln_runtime_create_map(
+      try mln_runtime_create_map(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         &value0,
         completion,
         diagnostic

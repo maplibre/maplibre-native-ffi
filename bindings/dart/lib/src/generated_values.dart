@@ -6570,6 +6570,7 @@ final class MapOptions extends _Value {
     this.fastPforEnabled = false,
     this.eventMask,
     this.tileCacheEnabled,
+    this.fallbackFontFaces = '',
   });
 
   /// The map's first size, and its scale factor. The scale factor stays fixed
@@ -6588,6 +6589,13 @@ final class MapOptions extends _Value {
   /// show again without loading. Without it, the map keeps them.
   final bool? tileCacheEnabled;
 
+  /// Fonts for the text that a style's own fonts don't draw, such as scripts
+  /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+  /// font files, each an object with a `url` and an optional `unicode-range`,
+  /// as in a font face of a style's `font-faces`, which every font stack uses
+  /// after the style's own font faces. Empty for none.
+  final String fallbackFontFaces;
+
   /// A copy of this value with the given members replaced.
   MapOptions copyWith({
     LogicalExtent? initialExtent,
@@ -6595,12 +6603,14 @@ final class MapOptions extends _Value {
     bool? fastPforEnabled,
     RuntimeEventFlag? eventMask,
     bool? tileCacheEnabled,
+    String? fallbackFontFaces,
   }) => MapOptions(
     initialExtent: initialExtent ?? this.initialExtent,
     mapMode: mapMode ?? this.mapMode,
     fastPforEnabled: fastPforEnabled ?? this.fastPforEnabled,
     eventMask: eventMask ?? this.eventMask,
     tileCacheEnabled: tileCacheEnabled ?? this.tileCacheEnabled,
+    fallbackFontFaces: fallbackFontFaces ?? this.fallbackFontFaces,
   );
 
   @override
@@ -6610,6 +6620,7 @@ final class MapOptions extends _Value {
     fastPforEnabled,
     eventMask,
     tileCacheEnabled,
+    fallbackFontFaces,
   ];
   @override
   String toString() => _describe('MapOptions', const [
@@ -6618,6 +6629,7 @@ final class MapOptions extends _Value {
     'fastPforEnabled',
     'eventMask',
     'tileCacheEnabled',
+    'fallbackFontFaces',
   ]);
 }
 

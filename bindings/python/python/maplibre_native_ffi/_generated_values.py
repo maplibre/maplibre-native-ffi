@@ -2602,6 +2602,14 @@ class MapOptions:
     show again without loading. Without it, the map keeps them.
     """
 
+    fallback_font_faces: str = ""
+    """Fonts for the text that a style's own fonts don't draw, such as scripts
+    that need complex shaping, like Myanmar or Devanagari. A JSON array of
+    font files, each an object with a `url` and an optional `unicode-range`,
+    as in a font face of a style's `font-faces`, which every font stack uses
+    after the style's own font faces. Empty for none.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -2610,6 +2618,7 @@ class MapOptions:
             fast_pfor_enabled=raw["fast_pfor_enabled"],
             event_mask=_maybe(RuntimeEventFlag, raw["event_mask"]),
             tile_cache_enabled=raw["tile_cache_enabled"],
+            fallback_font_faces=raw["fallback_font_faces"],
         )
 
 

@@ -8510,6 +8510,7 @@ struct _MaplibreNativeFfiMapOptions {
   gboolean fast_pfor_enabled;
   MaplibreNativeFfiRuntimeEventFlag event_mask;
   gboolean tile_cache_enabled;
+  char* fallback_font_faces;
 };
 
 enum {
@@ -8519,6 +8520,7 @@ enum {
   MAP_OPTIONS_PROP_FAST_PFOR_ENABLED,
   MAP_OPTIONS_PROP_EVENT_MASK,
   MAP_OPTIONS_PROP_TILE_CACHE_ENABLED,
+  MAP_OPTIONS_PROP_FALLBACK_FONT_FACES,
   MAP_OPTIONS_N_PROPERTIES
 };
 
@@ -8527,6 +8529,13 @@ static GParamSpec* map_options_properties[MAP_OPTIONS_N_PROPERTIES];
 G_DEFINE_FINAL_TYPE(
   MaplibreNativeFfiMapOptions, maplibre_native_ffi_map_options, G_TYPE_OBJECT
 )
+
+static void maplibre_native_ffi_map_options_finalize(GObject* object) {
+  MaplibreNativeFfiMapOptions* self = MAPLIBRE_NATIVE_FFI_MAP_OPTIONS(object);
+  g_free(self->fallback_font_faces);
+  G_OBJECT_CLASS(maplibre_native_ffi_map_options_parent_class)
+    ->finalize(object);
+}
 
 static void maplibre_native_ffi_map_options_get_property(
   GObject* object, guint id, GValue* value, GParamSpec* pspec
@@ -8547,6 +8556,9 @@ static void maplibre_native_ffi_map_options_get_property(
       break;
     case MAP_OPTIONS_PROP_TILE_CACHE_ENABLED:
       g_value_set_boolean(value, self->tile_cache_enabled);
+      break;
+    case MAP_OPTIONS_PROP_FALLBACK_FONT_FACES:
+      g_value_set_string(value, self->fallback_font_faces);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -8583,6 +8595,11 @@ static void maplibre_native_ffi_map_options_set_property(
         self, g_value_get_boolean(value)
       );
       break;
+    case MAP_OPTIONS_PROP_FALLBACK_FONT_FACES:
+      maplibre_native_ffi_map_options_set_fallback_font_faces(
+        self, g_value_get_string(value)
+      );
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
   }
@@ -8592,6 +8609,7 @@ static void maplibre_native_ffi_map_options_class_init(
   MaplibreNativeFfiMapOptionsClass* klass
 ) {
   GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->finalize = maplibre_native_ffi_map_options_finalize;
   object_class->get_property = maplibre_native_ffi_map_options_get_property;
   object_class->set_property = maplibre_native_ffi_map_options_set_property;
   map_options_properties[MAP_OPTIONS_PROP_INITIAL_EXTENT] = g_param_spec_boxed(
@@ -8613,6 +8631,8 @@ static void maplibre_native_ffi_map_options_class_init(
     g_param_spec_boolean(
       "tile-cache-enabled", NULL, NULL, FALSE, PROPERTY_FLAGS
     );
+  map_options_properties[MAP_OPTIONS_PROP_FALLBACK_FONT_FACES] =
+    g_param_spec_string("fallback-font-faces", NULL, NULL, "", PROPERTY_FLAGS);
   g_object_class_install_properties(
     object_class, MAP_OPTIONS_N_PROPERTIES, map_options_properties
   );
@@ -8621,7 +8641,7 @@ static void maplibre_native_ffi_map_options_class_init(
 static void maplibre_native_ffi_map_options_init(
   MaplibreNativeFfiMapOptions* self
 ) {
-  (void)self;
+  self->fallback_font_faces = g_strdup("");
 }
 
 MaplibreNativeFfiMapOptions* maplibre_native_ffi_map_options_new(void) {
@@ -8751,6 +8771,28 @@ void maplibre_native_ffi_map_options_set_tile_cache_enabled(
     );
 }
 
+const char* maplibre_native_ffi_map_options_get_fallback_font_faces(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self), NULL);
+  return self->fallback_font_faces;
+}
+
+void maplibre_native_ffi_map_options_set_fallback_font_faces(
+  MaplibreNativeFfiMapOptions* self, const char* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self));
+  char* previous = self->fallback_font_faces;
+  self->fallback_font_faces = g_strdup(value != NULL ? value : "");
+  gboolean changed = g_strcmp0(previous, self->fallback_font_faces) != 0;
+  g_free(previous);
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      map_options_properties[MAP_OPTIONS_PROP_FALLBACK_FONT_FACES]
+    );
+}
+
 void maplibre_native_ffi_map_options_to_native(
   const MaplibreNativeFfiMapOptions* self, mln_map_options* out,
   MaplibreNativeFfiCall* call
@@ -8765,6 +8807,8 @@ void maplibre_native_ffi_map_options_to_native(
   out->fast_pfor_enabled = (self->fast_pfor_enabled) != FALSE;
   out->event_mask = (mln_runtime_event_flags)(self->event_mask);
   out->tile_cache_enabled = (self->tile_cache_enabled) != FALSE;
+  out->fallback_font_faces =
+    maplibre_native_ffi_text_view(self->fallback_font_faces);
 }
 
 G_DEFINE_BOXED_TYPE(

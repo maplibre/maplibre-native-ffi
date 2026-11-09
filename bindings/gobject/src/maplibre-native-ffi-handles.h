@@ -5300,6 +5300,11 @@ MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_create(
  * See `mln_runtime_create_map` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the `fallback_font_faces`
+ *   of `options` isn't an array of font files.
+ *
  * Returns: (transfer full): the new object, or %NULL with `error` set
  */
 MaplibreNativeFfiMap* maplibre_native_ffi_runtime_create_map(

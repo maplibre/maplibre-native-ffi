@@ -90,7 +90,12 @@ impl RuntimeHandle {
     ///
     /// See `mln_runtime_create_map` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn create_map(&self, options: &MapOptions) -> Result<(MapHandle, NativeFuture<()>)> {
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when the `fallback_font_faces` of `options`
+    ///   isn't an array of font files.
+    pub fn create_map(&self, options: &MapOptions<'_>) -> Result<(MapHandle, NativeFuture<()>)> {
         let mut call = self.inner.call();
         let mut out_map = sys::mln_map(0);
         let options = call.reference(&options)?;

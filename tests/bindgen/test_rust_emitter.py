@@ -170,14 +170,14 @@ class RustEmitterTests(unittest.TestCase):
             "crates/maplibre-native-ffi/src/generated/values.rs"
         ]
         self.assertIn(
-            "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct MapOptions {", values
+            "#[derive(Debug, Clone, PartialEq)]\npub struct MapOptions<'a> {", values
         )
         # The others start at zero, which native reads as their defaults.
         self.assertIn(
             "pub fn new(initial_extent: LogicalExtent) -> Self { Self { "
             "initial_extent, map_mode: Default::default(), "
             "fast_pfor_enabled: Default::default(), event_mask: None, "
-            "tile_cache_enabled: None } }",
+            "tile_cache_enabled: None, fallback_font_faces: Default::default() } }",
             values,
         )
         self.assertIn(

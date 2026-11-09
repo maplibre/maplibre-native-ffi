@@ -3464,6 +3464,12 @@ type MapOptions struct {
 	// Whether the map keeps tiles in memory after they leave the view, so they show
 	// again without loading. Without it, the map keeps them.
 	TileCacheEnabled *bool
+	// Fonts for the text that a style's own fonts don't draw, such as scripts that
+	// need complex shaping, like Myanmar or Devanagari. A JSON array of font files,
+	// each an object with a url and an optional unicode-range, as in a font face of
+	// a style's font-faces, which every font stack uses after the style's own font
+	// faces. Empty for none.
+	FallbackFontFaces string
 }
 
 func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
@@ -3475,6 +3481,7 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	raw.fast_pfor_enabled = C.bool(input.FastPforEnabled)
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_EVENT_MASK, &raw.event_mask, input.EventMask, arena, bindingNumber[RuntimeEventFlag, C.mln_runtime_event_flags])
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_TILE_CACHE_ENABLED, &raw.tile_cache_enabled, input.TileCacheEnabled, arena, bindingBool[bool, C.bool])
+	raw.fallback_font_faces = C.mln_buffer_view{data: arena.bytes([]byte(input.FallbackFontFaces)), size: C.size_t(len(input.FallbackFontFaces))}
 	return raw
 }
 
@@ -9755,6 +9762,10 @@ func NewRuntime(options *RuntimeOptions) (*RuntimeHandle, error) {
 //
 // See mln_runtime_create_map in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when the fallback_font_faces of options isn't an
+//     array of font files.
 func (receiver *RuntimeHandle) CreateMap(options MapOptions) (mapHandle *MapHandle, ready *Future[struct{}], err error) {
 	var outMap C.mln_map
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {

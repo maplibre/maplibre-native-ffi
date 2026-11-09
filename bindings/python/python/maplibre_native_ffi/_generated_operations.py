@@ -3057,6 +3057,11 @@ class _RuntimeHandleOperations(GeneratedOperations):
 
         See `mln_runtime_create_map` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when the `fallback_font_faces` of
+          `options` isn't an array of font files.
         """
         raw = self._native.create_map(options)
         return _adopt_value(raw["map"], "MapHandle", self, raw["ready"])

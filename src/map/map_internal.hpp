@@ -67,6 +67,8 @@ struct MapObject {
   mln_map_mode map_mode = MLN_MAP_MODE_CONTINUOUS;
   // Fixed at creation; applied to the renderer of each render session.
   bool tile_cache_enabled = true;
+  // Fixed at creation; the style applies them to every style it loads.
+  std::string fallback_font_faces;
   // Width and height follow resize on the runtime worker; scale_factor is
   // fixed at creation, so map_scale_factor() may read it from any thread.
   mln_logical_extent logical_extent{256, 256, 1.0};

@@ -5278,6 +5278,12 @@ bool mln_ts_write_map_options(
     }
     out->fields |= MLN_MAP_OPTION_TILE_CACHE_ENABLED;
   }
+  if (!mln_ts_member(call, value, "fallbackFontFaces", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "fallbackFontFaces");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->fallback_font_faces, child))
+      return false;
+  }
   return true;
 }
 

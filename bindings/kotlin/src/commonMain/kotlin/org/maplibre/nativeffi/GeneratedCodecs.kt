@@ -1305,7 +1305,7 @@ internal fun NativeArena.writeResourceTransformError(value: ResourceTransformErr
 
 @JvmSynthetic
 internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
-  writeU32(target, w(48, 48, 44).toUInt())
+  writeU32(target, w(56, 64, 52).toUInt())
   var fields = 0u
   putLogicalExtent(target + 8, value.initialExtent)
   writeU32(target + 24, value.mapMode.rawValue)
@@ -1318,12 +1318,13 @@ internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
     fields = fields or 2u
     writeBool(target + 40, it)
   }
+  putView(target + w(44, 48), value.fallbackFontFaces)
   writeU32(target + 4, fields)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeMapOptions(value: MapOptions): Long =
-  allocate(w(48, 48, 44), w(8, 8, 4)).also { putMapOptions(it, value) }
+  allocate(w(56, 64, 52), w(8, 8, 4)).also { putMapOptions(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: OfflineRegionDefinition) {
