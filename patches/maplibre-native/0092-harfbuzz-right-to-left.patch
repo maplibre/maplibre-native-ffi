@@ -1,0 +1,409 @@
+Lays out right-to-left text in the right order when a style's font-faces send
+it through HarfBuzz. The HarfBuzz path shaped every run left to right, skipped
+the bidi reordering that glyph PBFs get, and received ICU's Arabic presentation
+forms instead of the letters, so Arabic and Kurdish labels came out reversed and
+unjoined. Now each run of one direction is shaped in that direction, the runs
+come in visual order, and only glyph PBF sections take presentation forms.
+Adapted from the patch that yusfrubar-sketch posted on the upstream issue.
+Issue: https://github.com/maplibre/maplibre-native/issues/4513
+Upstream: not proposed
+
+diff --git a/platform/default/src/mln/text/bidi.cpp b/platform/default/src/mln/text/bidi.cpp
+index c8cfe50..f47b38e 100644
+--- a/platform/default/src/mln/text/bidi.cpp
++++ b/platform/default/src/mln/text/bidi.cpp
+@@ -201,6 +201,40 @@ std::vector<StyledText> BiDi::processStyledText(const StyledText& input, std::se
+     return lines;
+ }
+ 
++std::vector<BiDiRun> BiDi::visualRuns(const std::u16string& input) {
++    std::vector<BiDiRun> runs;
++    if (input.empty()) return runs;
++
++    UErrorCode errorCode = U_ZERO_ERROR;
++    ubidi_setPara(impl->bidiText,
++                  mln::utf16char_cast<const UChar*>(input.c_str()),
++                  static_cast<int32_t>(input.size()),
++                  UBIDI_DEFAULT_LTR,
++                  nullptr,
++                  &errorCode);
++    if (U_FAILURE(errorCode)) {
++        return {{input, false}};
++    }
++
++    const int32_t runCount = ubidi_countRuns(impl->bidiText, &errorCode);
++    if (U_FAILURE(errorCode) || runCount <= 0) {
++        return {{input, false}};
++    }
++
++    runs.reserve(static_cast<std::size_t>(runCount));
++    for (int32_t runIndex = 0; runIndex < runCount; runIndex++) {
++        int32_t logicalStart = 0;
++        int32_t length = 0;
++        const UBiDiDirection direction = ubidi_getVisualRun(impl->bidiText, runIndex, &logicalStart, &length);
++        if (length <= 0) continue;
++        runs.push_back({input.substr(static_cast<std::size_t>(logicalStart), static_cast<std::size_t>(length)),
++                        direction == UBIDI_RTL});
++    }
++
++    if (runs.empty()) runs.push_back({input, false});
++    return runs;
++}
++
+ std::u16string BiDi::writeReverse(const std::u16string& input, std::size_t logicalStart, std::size_t logicalEnd) {
+     UErrorCode errorCode = U_ZERO_ERROR;
+     auto logicalLength = static_cast<int32_t>(logicalEnd - logicalStart);
+diff --git a/platform/qt/src/mln/bidi.cpp b/platform/qt/src/mln/bidi.cpp
+index bc4137d..8eb99bc 100644
+--- a/platform/qt/src/mln/bidi.cpp
++++ b/platform/qt/src/mln/bidi.cpp
+@@ -33,6 +33,11 @@ std::vector<std::u16string> BiDi::processText(const std::u16string& input, std::
+     return transformedLines;
+ }
+ 
++std::vector<BiDiRun> BiDi::visualRuns(const std::u16string& input) {
++    if (input.empty()) return {};
++    return {{input, false}};
++}
++
+ std::vector<StyledText> BiDi::processStyledText(const StyledText& input, std::set<std::size_t> lineBreakPoints) {
+     lineBreakPoints.insert(input.first.length());
+ 
+diff --git a/src/mln/layout/symbol_layout.cpp b/src/mln/layout/symbol_layout.cpp
+index e65269d..77d278f 100644
+--- a/src/mln/layout/symbol_layout.cpp
++++ b/src/mln/layout/symbol_layout.cpp
+@@ -221,7 +221,10 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
+                             u8string = platform::lowercase(u8string);
+                         }
+ 
+-                        auto u16String = applyArabicShaping(util::convertUTF8ToUTF16(u8string));
++                        // Only the sections that draw from glyph PBFs take ICU's
++                        // Arabic presentation forms. HarfBuzz needs the letters
++                        // themselves, to apply the font's own joining rules.
++                        auto u16String = util::convertUTF8ToUTF16(u8string);
+                         const char16_t* u16Char = u16String.data();
+                         std::u16string subString;
+                         auto sectionScale = section.fontScale ? *section.fontScale : 1.0;
+@@ -230,26 +233,25 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
+                         GlyphIDType subStringtype = getCharGlyphIDType(
+                             *u16Char, sectionFontStack, layoutParameters.fontFaces, GlyphIDType::FontPBF);
+ 
++                        auto addSubString = [&](bool keySection) {
++                            if (subString.empty()) return;
++                            if (subStringtype == GlyphIDType::FontPBF) {
++                                subString = applyArabicShaping(subString);
++                            }
++                            ft.formattedText->addTextSection(
++                                subString, sectionScale, sectionFontStack, subStringtype, keySection, section.textColor);
++                            sectionTable[ft.formattedText->getSections().size() - 1] = sectionIndex;
++                            if (subStringtype != GlyphIDType::FontPBF) {
++                                layoutParameters.glyphDependencies.shapes[sectionFontStack][subStringtype].insert(
++                                    subString);
++                            }
++                        };
++
+                         while (*u16Char) {
+                             const auto chType = getCharGlyphIDType(
+                                 *u16Char, sectionFontStack, layoutParameters.fontFaces, subStringtype);
+                             if (chType != subStringtype) {
+-                                if (!subString.empty()) {
+-                                    ft.formattedText->addTextSection(subString,
+-                                                                     sectionScale,
+-                                                                     sectionFontStack,
+-                                                                     subStringtype,
+-                                                                     false,
+-                                                                     section.textColor);
+-                                    sectionTable[ft.formattedText->getSections().size() - 1] = sectionIndex;
+-                                    if (subStringtype != GlyphIDType::FontPBF) {
+-                                        layoutParameters.glyphDependencies
+-                                            .shapes[section.fontStack ? *section.fontStack : baseFontStack]
+-                                                   [subStringtype]
+-                                            .insert(subString);
+-                                    }
+-                                }
+-
++                                addSubString(false);
+                                 subString.clear();
+                                 subStringtype = chType;
+                             }
+@@ -259,20 +261,7 @@ SymbolLayout::SymbolLayout(const BucketParameters& parameters,
+                             ++u16Char;
+                         }
+ 
+-                        if (!subString.empty()) {
+-                            ft.formattedText->addTextSection(subString,
+-                                                             section.fontScale ? *section.fontScale : 1.0,
+-                                                             section.fontStack ? *section.fontStack : baseFontStack,
+-                                                             subStringtype,
+-                                                             true,
+-                                                             section.textColor);
+-                            sectionTable[ft.formattedText->getSections().size() - 1] = sectionIndex;
+-                            if (subStringtype != GlyphIDType::FontPBF) {
+-                                layoutParameters.glyphDependencies
+-                                    .shapes[section.fontStack ? *section.fontStack : baseFontStack][subStringtype]
+-                                    .insert(subString);
+-                            }
+-                        }
++                        addSubString(true);
+                     } catch (...) {
+                         mln::Log::Error(
+                             mln::Event::ParseTile,
+diff --git a/src/mln/text/bidi.hpp b/src/mln/text/bidi.hpp
+index beb11ff..ff3ad63 100644
+--- a/src/mln/text/bidi.hpp
++++ b/src/mln/text/bidi.hpp
+@@ -21,6 +21,12 @@ std::u16string applyArabicShaping(const std::u16string&);
+ // of formatting that can happen when BiDi rearranges inputs
+ using StyledText = std::pair<std::u16string, std::vector<uint8_t>>;
+ 
++// A run of text in one direction, in logical order.
++struct BiDiRun {
++    std::u16string text;
++    bool rtl;
++};
++
+ class BiDi : private util::noncopyable {
+ public:
+     BiDi();
+@@ -31,6 +37,10 @@ public:
+     std::vector<std::u16string> processText(const std::u16string&, std::set<std::size_t>);
+     // Same as processText but preserves per-code-point formatting information
+     std::vector<StyledText> processStyledText(const StyledText&, std::set<std::size_t>);
++    // Splits text in logical order into runs of one direction each, and
++    // returns the runs in visual order. Each run keeps its logical order, so a
++    // shaper such as HarfBuzz can lay it out in its direction.
++    std::vector<BiDiRun> visualRuns(const std::u16string&);
+ 
+ private:
+     void mergeParagraphLineBreaks(std::set<std::size_t>&);
+diff --git a/src/mln/text/glyph_manager.cpp b/src/mln/text/glyph_manager.cpp
+index a097107..8760b99 100644
+--- a/src/mln/text/glyph_manager.cpp
++++ b/src/mln/text/glyph_manager.cpp
+@@ -290,13 +290,14 @@ Immutable<Glyph> GlyphManager::getGlyph(const FontStack& fontStack, GlyphID glyp
+ }
+ 
+ void GlyphManager::hbShaping(const std::u16string& text,
++                             bool rtl,
+                              const FontStack& font,
+                              GlyphIDType type,
+                              std::vector<GlyphID>& glyphIDs,
+                              std::vector<HBShapeAdjust>& adjusts) {
+     auto shaper = getHBShaper(font, type);
+     if (shaper) {
+-        shaper->createComplexGlyphIDs(text, glyphIDs, adjusts);
++        shaper->createComplexGlyphIDs(text, rtl, glyphIDs, adjusts);
+     }
+ }
+ 
+diff --git a/src/mln/text/glyph_manager.hpp b/src/mln/text/glyph_manager.hpp
+index 7e7df2e..44e7c8b 100644
+--- a/src/mln/text/glyph_manager.hpp
++++ b/src/mln/text/glyph_manager.hpp
+@@ -74,6 +74,7 @@ public:
+     std::shared_ptr<HBShaper> getHBShaper(FontStack, GlyphIDType);
+ 
+     void hbShaping(const std::u16string &text,
++                   bool rtl,
+                    const FontStack &font,
+                    GlyphIDType type,
+                    std::vector<GlyphID> &glyphIDs,
+diff --git a/src/mln/text/harfbuzz.cpp b/src/mln/text/harfbuzz.cpp
+index be21e29..9a10a6f 100644
+--- a/src/mln/text/harfbuzz.cpp
++++ b/src/mln/text/harfbuzz.cpp
+@@ -15,7 +15,7 @@ public:
+ 
+     bool valid() { return false; }
+ 
+-    void createComplexGlyphIDs(const std::u16string &, std::vector<GlyphID> &, std::vector<HBShapeAdjust> &) {
++    void createComplexGlyphIDs(const std::u16string &, bool, std::vector<GlyphID> &, std::vector<HBShapeAdjust> &) {
+         assert(false && "can't shaping text without harfbuzz.");
+     }
+ 
+@@ -36,9 +36,10 @@ HBShaper::~HBShaper() {
+ }
+ 
+ void HBShaper::createComplexGlyphIDs(const std::u16string &text,
++                                     bool rtl,
+                                      std::vector<GlyphID> &glyphIDs,
+                                      std::vector<HBShapeAdjust> &adjusts) {
+-    impl->createComplexGlyphIDs(text, glyphIDs, adjusts);
++    impl->createComplexGlyphIDs(text, rtl, glyphIDs, adjusts);
+ }
+ 
+ Glyph HBShaper::rasterizeGlyph(const GlyphID &glyph) {
+diff --git a/src/mln/text/harfbuzz.hpp b/src/mln/text/harfbuzz.hpp
+index d525de7..bbb28d5 100644
+--- a/src/mln/text/harfbuzz.hpp
++++ b/src/mln/text/harfbuzz.hpp
+@@ -29,7 +29,10 @@ public:
+     explicit HBShaper(GlyphIDType type, const std::string &fontFileData, const FreeTypeLibrary &lib);
+     ~HBShaper();
+ 
++    // Shapes `text`, one run of one direction in logical order. Glyphs come
++    // back in visual order, so a right-to-left run's glyphs come back reversed.
+     void createComplexGlyphIDs(const std::u16string &text,
++                               bool rtl,
+                                std::vector<GlyphID> &glyphIDs,
+                                std::vector<HBShapeAdjust> &adjusts);
+     Glyph rasterizeGlyph(const GlyphID &glyph);
+diff --git a/src/mln/text/harfbuzz_impl.cpp b/src/mln/text/harfbuzz_impl.cpp
+index c634217..343b77c 100644
+--- a/src/mln/text/harfbuzz_impl.cpp
++++ b/src/mln/text/harfbuzz_impl.cpp
+@@ -43,6 +43,7 @@ HBShaper::Impl::~Impl() {
+     hb_font_destroy(font);
+ }
+ void HBShaper::Impl::createComplexGlyphIDs(const std::u16string &text,
++                                           bool rtl,
+                                            std::vector<GlyphID> &glyphIDs,
+                                            std::vector<HBShapeAdjust> &adjusts) {
+     if (text.empty()) {
+@@ -55,22 +56,38 @@ void HBShaper::Impl::createComplexGlyphIDs(const std::u16string &text,
+     };
+ 
+     std::vector<TextPart> textParts;
+-    textParts.emplace_back();
+-    auto *lastTextPart = &textParts.back();
+-    lastTextPart->text = text[0];
+-    lastTextPart->script = getUnicodeScript(text[0]);
++    if (rtl) {
++        // A right-to-left run is shaped as one buffer, so cursive joining sees
++        // every neighbor, and the glyphs come back in visual order. Its spaces
++        // and punctuation take the script of its letters.
++        hb_script_t runScript = HB_SCRIPT_INVALID;
++        for (char16_t ch : text) {
++            const auto script = getUnicodeScript(ch);
++            if (script != HB_SCRIPT_COMMON && script != HB_SCRIPT_INHERITED && script != HB_SCRIPT_UNKNOWN) {
++                runScript = script;
++                break;
++            }
++        }
++        if (runScript == HB_SCRIPT_INVALID) runScript = HB_SCRIPT_ARABIC;
++        textParts.push_back({text, runScript});
++    } else {
++        textParts.emplace_back();
++        auto *lastTextPart = &textParts.back();
++        lastTextPart->text = text[0];
++        lastTextPart->script = getUnicodeScript(text[0]);
+ 
+-    for (std::size_t i = 1; i < text.size(); ++i) {
+-        auto ch = text[i];
+-        auto script = getUnicodeScript(text[i]);
++        for (std::size_t i = 1; i < text.size(); ++i) {
++            auto ch = text[i];
++            auto script = getUnicodeScript(text[i]);
+ 
+-        if (lastTextPart->script == script || script == HB_SCRIPT_INHERITED) {
+-            lastTextPart->text += ch;
+-        } else {
+-            textParts.emplace_back();
+-            lastTextPart = &textParts.back();
+-            lastTextPart->text = ch;
+-            lastTextPart->script = script;
++            if (lastTextPart->script == script || script == HB_SCRIPT_INHERITED) {
++                lastTextPart->text += ch;
++            } else {
++                textParts.emplace_back();
++                lastTextPart = &textParts.back();
++                lastTextPart->text = ch;
++                lastTextPart->script = script;
++            }
+         }
+     }
+ 
+@@ -78,7 +95,7 @@ void HBShaper::Impl::createComplexGlyphIDs(const std::u16string &text,
+         // Setup harfbuzz
+         hb_buffer_reset(buffer);
+ 
+-        hb_buffer_set_direction(buffer, HB_DIRECTION_LTR);
++        hb_buffer_set_direction(buffer, rtl ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
+         hb_buffer_set_script(buffer, textPart.script);
+         hb_buffer_set_language(buffer, getDefaultLanguage());
+         size_t length = textPart.text.size();
+@@ -93,8 +110,8 @@ void HBShaper::Impl::createComplexGlyphIDs(const std::u16string &text,
+         hb_glyph_info_t *glyphInfo = hb_buffer_get_glyph_infos(buffer, &glyphCount);
+         hb_glyph_position_t *glyphPos = hb_buffer_get_glyph_positions(buffer, &glyphCount);
+ 
+-        glyphIDs.reserve(glyphCount);
+-        adjusts.reserve(glyphCount);
++        glyphIDs.reserve(glyphIDs.size() + glyphCount);
++        adjusts.reserve(adjusts.size() + glyphCount);
+ 
+         for (uint32_t i = 0; i < glyphCount; ++i) {
+             glyphIDs.emplace_back(glyphInfo[i].codepoint, type);
+diff --git a/src/mln/text/harfbuzz_impl.hpp b/src/mln/text/harfbuzz_impl.hpp
+index 1e1d535..0a143c1 100644
+--- a/src/mln/text/harfbuzz_impl.hpp
++++ b/src/mln/text/harfbuzz_impl.hpp
+@@ -18,6 +18,7 @@ public:
+     ~Impl();
+ 
+     void createComplexGlyphIDs(const std::u16string &text,
++                               bool rtl,
+                                std::vector<GlyphID> &glyphIDs,
+                                std::vector<HBShapeAdjust> &adjusts);
+ 
+diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
+index f2eafdd..51fa7fb 100644
+--- a/src/mln/tile/geometry_tile.cpp
++++ b/src/mln/tile/geometry_tile.cpp
+@@ -17,6 +17,7 @@
+ #include <mln/tile/geometry_tile_data.hpp>
+ #include <mln/tile/geometry_tile_worker.hpp>
+ #include <mln/tile/tile_observer.hpp>
++#include <mln/text/bidi.hpp>
+ #include <mln/util/error_sink.hpp>
+ #include <mln/util/instrumentation.hpp>
+ #include <mln/util/logging.hpp>
+@@ -413,6 +414,7 @@ void GeometryTile::onGlyphsAvailable(GlyphMap glyphMap, [[maybe_unused]] HBShape
+ 
+     HBShapeResults results;
+ #ifdef MLN_TEXT_SHAPING_HARFBUZZ
++    BiDi bidi;
+     for (auto& fontStackIT : requests) {
+         auto fontStack = fontStackIT.first;
+         auto& fontTypes = fontStackIT.second;
+@@ -424,7 +426,10 @@ void GeometryTile::onGlyphsAvailable(GlyphMap glyphMap, [[maybe_unused]] HBShape
+                 std::vector<GlyphID> shapedGlyphIDs;
+                 std::shared_ptr<std::vector<HBShapeAdjust>> shapedAdjusts =
+                     std::make_shared<std::vector<HBShapeAdjust>>();
+-                glyphManager->hbShaping(str, fontStack, type, shapedGlyphIDs, *shapedAdjusts);
++                // Shapes each run in its own direction, in visual order.
++                for (const auto& run : bidi.visualRuns(str)) {
++                    glyphManager->hbShaping(run.text, run.rtl, fontStack, type, shapedGlyphIDs, *shapedAdjusts);
++                }
+                 std::u16string shapedstr;
+ 
+                 shapedstr.reserve(shapedGlyphIDs.size());
+diff --git a/test/text/bidi.test.cpp b/test/text/bidi.test.cpp
+index 9fe965b..673134e 100644
+--- a/test/text/bidi.test.cpp
++++ b/test/text/bidi.test.cpp
+@@ -79,3 +79,24 @@ TEST(BiDi, StyledText) {
+ 
+     EXPECT_EQ(bidi.processStyledText(input, {5, 18, 30}), expected);
+ }
++
++TEST(BiDi, VisualRuns) {
++    BiDi bidi;
++    auto runs = bidi.visualRuns(u"Erbil هەولێر");
++    ASSERT_EQ(runs.size(), 2u);
++    EXPECT_EQ(runs[0].text, u"Erbil ");
++    EXPECT_FALSE(runs[0].rtl);
++    EXPECT_EQ(runs[1].text, u"هەولێر");
++    EXPECT_TRUE(runs[1].rtl);
++}
++
++TEST(BiDi, VisualRunsRightToLeftParagraph) {
++    BiDi bidi;
++    // The runs come in visual order, left to right, each in logical order.
++    auto runs = bidi.visualRuns(u"هەولێر Erbil");
++    ASSERT_EQ(runs.size(), 2u);
++    EXPECT_EQ(runs[0].text, u"Erbil");
++    EXPECT_FALSE(runs[0].rtl);
++    EXPECT_EQ(runs[1].text, u"هەولێر ");
++    EXPECT_TRUE(runs[1].rtl);
++}
