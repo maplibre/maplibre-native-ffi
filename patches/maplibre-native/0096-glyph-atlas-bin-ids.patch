@@ -1,0 +1,193 @@
+Gives each glyph in the glyph atlas a bin of its own. The atlas made a glyph's
+bin id from the square root of its font stack's hash plus its code point, and
+the shelf pack hands back the bin it already holds for an id. Two glyphs of
+different font stacks whose ids matched shared one bin, so one drew the other.
+In a 32-bit build such as WebAssembly, a font stack's hash is 32 bits, so the
+square root stays under 65,536 and ids of Latin and CJK glyphs often match: a
+label's "U" drew as "旧", and "市" as another glyph. Glyphs now take bins as
+images do: an allocation keyed by the immutable glyph, which the font stacks
+that hold the same glyph share.
+Upstream: not proposed
+
+diff --git a/include/mln/gfx/dynamic_texture_atlas.hpp b/include/mln/gfx/dynamic_texture_atlas.hpp
+index 6701012..4f292c6 100644
+--- a/include/mln/gfx/dynamic_texture_atlas.hpp
++++ b/include/mln/gfx/dynamic_texture_atlas.hpp
+@@ -63,6 +63,22 @@ private:
+         Immutable<style::Image::Impl> image;
+         int32_t binId;
+     };
++    // A glyph's allocation is shared by the font stacks that hold the same
++    // immutable glyph, which have the same pixels.
++    struct GlyphAllocationKey {
++        const DynamicTexture* dynamicTexture;
++        const Glyph* glyph;
++
++        bool operator==(const GlyphAllocationKey&) const = default;
++    };
++    struct GlyphAllocationKeyHasher {
++        size_t operator()(const GlyphAllocationKey& key) const { return util::hash(key.dynamicTexture, key.glyph); }
++    };
++    struct GlyphAllocation {
++        // Keeps the glyph alive so its address can't be reused by another glyph while the bin exists.
++        Immutable<Glyph> glyph;
++        int32_t binId;
++    };
+     struct BinKey {
+         const DynamicTexture* dynamicTexture;
+         int32_t binId;
+@@ -76,6 +92,7 @@ private:
+     std::optional<TextureHandle> reserveImage(const DynamicTexturePtr&,
+                                               const Immutable<style::Image::Impl>&,
+                                               ImageType);
++    std::optional<TextureHandle> reserveGlyph(const DynamicTexturePtr&, const Immutable<Glyph>&);
+     void releaseTexture(const DynamicTexturePtr&, const TextureHandle&);
+ 
+     Context& context;
+@@ -83,6 +100,8 @@ private:
+     std::unordered_map<TexturePixelType, DynamicTexturePtr> dummyDynamicTexture;
+     std::unordered_map<ImageAllocationKey, ImageAllocation, ImageAllocationKeyHasher> imageAllocations;
+     std::unordered_map<BinKey, ImageAllocationKey, BinKeyHasher> imageAllocationKeys;
++    std::unordered_map<GlyphAllocationKey, GlyphAllocation, GlyphAllocationKeyHasher> glyphAllocations;
++    std::unordered_map<BinKey, GlyphAllocationKey, BinKeyHasher> glyphAllocationKeys;
+     std::mutex mutex;
+ };
+ 
+diff --git a/src/mln/gfx/dynamic_texture_atlas.cpp b/src/mln/gfx/dynamic_texture_atlas.cpp
+index 4189ad2..c249048 100644
+--- a/src/mln/gfx/dynamic_texture_atlas.cpp
++++ b/src/mln/gfx/dynamic_texture_atlas.cpp
+@@ -2,7 +2,6 @@
+ #include <mln/gfx/context.hpp>
+ 
+ #include <algorithm>
+-#include <cmath>
+ 
+ namespace mln {
+ namespace gfx {
+@@ -62,10 +61,7 @@ GlyphAtlas DynamicTextureAtlas::uploadGlyphs(const GlyphMap& glyphs) {
+                 const auto& glyph = glyphEntry.second;
+ 
+                 if (glyph.has_value() && glyph.value()->bitmap.valid()) {
+-                    int32_t uniqueId = static_cast<int32_t>(sqrt(fontStack) / 2 + glyph.value()->id.hash);
+-                    const auto size = Size(glyph.value()->bitmap.size.width + 2 * padding,
+-                                           glyph.value()->bitmap.size.height + 2 * padding);
+-                    const auto& texHandle = glyphAtlas.dynamicTexture->reserveSize(size, uniqueId);
++                    const auto& texHandle = reserveGlyph(glyphAtlas.dynamicTexture, *glyph);
+                     if (!texHandle) {
+                         hasSpace = false;
+                         break;
+@@ -75,7 +71,7 @@ GlyphAtlas DynamicTextureAtlas::uploadGlyphs(const GlyphMap& glyphs) {
+             }
+             if (!hasSpace) {
+                 for (const auto& [texHandle, glyph, fontStack_] : glyphsToUpload) {
+-                    glyphAtlas.dynamicTexture->removeTexture(texHandle);
++                    releaseTexture(glyphAtlas.dynamicTexture, texHandle);
+                 }
+                 glyphsToUpload.clear();
+                 glyphAtlas.dynamicTexture = nullptr;
+@@ -247,18 +243,36 @@ std::optional<TextureHandle> DynamicTextureAtlas::reserveImage(const DynamicText
+     return texHandle;
+ }
+ 
++std::optional<TextureHandle> DynamicTextureAtlas::reserveGlyph(const DynamicTexturePtr& dynamicTexture,
++                                                               const Immutable<Glyph>& glyph) {
++    const auto size = Size(glyph->bitmap.size.width + 2 * padding, glyph->bitmap.size.height + 2 * padding);
++    const GlyphAllocationKey key{.dynamicTexture = dynamicTexture.get(), .glyph = glyph.get()};
++
++    // Reuse the bin of this exact glyph; otherwise let the shelf pack assign a fresh id.
++    const auto it = glyphAllocations.find(key);
++    auto texHandle = dynamicTexture->reserveSize(size, it != glyphAllocations.end() ? it->second.binId : -1);
++    if (texHandle && it == glyphAllocations.end()) {
++        glyphAllocations.emplace(key, GlyphAllocation{.glyph = glyph, .binId = texHandle->getId()});
++        glyphAllocationKeys.emplace(BinKey{.dynamicTexture = dynamicTexture.get(), .binId = texHandle->getId()}, key);
++    }
++    return texHandle;
++}
++
+ void DynamicTextureAtlas::releaseTexture(const DynamicTexturePtr& dynamicTexture, const TextureHandle& texHandle) {
+     if (!dynamicTexture->removeTexture(texHandle)) {
+         return;
+     }
+ 
+-    // The last handle was released, so forget the revision; its bin may now be reused by other images.
+-    const auto it = imageAllocationKeys.find(
+-        BinKey{.dynamicTexture = dynamicTexture.get(), .binId = texHandle.getId()});
+-    if (it != imageAllocationKeys.end()) {
++    // The last handle was released, so forget the image revision or glyph; its bin may now be reused.
++    const BinKey binKey{.dynamicTexture = dynamicTexture.get(), .binId = texHandle.getId()};
++    if (const auto it = imageAllocationKeys.find(binKey); it != imageAllocationKeys.end()) {
+         imageAllocations.erase(it->second);
+         imageAllocationKeys.erase(it);
+     }
++    if (const auto it = glyphAllocationKeys.find(binKey); it != glyphAllocationKeys.end()) {
++        glyphAllocations.erase(it->second);
++        glyphAllocationKeys.erase(it);
++    }
+ }
+ 
+ void DynamicTextureAtlas::removeTextures(const std::vector<TextureHandle>& textureHandles,
+diff --git a/test/renderer/dynamic_texture_atlas.test.cpp b/test/renderer/dynamic_texture_atlas.test.cpp
+index 67dd6a0..3f341e2 100644
+--- a/test/renderer/dynamic_texture_atlas.test.cpp
++++ b/test/renderer/dynamic_texture_atlas.test.cpp
+@@ -10,6 +10,15 @@ using namespace mln;
+ 
+ namespace {
+ 
++Immutable<Glyph> makeGlyph(char16_t code) {
++    Glyph glyph;
++    glyph.id = GlyphID(code);
++    glyph.bitmap = AlphaImage({8, 8});
++    glyph.metrics.width = 8;
++    glyph.metrics.height = 8;
++    return makeMutable<Glyph>(std::move(glyph));
++}
++
+ Immutable<style::Image::Impl> makeImage(const std::string& id, bool sdf, Size size = {16, 16}) {
+     return makeMutable<style::Image::Impl>(id, PremultipliedImage(size), 1.0f, sdf);
+ }
+@@ -20,6 +29,7 @@ protected:
+     gfx::BackendScope scope{*backend->getRendererBackend()};
+     gfx::DynamicTextureAtlas atlas{backend->getRendererBackend()->getContext()};
+     std::vector<gfx::ImageAtlas> atlases;
++    std::vector<gfx::GlyphAtlas> glyphAtlases;
+ 
+     const gfx::ImageAtlas& uploadPattern(const Immutable<style::Image::Impl>& image) {
+         atlases.push_back(atlas.uploadIconsAndPatterns({}, {{image->id, image}}, {}));
+@@ -30,6 +40,9 @@ protected:
+         for (const auto& imageAtlas : atlases) {
+             atlas.removeTextures(imageAtlas.textureHandles, imageAtlas.dynamicTexture);
+         }
++        for (const auto& glyphAtlas : glyphAtlases) {
++            atlas.removeTextures(glyphAtlas.textureHandles, glyphAtlas.dynamicTexture);
++        }
+     }
+ };
+ 
+@@ -75,3 +88,25 @@ TEST_F(DynamicTextureAtlasTest, ReleasedRevisionGetsFreshAllocation) {
+     // The revision was forgotten on its last release, so it is packed and uploaded again under a new id.
+     EXPECT_NE(releasedId, uploadPattern(image).textureHandles.at(0).getId());
+ }
++
++TEST_F(DynamicTextureAtlasTest, GlyphsOfDifferentFontStacksGetTheirOwnAllocations) {
++    // These font stack hashes and code points once gave both glyphs the same bin, as a 32-bit build's
++    // hashes often did for Latin and CJK glyphs, so one drew the other.
++    const auto b = makeGlyph(u'B');
++    const auto a = makeGlyph(u'A');
++    glyphAtlases.push_back(atlas.uploadGlyphs({{0, {{b->id, b}}}, {4, {{a->id, a}}}}));
++    const auto& glyphAtlas = glyphAtlases.back();
++
++    ASSERT_EQ(2u, glyphAtlas.textureHandles.size());
++    EXPECT_NE(glyphAtlas.textureHandles[0].getRectangle(), glyphAtlas.textureHandles[1].getRectangle());
++    EXPECT_NE(glyphAtlas.glyphPositions.at(0).at(b->id).rect, glyphAtlas.glyphPositions.at(4).at(a->id).rect);
++}
++
++TEST_F(DynamicTextureAtlasTest, FontStacksShareTheAllocationOfTheSameGlyph) {
++    const auto glyph = makeGlyph(u'A');
++    glyphAtlases.push_back(atlas.uploadGlyphs({{1, {{glyph->id, glyph}}}, {2, {{glyph->id, glyph}}}}));
++    const auto& glyphAtlas = glyphAtlases.back();
++
++    ASSERT_EQ(2u, glyphAtlas.textureHandles.size());
++    EXPECT_EQ(glyphAtlas.textureHandles[0].getId(), glyphAtlas.textureHandles[1].getId());
++}
