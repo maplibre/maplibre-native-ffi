@@ -1816,22 +1816,6 @@ private constructor(
     }
 
   /**
-   * Replaces the &#91;light&#93;(https://maplibre.org/maplibre-style-spec/light/) of the map's
-   * style.
-   *
-   * See `mln_map_set_style_light_json` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
-   */
-  public fun setStyleLightJson(lightJson: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
-    }
-
-  /**
    * Sets a property of the light of the map's style.
    *
    * See `mln_map_set_style_light_property` in the
@@ -2620,12 +2604,6 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
           diagnostic,
         ),
       )
-    }
-
-  /** [MapHandle.setStyleLightJson] without its completion. */
-  public fun setStyleLightJson(lightJson: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
     }
 
   /** [MapHandle.setStyleLightProperty] without its completion. */

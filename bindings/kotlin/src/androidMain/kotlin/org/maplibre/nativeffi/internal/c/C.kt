@@ -986,14 +986,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_style_light_json(
-    map: Long,
-    lightJson: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_set_style_light_property(
     map: Long,
     propertyName: Long,

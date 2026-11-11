@@ -1593,19 +1593,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_style_light_json(
-    map: Long,
-    lightJson: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_style_light_json(
-      map.toULong(),
-      lightJson.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_set_style_light_property(
     map: Long,
     propertyName: Long,

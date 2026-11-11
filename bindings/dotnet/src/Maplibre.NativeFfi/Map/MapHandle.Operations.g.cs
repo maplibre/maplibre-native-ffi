@@ -2984,33 +2984,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Replaces the [light](https://maplibre.org/maplibre-style-spec/light/) of
-    /// the map's style.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_set_style_light_json</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> while the style isn't
-    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
-    /// describes.</description></item>
-    /// </list>
-    /// </remarks>
-    public Task<CommandCompletion> SetStyleLightJsonAsync(string lightJson)
-    {
-        using var scope = new NativeCallScope(this);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_set_style_light_json(
-            Handle,
-            scope.Utf8(lightJson),
-            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
     /// Sets a property of the light of the map's style.
     /// </summary>
     /// <remarks>
@@ -4013,21 +3986,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     scope.Utf8(layerId),
                     scope.Utf8(propertyName),
                     scope.Utf8(value),
-                    null,
-                    Diagnostic
-                )
-            );
-            scope.Accept();
-        }
-
-        public void SetStyleLightJson(string lightJson)
-        {
-            var receiverHandle = owner.Handle;
-            using var scope = new NativeCallScope(owner);
-            Check(
-                NativeMethods.mln_map_set_style_light_json(
-                    receiverHandle,
-                    scope.Utf8(lightJson),
                     null,
                     Diagnostic
                 )

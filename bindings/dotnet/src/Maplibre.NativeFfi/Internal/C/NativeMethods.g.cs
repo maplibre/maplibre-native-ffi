@@ -990,14 +990,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_style_light_json(
-        MlnMap map,
-        mln_buffer_view light_json,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_style_light_property(
         MlnMap map,
         mln_buffer_view property_name,

@@ -4505,21 +4505,6 @@ external int mln_map_set_style_layer_property(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_style_light_json(
-  int map,
-  mln_buffer_view light_json,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
     mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,

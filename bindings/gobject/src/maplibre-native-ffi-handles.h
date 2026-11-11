@@ -3234,43 +3234,6 @@ maplibre_native_ffi_map_set_style_layer_property_finish(
 );
 
 /**
- * maplibre_native_ffi_map_set_style_light_json_async:
- * @light_json: the UTF-8 text
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
- * the map's style.
- *
- * See `mln_map_set_style_light_json` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
- *   `maplibre_native_ffi_map_set_style_url_async()` describes.
- *
- * Without `callback`, nothing reports whether the call succeeds.
- */
-void maplibre_native_ffi_map_set_style_light_json_async(
-  MaplibreNativeFfiMap* self, const char* light_json,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_map_set_style_light_json_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_map_set_style_light_json_async` started.
- *
- * Returns: (transfer full): the command's completion, or %NULL with `error` set
- */
-MaplibreNativeFfiCommandCompletion*
-maplibre_native_ffi_map_set_style_light_json_finish(
-  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
-);
-
-/**
  * maplibre_native_ffi_map_set_style_light_property_async:
  * @property_name: the UTF-8 text
  * @value: the UTF-8 text

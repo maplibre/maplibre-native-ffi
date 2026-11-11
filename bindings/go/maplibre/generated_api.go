@@ -8826,21 +8826,6 @@ func (receiver *MapHandle) SetStyleLayerProperty(layerID string, propertyName st
 	}, completionCommand)
 }
 
-// SetStyleLightJSON replaces the
-// [light](https://maplibre.org/maplibre-style-spec/light/) of the map's style.
-//
-// See mln_map_set_style_light_json in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-//
-// Errors:
-//   - StatusInvalidState while the style isn't loaded, as
-//     MapHandle.SetStyleURL() describes.
-func (receiver *MapHandle) SetStyleLightJSON(lightJSON string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJSON, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
 // SetStyleLightProperty sets a property of the light of the map's style.
 //
 // See mln_map_set_style_light_property in the C API reference:
@@ -10588,13 +10573,6 @@ func (view MapHandleDiscarding) SetStyleLayerProperty(layerID string, propertyNa
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerID, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	})
-}
-
-func (view MapHandleDiscarding) SetStyleLightJSON(lightJSON string) error {
-	receiver := view.owner
-	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJSON, arena), completion, diagnostic))
 	})
 }
 

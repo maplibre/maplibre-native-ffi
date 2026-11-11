@@ -3367,25 +3367,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Replaces the
-   * &#91;light&#93;(https://maplibre.org/maplibre-style-spec/light/) of the
-   * map's style.
-   *
-   * See `mln_map_set_style_light_json` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.invalidState` while the style isn't loaded, as
-   *   `MapHandle.setStyleUrl()` describes.
-   */
-  setStyleLightJson(lightJson: unknown): Promise<CommandCompletion> {
-    return command((completion) =>
-      native.mln_map_set_style_light_json(this.id, lightJson, completion),
-    );
-  }
-
-  /**
    * Sets a property of the light of the map's style.
    *
    * See `mln_map_set_style_light_property` in the
@@ -4431,18 +4412,6 @@ export class MapHandleDiscarding {
       value,
       undefined,
     );
-  }
-
-  /**
-   * Replaces the
-   * &#91;light&#93;(https://maplibre.org/maplibre-style-spec/light/) of the
-   * map's style.
-   *
-   * See `mln_map_set_style_light_json` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  setStyleLightJson(lightJson: unknown): void {
-    native.mln_map_set_style_light_json(this.#owner.id, lightJson, undefined);
   }
 
   /**

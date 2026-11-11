@@ -1086,20 +1086,6 @@ MLN_API mln_status mln_map_get_style_root_property(
 ) MLN_NOEXCEPT;
 
 /**
- * Replaces the [light](https://maplibre.org/maplibre-style-spec/light/) of the
- * map's style.
- *
- * Completes with:
- * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
- *   mln_map_set_style_url() describes.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_style_light_json(
-  mln_map map, mln_buffer_view light_json MLN_BINDING("encoding=json"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Sets a property of the light of the map's style.
  *
  * Completes with:

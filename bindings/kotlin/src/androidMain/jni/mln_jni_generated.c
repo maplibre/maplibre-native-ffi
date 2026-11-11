@@ -1419,17 +1419,6 @@ static jint mln_map_set_style_layer_property_jni(
   );
 }
 
-static jint mln_map_set_style_light_json_jni(
-  JNIEnv* env, jclass type, jlong map, jlong light_json, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_map_set_style_light_json(
-    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, light_json),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_map_set_style_light_property_jni(
   JNIEnv* env, jclass type, jlong map, jlong property_name, jlong value,
   jlong completion, jlong out_diagnostic
@@ -2634,8 +2623,6 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_map_set_style_json", "(JJJJ)I", (void*)mln_map_set_style_json_jni},
   {"mln_map_set_style_layer_property", "(JJJJJJ)I",
    (void*)mln_map_set_style_layer_property_jni},
-  {"mln_map_set_style_light_json", "(JJJJ)I",
-   (void*)mln_map_set_style_light_json_jni},
   {"mln_map_set_style_light_property", "(JJJJJ)I",
    (void*)mln_map_set_style_light_property_jni},
   {"mln_map_set_style_root_property", "(JJJJJ)I",
@@ -3035,8 +3022,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_map_set_style_json", "(JJJJ)I", (void*)mln_map_set_style_json_jni},
   {"mln_map_set_style_layer_property", "(JJJJJJ)I",
    (void*)mln_map_set_style_layer_property_jni},
-  {"mln_map_set_style_light_json", "(JJJJ)I",
-   (void*)mln_map_set_style_light_json_jni},
   {"mln_map_set_style_light_property", "(JJJJJ)I",
    (void*)mln_map_set_style_light_property_jni},
   {"mln_map_set_style_root_property", "(JJJJJ)I",

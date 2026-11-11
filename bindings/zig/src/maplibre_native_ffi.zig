@@ -1739,20 +1739,6 @@ pub const Map = struct {
         return call.submit("mln_map_set_style_layer_property", .handle, self, call.command, null, diagnostic, .{ layer_id, property_name, value });
     }
 
-    /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
-    /// the map's style.
-    ///
-    /// See `mln_map_set_style_light_json` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
-    ///   describes.
-    pub fn setStyleLightJson(self: Map, light_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_style_light_json", .handle, self, call.command, null, diagnostic, .{light_json});
-    }
-
     /// Sets a property of the light of the map's style.
     ///
     /// See `mln_map_set_style_light_property` in the
@@ -10165,11 +10151,6 @@ pub const MapDiscarding = struct {
     pub fn setStyleLayerProperty(self: MapDiscarding, layer_id: []const u8, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_style_layer_property", .handle, map, null, diagnostic, .{ layer_id, property_name, value });
-    }
-
-    pub fn setStyleLightJson(self: MapDiscarding, light_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_set_style_light_json", .handle, map, null, diagnostic, .{light_json});
     }
 
     pub fn setStyleLightProperty(self: MapDiscarding, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

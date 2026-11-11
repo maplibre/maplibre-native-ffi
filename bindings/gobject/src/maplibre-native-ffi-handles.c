@@ -3642,36 +3642,6 @@ maplibre_native_ffi_map_set_style_layer_property_finish(
   return g_task_propagate_pointer(G_TASK(result), error);
 }
 
-void maplibre_native_ffi_map_set_style_light_json_async(
-  MaplibreNativeFfiMap* self, const char* light_json,
-  GAsyncReadyCallback callback, gpointer user_data
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
-  MaplibreNativeFfiAsync async_;
-  maplibre_native_ffi_async_init(
-    &async_, self, maplibre_native_ffi_map_set_style_light_json_async, callback,
-    user_data, TRUE
-  );
-  if (!maplibre_native_ffi_async_begin(
-        &async_, maplibre_native_ffi_command_decode,
-        (GDestroyNotify)maplibre_native_ffi_command_completion_free
-      ))
-    return;
-  mln_status status_ = mln_map_set_style_light_json(
-    self->handle, maplibre_native_ffi_text_view(light_json),
-    async_.completion_argument, &async_.diagnostic
-  );
-  maplibre_native_ffi_async_end(&async_, status_);
-}
-
-MaplibreNativeFfiCommandCompletion*
-maplibre_native_ffi_map_set_style_light_json_finish(
-  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
-) {
-  g_return_val_if_fail(g_task_is_valid(result, self), NULL);
-  return g_task_propagate_pointer(G_TASK(result), error);
-}
-
 void maplibre_native_ffi_map_set_style_light_property_async(
   MaplibreNativeFfiMap* self, const char* property_name, const char* value,
   GAsyncReadyCallback callback, gpointer user_data

@@ -2069,23 +2069,6 @@ auto map_get_global_state(MapObject& live) -> std::string {
   );
 }
 
-auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
-  -> mln_status {
-  auto error = mln::style::conversion::Error{};
-  auto light = mln::style::conversion::convertJSON<mln::style::Light>(
-    string_from_view(light_json), error
-  );
-  if (!light) {
-    set_style_conversion_error("style light", error);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  map_native(live).getStyle().setLight(
-    std::make_unique<mln::style::Light>(std::move(light->impl))
-  );
-  return MLN_STATUS_OK;
-}
-
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status {

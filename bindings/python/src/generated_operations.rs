@@ -7199,38 +7199,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (light_json))]
-    fn set_style_light_json(
-        &self,
-        py: Python<'_>,
-        light_json: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let light_json_value = storage.json(light_json.clone(), false)?;
-        let handle = self.input();
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_style_light_json(handle, light_json_value, completion, diagnostic)
-            })
-        }
-    }
-    #[pyo3(signature = (light_json))]
-    fn _discard_set_style_light_json(
-        &self,
-        py: Python<'_>,
-        light_json: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let light_json_value = storage.json(light_json.clone(), false)?;
-        let handle = self.input();
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_set_style_light_json(handle, light_json_value, completion, diagnostic)
-            })
-        }
-    }
     #[pyo3(signature = (property_name, value))]
     fn set_style_light_property(
         &self,

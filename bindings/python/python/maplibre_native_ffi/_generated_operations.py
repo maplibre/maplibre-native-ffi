@@ -1989,21 +1989,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_style_layer_property(layer_id, property_name, value)
 
-    def set_style_light_json(self, light_json: Any) -> Future[CommandCompletion]:
-        """Replaces the
-        \\[light\\](https://maplibre.org/maplibre-style-spec/light/) of the
-        map's style.
-
-        See `mln_map_set_style_light_json` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-
-        Errors:
-
-        - `Status.INVALID_STATE` while the style isn't loaded, as
-          `MapHandle.set_style_url()` describes.
-        """
-        return self._native.set_style_light_json(light_json)
-
     def set_style_light_property(
         self, property_name: str, value: Any
     ) -> Future[CommandCompletion]:
@@ -4347,16 +4332,6 @@ class MapHandleDiscarding:
         return self._native._discard_set_style_layer_property(
             layer_id, property_name, value
         )
-
-    def set_style_light_json(self, light_json: Any) -> None:
-        """Replaces the
-        \\[light\\](https://maplibre.org/maplibre-style-spec/light/) of the
-        map's style.
-
-        See `mln_map_set_style_light_json` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native._discard_set_style_light_json(light_json)
 
     def set_style_light_property(self, property_name: str, value: Any) -> None:
         """Sets a property of the light of the map's style.

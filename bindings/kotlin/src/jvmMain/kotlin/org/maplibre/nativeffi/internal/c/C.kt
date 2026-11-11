@@ -898,15 +898,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_style_light_json =
-    Ffm.downcall(
-      "mln_map_set_style_light_json",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_set_style_light_property =
     Ffm.downcall(
       "mln_map_set_style_light_property",
@@ -2790,19 +2781,6 @@ internal actual object C {
       Ffm.value(layerId, mln_buffer_view),
       Ffm.value(propertyName, mln_buffer_view),
       Ffm.value(value, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_set_style_light_json(
-    map: Long,
-    lightJson: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_style_light_json.invokeExact(
-      map,
-      Ffm.value(lightJson, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int

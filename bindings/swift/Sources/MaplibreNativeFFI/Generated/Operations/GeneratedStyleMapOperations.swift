@@ -1084,30 +1084,6 @@ public extension MapHandle {
     }
   }
 
-  /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
-  /// the map's style.
-  ///
-  /// See `mln_map_set_style_light_json` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.invalidState` while the style isn't loaded, as
-  ///   `MapHandle.setStyleUrl()` describes.
-  @discardableResult
-  func setStyleLightJson(_ bindingArg0: String) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_style_light_json(
-        raw,
-        arena.view(bindingArg0),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Sets a property of the light of the map's style.
   ///
   /// See `mln_map_set_style_light_property` in the
@@ -1640,16 +1616,6 @@ public extension MapHandleDiscarding {
           diagnostic
         )
       }
-  }
-
-  func setStyleLightJson(_ bindingArg0: String) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in mln_map_set_style_light_json(
-        raw,
-        arena.view(bindingArg0),
-        nil,
-        diagnostic
-      ) }
   }
 
   func setStyleLightProperty(

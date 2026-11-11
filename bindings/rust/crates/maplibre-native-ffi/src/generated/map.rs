@@ -2651,27 +2651,6 @@ impl MapHandle {
         })
     }
 
-    /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/)
-    /// of the map's style.
-    ///
-    /// See `mln_map_set_style_light_json` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    ///
-    /// # Errors
-    ///
-    /// - `Status::InvalidState` while the style isn't loaded, as
-    ///   `MapHandle::set_style_url()` describes.
-    pub fn set_style_light_json(
-        &self,
-        light_json: &str,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call();
-        let light_json = call.input(&light_json)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_style_light_json(map, light_json, completion, out_diagnostic)
-        })
-    }
-
     /// Sets a property of the light of the map's style.
     ///
     /// See `mln_map_set_style_light_property` in the
@@ -3853,19 +3832,6 @@ impl MapHandleDiscarding<'_> {
                 completion,
                 out_diagnostic,
             )
-        })
-    }
-
-    /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/)
-    /// of the map's style.
-    ///
-    /// See `mln_map_set_style_light_json` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_style_light_json(&self, light_json: &str) -> Result<()> {
-        let mut call = self.0.inner.call();
-        let light_json = call.input(&light_json)?;
-        call.discard(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_style_light_json(map, light_json, completion, out_diagnostic)
         })
     }
 

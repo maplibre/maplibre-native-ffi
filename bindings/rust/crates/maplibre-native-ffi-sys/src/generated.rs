@@ -3073,12 +3073,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_style_light_json(
-        map: mln_map,
-        light_json: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_set_style_light_property(
         map: mln_map,
         property_name: mln_buffer_view,

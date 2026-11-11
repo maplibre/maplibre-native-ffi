@@ -716,13 +716,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_set_style_light_json(
-    map: Long,
-    lightJson: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_set_style_light_property(
     map: Long,
     propertyName: Long,

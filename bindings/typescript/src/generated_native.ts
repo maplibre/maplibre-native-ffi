@@ -651,11 +651,6 @@ export interface NativeOperations {
     value: unknown,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_set_style_light_json(
-    map: bigint,
-    lightJson: unknown,
-    completion: NativeCompletion | undefined,
-  ): void;
   mln_map_set_style_light_property(
     map: bigint,
     propertyName: string,

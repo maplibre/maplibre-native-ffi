@@ -4624,14 +4624,6 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setStyleLightJson(Object? lightJson) => _discard(
-    (arena, completion) => raw.mln_map_set_style_light_json(
-      _handle.raw,
-      _nativeJsonView(lightJson, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
   void setStyleLightProperty(String propertyName, Object? value) => _discard(
     (arena, completion) => raw.mln_map_set_style_light_property(
       _handle.raw,
@@ -6987,25 +6979,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
       nativeStringView(layerId, arena).value,
       nativeStringView(propertyName, arena).value,
       _nativeJsonView(value, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
-  /// the map's style.
-  ///
-  /// See `mln_map_set_style_light_json` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.invalidState` while the style isn't loaded, as
-  ///   `MapHandle.setStyleUrl()` describes.
-  Future<CommandCompletion> setStyleLightJson(Object? lightJson) => _command(
-    (arena, completion) => raw.mln_map_set_style_light_json(
-      _handle.raw,
-      _nativeJsonView(lightJson, arena),
       completion,
       nativeDiagnostic,
     ),

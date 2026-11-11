@@ -1269,16 +1269,6 @@ int32_t mln_kw_mln_map_set_style_layer_property(
   );
 }
 
-int32_t mln_kw_mln_map_set_style_light_json(
-  int64_t map, uintptr_t light_json, uintptr_t completion,
-  uintptr_t out_diagnostic
-) {
-  return (int32_t)mln_map_set_style_light_json(
-    (mln_map)map, *(const mln_buffer_view*)(uintptr_t)light_json,
-    (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_map_set_style_light_property(
   int64_t map, uintptr_t property_name, uintptr_t value, uintptr_t completion,
   uintptr_t out_diagnostic

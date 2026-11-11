@@ -435,8 +435,9 @@ static void the_style_light_round_trips_through_json(void) {
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   const mln_buffer_view intensity = MLN_BUFFER_LITERAL("intensity");
 
-  MLN_TEST_AWAIT_OK(mln_map_set_style_light_json(
-    map, MLN_BUFFER_LITERAL("{\"anchor\":\"viewport\",\"intensity\":0.5}"),
+  MLN_TEST_AWAIT_OK(mln_map_set_style_root_property(
+    map, MLN_BUFFER_LITERAL("light"),
+    MLN_BUFFER_LITERAL("{\"anchor\":\"viewport\",\"intensity\":0.5}"),
     &completion.descriptor, NULL
   ));
   EXPECT_LIGHT_PROPERTY("\"viewport\"", map, "anchor");
@@ -455,9 +456,10 @@ static void the_style_light_round_trips_through_json(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "style light",
-    mln_map_set_style_light_json(
-      map, MLN_BUFFER_LITERAL("{\"anchor\":7}"), &completion.descriptor, NULL
+    MLN_STATUS_INVALID_ARGUMENT, "style root property",
+    mln_map_set_style_root_property(
+      map, MLN_BUFFER_LITERAL("light"), MLN_BUFFER_LITERAL("{\"anchor\":7}"),
+      &completion.descriptor, NULL
     )
   );
   EXPECT_LIGHT_PROPERTY("0.75", map, "intensity");

@@ -1093,25 +1093,6 @@ auto mln_map_get_style_root_property(
   });
 }
 
-auto mln_map_set_style_light_json(
-  mln_map map, mln_buffer_view light_json, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_non_empty_view(light_json, "light_json")) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto json = OwnedView{light_json};
-    return submit_style_edit(
-      map,
-      [json = std::move(json)](mln::core::MapObject& live) -> mln_status {
-        return mln::core::map_set_style_light_json(live, json.view());
-      },
-      completion
-    );
-  });
-}
-
 auto mln_map_set_global_state_property(
   mln_map map, mln_buffer_view property_name, mln_buffer_view value,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

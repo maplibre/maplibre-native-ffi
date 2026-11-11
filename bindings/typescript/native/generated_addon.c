@@ -4623,40 +4623,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_set_style_light_json(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_buffer_view arg_light_json = {0};
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  if (!mln_ts_read_json_view(call, call->argv[1], &arg_light_json, "lightJson"))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], true, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_set_style_light_json(
-    arg_map, arg_light_json, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_map_set_style_light_property(
   napi_env env, napi_callback_info info
 ) {
@@ -8046,7 +8012,6 @@ static const mln_ts_export exports[] = {
   {"mln_map_set_style_json", mln_ts_export_mln_map_set_style_json},
   {"mln_map_set_style_layer_property",
    mln_ts_export_mln_map_set_style_layer_property},
-  {"mln_map_set_style_light_json", mln_ts_export_mln_map_set_style_light_json},
   {"mln_map_set_style_light_property",
    mln_ts_export_mln_map_set_style_light_property},
   {"mln_map_set_style_root_property",
