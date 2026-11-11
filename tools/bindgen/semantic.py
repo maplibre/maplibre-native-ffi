@@ -1436,11 +1436,12 @@ class Binder:
                     stride=COMPLETION_VALUE_SIZE,
                     element=replace(result, nullable=False),
                 )
-        elif not any(is_completion(p.type) for p in function.parameters):
-            if function.return_type.kind != "void" and not is_status(
-                function.return_type
-            ):
-                result = self.value(function.return_type, metadata, context + " return")
+        elif (
+            not any(is_completion(p.type) for p in function.parameters)
+            and function.return_type.kind != "void"
+            and not is_status(function.return_type)
+        ):
+            result = self.value(function.return_type, metadata, context + " return")
         support: DisposeSupport | ViewSupport | DeliverySupport | None = None
         for parameter in function.parameters:
             if type_name(parameter.type.pointee or parameter.type) == DELIVERY_QUEUE:
