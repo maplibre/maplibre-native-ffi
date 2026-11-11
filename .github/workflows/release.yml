@@ -83,7 +83,7 @@ jobs:
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           cache: false
           install_args: python
@@ -229,7 +229,7 @@ jobs:
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           cache: false
           install_args: core:node
@@ -309,7 +309,7 @@ jobs:
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           cache: false
           install_args: core:node
@@ -386,7 +386,7 @@ jobs:
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           cache: false
           install_args: python
@@ -467,7 +467,7 @@ jobs:
         with:
           ref: ${{ env.PUBLISH_SHA }}
           persist-credentials: false
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           cache: false
           install_args: core:dotnet
