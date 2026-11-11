@@ -1,10 +1,11 @@
 Lets a custom geometry source fail a tile, as a custom vector source can. The
-source keeps the failed tile registered, so invalidating it fetches it again
-(https://github.com/maplibre/maplibre-native-ffi/issues/778).
+failed tile stays subscribed, so invalidating it or needing it again fetches
+it again (https://github.com/maplibre/maplibre-native-ffi/issues/778). Needs
+0069.
 Upstream: not proposed
 
 diff --git a/include/mln/style/sources/custom_geometry_source.hpp b/include/mln/style/sources/custom_geometry_source.hpp
-index 9a280fbd36..1975c8769e 100644
+index 9a280fb..1975c87 100644
 --- a/include/mln/style/sources/custom_geometry_source.hpp
 +++ b/include/mln/style/sources/custom_geometry_source.hpp
 @@ -43,6 +43,7 @@ public:
@@ -16,42 +17,43 @@ index 9a280fbd36..1975c8769e 100644
      void invalidateRegion(const LatLngBounds&);
      // Private implementation
 diff --git a/src/mln/style/custom_tile_loader.cpp b/src/mln/style/custom_tile_loader.cpp
-index 6b2d590238..08611ed8b4 100644
+index 27d8162..9da7a80 100644
 --- a/src/mln/style/custom_tile_loader.cpp
 +++ b/src/mln/style/custom_tile_loader.cpp
-@@ -72,6 +72,18 @@ void CustomTileLoader::setTileData(const CanonicalTileID& tileID, const GeoJSON&
+@@ -70,6 +70,19 @@ void CustomTileLoader::setTileData(const CanonicalTileID& tileID, const GeoJSON&
      dataCache[tileID] = std::move(dataPtr);
  }
  
 +void CustomTileLoader::setTileError(const CanonicalTileID& tileID, std::exception_ptr error) {
 +    std::scoped_lock guard(dataMutex);
-+    auto iter = tileCallbackMap.find(tileID);
-+    if (iter == tileCallbackMap.end()) return;
-+    for (auto& tuple : iter->second) {
-+        auto actor = std::get<2>(tuple);
-+        actor.invoke(&CustomGeometryTile::setTileError, error);
++    auto state = tileStates.find(tileID);
++    if (state == tileStates.end() || !state->second.required()) return;
++    // The tiles stay subscribed, so invalidating the failed tile or needing it
++    // again fetches it again.
++    state->second.fetching = false;
++    for (auto& subscriber : state->second.subscribers) {
++        subscriber.tile.invoke(&CustomGeometryTile::setTileError, error);
 +    }
-+    // Keep the callbacks, so invalidating the failed tile fetches it again.
 +    dataCache.erase(tileID);
 +}
 +
  void CustomTileLoader::invalidateTile(const CanonicalTileID& tileID) {
      std::scoped_lock guard(dataMutex);
-     auto tileCallbacks = tileCallbackMap.find(tileID);
+     auto state = tileStates.find(tileID);
 diff --git a/src/mln/style/custom_tile_loader.hpp b/src/mln/style/custom_tile_loader.hpp
-index b2f3f838fd..08c6f55d30 100644
+index 480fd48..cc8d344 100644
 --- a/src/mln/style/custom_tile_loader.hpp
 +++ b/src/mln/style/custom_tile_loader.hpp
 @@ -28,6 +28,7 @@ public:
  
-     void removeTile(const OverscaledTileID& tileID);
+     void removeTile(const OverscaledTileID& tileID, const ActorRef<CustomGeometryTile>& tileRef);
      void setTileData(const CanonicalTileID& tileID, const GeoJSON& data);
 +    void setTileError(const CanonicalTileID& tileID, std::exception_ptr error);
  
      void invalidateTile(const CanonicalTileID&);
      void invalidateRegion(const LatLngBounds&, Range<uint8_t>);
 diff --git a/src/mln/style/sources/custom_geometry_source.cpp b/src/mln/style/sources/custom_geometry_source.cpp
-index 0cfb9751d8..4ea2844727 100644
+index 0cfb975..4ea2844 100644
 --- a/src/mln/style/sources/custom_geometry_source.cpp
 +++ b/src/mln/style/sources/custom_geometry_source.cpp
 @@ -39,6 +39,10 @@ void CustomGeometrySource::setTileData(const CanonicalTileID& tileID, const GeoJ
@@ -66,7 +68,7 @@ index 0cfb9751d8..4ea2844727 100644
      loader->self().invoke(&CustomTileLoader::invalidateTile, tileID);
  }
 diff --git a/src/mln/tile/custom_geometry_tile.cpp b/src/mln/tile/custom_geometry_tile.cpp
-index c9cefdf1e3..95f63ca6e8 100644
+index 5c7e983..460c4b8 100644
 --- a/src/mln/tile/custom_geometry_tile.cpp
 +++ b/src/mln/tile/custom_geometry_tile.cpp
 @@ -57,6 +57,11 @@ void CustomGeometryTile::setTileData(const GeoJSON& geoJSON) {
@@ -82,7 +84,7 @@ index c9cefdf1e3..95f63ca6e8 100644
      stale = true;
      observer->onTileChanged(*this);
 diff --git a/src/mln/tile/custom_geometry_tile.hpp b/src/mln/tile/custom_geometry_tile.hpp
-index 0c4c417407..61029d4803 100644
+index 0c4c417..61029d4 100644
 --- a/src/mln/tile/custom_geometry_tile.hpp
 +++ b/src/mln/tile/custom_geometry_tile.hpp
 @@ -27,6 +27,7 @@ public:
@@ -94,7 +96,7 @@ index 0c4c417407..61029d4803 100644
  
      void setNecessity(TileNecessity) final;
 diff --git a/test/style/source.test.cpp b/test/style/source.test.cpp
-index b7fd7734d9..a4e3af138d 100644
+index b7fd773..a4e3af1 100644
 --- a/test/style/source.test.cpp
 +++ b/test/style/source.test.cpp
 @@ -51,6 +51,7 @@
@@ -142,7 +144,7 @@ index b7fd7734d9..a4e3af138d 100644
  
  class FakeTileSource;
 diff --git a/test/tile/custom_geometry_tile.test.cpp b/test/tile/custom_geometry_tile.test.cpp
-index b26cc2e8e7..5ddca9c2d0 100644
+index ffb41d4..ac46446 100644
 --- a/test/tile/custom_geometry_tile.test.cpp
 +++ b/test/tile/custom_geometry_tile.test.cpp
 @@ -18,6 +18,7 @@
