@@ -23,6 +23,14 @@ public sealed record AnimationOptions
     /// The zoom level at the peak of a fly animation.
     /// </summary>
     public double? MinZoom { get; init; }
+
+    /// <summary>
+    /// The longest a fly animation may take. A fly animation whose duration,
+    /// set or derived from <c>velocity</c>, is longer moves the camera at once
+    /// instead, and so does one too slow for the library to time, without this
+    /// field. Other animations ignore it.
+    /// </summary>
+    public double? MaxDurationMs { get; init; }
     public UnitBezier? Easing { get; init; }
 
     /// <summary>

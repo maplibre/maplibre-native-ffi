@@ -790,9 +790,9 @@ diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
 index c15ea59..44700ea 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
-@@ -1619,3 +1619,267 @@ TEST(Transform, FlyDurationRange) {
-     EXPECT_DOUBLE_EQ(1.0, transform.getZoom());
-     EXPECT_FALSE(transform.inTransition());
+@@ -1678,3 +1678,267 @@ TEST(Transform, FlyPastMaxDurationJumps) {
+     EXPECT_EQ(Duration{std::chrono::seconds(2)}, transform.getLatestTransitionDuration());
+     EXPECT_TRUE(transform.inTransition());
  }
 +
 +namespace {

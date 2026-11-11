@@ -3088,6 +3088,7 @@ final class AnimationOptions extends _Value {
     this.durationMs,
     this.velocity,
     this.minZoom,
+    this.maxDurationMs,
     this.easing,
     this.transitionId,
     this.endHandler = const CameraTransitionHandler(),
@@ -3100,6 +3101,12 @@ final class AnimationOptions extends _Value {
 
   /// The zoom level at the peak of a fly animation.
   final double? minZoom;
+
+  /// The longest a fly animation may take. A fly animation whose duration, set
+  /// or derived from `velocity`, is longer moves the camera at once instead,
+  /// and so does one too slow for the library to time, without this field.
+  /// Other animations ignore it.
+  final double? maxDurationMs;
   final UnitBezier? easing;
 
   /// An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change
@@ -3112,6 +3119,7 @@ final class AnimationOptions extends _Value {
     double? durationMs,
     double? velocity,
     double? minZoom,
+    double? maxDurationMs,
     UnitBezier? easing,
     int? transitionId,
     CameraTransitionHandler? endHandler,
@@ -3119,6 +3127,7 @@ final class AnimationOptions extends _Value {
     durationMs: durationMs ?? this.durationMs,
     velocity: velocity ?? this.velocity,
     minZoom: minZoom ?? this.minZoom,
+    maxDurationMs: maxDurationMs ?? this.maxDurationMs,
     easing: easing ?? this.easing,
     transitionId: transitionId ?? this.transitionId,
     endHandler: endHandler ?? this.endHandler,
@@ -3129,6 +3138,7 @@ final class AnimationOptions extends _Value {
     durationMs,
     velocity,
     minZoom,
+    maxDurationMs,
     easing,
     transitionId,
     endHandler,
@@ -3138,6 +3148,7 @@ final class AnimationOptions extends _Value {
     'durationMs',
     'velocity',
     'minZoom',
+    'maxDurationMs',
     'easing',
     'transitionId',
     'endHandler',

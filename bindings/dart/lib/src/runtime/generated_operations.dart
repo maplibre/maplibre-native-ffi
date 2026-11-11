@@ -920,6 +920,10 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
     result.ref.fields |= raw.MLN_ANIMATION_OPTION_MIN_ZOOM;
     result.ref.min_zoom = value.minZoom!;
   }
+  if (value.maxDurationMs != null) {
+    result.ref.fields |= raw.MLN_ANIMATION_OPTION_MAX_DURATION;
+    result.ref.max_duration_ms = value.maxDurationMs!;
+  }
   if (value.easing != null) {
     result.ref.fields |= raw.MLN_ANIMATION_OPTION_EASING;
     result.ref.easing = _writeUnitBezier(value.easing!, arena).ref;

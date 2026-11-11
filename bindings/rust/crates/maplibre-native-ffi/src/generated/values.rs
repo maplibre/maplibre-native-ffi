@@ -204,6 +204,11 @@ pub struct AnimationOptions {
     pub velocity: Option<f64>,
     /// The zoom level at the peak of a fly animation.
     pub min_zoom: Option<f64>,
+    /// The longest a fly animation may take. A fly animation whose duration,
+    /// set or derived from `velocity`, is longer moves the camera at once
+    /// instead, and so does one too slow for the library to time, without this
+    /// field. Other animations ignore it.
+    pub max_duration_ms: Option<f64>,
     pub easing: Option<UnitBezier>,
     /// An ID that `MapHandle::cancel_camera_transitions_with_id()` cancels the
     /// change by. Several changes can share one.
@@ -225,6 +230,10 @@ impl ToNative<sys::mln_animation_options> for AnimationOptions {
         if let Some(item) = &self.min_zoom {
             raw.fields |= sys::MLN_ANIMATION_OPTION_MIN_ZOOM;
             raw.min_zoom = *item;
+        }
+        if let Some(item) = &self.max_duration_ms {
+            raw.fields |= sys::MLN_ANIMATION_OPTION_MAX_DURATION;
+            raw.max_duration_ms = *item;
         }
         if let Some(item) = &self.easing {
             raw.fields |= sys::MLN_ANIMATION_OPTION_EASING;

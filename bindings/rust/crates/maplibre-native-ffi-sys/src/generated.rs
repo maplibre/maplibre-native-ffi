@@ -17,6 +17,7 @@ pub const MLN_ANIMATION_OPTION_VELOCITY: mln_animation_option_field = 2;
 pub const MLN_ANIMATION_OPTION_MIN_ZOOM: mln_animation_option_field = 4;
 pub const MLN_ANIMATION_OPTION_EASING: mln_animation_option_field = 8;
 pub const MLN_ANIMATION_OPTION_TRANSITION_ID: mln_animation_option_field = 16;
+pub const MLN_ANIMATION_OPTION_MAX_DURATION: mln_animation_option_field = 32;
 pub type mln_bound_option_field = u32;
 pub const MLN_BOUND_OPTION_BOUNDS: mln_bound_option_field = 1;
 pub const MLN_BOUND_OPTION_MIN_ZOOM: mln_bound_option_field = 2;
@@ -578,6 +579,7 @@ pub struct mln_animation_options {
     pub duration_ms: f64,
     pub velocity: f64,
     pub min_zoom: f64,
+    pub max_duration_ms: f64,
     pub easing: mln_unit_bezier,
     pub transition_id: u64,
     pub end_handler: mln_camera_transition_handler,

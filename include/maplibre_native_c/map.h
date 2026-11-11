@@ -44,6 +44,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_animation_option_field : uint32_t {
   MLN_ANIMATION_OPTION_MIN_ZOOM = 1U << 2U,
   MLN_ANIMATION_OPTION_EASING = 1U << 3U,
   MLN_ANIMATION_OPTION_TRANSITION_ID = 1U << 4U,
+  MLN_ANIMATION_OPTION_MAX_DURATION = 1U << 5U,
 } mln_animation_option_field;
 
 /** A set of mln_animation_option_field bits. */
@@ -454,6 +455,14 @@ typedef struct mln_animation_options {
   double velocity MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_VELOCITY");
   /** The zoom level at the peak of a fly animation. */
   double min_zoom MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_MIN_ZOOM");
+  /**
+   * The longest a fly animation may take. A fly animation whose duration, set
+   * or derived from `velocity`, is longer moves the camera at once instead,
+   * and so does one too slow for the library to time, without this field.
+   * Other animations ignore it.
+   */
+  double max_duration_ms
+    MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_MAX_DURATION");
   mln_unit_bezier easing
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_EASING");
   /**

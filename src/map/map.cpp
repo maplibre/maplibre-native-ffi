@@ -1690,7 +1690,8 @@ auto validate_animation_options(const mln_animation_options* animation)
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_ANIMATION_OPTION_DURATION) |
     MLN_ANIMATION_OPTION_VELOCITY | MLN_ANIMATION_OPTION_MIN_ZOOM |
-    MLN_ANIMATION_OPTION_EASING | MLN_ANIMATION_OPTION_TRANSITION_ID;
+    MLN_ANIMATION_OPTION_EASING | MLN_ANIMATION_OPTION_TRANSITION_ID |
+    MLN_ANIMATION_OPTION_MAX_DURATION;
   if ((animation->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_animation_options.fields contains unknown bits"
@@ -1712,6 +1713,15 @@ auto validate_animation_options(const mln_animation_options* animation)
   ) {
     mln::core::set_thread_error(
       "animation duration_ms must fit the native duration range"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    (animation->fields & MLN_ANIMATION_OPTION_MAX_DURATION) != 0U &&
+    !is_native_duration_ms(animation->max_duration_ms)
+  ) {
+    mln::core::set_thread_error(
+      "animation max_duration_ms must fit the native duration range"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -2498,6 +2508,9 @@ auto to_native_animation(
   }
   if ((animation.fields & MLN_ANIMATION_OPTION_MIN_ZOOM) != 0U) {
     result.minZoom = animation.min_zoom;
+  }
+  if ((animation.fields & MLN_ANIMATION_OPTION_MAX_DURATION) != 0U) {
+    result.maxDuration = duration_from_milliseconds(animation.max_duration_ms);
   }
   if ((animation.fields & MLN_ANIMATION_OPTION_EASING) != 0U) {
     const auto easing = animation.easing;
