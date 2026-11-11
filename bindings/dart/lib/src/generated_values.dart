@@ -1321,9 +1321,8 @@ final class StyleSourceType extends _Enum {
   static const geoJson = StyleSourceType.fromRawValue(4);
   static const image = StyleSourceType.fromRawValue(5);
   static const video = StyleSourceType.fromRawValue(6);
-  static const annotations = StyleSourceType.fromRawValue(7);
-  static const customGeometry = StyleSourceType.fromRawValue(8);
-  static const customVector = StyleSourceType.fromRawValue(9);
+  static const customGeometry = StyleSourceType.fromRawValue(7);
+  static const customVector = StyleSourceType.fromRawValue(8);
   @override
   String toString() => switch (rawValue) {
     0 => 'StyleSourceType.unknown',
@@ -1333,9 +1332,8 @@ final class StyleSourceType extends _Enum {
     4 => 'StyleSourceType.geoJson',
     5 => 'StyleSourceType.image',
     6 => 'StyleSourceType.video',
-    7 => 'StyleSourceType.annotations',
-    8 => 'StyleSourceType.customGeometry',
-    9 => 'StyleSourceType.customVector',
+    7 => 'StyleSourceType.customGeometry',
+    8 => 'StyleSourceType.customVector',
     _ => 'StyleSourceType($rawValue)',
   };
 }

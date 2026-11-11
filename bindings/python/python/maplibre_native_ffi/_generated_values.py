@@ -982,9 +982,8 @@ class StyleSourceType(UnknownIntEnum):
     GEO_JSON = 4
     IMAGE = 5
     VIDEO = 6
-    ANNOTATIONS = 7
-    CUSTOM_GEOMETRY = 8
-    CUSTOM_VECTOR = 9
+    CUSTOM_GEOMETRY = 7
+    CUSTOM_VECTOR = 8
 
 
 class StyleTileScheme(UnknownIntEnum):

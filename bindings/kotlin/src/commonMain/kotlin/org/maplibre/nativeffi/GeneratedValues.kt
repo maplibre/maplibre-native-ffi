@@ -3012,9 +3012,8 @@ public class StyleSourceType(@get:JvmName("getRawValue") public val rawValue: UI
       4u -> "GEO_JSON"
       5u -> "IMAGE"
       6u -> "VIDEO"
-      7u -> "ANNOTATIONS"
-      8u -> "CUSTOM_GEOMETRY"
-      9u -> "CUSTOM_VECTOR"
+      7u -> "CUSTOM_GEOMETRY"
+      8u -> "CUSTOM_VECTOR"
       else -> "StyleSourceType($rawValue)"
     }
 
@@ -3044,15 +3043,12 @@ public class StyleSourceType(@get:JvmName("getRawValue") public val rawValue: UI
     @JvmField public val VIDEO: StyleSourceType = StyleSourceType(VIDEO_VALUE)
     /** The `rawValue` of [VIDEO]. */
     public const val VIDEO_VALUE: UInt = 6u
-    @JvmField public val ANNOTATIONS: StyleSourceType = StyleSourceType(ANNOTATIONS_VALUE)
-    /** The `rawValue` of [ANNOTATIONS]. */
-    public const val ANNOTATIONS_VALUE: UInt = 7u
     @JvmField public val CUSTOM_GEOMETRY: StyleSourceType = StyleSourceType(CUSTOM_GEOMETRY_VALUE)
     /** The `rawValue` of [CUSTOM_GEOMETRY]. */
-    public const val CUSTOM_GEOMETRY_VALUE: UInt = 8u
+    public const val CUSTOM_GEOMETRY_VALUE: UInt = 7u
     @JvmField public val CUSTOM_VECTOR: StyleSourceType = StyleSourceType(CUSTOM_VECTOR_VALUE)
     /** The `rawValue` of [CUSTOM_VECTOR]. */
-    public const val CUSTOM_VECTOR_VALUE: UInt = 9u
+    public const val CUSTOM_VECTOR_VALUE: UInt = 8u
 
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
@@ -3066,7 +3062,6 @@ public class StyleSourceType(@get:JvmName("getRawValue") public val rawValue: UI
         GEO_JSON_VALUE -> GEO_JSON
         IMAGE_VALUE -> IMAGE
         VIDEO_VALUE -> VIDEO
-        ANNOTATIONS_VALUE -> ANNOTATIONS
         CUSTOM_GEOMETRY_VALUE -> CUSTOM_GEOMETRY
         CUSTOM_VECTOR_VALUE -> CUSTOM_VECTOR
         else -> StyleSourceType(rawValue)

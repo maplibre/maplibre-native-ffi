@@ -8807,9 +8807,8 @@ pub const StyleSourceType = enum(u32) {
     geo_json = 4,
     image = 5,
     video = 6,
-    annotations = 7,
-    custom_geometry = 8,
-    custom_vector = 9,
+    custom_geometry = 7,
+    custom_vector = 8,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;

@@ -6288,9 +6288,8 @@ pub enum StyleSourceType: u32 {
     GeoJson = 4,
     Image = 5,
     Video = 6,
-    Annotations = 7,
-    CustomGeometry = 8,
-    CustomVector = 9,
+    CustomGeometry = 7,
+    CustomVector = 8,
 } Unrecognized
 }
 impl Default for StyleSourceType {

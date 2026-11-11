@@ -3985,9 +3985,8 @@ export const StyleSourceType = {
   geoJson: 4,
   image: 5,
   video: 6,
-  annotations: 7,
-  customGeometry: 8,
-  customVector: 9,
+  customGeometry: 7,
+  customVector: 8,
 } as const;
 /** One of the StyleSourceType values, or a value this binding does not know. */
 export type StyleSourceType =

@@ -908,9 +908,8 @@ public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
   public static let geoJson: StyleSourceType = .init(rawValue: 4)
   public static let image: StyleSourceType = .init(rawValue: 5)
   public static let video: StyleSourceType = .init(rawValue: 6)
-  public static let annotations: StyleSourceType = .init(rawValue: 7)
-  public static let customGeometry: StyleSourceType = .init(rawValue: 8)
-  public static let customVector: StyleSourceType = .init(rawValue: 9)
+  public static let customGeometry: StyleSourceType = .init(rawValue: 7)
+  public static let customVector: StyleSourceType = .init(rawValue: 8)
   public var description: String {
     switch rawValue {
     case 0: return "unknown"
@@ -920,9 +919,8 @@ public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
     case 4: return "geoJson"
     case 5: return "image"
     case 6: return "video"
-    case 7: return "annotations"
-    case 8: return "customGeometry"
-    case 9: return "customVector"
+    case 7: return "customGeometry"
+    case 8: return "customVector"
     default: return "StyleSourceType(\(rawValue))"
     }
   }
