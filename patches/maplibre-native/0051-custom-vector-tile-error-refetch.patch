@@ -1,28 +1,303 @@
-Keeps a custom vector tile's callbacks after the source reports an error for
-it, so invalidating the failed tile fetches it again. Before, setTileError
-dropped them, so invalidateTile found nothing, and the tile stayed failed until
-it left the view and came back
-(https://github.com/maplibre/maplibre-native-ffi/issues/782).
-Upstream: https://github.com/maplibre/maplibre-native/pull/4928
+Tracks a custom vector source's in-flight requests separately from the tiles
+that want each tile's data. The loader used one registry for both: a tile
+being registered meant both that it wanted the data and that the host had been
+asked for it. So setTileError dropped the failed tile's registration, and
+invalidating the tile found nothing to fetch again
+(https://github.com/maplibre/maplibre-native-ffi/issues/782). Keeping the
+registration instead stopped a failed refresh from ever retrying, and erasing
+it on cancel dropped the other wrapped copies of the tile. Registrations were
+also matched by the wrap of the tile's ID, which TilePyramid changes when the
+map moves by a world.
 
+Now each canonical tile has subscribers, identified by their actor, and a flag
+for whether a fetch is in flight. A tile stays subscribed until it is
+destroyed. The loader asks the host for data when a tile needs it, none is
+cached, and no fetch is in flight, so a failed tile fetches again when it is
+invalidated or needed again. Copies of a tile share one fetch, and the host
+hears a cancel once no copy needs the tile. ActorRef gains operator== for the
+subscriber identity.
+Upstream: not proposed. maplibre/maplibre-native#4928 took the earlier approach
+and was closed.
+
+diff --git a/include/mln/actor/actor_ref.hpp b/include/mln/actor/actor_ref.hpp
+index 4c1dab6..7d49578 100644
+--- a/include/mln/actor/actor_ref.hpp
++++ b/include/mln/actor/actor_ref.hpp
+@@ -52,6 +52,9 @@ public:
+         return future;
+     }
+ 
++    // Two references are equal when they refer to the same object.
++    bool operator==(const ActorRef& other) const { return object == other.object; }
++
+ private:
+     Object* object;
+     std::weak_ptr<Mailbox> weakMailbox;
 diff --git a/src/mln/style/custom_vector_tile_loader.cpp b/src/mln/style/custom_vector_tile_loader.cpp
-index b2b4fea..db0a5b2 100644
+index b2b4fea..86821e7 100644
 --- a/src/mln/style/custom_vector_tile_loader.cpp
 +++ b/src/mln/style/custom_vector_tile_loader.cpp
-@@ -81,7 +81,7 @@ void CustomVectorTileLoader::setTileError(const CanonicalTileID& tileID, std::ex
-         auto actor = std::get<2>(tuple);
-         actor.invoke(&CustomVectorTile::setTileError, error);
+@@ -1,6 +1,8 @@
+ #include <mln/style/custom_vector_tile_loader.hpp>
+ #include <mln/tile/custom_vector_tile.hpp>
+ 
++#include <algorithm>
++
+ namespace mln {
+ namespace style {
+ 
+@@ -10,53 +12,47 @@ CustomVectorTileLoader::CustomVectorTileLoader(const TileFunction& fetchTileFn,
+ 
+ void CustomVectorTileLoader::fetchTile(const OverscaledTileID& tileID, const ActorRef<CustomVectorTile>& tileRef) {
+     std::scoped_lock guard(dataMutex);
++    auto& state = tileStates[tileID.canonical];
++    auto subscriber = state.find(tileRef);
++    if (subscriber == state.subscribers.end()) {
++        state.subscribers.push_back({tileRef, true});
++    } else {
++        subscriber->required = true;
++    }
+     auto cachedTileData = dataCache.find(tileID.canonical);
+     if (cachedTileData != dataCache.end()) {
+         tileRef.invoke(&CustomVectorTile::setTileData, cachedTileData->second.first, cachedTileData->second.second);
+-    }
+-    auto tileCallbacks = tileCallbackMap.find(tileID.canonical);
+-    if (tileCallbacks == tileCallbackMap.end()) {
+-        auto tuple = std::make_tuple(tileID.overscaledZ, tileID.wrap, tileRef);
+-        tileCallbackMap.insert({tileID.canonical, std::vector<OverscaledIDFunctionTuple>(1, tuple)});
+-    } else {
+-        for (auto& iter : tileCallbacks->second) {
+-            if (std::get<0>(iter) == tileID.overscaledZ && std::get<1>(iter) == tileID.wrap) {
+-                std::get<2>(iter) = tileRef;
+-                return;
+-            }
+-        }
+-        tileCallbacks->second.emplace_back(tileID.overscaledZ, tileID.wrap, tileRef);
+-    }
+-    if (cachedTileData == dataCache.end()) {
++    } else if (!state.fetching) {
++        state.fetching = true;
+         invokeTileFetch(tileID.canonical);
+     }
+ }
+ 
+-void CustomVectorTileLoader::cancelTile(const OverscaledTileID& tileID) {
++void CustomVectorTileLoader::cancelTile(const OverscaledTileID& tileID, const ActorRef<CustomVectorTile>& tileRef) {
+     std::scoped_lock guard(dataMutex);
+-    if (tileCallbackMap.contains(tileID.canonical)) {
+-        invokeTileCancel(tileID.canonical);
+-        // Erase so a subsequent fetchTile for the same tile re-issues the fetch.
+-        // Intentionally diverges from CustomTileLoader which omits this — that is a
+-        // latent bug there that needs a separate cleanup.
+-        tileCallbackMap.erase(tileID.canonical);
+-    }
++    auto state = tileStates.find(tileID.canonical);
++    if (state == tileStates.end()) return;
++    auto subscriber = state->second.find(tileRef);
++    if (subscriber == state->second.subscribers.end() || !subscriber->required) return;
++    subscriber->required = false;
++    cancelIfUnneeded(state->first, state->second);
+ }
+ 
+-void CustomVectorTileLoader::removeTile(const OverscaledTileID& tileID) {
++void CustomVectorTileLoader::removeTile(const OverscaledTileID& tileID, const ActorRef<CustomVectorTile>& tileRef) {
+     std::scoped_lock guard(dataMutex);
+-    auto tileCallbacks = tileCallbackMap.find(tileID.canonical);
+-    if (tileCallbacks == tileCallbackMap.end()) return;
+-    for (auto iter = tileCallbacks->second.begin(); iter != tileCallbacks->second.end(); iter++) {
+-        if (std::get<0>(*iter) == tileID.overscaledZ && std::get<1>(*iter) == tileID.wrap) {
+-            tileCallbacks->second.erase(iter);
+-            invokeTileCancel(tileID.canonical);
+-            break;
+-        }
++    auto state = tileStates.find(tileID.canonical);
++    if (state == tileStates.end()) return;
++    auto& subscribers = state->second.subscribers;
++    auto subscriber = state->second.find(tileRef);
++    if (subscriber == subscribers.end()) return;
++    const bool required = subscriber->required;
++    subscribers.erase(subscriber);
++    if (required) {
++        cancelIfUnneeded(state->first, state->second);
+     }
+-    if (tileCallbacks->second.empty()) {
+-        tileCallbackMap.erase(tileCallbacks);
+-        dataCache.erase(tileID.canonical);
++    if (subscribers.empty()) {
++        dataCache.erase(state->first);
++        tileStates.erase(state);
+     }
+ }
+ 
+@@ -64,40 +60,63 @@ void CustomVectorTileLoader::setTileData(const CanonicalTileID& tileID,
+                                          const std::shared_ptr<const std::string>& data,
+                                          TileDataFormat format) {
+     std::scoped_lock guard(dataMutex);
+-    auto iter = tileCallbackMap.find(tileID);
+-    if (iter == tileCallbackMap.end()) return;
+-    for (auto& tuple : iter->second) {
+-        auto actor = std::get<2>(tuple);
+-        actor.invoke(&CustomVectorTile::setTileData, data, format);
++    auto state = tileStates.find(tileID);
++    if (state == tileStates.end() || !state->second.required()) return;
++    state->second.fetching = false;
++    for (auto& subscriber : state->second.subscribers) {
++        subscriber.tile.invoke(&CustomVectorTile::setTileData, data, format);
+     }
+     dataCache[tileID] = std::make_pair(data, format);
+ }
+ 
+ void CustomVectorTileLoader::setTileError(const CanonicalTileID& tileID, std::exception_ptr error) {
+     std::scoped_lock guard(dataMutex);
+-    auto iter = tileCallbackMap.find(tileID);
+-    if (iter == tileCallbackMap.end()) return;
+-    for (auto& tuple : iter->second) {
+-        auto actor = std::get<2>(tuple);
+-        actor.invoke(&CustomVectorTile::setTileError, error);
++    auto state = tileStates.find(tileID);
++    if (state == tileStates.end() || !state->second.required()) return;
++    // The tiles stay subscribed, so invalidating the failed tile or needing it
++    // again fetches it again.
++    state->second.fetching = false;
++    for (auto& subscriber : state->second.subscribers) {
++        subscriber.tile.invoke(&CustomVectorTile::setTileError, error);
      }
 -    tileCallbackMap.erase(iter);
-+    // Keep the callbacks, so invalidating the failed tile fetches it again.
      dataCache.erase(tileID);
  }
  
+ void CustomVectorTileLoader::invalidateTile(const CanonicalTileID& tileID) {
+     std::scoped_lock guard(dataMutex);
+-    auto tileCallbacks = tileCallbackMap.find(tileID);
+-    if (tileCallbacks == tileCallbackMap.end()) return;
+-    for (auto& iter : tileCallbacks->second) {
+-        auto actor = std::get<2>(iter);
+-        actor.invoke(&CustomVectorTile::invalidateTileData);
++    auto state = tileStates.find(tileID);
++    if (state == tileStates.end()) return;
++    for (auto& subscriber : state->second.subscribers) {
++        subscriber.tile.invoke(&CustomVectorTile::invalidateTileData);
++    }
++    if (state->second.required()) {
+         invokeTileCancel(tileID);
+     }
+-    tileCallbackMap.erase(tileCallbacks);
++    tileStates.erase(state);
+     dataCache.erase(tileID);
+ }
+ 
++std::vector<CustomVectorTileLoader::Subscriber>::iterator CustomVectorTileLoader::TileState::find(
++    const ActorRef<CustomVectorTile>& tileRef) {
++    return std::find_if(subscribers.begin(), subscribers.end(), [&](const Subscriber& subscriber) {
++        return subscriber.tile == tileRef;
++    });
++}
++
++bool CustomVectorTileLoader::TileState::required() const {
++    return std::any_of(
++        subscribers.begin(), subscribers.end(), [](const Subscriber& subscriber) { return subscriber.required; });
++}
++
++// Once no tile needs the data, tells the host to stop, and forgets the request
++// so that the next tile to need the data asks for it again.
++void CustomVectorTileLoader::cancelIfUnneeded(const CanonicalTileID& tileID, TileState& state) {
++    if (!state.required()) {
++        state.fetching = false;
++        invokeTileCancel(tileID);
++    }
++}
++
+ void CustomVectorTileLoader::invokeTileFetch(const CanonicalTileID& tileID) {
+     if (fetchTileFunction != nullptr) {
+         fetchTileFunction(tileID);
+diff --git a/src/mln/style/custom_vector_tile_loader.hpp b/src/mln/style/custom_vector_tile_loader.hpp
+index 9470033..bebda0d 100644
+--- a/src/mln/style/custom_vector_tile_loader.hpp
++++ b/src/mln/style/custom_vector_tile_loader.hpp
+@@ -8,7 +8,6 @@
+ #include <memory>
+ #include <mutex>
+ #include <string>
+-#include <tuple>
+ #include <unordered_map>
+ #include <vector>
+ 
+@@ -23,13 +22,11 @@ public:
+     CustomVectorTileLoader(const CustomVectorTileLoader&) = delete;
+     CustomVectorTileLoader& operator=(const CustomVectorTileLoader&) = delete;
+ 
+-    using OverscaledIDFunctionTuple = std::tuple<uint8_t, int16_t, ActorRef<CustomVectorTile>>;
+-
+     CustomVectorTileLoader(const TileFunction& fetchTileFn, const TileFunction& cancelTileFn);
+ 
+     void fetchTile(const OverscaledTileID& tileID, const ActorRef<CustomVectorTile>& tileRef);
+-    void cancelTile(const OverscaledTileID& tileID);
+-    void removeTile(const OverscaledTileID& tileID);
++    void cancelTile(const OverscaledTileID& tileID, const ActorRef<CustomVectorTile>& tileRef);
++    void removeTile(const OverscaledTileID& tileID, const ActorRef<CustomVectorTile>& tileRef);
+ 
+     void setTileData(const CanonicalTileID& tileID,
+                      const std::shared_ptr<const std::string>& data,
+@@ -38,12 +35,31 @@ public:
+     void invalidateTile(const CanonicalTileID&);
+ 
+ private:
++    // A tile that receives a canonical tile's data. Wrapped and overscaled
++    // tiles share their canonical tile's data. A tile is identified by its
++    // actor, since TilePyramid changes the wrap of a tile's ID.
++    struct Subscriber {
++        ActorRef<CustomVectorTile> tile;
++        // Whether the tile still needs the data, rather than having cancelled.
++        bool required;
++    };
++
++    struct TileState {
++        std::vector<Subscriber> subscribers;
++        // Whether the host was asked for the data and hasn't answered yet.
++        bool fetching = false;
++
++        std::vector<Subscriber>::iterator find(const ActorRef<CustomVectorTile>& tileRef);
++        bool required() const;
++    };
++
++    void cancelIfUnneeded(const CanonicalTileID& tileID, TileState& state);
+     void invokeTileFetch(const CanonicalTileID& tileID);
+     void invokeTileCancel(const CanonicalTileID& tileID);
+ 
+     TileFunction fetchTileFunction;
+     TileFunction cancelTileFunction;
+-    std::unordered_map<CanonicalTileID, std::vector<OverscaledIDFunctionTuple>> tileCallbackMap;
++    std::unordered_map<CanonicalTileID, TileState> tileStates;
+     std::map<CanonicalTileID, std::pair<std::shared_ptr<const std::string>, TileDataFormat>> dataCache;
+     std::mutex dataMutex;
+ };
+diff --git a/src/mln/tile/custom_vector_tile.cpp b/src/mln/tile/custom_vector_tile.cpp
+index a3890fc..d6686d2 100644
+--- a/src/mln/tile/custom_vector_tile.cpp
++++ b/src/mln/tile/custom_vector_tile.cpp
+@@ -21,7 +21,7 @@ CustomVectorTile::CustomVectorTile(const OverscaledTileID& overscaledTileID,
+       actorRef(*this, mailbox) {}
+ 
+ CustomVectorTile::~CustomVectorTile() {
+-    loader.invoke(&style::CustomVectorTileLoader::removeTile, id);
++    loader.invoke(&style::CustomVectorTileLoader::removeTile, id, actorRef);
+ }
+ 
+ void CustomVectorTile::setTileData(const std::shared_ptr<const std::string>& data, style::TileDataFormat format) {
+@@ -55,7 +55,7 @@ void CustomVectorTile::setNecessity(TileNecessity newNecessity) {
+             loader.invoke(&style::CustomVectorTileLoader::fetchTile, id, actorRef);
+             stale = false;
+         } else if (!isRenderable()) {
+-            loader.invoke(&style::CustomVectorTileLoader::cancelTile, id);
++            loader.invoke(&style::CustomVectorTileLoader::cancelTile, id, actorRef);
+         }
+     }
+ }
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index 34c8087..5167a53 100644
+index 05b1b9f..b8e832b 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
-@@ -88,6 +88,7 @@ add_library(
+@@ -89,6 +89,7 @@ add_library(
      ${PROJECT_SOURCE_DIR}/test/text/shaping.test.cpp
      ${PROJECT_SOURCE_DIR}/test/text/tagged_string.test.cpp
      ${PROJECT_SOURCE_DIR}/test/tile/custom_geometry_tile.test.cpp
@@ -32,10 +307,10 @@ index 34c8087..5167a53 100644
      ${PROJECT_SOURCE_DIR}/test/tile/raster_dem_tile.test.cpp
 diff --git a/test/tile/custom_vector_tile.test.cpp b/test/tile/custom_vector_tile.test.cpp
 new file mode 100644
-index 0000000..d35cae5
+index 0000000..3f23a71
 --- /dev/null
 +++ b/test/tile/custom_vector_tile.test.cpp
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,134 @@
 +#include <mln/test/util.hpp>
 +#include <mln/test/fake_file_source.hpp>
 +#include <mln/style/sources/custom_vector_source.hpp>
@@ -108,6 +383,65 @@ index 0000000..d35cae5
 +
 +    // The render source updates the necessity of a changed tile.
 +    tile.setNecessity(TileNecessity::Required);
++    test.loop.waitForEmpty();
++    EXPECT_EQ(2, fetches);
++}
++
++TEST(CustomVectorTile, FetchFailedTileAgain) {
++    CustomVectorTileTest test;
++
++    int fetches = 0;
++    CustomVectorTileLoader loader([&](const CanonicalTileID&) { fetches++; }, nullptr);
++    auto mb = std::make_shared<Mailbox>(*Scheduler::GetCurrent());
++    ActorRef<CustomVectorTileLoader> loaderActor(loader, mb);
++
++    const OverscaledTileID id(0, 0, 0);
++    CustomVectorTile tile(id, "source", test.tileParameters, loaderActor);
++    auto tileMailbox = std::make_shared<Mailbox>(*Scheduler::GetCurrent());
++    ActorRef<CustomVectorTile> tileRef(tile, tileMailbox);
++
++    loader.fetchTile(id, tileRef);
++    ASSERT_EQ(1, fetches);
++    loader.setTileError(id.canonical, std::make_exception_ptr(std::runtime_error("failed")));
++
++    // A tile that still shows older data doesn't cancel when it leaves the
++    // view, so the next request for it has to ask the host again.
++    loader.fetchTile(id, tileRef);
++    EXPECT_EQ(2, fetches);
++    test.loop.waitForEmpty();
++}
++
++TEST(CustomVectorTile, CancelOneCopy) {
++    CustomVectorTileTest test;
++
++    int fetches = 0;
++    int cancels = 0;
++    CustomVectorTileLoader loader([&](const CanonicalTileID&) { fetches++; },
++                                  [&](const CanonicalTileID&) { cancels++; });
++    auto mb = std::make_shared<Mailbox>(*Scheduler::GetCurrent());
++    ActorRef<CustomVectorTileLoader> loaderActor(loader, mb);
++
++    // Two copies of one tile in neighboring worlds share its data.
++    CustomVectorTile first(OverscaledTileID(0, 0, 0), "source", test.tileParameters, loaderActor);
++    CustomVectorTile second(
++        OverscaledTileID(0, 1, CanonicalTileID(0, 0, 0)), "source", test.tileParameters, loaderActor);
++    first.setNecessity(TileNecessity::Required);
++    second.setNecessity(TileNecessity::Required);
++    test.loop.waitForEmpty();
++    EXPECT_EQ(1, fetches);
++
++    // The map moves by a world, and TilePyramid changes both copies' wraps.
++    first.id = first.id.unwrapTo(-1);
++    second.id = second.id.unwrapTo(0);
++
++    second.setNecessity(TileNecessity::Optional);
++    test.loop.waitForEmpty();
++    EXPECT_EQ(0, cancels);
++
++    // The copy that is still needed is still invalidated, and fetches again.
++    loader.invalidateTile(CanonicalTileID(0, 0, 0));
++    test.loop.waitForEmpty();
++    first.setNecessity(TileNecessity::Required);
 +    test.loop.waitForEmpty();
 +    EXPECT_EQ(2, fetches);
 +}

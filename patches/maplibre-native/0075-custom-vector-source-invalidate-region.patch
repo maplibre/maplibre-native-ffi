@@ -4,8 +4,8 @@ invalidate one tile at a time, so a host whose data changed over an area had to
 work out every loaded tile that the area touches. CustomVectorTileLoader now
 invalidates each loaded tile that the bounds intersect, at its own zoom, the
 same way invalidateTile() invalidates one: the tile fetches again, its cached
-data is dropped, and the cancel callback runs
-(https://github.com/maplibre/maplibre-native-ffi/issues/1491).
+data is dropped, and the host hears a cancel if a tile still needed it
+(https://github.com/maplibre/maplibre-native-ffi/issues/1491). Needs 0051.
 Upstream: not proposed
 
 diff --git a/include/mln/style/sources/custom_vector_source.hpp b/include/mln/style/sources/custom_vector_source.hpp
@@ -29,7 +29,7 @@ index 6dd0b9c..b21c56c 100644
      class Impl;
      const Impl& impl() const;
 diff --git a/src/mln/style/custom_vector_tile_loader.cpp b/src/mln/style/custom_vector_tile_loader.cpp
-index ef9bf90..8cb041e 100644
+index d6f3d1b..51cfd41 100644
 --- a/src/mln/style/custom_vector_tile_loader.cpp
 +++ b/src/mln/style/custom_vector_tile_loader.cpp
 @@ -1,5 +1,6 @@
@@ -37,69 +37,78 @@ index ef9bf90..8cb041e 100644
  #include <mln/tile/custom_vector_tile.hpp>
 +#include <mln/util/tile_range.hpp>
  
- namespace mln {
- namespace style {
-@@ -87,13 +88,38 @@ void CustomVectorTileLoader::invalidateTile(const CanonicalTileID& tileID) {
+ #include <algorithm>
+ 
+@@ -85,15 +86,40 @@ void CustomVectorTileLoader::setTileError(const CanonicalTileID& tileID, std::ex
+ void CustomVectorTileLoader::invalidateTile(const CanonicalTileID& tileID) {
      std::scoped_lock guard(dataMutex);
-     auto tileCallbacks = tileCallbackMap.find(tileID);
-     if (tileCallbacks == tileCallbackMap.end()) return;
-+    invalidateTileCallbacks(tileCallbacks);
+     auto state = tileStates.find(tileID);
+-    if (state == tileStates.end()) return;
++    if (state != tileStates.end()) {
++        invalidate(state);
++    }
 +}
 +
 +void CustomVectorTileLoader::invalidateRegion(const LatLngBounds& bounds) {
 +    std::scoped_lock guard(dataMutex);
 +    std::map<uint8_t, util::TileRange> tileRanges;
-+    for (auto tileCallbacks = tileCallbackMap.begin(); tileCallbacks != tileCallbackMap.end();) {
-+        const auto zoom = tileCallbacks->first.z;
++    for (auto state = tileStates.begin(); state != tileStates.end();) {
++        const auto zoom = state->first.z;
 +        auto tileRange = tileRanges.find(zoom);
 +        if (tileRange == tileRanges.end()) {
 +            tileRange = tileRanges.emplace(zoom, util::TileRange::fromLatLngBounds(bounds, zoom)).first;
 +        }
-+        if (tileRange->second.contains(tileCallbacks->first)) {
-+            tileCallbacks = invalidateTileCallbacks(tileCallbacks);
++        if (tileRange->second.contains(state->first)) {
++            state = invalidate(state);
 +        } else {
-+            ++tileCallbacks;
++            ++state;
 +        }
 +    }
 +}
 +
-+// Makes every tile waiting for the entry's tile fetch it again, and drops the
-+// entry and its cached data. Returns the entry after it.
-+CustomVectorTileLoader::TileCallbackMap::iterator CustomVectorTileLoader::invalidateTileCallbacks(
-+    TileCallbackMap::iterator tileCallbacks) {
-+    const auto tileID = tileCallbacks->first;
-     for (auto& iter : tileCallbacks->second) {
-         auto actor = std::get<2>(iter);
-         actor.invoke(&CustomVectorTile::invalidateTileData);
++// Makes every subscriber fetch the tile again when it next needs it, and drops
++// the tile's state and cached data. Returns the state after it.
++CustomVectorTileLoader::TileStates::iterator CustomVectorTileLoader::invalidate(TileStates::iterator state) {
++    const auto tileID = state->first;
+     for (auto& subscriber : state->second.subscribers) {
+         subscriber.tile.invoke(&CustomVectorTile::invalidateTileData);
+     }
+     if (state->second.required()) {
          invokeTileCancel(tileID);
      }
--    tileCallbackMap.erase(tileCallbacks);
+-    tileStates.erase(state);
      dataCache.erase(tileID);
-+    return tileCallbackMap.erase(tileCallbacks);
++    return tileStates.erase(state);
  }
  
- void CustomVectorTileLoader::invokeTileFetch(const CanonicalTileID& tileID) {
+ std::vector<CustomVectorTileLoader::Subscriber>::iterator CustomVectorTileLoader::TileState::find(
 diff --git a/src/mln/style/custom_vector_tile_loader.hpp b/src/mln/style/custom_vector_tile_loader.hpp
-index 9470033..264f8bd 100644
+index bebda0d..834434d 100644
 --- a/src/mln/style/custom_vector_tile_loader.hpp
 +++ b/src/mln/style/custom_vector_tile_loader.hpp
-@@ -36,14 +36,18 @@ public:
+@@ -33,6 +33,7 @@ public:
                       TileDataFormat format);
      void setTileError(const CanonicalTileID& tileID, std::exception_ptr error);
      void invalidateTile(const CanonicalTileID&);
 +    void invalidateRegion(const LatLngBounds&);
  
  private:
-+    using TileCallbackMap = std::unordered_map<CanonicalTileID, std::vector<OverscaledIDFunctionTuple>>;
+     // A tile that receives a canonical tile's data. Wrapped and overscaled
+@@ -53,13 +54,16 @@ private:
+         bool required() const;
+     };
+ 
++    using TileStates = std::unordered_map<CanonicalTileID, TileState>;
 +
-+    TileCallbackMap::iterator invalidateTileCallbacks(TileCallbackMap::iterator tileCallbacks);
++    TileStates::iterator invalidate(TileStates::iterator state);
+     void cancelIfUnneeded(const CanonicalTileID& tileID, TileState& state);
      void invokeTileFetch(const CanonicalTileID& tileID);
      void invokeTileCancel(const CanonicalTileID& tileID);
  
      TileFunction fetchTileFunction;
      TileFunction cancelTileFunction;
--    std::unordered_map<CanonicalTileID, std::vector<OverscaledIDFunctionTuple>> tileCallbackMap;
-+    TileCallbackMap tileCallbackMap;
+-    std::unordered_map<CanonicalTileID, TileState> tileStates;
++    TileStates tileStates;
      std::map<CanonicalTileID, std::pair<std::shared_ptr<const std::string>, TileDataFormat>> dataCache;
      std::mutex dataMutex;
  };
@@ -119,7 +128,7 @@ index e4bb270..efa75e4 100644
      return staticMutableCast<Source::Impl>(makeMutable<Impl>(impl()));
  }
 diff --git a/test/tile/custom_vector_tile.test.cpp b/test/tile/custom_vector_tile.test.cpp
-index d35cae5..82e138d 100644
+index 9e33a11..831e888 100644
 --- a/test/tile/custom_vector_tile.test.cpp
 +++ b/test/tile/custom_vector_tile.test.cpp
 @@ -13,8 +13,10 @@
@@ -133,7 +142,7 @@ index d35cae5..82e138d 100644
  
  using namespace mln;
  using namespace mln::style;
-@@ -73,3 +75,52 @@ TEST(CustomVectorTile, InvalidateFailedTile) {
+@@ -131,3 +133,52 @@ TEST(CustomVectorTile, CancelOneCopy) {
      test.loop.waitForEmpty();
      EXPECT_EQ(2, fetches);
  }

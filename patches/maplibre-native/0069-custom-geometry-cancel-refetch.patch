@@ -1,37 +1,300 @@
-Forgets a custom geometry tile when it's cancelled, as the custom vector loader
-already does, so the tile fetches again when it is next required. Before, the
-source told the provider to cancel the tile and never asked for it again
-(https://github.com/maplibre/maplibre-native-ffi/issues/778).
-Upstream: https://github.com/maplibre/maplibre-native/pull/4928
+Gives a custom geometry source the same request tracking as 0051 gives a
+custom vector source. The loader kept a cancelled tile registered, and took a
+registered tile to mean that the host had already been asked for it, so the
+source told the host to cancel the tile and never asked for it again
+(https://github.com/maplibre/maplibre-native-ffi/issues/778). Erasing the
+registration on cancel instead dropped the other wrapped copies of the tile
+and left its cached data behind.
+
+Now each canonical tile has subscribers, identified by their actor, and a flag
+for whether a fetch is in flight. A cancelled tile stays subscribed, so it
+fetches again when it is next needed, and its cached data goes once the last
+subscriber is destroyed. Copies of a tile share one fetch, and the host hears
+a cancel once no copy needs the tile. Needs 0051 for ActorRef's operator==.
+Upstream: not proposed. maplibre/maplibre-native#4928 took the earlier approach
+and was closed.
 
 diff --git a/src/mln/style/custom_tile_loader.cpp b/src/mln/style/custom_tile_loader.cpp
-index a7e306c..6b2d590 100644
+index a7e306c..612bfe5 100644
 --- a/src/mln/style/custom_tile_loader.cpp
 +++ b/src/mln/style/custom_tile_loader.cpp
-@@ -38,6 +38,8 @@ void CustomTileLoader::cancelTile(const OverscaledTileID& tileID) {
+@@ -2,6 +2,8 @@
+ #include <mln/tile/custom_geometry_tile.hpp>
+ #include <mln/util/tile_range.hpp>
+ 
++#include <algorithm>
++
+ namespace mln {
+ namespace style {
+ 
+@@ -12,100 +14,122 @@ CustomTileLoader::CustomTileLoader(const TileFunction& fetchTileFn, const TileFu
+ 
+ void CustomTileLoader::fetchTile(const OverscaledTileID& tileID, const ActorRef<CustomGeometryTile>& tileRef) {
      std::scoped_lock guard(dataMutex);
-     if (tileCallbackMap.contains(tileID.canonical)) {
-         invokeTileCancel(tileID.canonical);
-+        // Erase so a subsequent fetchTile for the same tile re-issues the fetch.
-+        tileCallbackMap.erase(tileID.canonical);
++    auto& state = tileStates[tileID.canonical];
++    auto subscriber = state.find(tileRef);
++    if (subscriber == state.subscribers.end()) {
++        state.subscribers.push_back({tileRef, true});
++    } else {
++        subscriber->required = true;
++    }
+     auto cachedTileData = dataCache.find(tileID.canonical);
+     if (cachedTileData != dataCache.end()) {
+         tileRef.invoke(&CustomGeometryTile::setTileData, *cachedTileData->second);
+-    }
+-    auto tileCallbacks = tileCallbackMap.find(tileID.canonical);
+-    if (tileCallbacks == tileCallbackMap.end()) {
+-        auto tuple = std::make_tuple(tileID.overscaledZ, tileID.wrap, tileRef);
+-        tileCallbackMap.insert({tileID.canonical, std::vector<OverscaledIDFunctionTuple>(1, tuple)});
+-    } else {
+-        for (auto& iter : tileCallbacks->second) {
+-            if (std::get<0>(iter) == tileID.overscaledZ && std::get<1>(iter) == tileID.wrap) {
+-                std::get<2>(iter) = tileRef;
+-                return;
+-            }
+-        }
+-        tileCallbacks->second.emplace_back(tileID.overscaledZ, tileID.wrap, tileRef);
+-    }
+-    if (cachedTileData == dataCache.end()) {
++    } else if (!state.fetching) {
++        state.fetching = true;
+         invokeTileFetch(tileID.canonical);
      }
  }
  
-diff --git a/src/mln/style/custom_vector_tile_loader.cpp b/src/mln/style/custom_vector_tile_loader.cpp
-index db0a5b2..ef9bf90 100644
---- a/src/mln/style/custom_vector_tile_loader.cpp
-+++ b/src/mln/style/custom_vector_tile_loader.cpp
-@@ -37,8 +37,6 @@ void CustomVectorTileLoader::cancelTile(const OverscaledTileID& tileID) {
-     if (tileCallbackMap.contains(tileID.canonical)) {
-         invokeTileCancel(tileID.canonical);
-         // Erase so a subsequent fetchTile for the same tile re-issues the fetch.
--        // Intentionally diverges from CustomTileLoader which omits this — that is a
--        // latent bug there that needs a separate cleanup.
-         tileCallbackMap.erase(tileID.canonical);
+-void CustomTileLoader::cancelTile(const OverscaledTileID& tileID) {
++void CustomTileLoader::cancelTile(const OverscaledTileID& tileID, const ActorRef<CustomGeometryTile>& tileRef) {
+     std::scoped_lock guard(dataMutex);
+-    if (tileCallbackMap.contains(tileID.canonical)) {
+-        invokeTileCancel(tileID.canonical);
+-    }
++    auto state = tileStates.find(tileID.canonical);
++    if (state == tileStates.end()) return;
++    auto subscriber = state->second.find(tileRef);
++    if (subscriber == state->second.subscribers.end() || !subscriber->required) return;
++    subscriber->required = false;
++    cancelIfUnneeded(state->first, state->second);
+ }
+ 
+-void CustomTileLoader::removeTile(const OverscaledTileID& tileID) {
++void CustomTileLoader::removeTile(const OverscaledTileID& tileID, const ActorRef<CustomGeometryTile>& tileRef) {
+     std::scoped_lock guard(dataMutex);
+-    auto tileCallbacks = tileCallbackMap.find(tileID.canonical);
+-    if (tileCallbacks == tileCallbackMap.end()) return;
+-    for (auto iter = tileCallbacks->second.begin(); iter != tileCallbacks->second.end(); iter++) {
+-        if (std::get<0>(*iter) == tileID.overscaledZ && std::get<1>(*iter) == tileID.wrap) {
+-            tileCallbacks->second.erase(iter);
+-            invokeTileCancel(tileID.canonical);
+-            break;
+-        }
++    auto state = tileStates.find(tileID.canonical);
++    if (state == tileStates.end()) return;
++    auto& subscribers = state->second.subscribers;
++    auto subscriber = state->second.find(tileRef);
++    if (subscriber == subscribers.end()) return;
++    const bool required = subscriber->required;
++    subscribers.erase(subscriber);
++    if (required) {
++        cancelIfUnneeded(state->first, state->second);
+     }
+-    if (tileCallbacks->second.empty()) {
+-        tileCallbackMap.erase(tileCallbacks);
+-        dataCache.erase(tileID.canonical);
++    if (subscribers.empty()) {
++        dataCache.erase(state->first);
++        tileStates.erase(state);
+     }
+ }
+ 
+ void CustomTileLoader::setTileData(const CanonicalTileID& tileID, const GeoJSON& data) {
+     std::scoped_lock guard(dataMutex);
+-    auto iter = tileCallbackMap.find(tileID);
+-    if (iter == tileCallbackMap.end()) return;
++    auto state = tileStates.find(tileID);
++    if (state == tileStates.end() || !state->second.required()) return;
++    state->second.fetching = false;
+     auto dataPtr = std::make_unique<mapbox::geojson::geojson>(data);
+-    for (auto tuple : iter->second) {
+-        auto actor = std::get<2>(tuple);
+-        actor.invoke(&CustomGeometryTile::setTileData, *dataPtr);
++    for (auto& subscriber : state->second.subscribers) {
++        subscriber.tile.invoke(&CustomGeometryTile::setTileData, *dataPtr);
+     }
+     dataCache[tileID] = std::move(dataPtr);
+ }
+ 
+ void CustomTileLoader::invalidateTile(const CanonicalTileID& tileID) {
+     std::scoped_lock guard(dataMutex);
+-    auto tileCallbacks = tileCallbackMap.find(tileID);
+-    if (tileCallbacks == tileCallbackMap.end()) {
+-        return;
++    auto state = tileStates.find(tileID);
++    if (state != tileStates.end()) {
++        invalidate(state);
+     }
+-    for (auto& iter : tileCallbacks->second) {
+-        auto actor = std::get<2>(iter);
+-        actor.invoke(&CustomGeometryTile::invalidateTileData);
+-        invokeTileCancel(tileID);
+-    }
+-    tileCallbackMap.erase(tileCallbacks);
+-    dataCache.erase(tileID);
+ }
+ 
+ void CustomTileLoader::invalidateRegion(const LatLngBounds& bounds, Range<uint8_t>) {
+     std::scoped_lock guard(dataMutex);
+     std::map<uint8_t, util::TileRange> tileRanges;
+-    for (auto& idtuple : tileCallbackMap) {
+-        auto zoom = idtuple.first.z;
++    for (auto state = tileStates.begin(); state != tileStates.end();) {
++        auto zoom = state->first.z;
+         auto tileRange = tileRanges.find(zoom);
+         if (tileRange == tileRanges.end()) {
+             tileRange = tileRanges.emplace(zoom, util::TileRange::fromLatLngBounds(bounds, zoom)).first;
+         }
+-        if (tileRange->second.contains(idtuple.first)) {
+-            for (auto iter = idtuple.second.begin(); iter != idtuple.second.end(); iter++) {
+-                auto actor = std::get<2>(*iter);
+-                actor.invoke(&CustomGeometryTile::invalidateTileData);
+-                invokeTileCancel(idtuple.first);
+-                dataCache.erase(idtuple.first);
+-            }
+-            idtuple.second.clear();
++        if (tileRange->second.contains(state->first)) {
++            state = invalidate(state);
++        } else {
++            ++state;
+         }
+     }
+ }
+ 
++// Makes every subscriber fetch the tile again when it next needs it, and drops
++// the tile's state and cached data. Returns the state after it.
++CustomTileLoader::TileStates::iterator CustomTileLoader::invalidate(TileStates::iterator state) {
++    const auto tileID = state->first;
++    for (auto& subscriber : state->second.subscribers) {
++        subscriber.tile.invoke(&CustomGeometryTile::invalidateTileData);
++    }
++    if (state->second.required()) {
++        invokeTileCancel(tileID);
++    }
++    dataCache.erase(tileID);
++    return tileStates.erase(state);
++}
++
++std::vector<CustomTileLoader::Subscriber>::iterator CustomTileLoader::TileState::find(
++    const ActorRef<CustomGeometryTile>& tileRef) {
++    return std::find_if(subscribers.begin(), subscribers.end(), [&](const Subscriber& subscriber) {
++        return subscriber.tile == tileRef;
++    });
++}
++
++bool CustomTileLoader::TileState::required() const {
++    return std::any_of(
++        subscribers.begin(), subscribers.end(), [](const Subscriber& subscriber) { return subscriber.required; });
++}
++
++// Once no tile needs the data, tells the host to stop, and forgets the request
++// so that the next tile to need the data asks for it again.
++void CustomTileLoader::cancelIfUnneeded(const CanonicalTileID& tileID, TileState& state) {
++    if (!state.required()) {
++        state.fetching = false;
++        invokeTileCancel(tileID);
++    }
++}
++
+ void CustomTileLoader::invokeTileFetch(const CanonicalTileID& tileID) {
+     if (fetchTileFunction != nullptr) {
+         fetchTileFunction(tileID);
+diff --git a/src/mln/style/custom_tile_loader.hpp b/src/mln/style/custom_tile_loader.hpp
+index b2f3f83..480fd48 100644
+--- a/src/mln/style/custom_tile_loader.hpp
++++ b/src/mln/style/custom_tile_loader.hpp
+@@ -7,6 +7,8 @@
+ 
+ #include <map>
+ #include <mutex>
++#include <unordered_map>
++#include <vector>
+ 
+ namespace mln {
+ 
+@@ -19,26 +21,46 @@ public:
+     CustomTileLoader(const CustomTileLoader&) = delete;
+     CustomTileLoader& operator=(const CustomTileLoader&) = delete;
+ 
+-    using OverscaledIDFunctionTuple = std::tuple<uint8_t, int16_t, ActorRef<CustomGeometryTile>>;
+-
+     CustomTileLoader(const TileFunction& fetchTileFn, const TileFunction& cancelTileFn);
+ 
+     void fetchTile(const OverscaledTileID& tileID, const ActorRef<CustomGeometryTile>& tileRef);
+-    void cancelTile(const OverscaledTileID& tileID);
++    void cancelTile(const OverscaledTileID& tileID, const ActorRef<CustomGeometryTile>& tileRef);
+ 
+-    void removeTile(const OverscaledTileID& tileID);
++    void removeTile(const OverscaledTileID& tileID, const ActorRef<CustomGeometryTile>& tileRef);
+     void setTileData(const CanonicalTileID& tileID, const GeoJSON& data);
+ 
+     void invalidateTile(const CanonicalTileID&);
+     void invalidateRegion(const LatLngBounds&, Range<uint8_t>);
+ 
+ private:
++    // A tile that receives a canonical tile's data. Wrapped and overscaled
++    // tiles share their canonical tile's data. A tile is identified by its
++    // actor, since TilePyramid changes the wrap of a tile's ID.
++    struct Subscriber {
++        ActorRef<CustomGeometryTile> tile;
++        // Whether the tile still needs the data, rather than having cancelled.
++        bool required;
++    };
++
++    struct TileState {
++        std::vector<Subscriber> subscribers;
++        // Whether the host was asked for the data and hasn't answered yet.
++        bool fetching = false;
++
++        std::vector<Subscriber>::iterator find(const ActorRef<CustomGeometryTile>& tileRef);
++        bool required() const;
++    };
++
++    using TileStates = std::unordered_map<CanonicalTileID, TileState>;
++
++    TileStates::iterator invalidate(TileStates::iterator state);
++    void cancelIfUnneeded(const CanonicalTileID& tileID, TileState& state);
+     void invokeTileFetch(const CanonicalTileID& tileID);
+     void invokeTileCancel(const CanonicalTileID& tileID);
+ 
+     TileFunction fetchTileFunction;
+     TileFunction cancelTileFunction;
+-    std::unordered_map<CanonicalTileID, std::vector<OverscaledIDFunctionTuple>> tileCallbackMap;
++    TileStates tileStates;
+     // Keep around a cache of tile data to serve back for wrapped and over-zooomed tiles
+     std::map<CanonicalTileID, std::unique_ptr<GeoJSON>> dataCache;
+     std::mutex dataMutex;
+diff --git a/src/mln/tile/custom_geometry_tile.cpp b/src/mln/tile/custom_geometry_tile.cpp
+index c9cefdf..5c7e983 100644
+--- a/src/mln/tile/custom_geometry_tile.cpp
++++ b/src/mln/tile/custom_geometry_tile.cpp
+@@ -29,7 +29,7 @@ CustomGeometryTile::CustomGeometryTile(const OverscaledTileID& overscaledTileID,
+ 
+ CustomGeometryTile::~CustomGeometryTile() {
+     CustomGeometryTile::cancel();
+-    loader.invoke(&style::CustomTileLoader::removeTile, id);
++    loader.invoke(&style::CustomTileLoader::removeTile, id, actorRef);
+ }
+ 
+ void CustomGeometryTile::cancel() {
+@@ -72,7 +72,7 @@ void CustomGeometryTile::setNecessity(TileNecessity newNecessity) {
+             loader.invoke(&style::CustomTileLoader::fetchTile, id, actorRef);
+             stale = false;
+         } else if (!isRenderable()) {
+-            loader.invoke(&style::CustomTileLoader::cancelTile, id);
++            loader.invoke(&style::CustomTileLoader::cancelTile, id, actorRef);
+         }
      }
  }
 diff --git a/test/tile/custom_geometry_tile.test.cpp b/test/tile/custom_geometry_tile.test.cpp
-index d7e19d4..c4c2e43 100644
+index e929e0e..fc7d558 100644
 --- a/test/tile/custom_geometry_tile.test.cpp
 +++ b/test/tile/custom_geometry_tile.test.cpp
 @@ -107,6 +107,30 @@ TEST(CustomGeometryTile, InvokeCancelTile) {
@@ -65,3 +328,77 @@ index d7e19d4..c4c2e43 100644
  TEST(CustomGeometryTile, InvokeTileChanged) {
      CustomTileTest test;
  
+@@ -200,3 +224,73 @@ TEST(CustomGeometryTile, CancellationDiscardsLateInvalidation) {
+ 
+     EXPECT_EQ(changes, 0u);
+ }
++
++TEST(CustomGeometryTile, CancelOneCopy) {
++    CustomTileTest test;
++
++    int fetches = 0;
++    int cancels = 0;
++    CustomTileLoader loader([&](const CanonicalTileID&) { fetches++; }, [&](const CanonicalTileID&) { cancels++; });
++    auto mb = std::make_shared<Mailbox>(*Scheduler::GetCurrent());
++    ActorRef<CustomTileLoader> loaderActor(loader, mb);
++
++    // Two copies of one tile in neighboring worlds share its data.
++    StubTileObserver observer;
++    Immutable<CustomGeometrySource::TileOptions> options = makeMutable<CustomGeometrySource::TileOptions>();
++    CustomGeometryTile first(OverscaledTileID(0, 0, 0), "source", test.tileParameters, options, loaderActor, &observer);
++    CustomGeometryTile second(OverscaledTileID(0, 1, CanonicalTileID(0, 0, 0)),
++                              "source",
++                              test.tileParameters,
++                              options,
++                              loaderActor,
++                              &observer);
++    first.setNecessity(TileNecessity::Required);
++    second.setNecessity(TileNecessity::Required);
++    test.loop.waitForEmpty();
++    EXPECT_EQ(1, fetches);
++
++    // The map moves by a world, and TilePyramid changes both copies' wraps.
++    first.id = first.id.unwrapTo(-1);
++    second.id = second.id.unwrapTo(0);
++
++    second.setNecessity(TileNecessity::Optional);
++    test.loop.waitForEmpty();
++    EXPECT_EQ(0, cancels);
++
++    // The copy that is still needed is still invalidated, and fetches again.
++    loader.invalidateTile(CanonicalTileID(0, 0, 0));
++    test.loop.waitForEmpty();
++    first.setNecessity(TileNecessity::Required);
++    test.loop.waitForEmpty();
++    EXPECT_EQ(2, fetches);
++}
++
++TEST(CustomGeometryTile, CancelledTileDropsCachedData) {
++    CustomTileTest test;
++
++    int fetches = 0;
++    CustomTileLoader loader([&](const CanonicalTileID&) { fetches++; }, nullptr);
++    auto mb = std::make_shared<Mailbox>(*Scheduler::GetCurrent());
++    ActorRef<CustomTileLoader> loaderActor(loader, mb);
++
++    const OverscaledTileID id(0, 0, 0);
++    Immutable<CustomGeometrySource::TileOptions> options = makeMutable<CustomGeometrySource::TileOptions>();
++    {
++        CustomGeometryTile tile(id, "source", test.tileParameters, options, loaderActor);
++        tile.setNecessity(TileNecessity::Required);
++        test.loop.waitForEmpty();
++        ASSERT_EQ(1, fetches);
++
++        // The data arrives, but the tile leaves the view before it is parsed.
++        loader.setTileData(id.canonical, GeoJSON{FeatureCollection{}});
++        tile.setNecessity(TileNecessity::Optional);
++        test.loop.waitForEmpty();
++    }
++    test.loop.waitForEmpty();
++
++    // The data went with the last tile that wanted it.
++    CustomGeometryTile next(id, "source", test.tileParameters, options, loaderActor);
++    next.setNecessity(TileNecessity::Required);
++    test.loop.waitForEmpty();
++    EXPECT_EQ(2, fetches);
++}
