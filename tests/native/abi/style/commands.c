@@ -511,6 +511,15 @@ static void root_properties_change_the_light_and_the_transition(void) {
   TEST_ASSERT_EQUAL_DOUBLE(50.0, transition.delay_ms);
   TEST_ASSERT_TRUE(transition.enable_placement_transitions);
 
+  // A fractional millisecond from the typed setter keeps its fraction.
+  mln_style_transition_options fine = {
+    .size = sizeof(mln_style_transition_options)
+  };
+  fine.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
+  fine.duration_ms = 0.5;
+  set_transition_options(map, &fine);
+  EXPECT_ROOT_PROPERTY("{\"duration\":0.5}", map, "transition");
+
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "style root property \"light\"",
     mln_map_set_style_root_property(

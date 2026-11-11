@@ -2193,9 +2193,13 @@ auto transition_json(const mln::style::TransitionOptions& transition)
                               const std::optional<mln::Duration>& duration
                             ) -> std::optional<mln::Value> {
     if (!duration) return std::nullopt;
-    return mln::Value{static_cast<int64_t>(
-      std::chrono::duration_cast<std::chrono::milliseconds>(*duration).count()
-    )};
+    // Whole milliseconds read as integers; the typed setter can store finer
+    // durations, which keep their fraction.
+    const auto whole =
+      std::chrono::duration_cast<std::chrono::milliseconds>(*duration);
+    if (whole == *duration)
+      return mln::Value{static_cast<int64_t>(whole.count())};
+    return mln::Value{milliseconds_from_duration(*duration)};
   };
   const auto members =
     std::to_array<std::pair<const char*, std::optional<mln::Value>>>({
