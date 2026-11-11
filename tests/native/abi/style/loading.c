@@ -91,6 +91,13 @@ static void expect_style_edits_rejected(mln_map map) {
       &completion.descriptor, NULL
     )
   );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_STATE, not_loaded,
+    mln_map_set_style_root_property(
+      map, MLN_BUFFER_LITERAL("light"), MLN_BUFFER_LITERAL("{}"),
+      &completion.descriptor, NULL
+    )
+  );
   const mln_style_transition_options transition = {
     .size = sizeof(mln_style_transition_options),
     .fields = MLN_STYLE_TRANSITION_OPTION_DELAY,

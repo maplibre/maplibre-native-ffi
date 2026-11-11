@@ -368,6 +368,41 @@ public extension MapHandle {
     }
   }
 
+  /// Reads a \[root property\](https://maplibre.org/maplibre-style-spec/root/)
+  /// of the map's style.
+  ///
+  /// The value can differ in form from the value that was set: a color set as
+  /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+  ///
+  /// Completes with no value when neither the style nor the library sets the
+  /// property. The library can give a property a value of its own, such as a
+  /// default `transition`.
+  ///
+  /// See `mln_map_get_style_root_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `propertyName` isn't a root property, or
+  ///   is `sources` or `layers`.
+  func getStyleRootProperty(_ bindingArg0: String) async throws -> String? {
+    try await nativeStart(convert: { result in
+      if result.pointee
+        .value_count == 0
+      {
+        return nil
+      }; return try NativeCompletion
+        .string(result)
+    }) { raw, arena, completion, diagnostic in
+      mln_map_get_style_root_property(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
   /// Reads a source of the map's style.
   ///
   /// A tile source with a `url` has an empty attribution until its TileJSON
@@ -1049,30 +1084,6 @@ public extension MapHandle {
     }
   }
 
-  /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
-  /// the map's style.
-  ///
-  /// See `mln_map_set_style_light_json` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.invalidState` while the style isn't loaded, as
-  ///   `MapHandle.setStyleUrl()` describes.
-  @discardableResult
-  func setStyleLightJson(_ bindingArg0: String) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_style_light_json(
-        raw,
-        arena.view(bindingArg0),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Sets a property of the light of the map's style.
   ///
   /// See `mln_map_set_style_light_property` in the
@@ -1089,6 +1100,41 @@ public extension MapHandle {
   ) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in
       mln_map_set_style_light_property(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Sets a \[root property\](https://maplibre.org/maplibre-style-spec/root/)
+  /// of the map's style, such as `light`, `sky`, `projection`, or `terrain`,
+  /// without reloading the style.
+  ///
+  /// `propertyName` is a root property other than `sources` and `layers`, which
+  /// the source and layer calls change. A null `value` resets the property to
+  /// its default, as if the style didn't set it.
+  ///
+  /// See `mln_map_set_style_root_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `propertyName` isn't a root property, is
+  ///   `sources` or `layers`, or when `value` isn't a valid value for it.
+  /// - `Status.unsupported` when the library can't change the property while
+  ///   the style is loaded. Load a style that sets it instead.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
+  @discardableResult
+  func setStyleRootProperty(
+    _ bindingArg0: String,
+    value bindingArg1: String
+  ) async throws -> CommandCompletion {
+    try await nativeCommand { raw, arena, completion, diagnostic in
+      mln_map_set_style_root_property(
         raw,
         arena.view(bindingArg0),
         arena.view(bindingArg1),
@@ -1572,16 +1618,6 @@ public extension MapHandleDiscarding {
       }
   }
 
-  func setStyleLightJson(_ bindingArg0: String) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in mln_map_set_style_light_json(
-        raw,
-        arena.view(bindingArg0),
-        nil,
-        diagnostic
-      ) }
-  }
-
   func setStyleLightProperty(
     _ bindingArg0: String,
     value bindingArg1: String
@@ -1596,6 +1632,20 @@ public extension MapHandleDiscarding {
           diagnostic
         )
       }
+  }
+
+  func setStyleRootProperty(
+    _ bindingArg0: String,
+    value bindingArg1: String
+  ) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in mln_map_set_style_root_property(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        nil,
+        diagnostic
+      ) }
   }
 
   func setStyleSourceVolatile(

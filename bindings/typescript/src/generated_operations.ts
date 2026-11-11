@@ -2461,6 +2461,32 @@ export class MapHandle extends Owner {
   }
 
   /**
+   * Reads a &#91;root
+   * property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
+   * style.
+   *
+   * The value can differ in form from the value that was set: a color set as
+   * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+   *
+   * Completes with no value when neither the style nor the library sets the
+   * property. The library can give a property a value of its own, such as a
+   * default `transition`.
+   *
+   * See `mln_map_get_style_root_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `propertyName` isn't a root property, or is
+   *   `sources` or `layers`.
+   */
+  getStyleRootProperty(propertyName: string): Promise<unknown> {
+    return query<unknown>((completion) =>
+      native.mln_map_get_style_root_property(this.id, propertyName, completion),
+    );
+  }
+
+  /**
    * Reads a source of the map's style.
    *
    * A tile source with a `url` has an empty attribution until its TileJSON
@@ -3341,25 +3367,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Replaces the
-   * &#91;light&#93;(https://maplibre.org/maplibre-style-spec/light/) of the
-   * map's style.
-   *
-   * See `mln_map_set_style_light_json` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.invalidState` while the style isn't loaded, as
-   *   `MapHandle.setStyleUrl()` describes.
-   */
-  setStyleLightJson(lightJson: unknown): Promise<CommandCompletion> {
-    return command((completion) =>
-      native.mln_map_set_style_light_json(this.id, lightJson, completion),
-    );
-  }
-
-  /**
    * Sets a property of the light of the map's style.
    *
    * See `mln_map_set_style_light_property` in the
@@ -3376,6 +3383,42 @@ export class MapHandle extends Owner {
   ): Promise<CommandCompletion> {
     return command((completion) =>
       native.mln_map_set_style_light_property(
+        this.id,
+        propertyName,
+        value,
+        completion,
+      ),
+    );
+  }
+
+  /**
+   * Sets a &#91;root
+   * property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
+   * style, such as `light`, `sky`, `projection`, or `terrain`, without
+   * reloading the style.
+   *
+   * `propertyName` is a root property other than `sources` and `layers`, which
+   * the source and layer calls change. A null `value` resets the property to
+   * its default, as if the style didn't set it.
+   *
+   * See `mln_map_set_style_root_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when `propertyName` isn't a root property, is
+   *   `sources` or `layers`, or when `value` isn't a valid value for it.
+   * - `Status.unsupported` when the library can't change the property while the
+   *   style is loaded. Load a style that sets it instead.
+   * - `Status.invalidState` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
+   */
+  setStyleRootProperty(
+    propertyName: string,
+    value: unknown,
+  ): Promise<CommandCompletion> {
+    return command((completion) =>
+      native.mln_map_set_style_root_property(
         this.id,
         propertyName,
         value,
@@ -4372,18 +4415,6 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Replaces the
-   * &#91;light&#93;(https://maplibre.org/maplibre-style-spec/light/) of the
-   * map's style.
-   *
-   * See `mln_map_set_style_light_json` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  setStyleLightJson(lightJson: unknown): void {
-    native.mln_map_set_style_light_json(this.#owner.id, lightJson, undefined);
-  }
-
-  /**
    * Sets a property of the light of the map's style.
    *
    * See `mln_map_set_style_light_property` in the
@@ -4391,6 +4422,28 @@ export class MapHandleDiscarding {
    */
   setStyleLightProperty(propertyName: string, value: unknown): void {
     native.mln_map_set_style_light_property(
+      this.#owner.id,
+      propertyName,
+      value,
+      undefined,
+    );
+  }
+
+  /**
+   * Sets a &#91;root
+   * property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
+   * style, such as `light`, `sky`, `projection`, or `terrain`, without
+   * reloading the style.
+   *
+   * `propertyName` is a root property other than `sources` and `layers`, which
+   * the source and layer calls change. A null `value` resets the property to
+   * its default, as if the style didn't set it.
+   *
+   * See `mln_map_set_style_root_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  setStyleRootProperty(propertyName: string, value: unknown): void {
+    native.mln_map_set_style_root_property(
       this.#owner.id,
       propertyName,
       value,

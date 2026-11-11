@@ -48,6 +48,8 @@
 #include <mln/style/conversion/layer.hpp>   // IWYU pragma: keep
 #include <mln/style/conversion/light.hpp>   // IWYU pragma: keep
 #include <mln/style/conversion/source.hpp>  // IWYU pragma: keep
+#include <mln/style/conversion/stringify.hpp>
+#include <mln/style/conversion/transition_options.hpp>  // IWYU pragma: keep
 #include <mln/style/conversion_impl.hpp>
 #include <mln/style/image.hpp>
 #include <mln/style/layer.hpp>
@@ -79,6 +81,9 @@
 #include <mln/util/size.hpp>
 #include <mln/util/tileset.hpp>
 #include <mln/util/vectors.hpp>
+
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
@@ -2066,23 +2071,6 @@ auto map_get_global_state(MapObject& live) -> std::string {
   );
 }
 
-auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
-  -> mln_status {
-  auto error = mln::style::conversion::Error{};
-  auto light = mln::style::conversion::convertJSON<mln::style::Light>(
-    string_from_view(light_json), error
-  );
-  if (!light) {
-    set_style_conversion_error("style light", error);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  map_native(live).getStyle().setLight(
-    std::make_unique<mln::style::Light>(std::move(light->impl))
-  );
-  return MLN_STATUS_OK;
-}
-
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status {
@@ -2117,6 +2105,226 @@ auto map_get_style_light_property(
     return MLN_STATUS_OK;
   }
   out_value = serialize_json_value(property.getValue());
+  out_found = true;
+  return MLN_STATUS_OK;
+}
+
+namespace {
+
+// The style spec's root properties, other than `sources` and `layers`, which
+// have calls of their own.
+constexpr auto style_root_properties = std::to_array<std::string_view>({
+  "version",
+  "name",
+  "metadata",
+  "center",
+  "centerAltitude",
+  "zoom",
+  "bearing",
+  "pitch",
+  "roll",
+  "state",
+  "light",
+  "sky",
+  "projection",
+  "terrain",
+  "sprite",
+  "glyphs",
+  "font-faces",
+  "transition",
+});
+
+auto require_style_root_property(std::string_view name) -> bool {
+  if (
+    std::ranges::find(style_root_properties, name) !=
+    style_root_properties.end()
+  ) {
+    return true;
+  }
+  const auto message =
+    quote_id(name) + " is not a style root property that this call takes";
+  set_thread_error(message.c_str());
+  return false;
+}
+
+// Writes the members that are set, in the given order, so the text is stable.
+template <typename Members>
+auto object_json(const Members& members) -> std::optional<std::string> {
+  auto buffer = rapidjson::StringBuffer{};
+  auto writer = rapidjson::Writer<rapidjson::StringBuffer>{buffer};
+  auto empty = true;
+  writer.StartObject();
+  for (const auto& [name, value] : members) {
+    if (!value) continue;
+    empty = false;
+    writer.Key(name);
+    mln::style::conversion::stringify(writer, *value);
+  }
+  writer.EndObject();
+  if (empty) return std::nullopt;
+  return std::string{buffer.GetString(), buffer.GetSize()};
+}
+
+auto light_json(const mln::style::Light& light) -> std::optional<std::string> {
+  static constexpr auto names = std::to_array<const char*>({
+    "anchor",
+    "position",
+    "color",
+    "intensity",
+    "anchor-transition",
+    "position-transition",
+    "color-transition",
+    "intensity-transition",
+  });
+  auto members =
+    std::vector<std::pair<const char*, std::optional<mln::Value>>>{};
+  for (const auto* name : names) {
+    auto property = light.getProperty(name);
+    members.emplace_back(
+      name, property.getKind() == mln::style::StyleProperty::Kind::Undefined
+              ? std::nullopt
+              : std::optional{property.getValue()}
+    );
+  }
+  return object_json(members);
+}
+
+auto transition_json(const mln::style::TransitionOptions& transition)
+  -> std::optional<std::string> {
+  const auto milliseconds = [](
+                              const std::optional<mln::Duration>& duration
+                            ) -> std::optional<mln::Value> {
+    if (!duration) return std::nullopt;
+    // Whole milliseconds read as integers; the typed setter can store finer
+    // durations, which keep their fraction.
+    const auto whole =
+      std::chrono::duration_cast<std::chrono::milliseconds>(*duration);
+    if (whole == *duration)
+      return mln::Value{static_cast<int64_t>(whole.count())};
+    return mln::Value{milliseconds_from_duration(*duration)};
+  };
+  const auto members =
+    std::to_array<std::pair<const char*, std::optional<mln::Value>>>({
+      {"duration", milliseconds(transition.duration)},
+      {"delay", milliseconds(transition.delay)},
+    });
+  return object_json(members);
+}
+
+}  // namespace
+
+auto map_set_style_root_property(
+  MapObject& live, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status {
+  const auto name = string_from_view(property_name);
+  if (!require_style_root_property(name)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto context = "style root property " + quote_id(name);
+  auto document = mln::JSDocument{};
+  if (!parse_json_document(value, context.c_str(), document)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto convertible = mln::style::conversion::Convertible{
+    static_cast<const mln::JSValue*>(&document)
+  };
+  auto& style = map_native(live).getStyle();
+
+  if (name == "light") {
+    if (document.IsNull()) {
+      style.setLight(std::make_unique<mln::style::Light>());
+      return MLN_STATUS_OK;
+    }
+    auto error = mln::style::conversion::Error{};
+    auto light =
+      mln::style::conversion::convert<mln::style::Light>(convertible, error);
+    if (!light) {
+      set_style_conversion_error(context.c_str(), error);
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    style.setLight(std::make_unique<mln::style::Light>(std::move(light->impl)));
+    return MLN_STATUS_OK;
+  }
+
+  if (name == "transition") {
+    // Placement transitions aren't part of the style spec's transition, so
+    // the setting keeps its current value.
+    const auto placement =
+      style.getTransitionOptions().enablePlacementTransitions;
+    if (document.IsNull()) {
+      // The transition that MapLibre gives a style without one.
+      style.setTransitionOptions(
+        mln::style::TransitionOptions{
+          mln::util::DEFAULT_TRANSITION_DURATION, std::nullopt, placement
+        }
+      );
+      return MLN_STATUS_OK;
+    }
+    auto error = mln::style::conversion::Error{};
+    auto transition =
+      mln::style::conversion::convert<mln::style::TransitionOptions>(
+        convertible, error
+      );
+    if (!transition) {
+      set_style_conversion_error(context.c_str(), error);
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    transition->enablePlacementTransitions = placement;
+    style.setTransitionOptions(*transition);
+    return MLN_STATUS_OK;
+  }
+
+  // MapLibre Native reads the other root properties only when it loads a
+  // style, and has no globe, sky, or terrain to apply them to.
+  const auto message = context + " can't change while the style is loaded";
+  set_thread_error(message.c_str());
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto map_get_style_root_property(
+  MapObject& live, mln_buffer_view property_name, std::string& out_value,
+  bool& out_found
+) -> mln_status {
+  out_found = false;
+  const auto name = string_from_view(property_name);
+  if (!require_style_root_property(name)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto& style = map_native(live).getStyle();
+
+  if (name == "light") {
+    auto light = light_json(*style.getLight());
+    if (light) {
+      out_value = std::move(*light);
+      out_found = true;
+    }
+    return MLN_STATUS_OK;
+  }
+  if (name == "transition") {
+    auto transition = transition_json(style.getTransitionOptions());
+    if (transition) {
+      out_value = std::move(*transition);
+      out_found = true;
+    }
+    return MLN_STATUS_OK;
+  }
+
+  // The other root properties can't change after the style loads, so the
+  // loaded document holds their current values.
+  auto document = mln::JSDocument{};
+  const auto json = style.getJSON();
+  document.Parse<0>(json.data(), json.size());
+  if (document.HasParseError() || !document.IsObject()) {
+    return MLN_STATUS_OK;
+  }
+  const auto member = document.FindMember(name.c_str());
+  if (member == document.MemberEnd()) {
+    return MLN_STATUS_OK;
+  }
+  auto buffer = rapidjson::StringBuffer{};
+  auto writer = rapidjson::Writer<rapidjson::StringBuffer>{buffer};
+  member->value.Accept(writer);
+  out_value.assign(buffer.GetString(), buffer.GetSize());
   out_found = true;
   return MLN_STATUS_OK;
 }

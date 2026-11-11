@@ -568,6 +568,14 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_get_style_root_property(
+    map: Long,
+    propertyName: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_get_style_source(
     map: Long,
     sourceId: Long,
@@ -978,15 +986,16 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_style_light_json(
+  actual external fun mln_map_set_style_light_property(
     map: Long,
-    lightJson: Long,
+    propertyName: Long,
+    value: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_style_light_property(
+  actual external fun mln_map_set_style_root_property(
     map: Long,
     propertyName: Long,
     value: Long,

@@ -159,6 +159,13 @@ struct CompletionResult<&mln_map_get_style_light_property> {
   static constexpr bool nullable = true;
 };
 template <>
+struct CompletionResult<&mln_map_get_style_root_property> {
+  static constexpr bool has_value = true;
+  using type = mln_buffer_view;
+  static constexpr bool array = false;
+  static constexpr bool nullable = true;
+};
+template <>
 struct CompletionResult<&mln_map_get_style_source> {
   static constexpr bool has_value = true;
   using type = mln_style_source_info;

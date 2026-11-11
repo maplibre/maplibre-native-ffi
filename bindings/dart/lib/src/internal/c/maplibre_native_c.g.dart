@@ -3731,6 +3731,21 @@ external int mln_map_get_style_light_property(
     Pointer<mln_diagnostic>,
   )
 >()
+external int mln_map_get_style_root_property(
+  int map,
+  mln_buffer_view property_name,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_map_get_style_source(
   int map,
   mln_buffer_view source_id,
@@ -4492,13 +4507,15 @@ external int mln_map_set_style_layer_property(
   Int32 Function(
     mln_map,
     mln_buffer_view,
+    mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_set_style_light_json(
+external int mln_map_set_style_light_property(
   int map,
-  mln_buffer_view light_json,
+  mln_buffer_view property_name,
+  mln_buffer_view value,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -4512,7 +4529,7 @@ external int mln_map_set_style_light_json(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_set_style_light_property(
+external int mln_map_set_style_root_property(
   int map,
   mln_buffer_view property_name,
   mln_buffer_view value,

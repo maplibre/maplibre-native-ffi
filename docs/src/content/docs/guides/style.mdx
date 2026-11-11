@@ -66,6 +66,11 @@ them between [](api:mln_map_begin_command_group) and
 
 <Snippet page="style" region="set-property" />
 
+The style's other top-level properties, such as `light`, `sky`, and `terrain`,
+change with [](api:mln_map_set_style_root_property) without reloading the style.
+It completes with an unsupported status for a property that the library can't
+change while the style is loaded.
+
 ## Add an image
 
 Add an image to the style by its ID and premultiplied RGBA pixels with

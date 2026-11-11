@@ -2,6 +2,7 @@
 // that belong to no layer.
 
 #include <math.h>
+#include <string.h>
 
 #include "support/style.h"
 #include "support/test_support.h"
@@ -434,8 +435,9 @@ static void the_style_light_round_trips_through_json(void) {
   mln_test_load_style_and_wait(map, mln_test_empty_style_json);
   const mln_buffer_view intensity = MLN_BUFFER_LITERAL("intensity");
 
-  MLN_TEST_AWAIT_OK(mln_map_set_style_light_json(
-    map, MLN_BUFFER_LITERAL("{\"anchor\":\"viewport\",\"intensity\":0.5}"),
+  MLN_TEST_AWAIT_OK(mln_map_set_style_root_property(
+    map, MLN_BUFFER_LITERAL("light"),
+    MLN_BUFFER_LITERAL("{\"anchor\":\"viewport\",\"intensity\":0.5}"),
     &completion.descriptor, NULL
   ));
   EXPECT_LIGHT_PROPERTY("\"viewport\"", map, "anchor");
@@ -454,14 +456,171 @@ static void the_style_light_round_trips_through_json(void) {
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "style light",
-    mln_map_set_style_light_json(
-      map, MLN_BUFFER_LITERAL("{\"anchor\":7}"), &completion.descriptor, NULL
+    MLN_STATUS_INVALID_ARGUMENT, "style root property",
+    mln_map_set_style_root_property(
+      map, MLN_BUFFER_LITERAL("light"), MLN_BUFFER_LITERAL("{\"anchor\":7}"),
+      &completion.descriptor, NULL
     )
   );
   EXPECT_LIGHT_PROPERTY("0.75", map, "intensity");
   EXPECT_LIGHT_PROPERTY("\"viewport\"", map, "anchor");
   EXPECT_LIGHT_PROPERTY("", map, "brightness");
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// Expects one root property's JSON, or "" when the style doesn't set it.
+#define EXPECT_ROOT_PROPERTY(expected, map, name)                     \
+  do {                                                                \
+    mln_test_completion root = mln_test_completion_buffer_view();     \
+    MLN_TEST_OK(mln_map_get_style_root_property(                      \
+      (map), MLN_BUFFER_LITERAL(name), &root.descriptor, NULL         \
+    ));                                                               \
+    char value[128];                                                  \
+    MLN_TEST_OK(mln_test_style_finish_text(&root, value, 128, NULL)); \
+    TEST_ASSERT_EQUAL_STRING((expected), value);                      \
+  } while (false)
+
+static void root_properties_change_the_light_and_the_transition(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
+  EXPECT_ROOT_PROPERTY("", map, "light");
+  // MapLibre gives a style without a transition its default duration.
+  EXPECT_ROOT_PROPERTY("{\"duration\":300}", map, "transition");
+
+  MLN_TEST_AWAIT_OK(mln_map_set_style_root_property(
+    map, MLN_BUFFER_LITERAL("light"),
+    MLN_BUFFER_LITERAL("{\"intensity\":0.5,\"anchor\":\"viewport\"}"),
+    &completion.descriptor, NULL
+  ));
+  EXPECT_ROOT_PROPERTY(
+    "{\"anchor\":\"viewport\",\"intensity\":0.5}", map, "light"
+  );
+  EXPECT_LIGHT_PROPERTY("0.5", map, "intensity");
+
+  MLN_TEST_AWAIT_OK(mln_map_set_style_root_property(
+    map, MLN_BUFFER_LITERAL("transition"),
+    MLN_BUFFER_LITERAL("{\"delay\":50,\"duration\":300}"),
+    &completion.descriptor, NULL
+  ));
+  EXPECT_ROOT_PROPERTY("{\"duration\":300,\"delay\":50}", map, "transition");
+  const mln_style_transition_options transition = read_transition_options(map);
+  TEST_ASSERT_EQUAL_DOUBLE(300.0, transition.duration_ms);
+  TEST_ASSERT_EQUAL_DOUBLE(50.0, transition.delay_ms);
+  TEST_ASSERT_TRUE(transition.enable_placement_transitions);
+
+  // A fractional millisecond from the typed setter keeps its fraction.
+  mln_style_transition_options fine = {
+    .size = sizeof(mln_style_transition_options)
+  };
+  fine.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
+  fine.duration_ms = 0.5;
+  set_transition_options(map, &fine);
+  EXPECT_ROOT_PROPERTY("{\"duration\":0.5}", map, "transition");
+
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "style root property \"light\"",
+    mln_map_set_style_root_property(
+      map, MLN_BUFFER_LITERAL("light"), MLN_BUFFER_LITERAL("{\"anchor\":7}"),
+      &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "not valid JSON",
+    mln_map_set_style_root_property(
+      map, MLN_BUFFER_LITERAL("transition"), MLN_BUFFER_LITERAL("{"),
+      &completion.descriptor, NULL
+    )
+  );
+  EXPECT_ROOT_PROPERTY(
+    "{\"anchor\":\"viewport\",\"intensity\":0.5}", map, "light"
+  );
+
+  MLN_TEST_AWAIT_OK(mln_map_set_style_root_property(
+    map, MLN_BUFFER_LITERAL("light"), MLN_BUFFER_LITERAL("null"),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_style_root_property(
+    map, MLN_BUFFER_LITERAL("transition"), MLN_BUFFER_LITERAL("null"),
+    &completion.descriptor, NULL
+  ));
+  EXPECT_ROOT_PROPERTY("", map, "light");
+  EXPECT_ROOT_PROPERTY("{\"duration\":300}", map, "transition");
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// The library reads the other root properties from the style as it loaded,
+// and can't change them after.
+static void other_root_properties_read_back_as_loaded_and_reject_changes(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"name\":\"plain\",\"sources\":{},\"layers\":[],"
+           "\"projection\":{\"type\":\"globe\"}}"
+         )
+  );
+  EXPECT_ROOT_PROPERTY("8", map, "version");
+  EXPECT_ROOT_PROPERTY("\"plain\"", map, "name");
+  EXPECT_ROOT_PROPERTY("{\"type\":\"globe\"}", map, "projection");
+  EXPECT_ROOT_PROPERTY("", map, "sky");
+
+  static const struct {
+    const char* name;
+    const char* value;
+  } unsupported[] = {
+    {"projection", "{\"type\":\"globe\"}"},
+    {"sky", "{\"sky-color\":\"#88c6fc\"}"},
+    {"terrain", "{\"source\":\"dem\"}"},
+    {"sprite", "\"sprite\""},
+    {"font-faces", "{}"},
+  };
+  for (size_t index = 0; index < sizeof(unsupported) / sizeof(unsupported[0]);
+       index += 1) {
+    const mln_buffer_view name = {
+      .data = (const uint8_t*)unsupported[index].name,
+      .size = strlen(unsupported[index].name),
+    };
+    const mln_buffer_view value = {
+      .data = (const uint8_t*)unsupported[index].value,
+      .size = strlen(unsupported[index].value),
+    };
+    MLN_TEST_EXPECT_COMMAND_FAILED(
+      MLN_STATUS_UNSUPPORTED, unsupported[index].name,
+      mln_map_set_style_root_property(
+        map, name, value, &completion.descriptor, NULL
+      )
+    );
+  }
+  EXPECT_ROOT_PROPERTY("{\"type\":\"globe\"}", map, "projection");
+
+  static const char* const rejected[] = {"layers", "sources", "Light", "fog"};
+  for (size_t index = 0; index < sizeof(rejected) / sizeof(rejected[0]);
+       index += 1) {
+    const mln_buffer_view name = {
+      .data = (const uint8_t*)rejected[index],
+      .size = strlen(rejected[index]),
+    };
+    MLN_TEST_EXPECT_COMMAND_FAILED(
+      MLN_STATUS_INVALID_ARGUMENT, "not a style root property",
+      mln_map_set_style_root_property(
+        map, name, MLN_BUFFER_LITERAL("{}"), &completion.descriptor, NULL
+      )
+    );
+    mln_test_completion root = mln_test_completion_buffer_view();
+    MLN_TEST_OK(
+      mln_map_get_style_root_property(map, name, &root.descriptor, NULL)
+    );
+    char value[8];
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_INVALID_ARGUMENT,
+      mln_test_style_finish_text(&root, value, sizeof(value), NULL)
+    );
+  }
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -475,4 +634,6 @@ MLN_TEST_GROUP {
   RUN_TEST(transition_options_report_the_fields_the_style_sets);
   RUN_TEST(style_transition_options_reject_unsafe_raw_input);
   RUN_TEST(the_style_light_round_trips_through_json);
+  RUN_TEST(root_properties_change_the_light_and_the_transition);
+  RUN_TEST(other_root_properties_read_back_as_loaded_and_reject_changes);
 }

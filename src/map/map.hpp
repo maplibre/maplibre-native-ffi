@@ -452,8 +452,13 @@ auto map_set_global_state_property(
 ) -> mln_status;
 auto map_get_global_state(MapObject& live) -> std::string;
 
-auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
-  -> mln_status;
+auto map_set_style_root_property(
+  MapObject& live, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status;
+auto map_get_style_root_property(
+  MapObject& live, mln_buffer_view property_name, std::string& out_value,
+  bool& out_found
+) -> mln_status;
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;

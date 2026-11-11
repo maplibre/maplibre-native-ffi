@@ -1712,6 +1712,47 @@ char* maplibre_native_ffi_map_get_style_light_property_finish(
 );
 
 /**
+ * maplibre_native_ffi_map_get_style_root_property_async:
+ * @property_name: the UTF-8 text
+ * @callback: (scope async) (nullable): the callback to call when the call finishes
+ * @user_data: the data to pass to `callback`
+ *
+ * Reads a \[root property\](https://maplibre.org/maplibre-style-spec/root/) of
+ * the map's style.
+ *
+ * The value can differ in form from the value that was set: a color set as
+ * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+ *
+ * Completes with no value when neither the style nor the library sets the
+ * property. The library can give a property a value of its own, such as a
+ * default `transition`.
+ *
+ * See `mln_map_get_style_root_property` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when `property_name` isn't a
+ *   root property, or is `sources` or `layers`.
+ */
+void maplibre_native_ffi_map_get_style_root_property_async(
+  MaplibreNativeFfiMap* self, const char* property_name,
+  GAsyncReadyCallback callback, gpointer user_data
+);
+
+/**
+ * maplibre_native_ffi_map_get_style_root_property_finish:
+ * @result: the result that the callback received
+ *
+ * Finishes a call that `maplibre_native_ffi_map_get_style_root_property_async` started.
+ *
+ * Returns: (transfer full) (nullable): the text
+ */
+char* maplibre_native_ffi_map_get_style_root_property_finish(
+  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
+);
+
+/**
  * maplibre_native_ffi_map_get_style_source_async:
  * @source_id: the UTF-8 text
  * @callback: (scope async) (nullable): the callback to call when the call finishes
@@ -3193,43 +3234,6 @@ maplibre_native_ffi_map_set_style_layer_property_finish(
 );
 
 /**
- * maplibre_native_ffi_map_set_style_light_json_async:
- * @light_json: the UTF-8 text
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
- * the map's style.
- *
- * See `mln_map_set_style_light_json` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
- *   `maplibre_native_ffi_map_set_style_url_async()` describes.
- *
- * Without `callback`, nothing reports whether the call succeeds.
- */
-void maplibre_native_ffi_map_set_style_light_json_async(
-  MaplibreNativeFfiMap* self, const char* light_json,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_map_set_style_light_json_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_map_set_style_light_json_async` started.
- *
- * Returns: (transfer full): the command's completion, or %NULL with `error` set
- */
-MaplibreNativeFfiCommandCompletion*
-maplibre_native_ffi_map_set_style_light_json_finish(
-  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
-);
-
-/**
  * maplibre_native_ffi_map_set_style_light_property_async:
  * @property_name: the UTF-8 text
  * @value: the UTF-8 text
@@ -3263,6 +3267,54 @@ void maplibre_native_ffi_map_set_style_light_property_async(
  */
 MaplibreNativeFfiCommandCompletion*
 maplibre_native_ffi_map_set_style_light_property_finish(
+  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
+);
+
+/**
+ * maplibre_native_ffi_map_set_style_root_property_async:
+ * @property_name: the UTF-8 text
+ * @value: the UTF-8 text
+ * @callback: (scope async) (nullable): the callback to call when the call finishes
+ * @user_data: the data to pass to `callback`
+ *
+ * Sets a \[root property\](https://maplibre.org/maplibre-style-spec/root/) of
+ * the map's style, such as `light`, `sky`, `projection`, or `terrain`, without
+ * reloading the style.
+ *
+ * `property_name` is a root property other than `sources` and `layers`, which
+ * the source and layer calls change. A null `value` resets the property to its
+ * default, as if the style didn't set it.
+ *
+ * See `mln_map_set_style_root_property` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when `property_name` isn't a
+ *   root property, is `sources` or `layers`, or when `value` isn't a valid
+ *   value for it.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the library can't change the
+ *   property while the style is loaded. Load a style that sets it instead.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
+ *   `maplibre_native_ffi_map_set_style_url_async()` describes.
+ *
+ * Without `callback`, nothing reports whether the call succeeds.
+ */
+void maplibre_native_ffi_map_set_style_root_property_async(
+  MaplibreNativeFfiMap* self, const char* property_name, const char* value,
+  GAsyncReadyCallback callback, gpointer user_data
+);
+
+/**
+ * maplibre_native_ffi_map_set_style_root_property_finish:
+ * @result: the result that the callback received
+ *
+ * Finishes a call that `maplibre_native_ffi_map_set_style_root_property_async` started.
+ *
+ * Returns: (transfer full): the command's completion, or %NULL with `error` set
+ */
+MaplibreNativeFfiCommandCompletion*
+maplibre_native_ffi_map_set_style_root_property_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
 );
 

@@ -759,6 +759,19 @@ internal actual object C {
       word(outDiagnostic),
     )
 
+  actual fun mln_map_get_style_root_property(
+    map: Long,
+    propertyName: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_get_style_root_property(
+      map,
+      word(propertyName),
+      word(completion),
+      word(outDiagnostic),
+    )
+
   actual fun mln_map_get_style_source(
     map: Long,
     sourceId: Long,
@@ -1322,14 +1335,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_style_light_json(
-    map: Long,
-    lightJson: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_set_style_light_json(map, word(lightJson), word(completion), word(outDiagnostic))
-
   actual fun mln_map_set_style_light_property(
     map: Long,
     propertyName: Long,
@@ -1338,6 +1343,21 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_map_set_style_light_property(
+      map,
+      word(propertyName),
+      word(value),
+      word(completion),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_map_set_style_root_property(
+    map: Long,
+    propertyName: Long,
+    value: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_set_style_root_property(
       map,
       word(propertyName),
       word(value),
@@ -2696,6 +2716,11 @@ private fun mln_kw_mln_map_get_style_light_property(p0: Long, p1: Int, p2: Int, 
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_light_property(p0, p1, p2, p3)",
   )
 
+private fun mln_kw_mln_map_get_style_root_property(p0: Long, p1: Int, p2: Int, p3: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_root_property(p0, p1, p2, p3)",
+  )
+
 private fun mln_kw_mln_map_get_style_source(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_source(p0, p1, p2, p3)",
@@ -3080,11 +3105,6 @@ private fun mln_kw_mln_map_set_style_layer_property(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_layer_property(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_set_style_light_json(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_light_json(p0, p1, p2, p3)",
-  )
-
 private fun mln_kw_mln_map_set_style_light_property(
   p0: Long,
   p1: Int,
@@ -3094,6 +3114,17 @@ private fun mln_kw_mln_map_set_style_light_property(
 ): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_light_property(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_map_set_style_root_property(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_root_property(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_style_source_volatile(

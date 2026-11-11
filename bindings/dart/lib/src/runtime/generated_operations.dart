@@ -4628,16 +4628,17 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
-  void setStyleLightJson(Object? lightJson) => _discard(
-    (arena, completion) => raw.mln_map_set_style_light_json(
+  void setStyleLightProperty(String propertyName, Object? value) => _discard(
+    (arena, completion) => raw.mln_map_set_style_light_property(
       _handle.raw,
-      _nativeJsonView(lightJson, arena),
+      nativeStringView(propertyName, arena).value,
+      _nativeJsonView(value, arena),
       completion,
       nativeDiagnostic,
     ),
   );
-  void setStyleLightProperty(String propertyName, Object? value) => _discard(
-    (arena, completion) => raw.mln_map_set_style_light_property(
+  void setStyleRootProperty(String propertyName, Object? value) => _discard(
+    (arena, completion) => raw.mln_map_set_style_root_property(
       _handle.raw,
       nativeStringView(propertyName, arena).value,
       _nativeJsonView(value, arena),
@@ -6110,6 +6111,33 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
+  /// Reads a \[root property\](https://maplibre.org/maplibre-style-spec/root/)
+  /// of the map's style.
+  ///
+  /// The value can differ in form from the value that was set: a color set as
+  /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+  ///
+  /// Completes with no value when neither the style nor the library sets the
+  /// property. The library can give a property a value of its own, such as a
+  /// default `transition`.
+  ///
+  /// See `mln_map_get_style_root_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `propertyName` isn't a root property, or
+  ///   is `sources` or `layers`.
+  Future<Object?> getStyleRootProperty(String propertyName) => _queryOptional(
+    _resultObjectOrNull,
+    (arena, completion) => raw.mln_map_get_style_root_property(
+      _handle.raw,
+      nativeStringView(propertyName, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Reads a source of the map's style.
   ///
   /// A tile source with a `url` has an empty attribution until its TileJSON
@@ -6960,25 +6988,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
-  /// the map's style.
-  ///
-  /// See `mln_map_set_style_light_json` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.invalidState` while the style isn't loaded, as
-  ///   `MapHandle.setStyleUrl()` describes.
-  Future<CommandCompletion> setStyleLightJson(Object? lightJson) => _command(
-    (arena, completion) => raw.mln_map_set_style_light_json(
-      _handle.raw,
-      _nativeJsonView(lightJson, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Sets a property of the light of the map's style.
   ///
   /// See `mln_map_set_style_light_property` in the
@@ -6993,6 +7002,38 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     Object? value,
   ) => _command(
     (arena, completion) => raw.mln_map_set_style_light_property(
+      _handle.raw,
+      nativeStringView(propertyName, arena).value,
+      _nativeJsonView(value, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Sets a \[root property\](https://maplibre.org/maplibre-style-spec/root/)
+  /// of the map's style, such as `light`, `sky`, `projection`, or `terrain`,
+  /// without reloading the style.
+  ///
+  /// `propertyName` is a root property other than `sources` and `layers`, which
+  /// the source and layer calls change. A null `value` resets the property to
+  /// its default, as if the style didn't set it.
+  ///
+  /// See `mln_map_set_style_root_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when `propertyName` isn't a root property, is
+  ///   `sources` or `layers`, or when `value` isn't a valid value for it.
+  /// - `Status.unsupported` when the library can't change the property while
+  ///   the style is loaded. Load a style that sets it instead.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
+  Future<CommandCompletion> setStyleRootProperty(
+    String propertyName,
+    Object? value,
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_root_property(
       _handle.raw,
       nativeStringView(propertyName, arena).value,
       _nativeJsonView(value, arena),

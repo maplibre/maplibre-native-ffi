@@ -1161,6 +1161,27 @@ pub const Map = struct {
         return call.submit("mln_map_get_style_light_property", .handle, self, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{property_name});
     }
 
+    /// Reads a \[root property\](https://maplibre.org/maplibre-style-spec/root/) of
+    /// the map's style.
+    ///
+    /// The value can differ in form from the value that was set: a color set as
+    /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+    ///
+    /// Completes with no value when neither the style nor the library sets the
+    /// property. The library can give a property a value of its own, such as a
+    /// default `transition`.
+    ///
+    /// See `mln_map_get_style_root_property` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when `property_name` isn't a root property, or is
+    ///   `sources` or `layers`.
+    pub fn getStyleRootProperty(self: Map, allocator: std.mem.Allocator, property_name: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
+        return call.submit("mln_map_get_style_root_property", .handle, self, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{property_name});
+    }
+
     /// Reads a source of the map's style.
     ///
     /// A tile source with a `url` has an empty attribution until its TileJSON
@@ -1718,20 +1739,6 @@ pub const Map = struct {
         return call.submit("mln_map_set_style_layer_property", .handle, self, call.command, null, diagnostic, .{ layer_id, property_name, value });
     }
 
-    /// Replaces the \[light\](https://maplibre.org/maplibre-style-spec/light/) of
-    /// the map's style.
-    ///
-    /// See `mln_map_set_style_light_json` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
-    ///   describes.
-    pub fn setStyleLightJson(self: Map, light_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_style_light_json", .handle, self, call.command, null, diagnostic, .{light_json});
-    }
-
     /// Sets a property of the light of the map's style.
     ///
     /// See `mln_map_set_style_light_property` in the
@@ -1743,6 +1750,29 @@ pub const Map = struct {
     ///   describes.
     pub fn setStyleLightProperty(self: Map, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_light_property", .handle, self, call.command, null, diagnostic, .{ property_name, value });
+    }
+
+    /// Sets a \[root property\](https://maplibre.org/maplibre-style-spec/root/) of
+    /// the map's style, such as `light`, `sky`, `projection`, or `terrain`, without
+    /// reloading the style.
+    ///
+    /// `property_name` is a root property other than `sources` and `layers`, which
+    /// the source and layer calls change. A null `value` resets the property to its
+    /// default, as if the style didn't set it.
+    ///
+    /// See `mln_map_set_style_root_property` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when `property_name` isn't a root property, is
+    ///   `sources` or `layers`, or when `value` isn't a valid value for it.
+    /// - `error.Unsupported` when the library can't change the property while the
+    ///   style is loaded. Load a style that sets it instead.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
+    pub fn setStyleRootProperty(self: Map, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_set_style_root_property", .handle, self, call.command, null, diagnostic, .{ property_name, value });
     }
 
     /// Sets whether a source is volatile.
@@ -10129,14 +10159,14 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_set_style_layer_property", .handle, map, null, diagnostic, .{ layer_id, property_name, value });
     }
 
-    pub fn setStyleLightJson(self: MapDiscarding, light_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_set_style_light_json", .handle, map, null, diagnostic, .{light_json});
-    }
-
     pub fn setStyleLightProperty(self: MapDiscarding, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_style_light_property", .handle, map, null, diagnostic, .{ property_name, value });
+    }
+
+    pub fn setStyleRootProperty(self: MapDiscarding, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_style_root_property", .handle, map, null, diagnostic, .{ property_name, value });
     }
 
     pub fn setStyleSourceVolatile(self: MapDiscarding, source_id: []const u8, is_volatile: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
