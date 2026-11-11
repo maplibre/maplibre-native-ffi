@@ -478,6 +478,8 @@ label.field {
   position: fixed;
   inset: 0;
   clip-path: inset(0 0 0 var(--split));
+  /* GL JS clears to transparent; without this the native map shows through. */
+  background: var(--raised);
 }
 
 .divider {
