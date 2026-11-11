@@ -5659,6 +5659,37 @@ impl MapHandle {
             )
         }
     }
+    #[pyo3(signature = (property_name))]
+    fn get_style_root_property(
+        &self,
+        py: Python<'_>,
+        property_name: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let property_name_value = storage.buffer(property_name.clone(), true)?;
+        let handle = self.input();
+        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
+            if result.value.is_null() {
+                return Ok(py.None());
+            }
+            let value = completion_value::<sys::mln_buffer_view>(result)?;
+            generated_optional(py, !value.data.is_null(), || generated_json(py, value))
+        };
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_map_get_style_root_property(
+                        handle,
+                        property_name_value,
+                        completion,
+                        diagnostic,
+                    )
+                },
+                convert,
+            )
+        }
+    }
     #[pyo3(signature = (source_id))]
     fn get_style_source(
         &self,
@@ -7239,6 +7270,54 @@ impl MapHandle {
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_style_light_property(
+                    handle,
+                    property_name_value,
+                    value_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
+    #[pyo3(signature = (property_name, value))]
+    fn set_style_root_property(
+        &self,
+        py: Python<'_>,
+        property_name: &Bound<'_, PyAny>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let property_name_value = storage.buffer(property_name.clone(), true)?;
+        let value_value = storage.json(value.clone(), false)?;
+        let handle = self.input();
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_set_style_root_property(
+                    handle,
+                    property_name_value,
+                    value_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }
+    }
+    #[pyo3(signature = (property_name, value))]
+    fn _discard_set_style_root_property(
+        &self,
+        py: Python<'_>,
+        property_name: &Bound<'_, PyAny>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let property_name_value = storage.buffer(property_name.clone(), true)?;
+        let value_value = storage.json(value.clone(), false)?;
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_set_style_root_property(
                     handle,
                     property_name_value,
                     value_value,

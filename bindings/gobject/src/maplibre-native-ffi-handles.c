@@ -224,6 +224,14 @@ static gpointer mln_map_get_style_light_property_decode(
   return maplibre_native_ffi_text_new(*view);
 }
 
+static gpointer mln_map_get_style_root_property_decode(
+  const mln_completion_result* result
+) {
+  if (result->value == NULL) return NULL;
+  const mln_buffer_view* view = result->value;
+  return maplibre_native_ffi_text_new(*view);
+}
+
 static gpointer mln_map_get_style_source_decode(
   const mln_completion_result* result
 ) {
@@ -2293,6 +2301,34 @@ char* maplibre_native_ffi_map_get_style_light_property_finish(
   return g_task_propagate_pointer(G_TASK(result), error);
 }
 
+void maplibre_native_ffi_map_get_style_root_property_async(
+  MaplibreNativeFfiMap* self, const char* property_name,
+  GAsyncReadyCallback callback, gpointer user_data
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_get_style_root_property_async,
+    callback, user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_map_get_style_root_property_decode, g_free
+      ))
+    return;
+  mln_status status_ = mln_map_get_style_root_property(
+    self->handle, maplibre_native_ffi_text_view(property_name),
+    async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
+}
+
+char* maplibre_native_ffi_map_get_style_root_property_finish(
+  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
+) {
+  g_return_val_if_fail(g_task_is_valid(result, self), NULL);
+  return g_task_propagate_pointer(G_TASK(result), error);
+}
+
 void maplibre_native_ffi_map_get_style_source_async(
   MaplibreNativeFfiMap* self, const char* source_id,
   GAsyncReadyCallback callback, gpointer user_data
@@ -3661,6 +3697,37 @@ void maplibre_native_ffi_map_set_style_light_property_async(
 
 MaplibreNativeFfiCommandCompletion*
 maplibre_native_ffi_map_set_style_light_property_finish(
+  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
+) {
+  g_return_val_if_fail(g_task_is_valid(result, self), NULL);
+  return g_task_propagate_pointer(G_TASK(result), error);
+}
+
+void maplibre_native_ffi_map_set_style_root_property_async(
+  MaplibreNativeFfiMap* self, const char* property_name, const char* value,
+  GAsyncReadyCallback callback, gpointer user_data
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_style_root_property_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_set_style_root_property(
+    self->handle, maplibre_native_ffi_text_view(property_name),
+    maplibre_native_ffi_text_view(value), async_.completion_argument,
+    &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
+}
+
+MaplibreNativeFfiCommandCompletion*
+maplibre_native_ffi_map_set_style_root_property_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
 ) {
   g_return_val_if_fail(g_task_is_valid(result, self), NULL);

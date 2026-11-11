@@ -2688,6 +2688,43 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_map_get_style_root_property(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_buffer_view arg_property_name = {0};
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_read_text_view(
+        call, call->argv[1], &arg_property_name, "propertyName"
+      ))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[2], false, mln_ts_decode_buffer_view_json_optional,
+        &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_get_style_root_property(
+    arg_map, arg_property_name, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_map_get_style_source(
   napi_env env, napi_callback_info info
 ) {
@@ -4651,6 +4688,45 @@ static napi_value mln_ts_export_mln_map_set_style_light_property(
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_map_set_style_light_property(
+    arg_map, arg_property_name, arg_value, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_set_style_root_property(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_buffer_view arg_property_name = {0};
+  mln_buffer_view arg_value = {0};
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 4)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_read_text_view(
+        call, call->argv[1], &arg_property_name, "propertyName"
+      ))
+    goto done;
+  if (!mln_ts_read_json_view(call, call->argv[2], &arg_value, "value"))
+    goto done;
+  if (!mln_ts_read_completion(
+        call, call->argv[3], true, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_set_style_root_property(
     arg_map, arg_property_name, arg_value, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
@@ -7889,6 +7965,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_get_style_layer_property},
   {"mln_map_get_style_light_property",
    mln_ts_export_mln_map_get_style_light_property},
+  {"mln_map_get_style_root_property",
+   mln_ts_export_mln_map_get_style_root_property},
   {"mln_map_get_style_source", mln_ts_export_mln_map_get_style_source},
   {"mln_map_get_style_transition_options",
    mln_ts_export_mln_map_get_style_transition_options},
@@ -7971,6 +8049,8 @@ static const mln_ts_export exports[] = {
   {"mln_map_set_style_light_json", mln_ts_export_mln_map_set_style_light_json},
   {"mln_map_set_style_light_property",
    mln_ts_export_mln_map_set_style_light_property},
+  {"mln_map_set_style_root_property",
+   mln_ts_export_mln_map_set_style_root_property},
   {"mln_map_set_style_source_volatile",
    mln_ts_export_mln_map_set_style_source_volatile},
   {"mln_map_set_style_transition_options",

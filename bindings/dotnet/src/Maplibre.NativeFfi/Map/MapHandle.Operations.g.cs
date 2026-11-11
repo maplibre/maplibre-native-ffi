@@ -1731,6 +1731,47 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Reads a [root property](https://maplibre.org/maplibre-style-spec/root/)
+    /// of the map's style.
+    /// </summary>
+    /// <remarks>
+    /// <para>The value can differ in form from the value that was set: a color
+    /// set as <c>"#ff0000"</c> reads back as <c>["rgba", 255, 0, 0,
+    /// 1]</c>.</para>
+    /// <para>Completes with no value when neither the style nor the library
+    /// sets the property. The library can give a property a value of its own,
+    /// such as a default <c>transition</c>.</para>
+    /// <para>See <c>mln_map_get_style_root_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when
+    /// <c>propertyName</c> isn't a root property, or is <c>sources</c> or
+    /// <c>layers</c>.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<string?> GetStyleRootPropertyAsync(string propertyName)
+    {
+        using var scope = new NativeCallScope(this);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_get_style_root_property(
+            Handle,
+            scope.Utf8(propertyName),
+            NativeCompletion.Start<string?>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Optional<mln_buffer_view, string>(
+                        nativeResult,
+                        ValueStructs.CopyUtf8View
+                    ),
+                out var nativePending
+            ),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
     /// Reads a source of the map's style.
     /// </summary>
     /// <remarks>
@@ -2997,6 +3038,46 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Sets a [root property](https://maplibre.org/maplibre-style-spec/root/)
+    /// of the map's style, such as <c>light</c>, <c>sky</c>, <c>projection</c>,
+    /// or <c>terrain</c>, without reloading the style.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>propertyName</c> is a root property other than <c>sources</c>
+    /// and <c>layers</c>, which the source and layer calls change. A null
+    /// <c>value</c> resets the property to its default, as if the style didn't
+    /// set it.</para>
+    /// <para>See <c>mln_map_set_style_root_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when
+    /// <c>propertyName</c> isn't a root property, is <c>sources</c> or
+    /// <c>layers</c>, or when <c>value</c> isn't a valid value for
+    /// it.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the library can't
+    /// change the property while the style is loaded. Load a style that sets it
+    /// instead.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<CommandCompletion> SetStyleRootPropertyAsync(string propertyName, string value)
+    {
+        using var scope = new NativeCallScope(this);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_set_style_root_property(
+            Handle,
+            scope.Utf8(propertyName),
+            scope.Utf8(value),
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
     /// Sets whether a source is volatile.
     /// </summary>
     /// <remarks>
@@ -3960,6 +4041,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_light_property(
+                    receiverHandle,
+                    scope.Utf8(propertyName),
+                    scope.Utf8(value),
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
+        public void SetStyleRootProperty(string propertyName, string value)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            Check(
+                NativeMethods.mln_map_set_style_root_property(
                     receiverHandle,
                     scope.Utf8(propertyName),
                     scope.Utf8(value),

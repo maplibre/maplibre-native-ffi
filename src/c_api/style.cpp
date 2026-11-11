@@ -1044,6 +1044,55 @@ auto mln_map_get_style_layer_json(
   });
 }
 
+auto mln_map_set_style_root_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(property_name, "property_name") ||
+      !valid_non_empty_view(value, "value")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto name = OwnedView{property_name};
+    auto json = OwnedView{value};
+    return submit_style_edit(
+      map,
+      [name = std::move(name),
+       json = std::move(json)](mln::core::MapObject& live) -> mln_status {
+        return mln::core::map_set_style_root_property(
+          live, name.view(), json.view()
+        );
+      },
+      completion
+    );
+  });
+}
+
+auto mln_map_get_style_root_property(
+  mln_map map, mln_buffer_view property_name, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(property_name, "property_name")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto name = OwnedView{property_name};
+    return mln::core::start_style_operation<&mln_map_get_style_root_property>(
+      map,
+      [name = std::move(name)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        return mln::core::map_get_style_root_property(
+          live, name.view(), result.bytes, result.found
+        );
+      },
+      completion
+    );
+  });
+}
+
 auto mln_map_set_style_light_json(
   mln_map map, mln_buffer_view light_json, const mln_completion* completion,
   mln_diagnostic* out_diagnostic

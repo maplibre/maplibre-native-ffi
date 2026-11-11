@@ -877,6 +877,36 @@ private constructor(
     }
 
   /**
+   * Reads a &#91;root property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
+   * style.
+   *
+   * The value can differ in form from the value that was set: a color set as `"#ff0000"` reads back
+   * as `["rgba", 255, 0, 0, 1]`.
+   *
+   * Completes with no value when neither the style nor the library sets the property. The library
+   * can give a property a value of its own, such as a default `transition`.
+   *
+   * See `mln_map_get_style_root_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when `propertyName` isn't a root property, or is `sources` or
+   *   `layers`.
+   */
+  public fun getStyleRootProperty(propertyName: String): Completion<String?> =
+    nativeSubmit(
+      this,
+      binding,
+      { result ->
+        if (CompletionBridge.valueCount(result) == 0uL) null
+        else readViewString(CompletionBridge.value(result))
+      },
+    ) {
+      check(C.mln_map_get_style_root_property(handle, view(propertyName), completion, diagnostic))
+    }
+
+  /**
    * Reads a source of the map's style.
    *
    * A tile source with a `url` has an empty attribution until its TileJSON loads, which raises
@@ -1828,6 +1858,40 @@ private constructor(
     }
 
   /**
+   * Sets a &#91;root property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
+   * style, such as `light`, `sky`, `projection`, or `terrain`, without reloading the style.
+   *
+   * `propertyName` is a root property other than `sources` and `layers`, which the source and layer
+   * calls change. A null `value` resets the property to its default, as if the style didn't set it.
+   *
+   * See `mln_map_set_style_root_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when `propertyName` isn't a root property, is `sources` or
+   *   `layers`, or when `value` isn't a valid value for it.
+   * - `Status.UNSUPPORTED` when the library can't change the property while the style is loaded.
+   *   Load a style that sets it instead.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   */
+  public fun setStyleRootProperty(
+    propertyName: String,
+    value: String,
+  ): Completion<CommandCompletion> =
+    nativeCommand(this, binding) {
+      check(
+        C.mln_map_set_style_root_property(
+          handle,
+          view(propertyName),
+          view(value),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
    * Sets whether a source is volatile.
    *
    * The map doesn't store the tiles of a volatile source in the persistent cache.
@@ -2569,6 +2633,20 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
     nativeDiscard(owner, binding) {
       check(
         C.mln_map_set_style_light_property(
+          handle,
+          view(propertyName),
+          view(value),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /** [MapHandle.setStyleRootProperty] without its completion. */
+  public fun setStyleRootProperty(propertyName: String, value: String): Unit =
+    nativeDiscard(owner, binding) {
+      check(
+        C.mln_map_set_style_root_property(
           handle,
           view(propertyName),
           view(value),

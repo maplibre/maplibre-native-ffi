@@ -1664,6 +1664,38 @@ impl MapHandle {
         )
     }
 
+    /// Reads a \[root
+    /// property\](https://maplibre.org/maplibre-style-spec/root/) of the map's
+    /// style.
+    ///
+    /// The value can differ in form from the value that was set: a color set as
+    /// `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+    ///
+    /// Completes with no value when neither the style nor the library sets the
+    /// property. The library can give a property a value of its own, such as a
+    /// default `transition`.
+    ///
+    /// See `mln_map_get_style_root_property` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when `property_name` isn't a root property,
+    ///   or is `sources` or `layers`.
+    pub fn get_style_root_property(
+        &self,
+        property_name: &str,
+    ) -> Result<NativeFuture<Option<String>>> {
+        let mut call = self.inner.call();
+        let property_name = call.input(&property_name)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_root_property(map, property_name, completion, out_diagnostic)
+            },
+            completion::optional::<sys::mln_buffer_view, _>,
+        )
+    }
+
     /// Reads a source of the map's style.
     ///
     /// A tile source with a `url` has an empty attribution until its TileJSON
@@ -2659,6 +2691,44 @@ impl MapHandle {
         let value = call.input(&value)?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_light_property(
+                map,
+                property_name,
+                value,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Sets a \[root property\](https://maplibre.org/maplibre-style-spec/root/)
+    /// of the map's style, such as `light`, `sky`, `projection`, or `terrain`,
+    /// without reloading the style.
+    ///
+    /// `property_name` is a root property other than `sources` and `layers`,
+    /// which the source and layer calls change. A null `value` resets the
+    /// property to its default, as if the style didn't set it.
+    ///
+    /// See `mln_map_set_style_root_property` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::InvalidArgument` when `property_name` isn't a root property,
+    ///   is `sources` or `layers`, or when `value` isn't a valid value for it.
+    /// - `Status::Unsupported` when the library can't change the property while
+    ///   the style is loaded. Load a style that sets it instead.
+    /// - `Status::InvalidState` while the style isn't loaded, as
+    ///   `MapHandle::set_style_url()` describes.
+    pub fn set_style_root_property(
+        &self,
+        property_name: &str,
+        value: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call();
+        let property_name = call.input(&property_name)?;
+        let value = call.input(&value)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_root_property(
                 map,
                 property_name,
                 value,
@@ -3809,6 +3879,31 @@ impl MapHandleDiscarding<'_> {
         let value = call.input(&value)?;
         call.discard(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_light_property(
+                map,
+                property_name,
+                value,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Sets a \[root property\](https://maplibre.org/maplibre-style-spec/root/)
+    /// of the map's style, such as `light`, `sky`, `projection`, or `terrain`,
+    /// without reloading the style.
+    ///
+    /// `property_name` is a root property other than `sources` and `layers`,
+    /// which the source and layer calls change. A null `value` resets the
+    /// property to its default, as if the style didn't set it.
+    ///
+    /// See `mln_map_set_style_root_property` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_style_root_property(&self, property_name: &str, value: &str) -> Result<()> {
+        let mut call = self.0.inner.call();
+        let property_name = call.input(&property_name)?;
+        let value = call.input(&value)?;
+        call.discard(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_root_property(
                 map,
                 property_name,
                 value,

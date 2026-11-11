@@ -559,6 +559,14 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_get_style_root_property(
+        MlnMap map,
+        mln_buffer_view property_name,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_get_style_source(
         MlnMap map,
         mln_buffer_view source_id,
@@ -991,6 +999,15 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_style_light_property(
+        MlnMap map,
+        mln_buffer_view property_name,
+        mln_buffer_view value,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_style_root_property(
         MlnMap map,
         mln_buffer_view property_name,
         mln_buffer_view value,

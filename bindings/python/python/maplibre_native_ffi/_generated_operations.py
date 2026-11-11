@@ -1319,6 +1319,28 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.get_style_light_property(property_name)
 
+    def get_style_root_property(self, property_name: str) -> Future[Any]:
+        """Reads a \\[root
+        property\\](https://maplibre.org/maplibre-style-spec/root/) of the
+        map's style.
+
+        The value can differ in form from the value that was set: a color set
+        as `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
+
+        Completes with no value when neither the style nor the library sets
+        the property. The library can give a property a value of its own,
+        such as a default `transition`.
+
+        See `mln_map_get_style_root_property` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `property_name` isn't a root
+          property, or is `sources` or `layers`.
+        """
+        return self._native.get_style_root_property(property_name)
+
     def get_style_source(self, source_id: str) -> Future[StyleSourceInfo | None]:
         """Reads a source of the map's style.
 
@@ -1996,6 +2018,33 @@ class _MapHandleOperations(GeneratedOperations):
           `MapHandle.set_style_url()` describes.
         """
         return self._native.set_style_light_property(property_name, value)
+
+    def set_style_root_property(
+        self, property_name: str, value: Any
+    ) -> Future[CommandCompletion]:
+        """Sets a \\[root
+        property\\](https://maplibre.org/maplibre-style-spec/root/) of the
+        map's style, such as `light`, `sky`, `projection`, or `terrain`,
+        without reloading the style.
+
+        `property_name` is a root property other than `sources` and `layers`,
+        which the source and layer calls change. A null `value` resets the
+        property to its default, as if the style didn't set it.
+
+        See `mln_map_set_style_root_property` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when `property_name` isn't a root
+          property, is `sources` or `layers`, or when `value` isn't a valid
+          value for it.
+        - `Status.UNSUPPORTED` when the library can't change the property
+          while the style is loaded. Load a style that sets it instead.
+        - `Status.INVALID_STATE` while the style isn't loaded, as
+          `MapHandle.set_style_url()` describes.
+        """
+        return self._native.set_style_root_property(property_name, value)
 
     def set_style_source_volatile(
         self, source_id: str, is_volatile: bool
@@ -4316,6 +4365,21 @@ class MapHandleDiscarding:
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native._discard_set_style_light_property(property_name, value)
+
+    def set_style_root_property(self, property_name: str, value: Any) -> None:
+        """Sets a \\[root
+        property\\](https://maplibre.org/maplibre-style-spec/root/) of the
+        map's style, such as `light`, `sky`, `projection`, or `terrain`,
+        without reloading the style.
+
+        `property_name` is a root property other than `sources` and `layers`,
+        which the source and layer calls change. A null `value` resets the
+        property to its default, as if the style didn't set it.
+
+        See `mln_map_set_style_root_property` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native._discard_set_style_root_property(property_name, value)
 
     def set_style_source_volatile(self, source_id: str, is_volatile: bool) -> None:
         """Sets whether a source is volatile.

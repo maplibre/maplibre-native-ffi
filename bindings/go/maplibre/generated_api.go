@@ -8001,6 +8001,28 @@ func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[s
 	}, completionOrZero(completionOf(copyViewText)))
 }
 
+// GetStyleRootProperty reads a [root
+// property](https://maplibre.org/maplibre-style-spec/root/) of the map's style.
+//
+// The value can differ in form from the value that was set: a color set as
+// "#ff0000" reads back as ["rgba", 255, 0, 0, 1].
+//
+// Completes with no value when neither the style nor the library sets the
+// property. The library can give a property a value of its own, such as a
+// default transition.
+//
+// See mln_map_get_style_root_property in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when propertyName isn't a root property, or is
+//     sources or layers.
+func (receiver *MapHandle) GetStyleRootProperty(propertyName string) (*Future[string], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_root_property(C.mln_map(raw), bindingView(propertyName, arena), completion, diagnostic))
+	}, completionOrZero(completionOf(copyViewText)))
+}
+
 // GetStyleSource reads a source of the map's style.
 //
 // A tile source with a url has an empty attribution until its TileJSON loads,
@@ -8830,6 +8852,30 @@ func (receiver *MapHandle) SetStyleLightJSON(lightJSON string) (*Future[CommandC
 func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
+	}, completionCommand)
+}
+
+// SetStyleRootProperty sets a [root
+// property](https://maplibre.org/maplibre-style-spec/root/) of the map's style,
+// such as light, sky, projection, or terrain, without reloading the style.
+//
+// propertyName is a root property other than sources and layers, which the
+// source and layer calls change. A null value resets the property to its
+// default, as if the style didn't set it.
+//
+// See mln_map_set_style_root_property in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument when propertyName isn't a root property, is sources
+//     or layers, or when value isn't a valid value for it.
+//   - StatusUnsupported when the library can't change the property while the
+//     style is loaded. Load a style that sets it instead.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleURL() describes.
+func (receiver *MapHandle) SetStyleRootProperty(propertyName string, value string) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_root_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -10556,6 +10602,13 @@ func (view MapHandleDiscarding) SetStyleLightProperty(propertyName string, value
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
+	})
+}
+
+func (view MapHandleDiscarding) SetStyleRootProperty(propertyName string, value string) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_root_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
 	})
 }
 

@@ -400,6 +400,11 @@ export interface NativeOperations {
     propertyName: string,
     completion: NativeCompletion,
   ): void;
+  mln_map_get_style_root_property(
+    map: bigint,
+    propertyName: string,
+    completion: NativeCompletion,
+  ): void;
   mln_map_get_style_source(
     map: bigint,
     sourceId: string,
@@ -652,6 +657,12 @@ export interface NativeOperations {
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_light_property(
+    map: bigint,
+    propertyName: string,
+    value: unknown,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_set_style_root_property(
     map: bigint,
     propertyName: string,
     value: unknown,
