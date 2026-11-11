@@ -1693,7 +1693,7 @@ pub const Map = struct {
     ///
     /// Errors:
     ///
-    /// - `error.NativeError` when `json` isn't a valid style. The map keeps its
+    /// - `error.InvalidArgument` when `json` isn't a valid style. The map keeps its
     ///   current style.
     pub fn setStyleJson(self: Map, json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_style_json", .handle, self, call.command, null, diagnostic, .{json});

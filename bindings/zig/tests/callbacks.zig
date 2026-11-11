@@ -30,7 +30,7 @@ test "a replacement process-global log callback receives native log records" {
 
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    try testing.expectError(error.NativeError, (try fixture.map.setStyleJson("{", null)).await(null));
+    try testing.expectError(error.InvalidArgument, (try fixture.map.setStyleJson("{", null)).await(null));
     try replacement.saw_parse_error.wait();
     try testing.expect(!first.saw_parse_error.isSet());
 }

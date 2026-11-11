@@ -1744,7 +1744,7 @@ private constructor(
    *
    * Errors:
    *
-   * - `Status.NATIVE_ERROR` when `json` isn't a valid style. The map keeps its current style.
+   * - `Status.INVALID_ARGUMENT` when `json` isn't a valid style. The map keeps its current style.
    */
   public fun setStyleJson(json: String): Completion<CommandCompletion> =
     nativeCommand(this, binding) {

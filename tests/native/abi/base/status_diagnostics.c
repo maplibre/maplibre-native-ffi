@@ -26,8 +26,9 @@ static void a_diagnostic_is_written_within_its_declared_size(void) {
   TEST_ASSERT_EQUAL_INT('x', diagnostic.message[4]);
 }
 
-// MapLibre throws while parsing malformed style JSON.
-static void a_native_exception_becomes_native_error_with_its_text(void) {
+// A style that fails to parse completes with the parser's text, which the
+// loading-failed event repeats.
+static void a_malformed_style_fails_with_the_parser_text(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_drain_all(runtime);
@@ -37,7 +38,7 @@ static void a_native_exception_becomes_native_error_with_its_text(void) {
     map, MLN_BUFFER_LITERAL("{"), &completion.descriptor, NULL
   ));
   MLN_TEST_STATUS(
-    MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&completion)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&completion)
   );
   char diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
   const char* completion_diagnostic =
@@ -97,7 +98,7 @@ static void the_library_reports_its_built_backend(void) {
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it);
   RUN_TEST(a_diagnostic_is_written_within_its_declared_size);
-  RUN_TEST(a_native_exception_becomes_native_error_with_its_text);
+  RUN_TEST(a_malformed_style_fails_with_the_parser_text);
   RUN_TEST(android_initialization_requires_its_environment_and_context);
   RUN_TEST(the_library_reports_its_built_backend);
 }

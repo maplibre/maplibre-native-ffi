@@ -1463,8 +1463,8 @@ MLN_API mln_status mln_map_set_style_url(
  * and glyphs load in the background.
  *
  * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when `json` isn't a valid style. The map keeps its
- *   current style.
+ * - MLN_STATUS_INVALID_ARGUMENT when `json` isn't a valid style. The map keeps
+ *   its current style.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_json(

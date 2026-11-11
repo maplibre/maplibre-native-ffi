@@ -331,7 +331,7 @@ static void a_failed_command_reports_the_generation_of_its_events(void) {
   recorder_drain();
 
   const probed_result failed = run_probed(map, set_malformed_style);
-  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, failed.status);
+  MLN_TEST_STATUS(MLN_STATUS_INVALID_ARGUMENT, failed.status);
   TEST_ASSERT_GREATER_THAN_UINT64(0, failed.generation);
   TEST_ASSERT_EQUAL_size_t(
     1, count_in_range(&failed, map, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)

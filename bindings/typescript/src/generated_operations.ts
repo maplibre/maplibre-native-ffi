@@ -3298,8 +3298,8 @@ export class MapHandle extends Owner {
    *
    * Errors:
    *
-   * - `Status.nativeError` when `json` isn't a valid style. The map keeps its
-   *   current style.
+   * - `Status.invalidArgument` when `json` isn't a valid style. The map keeps
+   *   its current style.
    */
   setStyleJson(json: unknown): Promise<CommandCompletion> {
     return command((completion) =>

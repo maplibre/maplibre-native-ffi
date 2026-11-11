@@ -8776,7 +8776,7 @@ func (receiver *MapHandle) SetStyleImage(imageID string, image PremultipliedRgba
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 //
 // Errors:
-//   - StatusNativeError when json isn't a valid style. The map keeps its
+//   - StatusInvalidArgument when json isn't a valid style. The map keeps its
 //     current style.
 func (receiver *MapHandle) SetStyleJSON(json string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
