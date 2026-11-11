@@ -333,7 +333,7 @@ internal fun NativeArena.writePremultipliedRgba8Image(value: PremultipliedRgba8I
 
 @JvmSynthetic
 internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
-  writeU32(target, w(792, 800, 756).toUInt())
+  writeU32(target, w(800, 808, 764).toUInt())
   var fields = 0u
   value.offset?.let {
     fields = fields or 1u
@@ -360,13 +360,13 @@ internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
     putGestureMomentum(target + 64, it)
   }
   putAnimationOptions(target + w(688, 688, 660), value.animation)
-  writeU32(target + w(784, 792, 748), value.gesturePhase.rawValue)
+  writeU32(target + w(792, 800, 756), value.gesturePhase.rawValue)
   writeU32(target + 4, fields)
 }
 
 @JvmSynthetic
 internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
-  allocate(w(792, 800, 756), w(8, 8, 4)).also { putCameraDelta(it, value) }
+  allocate(w(800, 808, 764), w(8, 8, 4)).also { putCameraDelta(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putAndroidHardwareBufferRingDescriptor(
@@ -674,7 +674,7 @@ internal fun NativeArena.writeLatLngBounds(value: LatLngBounds): Long =
 
 @JvmSynthetic
 internal fun NativeCall.putCameraFitUpdate(target: Long, value: CameraFitUpdate) {
-  writeU32(target, w(160, 168, 152).toUInt())
+  writeU32(target, w(168, 176, 160).toUInt())
   writeU32(target + 4, value.mode.rawValue)
   putCameraFitOptions(target + 8, value.fit)
   putAnimationOptions(target + 64, value.animation)
@@ -682,7 +682,7 @@ internal fun NativeCall.putCameraFitUpdate(target: Long, value: CameraFitUpdate)
 
 @JvmSynthetic
 internal fun NativeCall.writeCameraFitUpdate(value: CameraFitUpdate): Long =
-  allocate(w(160, 168, 152), w(8, 8, 4)).also { putCameraFitUpdate(it, value) }
+  allocate(w(168, 176, 160), w(8, 8, 4)).also { putCameraFitUpdate(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putFeatureStateSelector(target: Long, value: FeatureStateSelector) {
@@ -955,16 +955,16 @@ internal fun NativeArena.writeMapViewportOptions(value: MapViewportOptions): Lon
 
 @JvmSynthetic
 internal fun NativeCall.putCameraUpdate(target: Long, value: CameraUpdate) {
-  writeU32(target, w(232, 240, 224).toUInt())
+  writeU32(target, w(240, 248, 232).toUInt())
   writeU32(target + 4, value.mode.rawValue)
   putCameraOptions(target + 8, value.camera)
   putAnimationOptions(target + 128, value.animation)
-  writeU32(target + w(224, 232, 216), value.gesturePhase.rawValue)
+  writeU32(target + w(232, 240, 224), value.gesturePhase.rawValue)
 }
 
 @JvmSynthetic
 internal fun NativeCall.writeCameraUpdate(value: CameraUpdate): Long =
-  allocate(w(232, 240, 224), w(8, 8, 4)).also { putCameraUpdate(it, value) }
+  allocate(w(240, 248, 232), w(8, 8, 4)).also { putCameraUpdate(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putScreenPoint(target: Long, value: ScreenPoint) {
@@ -1907,21 +1907,25 @@ internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOption
     fields = fields or 4u
     writeF64(target + w(24, 24, 20), it)
   }
+  value.maxDurationMs?.let {
+    fields = fields or 32u
+    writeF64(target + w(32, 32, 28), it)
+  }
   value.easing?.let {
     fields = fields or 8u
-    putUnitBezier(target + w(32, 32, 28), it)
+    putUnitBezier(target + w(40, 40, 36), it)
   }
   value.transitionId?.let {
     fields = fields or 16u
-    writeU64(target + w(64, 64, 60), it)
+    writeU64(target + w(72, 72, 68), it)
   }
-  putCameraTransitionHandler(target + w(72, 72, 68), value.endHandler)
+  putCameraTransitionHandler(target + w(80, 80, 76), value.endHandler)
   writeU32(target, fields)
 }
 
 @JvmSynthetic
 internal fun NativeCall.writeAnimationOptions(value: AnimationOptions): Long =
-  allocate(w(96, 104, 88), w(8, 8, 4)).also { putAnimationOptions(it, value) }
+  allocate(w(104, 112, 96), w(8, 8, 4)).also { putAnimationOptions(it, value) }
 
 @JvmSynthetic
 internal fun NativeCall.putWake(target: Long, value: Wake) {

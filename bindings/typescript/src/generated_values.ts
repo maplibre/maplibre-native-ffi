@@ -150,6 +150,13 @@ export interface AnimationOptions {
    * The zoom level at the peak of a fly animation.
    */
   minZoom?: number;
+  /**
+   * The longest a fly animation may take. A fly animation whose duration, set
+   * or derived from `velocity`, is longer moves the camera at once instead, and
+   * so does one too slow for the library to time, without this field. Other
+   * animations ignore it.
+   */
+  maxDurationMs?: number;
   easing?: UnitBezier;
   /**
    * An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change

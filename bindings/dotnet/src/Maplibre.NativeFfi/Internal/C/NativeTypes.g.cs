@@ -80,6 +80,7 @@ internal unsafe struct mln_animation_options
     public double duration_ms;
     public double velocity;
     public double min_zoom;
+    public double max_duration_ms;
     public mln_unit_bezier easing;
     public ulong transition_id;
     public mln_camera_transition_handler end_handler;
@@ -1719,6 +1720,7 @@ internal enum mln_animation_option_field : uint
     MLN_ANIMATION_OPTION_MIN_ZOOM = 4,
     MLN_ANIMATION_OPTION_EASING = 8,
     MLN_ANIMATION_OPTION_TRANSITION_ID = 16,
+    MLN_ANIMATION_OPTION_MAX_DURATION = 32,
 }
 
 internal enum mln_bound_option_field : uint

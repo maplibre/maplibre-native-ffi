@@ -1213,6 +1213,7 @@ struct _MaplibreNativeFfiAnimationOptions {
   gdouble duration_ms;
   gdouble velocity;
   gdouble min_zoom;
+  gdouble max_duration_ms;
   MaplibreNativeFfiUnitBezier easing;
   guint64 transition_id;
   MaplibreNativeFfiCameraTransitionHandler* end_handler;
@@ -1223,6 +1224,7 @@ enum {
   ANIMATION_OPTIONS_PROP_DURATION_MS,
   ANIMATION_OPTIONS_PROP_VELOCITY,
   ANIMATION_OPTIONS_PROP_MIN_ZOOM,
+  ANIMATION_OPTIONS_PROP_MAX_DURATION_MS,
   ANIMATION_OPTIONS_PROP_EASING,
   ANIMATION_OPTIONS_PROP_TRANSITION_ID,
   ANIMATION_OPTIONS_PROP_END_HANDLER,
@@ -1261,6 +1263,9 @@ static void maplibre_native_ffi_animation_options_get_property(
     case ANIMATION_OPTIONS_PROP_MIN_ZOOM:
       g_value_set_double(value, self->min_zoom);
       break;
+    case ANIMATION_OPTIONS_PROP_MAX_DURATION_MS:
+      g_value_set_double(value, self->max_duration_ms);
+      break;
     case ANIMATION_OPTIONS_PROP_EASING:
       g_value_set_boxed(value, &self->easing);
       break;
@@ -1293,6 +1298,11 @@ static void maplibre_native_ffi_animation_options_set_property(
       break;
     case ANIMATION_OPTIONS_PROP_MIN_ZOOM:
       maplibre_native_ffi_animation_options_set_min_zoom(
+        self, g_value_get_double(value)
+      );
+      break;
+    case ANIMATION_OPTIONS_PROP_MAX_DURATION_MS:
+      maplibre_native_ffi_animation_options_set_max_duration_ms(
         self, g_value_get_double(value)
       );
       break;
@@ -1336,6 +1346,10 @@ static void maplibre_native_ffi_animation_options_class_init(
   animation_options_properties[ANIMATION_OPTIONS_PROP_MIN_ZOOM] =
     g_param_spec_double(
       "min-zoom", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  animation_options_properties[ANIMATION_OPTIONS_PROP_MAX_DURATION_MS] =
+    g_param_spec_double(
+      "max-duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
     );
   animation_options_properties[ANIMATION_OPTIONS_PROP_EASING] =
     g_param_spec_boxed(
@@ -1454,6 +1468,35 @@ void maplibre_native_ffi_animation_options_set_min_zoom(
     );
 }
 
+gdouble maplibre_native_ffi_animation_options_get_max_duration_ms(
+  MaplibreNativeFfiAnimationOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANIMATION_OPTIONS(self), 0);
+  return self->max_duration_ms;
+}
+
+gboolean maplibre_native_ffi_animation_options_has_max_duration_ms(
+  MaplibreNativeFfiAnimationOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANIMATION_OPTIONS(self), FALSE);
+  return (self->fields & MLN_ANIMATION_OPTION_MAX_DURATION) != 0;
+}
+
+void maplibre_native_ffi_animation_options_set_max_duration_ms(
+  MaplibreNativeFfiAnimationOptions* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANIMATION_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_ANIMATION_OPTION_MAX_DURATION) != 0;
+  gboolean changed = self->max_duration_ms != value;
+  self->max_duration_ms = value;
+  self->fields |= MLN_ANIMATION_OPTION_MAX_DURATION;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      animation_options_properties[ANIMATION_OPTIONS_PROP_MAX_DURATION_MS]
+    );
+}
+
 MaplibreNativeFfiUnitBezier* maplibre_native_ffi_animation_options_get_easing(
   MaplibreNativeFfiAnimationOptions* self
 ) {
@@ -1547,6 +1590,7 @@ MaplibreNativeFfiAnimationOptions* maplibre_native_ffi_animation_options_copy(
   copy->duration_ms = self->duration_ms;
   copy->velocity = self->velocity;
   copy->min_zoom = self->min_zoom;
+  copy->max_duration_ms = self->max_duration_ms;
   copy->easing = self->easing;
   copy->transition_id = self->transition_id;
   g_clear_pointer(
@@ -1568,6 +1612,7 @@ void maplibre_native_ffi_animation_options_to_native(
   out->duration_ms = (double)(self->duration_ms);
   out->velocity = (double)(self->velocity);
   out->min_zoom = (double)(self->min_zoom);
+  out->max_duration_ms = (double)(self->max_duration_ms);
   maplibre_native_ffi_unit_bezier_to_native(&self->easing, &out->easing, call);
   out->transition_id = (uint64_t)(self->transition_id);
   if (self->end_handler != NULL)

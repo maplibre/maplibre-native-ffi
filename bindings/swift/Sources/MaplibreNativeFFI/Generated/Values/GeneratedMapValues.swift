@@ -72,6 +72,11 @@ public struct AnimationOptions: Sendable {
   public var velocity: Double?
   /// The zoom level at the peak of a fly animation.
   public var minZoom: Double?
+  /// The longest a fly animation may take. A fly animation whose duration, set
+  /// or derived from `velocity`, is longer moves the camera at once instead,
+  /// and so does one too slow for the library to time, without this field.
+  /// Other animations ignore it.
+  public var maxDurationMs: Double?
   public var easing: UnitBezier?
   /// An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change
   /// by. Several changes can share one.
@@ -81,6 +86,7 @@ public struct AnimationOptions: Sendable {
     durationMs: Double? = nil,
     velocity: Double? = nil,
     minZoom: Double? = nil,
+    maxDurationMs: Double? = nil,
     easing: UnitBezier? = nil,
     transitionId: UInt64? = nil,
     endHandler: CameraTransitionHandler = .init()
@@ -88,6 +94,7 @@ public struct AnimationOptions: Sendable {
     self.durationMs = durationMs
     self.velocity = velocity
     self.minZoom = minZoom
+    self.maxDurationMs = maxDurationMs
     self.easing = easing
     self.transitionId = transitionId
     self.endHandler = endHandler
@@ -105,6 +112,10 @@ public struct AnimationOptions: Sendable {
     }
     if let item = minZoom {
       raw.fields |= MLN_ANIMATION_OPTION_MIN_ZOOM.rawValue; raw.min_zoom = item
+    }
+    if let item = maxDurationMs {
+      raw.fields |= MLN_ANIMATION_OPTION_MAX_DURATION.rawValue; raw
+        .max_duration_ms = item
     }
     if let item = easing {
       raw.fields |= MLN_ANIMATION_OPTION_EASING.rawValue; raw.easing = item

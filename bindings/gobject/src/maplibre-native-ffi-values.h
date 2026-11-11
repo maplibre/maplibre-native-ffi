@@ -2689,6 +2689,45 @@ void maplibre_native_ffi_animation_options_set_min_zoom(
 );
 
 /**
+ * MaplibreNativeFfiAnimationOptions:max-duration-ms: (setter set_max_duration_ms) (getter get_max_duration_ms)
+ *
+ * The longest a fly animation may take. A fly animation whose duration, set or
+ * derived from `velocity`, is longer moves the camera at once instead, and so
+ * does one too slow for the library to time, without this field. Other
+ * animations ignore it.
+ */
+/**
+ * maplibre_native_ffi_animation_options_get_max_duration_ms: (get-property max-duration-ms)
+ *
+ * Gets `MaplibreNativeFfiAnimationOptions:max-duration-ms`.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_animation_options_get_max_duration_ms(
+  MaplibreNativeFfiAnimationOptions* self
+);
+
+/**
+ * maplibre_native_ffi_animation_options_has_max_duration_ms:
+ *
+ * Whether `MaplibreNativeFfiAnimationOptions:max-duration-ms` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_animation_options_has_max_duration_ms(
+  MaplibreNativeFfiAnimationOptions* self
+);
+
+/**
+ * maplibre_native_ffi_animation_options_set_max_duration_ms: (set-property max-duration-ms)
+ *
+ * Sets `MaplibreNativeFfiAnimationOptions:max-duration-ms`.
+ */
+void maplibre_native_ffi_animation_options_set_max_duration_ms(
+  MaplibreNativeFfiAnimationOptions* self, gdouble value
+);
+
+/**
  * MaplibreNativeFfiAnimationOptions:easing: (setter set_easing) (getter get_easing)
  *
  * The `easing` member.

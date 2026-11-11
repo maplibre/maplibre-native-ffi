@@ -2136,7 +2136,12 @@ type AnimationOptions struct {
 	Velocity *float64
 	// The zoom level at the peak of a fly animation.
 	MinZoom *float64
-	Easing  *UnitBezier
+	// The longest a fly animation may take. A fly animation whose duration, set or
+	// derived from velocity, is longer moves the camera at once instead, and so
+	// does one too slow for the library to time, without this field. Other
+	// animations ignore it.
+	MaxDurationMs *float64
+	Easing        *UnitBezier
 	// An ID that MapHandle.CancelCameraTransitionsWithID() cancels the change by.
 	// Several changes can share one.
 	TransitionID *uint64
@@ -2149,6 +2154,7 @@ func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_a
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_VELOCITY, &raw.velocity, input.Velocity, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_MAX_DURATION, &raw.max_duration_ms, input.MaxDurationMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_EASING, &raw.easing, input.Easing, arena, nativeUnitBezier)
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_TRANSITION_ID, &raw.transition_id, input.TransitionID, arena, bindingNumber[uint64, C.uint64_t])
 	raw.end_handler = nativeCameraTransitionHandler(input.EndHandler, arena)

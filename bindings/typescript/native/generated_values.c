@@ -3393,6 +3393,16 @@ bool mln_ts_write_animation_options(
     }
     out->fields |= MLN_ANIMATION_OPTION_MIN_ZOOM;
   }
+  if (!mln_ts_member(call, value, "maxDurationMs", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "maxDurationMs");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      double number = 0;
+      if (!mln_ts_read_double(call, member, &number, child)) return false;
+      out->max_duration_ms = (double)number;
+    }
+    out->fields |= MLN_ANIMATION_OPTION_MAX_DURATION;
+  }
   if (!mln_ts_member(call, value, "easing", &member)) return false;
   mln_ts_path(child, sizeof child, path, "easing");
   if (!mln_ts_is_absent(call, member)) {

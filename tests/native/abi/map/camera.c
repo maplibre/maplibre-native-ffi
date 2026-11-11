@@ -110,6 +110,12 @@ static void animation_duration_past_the_native_range(void* descriptor) {
   animation->fields = MLN_ANIMATION_OPTION_DURATION;
   animation->duration_ms = 1e300;
 }
+static void animation_negative_max_duration(void* descriptor) {
+  mln_animation_options* animation =
+    &((mln_camera_update*)descriptor)->animation;
+  animation->fields = MLN_ANIMATION_OPTION_MAX_DURATION;
+  animation->max_duration_ms = -1.0;
+}
 static void animation_zero_velocity(void* descriptor) {
   mln_animation_options* animation =
     &((mln_camera_update*)descriptor)->animation;
@@ -141,6 +147,8 @@ static const mln_test_validation_case update_cases[] = {
   {"unknown animation field", animation_unknown_field,
    MLN_STATUS_INVALID_ARGUMENT, "unknown bits"},
   {"duration past the native range", animation_duration_past_the_native_range,
+   MLN_STATUS_INVALID_ARGUMENT, "native duration range"},
+  {"negative max duration", animation_negative_max_duration,
    MLN_STATUS_INVALID_ARGUMENT, "native duration range"},
   {"zero velocity", animation_zero_velocity, MLN_STATUS_INVALID_ARGUMENT,
    "positive and finite"},
@@ -1316,7 +1324,29 @@ static void camera_calls_reject_what_they_cannot_express(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void flights_reject_unrepresentable_derived_durations(void) {
+// Starts a camera update toward zoom 1 from zoom 0, and reads the zoom once the
+// command has started.
+static double zoom_after(mln_map map, mln_camera_update update) {
+  mln_camera_options start = {.size = sizeof(mln_camera_options)};
+  start.fields = MLN_CAMERA_OPTION_ZOOM;
+  start.zoom = 0.0;
+  jump(map, start);
+  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = 1.0;
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+  const double zoom = query_camera(map).camera.zoom;
+  MLN_TEST_AWAIT_OK(
+    mln_map_cancel_camera_transitions(map, &completion.descriptor, NULL)
+  );
+  return zoom;
+}
+
+// A fly animation longer than its max_duration_ms, or too slow to time at all,
+// moves the camera at once. The durations that animate are long enough that
+// the camera can't have reached the target when the zoom is read.
+static void flights_too_long_to_run_jump(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_square_map(runtime, 512);
   mln_camera_update update = {
@@ -1324,37 +1354,27 @@ static void flights_reject_unrepresentable_derived_durations(void) {
     .camera = {.size = sizeof(mln_camera_options)}
   };
   update.mode = MLN_CAMERA_UPDATE_MODE_FLY;
-  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  update.camera.zoom = 1.0;
+
   update.animation.fields = MLN_ANIMATION_OPTION_VELOCITY;
   update.animation.velocity = nextafter(0.0, 1.0);
-  mln_test_completion command = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_update_camera(map, &update, &command.descriptor, NULL));
-  MLN_TEST_STATUS(
-    MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&command)
-  );
-  TEST_ASSERT_EQUAL_STRING(
-    "flyTo duration must fit the native duration range",
-    mln_test_completion_diagnostic(&command)
-  );
-  mln_test_completion_destroy(&command);
-  TEST_ASSERT_EQUAL_DOUBLE(0.0, query_camera(map).camera.zoom);
-
+  TEST_ASSERT_EQUAL_DOUBLE(1.0, zoom_after(map, update));
   update.animation.velocity = 1e-9;
-  MLN_TEST_AWAIT_OK(
-    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
-  );
-  MLN_TEST_AWAIT_OK(
-    mln_map_cancel_camera_transitions(map, &completion.descriptor, NULL)
-  );
+  TEST_ASSERT_LESS_THAN_DOUBLE(1.0, zoom_after(map, update));
+  update.animation.fields |= MLN_ANIMATION_OPTION_MAX_DURATION;
+  update.animation.max_duration_ms = 1000.0;
+  TEST_ASSERT_EQUAL_DOUBLE(1.0, zoom_after(map, update));
 
-  update.animation.fields |= MLN_ANIMATION_OPTION_DURATION;
-  update.animation.duration_ms = 0.0;
-  update.animation.velocity = nextafter(0.0, 1.0);
-  MLN_TEST_AWAIT_OK(
-    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
-  );
-  TEST_ASSERT_EQUAL_DOUBLE(1.0, query_camera(map).camera.zoom);
+  update.animation.fields =
+    MLN_ANIMATION_OPTION_DURATION | MLN_ANIMATION_OPTION_MAX_DURATION;
+  update.animation.duration_ms = 1e9;
+  update.animation.max_duration_ms = 1e9 - 1.0;
+  TEST_ASSERT_EQUAL_DOUBLE(1.0, zoom_after(map, update));
+  update.animation.max_duration_ms = 1e9;
+  TEST_ASSERT_LESS_THAN_DOUBLE(1.0, zoom_after(map, update));
+
+  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  update.animation.max_duration_ms = 1.0;
+  TEST_ASSERT_LESS_THAN_DOUBLE(1.0, zoom_after(map, update));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -1403,7 +1423,7 @@ static void unbounded_and_world_bounds_stay_distinct(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(camera_calls_reject_what_they_cannot_express);
-  RUN_TEST(flights_reject_unrepresentable_derived_durations);
+  RUN_TEST(flights_too_long_to_run_jump);
   RUN_TEST(every_camera_field_round_trips_through_the_snapshot);
   RUN_TEST(queued_immediate_deltas_compose_exactly);
   RUN_TEST(every_camera_delta_field_follows_its_convention);

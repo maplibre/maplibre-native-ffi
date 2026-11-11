@@ -1766,6 +1766,10 @@ fn generated_input_mln_animation_options<'py>(
         raw.min_zoom = field.extract::<f64>()?;
         raw.fields |= sys::MLN_ANIMATION_OPTION_MIN_ZOOM;
     }
+    if let Some(field) = generated_present(value, "max_duration_ms")? {
+        raw.max_duration_ms = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_ANIMATION_OPTION_MAX_DURATION;
+    }
     if let Some(field) = generated_present(value, "easing")? {
         raw.easing = generated_input_mln_unit_bezier(&field, storage)?;
         raw.fields |= sys::MLN_ANIMATION_OPTION_EASING;

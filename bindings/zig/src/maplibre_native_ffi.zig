@@ -3426,6 +3426,11 @@ pub const AnimationOptions = struct {
     velocity: ?f64 = null,
     /// The zoom level at the peak of a fly animation.
     min_zoom: ?f64 = null,
+    /// The longest a fly animation may take. A fly animation whose duration,
+    /// set or derived from `velocity`, is longer moves the camera at once
+    /// instead, and so does one too slow for the library to time, without this
+    /// field. Other animations ignore it.
+    max_duration_ms: ?f64 = null,
     easing: ?UnitBezier = null,
     /// An ID that `Map.cancelCameraTransitionsWithId()` cancels the change by.
     /// Several changes can share one.
@@ -3437,6 +3442,7 @@ pub const AnimationOptions = struct {
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, self.duration_ms);
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_VELOCITY, &raw.velocity, self.velocity);
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_MAX_DURATION, &raw.max_duration_ms, self.max_duration_ms);
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_EASING, &raw.easing, self.easing);
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_TRANSITION_ID, &raw.transition_id, self.transition_id);
         raw.end_handler = try self.end_handler.toNative(roots);
@@ -3449,6 +3455,7 @@ pub const AnimationOptions = struct {
             .duration_ms = if (raw.fields & c.MLN_ANIMATION_OPTION_DURATION != 0) raw.duration_ms else null,
             .velocity = if (raw.fields & c.MLN_ANIMATION_OPTION_VELOCITY != 0) raw.velocity else null,
             .min_zoom = if (raw.fields & c.MLN_ANIMATION_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
+            .max_duration_ms = if (raw.fields & c.MLN_ANIMATION_OPTION_MAX_DURATION != 0) raw.max_duration_ms else null,
             .easing = if (raw.fields & c.MLN_ANIMATION_OPTION_EASING != 0) UnitBezier.fromNative(raw.easing) else null,
             .transition_id = if (raw.fields & c.MLN_ANIMATION_OPTION_TRANSITION_ID != 0) raw.transition_id else null,
             .end_handler = .{},

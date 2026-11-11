@@ -94,6 +94,11 @@ internal static unsafe class GeneratedValues
         native.fields |= Put(value.Velocity, ref native.velocity, MLN_ANIMATION_OPTION_VELOCITY);
         native.fields |= Put(value.MinZoom, ref native.min_zoom, MLN_ANIMATION_OPTION_MIN_ZOOM);
         native.fields |= Put(
+            value.MaxDurationMs,
+            ref native.max_duration_ms,
+            MLN_ANIMATION_OPTION_MAX_DURATION
+        );
+        native.fields |= Put(
             value.Easing,
             ref native.easing,
             MLN_ANIMATION_OPTION_EASING,

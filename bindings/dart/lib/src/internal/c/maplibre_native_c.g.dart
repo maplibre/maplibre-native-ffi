@@ -172,6 +172,8 @@ final class mln_animation_options extends Struct {
   external double velocity;
   @Double()
   external double min_zoom;
+  @Double()
+  external double max_duration_ms;
   external mln_unit_bezier easing;
   @Uint64()
   external int transition_id;
@@ -2098,6 +2100,7 @@ const MLN_ANIMATION_OPTION_VELOCITY = 2;
 const MLN_ANIMATION_OPTION_MIN_ZOOM = 4;
 const MLN_ANIMATION_OPTION_EASING = 8;
 const MLN_ANIMATION_OPTION_TRANSITION_ID = 16;
+const MLN_ANIMATION_OPTION_MAX_DURATION = 32;
 
 // mln_bound_option_field
 const MLN_BOUND_OPTION_BOUNDS = 1;

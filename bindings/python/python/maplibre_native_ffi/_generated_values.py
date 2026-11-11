@@ -1275,6 +1275,13 @@ class AnimationOptions:
     min_zoom: float | None = None
     """The zoom level at the peak of a fly animation."""
 
+    max_duration_ms: float | None = None
+    """The longest a fly animation may take. A fly animation whose duration, set
+    or derived from `velocity`, is longer moves the camera at once instead,
+    and so does one too slow for the library to time, without this field.
+    Other animations ignore it.
+    """
+
     easing: UnitBezier | None = None
 
     transition_id: int | None = None
@@ -1292,6 +1299,7 @@ class AnimationOptions:
             duration_ms=raw["duration_ms"],
             velocity=raw["velocity"],
             min_zoom=raw["min_zoom"],
+            max_duration_ms=raw["max_duration_ms"],
             easing=_maybe(UnitBezier._from_native, raw["easing"]),
             transition_id=raw["transition_id"],
             end_handler=CameraTransitionHandler(),
