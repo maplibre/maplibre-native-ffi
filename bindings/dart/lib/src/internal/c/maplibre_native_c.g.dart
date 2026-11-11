@@ -802,6 +802,10 @@ final class mln_map_snapshot extends Struct {
   external mln_camera_bounds bounds;
   external mln_free_camera free_camera;
   external mln_map_view view;
+  @Bool()
+  external bool globe_rendering;
+  @Bool()
+  external bool globe_free_bearing_enabled;
 }
 
 final class mln_map_tile_options extends Struct {
@@ -845,6 +849,7 @@ final class mln_map_view extends Struct {
   external mln_logical_extent extent;
   external mln_projection_mode projection_mode;
   external mln_map_viewport viewport;
+  external mln_projection_definition projection;
 }
 
 final class mln_map_viewport extends Struct {
@@ -1185,6 +1190,15 @@ final class mln_projected_meters extends Struct {
   external double northing;
   @Double()
   external double easting;
+}
+
+final class mln_projection_definition extends Struct {
+  @Uint32()
+  external int from;
+  @Uint32()
+  external int to;
+  @Double()
+  external double transition;
 }
 
 final class mln_projection_mode extends Struct {
@@ -2371,6 +2385,11 @@ const MLN_PAN_MOMENTUM_VELOCITY = 1;
 const MLN_PROJECTION_MODE_OPTION_AXONOMETRIC = 1;
 const MLN_PROJECTION_MODE_OPTION_X_SKEW = 2;
 const MLN_PROJECTION_MODE_OPTION_Y_SKEW = 4;
+
+// mln_projection_type
+const MLN_PROJECTION_TYPE_MERCATOR = 0;
+const MLN_PROJECTION_TYPE_VERTICAL_PERSPECTIVE = 1;
+const MLN_PROJECTION_TYPE_GLOBE = 2;
 
 // mln_render_abandon_disposition
 const MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0;
@@ -3901,6 +3920,21 @@ external int mln_map_projection_get_camera(
 @Native<
   Int32 Function(
     mln_map_projection,
+    mln_lat_lng,
+    Pointer<Bool>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_projection_is_location_occluded(
+  int projection,
+  mln_lat_lng coordinate,
+  Pointer<Bool> out_occluded,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map_projection,
     mln_screen_point,
     Pointer<mln_lat_lng>,
     Pointer<mln_diagnostic>,
@@ -4346,6 +4380,21 @@ external int mln_map_set_global_state_property(
   int map,
   mln_buffer_view property_name,
   mln_buffer_view value,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Bool,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_globe_free_bearing_enabled(
+  int map,
+  bool enabled,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

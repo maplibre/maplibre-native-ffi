@@ -585,6 +585,15 @@ internal actual object C {
     Ffm.downcall("mln_map_projection_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_get_camera =
     Ffm.downcall("mln_map_projection_get_camera", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_projection_is_location_occluded =
+    Ffm.downcall(
+      "mln_map_projection_is_location_occluded",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_lat_lng,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_projection_lat_lng_for_pixel =
     Ffm.downcall(
       "mln_map_projection_lat_lng_for_pixel",
@@ -806,6 +815,15 @@ internal actual object C {
       JAVA_LONG,
       mln_buffer_view,
       mln_buffer_view,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_set_globe_free_bearing_enabled =
+    Ffm.downcall(
+      "mln_map_set_globe_free_bearing_enabled",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_BOOLEAN,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -2303,6 +2321,19 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_map_projection_get_camera.invokeExact(projection, outResult, outDiagnostic) as Int
 
+  actual fun mln_map_projection_is_location_occluded(
+    projection: Long,
+    coordinate: Long,
+    outOccluded: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_projection_is_location_occluded.invokeExact(
+      projection,
+      Ffm.value(coordinate, mln_lat_lng),
+      outOccluded,
+      outDiagnostic,
+    ) as Int
+
   actual fun mln_map_projection_lat_lng_for_pixel(
     projection: Long,
     point: Long,
@@ -2651,6 +2682,15 @@ internal actual object C {
       completion,
       outDiagnostic,
     ) as Int
+
+  actual fun mln_map_set_globe_free_bearing_enabled(
+    map: Long,
+    enabled: Boolean,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_set_globe_free_bearing_enabled.invokeExact(map, enabled, completion, outDiagnostic)
+      as Int
 
   actual fun mln_map_set_image_source_coordinates(
     map: Long,

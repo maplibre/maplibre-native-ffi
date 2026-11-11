@@ -96,16 +96,17 @@ internal fun NativeArena.writeLogicalExtent(value: LogicalExtent): Long =
 
 @JvmSynthetic
 internal fun NativeArena.putMapView(target: Long, value: MapView) {
-  writeU32(target, w(192, 192, 180).toUInt())
+  writeU32(target, w(208, 208, 196).toUInt())
   putCamera(target + w(8, 8, 4), value.camera)
   putLogicalExtent(target + w(104, 104, 100), value.extent)
   putProjectionMode(target + w(120, 120, 116), value.projectionMode)
   putMapViewport(target + w(144, 144, 136), value.viewport)
+  putProjectionDefinition(target + w(192, 192, 180), value.projection)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeMapView(value: MapView): Long =
-  allocate(w(192, 192, 180), w(8, 8, 4)).also { putMapView(it, value) }
+  allocate(w(208, 208, 196), w(8, 8, 4)).also { putMapView(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putOffscreenDeviceOptions(target: Long, value: OffscreenDeviceOptions) {
@@ -1567,7 +1568,7 @@ internal fun readRenderFrameResult(source: Long): RenderFrameResult =
     frameGeneration = readU64(source + 32),
     needsRepaint = readBool(source + 40),
     view = readMapView(source + w(48, 48, 44)),
-    mode = RenderMode.of(readU32(source + w(240, 240, 224))),
+    mode = RenderMode.of(readU32(source + w(256, 256, 240))),
   )
 
 @JvmSynthetic
@@ -1654,6 +1655,8 @@ internal fun readMapSnapshot(source: Long): MapSnapshot =
     bounds = readCameraBounds(source + w(88, 88, 76)),
     freeCamera = readFreeCamera(source + w(160, 160, 144)),
     view = readMapView(source + w(216, 216, 200)),
+    globeRendering = readBool(source + w(424, 424, 396)),
+    globeFreeBearingEnabled = readBool(source + w(425, 425, 397)),
   )
 
 @JvmSynthetic
@@ -1752,7 +1755,7 @@ internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> =
     readAddress(source + 8),
     readSize(source + w(12, 16)),
     readU32(source + 4).toULong(),
-    w(248, 248, 228),
+    w(264, 264, 244),
   ) { item ->
     readRenderFrameResult(item)
   }
@@ -1868,6 +1871,17 @@ internal fun NativeArena.putMapViewport(target: Long, value: MapViewport) {
 @JvmSynthetic
 internal fun NativeArena.writeMapViewport(value: MapViewport): Long =
   allocate(w(48, 48, 44), w(8, 8, 4)).also { putMapViewport(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putProjectionDefinition(target: Long, value: ProjectionDefinition) {
+  writeU32(target, value.from.rawValue)
+  writeU32(target + 4, value.to.rawValue)
+  writeF64(target + 8, value.transition)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeProjectionDefinition(value: ProjectionDefinition): Long =
+  allocate(16, w(8, 8, 4)).also { putProjectionDefinition(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putStyleExpressionType(target: Long, value: StyleExpressionType) {
@@ -2295,6 +2309,7 @@ internal fun readMapView(source: Long): MapView =
     extent = readLogicalExtent(source + w(104, 104, 100)),
     projectionMode = readProjectionMode(source + w(120, 120, 116)),
     viewport = readMapViewport(source + w(144, 144, 136)),
+    projection = readProjectionDefinition(source + w(192, 192, 180)),
   )
 
 @JvmSynthetic
@@ -2601,6 +2616,14 @@ internal fun readMapViewport(source: Long): MapViewport =
     constrainMode = ConstrainMode.of(readU32(source + 4)),
     viewportMode = ViewportMode.of(readU32(source + 8)),
     frustumOffset = readEdgeInsets(source + w(16, 16, 12)),
+  )
+
+@JvmSynthetic
+internal fun readProjectionDefinition(source: Long): ProjectionDefinition =
+  ProjectionDefinition(
+    from = ProjectionType.of(readU32(source)),
+    to = ProjectionType.of(readU32(source + 4)),
+    transition = readF64(source + 8),
   )
 
 @JvmSynthetic

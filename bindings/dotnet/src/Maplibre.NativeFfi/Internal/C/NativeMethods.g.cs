@@ -662,6 +662,14 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_projection_is_location_occluded(
+        MlnMapProjection projection,
+        mln_lat_lng coordinate,
+        bool* out_occluded,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_lat_lng_for_pixel(
         MlnMapProjection projection,
         mln_screen_point point,
@@ -905,6 +913,14 @@ internal static unsafe partial class NativeMethods
         MlnMap map,
         mln_buffer_view property_name,
         mln_buffer_view value,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_globe_free_bearing_enabled(
+        MlnMap map,
+        byte enabled,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );

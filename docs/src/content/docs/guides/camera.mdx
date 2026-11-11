@@ -82,10 +82,16 @@ it slows, so it can match how your platform scrolls.
 
 <Snippet page="camera" region="gesture" />
 
+On a globe, drags and zooms keep the bearing by default. If your users can
+rotate the map, turn on [](api:mln_map_set_globe_free_bearing_enabled) so they
+turn the bearing with the planet instead, and a drag can cross a pole.
+
 ## Convert coordinates
 
 A [](api:mln_map_projection) converts between screen points and coordinates for
 one view of the map. Create it from the snapshot's view, and create a new one
-after the camera moves. Release it when you're done.
+after the camera moves. Release it when you're done. On a globe, a coordinate on
+the far side still has a screen point, so check
+[](api:mln_map_projection_is_location_occluded) before you draw at it.
 
 <Snippet page="camera" region="convert" />

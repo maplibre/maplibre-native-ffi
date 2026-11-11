@@ -1578,6 +1578,14 @@ export interface MapSnapshot {
   readonly bounds: CameraBounds;
   readonly freeCamera: FreeCamera;
   readonly view: MapView;
+  /**
+   * Whether the map draws as a globe, alone or blending into Mercator.
+   */
+  readonly globeRendering: boolean;
+  /**
+   * The setting from `MapHandle.setGlobeFreeBearingEnabled()`.
+   */
+  readonly globeFreeBearingEnabled: boolean;
 }
 
 /**
@@ -1648,6 +1656,10 @@ export interface MapView {
   extent: LogicalExtent;
   projectionMode: ProjectionMode;
   viewport: MapViewport;
+  /**
+   * The style's projection at the camera's zoom.
+   */
+  projection: ProjectionDefinition;
 }
 
 /**
@@ -2414,6 +2426,24 @@ export interface ProjectedMeters {
 }
 
 /**
+ * A style's projection at one zoom: `from` turning into `to`.
+ *
+ * A zeroed definition is Mercator.
+ *
+ * See `mln_projection_definition` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface ProjectionDefinition {
+  from: ProjectionType;
+  to: ProjectionType;
+  /**
+   * How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
+   * equals `to`. A value outside that range holds at the nearer end.
+   */
+  transition: number;
+}
+
+/**
  * A map's whole projection mode.
  *
  * Its members mean the same as those of `ProjectionModeOptions`.
@@ -2441,6 +2471,31 @@ export interface ProjectionModeOptions {
   xSkew?: number;
   ySkew?: number;
 }
+
+/**
+ * A projection that a style's
+ * &#91;projection&#93;(https://maplibre.org/maplibre-style-spec/projection/)
+ * names.
+ *
+ * See `mln_projection_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export const ProjectionType = {
+  mercator: 0,
+  /**
+   * Draws the map as a globe.
+   */
+  verticalPerspective: 1,
+  /**
+   * Draws the map as a globe at low zooms, and hands over to Mercator between
+   * zoom 11 and 12.
+   */
+  globe: 2,
+} as const;
+/** One of the ProjectionType values, or a value this binding does not know. */
+export type ProjectionType =
+  | (typeof ProjectionType)[keyof typeof ProjectionType]
+  | (number & {});
 
 /**
  * A rotation, as a quaternion.

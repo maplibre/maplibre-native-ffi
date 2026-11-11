@@ -590,6 +590,14 @@ fn generated_copy_mln_map_snapshot(
         generated_copy_mln_free_camera(py, &value.free_camera)?,
     )?;
     dict.set_item("view", generated_copy_mln_map_view(py, &value.view)?)?;
+    dict.set_item(
+        "globe_rendering",
+        generated_value(py, value.globe_rendering)?,
+    )?;
+    dict.set_item(
+        "globe_free_bearing_enabled",
+        generated_value(py, value.globe_free_bearing_enabled)?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -627,6 +635,10 @@ fn generated_copy_mln_map_view(py: Python<'_>, value: &sys::mln_map_view) -> PyR
     dict.set_item(
         "viewport",
         generated_copy_mln_map_viewport(py, &value.viewport)?,
+    )?;
+    dict.set_item(
+        "projection",
+        generated_copy_mln_projection_definition(py, &value.projection)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -801,6 +813,17 @@ fn generated_copy_mln_projected_meters(
     let dict = PyDict::new(py);
     dict.set_item("northing", generated_value(py, value.northing)?)?;
     dict.set_item("easting", generated_value(py, value.easting)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_projection_definition(
+    py: Python<'_>,
+    value: &sys::mln_projection_definition,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("from_", generated_value(py, value.from)?)?;
+    dict.set_item("to", generated_value(py, value.to)?)?;
+    dict.set_item("transition", generated_value(py, value.transition)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2550,6 +2573,8 @@ fn generated_input_mln_map_view<'py>(
     raw.projection_mode =
         generated_input_mln_projection_mode(&value.getattr("projection_mode")?, storage)?;
     raw.viewport = generated_input_mln_map_viewport(&value.getattr("viewport")?, storage)?;
+    raw.projection =
+        generated_input_mln_projection_definition(&value.getattr("projection")?, storage)?;
     Ok(raw)
 }
 
@@ -2983,6 +3008,20 @@ fn generated_input_mln_projected_meters<'py>(
     let mut raw: sys::mln_projected_meters = unsafe { std::mem::zeroed() };
     raw.northing = value.getattr("northing")?.extract::<f64>()?;
     raw.easting = value.getattr("easting")?.extract::<f64>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_projection_definition<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_projection_definition> {
+    let _ = storage;
+    let mut raw: sys::mln_projection_definition = unsafe { std::mem::zeroed() };
+    raw.from = value
+        .getattr("from_")?
+        .extract::<sys::mln_projection_type>()?;
+    raw.to = value.getattr("to")?.extract::<sys::mln_projection_type>()?;
+    raw.transition = value.getattr("transition")?.extract::<f64>()?;
     Ok(raw)
 }
 
@@ -6812,6 +6851,30 @@ impl MapHandle {
             })
         }
     }
+    #[pyo3(signature = (enabled))]
+    fn set_globe_free_bearing_enabled(&self, py: Python<'_>, enabled: bool) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic)
+            })
+        }
+    }
+    #[pyo3(signature = (enabled))]
+    fn _discard_set_globe_free_bearing_enabled(
+        &self,
+        py: Python<'_>,
+        enabled: bool,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic)
+            })
+        }
+    }
     #[pyo3(signature = (source_id, coordinates))]
     fn set_image_source_coordinates(
         &self,
@@ -7490,6 +7553,29 @@ impl MapProjectionHandle {
             })
         }?;
         generated_copy_mln_map_projection_camera_result(py, &out_result)
+    }
+    #[pyo3(signature = (coordinate))]
+    fn is_location_occluded(
+        &self,
+        py: Python<'_>,
+        coordinate: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let coordinate_value = generated_input_mln_lat_lng(&coordinate.clone(), storage)?;
+        let handle = self.input();
+        let mut out_occluded: bool = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_map_projection_is_location_occluded(
+                    handle,
+                    coordinate_value,
+                    &mut out_occluded,
+                    diagnostic,
+                )
+            })
+        }?;
+        generated_value(py, out_occluded)
     }
     #[pyo3(signature = (point))]
     fn lat_lng_for_pixel(&self, py: Python<'_>, point: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {

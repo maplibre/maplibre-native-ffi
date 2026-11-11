@@ -389,6 +389,30 @@ public extension MapHandle {
     }
   }
 
+  /// Sets whether drags and zooms on a globe turn the bearing.
+  ///
+  /// When it's on, a drag or a zoom around a point on the globe turns the
+  /// bearing so the planet keeps its orientation, and a drag can carry the
+  /// camera over a pole. When it's off, the default, they keep the bearing, as
+  /// MapLibre GL JS does. Turn it on for a map whose users can rotate it. It
+  /// changes nothing while the map draws Mercator.
+  ///
+  /// See `mln_map_set_globe_free_bearing_enabled` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  @discardableResult
+  func setGlobeFreeBearingEnabled(_ bindingArg0: Bool) async throws
+    -> CommandCompletion
+  {
+    try await nativeCommand { raw, _, completion, diagnostic in
+      mln_map_set_globe_free_bearing_enabled(
+        raw,
+        bindingArg0,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
   /// Sets whether the map draws in perspective or axonometric projection, and
   /// how much it skews the view.
   ///
@@ -610,6 +634,18 @@ public extension MapHandleDiscarding {
         nil,
         diagnostic
       ) }
+  }
+
+  func setGlobeFreeBearingEnabled(_ bindingArg0: Bool) throws {
+    try owner
+      .nativeInvoke { raw, _, diagnostic in
+        mln_map_set_globe_free_bearing_enabled(
+          raw,
+          bindingArg0,
+          nil,
+          diagnostic
+        )
+      }
   }
 
   func setProjectionMode(options bindingArg0: ProjectionModeOptions) throws {

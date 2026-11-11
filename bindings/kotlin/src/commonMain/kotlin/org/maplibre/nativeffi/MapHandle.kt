@@ -752,7 +752,7 @@ private constructor(
    */
   public fun getSnapshot(): MapSnapshot =
     nativeCall(this, binding) {
-      val out = sized(w(408, 408, 380), w(8, 8, 4))
+      val out = sized(w(432, 432, 400), w(8, 8, 4))
       check(C.mln_map_get_snapshot(handle, out, diagnostic))
       readMapSnapshot(out)
     }
@@ -1592,6 +1592,22 @@ private constructor(
           diagnostic,
         ),
       )
+    }
+
+  /**
+   * Sets whether drags and zooms on a globe turn the bearing.
+   *
+   * When it's on, a drag or a zoom around a point on the globe turns the bearing so the planet
+   * keeps its orientation, and a drag can carry the camera over a pole. When it's off, the default,
+   * they keep the bearing, as MapLibre GL JS does. Turn it on for a map whose users can rotate it.
+   * It changes nothing while the map draws Mercator.
+   *
+   * See `mln_map_set_globe_free_bearing_enabled` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  public fun setGlobeFreeBearingEnabled(enabled: Boolean): Completion<CommandCompletion> =
+    nativeCommand(this, binding) {
+      check(C.mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic))
     }
 
   /**
@@ -2460,6 +2476,12 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
           diagnostic,
         ),
       )
+    }
+
+  /** [MapHandle.setGlobeFreeBearingEnabled] without its completion. */
+  public fun setGlobeFreeBearingEnabled(enabled: Boolean): Unit =
+    nativeDiscard(owner, binding) {
+      check(C.mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic))
     }
 
   /** [MapHandle.setImageSourceCoordinates] without its completion. */

@@ -6,6 +6,10 @@
 #ifndef MAPLIBRE_NATIVE_C_PROJECTION_H
 #define MAPLIBRE_NATIVE_C_PROJECTION_H
 
+#ifndef __cplusplus
+#include <stdbool.h>
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -21,7 +25,11 @@ extern "C" {
  *
  * Create it from the `view` of an mln_map_snapshot or an
  * mln_render_frame_result. The projection doesn't follow the map, so create a
- * new one after the map's camera or size changes.
+ * new one after the map's camera, size, or style projection changes.
+ *
+ * Returns:
+ * - MLN_STATUS_UNSUPPORTED when the view's style projection draws a globe and
+ *   the library can't project one.
  */
 MLN_API mln_status mln_map_projection_create(
   const mln_map_view* view,
@@ -50,7 +58,8 @@ MLN_API mln_status mln_map_projection_get_camera(
 /**
  * Moves the projection's camera, without changing the map.
  *
- * Camera fields that `camera` doesn't set keep their values.
+ * Camera fields that `camera` doesn't set keep their values. The style
+ * projection stays as the view had it, even at another zoom.
  */
 MLN_API mln_status mln_map_projection_set_camera(
   mln_map_projection projection, const mln_camera_options* camera,
@@ -60,11 +69,25 @@ MLN_API mln_status mln_map_projection_set_camera(
 /**
  * Finds the screen point of a coordinate.
  *
- * The point is in the copy of the world nearest the camera's center.
+ * The point is in the copy of the world nearest the camera's center. On a
+ * globe, a coordinate on the far side also gets a point;
+ * mln_map_projection_is_location_occluded() says whether the globe hides it.
  */
 MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Reports whether the globe hides a coordinate from the camera.
+ *
+ * Mercator hides nothing, so this reports false unless the view's style
+ * projection draws a globe.
+ */
+MLN_API mln_status mln_map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate,
+  bool* out_occluded MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

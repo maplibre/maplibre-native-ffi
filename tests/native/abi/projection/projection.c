@@ -188,6 +188,33 @@ static void negative_frustum_offset(void* call) {
 static void unknown_orientation(void* call) {
   ((projection_call*)call)->view.viewport.north_orientation = 9;
 }
+static void unknown_projection_type(void* call) {
+  ((projection_call*)call)->view.projection.to = 9;
+}
+static void nan_projection_transition(void* call) {
+  projection_call* projection = call;
+  projection->view.projection.to = MLN_PROJECTION_TYPE_VERTICAL_PERSPECTIVE;
+  projection->view.projection.transition = NAN;
+}
+static void halfway_to_the_globe(void* call) {
+  projection_call* projection = call;
+  projection->view.projection.to = MLN_PROJECTION_TYPE_VERTICAL_PERSPECTIVE;
+  projection->view.projection.transition = 0.5;
+}
+static void globe_projection(void* call) {
+  projection_call* projection = call;
+  projection->view.projection.from = MLN_PROJECTION_TYPE_GLOBE;
+  projection->view.projection.to = MLN_PROJECTION_TYPE_GLOBE;
+}
+static void done_leaving_the_globe(void* call) {
+  projection_call* projection = call;
+  projection->view.projection.from = MLN_PROJECTION_TYPE_GLOBE;
+  projection->view.projection.transition = 1.0;
+}
+static void zeroed_projection(void* call) {
+  projection_call* projection = call;
+  projection->view.projection = (mln_projection_definition){0};
+}
 static void null_output(void* call) {
   ((projection_call*)call)->null_output = true;
 }
@@ -241,6 +268,16 @@ static void creation_rejects_invalid_views(void) {
      MLN_STATUS_INVALID_ARGUMENT, "frustum offset"},
     {"unknown orientation", unknown_orientation, MLN_STATUS_INVALID_ARGUMENT,
      "north_orientation"},
+    {"unknown projection type", unknown_projection_type,
+     MLN_STATUS_INVALID_ARGUMENT, "projection types"},
+    {"non-finite projection transition", nan_projection_transition,
+     MLN_STATUS_INVALID_ARGUMENT, "projection transition"},
+    // MapLibre Native has no globe to project.
+    {"halfway to the globe", halfway_to_the_globe, MLN_STATUS_UNSUPPORTED,
+     "globe"},
+    {"globe projection", globe_projection, MLN_STATUS_UNSUPPORTED, "globe"},
+    {"done leaving the globe", done_leaving_the_globe, MLN_STATUS_OK, NULL},
+    {"zeroed projection", zeroed_projection, MLN_STATUS_OK, NULL},
     {"null output", null_output, MLN_STATUS_INVALID_ARGUMENT, "out_projection"},
     {"occupied output", occupied_output, MLN_STATUS_INVALID_ARGUMENT,
      "out_projection"},
@@ -249,6 +286,50 @@ static void creation_rejects_invalid_views(void) {
     cases, sizeof(cases) / sizeof(cases[0]), &defaults, sizeof(defaults),
     submit_projection, NULL
   );
+}
+
+// MapLibre Native draws only Mercator, which hides no location.
+static void a_mercator_view_hides_no_location(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
+  TEST_ASSERT_FALSE(snapshot.globe_rendering);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_PROJECTION_TYPE_MERCATOR, snapshot.view.projection.from
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_PROJECTION_TYPE_MERCATOR, snapshot.view.projection.to
+  );
+
+  mln_map_projection projection = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_map_projection_create(&snapshot.view, &projection, NULL));
+  const mln_lat_lng locations[] = {{0.0, 0.0}, {0.0, 180.0}, {-80.0, 90.0}};
+  for (size_t index = 0; index < sizeof(locations) / sizeof(locations[0]);
+       index += 1) {
+    bool occluded = true;
+    MLN_TEST_OK(mln_map_projection_is_location_occluded(
+      projection, locations[index], &occluded, NULL
+    ));
+    TEST_ASSERT_FALSE(occluded);
+  }
+
+  bool unchanged = true;
+  MLN_TEST_INVALID(mln_map_projection_is_location_occluded(
+    projection, (mln_lat_lng){91.0, 0.0}, &unchanged, NULL
+  ));
+  TEST_ASSERT_TRUE(unchanged);
+  MLN_TEST_INVALID(mln_map_projection_is_location_occluded(
+    projection, (mln_lat_lng){0.0, 0.0}, NULL, NULL
+  ));
+  MLN_TEST_INVALID(mln_map_projection_is_location_occluded(
+    MLN_HANDLE_NULL, (mln_lat_lng){0.0, 0.0}, &unchanged, NULL
+  ));
+  TEST_ASSERT_TRUE(unchanged);
+
+  mln_map_projection_release(projection);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 static void a_view_projection_ignores_the_maps_constraints(void) {
@@ -738,6 +819,7 @@ MLN_TEST_GROUP {
   RUN_TEST(projection_outlives_its_source_map_and_runtime);
   RUN_TEST(projection_follows_committed_extent_viewport_and_mode);
   RUN_TEST(creation_rejects_invalid_views);
+  RUN_TEST(a_mercator_view_hides_no_location);
   RUN_TEST(a_view_projection_ignores_the_maps_constraints);
   RUN_TEST(setters_apply_before_return);
   RUN_TEST(projection_setters_reject_invalid_values);

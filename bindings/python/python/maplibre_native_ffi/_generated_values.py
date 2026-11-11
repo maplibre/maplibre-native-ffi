@@ -608,6 +608,20 @@ class OpenGlContextProviderFlag(IntFlag):
     WEB_GL = 4
 
 
+class ProjectionType(UnknownIntEnum):
+    """A projection that a style's
+    \\[projection\\](https://maplibre.org/maplibre-style-spec/projection/)
+    names.
+
+    See `mln_projection_type` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    MERCATOR = 0
+    VERTICAL_PERSPECTIVE = 1
+    GLOBE = 2
+
+
 class RenderAbandonDisposition(UnknownIntEnum):
     """What `RenderSessionHandle.abandon()` did with a session's graphics
     objects.
@@ -2672,6 +2686,12 @@ class MapSnapshot:
 
     view: MapView
 
+    globe_rendering: bool
+    """Whether the map draws as a globe, alone or blending into Mercator."""
+
+    globe_free_bearing_enabled: bool
+    """The setting from `MapHandle.set_globe_free_bearing_enabled()`."""
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -2687,6 +2707,8 @@ class MapSnapshot:
             bounds=CameraBounds._from_native(raw["bounds"]),
             free_camera=FreeCamera._from_native(raw["free_camera"]),
             view=MapView._from_native(raw["view"]),
+            globe_rendering=raw["globe_rendering"],
+            globe_free_bearing_enabled=raw["globe_free_bearing_enabled"],
         )
 
 
@@ -2784,6 +2806,11 @@ class MapView:
 
     viewport: MapViewport = field(default_factory=lambda: MapViewport())
 
+    projection: ProjectionDefinition = field(
+        default_factory=lambda: ProjectionDefinition()
+    )
+    """The style's projection at the camera's zoom."""
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -2791,6 +2818,7 @@ class MapView:
             extent=LogicalExtent._from_native(raw["extent"]),
             projection_mode=ProjectionMode._from_native(raw["projection_mode"]),
             viewport=MapViewport._from_native(raw["viewport"]),
+            projection=ProjectionDefinition._from_native(raw["projection"]),
         )
 
 
@@ -3678,6 +3706,34 @@ class ProjectedMeters:
     @classmethod
     def _from_native(cls, raw):
         return cls(northing=raw["northing"], easting=raw["easting"])
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectionDefinition:
+    """A style's projection at one zoom: `from` turning into `to`.
+
+    A zeroed definition is Mercator.
+
+    See `mln_projection_definition` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    from_: ProjectionType = ProjectionType.MERCATOR
+
+    to: ProjectionType = ProjectionType.MERCATOR
+
+    transition: float = 0.0
+    """How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
+    equals `to`. A value outside that range holds at the nearer end.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            from_=ProjectionType(raw["from_"]),
+            to=ProjectionType(raw["to"]),
+            transition=raw["transition"],
+        )
 
 
 @dataclass(frozen=True, slots=True)

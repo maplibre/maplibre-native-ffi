@@ -27,6 +27,7 @@ OffscreenDescriptor struct
 OpenGlBorrowedTexture struct
 OpenGlTextureFrame struct
 ProjectedMeters struct
+ProjectionDefinition struct
 ProjectionMode struct
 Quaternion struct
 RenderAbandonResult struct

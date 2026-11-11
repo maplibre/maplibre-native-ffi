@@ -8995,6 +8995,66 @@ MaplibreNativeFfiMapViewport* maplibre_native_ffi_map_viewport_from_native(
 }
 
 G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiProjectionDefinition,
+  maplibre_native_ffi_projection_definition,
+  maplibre_native_ffi_projection_definition_copy,
+  maplibre_native_ffi_projection_definition_free
+)
+
+MaplibreNativeFfiProjectionDefinition*
+maplibre_native_ffi_projection_definition_copy(
+  const MaplibreNativeFfiProjectionDefinition* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_projection_definition_free(
+  MaplibreNativeFfiProjectionDefinition* self
+) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiProjectionDefinition) ==
+  sizeof(mln_projection_definition)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiProjectionDefinition, mln_projection_definition, from
+);
+SAME_MEMBER(
+  MaplibreNativeFfiProjectionDefinition, mln_projection_definition, to
+);
+SAME_MEMBER(
+  MaplibreNativeFfiProjectionDefinition, mln_projection_definition, transition
+);
+
+void maplibre_native_ffi_projection_definition_to_native(
+  const MaplibreNativeFfiProjectionDefinition* self,
+  mln_projection_definition* out, MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memcpy(out, self, sizeof *out);
+}
+
+void maplibre_native_ffi_projection_definition_read(
+  MaplibreNativeFfiProjectionDefinition* out,
+  const mln_projection_definition* in
+) {
+  memcpy(out, in, sizeof *out);
+}
+
+MaplibreNativeFfiProjectionDefinition*
+maplibre_native_ffi_projection_definition_from_native(
+  const mln_projection_definition* in
+) {
+  MaplibreNativeFfiProjectionDefinition* self =
+    g_new0(MaplibreNativeFfiProjectionDefinition, 1);
+  maplibre_native_ffi_projection_definition_read(self, in);
+  return self;
+}
+
+G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiMapView, maplibre_native_ffi_map_view,
   maplibre_native_ffi_map_view_copy, maplibre_native_ffi_map_view_free
 )
@@ -9027,6 +9087,9 @@ void maplibre_native_ffi_map_view_to_native(
   maplibre_native_ffi_map_viewport_to_native(
     &self->viewport, &out->viewport, call
   );
+  maplibre_native_ffi_projection_definition_to_native(
+    &self->projection, &out->projection, call
+  );
 }
 
 void maplibre_native_ffi_map_view_read(
@@ -9038,6 +9101,9 @@ void maplibre_native_ffi_map_view_read(
     &out->projection_mode, &in->projection_mode
   );
   maplibre_native_ffi_map_viewport_read(&out->viewport, &in->viewport);
+  maplibre_native_ffi_projection_definition_read(
+    &out->projection, &in->projection
+  );
 }
 
 MaplibreNativeFfiMapView* maplibre_native_ffi_map_view_from_native(
@@ -9081,6 +9147,9 @@ void maplibre_native_ffi_map_snapshot_read(
   maplibre_native_ffi_camera_bounds_read(&out->bounds, &in->bounds);
   maplibre_native_ffi_free_camera_read(&out->free_camera, &in->free_camera);
   maplibre_native_ffi_map_view_read(&out->view, &in->view);
+  out->globe_rendering = (in->globe_rendering) ? TRUE : FALSE;
+  out->globe_free_bearing_enabled =
+    (in->globe_free_bearing_enabled) ? TRUE : FALSE;
 }
 
 MaplibreNativeFfiMapSnapshot* maplibre_native_ffi_map_snapshot_from_native(

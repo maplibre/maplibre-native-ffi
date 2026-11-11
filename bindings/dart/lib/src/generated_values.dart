@@ -628,6 +628,30 @@ final class OpenGlContextProviderFlag
   });
 }
 
+/// A projection that a style's
+/// \[projection\](https://maplibre.org/maplibre-style-spec/projection/) names.
+///
+/// See `mln_projection_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ProjectionType extends _Enum {
+  const ProjectionType.fromRawValue(super.rawValue);
+  static const mercator = ProjectionType.fromRawValue(0);
+
+  /// Draws the map as a globe.
+  static const verticalPerspective = ProjectionType.fromRawValue(1);
+
+  /// Draws the map as a globe at low zooms, and hands over to Mercator between
+  /// zoom 11 and 12.
+  static const globe = ProjectionType.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'ProjectionType.mercator',
+    1 => 'ProjectionType.verticalPerspective',
+    2 => 'ProjectionType.globe',
+    _ => 'ProjectionType($rawValue)',
+  };
+}
+
 /// What `RenderSessionHandle.abandon()` did with a session's graphics objects.
 ///
 /// See `mln_render_abandon_disposition` in the
@@ -2187,6 +2211,43 @@ final class MapViewport extends _Value {
   ]);
 }
 
+/// A style's projection at one zoom: `from` turning into `to`.
+///
+/// A zeroed definition is Mercator.
+///
+/// See `mln_projection_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ProjectionDefinition extends _Value {
+  const ProjectionDefinition({
+    this.from = const ProjectionType.fromRawValue(0),
+    this.to = const ProjectionType.fromRawValue(0),
+    this.transition = 0,
+  });
+  final ProjectionType from;
+  final ProjectionType to;
+
+  /// How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
+  /// equals `to`. A value outside that range holds at the nearer end.
+  final double transition;
+
+  /// A copy of this value with the given members replaced.
+  ProjectionDefinition copyWith({
+    ProjectionType? from,
+    ProjectionType? to,
+    double? transition,
+  }) => ProjectionDefinition(
+    from: from ?? this.from,
+    to: to ?? this.to,
+    transition: transition ?? this.transition,
+  );
+
+  @override
+  List<Object?> get _members => [from, to, transition];
+  @override
+  String toString() =>
+      _describe('ProjectionDefinition', const ['from', 'to', 'transition']);
+}
+
 /// One view of a map: its camera, size, and projection.
 ///
 /// See `mln_map_view` in the
@@ -2197,11 +2258,15 @@ final class MapView extends _Value {
     this.extent = const LogicalExtent(),
     this.projectionMode = const ProjectionMode(),
     this.viewport = const MapViewport(),
+    this.projection = const ProjectionDefinition(),
   });
   final Camera camera;
   final LogicalExtent extent;
   final ProjectionMode projectionMode;
   final MapViewport viewport;
+
+  /// The style's projection at the camera's zoom.
+  final ProjectionDefinition projection;
 
   /// A copy of this value with the given members replaced.
   MapView copyWith({
@@ -2209,21 +2274,30 @@ final class MapView extends _Value {
     LogicalExtent? extent,
     ProjectionMode? projectionMode,
     MapViewport? viewport,
+    ProjectionDefinition? projection,
   }) => MapView(
     camera: camera ?? this.camera,
     extent: extent ?? this.extent,
     projectionMode: projectionMode ?? this.projectionMode,
     viewport: viewport ?? this.viewport,
+    projection: projection ?? this.projection,
   );
 
   @override
-  List<Object?> get _members => [camera, extent, projectionMode, viewport];
+  List<Object?> get _members => [
+    camera,
+    extent,
+    projectionMode,
+    viewport,
+    projection,
+  ];
   @override
   String toString() => _describe('MapView', const [
     'camera',
     'extent',
     'projectionMode',
     'viewport',
+    'projection',
   ]);
 }
 
@@ -4823,6 +4897,8 @@ final class MapSnapshot extends _Value {
     this.bounds = const CameraBounds(),
     this.freeCamera = const FreeCamera(),
     this.view = const MapView(),
+    this.globeRendering = false,
+    this.globeFreeBearingEnabled = false,
   });
   final MapDebugFlag debugFlags;
 
@@ -4843,6 +4919,12 @@ final class MapSnapshot extends _Value {
   final FreeCamera freeCamera;
   final MapView view;
 
+  /// Whether the map draws as a globe, alone or blending into Mercator.
+  final bool globeRendering;
+
+  /// The setting from `MapHandle.setGlobeFreeBearingEnabled()`.
+  final bool globeFreeBearingEnabled;
+
   @override
   List<Object?> get _members => [
     debugFlags,
@@ -4857,6 +4939,8 @@ final class MapSnapshot extends _Value {
     bounds,
     freeCamera,
     view,
+    globeRendering,
+    globeFreeBearingEnabled,
   ];
   @override
   String toString() => _describe('MapSnapshot', const [
@@ -4872,6 +4956,8 @@ final class MapSnapshot extends _Value {
     'bounds',
     'freeCamera',
     'view',
+    'globeRendering',
+    'globeFreeBearingEnabled',
   ]);
 }
 

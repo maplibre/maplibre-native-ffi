@@ -67,6 +67,8 @@ struct MapObject {
   mln_map_mode map_mode = MLN_MAP_MODE_CONTINUOUS;
   // Fixed at creation; applied to the renderer of each render session.
   bool tile_cache_enabled = true;
+  // MapLibre Native has no globe yet, so the map only reports this setting.
+  bool globe_free_bearing_enabled = false;
   // Fixed at creation; the style applies them to every style it loads.
   std::string fallback_font_faces;
   // Width and height follow resize on the runtime worker; scale_factor is

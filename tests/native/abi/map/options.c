@@ -66,6 +66,15 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
                               )
     );
     TEST_ASSERT_EQUAL(stats, snapshot.rendering_stats_view_enabled);
+    // MapLibre Native has no globe, so the setting changes only the snapshot.
+    const bool free_bearing = pass == 0;
+    COMMIT(
+      "globe free bearing", mln_map_set_globe_free_bearing_enabled(
+                              map, free_bearing, &completion.descriptor, NULL
+                            )
+    );
+    TEST_ASSERT_EQUAL(free_bearing, snapshot.globe_free_bearing_enabled);
+    TEST_ASSERT_FALSE(snapshot.globe_rendering);
   }
 
   static const struct {
@@ -422,6 +431,9 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
   MLN_TEST_INVALID(mln_map_set_projection_mode(map, NULL, &discard, NULL));
   MLN_TEST_INVALID(mln_map_set_debug_flags(MLN_HANDLE_NULL, 0, &discard, NULL));
   MLN_TEST_INVALID(mln_map_set_rendering_stats_view_enabled(
+    MLN_HANDLE_NULL, true, &discard, NULL
+  ));
+  MLN_TEST_INVALID(mln_map_set_globe_free_bearing_enabled(
     MLN_HANDLE_NULL, true, &discard, NULL
   ));
   MLN_TEST_INVALID(mln_map_dump_debug_logs(MLN_HANDLE_NULL, &discard, NULL));

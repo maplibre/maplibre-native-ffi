@@ -393,6 +393,18 @@ maplibre_native_ffi_map_viewport_from_native(const mln_map_viewport* in);
 G_GNUC_INTERNAL void maplibre_native_ffi_map_viewport_read(
   MaplibreNativeFfiMapViewport* out, const mln_map_viewport* in
 );
+G_GNUC_INTERNAL void maplibre_native_ffi_projection_definition_to_native(
+  const MaplibreNativeFfiProjectionDefinition* self,
+  mln_projection_definition* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiProjectionDefinition*
+maplibre_native_ffi_projection_definition_from_native(
+  const mln_projection_definition* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_projection_definition_read(
+  MaplibreNativeFfiProjectionDefinition* out,
+  const mln_projection_definition* in
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_map_view_to_native(
   const MaplibreNativeFfiMapView* self, mln_map_view* out,
   MaplibreNativeFfiCall* call

@@ -255,6 +255,9 @@ napi_value mln_ts_read_open_gl_texture_frame(
 napi_value mln_ts_read_projected_meters(
   napi_env env, const mln_projected_meters* source, size_t size
 );
+napi_value mln_ts_read_projection_definition(
+  napi_env env, const mln_projection_definition* source, size_t size
+);
 napi_value mln_ts_read_projection_mode(
   napi_env env, const mln_projection_mode* source, size_t size
 );
@@ -697,6 +700,10 @@ bool mln_ts_write_premultiplied_rgba8_image(
 );
 bool mln_ts_write_projected_meters(
   mln_ts_call* call, napi_value value, mln_projected_meters* out,
+  const char* path
+);
+bool mln_ts_write_projection_definition(
+  mln_ts_call* call, napi_value value, mln_projection_definition* out,
   const char* path
 );
 bool mln_ts_write_projection_mode(

@@ -246,6 +246,10 @@ pub type mln_projection_mode_option_field = u32;
 pub const MLN_PROJECTION_MODE_OPTION_AXONOMETRIC: mln_projection_mode_option_field = 1;
 pub const MLN_PROJECTION_MODE_OPTION_X_SKEW: mln_projection_mode_option_field = 2;
 pub const MLN_PROJECTION_MODE_OPTION_Y_SKEW: mln_projection_mode_option_field = 4;
+pub type mln_projection_type = u32;
+pub const MLN_PROJECTION_TYPE_MERCATOR: mln_projection_type = 0;
+pub const MLN_PROJECTION_TYPE_VERTICAL_PERSPECTIVE: mln_projection_type = 1;
+pub const MLN_PROJECTION_TYPE_GLOBE: mln_projection_type = 2;
 pub type mln_render_abandon_disposition = u32;
 pub const MLN_RENDER_ABANDON_DISPOSITION_CLEAN: mln_render_abandon_disposition = 0;
 pub const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED: mln_render_abandon_disposition = 1;
@@ -1075,6 +1079,8 @@ pub struct mln_map_snapshot {
     pub bounds: mln_camera_bounds,
     pub free_camera: mln_free_camera,
     pub view: mln_map_view,
+    pub globe_rendering: bool,
+    pub globe_free_bearing_enabled: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1106,6 +1112,7 @@ pub struct mln_map_view {
     pub extent: mln_logical_extent,
     pub projection_mode: mln_projection_mode,
     pub viewport: mln_map_viewport,
+    pub projection: mln_projection_definition,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1380,6 +1387,13 @@ pub struct mln_premultiplied_rgba8_image {
 pub struct mln_projected_meters {
     pub northing: f64,
     pub easting: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_projection_definition {
+    pub from: mln_projection_type,
+    pub to: mln_projection_type,
+    pub transition: f64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2823,6 +2837,12 @@ unsafe extern "C" {
         out_result: *mut mln_map_projection_camera_result,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_projection_is_location_occluded(
+        projection: mln_map_projection,
+        coordinate: mln_lat_lng,
+        out_occluded: *mut bool,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_projection_lat_lng_for_pixel(
         projection: mln_map_projection,
         point: mln_screen_point,
@@ -3008,6 +3028,12 @@ unsafe extern "C" {
         map: mln_map,
         property_name: mln_buffer_view,
         value: mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_set_globe_free_bearing_enabled(
+        map: mln_map,
+        enabled: bool,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

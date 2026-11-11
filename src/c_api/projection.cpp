@@ -49,6 +49,17 @@ auto mln_map_projection_pixel_for_lat_lng(
   });
 }
 
+auto mln_map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::map_projection_is_location_occluded(
+      projection, coordinate, out_occluded
+    );
+  });
+}
+
 auto mln_map_projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate, mln_diagnostic* out_diagnostic

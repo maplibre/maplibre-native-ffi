@@ -1065,6 +1065,19 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_projection_is_location_occluded(
+    projection: Long,
+    coordinate: Long,
+    outOccluded: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_projection_is_location_occluded(
+      projection.toULong(),
+      coordinate.toCPointer<mln_lat_lng>()!!.pointed.readValue(),
+      outOccluded.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_projection_lat_lng_for_pixel(
     projection: Long,
     point: Long,
@@ -1456,6 +1469,19 @@ internal actual object C {
       map.toULong(),
       propertyName.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       value.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_set_globe_free_bearing_enabled(
+    map: Long,
+    enabled: Boolean,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_set_globe_free_bearing_enabled(
+      map.toULong(),
+      enabled,
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

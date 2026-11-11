@@ -1195,6 +1195,36 @@ typedef struct mln_map_viewport {
   mln_edge_insets frustum_offset;
 } mln_map_viewport;
 
+/**
+ * A projection that a style's
+ * [projection](https://maplibre.org/maplibre-style-spec/projection/) names.
+ */
+typedef enum mln_projection_type : uint32_t {
+  MLN_PROJECTION_TYPE_MERCATOR = 0,
+  /** Draws the map as a globe. */
+  MLN_PROJECTION_TYPE_VERTICAL_PERSPECTIVE = 1,
+  /**
+   * Draws the map as a globe at low zooms, and hands over to Mercator between
+   * zoom 11 and 12.
+   */
+  MLN_PROJECTION_TYPE_GLOBE = 2,
+} mln_projection_type;
+
+/**
+ * A style's projection at one zoom: `from` turning into `to`.
+ *
+ * A zeroed definition is Mercator.
+ */
+typedef struct mln_projection_definition {
+  mln_projection_type from;
+  mln_projection_type to;
+  /**
+   * How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
+   * equals `to`. A value outside that range holds at the nearer end.
+   */
+  double transition;
+} mln_projection_definition;
+
 /** One view of a map: its camera, size, and projection. */
 typedef struct mln_map_view {
   uint32_t size;
@@ -1202,6 +1232,8 @@ typedef struct mln_map_view {
   mln_logical_extent extent;
   mln_projection_mode projection_mode;
   mln_map_viewport viewport;
+  /** The style's projection at the camera's zoom. */
+  mln_projection_definition projection;
 } mln_map_view;
 
 /**
@@ -1268,6 +1300,10 @@ typedef struct mln_map_snapshot {
   mln_camera_bounds bounds;
   mln_free_camera free_camera;
   mln_map_view view;
+  /** Whether the map draws as a globe, alone or blending into Mercator. */
+  bool globe_rendering;
+  /** The setting from mln_map_set_globe_free_bearing_enabled(). */
+  bool globe_free_bearing_enabled;
 } mln_map_snapshot;
 
 /** A map's camera, with the snapshot generation that it matches. */
