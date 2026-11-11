@@ -820,7 +820,7 @@ static void failed_loads_report_their_text(void) {
   log_reset(log);
 
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_NATIVE_ERROR,
+    MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_style_json(
       map, MLN_BUFFER_LITERAL("{"), &completion.descriptor, NULL
     )

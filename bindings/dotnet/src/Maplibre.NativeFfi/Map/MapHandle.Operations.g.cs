@@ -2886,8 +2886,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.NativeError</c> when <c>json</c> isn't a
-    /// valid style. The map keeps its current style.</description></item>
+    /// <item><description><c>Status.InvalidArgument</c> when <c>json</c> isn't
+    /// a valid style. The map keeps its current style.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetStyleJsonAsync(string json)

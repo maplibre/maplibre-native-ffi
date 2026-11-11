@@ -3124,8 +3124,8 @@ maplibre_native_ffi_map_set_style_image_finish(
  *
  * It fails with these errors:
  *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when `json` isn't a valid style.
- *   The map keeps its current style.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when `json` isn't a valid
+ *   style. The map keeps its current style.
  *
  * Without `callback`, nothing reports whether the call succeeds.
  */

@@ -123,7 +123,7 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_size_t(0, info->stretch_y_count);
 
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_NATIVE_ERROR,
+    MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_style_json(
       map, MLN_BUFFER_LITERAL("{\"version\":8"), &completion.descriptor, NULL
     )

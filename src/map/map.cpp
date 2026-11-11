@@ -4814,6 +4814,12 @@ auto map_set_style_json(MapObject& live, mln_buffer_view json) -> mln_status {
     }
     return MLN_STATUS_NATIVE_ERROR;
   }
+  // MapLibre reports a style that fails to parse through
+  // onDidFailLoadingMap() before loadJSON() returns.
+  if (live.event_state->style_load_failed) {
+    set_thread_error(live.event_state->style_load_failure.c_str());
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   return MLN_STATUS_OK;
 }
 

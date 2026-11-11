@@ -2571,8 +2571,8 @@ impl MapHandle {
     ///
     /// # Errors
     ///
-    /// - `Status::NativeError` when `json` isn't a valid style. The map keeps
-    ///   its current style.
+    /// - `Status::InvalidArgument` when `json` isn't a valid style. The map
+    ///   keeps its current style.
     pub fn set_style_json(&self, json: &str) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call();
         let json = call.input(&json)?;

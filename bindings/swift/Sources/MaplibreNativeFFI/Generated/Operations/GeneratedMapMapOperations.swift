@@ -285,8 +285,8 @@ public extension MapHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.nativeError` when `json` isn't a valid style. The map keeps its
-  ///   current style.
+  /// - `Status.invalidArgument` when `json` isn't a valid style. The map keeps
+  ///   its current style.
   @discardableResult
   func setStyleJson(_ bindingArg0: String) async throws -> CommandCompletion {
     try await nativeCommand { raw, arena, completion, diagnostic in

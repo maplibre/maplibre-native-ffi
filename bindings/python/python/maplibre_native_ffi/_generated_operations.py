@@ -1940,7 +1940,7 @@ class _MapHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.NATIVE_ERROR` when `json` isn't a valid style. The map
+        - `Status.INVALID_ARGUMENT` when `json` isn't a valid style. The map
           keeps its current style.
         """
         return self._native.set_style_json(json)

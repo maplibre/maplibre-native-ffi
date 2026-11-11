@@ -6914,8 +6914,8 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// Errors:
   ///
-  /// - `Status.nativeError` when `json` isn't a valid style. The map keeps its
-  ///   current style.
+  /// - `Status.invalidArgument` when `json` isn't a valid style. The map keeps
+  ///   its current style.
   Future<CommandCompletion> setStyleJson(Object? json) => _command(
     (arena, completion) => raw.mln_map_set_style_json(
       _handle.raw,
