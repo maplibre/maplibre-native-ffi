@@ -431,7 +431,7 @@ runs:
 
     - name: Install Windows Vulkan SDK
       if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'vulkan' }}
-      uses: jakoch/install-vulkan-sdk-action@d17de7e2f5e50efb5d2123efed18497d3c58c533 # v1.7.0
+      uses: jakoch/install-vulkan-sdk-action@7fe84289ddbf750f7eff9f8e4588e600e1dd06c8 # v1.8.1
       with:
         # The action's cache key is the OS, architecture and this version, and a
         # hit returns before the runtime is installed, so the entry saved
@@ -528,7 +528,7 @@ runs:
           ${{ steps.toolchain-key.outputs.prefix }}-
 
     - name: Bootstrap repository
-      uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
       env:
         GITHUB_TOKEN: ${{ github.token }}
       with:
