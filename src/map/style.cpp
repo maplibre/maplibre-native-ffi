@@ -183,14 +183,16 @@ auto to_c_source_type(mln::style::SourceType type) -> mln_style_source_type {
       return MLN_STYLE_SOURCE_TYPE_GEO_JSON;
     case mln::style::SourceType::Video:
       return MLN_STYLE_SOURCE_TYPE_VIDEO;
-    case mln::style::SourceType::Annotations:
-      return MLN_STYLE_SOURCE_TYPE_ANNOTATIONS;
     case mln::style::SourceType::Image:
       return MLN_STYLE_SOURCE_TYPE_IMAGE;
     case mln::style::SourceType::CustomVector:
       return MLN_STYLE_SOURCE_TYPE_CUSTOM_GEOMETRY;
     case mln::style::SourceType::CustomMVTVector:
       return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
+    // The library builds MapLibre without legacy annotations, so no style
+    // has an annotations source.
+    case mln::style::SourceType::Annotations:
+      break;
   }
   assert(false);
   return MLN_STYLE_SOURCE_TYPE_UNKNOWN;

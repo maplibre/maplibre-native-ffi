@@ -1519,7 +1519,6 @@ const (
 	StyleSourceTypeGeoJSON        StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_GEO_JSON)
 	StyleSourceTypeImage          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_IMAGE)
 	StyleSourceTypeVideo          StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_VIDEO)
-	StyleSourceTypeAnnotations    StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS)
 	StyleSourceTypeCustomGeometry StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_GEOMETRY)
 	StyleSourceTypeCustomVector   StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
 )
@@ -1541,10 +1540,8 @@ func (value StyleSourceType) String() string {
 	case 6:
 		return "StyleSourceTypeVideo"
 	case 7:
-		return "StyleSourceTypeAnnotations"
-	case 8:
 		return "StyleSourceTypeCustomGeometry"
-	case 9:
+	case 8:
 		return "StyleSourceTypeCustomVector"
 	}
 	return fmt.Sprintf("StyleSourceType(%d)", value)
