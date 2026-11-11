@@ -715,6 +715,35 @@ func (value OpenGLContextProviderFlag) String() string {
 	return bindingFlagString(uint64(value), []bindingFlag{{1, "OpenGLContextProviderFlagWGL"}, {2, "OpenGLContextProviderFlagEGL"}, {4, "OpenGLContextProviderFlagWebGL"}})
 }
 
+// ProjectionType corresponds to mln_projection_type. A projection that a
+// style's [projection](https://maplibre.org/maplibre-style-spec/projection/)
+// names.
+//
+// See mln_projection_type in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type ProjectionType uint32
+
+const (
+	ProjectionTypeMercator ProjectionType = ProjectionType(C.MLN_PROJECTION_TYPE_MERCATOR)
+	// Draws the map as a globe.
+	ProjectionTypeVerticalPerspective ProjectionType = ProjectionType(C.MLN_PROJECTION_TYPE_VERTICAL_PERSPECTIVE)
+	// Draws the map as a globe at low zooms, and hands over to Mercator between
+	// zoom 11 and 12.
+	ProjectionTypeGlobe ProjectionType = ProjectionType(C.MLN_PROJECTION_TYPE_GLOBE)
+)
+
+func (value ProjectionType) String() string {
+	switch value {
+	case 0:
+		return "ProjectionTypeMercator"
+	case 1:
+		return "ProjectionTypeVerticalPerspective"
+	case 2:
+		return "ProjectionTypeGlobe"
+	}
+	return fmt.Sprintf("ProjectionType(%d)", value)
+}
+
 // RenderAbandonDisposition corresponds to mln_render_abandon_disposition. What
 // RenderSessionHandle.Abandon() did with a session's graphics objects.
 //
@@ -3522,6 +3551,10 @@ type MapSnapshot struct {
 	Bounds                       CameraBounds
 	FreeCamera                   FreeCamera
 	View                         MapView
+	// Whether the map draws as a globe, alone or blending into Mercator.
+	GlobeRendering bool
+	// The setting from MapHandle.SetGlobeFreeBearingEnabled().
+	GlobeFreeBearingEnabled bool
 }
 
 func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
@@ -3538,6 +3571,8 @@ func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	result.Bounds = copyCameraBounds(raw.bounds)
 	result.FreeCamera = copyFreeCamera(raw.free_camera)
 	result.View = copyMapView(raw.view)
+	result.GlobeRendering = bool(raw.globe_rendering)
+	result.GlobeFreeBearingEnabled = bool(raw.globe_free_bearing_enabled)
 	return result
 }
 
@@ -3616,6 +3651,8 @@ type MapView struct {
 	Extent         LogicalExtent
 	ProjectionMode ProjectionMode
 	Viewport       MapViewport
+	// The style's projection at the camera's zoom.
+	Projection ProjectionDefinition
 }
 
 func copyMapView(raw C.mln_map_view) MapView {
@@ -3624,6 +3661,7 @@ func copyMapView(raw C.mln_map_view) MapView {
 	result.Extent = copyLogicalExtent(raw.extent)
 	result.ProjectionMode = copyProjectionMode(raw.projection_mode)
 	result.Viewport = copyMapViewport(raw.viewport)
+	result.Projection = copyProjectionDefinition(raw.projection)
 	return result
 }
 
@@ -3634,6 +3672,7 @@ func nativeMapView(input MapView, arena *bindingArena) C.mln_map_view {
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.projection_mode = nativeProjectionMode(input.ProjectionMode, arena)
 	raw.viewport = nativeMapViewport(input.Viewport, arena)
+	raw.projection = nativeProjectionDefinition(input.Projection, arena)
 	return raw
 }
 
@@ -4501,6 +4540,37 @@ func nativeProjectedMeters(input ProjectedMeters, arena *bindingArena) C.mln_pro
 	raw := C.mln_projected_meters{}
 	raw.northing = C.double(input.Northing)
 	raw.easting = C.double(input.Easting)
+	return raw
+}
+
+// ProjectionDefinition corresponds to mln_projection_definition. A style's
+// projection at one zoom: from turning into to.
+//
+// A zeroed definition is Mercator.
+//
+// See mln_projection_definition in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type ProjectionDefinition struct {
+	From ProjectionType
+	To   ProjectionType
+	// How far from has turned into to, from 0 to 1. Ignored when from equals to. A
+	// value outside that range holds at the nearer end.
+	Transition float64
+}
+
+func copyProjectionDefinition(raw C.mln_projection_definition) ProjectionDefinition {
+	var result ProjectionDefinition
+	result.From = ProjectionType(raw.from)
+	result.To = ProjectionType(raw.to)
+	result.Transition = float64(raw.transition)
+	return result
+}
+
+func nativeProjectionDefinition(input ProjectionDefinition, arena *bindingArena) C.mln_projection_definition {
+	raw := C.mln_projection_definition{}
+	raw.from = C.mln_projection_type(input.From)
+	raw.to = C.mln_projection_type(input.To)
+	raw.transition = C.double(input.Transition)
 	return raw
 }
 
@@ -8182,11 +8252,15 @@ func (receiver *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) 
 // of a map.
 //
 // Create it from the view of an MapSnapshot or an RenderFrameResult. The
-// projection doesn't follow the map, so create a new one after the map's camera
-// or size changes.
+// projection doesn't follow the map, so create a new one after the map's
+// camera, size, or style projection changes.
 //
 // See mln_map_projection_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+//
+// Errors:
+//   - StatusUnsupported when the view's style projection draws a globe and the
+//     library can't project one.
 func NewMapProjection(view MapView) (*MapProjectionHandle, error) {
 	var outProjection C.mln_map_projection
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
@@ -8208,6 +8282,23 @@ func (receiver *MapProjectionHandle) Camera() (MapProjectionCameraResult, error)
 		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(raw), &outResult, diagnostic))
 	}, func(arena *bindingArena) MapProjectionCameraResult {
 		return copyMapProjectionCameraResult(outResult)
+	})
+}
+
+// IsLocationOccluded reports whether the globe hides a coordinate from the
+// camera.
+//
+// Mercator hides nothing, so this reports false unless the view's style
+// projection draws a globe.
+//
+// See mln_map_projection_is_location_occluded in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+func (receiver *MapProjectionHandle) IsLocationOccluded(coordinate LatLng) (bool, error) {
+	var outOccluded C.bool
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_is_location_occluded(C.mln_map_projection(raw), nativeLatLng(coordinate, arena), &outOccluded, diagnostic))
+	}, func(arena *bindingArena) bool {
+		return bool(outOccluded)
 	})
 }
 
@@ -8301,7 +8392,9 @@ func (receiver *MapProjectionHandle) MetersPerPixelAtLatitude(latitude float64) 
 
 // PixelForLatLng finds the screen point of a coordinate.
 //
-// The point is in the copy of the world nearest the camera's center.
+// The point is in the copy of the world nearest the camera's center. On a
+// globe, a coordinate on the far side also gets a point;
+// MapProjectionHandle.IsLocationOccluded() says whether the globe hides it.
 //
 // See mln_map_projection_pixel_for_lat_lng in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
@@ -8348,7 +8441,8 @@ func (receiver *MapProjectionHandle) Release() error {
 
 // SetCamera moves the projection's camera, without changing the map.
 //
-// Camera fields that camera doesn't set keep their values.
+// Camera fields that camera doesn't set keep their values. The style projection
+// stays as the view had it, even at another zoom.
 //
 // See mln_map_projection_set_camera in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
@@ -8696,6 +8790,23 @@ func (receiver *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) (*Fu
 func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
+	}, completionCommand)
+}
+
+// SetGlobeFreeBearingEnabled sets whether drags and zooms on a globe turn the
+// bearing.
+//
+// When it's on, a drag or a zoom around a point on the globe turns the bearing
+// so the planet keeps its orientation, and a drag can carry the camera over a
+// pole. When it's off, the default, they keep the bearing, as MapLibre GL JS
+// does. Turn it on for a map whose users can rotate it. It changes nothing
+// while the map draws Mercator.
+//
+// See mln_map_set_globe_free_bearing_enabled in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+func (receiver *MapHandle) SetGlobeFreeBearingEnabled(enabled bool) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_globe_free_bearing_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -10520,6 +10631,13 @@ func (view MapHandleDiscarding) SetGlobalStateProperty(propertyName string, valu
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
+	})
+}
+
+func (view MapHandleDiscarding) SetGlobeFreeBearingEnabled(enabled bool) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_globe_free_bearing_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
 	})
 }
 

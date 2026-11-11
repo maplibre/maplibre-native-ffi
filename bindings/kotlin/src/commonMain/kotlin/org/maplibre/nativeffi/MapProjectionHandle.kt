@@ -51,6 +51,23 @@ private constructor(
     }
 
   /**
+   * Reports whether the globe hides a coordinate from the camera.
+   *
+   * Mercator hides nothing, so this reports false unless the view's style projection draws a globe.
+   *
+   * See `mln_map_projection_is_location_occluded` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  public fun isLocationOccluded(coordinate: LatLng): Boolean =
+    nativeCall(this, binding) {
+      val out = allocate(1, 1)
+      check(
+        C.mln_map_projection_is_location_occluded(handle, writeLatLng(coordinate), out, diagnostic),
+      )
+      readBool(out)
+    }
+
+  /**
    * Finds the coordinate at a screen point.
    *
    * The longitude stays between -180 and 180.
@@ -150,7 +167,9 @@ private constructor(
   /**
    * Finds the screen point of a coordinate.
    *
-   * The point is in the copy of the world nearest the camera's center.
+   * The point is in the copy of the world nearest the camera's center. On a globe, a coordinate on
+   * the far side also gets a point; `MapProjectionHandle.isLocationOccluded()` says whether the
+   * globe hides it.
    *
    * See `mln_map_projection_pixel_for_lat_lng` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -196,7 +215,8 @@ private constructor(
   /**
    * Moves the projection's camera, without changing the map.
    *
-   * Camera fields that `camera` doesn't set keep their values.
+   * Camera fields that `camera` doesn't set keep their values. The style projection stays as the
+   * view had it, even at another zoom.
    *
    * See `mln_map_projection_set_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -214,10 +234,16 @@ private constructor(
      * Creates a projection that converts coordinates for one view of a map.
      *
      * Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`. The projection
-     * doesn't follow the map, so create a new one after the map's camera or size changes.
+     * doesn't follow the map, so create a new one after the map's camera, size, or style projection
+     * changes.
      *
      * See `mln_map_projection_create` in the
      * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+     *
+     * Errors:
+     *
+     * - `Status.UNSUPPORTED` when the view's style projection draws a globe and the library can't
+     *   project one.
      */
     @JvmStatic
     public fun create(view: MapView): MapProjectionHandle =

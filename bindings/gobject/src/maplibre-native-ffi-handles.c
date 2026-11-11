@@ -3369,6 +3369,36 @@ maplibre_native_ffi_map_set_global_state_property_finish(
   return g_task_propagate_pointer(G_TASK(result), error);
 }
 
+void maplibre_native_ffi_map_set_globe_free_bearing_enabled_async(
+  MaplibreNativeFfiMap* self, gboolean enabled, GAsyncReadyCallback callback,
+  gpointer user_data
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self));
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_map_set_globe_free_bearing_enabled_async,
+    callback, user_data, TRUE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, maplibre_native_ffi_command_decode,
+        (GDestroyNotify)maplibre_native_ffi_command_completion_free
+      ))
+    return;
+  mln_status status_ = mln_map_set_globe_free_bearing_enabled(
+    self->handle, (enabled) != FALSE, async_.completion_argument,
+    &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
+}
+
+MaplibreNativeFfiCommandCompletion*
+maplibre_native_ffi_map_set_globe_free_bearing_enabled_finish(
+  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
+) {
+  g_return_val_if_fail(g_task_is_valid(result, self), NULL);
+  return g_task_propagate_pointer(G_TASK(result), error);
+}
+
 void maplibre_native_ffi_map_set_image_source_coordinates_async(
   MaplibreNativeFfiMap* self, const char* source_id,
   const MaplibreNativeFfiLatLng* coordinates, gsize coordinate_count,
@@ -4025,6 +4055,26 @@ maplibre_native_ffi_map_projection_get_camera(
   return maplibre_native_ffi_map_projection_camera_result_from_native(
     &out_result_
   );
+}
+
+gboolean maplibre_native_ffi_map_projection_is_location_occluded(
+  MaplibreNativeFfiMapProjection* self,
+  const MaplibreNativeFfiLatLng* coordinate, GError** error
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_PROJECTION(self), FALSE);
+  g_return_val_if_fail(coordinate != NULL, FALSE);
+  g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+  mln_lat_lng coordinate_native_;
+  maplibre_native_ffi_lat_lng_to_native(coordinate, &coordinate_native_, NULL);
+  bool out_occluded_ = 0;
+  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  mln_status status_ = mln_map_projection_is_location_occluded(
+    self->handle, coordinate_native_, &out_occluded_, &diagnostic_
+  );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    return FALSE;
+  }
+  return (out_occluded_) ? TRUE : FALSE;
 }
 
 MaplibreNativeFfiLatLng* maplibre_native_ffi_map_projection_lat_lng_for_pixel(

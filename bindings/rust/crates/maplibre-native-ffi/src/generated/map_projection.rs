@@ -18,10 +18,15 @@ impl MapProjectionHandle {
     ///
     /// Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`.
     /// The projection doesn't follow the map, so create a new one after the
-    /// map's camera or size changes.
+    /// map's camera, size, or style projection changes.
     ///
     /// See `mln_map_projection_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    ///
+    /// # Errors
+    ///
+    /// - `Status::Unsupported` when the view's style projection draws a globe
+    ///   and the library can't project one.
     pub fn create(view: &MapView) -> Result<MapProjectionHandle> {
         let mut call = Call::global();
         crate::abi::validate_abi_version()?;
@@ -45,6 +50,28 @@ impl MapProjectionHandle {
             sys::mln_map_projection_get_camera(projection, &mut out_result, out_diagnostic)
         })?;
         Ok(unsafe { from_native(out_result) }?)
+    }
+
+    /// Reports whether the globe hides a coordinate from the camera.
+    ///
+    /// Mercator hides nothing, so this reports false unless the view's style
+    /// projection draws a globe.
+    ///
+    /// See `mln_map_projection_is_location_occluded` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn is_location_occluded(&self, coordinate: LatLng) -> Result<bool> {
+        let mut call = self.inner.call();
+        let mut out_occluded: bool = Default::default();
+        let coordinate = call.input(&coordinate)?;
+        call.status(|projection, out_diagnostic| unsafe {
+            sys::mln_map_projection_is_location_occluded(
+                projection,
+                coordinate,
+                &mut out_occluded,
+                out_diagnostic,
+            )
+        })?;
+        Ok(out_occluded)
     }
 
     /// Finds the coordinate at a screen point.
@@ -167,7 +194,10 @@ impl MapProjectionHandle {
 
     /// Finds the screen point of a coordinate.
     ///
-    /// The point is in the copy of the world nearest the camera's center.
+    /// The point is in the copy of the world nearest the camera's center. On a
+    /// globe, a coordinate on the far side also gets a point;
+    /// `MapProjectionHandle::is_location_occluded()` says whether the globe
+    /// hides it.
     ///
     /// See `mln_map_projection_pixel_for_lat_lng` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -227,7 +257,8 @@ impl MapProjectionHandle {
 
     /// Moves the projection's camera, without changing the map.
     ///
-    /// Camera fields that `camera` doesn't set keep their values.
+    /// Camera fields that `camera` doesn't set keep their values. The style
+    /// projection stays as the view had it, even at another zoom.
     ///
     /// See `mln_map_projection_set_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).

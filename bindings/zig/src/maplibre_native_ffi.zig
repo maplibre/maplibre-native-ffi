@@ -1621,6 +1621,20 @@ pub const Map = struct {
         return call.submit("mln_map_set_global_state_property", .handle, self, call.command, null, diagnostic, .{ property_name, value });
     }
 
+    /// Sets whether drags and zooms on a globe turn the bearing.
+    ///
+    /// When it's on, a drag or a zoom around a point on the globe turns the bearing
+    /// so the planet keeps its orientation, and a drag can carry the camera over a
+    /// pole. When it's off, the default, they keep the bearing, as MapLibre GL JS
+    /// does. Turn it on for a map whose users can rotate it. It changes nothing
+    /// while the map draws Mercator.
+    ///
+    /// See `mln_map_set_globe_free_bearing_enabled` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn setGlobeFreeBearingEnabled(self: Map, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_set_globe_free_bearing_enabled", .handle, self, call.command, null, diagnostic, .{enabled});
+    }
+
     /// Moves the image of an image source.
     ///
     /// `coordinates` are the image's four corners, clockwise from the top left.
@@ -1886,10 +1900,15 @@ pub const MapProjection = struct {
     ///
     /// Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`. The
     /// projection doesn't follow the map, so create a new one after the map's
-    /// camera or size changes.
+    /// camera, size, or style projection changes.
     ///
     /// See `mln_map_projection_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when the view's style projection draws a globe and the
+    ///   library can't project one.
     pub fn create(view: MapView, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
         return call.invoke("mln_map_projection_create", .none, {}, null, diagnostic, .{ view, call.adopt(MapProjection) });
     }
@@ -1900,6 +1919,17 @@ pub const MapProjection = struct {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn getCamera(self: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjectionCameraResult {
         return call.invoke("mln_map_projection_get_camera", .handle, self, null, diagnostic, .{call.sizedOut(MapProjectionCameraResult)});
+    }
+
+    /// Reports whether the globe hides a coordinate from the camera.
+    ///
+    /// Mercator hides nothing, so this reports false unless the view's style
+    /// projection draws a globe.
+    ///
+    /// See `mln_map_projection_is_location_occluded` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn isLocationOccluded(self: MapProjection, coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
+        return call.invoke("mln_map_projection_is_location_occluded", .handle, self, null, diagnostic, .{ coordinate, call.out(bool) });
     }
 
     /// Finds the coordinate at a screen point.
@@ -1954,7 +1984,9 @@ pub const MapProjection = struct {
 
     /// Finds the screen point of a coordinate.
     ///
-    /// The point is in the copy of the world nearest the camera's center.
+    /// The point is in the copy of the world nearest the camera's center. On a
+    /// globe, a coordinate on the far side also gets a point;
+    /// `MapProjection.isLocationOccluded()` says whether the globe hides it.
     ///
     /// See `mln_map_projection_pixel_for_lat_lng` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -1983,7 +2015,8 @@ pub const MapProjection = struct {
 
     /// Moves the projection's camera, without changing the map.
     ///
-    /// Camera fields that `camera` doesn't set keep their values.
+    /// Camera fields that `camera` doesn't set keep their values. The style
+    /// projection stays as the view had it, even at another zoom.
     ///
     /// See `mln_map_projection_set_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -5504,6 +5537,10 @@ pub const MapSnapshot = struct {
     bounds: CameraBounds = .{},
     free_camera: FreeCamera = .{},
     view: MapView = .{},
+    /// Whether the map draws as a globe, alone or blending into Mercator.
+    globe_rendering: bool = false,
+    /// The setting from `Map.setGlobeFreeBearingEnabled()`.
+    globe_free_bearing_enabled: bool = false,
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
             .debug_flags = MapDebugFlag.fromNative(raw.debug_flags),
@@ -5518,6 +5555,8 @@ pub const MapSnapshot = struct {
             .bounds = CameraBounds.fromNative(raw.bounds),
             .free_camera = FreeCamera.fromNative(raw.free_camera),
             .view = MapView.fromNative(raw.view),
+            .globe_rendering = raw.globe_rendering,
+            .globe_free_bearing_enabled = raw.globe_free_bearing_enabled,
         };
     }
 };
@@ -5603,6 +5642,8 @@ pub const MapView = struct {
     extent: LogicalExtent = .{},
     projection_mode: ProjectionMode = .{},
     viewport: MapViewport = .{},
+    /// The style's projection at the camera's zoom.
+    projection: ProjectionDefinition = .{},
     pub fn toNative(self: MapView) c.mln_map_view {
         var raw = std.mem.zeroes(c.mln_map_view);
         raw.size = @sizeOf(c.mln_map_view);
@@ -5610,6 +5651,7 @@ pub const MapView = struct {
         raw.extent = self.extent.toNative();
         raw.projection_mode = self.projection_mode.toNative();
         raw.viewport = self.viewport.toNative();
+        raw.projection = self.projection.toNative();
         return raw;
     }
     pub fn fromNative(raw: c.mln_map_view) MapView {
@@ -5618,6 +5660,7 @@ pub const MapView = struct {
             .extent = LogicalExtent.fromNative(raw.extent),
             .projection_mode = ProjectionMode.fromNative(raw.projection_mode),
             .viewport = MapViewport.fromNative(raw.viewport),
+            .projection = ProjectionDefinition.fromNative(raw.projection),
         };
     }
 };
@@ -6719,6 +6762,34 @@ pub const ProjectedMeters = struct {
     }
 };
 
+/// A style's projection at one zoom: `from` turning into `to`.
+///
+/// A zeroed definition is Mercator.
+///
+/// See `mln_projection_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const ProjectionDefinition = struct {
+    from: ProjectionType = .mercator,
+    to: ProjectionType = .mercator,
+    /// How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
+    /// equals `to`. A value outside that range holds at the nearer end.
+    transition: f64 = 0,
+    pub fn toNative(self: ProjectionDefinition) c.mln_projection_definition {
+        var raw = std.mem.zeroes(c.mln_projection_definition);
+        raw.from = self.from.toNative();
+        raw.to = self.to.toNative();
+        raw.transition = self.transition;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_projection_definition) ProjectionDefinition {
+        return .{
+            .from = ProjectionType.fromNative(raw.from),
+            .to = ProjectionType.fromNative(raw.to),
+            .transition = raw.transition,
+        };
+    }
+};
+
 /// A map's whole projection mode.
 ///
 /// Its members mean the same as those of `ProjectionModeOptions`.
@@ -6770,6 +6841,23 @@ pub const ProjectionModeOptions = struct {
             .y_skew = if (raw.fields & c.MLN_PROJECTION_MODE_OPTION_Y_SKEW != 0) raw.y_skew else null,
         };
     }
+};
+
+/// A projection that a style's
+/// \[projection\](https://maplibre.org/maplibre-style-spec/projection/) names.
+///
+/// See `mln_projection_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const ProjectionType = enum(u32) {
+    mercator = 0,
+    /// Draws the map as a globe.
+    vertical_perspective = 1,
+    /// Draws the map as a globe at low zooms, and hands over to Mercator
+    /// between zoom 11 and 12.
+    globe = 2,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// A rotation, as a quaternion.
@@ -10117,6 +10205,11 @@ pub const MapDiscarding = struct {
     pub fn setGlobalStateProperty(self: MapDiscarding, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_global_state_property", .handle, map, null, diagnostic, .{ property_name, value });
+    }
+
+    pub fn setGlobeFreeBearingEnabled(self: MapDiscarding, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_set_globe_free_bearing_enabled", .handle, map, null, diagnostic, .{enabled});
     }
 
     pub fn setImageSourceCoordinates(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

@@ -63,9 +63,16 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// <remarks>
     /// <para>Create it from the <c>view</c> of an <c>MapSnapshot</c> or an
     /// <c>RenderFrameResult</c>. The projection doesn't follow the map, so
-    /// create a new one after the map's camera or size changes.</para>
+    /// create a new one after the map's camera, size, or style projection
+    /// changes.</para>
     /// <para>See <c>mln_map_projection_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the view's style
+    /// projection draws a globe and the library can't project
+    /// one.</description></item>
+    /// </list>
     /// </remarks>
     public static MapProjectionHandle Create(MapView view)
     {
@@ -92,6 +99,30 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         };
         Check(NativeMethods.mln_map_projection_get_camera(Handle, &outResult, Diagnostic));
         return CopyMapProjectionCameraResult(outResult);
+    }
+
+    /// <summary>
+    /// Reports whether the globe hides a coordinate from the camera.
+    /// </summary>
+    /// <remarks>
+    /// <para>Mercator hides nothing, so this reports false unless the view's
+    /// style projection draws a globe.</para>
+    /// <para>See <c>mln_map_projection_is_location_occluded</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
+    /// </remarks>
+    public bool IsLocationOccluded(LatLng coordinate)
+    {
+        using var call = Enter(this);
+        bool outOccluded = default;
+        Check(
+            NativeMethods.mln_map_projection_is_location_occluded(
+                Handle,
+                NativeLatLng(coordinate),
+                &outOccluded,
+                Diagnostic
+            )
+        );
+        return outOccluded;
     }
 
     /// <summary>
@@ -235,8 +266,10 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// Finds the screen point of a coordinate.
     /// </summary>
     /// <remarks>
-    /// <para>The point is in the copy of the world nearest the camera's
-    /// center.</para>
+    /// <para>The point is in the copy of the world nearest the camera's center.
+    /// On a globe, a coordinate on the far side also gets a point;
+    /// <c>MapProjectionHandle.IsLocationOccluded()</c> says whether the globe
+    /// hides it.</para>
     /// <para>See <c>mln_map_projection_pixel_for_lat_lng</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -303,8 +336,9 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     /// Moves the projection's camera, without changing the map.
     /// </summary>
     /// <remarks>
-    /// <para>Camera fields that <c>camera</c> doesn't set keep their
-    /// values.</para>
+    /// <para>Camera fields that <c>camera</c> doesn't set keep their values.
+    /// The style projection stays as the view had it, even at another
+    /// zoom.</para>
     /// <para>See <c>mln_map_projection_set_camera</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
     /// </remarks>

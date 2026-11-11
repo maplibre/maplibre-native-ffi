@@ -2921,6 +2921,42 @@ maplibre_native_ffi_map_set_global_state_property_finish(
 );
 
 /**
+ * maplibre_native_ffi_map_set_globe_free_bearing_enabled_async:
+ * @callback: (scope async) (nullable): the callback to call when the call finishes
+ * @user_data: the data to pass to `callback`
+ *
+ * Sets whether drags and zooms on a globe turn the bearing.
+ *
+ * When it's on, a drag or a zoom around a point on the globe turns the bearing
+ * so the planet keeps its orientation, and a drag can carry the camera over a
+ * pole. When it's off, the default, they keep the bearing, as MapLibre GL JS
+ * does. Turn it on for a map whose users can rotate it. It changes nothing
+ * while the map draws Mercator.
+ *
+ * See `mln_map_set_globe_free_bearing_enabled` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+ *
+ * Without `callback`, nothing reports whether the call succeeds.
+ */
+void maplibre_native_ffi_map_set_globe_free_bearing_enabled_async(
+  MaplibreNativeFfiMap* self, gboolean enabled, GAsyncReadyCallback callback,
+  gpointer user_data
+);
+
+/**
+ * maplibre_native_ffi_map_set_globe_free_bearing_enabled_finish:
+ * @result: the result that the callback received
+ *
+ * Finishes a call that `maplibre_native_ffi_map_set_globe_free_bearing_enabled_async` started.
+ *
+ * Returns: (transfer full): the command's completion, or %NULL with `error` set
+ */
+MaplibreNativeFfiCommandCompletion*
+maplibre_native_ffi_map_set_globe_free_bearing_enabled_finish(
+  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
+);
+
+/**
  * maplibre_native_ffi_map_set_image_source_coordinates_async:
  * @source_id: the UTF-8 text
  * @coordinates: (array length=coordinate_count): the items
@@ -3615,10 +3651,16 @@ guint64 maplibre_native_ffi_map_projection_get_id(
  *
  * Create it from the `view` of an `MaplibreNativeFfiMapSnapshot` or an
  * `MaplibreNativeFfiRenderFrameResult`. The projection doesn't follow the map,
- * so create a new one after the map's camera or size changes.
+ * so create a new one after the map's camera, size, or style projection
+ * changes.
  *
  * See `mln_map_projection_create` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the view's style projection
+ *   draws a globe and the library can't project one.
  *
  * Returns: (transfer full): the object
  */
@@ -3639,6 +3681,24 @@ MaplibreNativeFfiMapProjection* maplibre_native_ffi_map_projection_create(
 MaplibreNativeFfiMapProjectionCameraResult*
 maplibre_native_ffi_map_projection_get_camera(
   MaplibreNativeFfiMapProjection* self, GError** error
+);
+
+/**
+ * maplibre_native_ffi_map_projection_is_location_occluded:
+ *
+ * Reports whether the globe hides a coordinate from the camera.
+ *
+ * Mercator hides nothing, so this reports false unless the view's style
+ * projection draws a globe.
+ *
+ * See `mln_map_projection_is_location_occluded` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ *
+ * Returns: the value
+ */
+gboolean maplibre_native_ffi_map_projection_is_location_occluded(
+  MaplibreNativeFfiMapProjection* self,
+  const MaplibreNativeFfiLatLng* coordinate, GError** error
 );
 
 /**
@@ -3733,7 +3793,10 @@ gdouble maplibre_native_ffi_map_projection_meters_per_pixel_at_latitude(
  *
  * Finds the screen point of a coordinate.
  *
- * The point is in the copy of the world nearest the camera's center.
+ * The point is in the copy of the world nearest the camera's center. On a
+ * globe, a coordinate on the far side also gets a point;
+ * `maplibre_native_ffi_map_projection_is_location_occluded()` says whether the
+ * globe hides it.
  *
  * See `mln_map_projection_pixel_for_lat_lng` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -3784,7 +3847,8 @@ void maplibre_native_ffi_map_projection_release(
  *
  * Moves the projection's camera, without changing the map.
  *
- * Camera fields that `camera` doesn't set keep their values.
+ * Camera fields that `camera` doesn't set keep their values. The style
+ * projection stays as the view had it, even at another zoom.
  *
  * See `mln_map_projection_set_camera` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).

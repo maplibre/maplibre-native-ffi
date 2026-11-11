@@ -475,6 +475,13 @@ internal expect object C {
 
   fun mln_map_projection_get_camera(projection: Long, outResult: Long, outDiagnostic: Long): Int
 
+  fun mln_map_projection_is_location_occluded(
+    projection: Long,
+    coordinate: Long,
+    outOccluded: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_projection_lat_lng_for_pixel(
     projection: Long,
     point: Long,
@@ -653,6 +660,13 @@ internal expect object C {
     map: Long,
     propertyName: Long,
     value: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_set_globe_free_bearing_enabled(
+    map: Long,
+    enabled: Boolean,
     completion: Long,
     outDiagnostic: Long,
   ): Int

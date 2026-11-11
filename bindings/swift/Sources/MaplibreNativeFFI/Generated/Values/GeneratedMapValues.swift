@@ -1345,6 +1345,10 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public var bounds: CameraBounds
   public var freeCamera: FreeCamera
   public var view: MapView
+  /// Whether the map draws as a globe, alone or blending into Mercator.
+  public var globeRendering: Bool
+  /// The setting from `MapHandle.setGlobeFreeBearingEnabled()`.
+  public var globeFreeBearingEnabled: Bool
   public init(
     debugFlags: MapDebugFlag = .init(rawValue: 0),
     generation: UInt64 = 0,
@@ -1357,7 +1361,9 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     tile: MapTileSettings = .init(),
     bounds: CameraBounds = .init(),
     freeCamera: FreeCamera = .init(),
-    view: MapView = .init()
+    view: MapView = .init(),
+    globeRendering: Bool = false,
+    globeFreeBearingEnabled: Bool = false
   ) {
     self.debugFlags = debugFlags
     self.generation = generation
@@ -1371,6 +1377,8 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     self.bounds = bounds
     self.freeCamera = freeCamera
     self.view = view
+    self.globeRendering = globeRendering
+    self.globeFreeBearingEnabled = globeFreeBearingEnabled
   }
 
   init(raw: mln_map_snapshot) {
@@ -1386,6 +1394,8 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     bounds = CameraBounds(raw: raw.bounds)
     freeCamera = FreeCamera(raw: raw.free_camera)
     view = MapView(raw: raw.view)
+    globeRendering = raw.globe_rendering
+    globeFreeBearingEnabled = raw.globe_free_bearing_enabled
   }
 }
 
@@ -1522,16 +1532,20 @@ public struct MapView: Equatable, Hashable, Sendable {
   public var extent: LogicalExtent
   public var projectionMode: ProjectionMode
   public var viewport: MapViewport
+  /// The style's projection at the camera's zoom.
+  public var projection: ProjectionDefinition
   public init(
     camera: Camera = .init(),
     extent: LogicalExtent = .init(),
     projectionMode: ProjectionMode = .init(),
-    viewport: MapViewport = .init()
+    viewport: MapViewport = .init(),
+    projection: ProjectionDefinition = .init()
   ) {
     self.camera = camera
     self.extent = extent
     self.projectionMode = projectionMode
     self.viewport = viewport
+    self.projection = projection
   }
 
   init(raw: mln_map_view) {
@@ -1539,6 +1553,7 @@ public struct MapView: Equatable, Hashable, Sendable {
     extent = LogicalExtent(raw: raw.extent)
     projectionMode = ProjectionMode(raw: raw.projection_mode)
     viewport = MapViewport(raw: raw.viewport)
+    projection = ProjectionDefinition(raw: raw.projection)
   }
 
   func nativeValue() -> mln_map_view {
@@ -1548,6 +1563,7 @@ public struct MapView: Equatable, Hashable, Sendable {
     raw.extent = extent.nativeValue()
     raw.projection_mode = projectionMode.nativeValue()
     raw.viewport = viewport.nativeValue()
+    raw.projection = projection.nativeValue()
     return raw
   }
 }
@@ -2157,6 +2173,43 @@ public struct ProjectedMeters: Equatable, Hashable, Sendable {
   }
 }
 
+/// A style's projection at one zoom: `from` turning into `to`.
+///
+/// A zeroed definition is Mercator.
+///
+/// See `mln_projection_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct ProjectionDefinition: Equatable, Hashable, Sendable {
+  public var from: ProjectionType
+  public var to: ProjectionType
+  /// How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
+  /// equals `to`. A value outside that range holds at the nearer end.
+  public var transition: Double
+  public init(
+    from: ProjectionType = .init(rawValue: 0),
+    to: ProjectionType = .init(rawValue: 0),
+    transition: Double = 0
+  ) {
+    self.from = from
+    self.to = to
+    self.transition = transition
+  }
+
+  init(raw: mln_projection_definition) {
+    from = ProjectionType(rawValue: raw.from.rawValue)
+    to = ProjectionType(rawValue: raw.to.rawValue)
+    transition = raw.transition
+  }
+
+  func nativeValue() -> mln_projection_definition {
+    var raw = mln_projection_definition()
+    raw.from = mln_projection_type(rawValue: from.rawValue)
+    raw.to = mln_projection_type(rawValue: to.rawValue)
+    raw.transition = transition
+    return raw
+  }
+}
+
 /// A map's whole projection mode.
 ///
 /// Its members mean the same as those of `ProjectionModeOptions`.
@@ -2233,6 +2286,35 @@ public struct ProjectionModeOptions: Equatable, Hashable, Sendable {
         .y_skew = item
     }
     return raw
+  }
+}
+
+/// A projection that a style's
+/// \[projection\](https://maplibre.org/maplibre-style-spec/projection/) names.
+///
+/// See `mln_projection_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct ProjectionType: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let mercator: ProjectionType = .init(rawValue: 0)
+  /// Draws the map as a globe.
+  public static let verticalPerspective: ProjectionType = .init(rawValue: 1)
+  /// Draws the map as a globe at low zooms, and hands over to Mercator between
+  /// zoom 11 and 12.
+  public static let globe: ProjectionType = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 0: return "mercator"
+    case 1: return "verticalPerspective"
+    case 2: return "globe"
+    default: return "ProjectionType(\(rawValue))"
+    }
   }
 }
 

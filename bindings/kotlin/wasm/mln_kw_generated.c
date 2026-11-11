@@ -883,6 +883,16 @@ int32_t mln_kw_mln_map_projection_get_camera(
   );
 }
 
+int32_t mln_kw_mln_map_projection_is_location_occluded(
+  int64_t projection, uintptr_t coordinate, uintptr_t out_occluded,
+  uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_projection_is_location_occluded(
+    (mln_map_projection)projection, *(const mln_lat_lng*)(uintptr_t)coordinate,
+    (bool*)out_occluded, (mln_diagnostic*)out_diagnostic
+  );
+}
+
 int32_t mln_kw_mln_map_projection_lat_lng_for_pixel(
   int64_t projection, uintptr_t point, uintptr_t out_coordinate,
   uintptr_t out_diagnostic
@@ -1182,6 +1192,15 @@ int32_t mln_kw_mln_map_set_global_state_property(
     (mln_map)map, *(const mln_buffer_view*)(uintptr_t)property_name,
     *(const mln_buffer_view*)(uintptr_t)value,
     (const mln_completion*)completion, (mln_diagnostic*)out_diagnostic
+  );
+}
+
+int32_t mln_kw_mln_map_set_globe_free_bearing_enabled(
+  int64_t map, int32_t enabled, uintptr_t completion, uintptr_t out_diagnostic
+) {
+  return (int32_t)mln_map_set_globe_free_bearing_enabled(
+    (mln_map)map, (bool)enabled, (const mln_completion*)completion,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 

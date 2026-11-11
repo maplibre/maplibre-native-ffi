@@ -82,8 +82,10 @@
 /dotnet/src/Maplibre.NativeFfi/Map/OfflineTilePyramidRegionDefinition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/PanMomentum.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ProjectedMeters.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/ProjectionDefinition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ProjectionMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ProjectionModeOptions.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/ProjectionType.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/Quaternion.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ScreenPoint.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/TileLodMode.g.cs linguist-generated=true

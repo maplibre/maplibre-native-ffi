@@ -2858,6 +2858,65 @@ auto from_native_free_camera(const mln::FreeCameraOptions& options)
   };
 }
 
+auto mercator_projection_definition() -> mln_projection_definition {
+  return mln_projection_definition{
+    .from = MLN_PROJECTION_TYPE_MERCATOR,
+    .to = MLN_PROJECTION_TYPE_MERCATOR,
+    .transition = 1.0,
+  };
+}
+
+auto is_projection_type(mln_projection_type type) -> bool {
+  switch (type) {
+    case MLN_PROJECTION_TYPE_MERCATOR:
+    case MLN_PROJECTION_TYPE_VERTICAL_PERSPECTIVE:
+    case MLN_PROJECTION_TYPE_GLOBE:
+      return true;
+  }
+  return false;
+}
+
+// How far a definition is toward the globe: 0 is Mercator, and anything above
+// draws at least part of a globe. GL JS's `GlobeProjection.transitionState`.
+auto globe_share(const mln_projection_definition& definition) -> double {
+  const auto is_globe = [](mln_projection_type type) {
+    return type != MLN_PROJECTION_TYPE_MERCATOR;
+  };
+  if (definition.from == definition.to) {
+    return is_globe(definition.from) ? 1.0 : 0.0;
+  }
+  const auto share = std::clamp(definition.transition, 0.0, 1.0);
+  if (is_globe(definition.from) && !is_globe(definition.to)) {
+    return 1.0 - share;
+  }
+  if (!is_globe(definition.from) && is_globe(definition.to)) {
+    return share;
+  }
+  return 1.0;
+}
+
+auto validate_projection_definition(const mln_projection_definition& definition)
+  -> mln_status {
+  if (
+    !is_projection_type(definition.from) || !is_projection_type(definition.to)
+  ) {
+    mln::core::set_thread_error("view projection types must be known");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!std::isfinite(definition.transition)) {
+    mln::core::set_thread_error("view projection transition must be finite");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (globe_share(definition) > 0.0) {
+    mln::core::set_thread_error(
+      "MapLibre Native can't project a view whose style projection draws a "
+      "globe"
+    );
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  return MLN_STATUS_OK;
+}
+
 // A view's camera has finite members, and its zoom, pitch, and field of view
 // stay within MapLibre Native's absolute limits, the only range in which a
 // transform converts coordinates.
@@ -2921,7 +2980,13 @@ auto validate_map_view(const mln_map_view& view) -> mln_status {
     .viewport_mode = viewport.viewport_mode,
     .frustum_offset = viewport.frustum_offset,
   };
-  return validate_viewport_options(&viewport_options);
+  if (
+    const auto status = validate_viewport_options(&viewport_options);
+    status != MLN_STATUS_OK
+  ) {
+    return status;
+  }
+  return validate_projection_definition(view.projection);
 }
 
 // Assigns a validated view to a fresh transform. A camera jump would wrap the
@@ -2981,14 +3046,15 @@ auto map_view_from_transform(
       {.axonometric = transform.getAxonometric(),
        .x_skew = transform.getXSkew(),
        .y_skew = transform.getYSkew()},
-    .viewport = {
-      .north_orientation =
-        from_native_north_orientation(transform.getNorthOrientation()),
-      .constrain_mode =
-        from_native_constrain_mode(transform.getConstrainMode()),
-      .viewport_mode = from_native_viewport_mode(transform.getViewportMode()),
-      .frustum_offset = from_native_edge_insets(transform.getFrustumOffset())
-    }
+    .viewport =
+      {.north_orientation =
+         from_native_north_orientation(transform.getNorthOrientation()),
+       .constrain_mode =
+         from_native_constrain_mode(transform.getConstrainMode()),
+       .viewport_mode = from_native_viewport_mode(transform.getViewportMode()),
+       .frustum_offset = from_native_edge_insets(transform.getFrustumOffset())},
+    // MapLibre Native draws only Mercator.
+    .projection = mercator_projection_definition(),
   };
 }
 
@@ -3190,7 +3256,9 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     .free_camera = from_native_free_camera(live.map->getFreeCameraOptions()),
     .view = map_view_from_transform(
       live.map->getTransformState(), live.logical_extent.scale_factor
-    )
+    ),
+    .globe_rendering = false,
+    .globe_free_bearing_enabled = live.globe_free_bearing_enabled,
   };
   const auto generation = snapshot.generation;
   {
@@ -5799,6 +5867,13 @@ auto map_set_debug_flags(MapObject& live, uint32_t flags) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+auto map_set_globe_free_bearing_enabled(MapObject& live, bool enabled)
+  -> mln_status {
+  live.snapshot_config_dirty = true;
+  live.globe_free_bearing_enabled = enabled;
+  return MLN_STATUS_OK;
+}
+
 auto map_set_rendering_stats_view_enabled(MapObject& live, bool enabled)
   -> mln_status {
   live.snapshot_config_dirty = true;
@@ -6105,6 +6180,23 @@ auto validate_latitude(double latitude) -> mln_status {
 }
 
 }  // namespace
+
+auto map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded
+) -> mln_status {
+  if (out_occluded == nullptr) {
+    set_thread_error("out_occluded must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto coordinate_status = validate_lat_lng(coordinate);
+  if (coordinate_status != MLN_STATUS_OK) {
+    return coordinate_status;
+  }
+  // A projection exists only for a Mercator view, which hides nothing.
+  return with_projection(projection, [out_occluded](mln::MapProjection&) {
+    *out_occluded = false;
+  });
+}
 
 auto map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude, double* out_meters_per_pixel

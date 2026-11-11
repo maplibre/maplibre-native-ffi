@@ -3175,6 +3175,28 @@ export class MapHandle extends Owner {
   }
 
   /**
+   * Sets whether drags and zooms on a globe turn the bearing.
+   *
+   * When it's on, a drag or a zoom around a point on the globe turns the
+   * bearing so the planet keeps its orientation, and a drag can carry the
+   * camera over a pole. When it's off, the default, they keep the bearing, as
+   * MapLibre GL JS does. Turn it on for a map whose users can rotate it. It
+   * changes nothing while the map draws Mercator.
+   *
+   * See `mln_map_set_globe_free_bearing_enabled` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  setGlobeFreeBearingEnabled(enabled: boolean): Promise<CommandCompletion> {
+    return command((completion) =>
+      native.mln_map_set_globe_free_bearing_enabled(
+        this.id,
+        enabled,
+        completion,
+      ),
+    );
+  }
+
+  /**
    * Moves the image of an image source.
    *
    * `coordinates` are the image's four corners, clockwise from the top left.
@@ -4279,6 +4301,26 @@ export class MapHandleDiscarding {
   }
 
   /**
+   * Sets whether drags and zooms on a globe turn the bearing.
+   *
+   * When it's on, a drag or a zoom around a point on the globe turns the
+   * bearing so the planet keeps its orientation, and a drag can carry the
+   * camera over a pole. When it's off, the default, they keep the bearing, as
+   * MapLibre GL JS does. Turn it on for a map whose users can rotate it. It
+   * changes nothing while the map draws Mercator.
+   *
+   * See `mln_map_set_globe_free_bearing_enabled` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  setGlobeFreeBearingEnabled(enabled: boolean): void {
+    native.mln_map_set_globe_free_bearing_enabled(
+      this.#owner.id,
+      enabled,
+      undefined,
+    );
+  }
+
+  /**
    * Moves the image of an image source.
    *
    * `coordinates` are the image's four corners, clockwise from the top left.
@@ -4576,10 +4618,15 @@ export class MapProjectionHandle extends Owner {
    *
    * Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`.
    * The projection doesn't follow the map, so create a new one after the map's
-   * camera or size changes.
+   * camera, size, or style projection changes.
    *
    * See `mln_map_projection_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the view's style projection draws a globe and
+   *   the library can't project one.
    */
   static create(view: MapView): MapProjectionHandle {
     const handle = native.mln_map_projection_create(view);
@@ -4598,6 +4645,19 @@ export class MapProjectionHandle extends Owner {
    */
   getCamera(): MapProjectionCameraResult {
     return native.mln_map_projection_get_camera(this.id);
+  }
+
+  /**
+   * Reports whether the globe hides a coordinate from the camera.
+   *
+   * Mercator hides nothing, so this reports false unless the view's style
+   * projection draws a globe.
+   *
+   * See `mln_map_projection_is_location_occluded` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  isLocationOccluded(coordinate: LatLng): boolean {
+    return native.mln_map_projection_is_location_occluded(this.id, coordinate);
   }
 
   /**
@@ -4672,7 +4732,9 @@ export class MapProjectionHandle extends Owner {
   /**
    * Finds the screen point of a coordinate.
    *
-   * The point is in the copy of the world nearest the camera's center.
+   * The point is in the copy of the world nearest the camera's center. On a
+   * globe, a coordinate on the far side also gets a point;
+   * `MapProjectionHandle.isLocationOccluded()` says whether the globe hides it.
    *
    * See `mln_map_projection_pixel_for_lat_lng` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -4707,7 +4769,8 @@ export class MapProjectionHandle extends Owner {
   /**
    * Moves the projection's camera, without changing the map.
    *
-   * Camera fields that `camera` doesn't set keep their values.
+   * Camera fields that `camera` doesn't set keep their values. The style
+   * projection stays as the view had it, even at another zoom.
    *
    * See `mln_map_projection_set_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).

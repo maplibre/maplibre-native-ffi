@@ -616,6 +616,8 @@ internal unsafe struct mln_map_snapshot
     public mln_camera_bounds bounds;
     public mln_free_camera free_camera;
     public mln_map_view view;
+    public byte globe_rendering;
+    public byte globe_free_bearing_enabled;
 }
 
 internal unsafe struct mln_map_tile_options
@@ -647,6 +649,7 @@ internal unsafe struct mln_map_view
     public mln_logical_extent extent;
     public mln_projection_mode projection_mode;
     public mln_map_viewport viewport;
+    public mln_projection_definition projection;
 }
 
 internal unsafe struct mln_map_viewport
@@ -931,6 +934,13 @@ internal unsafe struct mln_projected_meters
 {
     public double northing;
     public double easting;
+}
+
+internal unsafe struct mln_projection_definition
+{
+    public mln_projection_type from;
+    public mln_projection_type to;
+    public double transition;
 }
 
 internal unsafe struct mln_projection_mode
@@ -2082,6 +2092,13 @@ internal enum mln_projection_mode_option_field : uint
     MLN_PROJECTION_MODE_OPTION_AXONOMETRIC = 1,
     MLN_PROJECTION_MODE_OPTION_X_SKEW = 2,
     MLN_PROJECTION_MODE_OPTION_Y_SKEW = 4,
+}
+
+internal enum mln_projection_type : uint
+{
+    MLN_PROJECTION_TYPE_MERCATOR = 0,
+    MLN_PROJECTION_TYPE_VERTICAL_PERSPECTIVE = 1,
+    MLN_PROJECTION_TYPE_GLOBE = 2,
 }
 
 internal enum mln_render_abandon_disposition : uint

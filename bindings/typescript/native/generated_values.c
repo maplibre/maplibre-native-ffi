@@ -1371,6 +1371,15 @@ napi_value mln_ts_read_map_snapshot(
         mln_ts_read_map_view(env, &(source->view), sizeof(source->view))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "globeRendering", mln_ts_bool(env, source->globe_rendering)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "globeFreeBearingEnabled",
+        mln_ts_bool(env, source->globe_free_bearing_enabled)
+      ))
+    return NULL;
   return result;
 }
 
@@ -1440,6 +1449,13 @@ napi_value mln_ts_read_map_view(
         env, result, "viewport",
         mln_ts_read_map_viewport(
           env, &(source->viewport), sizeof(source->viewport)
+        )
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "projection",
+        mln_ts_read_projection_definition(
+          env, &(source->projection), sizeof(source->projection)
         )
       ))
     return NULL;
@@ -1765,6 +1781,26 @@ napi_value mln_ts_read_projected_meters(
     return NULL;
   if (!mln_ts_set(
         env, result, "easting", mln_ts_number(env, (double)(source->easting))
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_projection_definition(
+  napi_env env, const mln_projection_definition* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "from", mln_ts_number(env, (double)(source->from))
+      ))
+    return NULL;
+  if (!mln_ts_set(env, result, "to", mln_ts_number(env, (double)(source->to))))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "transition",
+        mln_ts_number(env, (double)(source->transition))
       ))
     return NULL;
   return result;
@@ -5398,6 +5434,14 @@ bool mln_ts_write_map_view(
   if (!mln_ts_read_record(call, member, child)) return false;
   if (!mln_ts_write_map_viewport(call, member, &out->viewport, child))
     return false;
+  if (!mln_ts_member(call, value, "projection", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "projection");
+  memset(&out->projection, 0, sizeof out->projection);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_projection_definition(
+        call, member, &out->projection, child
+      ))
+    return false;
   return true;
 }
 
@@ -6426,6 +6470,39 @@ bool mln_ts_write_projected_meters(
     double number = 0;
     if (!mln_ts_read_double(call, member, &number, child)) return false;
     out->easting = (double)number;
+  }
+  return true;
+}
+
+bool mln_ts_write_projection_definition(
+  mln_ts_call* call, napi_value value, mln_projection_definition* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "from", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "from");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->from = (mln_projection_type)number;
+  }
+  if (!mln_ts_member(call, value, "to", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "to");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->to = (mln_projection_type)number;
+  }
+  if (!mln_ts_member(call, value, "transition", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "transition");
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, member, &number, child)) return false;
+    out->transition = (double)number;
   }
   return true;
 }

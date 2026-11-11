@@ -78,6 +78,21 @@ auto mln_map_set_debug_flags(
   });
 }
 
+auto mln_map_set_globe_free_bearing_enabled(
+  mln_map map, bool enabled, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
+    return mln::core::submit_map_command(
+      map,
+      [enabled](mln::core::MapObject& live) {
+        return mln::core::map_set_globe_free_bearing_enabled(live, enabled);
+      },
+      completion
+    );
+  });
+}
+
 auto mln_map_set_rendering_stats_view_enabled(
   mln_map map, bool enabled, const mln_completion* completion,
   mln_diagnostic* out_diagnostic

@@ -1122,7 +1122,9 @@ internal static unsafe class GeneratedValues
             CopyMapTileSettings(value.tile),
             CopyCameraBounds(value.bounds),
             CopyFreeCamera(value.free_camera),
-            CopyMapView(value.view)
+            CopyMapView(value.view),
+            value.globe_rendering != 0,
+            value.globe_free_bearing_enabled != 0
         );
 
     internal static mln_map_tile_options NativeMapTileOptions(MapTileOptions value)
@@ -1175,7 +1177,8 @@ internal static unsafe class GeneratedValues
             CopyCamera(value.camera),
             CopyLogicalExtent(value.extent),
             CopyProjectionMode(value.projection_mode),
-            CopyMapViewport(value.viewport)
+            CopyMapViewport(value.viewport),
+            CopyProjectionDefinition(value.projection)
         );
 
     internal static mln_map_view NativeMapView(MapView value)
@@ -1186,6 +1189,7 @@ internal static unsafe class GeneratedValues
         native.extent = NativeLogicalExtent(value.Extent);
         native.projection_mode = NativeProjectionMode(value.ProjectionMode);
         native.viewport = NativeMapViewport(value.Viewport);
+        native.projection = NativeProjectionDefinition(value.Projection);
         return native;
     }
 
@@ -1684,6 +1688,24 @@ internal static unsafe class GeneratedValues
         var native = new mln_projected_meters();
         native.northing = value.Northing;
         native.easting = value.Easting;
+        return native;
+    }
+
+    internal static ProjectionDefinition CopyProjectionDefinition(
+        mln_projection_definition value
+    ) =>
+        new(
+            (global::Maplibre.NativeFfi.ProjectionType)value.from,
+            (global::Maplibre.NativeFfi.ProjectionType)value.to,
+            value.transition
+        );
+
+    internal static mln_projection_definition NativeProjectionDefinition(ProjectionDefinition value)
+    {
+        var native = new mln_projection_definition();
+        native.from = (mln_projection_type)value.From;
+        native.to = (mln_projection_type)value.To;
+        native.transition = value.Transition;
         return native;
     }
 

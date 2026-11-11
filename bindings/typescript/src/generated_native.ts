@@ -454,6 +454,10 @@ export interface NativeOperations {
   ): void;
   mln_map_projection_create(view: MapView): bigint;
   mln_map_projection_get_camera(projection: bigint): MapProjectionCameraResult;
+  mln_map_projection_is_location_occluded(
+    projection: bigint,
+    coordinate: LatLng,
+  ): boolean;
   mln_map_projection_lat_lng_for_pixel(
     projection: bigint,
     point: ScreenPoint,
@@ -602,6 +606,11 @@ export interface NativeOperations {
     map: bigint,
     propertyName: string,
     value: unknown,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_set_globe_free_bearing_enabled(
+    map: bigint,
+    enabled: boolean,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_image_source_coordinates(

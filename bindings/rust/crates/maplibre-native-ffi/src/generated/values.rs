@@ -2657,6 +2657,10 @@ pub struct MapSnapshot {
     pub bounds: CameraBounds,
     pub free_camera: FreeCamera,
     pub view: MapView,
+    /// Whether the map draws as a globe, alone or blending into Mercator.
+    pub globe_rendering: bool,
+    /// The setting from `MapHandle::set_globe_free_bearing_enabled()`.
+    pub globe_free_bearing_enabled: bool,
 }
 impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
     unsafe fn from_native(raw: sys::mln_map_snapshot) -> Result<Self> {
@@ -2673,6 +2677,8 @@ impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
             bounds: unsafe { from_native(raw.bounds) }?,
             free_camera: unsafe { from_native(raw.free_camera) }?,
             view: unsafe { from_native(raw.view) }?,
+            globe_rendering: raw.globe_rendering,
+            globe_free_bearing_enabled: raw.globe_free_bearing_enabled,
         })
     }
 }
@@ -2773,6 +2779,8 @@ pub struct MapView {
     pub extent: LogicalExtent,
     pub projection_mode: ProjectionMode,
     pub viewport: MapViewport,
+    /// The style's projection at the camera's zoom.
+    pub projection: ProjectionDefinition,
 }
 impl ToNative<sys::mln_map_view> for MapView {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_map_view> {
@@ -2782,6 +2790,7 @@ impl ToNative<sys::mln_map_view> for MapView {
         raw.extent = to_native(&self.extent, arena)?;
         raw.projection_mode = to_native(&self.projection_mode, arena)?;
         raw.viewport = to_native(&self.viewport, arena)?;
+        raw.projection = to_native(&self.projection, arena)?;
         Ok(raw)
     }
 }
@@ -2792,6 +2801,7 @@ impl FromNative<sys::mln_map_view> for MapView {
             extent: unsafe { from_native(raw.extent) }?,
             projection_mode: unsafe { from_native(raw.projection_mode) }?,
             viewport: unsafe { from_native(raw.viewport) }?,
+            projection: unsafe { from_native(raw.projection) }?,
         })
     }
 }
@@ -4082,6 +4092,39 @@ impl FromNative<sys::mln_projected_meters> for ProjectedMeters {
     }
 }
 
+/// A style's projection at one zoom: `from` turning into `to`.
+///
+/// A zeroed definition is Mercator.
+///
+/// See `mln_projection_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ProjectionDefinition {
+    pub from: ProjectionType,
+    pub to: ProjectionType,
+    /// How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
+    /// equals `to`. A value outside that range holds at the nearer end.
+    pub transition: f64,
+}
+impl ToNative<sys::mln_projection_definition> for ProjectionDefinition {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_projection_definition> {
+        let mut raw: sys::mln_projection_definition = unsafe { std::mem::zeroed() };
+        raw.from = to_native(&self.from, arena)?;
+        raw.to = to_native(&self.to, arena)?;
+        raw.transition = self.transition;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_projection_definition> for ProjectionDefinition {
+    unsafe fn from_native(raw: sys::mln_projection_definition) -> Result<Self> {
+        Ok(Self {
+            from: ProjectionType::from_raw(raw.from),
+            to: ProjectionType::from_raw(raw.to),
+            transition: raw.transition,
+        })
+    }
+}
+
 /// A map's whole projection mode.
 ///
 /// Its members mean the same as those of `ProjectionModeOptions`.
@@ -4151,6 +4194,27 @@ impl ToNative<sys::mln_projection_mode_options> for ProjectionModeOptions {
             raw.y_skew = *item;
         }
         Ok(raw)
+    }
+}
+
+native_enum! {
+/// A projection that a style's
+/// \[projection\](https://maplibre.org/maplibre-style-spec/projection/) names.
+///
+/// See `mln_projection_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub enum ProjectionType: u32 {
+    Mercator = 0,
+    /// Draws the map as a globe.
+    VerticalPerspective = 1,
+    /// Draws the map as a globe at low zooms, and hands over to Mercator
+    /// between zoom 11 and 12.
+    Globe = 2,
+} Unknown
+}
+impl Default for ProjectionType {
+    fn default() -> Self {
+        Self::Mercator
     }
 }
 

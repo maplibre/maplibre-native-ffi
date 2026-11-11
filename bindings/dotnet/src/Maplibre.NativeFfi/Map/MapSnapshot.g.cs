@@ -18,6 +18,12 @@ namespace Maplibre.NativeFfi;
 /// <param name="LatestRenderUpdateGeneration">
 /// Counts the render updates that the map has made for its render session.
 /// </param>
+/// <param name="GlobeRendering">
+/// Whether the map draws as a globe, alone or blending into Mercator.
+/// </param>
+/// <param name="GlobeFreeBearingEnabled">
+/// The setting from <c>MapHandle.SetGlobeFreeBearingEnabledAsync()</c>.
+/// </param>
 public readonly partial record struct MapSnapshot(
     MapDebugFlag DebugFlags,
     ulong Generation,
@@ -30,5 +36,7 @@ public readonly partial record struct MapSnapshot(
     MapTileSettings Tile,
     CameraBounds Bounds,
     FreeCamera FreeCamera,
-    MapView View
+    MapView View,
+    bool GlobeRendering,
+    bool GlobeFreeBearingEnabled
 );

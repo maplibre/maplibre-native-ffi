@@ -892,6 +892,19 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_kw_mln_map_projection_get_camera(projection, word(outResult), word(outDiagnostic))
 
+  actual fun mln_map_projection_is_location_occluded(
+    projection: Long,
+    coordinate: Long,
+    outOccluded: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_projection_is_location_occluded(
+      projection,
+      word(coordinate),
+      word(outOccluded),
+      word(outDiagnostic),
+    )
+
   actual fun mln_map_projection_lat_lng_for_pixel(
     projection: Long,
     point: Long,
@@ -1222,6 +1235,19 @@ internal actual object C {
       map,
       word(propertyName),
       word(value),
+      word(completion),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_map_set_globe_free_bearing_enabled(
+    map: Long,
+    enabled: Boolean,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_set_globe_free_bearing_enabled(
+      map,
+      if (enabled) 1 else 0,
       word(completion),
       word(outDiagnostic),
     )
@@ -2808,6 +2834,16 @@ private fun mln_kw_mln_map_projection_get_camera(p0: Long, p1: Int, p2: Int): In
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_get_camera(p0, p1, p2)",
   )
 
+private fun mln_kw_mln_map_projection_is_location_occluded(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_is_location_occluded(p0, p1, p2, p3)",
+  )
+
 private fun mln_kw_mln_map_projection_lat_lng_for_pixel(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_lat_lng_for_pixel(p0, p1, p2, p3)",
@@ -3031,6 +3067,16 @@ private fun mln_kw_mln_map_set_global_state_property(
 ): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_global_state_property(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_map_set_globe_free_bearing_enabled(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_globe_free_bearing_enabled(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_set_image_source_coordinates(

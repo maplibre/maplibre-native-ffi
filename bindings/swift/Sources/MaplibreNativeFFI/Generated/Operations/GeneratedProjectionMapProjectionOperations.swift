@@ -8,10 +8,15 @@ public extension MapProjectionHandle {
   ///
   /// Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`.
   /// The projection doesn't follow the map, so create a new one after the map's
-  /// camera or size changes.
+  /// camera, size, or style projection changes.
   ///
   /// See `mln_map_projection_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the view's style projection draws a globe and
+  ///   the library can't project one.
   static func create(view bindingArg0: MapView) throws -> MapProjectionHandle {
     var value0: mln_map_projection = 0
     return try MaplibreNativeFFI
@@ -36,6 +41,25 @@ public extension MapProjectionHandle {
         diagnostic
       )
     } result: { MapProjectionCameraResult(raw: value0) }
+  }
+
+  /// Reports whether the globe hides a coordinate from the camera.
+  ///
+  /// Mercator hides nothing, so this reports false unless the view's style
+  /// projection draws a globe.
+  ///
+  /// See `mln_map_projection_is_location_occluded` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  func isLocationOccluded(coordinate bindingArg0: LatLng) throws -> Bool {
+    var value0 = false
+    return try nativeInvoke { raw, _, diagnostic in
+      mln_map_projection_is_location_occluded(
+        raw,
+        bindingArg0.nativeValue(),
+        &value0,
+        diagnostic
+      )
+    } result: { value0 }
   }
 
   /// Finds the coordinate at a screen point.
@@ -142,7 +166,10 @@ public extension MapProjectionHandle {
 
   /// Finds the screen point of a coordinate.
   ///
-  /// The point is in the copy of the world nearest the camera's center.
+  /// The point is in the copy of the world nearest the camera's center. On a
+  /// globe, a coordinate on the far side also gets a point;
+  /// `MapProjectionHandle.isLocationOccluded()` says whether the globe hides
+  /// it.
   ///
   /// See `mln_map_projection_pixel_for_lat_lng` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -191,7 +218,8 @@ public extension MapProjectionHandle {
 
   /// Moves the projection's camera, without changing the map.
   ///
-  /// Camera fields that `camera` doesn't set keep their values.
+  /// Camera fields that `camera` doesn't set keep their values. The style
+  /// projection stays as the view had it, even at another zoom.
   ///
   /// See `mln_map_projection_set_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).

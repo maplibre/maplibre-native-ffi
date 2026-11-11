@@ -1851,6 +1851,22 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_global_state_property(property_name, value)
 
+    def set_globe_free_bearing_enabled(
+        self, enabled: bool
+    ) -> Future[CommandCompletion]:
+        """Sets whether drags and zooms on a globe turn the bearing.
+
+        When it's on, a drag or a zoom around a point on the globe turns the
+        bearing so the planet keeps its orientation, and a drag can carry the
+        camera over a pole. When it's off, the default, they keep the
+        bearing, as MapLibre GL JS does. Turn it on for a map whose users can
+        rotate it. It changes nothing while the map draws Mercator.
+
+        See `mln_map_set_globe_free_bearing_enabled` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native.set_globe_free_bearing_enabled(enabled)
+
     def set_image_source_coordinates(
         self, source_id: str, coordinates: Sequence[LatLng]
     ) -> Future[CommandCompletion]:
@@ -2140,10 +2156,15 @@ class _MapProjectionHandleOperations(GeneratedOperations):
 
         Create it from the `view` of an `MapSnapshot` or an
         `RenderFrameResult`. The projection doesn't follow the map, so create
-        a new one after the map's camera or size changes.
+        a new one after the map's camera, size, or style projection changes.
 
         See `mln_map_projection_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the view's style projection draws a globe
+          and the library can't project one.
         """
         return _adopt_value(
             _native._MapProjectionHandle.create(view), "MapProjectionHandle", None
@@ -2156,6 +2177,17 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
         return MapProjectionCameraResult._from_native(self._native.get_camera())
+
+    def is_location_occluded(self, coordinate: LatLng) -> bool:
+        """Reports whether the globe hides a coordinate from the camera.
+
+        Mercator hides nothing, so this reports false unless the view's style
+        projection draws a globe.
+
+        See `mln_map_projection_is_location_occluded` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return self._native.is_location_occluded(coordinate)
 
     def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
         """Finds the coordinate at a screen point.
@@ -2219,7 +2251,10 @@ class _MapProjectionHandleOperations(GeneratedOperations):
     def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
         """Finds the screen point of a coordinate.
 
-        The point is in the copy of the world nearest the camera's center.
+        The point is in the copy of the world nearest the camera's center. On
+        a globe, a coordinate on the far side also gets a point;
+        `MapProjectionHandle.is_location_occluded()` says whether the globe
+        hides it.
 
         See `mln_map_projection_pixel_for_lat_lng` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -2251,7 +2286,8 @@ class _MapProjectionHandleOperations(GeneratedOperations):
     def set_camera(self, camera: CameraOptions) -> None:
         """Moves the projection's camera, without changing the map.
 
-        Camera fields that `camera` doesn't set keep their values.
+        Camera fields that `camera` doesn't set keep their values. The style
+        projection stays as the view had it, even at another zoom.
 
         See `mln_map_projection_set_camera` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -4236,6 +4272,20 @@ class MapHandleDiscarding:
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return self._native._discard_set_global_state_property(property_name, value)
+
+    def set_globe_free_bearing_enabled(self, enabled: bool) -> None:
+        """Sets whether drags and zooms on a globe turn the bearing.
+
+        When it's on, a drag or a zoom around a point on the globe turns the
+        bearing so the planet keeps its orientation, and a drag can carry the
+        camera over a pole. When it's off, the default, they keep the
+        bearing, as MapLibre GL JS does. Turn it on for a map whose users can
+        rotate it. It changes nothing while the map draws Mercator.
+
+        See `mln_map_set_globe_free_bearing_enabled` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native._discard_set_globe_free_bearing_enabled(enabled)
 
     def set_image_source_coordinates(
         self, source_id: str, coordinates: Sequence[LatLng]

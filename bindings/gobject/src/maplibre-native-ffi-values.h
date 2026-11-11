@@ -1037,11 +1037,32 @@ typedef struct {
 } MaplibreNativeFfiMapViewport;
 
 /**
+ * MaplibreNativeFfiProjectionDefinition:
+ * @from: from
+ * @to: to
+ * @transition: How far `from` has turned into `to`, from 0 to 1. Ignored when
+ *   `from` equals `to`. A value outside that range holds at the nearer end.
+ *
+ * A style's projection at one zoom: `from` turning into `to`.
+ *
+ * A zeroed definition is Mercator.
+ *
+ * See `mln_projection_definition` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiProjectionType from;
+  MaplibreNativeFfiProjectionType to;
+  gdouble transition;
+} MaplibreNativeFfiProjectionDefinition;
+
+/**
  * MaplibreNativeFfiMapView:
  * @camera: camera
  * @extent: extent
  * @projection_mode: projection_mode
  * @viewport: viewport
+ * @projection: The style's projection at the camera's zoom.
  *
  * One view of a map: its camera, size, and projection.
  *
@@ -1053,6 +1074,7 @@ typedef struct {
   MaplibreNativeFfiLogicalExtent extent;
   MaplibreNativeFfiProjectionMode projection_mode;
   MaplibreNativeFfiMapViewport viewport;
+  MaplibreNativeFfiProjectionDefinition projection;
 } MaplibreNativeFfiMapView;
 
 /**
@@ -1071,6 +1093,10 @@ typedef struct {
  * @bounds: bounds
  * @free_camera: free_camera
  * @view: view
+ * @globe_rendering: Whether the map draws as a globe, alone or blending into
+ *   Mercator.
+ * @globe_free_bearing_enabled: The setting from
+ *   `maplibre_native_ffi_map_set_globe_free_bearing_enabled_async()`.
  *
  * A map's state, as `maplibre_native_ffi_map_get_snapshot()` reads it.
  *
@@ -1090,6 +1116,8 @@ typedef struct {
   MaplibreNativeFfiCameraBounds bounds;
   MaplibreNativeFfiFreeCamera free_camera;
   MaplibreNativeFfiMapView view;
+  gboolean globe_rendering;
+  gboolean globe_free_bearing_enabled;
 } MaplibreNativeFfiMapSnapshot;
 
 /**
@@ -7408,6 +7436,37 @@ void maplibre_native_ffi_map_viewport_free(MaplibreNativeFfiMapViewport* self);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   MaplibreNativeFfiMapViewport, maplibre_native_ffi_map_viewport_free
+)
+
+GType maplibre_native_ffi_projection_definition_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_DEFINITION \
+  (maplibre_native_ffi_projection_definition_get_type())
+
+/**
+ * maplibre_native_ffi_projection_definition_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiProjectionDefinition*
+maplibre_native_ffi_projection_definition_copy(
+  const MaplibreNativeFfiProjectionDefinition* self
+);
+
+/**
+ * maplibre_native_ffi_projection_definition_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_projection_definition_free(
+  MaplibreNativeFfiProjectionDefinition* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiProjectionDefinition,
+  maplibre_native_ffi_projection_definition_free
 )
 
 GType maplibre_native_ffi_map_view_get_type(void) G_GNUC_CONST;

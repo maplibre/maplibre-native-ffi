@@ -494,6 +494,8 @@ auto map_cancel_camera_transitions_with_id(
 auto map_camera_query_start(mln_map map, const mln_completion* completion)
   -> mln_status;
 auto map_set_debug_flags(MapObject& live, uint32_t flags) -> mln_status;
+auto map_set_globe_free_bearing_enabled(MapObject& live, bool enabled)
+  -> mln_status;
 auto map_set_rendering_stats_view_enabled(MapObject& live, bool enabled)
   -> mln_status;
 auto map_dump_debug_logs(MapObject& live) -> mln_status;
@@ -571,6 +573,9 @@ auto map_list_style_layers(
   MapObject& live, std::vector<StyleLayerRecord>& layers
 ) -> mln_status;
 
+auto map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded
+) -> mln_status;
 auto map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude, double* out_meters_per_pixel
 ) -> mln_status;

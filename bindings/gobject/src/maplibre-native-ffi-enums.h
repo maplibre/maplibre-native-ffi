@@ -684,6 +684,30 @@ GType maplibre_native_ffi_open_gl_context_provider_flag_get_type(
   (maplibre_native_ffi_open_gl_context_provider_flag_get_type())
 
 /**
+ * MaplibreNativeFfiProjectionType:
+ * @MAPLIBRE_NATIVE_FFI_PROJECTION_TYPE_MERCATOR:
+ * @MAPLIBRE_NATIVE_FFI_PROJECTION_TYPE_VERTICAL_PERSPECTIVE: Draws the map as a
+ *   globe.
+ * @MAPLIBRE_NATIVE_FFI_PROJECTION_TYPE_GLOBE: Draws the map as a globe at low
+ *   zooms, and hands over to Mercator between zoom 11 and 12.
+ *
+ * A projection that a style's
+ * \[projection\](https://maplibre.org/maplibre-style-spec/projection/) names.
+ *
+ * See `mln_projection_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_PROJECTION_TYPE_MERCATOR = 0,
+  MAPLIBRE_NATIVE_FFI_PROJECTION_TYPE_VERTICAL_PERSPECTIVE = 1,
+  MAPLIBRE_NATIVE_FFI_PROJECTION_TYPE_GLOBE = 2,
+} MaplibreNativeFfiProjectionType;
+
+GType maplibre_native_ffi_projection_type_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_TYPE \
+  (maplibre_native_ffi_projection_type_get_type())
+
+/**
  * MaplibreNativeFfiRenderAbandonDisposition:
  * @MAPLIBRE_NATIVE_FFI_RENDER_ABANDON_DISPOSITION_CLEAN:
  * @MAPLIBRE_NATIVE_FFI_RENDER_ABANDON_DISPOSITION_QUARANTINED: It kept some

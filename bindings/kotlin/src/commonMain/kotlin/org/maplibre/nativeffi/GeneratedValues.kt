@@ -1375,6 +1375,55 @@ public class OpenGlContextProviderFlag(@get:JvmName("getRawValue") public val ra
 }
 
 /**
+ * A projection that a style's
+ * &#91;projection&#93;(https://maplibre.org/maplibre-style-spec/projection/) names.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_projection_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public class ProjectionType(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "MERCATOR"
+      1u -> "VERTICAL_PERSPECTIVE"
+      2u -> "GLOBE"
+      else -> "ProjectionType($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean = other is ProjectionType && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    @JvmField public val MERCATOR: ProjectionType = ProjectionType(MERCATOR_VALUE)
+    /** The `rawValue` of [MERCATOR]. */
+    public const val MERCATOR_VALUE: UInt = 0u
+    /** Draws the map as a globe. */
+    @JvmField
+    public val VERTICAL_PERSPECTIVE: ProjectionType = ProjectionType(VERTICAL_PERSPECTIVE_VALUE)
+    /** The `rawValue` of [VERTICAL_PERSPECTIVE]. */
+    public const val VERTICAL_PERSPECTIVE_VALUE: UInt = 1u
+    /** Draws the map as a globe at low zooms, and hands over to Mercator between zoom 11 and 12. */
+    @JvmField public val GLOBE: ProjectionType = ProjectionType(GLOBE_VALUE)
+    /** The `rawValue` of [GLOBE]. */
+    public const val GLOBE_VALUE: UInt = 2u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): ProjectionType =
+      when (rawValue) {
+        MERCATOR_VALUE -> MERCATOR
+        VERTICAL_PERSPECTIVE_VALUE -> VERTICAL_PERSPECTIVE
+        GLOBE_VALUE -> GLOBE
+        else -> ProjectionType(rawValue)
+      }
+  }
+}
+
+/**
  * What `RenderSessionHandle.abandon()` did with a session's graphics objects.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
@@ -4135,6 +4184,41 @@ public data class MapViewport(
 }
 
 /**
+ * A style's projection at one zoom: `from` turning into `to`.
+ *
+ * A zeroed definition is Mercator.
+ *
+ * See `mln_projection_definition` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class ProjectionDefinition(
+  public val from: ProjectionType = ProjectionType.MERCATOR,
+  public val to: ProjectionType = ProjectionType.MERCATOR,
+  /**
+   * How far `from` has turned into `to`, from 0 to 1. Ignored when `from` equals `to`. A value
+   * outside that range holds at the nearer end.
+   */
+  public val transition: Double = 0.0,
+) {
+  @PublishedApi
+  internal fun withFrom(from: ProjectionType): ProjectionDefinition = copy(from = from)
+
+  @PublishedApi internal fun withTo(to: ProjectionType): ProjectionDefinition = copy(to = to)
+
+  @PublishedApi
+  internal fun withTransition(transition: Double): ProjectionDefinition =
+    copy(transition = transition)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ProjectionDefinition = ProjectionDefinition()
+  }
+}
+
+/**
  * One view of a map: its camera, size, and projection.
  *
  * See `mln_map_view` in the
@@ -4145,6 +4229,8 @@ public data class MapView(
   public val extent: LogicalExtent = LogicalExtent(),
   public val projectionMode: ProjectionMode = ProjectionMode(),
   public val viewport: MapViewport = MapViewport(),
+  /** The style's projection at the camera's zoom. */
+  public val projection: ProjectionDefinition = ProjectionDefinition(),
 ) {
   @PublishedApi internal fun withCamera(camera: Camera): MapView = copy(camera = camera)
 
@@ -4156,6 +4242,10 @@ public data class MapView(
 
   @PublishedApi
   internal fun withViewport(viewport: MapViewport): MapView = copy(viewport = viewport)
+
+  @PublishedApi
+  internal fun withProjection(projection: ProjectionDefinition): MapView =
+    copy(projection = projection)
 
   public companion object {
     /**
@@ -6506,6 +6596,10 @@ public data class MapSnapshot(
   public val bounds: CameraBounds,
   public val freeCamera: FreeCamera,
   public val view: MapView,
+  /** Whether the map draws as a globe, alone or blending into Mercator. */
+  public val globeRendering: Boolean,
+  /** The setting from `MapHandle.setGlobeFreeBearingEnabled()`. */
+  public val globeFreeBearingEnabled: Boolean,
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
@@ -6524,6 +6618,8 @@ public data class MapSnapshot(
       bounds: CameraBounds,
       freeCamera: FreeCamera,
       view: MapView,
+      globeRendering: Boolean,
+      globeFreeBearingEnabled: Boolean,
     ): MapSnapshot =
       MapSnapshot(
         debugFlags = debugFlags,
@@ -6538,6 +6634,8 @@ public data class MapSnapshot(
         bounds = bounds,
         freeCamera = freeCamera,
         view = view,
+        globeRendering = globeRendering,
+        globeFreeBearingEnabled = globeFreeBearingEnabled,
       )
   }
 }

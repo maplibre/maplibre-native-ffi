@@ -298,6 +298,26 @@ MapViewport _readMapViewport(raw.mln_map_viewport source) => MapViewport(
   frustumOffset: _readEdgeInsets(source.frustum_offset),
 );
 
+Pointer<raw.mln_projection_definition> _writeProjectionDefinition(
+  ProjectionDefinition value,
+  Allocator arena, {
+  Pointer<raw.mln_projection_definition>? into,
+}) {
+  final result = into ?? arena<raw.mln_projection_definition>();
+  result.ref.from = value.from.rawValue;
+  result.ref.to = value.to.rawValue;
+  result.ref.transition = value.transition;
+  return result;
+}
+
+ProjectionDefinition _readProjectionDefinition(
+  raw.mln_projection_definition source,
+) => ProjectionDefinition(
+  from: ProjectionType.fromRawValue(source.from),
+  to: ProjectionType.fromRawValue(source.to),
+  transition: source.transition,
+);
+
 Pointer<raw.mln_map_view> _writeMapView(
   MapView value,
   Allocator arena, {
@@ -312,6 +332,10 @@ Pointer<raw.mln_map_view> _writeMapView(
     arena,
   ).ref;
   result.ref.viewport = _writeMapViewport(value.viewport, arena).ref;
+  result.ref.projection = _writeProjectionDefinition(
+    value.projection,
+    arena,
+  ).ref;
   return result;
 }
 
@@ -320,6 +344,7 @@ MapView _readMapView(raw.mln_map_view source) => MapView(
   extent: _readLogicalExtent(source.extent),
   projectionMode: _readProjectionMode(source.projection_mode),
   viewport: _readMapViewport(source.viewport),
+  projection: _readProjectionDefinition(source.projection),
 );
 
 RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
@@ -1677,6 +1702,8 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   bounds: _readCameraBounds(source.bounds),
   freeCamera: _readFreeCamera(source.free_camera),
   view: _readMapView(source.view),
+  globeRendering: source.globe_rendering,
+  globeFreeBearingEnabled: source.globe_free_bearing_enabled,
 );
 
 Pointer<raw.mln_image_stretch> _writeImageStretch(
@@ -4536,6 +4563,14 @@ extension type MapHandleDiscarding._(MapHandle _owner) {
       nativeDiagnostic,
     ),
   );
+  void setGlobeFreeBearingEnabled(bool enabled) => _discard(
+    (arena, completion) => raw.mln_map_set_globe_free_bearing_enabled(
+      _handle.raw,
+      enabled,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   void setImageSourceCoordinates(String sourceId, List<LatLng> coordinates) =>
       _discard((arena, completion) {
         final nativecoordinates = arena<raw.mln_lat_lng>(
@@ -6798,6 +6833,26 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
+  /// Sets whether drags and zooms on a globe turn the bearing.
+  ///
+  /// When it's on, a drag or a zoom around a point on the globe turns the
+  /// bearing so the planet keeps its orientation, and a drag can carry the
+  /// camera over a pole. When it's off, the default, they keep the bearing, as
+  /// MapLibre GL JS does. Turn it on for a map whose users can rotate it. It
+  /// changes nothing while the map draws Mercator.
+  ///
+  /// See `mln_map_set_globe_free_bearing_enabled` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  Future<CommandCompletion> setGlobeFreeBearingEnabled(bool enabled) =>
+      _command(
+        (arena, completion) => raw.mln_map_set_globe_free_bearing_enabled(
+          _handle.raw,
+          enabled,
+          completion,
+          nativeDiagnostic,
+        ),
+      );
+
   /// Moves the image of an image source.
   ///
   /// `coordinates` are the image's four corners, clockwise from the top left.
@@ -7203,10 +7258,15 @@ final class MapProjectionHandle implements Finalizable {
   ///
   /// Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`.
   /// The projection doesn't follow the map, so create a new one after the map's
-  /// camera or size changes.
+  /// camera, size, or style projection changes.
   ///
   /// See `mln_map_projection_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the view's style projection draws a globe and
+  ///   the library can't project one.
   static MapProjectionHandle create(MapView view) => withNativeArena((arena) {
     ensureAbiVersion();
     final outProjection = arena<Uint64>();
@@ -7241,6 +7301,26 @@ final class MapProjectionHandle implements Finalizable {
       ),
     );
     return _readMapProjectionCameraResult(outResult.ref);
+  });
+
+  /// Reports whether the globe hides a coordinate from the camera.
+  ///
+  /// Mercator hides nothing, so this reports false unless the view's style
+  /// projection draws a globe.
+  ///
+  /// See `mln_map_projection_is_location_occluded` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  bool isLocationOccluded(LatLng coordinate) => withNativeArena((arena) {
+    final outOccluded = arena<Bool>();
+    _check(
+      raw.mln_map_projection_is_location_occluded(
+        _handle.raw,
+        _writeLatLng(coordinate, arena).ref,
+        outOccluded,
+        nativeDiagnostic,
+      ),
+    );
+    return outOccluded.value;
   });
 
   /// Finds the coordinate at a screen point.
@@ -7370,7 +7450,10 @@ final class MapProjectionHandle implements Finalizable {
 
   /// Finds the screen point of a coordinate.
   ///
-  /// The point is in the copy of the world nearest the camera's center.
+  /// The point is in the copy of the world nearest the camera's center. On a
+  /// globe, a coordinate on the far side also gets a point;
+  /// `MapProjectionHandle.isLocationOccluded()` says whether the globe hides
+  /// it.
   ///
   /// See `mln_map_projection_pixel_for_lat_lng` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
@@ -7435,7 +7518,8 @@ final class MapProjectionHandle implements Finalizable {
 
   /// Moves the projection's camera, without changing the map.
   ///
-  /// Camera fields that `camera` doesn't set keep their values.
+  /// Camera fields that `camera` doesn't set keep their values. The style
+  /// projection stays as the view had it, even at another zoom.
   ///
   /// See `mln_map_projection_set_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
