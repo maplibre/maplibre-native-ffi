@@ -18,8 +18,8 @@ dev = [
   "lief==1.0.0; sys_platform == 'darwin'",
   "meson==1.12.1",
   "ruamel-yaml==0.19.1",
-  "ruff==0.17.3",
-  "ty==0.0.95",
+  "ruff==0.17.4",
+  "ty==0.0.99",
   "wheel==0.48.0",
 ]
 
