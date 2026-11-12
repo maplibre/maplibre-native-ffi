@@ -630,10 +630,9 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   // completion queues the burst behind it with nothing announced ahead.
   mln_test_gate gate;
   mln_test_gate_init(&gate);
-  const mln_completion hold = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_map_get_camera(map, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+    mln_test_park_map_worker_in_query(map, &gate),
+    "the runtime worker never parked"
   );
   static const char layer_ids[] = "01234567";
   mln_test_completion commands[sizeof(layer_ids) - 1];
@@ -664,16 +663,28 @@ static void a_burst_of_held_commands_renders_in_one_frame(void) {
   detach(runtime, map, &fixture);
 }
 
-static void update_zoom(
-  mln_map map, double zoom, const mln_completion* completion
-) {
+static mln_camera_update zoom_update(double zoom) {
   mln_camera_update update = {
     .size = sizeof(mln_camera_update),
     .camera = {.size = sizeof(mln_camera_options)}
   };
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = zoom;
+  return update;
+}
+
+static void update_zoom(
+  mln_map map, double zoom, const mln_completion* completion
+) {
+  const mln_camera_update update = zoom_update(zoom);
   MLN_TEST_OK(mln_map_update_camera(map, &update, completion, NULL));
+}
+
+static mln_status zoom_to_two(void* context, const mln_completion* completion) {
+  const mln_camera_update update = zoom_update(2.0);
+  return mln_map_update_camera(
+    *(const mln_map*)context, &update, completion, NULL
+  );
 }
 
 // Services a caller-driven session once, and checks that the demand waits:
@@ -697,10 +708,9 @@ static void a_demand_shows_the_commands_sent_before_it(void) {
 
   mln_test_gate gate;
   mln_test_gate_init(&gate);
-  const mln_completion hold = mln_test_gate_completion(&gate);
-  update_zoom(map, 2.0, &hold);
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+    mln_test_gate_park_worker(&gate, zoom_to_two, &map),
+    "the runtime worker never parked"
   );
   mln_test_completion moved = mln_test_completion_default(0);
   update_zoom(map, 3.0, &moved.descriptor);
@@ -735,10 +745,9 @@ static void a_demand_behind_a_command_without_an_update_finishes(void) {
 
   mln_test_gate gate;
   mln_test_gate_init(&gate);
-  const mln_completion hold = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_map_get_camera(map, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+    mln_test_park_map_worker_in_query(map, &gate),
+    "the runtime worker never parked"
   );
   mln_test_completion logged = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_dump_debug_logs(map, &logged.descriptor, NULL));
@@ -768,10 +777,9 @@ static void a_detach_ends_a_demand_waiting_for_commands(void) {
 
   mln_test_gate gate;
   mln_test_gate_init(&gate);
-  const mln_completion hold = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_map_get_camera(map, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+    mln_test_park_map_worker_in_query(map, &gate),
+    "the runtime worker never parked"
   );
   mln_test_completion moved = mln_test_completion_default(0);
   update_zoom(map, 3.0, &moved.descriptor);

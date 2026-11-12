@@ -1196,6 +1196,14 @@ static void offline_submission_never_waits_for_the_runtime_worker(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static mln_status clear_resource_provider(
+  void* context, const mln_completion* completion
+) {
+  return mln_runtime_clear_resource_provider(
+    *(const mln_runtime*)context, completion, NULL
+  );
+}
+
 // A region that an operation accepted before release creates is there for the
 // next runtime that opens the same cache.
 static void an_offline_operation_accepted_before_release_still_completes(void) {
@@ -1212,10 +1220,9 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   // offline operation and the release queue behind it.
   mln_test_gate gate;
   mln_test_gate_init(&gate);
-  const mln_completion hold = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_runtime_clear_resource_provider(runtime, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+    mln_test_gate_park_worker(&gate, clear_resource_provider, &runtime),
+    "the runtime worker never parked"
   );
 
   const mln_offline_region_definition definition = tile_definition();

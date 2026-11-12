@@ -381,6 +381,30 @@ mln_status mln_test_map_fence(mln_map map) {
   return mln_test_completion_settle(&completion);
 }
 
+static mln_status clear_debug_flags(
+  void* context, const mln_completion* completion
+) {
+  return mln_map_set_debug_flags(
+    *(const mln_map*)context, 0, completion, MLN_TEST_DIAGNOSTIC
+  );
+}
+
+bool mln_test_park_map_worker(mln_map map, mln_test_gate* gate) {
+  return mln_test_gate_park_worker(gate, clear_debug_flags, &map);
+}
+
+static mln_status query_camera(
+  void* context, const mln_completion* completion
+) {
+  return mln_map_get_camera(
+    *(const mln_map*)context, completion, MLN_TEST_DIAGNOSTIC
+  );
+}
+
+bool mln_test_park_map_worker_in_query(mln_map map, mln_test_gate* gate) {
+  return mln_test_gate_park_worker(gate, query_camera, &map);
+}
+
 void mln_test_destroy_map(mln_map map) {
   const mln_completion release = mln_test_discard_completion();
   MLN_TEST_OK(mln_map_release(map, &release, MLN_TEST_DIAGNOSTIC));
