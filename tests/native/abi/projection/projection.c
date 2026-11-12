@@ -72,7 +72,7 @@ static void projection_follows_committed_extent_viewport_and_mode(void) {
   const mln_map_projection before = mln_test_map_create_projection(map);
 
   MLN_TEST_AWAIT_OK(mln_map_resize(
-    map, (mln_logical_size){512, 256}, &completion.descriptor, NULL
+    map, (mln_logical_extent){512, 256, 1.0}, &completion.descriptor, NULL
   ));
   mln_camera_update padded = {
     .size = sizeof(mln_camera_update),

@@ -214,7 +214,8 @@ typedef struct mln_map_options {
   mln_map_option_fields fields;
   /**
    * The map's first size, and its scale factor. Render sessions of the map
-   * render at its scale factor, and mln_render_session_resize() changes it.
+   * render at its scale factor. mln_map_resize() changes both, or
+   * mln_render_session_resize() while a render session is attached.
    */
   mln_logical_extent initial_extent MLN_BINDING("required=true");
   mln_map_mode map_mode;
@@ -1359,10 +1360,11 @@ MLN_API mln_status mln_map_get_snapshot(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets the map's size.
+ * Sets the map's size and scale factor.
  *
- * A map with a render session takes its size from the session, so resize the
- * session with mln_render_session_resize() instead.
+ * The map keeps its loaded tiles. A map with a render session takes its size
+ * and scale factor from the session, so resize the session with
+ * mln_render_session_resize() instead.
  *
  * Returns:
  * - MLN_STATUS_INVALID_STATE when the map has a render session.
@@ -1373,7 +1375,7 @@ MLN_API mln_status mln_map_get_snapshot(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_resize(
-  mln_map map, mln_logical_size logical_size, const mln_completion* completion,
+  mln_map map, mln_logical_extent extent, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
