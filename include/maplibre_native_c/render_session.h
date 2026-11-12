@@ -107,7 +107,7 @@ typedef struct mln_render_frame_result {
   mln_render_mode mode;
   /**
    * Where a rendered frame drew the map, for drawing into its frame with
-   * depth.
+   * depth. All zero for a demand that rendered nothing.
    */
   mln_frame_projection frame_projection;
 } mln_render_frame_result;
