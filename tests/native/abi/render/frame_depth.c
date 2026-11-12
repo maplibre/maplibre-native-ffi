@@ -108,7 +108,6 @@ static void a_frame_projection_places_points_where_the_frame_drew_them(void) {
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, frame.disposition);
   const mln_frame_projection* projection = &frame.frame_projection;
-  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_frame_projection), projection->size);
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL)
   TEST_ASSERT_EQUAL_UINT32(
     MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE, projection->clip_depth_range
@@ -135,7 +134,8 @@ static void a_frame_projection_places_points_where_the_frame_drew_them(void) {
     mln_test_render_batch_result(batch, 0);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, unchanged.disposition);
-  TEST_ASSERT_EQUAL_UINT32(0, unchanged.frame_projection.size);
+  TEST_ASSERT_EQUAL_UINT32(0, unchanged.frame_projection.clip_depth_range);
+  TEST_ASSERT_EQUAL_DOUBLE(0.0, unchanged.frame_projection.matrix.w.w);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
