@@ -58,11 +58,14 @@ static mln_screen_point projected(
     (coordinate.longitude + 180.0) / 360.0,
     (1.0 - log(tan(pi / 4.0 + latitude / 2.0)) / pi) / 2.0, 0.0, 1.0
   };
+  const mln_mat4* matrix = &projection->matrix;
+  const mln_vec4* columns[4] = {&matrix->x, &matrix->y, &matrix->z, &matrix->w};
   double clip[4] = {0};
-  for (int row = 0; row < 4; row += 1) {
-    for (int column = 0; column < 4; column += 1) {
-      clip[row] += projection->matrix[4 * column + row] * world[column];
-    }
+  for (int column = 0; column < 4; column += 1) {
+    clip[0] += columns[column]->x * world[column];
+    clip[1] += columns[column]->y * world[column];
+    clip[2] += columns[column]->z * world[column];
+    clip[3] += columns[column]->w * world[column];
   }
   return (mln_screen_point){
     .x = (clip[0] / clip[3] + 1.0) / 2.0 * side,

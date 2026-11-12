@@ -1246,6 +1246,27 @@ typedef struct mln_map_view {
   mln_projection_definition projection;
 } mln_map_view;
 
+/** A vector in four dimensions, such as a point in homogeneous coordinates. */
+typedef struct mln_vec4 {
+  double x;
+  double y;
+  double z;
+  double w;
+} mln_vec4;
+
+/**
+ * A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x,
+ * plus `y` times its y, `z` times its z, and `w` times its w. In memory it is
+ * 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and WebGPU
+ * shaders take a matrix.
+ */
+typedef struct mln_mat4 {
+  mln_vec4 x;
+  mln_vec4 y;
+  mln_vec4 z;
+  mln_vec4 w;
+} mln_mat4;
+
 /** How a graphics API's clip space holds depth. */
 typedef enum mln_clip_depth_range : uint32_t {
   /**
@@ -1296,9 +1317,7 @@ typedef enum mln_clip_depth_range : uint32_t {
  * points on the globe.
  */
 typedef struct mln_frame_projection {
-  uint32_t size;
-  /** The 4×4 matrix, in column-major order: `matrix[4 * column + row]`. */
-  double matrix[16];
+  mln_mat4 matrix;
   mln_clip_depth_range clip_depth_range;
   /**
    * The distance from the camera to the plane where the depth that you get
