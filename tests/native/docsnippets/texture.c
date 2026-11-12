@@ -93,12 +93,19 @@ void mln_doc_texture(
   // #endregion attach-options
 
   // #region attach-borrowed
+  // The device extensions that you enabled on your VkDevice.
+  const mln_buffer_view extensions[] = {
+    mln_buffer_view_from_cstr("VK_KHR_swapchain"),
+    mln_buffer_view_from_cstr("VK_KHR_external_semaphore_fd"),
+  };
   // Your VkDevice and graphics queue.
   const mln_vulkan_device_descriptor host = {
     .size = sizeof(mln_vulkan_device_descriptor),
     .context = vulkan,
     // Only if your renderer also submits to the graphics queue.
     .queue_lock = {.lock = lock_queue, .unlock = unlock_queue},
+    .enabled_extensions = extensions,
+    .enabled_extension_count = sizeof(extensions) / sizeof(extensions[0]),
   };
   mln_gpu_device device = MLN_HANDLE_NULL;
   mln_gpu_device_wrap_vulkan(&host, &device, NULL);

@@ -785,7 +785,9 @@ typedef struct mln_exported_ring_target {
    * dmabufs only of one of them. The library renders only DRM_FORMAT_ABGR8888
    * and DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
    * format has, such as a plane of compression metadata, and the library takes
-   * any such modifier that its GPU can render into and share.
+   * any such modifier that its GPU can render into and share. The library
+   * takes no implicit modifier: it skips DRM_FORMAT_MOD_INVALID, so a list of
+   * only that one gets no dmabuf.
    */
   const mln_dma_buf_format* dma_buf_formats
     MLN_BINDING("length=dma_buf_format_count");
