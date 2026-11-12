@@ -1246,6 +1246,77 @@ typedef struct mln_map_view {
   mln_projection_definition projection;
 } mln_map_view;
 
+/** How a graphics API's clip space holds depth. */
+typedef enum mln_clip_depth_range : uint32_t {
+  /**
+   * Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and
+   * OpenGL with `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+   */
+  MLN_CLIP_DEPTH_RANGE_ZERO_TO_ONE = 1U,
+  /** Clip z runs from -w to w, as in OpenGL by default. */
+  MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE = 2U,
+} mln_clip_depth_range;
+
+/**
+ * Where a frame drew the map, and the depth that it wrote there.
+ *
+ * World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at
+ * 180° east, and on past both into the copies of the world beside the first.
+ * y runs from 0 at the north edge of the Mercator world, about 85.05° north, to
+ * 1 at its south edge. z is the altitude in meters above sea level, where the
+ * map draws its ground at 0.
+ *
+ * `matrix` takes a world point to the clip coordinates where the frame drew
+ * it, with the camera's padding, roll, field of view, and center altitude, and
+ * the map's viewport and projection mode. Clip y points up, as the map draws
+ * with OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so negate
+ * it there too. At high zooms, single precision can't tell nearby world points
+ * apart: subtract an origin near your geometry from its coordinates in double
+ * precision, and fold the origin into the matrix, before you convert to float.
+ *
+ * Clip z follows `clip_depth_range`, the convention of the device's graphics
+ * API. With the API's default depth range of 0 to 1, a fragment that you draw
+ * through `matrix` gets the depth that the map's 3D layers, such as fill
+ * extrusions, wrote at the same place: 0 at `near_distance` from the camera,
+ * up to `far_depth` at `far_distance`. Depth-tested against the frame's depth,
+ * your fragments hide behind the map's 3D layers where those stand in front of
+ * them.
+ *
+ * The frame's depth starts at 1. The map's 3D layers write the depth of each of
+ * their fragments. Each 2D layer below every 3D layer of the style, such as a
+ * background or a fill, writes one depth over all its opaque fragments,
+ * wherever they are: the higher the layer, the lower its depth, and every one
+ * between `far_depth` and 1. The other 2D layers, such as labels above a 3D
+ * layer, and translucent fragments, write no depth. So what you draw through
+ * `matrix`, even on the ground, lies in front of every 2D layer.
+ *
+ * While `globe` is true, the frame drew the map onto a globe, and its 2D layers
+ * wrote no depth. `matrix` then is the map's Mercator one, which doesn't place
+ * points on the globe.
+ */
+typedef struct mln_frame_projection {
+  uint32_t size;
+  /** The 4×4 matrix, in column-major order: `matrix[4 * column + row]`. */
+  double matrix[16];
+  mln_clip_depth_range clip_depth_range;
+  /**
+   * The distance from the camera to the plane where the depth that you get
+   * through `matrix` is 0, along the camera's view. Like `far_distance`, it is
+   * in pixels of the map at the camera's zoom, where the world is
+   * 512 × 2^zoom pixels wide.
+   */
+  double near_distance;
+  /** The distance to the plane where the depth is `far_depth`. */
+  double far_distance;
+  /** The depth at `far_distance`, below 1. */
+  double far_depth;
+  /**
+   * Whether the frame drew the map as a globe, alone or blending into
+   * Mercator.
+   */
+  bool globe;
+} mln_frame_projection;
+
 /**
  * How the map picks the tiles to load.
  *
