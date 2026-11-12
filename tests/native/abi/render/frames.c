@@ -533,6 +533,93 @@ static void an_open_view_holds_an_abandon_back(void) {
   detach(runtime, map, &fixture);
 }
 
+// A frame wake that runs on the session's thread, as one without a delivery
+// queue does, opens a view while another thread abandons the session.
+typedef struct view_during_abandon {
+  mln_render_session session;
+  mln_acquired_frame frame;
+  atomic_bool armed;
+  atomic_bool entered;
+  atomic_bool done;
+  mln_status view_status;
+} view_during_abandon;
+
+static bool session_abandoned(void* context) {
+  const view_during_abandon* probe = context;
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  return mln_render_session_get_snapshot(probe->session, &snapshot, NULL) ==
+           MLN_STATUS_OK &&
+         snapshot.state == MLN_RENDER_SESSION_STATE_ABANDONED;
+}
+
+static void open_a_view_once_abandoned(void* user_data) {
+  view_during_abandon* probe = user_data;
+  mln_test_pulse();
+  bool expected = true;
+  if (!atomic_compare_exchange_strong(&probe->armed, &expected, false)) return;
+  mln_test_flag_set(&probe->entered);
+  // The abandon has begun once the session reports it, and waits for this
+  // thread to let go of the session's graphics objects.
+  if (
+    mln_test_await(
+      session_abandoned, probe, mln_test_deadline_default(),
+      "an abandon from another thread"
+    )
+  ) {
+    void* scope = NULL;
+    probe->view_status =
+      mln_acquired_frame_view_begin(probe->frame, &scope, NULL);
+    mln_acquired_frame_view_end(scope);
+  }
+  mln_test_flag_set(&probe->done);
+}
+
+static void a_view_opened_during_an_abandon_finds_the_session_gone(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(map, mln_test_empty_style_json);
+  view_during_abandon probe = {.view_status = MLN_STATUS_OK};
+  atomic_init(&probe.armed, false);
+  atomic_init(&probe.entered, false);
+  atomic_init(&probe.done, false);
+  mln_render_session_attach_options options = {
+    .size = sizeof(mln_render_session_attach_options)
+  };
+  options.frame_wake =
+    (mln_wake){.callback = open_a_view_once_abandoned, .user_data = &probe};
+  options.driver_work_wake = mln_test_pulse_wake();
+  mln_test_render_fixture fixture = {0};
+  mln_test_completion attached = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_test_render_fixture_start_attach(
+    map, &options, &attached.descriptor, &fixture
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attached));
+  mln_test_completion_destroy(&attached);
+  probe.session = fixture.session;
+  probe.frame = mln_test_render_and_acquire(&fixture, 1);
+  // A caller driver runs the wake on this thread.
+  if (fixture.driver != MLN_RENDER_DRIVER_CORE_WORKER) {
+    mln_test_render_release_frame(&probe.frame);
+    detach(runtime, map, &fixture);
+    return;
+  }
+
+  atomic_store(&probe.armed, true);
+  mln_test_render_demand_forced(&fixture, 2);
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.entered));
+  mln_render_abandon_result abandoned = {
+    .size = sizeof(mln_render_abandon_result)
+  };
+  MLN_TEST_OK(mln_render_session_abandon(fixture.session, &abandoned, NULL));
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.done));
+  MLN_TEST_STATUS(MLN_STATUS_TARGET_LOST, probe.view_status);
+
+  mln_test_render_release_frame(&probe.frame);
+  detach(runtime, map, &fixture);
+}
+
 // Waits for earlier driver work and verifies that parked demands have no
 // result.
 static void expect_parked_demand(const mln_test_render_fixture* fixture) {
@@ -816,6 +903,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_stale_release_during_detach_is_refused_before_its_sync);
   RUN_TEST(borrowed_views_hold_a_frame_until_every_view_ends);
   RUN_TEST(an_open_view_holds_an_abandon_back);
+  RUN_TEST(a_view_opened_during_an_abandon_finds_the_session_gone);
   RUN_TEST(disposing_a_frame_quarantines_only_its_slot);
   RUN_TEST(a_fully_quarantined_ring_takes_no_more_demands);
   RUN_TEST(a_resize_renders_and_reads_back_at_the_new_size);
