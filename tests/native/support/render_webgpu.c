@@ -231,21 +231,33 @@ bool mln_test_backend_attach_borrowed(
       .texture_view = view,
     };
   }
-  mln_web_gpu_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_web_gpu_borrowed_texture_descriptor)
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  if (
+    mln_gpu_device_wrap_web_gpu(&context, &device, MLN_TEST_DIAGNOSTIC) !=
+    MLN_STATUS_OK
+  ) {
+    fprintf(stderr, "wrapping the WebGPU device failed\n");
+    destroy_backend_state(ring);
+    return false;
+  }
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES,
+    .data.web_gpu_borrowed_textures = {
+      .logical_size = {.width = ring_texture_size, .height = ring_texture_size},
+      .physical_width = ring_texture_size,
+      .physical_height = ring_texture_size,
+      .textures = entries,
+      .texture_count = ring->texture_count,
+      .format = WGPUTextureFormat_RGBA8Unorm,
+    },
   };
-  descriptor.logical_size.width = ring_texture_size;
-  descriptor.logical_size.height = ring_texture_size;
-  descriptor.physical_width = ring_texture_size;
-  descriptor.physical_height = ring_texture_size;
-  descriptor.context = context;
-  descriptor.textures = entries;
-  descriptor.texture_count = ring->texture_count;
-  descriptor.format = WGPUTextureFormat_RGBA8Unorm;
   *out_state = ring;
-  *out_status = mln_map_attach_web_gpu_borrowed_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+  *out_status = mln_map_attach(
+    map, &target, device, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
+  // The session holds the device.
+  mln_gpu_device_release(device);
   return true;
 }
 

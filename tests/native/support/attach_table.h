@@ -2,9 +2,8 @@
 #define MLN_NATIVE_TESTS_ATTACH_TABLE_H
 
 // Validation tables for render target attach and set_target calls. A row edits
-// one call's arguments, its target, or its borrowed descriptor or replacement,
-// and the runner submits it
-// with a completion that no accepted row may reach: every row here expects a
+// one call's arguments or its target, and the runner submits it with a
+// completion that no accepted row may reach: every row here expects a
 // rejection, and a rejected attach must leave its output session as it was.
 
 #include <stdbool.h>
@@ -38,18 +37,10 @@ typedef struct mln_test_target_call {
   bool null_completion;
   union {
     mln_render_target target;
-    mln_metal_borrowed_texture_descriptor metal_borrowed;
-    mln_vulkan_borrowed_texture_descriptor vulkan_borrowed;
-    mln_open_gl_borrowed_texture_descriptor opengl_borrowed;
-    mln_web_gpu_borrowed_texture_descriptor webgpu_borrowed;
-    mln_metal_borrowed_texture_replacement metal_borrowed_replacement;
-    mln_vulkan_borrowed_texture_replacement vulkan_borrowed_replacement;
-    mln_open_gl_borrowed_texture_replacement opengl_borrowed_replacement;
-    mln_web_gpu_borrowed_texture_replacement webgpu_borrowed_replacement;
   } descriptor;
-  // Storage for a borrowed descriptor's textures array. A row works on a copy
-  // of the call whose array still points at the original's storage, so an edit
-  // that changes an entry first points the array here, at the copy's own.
+  // Storage for a borrowed ring's textures array. A row works on a copy of the
+  // call whose array still points at the original's storage, so an edit that
+  // changes an entry first points the array here, at the copy's own.
   union {
     mln_metal_borrowed_texture metal[MLN_TEST_RING_TEXTURES];
     mln_vulkan_borrowed_texture vulkan[MLN_TEST_RING_TEXTURES];
@@ -57,20 +48,6 @@ typedef struct mln_test_target_call {
     mln_web_gpu_borrowed_texture webgpu[MLN_TEST_RING_TEXTURES];
   } textures;
 } mln_test_target_call;
-
-// A backend's attach function, with its descriptor type erased.
-typedef mln_status (*mln_test_attach_fn)(
-  mln_map map, const void* descriptor,
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session, const mln_completion* completion,
-  mln_diagnostic* diagnostic
-);
-
-// A backend's set_target function, with its replacement type erased.
-typedef mln_status (*mln_test_set_target_fn)(
-  mln_render_session session, const void* replacement,
-  const mln_completion* completion, mln_diagnostic* diagnostic
-);
 
 // A call's defaults: `map`, a zeroed out session, the default options with
 // `driver`, and the descriptor the caller fills in afterwards.
@@ -83,28 +60,6 @@ static inline mln_test_target_call mln_test_target_call_default(
   };
   call.options.driver = driver;
   return call;
-}
-
-// Submits `call` through `attach` and checks that a rejection left the output
-// session as it was.
-static inline mln_status mln_test_submit_attach(
-  mln_test_attach_fn attach, const mln_test_target_call* call,
-  mln_diagnostic* diagnostic
-) {
-  mln_render_session session = call->session;
-  const mln_completion completion = mln_test_discard_completion();
-  const mln_status status = attach(
-    call->map, call->null_descriptor ? NULL : &call->descriptor,
-    call->null_options ? NULL : &call->options,
-    call->null_session ? NULL : &session,
-    call->null_completion ? NULL : &completion, diagnostic
-  );
-  if (status != MLN_STATUS_OK) {
-    TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-      call->session, session, "a rejected attach wrote its session"
-    );
-  }
-  return status;
 }
 
 // Submits `call`'s target through mln_map_attach(), on its device, and checks
@@ -139,17 +94,6 @@ static inline mln_status mln_test_submit_target_set_target(
   const mln_completion completion = mln_test_discard_completion();
   return mln_render_session_set_target(
     call->session, call->null_descriptor ? NULL : &call->descriptor.target,
-    call->null_completion ? NULL : &completion, diagnostic
-  );
-}
-
-static inline mln_status mln_test_submit_set_target(
-  mln_test_set_target_fn set_target, const mln_test_target_call* call,
-  mln_diagnostic* diagnostic
-) {
-  const mln_completion completion = mln_test_discard_completion();
-  return set_target(
-    call->session, call->null_descriptor ? NULL : &call->descriptor,
     call->null_completion ? NULL : &completion, diagnostic
   );
 }
@@ -226,27 +170,20 @@ static inline mln_render_session mln_test_create_disposed_session(mln_map map) {
 // the defaults in `call` unchanged. The defaults name a session from
 // mln_test_create_disposed_session() and a well-formed replacement. Every
 // build checks a replacement before the session and the completion, so each
-// row gets its edit's status whatever the session's state, never the disposed
-// session's. The defaults reach the session in a build that carries `backend`,
-// one of the MLN_RENDER_BACKEND_FLAG_* values, and the missing backend in any
-// other. A row that depends on the session's state names a live one instead.
+// row gets its edit's status whatever the session's state, and the defaults
+// reach the disposed session. A row that depends on the session's state names
+// a live one instead.
 static inline void mln_test_run_set_target_table(
   mln_test_validation_call submit, const mln_test_target_call* call,
-  const mln_test_validation_case* rows, size_t row_count, uint32_t backend
+  const mln_test_validation_case* rows, size_t row_count
 ) {
   static const mln_test_validation_case null_replacement = {
     "null replacement", mln_test_call_without_descriptor,
     MLN_STATUS_INVALID_ARGUMENT, NULL
   };
-  const mln_test_validation_case well_formed =
-    (mln_supported_render_backend_mask() & backend) != 0
-      ? (
-          mln_test_validation_case
-        ){"a well-formed replacement", NULL, MLN_STATUS_INVALID_STATE, "stale"}
-      : (mln_test_validation_case){
-          "a well-formed replacement", NULL, MLN_STATUS_UNSUPPORTED,
-          "not supported by this build"
-        };
+  static const mln_test_validation_case well_formed = {
+    "a well-formed replacement", NULL, MLN_STATUS_INVALID_STATE, "stale"
+  };
   mln_test_run_validation_table(
     &null_replacement, 1, call, sizeof(*call), submit, NULL
   );
@@ -258,101 +195,58 @@ static inline void mln_test_run_set_target_table(
   );
 }
 
-// Defines the edits every descriptor and replacement checks itself, for the
-// union member `member` of type `type`: undersized, and with a logical size of
-// zero width. MLN_TEST_DESCRIPTOR_CASES(member) names their rows.
-#define MLN_TEST_DESCRIPTOR_EDITS(member, type)                               \
-  static void member##_undersized(void* call) {                               \
-    ((mln_test_target_call*)call)->descriptor.member.size = sizeof(type) - 1; \
-  }                                                                           \
-  static void member##_zero_width(void* call) {                               \
-    ((mln_test_target_call*)call)->descriptor.member.logical_size.width = 0;  \
+// Defines the edits every borrowed ring checks itself, for the target's union
+// member `member` whose entries live in the call's `textures.entries`: zero
+// logical width, zero physical width, no textures array or count, one texture
+// named twice, which each ring's texture identity decides, and a ring deeper
+// than MLN_TEXTURE_RING_MAX_DEPTH. Each starts from a ring of one texture.
+// MLN_TEST_BORROWED_CASES(member) names their rows.
+#define MLN_TEST_BORROWED_EDITS(member, entries)                               \
+  static void member##_zero_width(void* call) {                                \
+    ((mln_test_target_call*)call)                                              \
+      ->descriptor.target.data.member.logical_size.width = 0;                  \
+  }                                                                            \
+  static void member##_zero_physical_width(void* call) {                       \
+    ((mln_test_target_call*)call)                                              \
+      ->descriptor.target.data.member.physical_width = 0;                      \
+  }                                                                            \
+  static void member##_without_textures(void* call) {                          \
+    ((mln_test_target_call*)call)->descriptor.target.data.member.textures =    \
+      NULL;                                                                    \
+  }                                                                            \
+  static void member##_without_texture_count(void* call) {                     \
+    ((mln_test_target_call*)call)                                              \
+      ->descriptor.target.data.member.texture_count = 0;                       \
+  }                                                                            \
+  static void member##_with_a_texture_twice(void* call) {                      \
+    mln_test_target_call* edited = call;                                       \
+    edited->textures.entries[1] = edited->textures.entries[0];                 \
+    edited->descriptor.target.data.member.textures = edited->textures.entries; \
+    edited->descriptor.target.data.member.texture_count = 2;                   \
+  }                                                                            \
+  static void member##_too_deep(void* call) {                                  \
+    mln_test_target_call* edited = call;                                       \
+    for (size_t index = 1; index < MLN_TEST_RING_TEXTURES; index += 1) {       \
+      edited->textures.entries[index] = edited->textures.entries[0];           \
+    }                                                                          \
+    edited->descriptor.target.data.member.textures = edited->textures.entries; \
+    edited->descriptor.target.data.member.texture_count =                      \
+      MLN_TEST_RING_TEXTURES;                                                  \
   }
 
-#define MLN_TEST_DESCRIPTOR_CASES(member)                                     \
-  {"undersized descriptor", member##_undersized, MLN_STATUS_INVALID_ARGUMENT, \
-   "size is too small"},                                                      \
-    {"zero logical width", member##_zero_width, MLN_STATUS_INVALID_ARGUMENT,  \
-     "must be positive"}
-
-// Defines the edits every borrowed descriptor checks itself, for the union
-// member `member` whose entries live in the call's `textures.entries`: no
-// textures array for a count of one, and one texture named twice, which each
-// descriptor's texture identity decides. Each starts from a ring of one
-// texture. MLN_TEST_BORROWED_CASES(member) names their rows.
-#define MLN_TEST_BORROWED_EDITS(member, entries)                      \
-  static void member##_without_textures(void* call) {                 \
-    ((mln_test_target_call*)call)->descriptor.member.textures = NULL; \
-  }                                                                   \
-  static void member##_with_a_texture_twice(void* call) {             \
-    mln_test_target_call* edited = call;                              \
-    edited->textures.entries[1] = edited->textures.entries[0];        \
-    edited->descriptor.member.textures = edited->textures.entries;    \
-    edited->descriptor.member.texture_count = 2;                      \
-  }
-
-#define MLN_TEST_BORROWED_CASES(member)                      \
-  {"null textures array", member##_without_textures,         \
-   MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},     \
-    {"a texture named twice", member##_with_a_texture_twice, \
-     MLN_STATUS_INVALID_ARGUMENT, "distinct textures"}
-
-// Defines the remaining ways a ring breaks the rules every borrowed descriptor
-// shares, for one union member: a zero count, and a ring deeper than
-// MLN_TEXTURE_RING_MAX_DEPTH.
-// MLN_TEST_RING_RULE_CASES(member) names their rows.
-#define MLN_TEST_RING_RULE_EDITS(member, entries)                        \
-  static void member##_without_texture_count(void* call) {               \
-    ((mln_test_target_call*)call)->descriptor.member.texture_count = 0;  \
-  }                                                                      \
-  static void member##_too_deep(void* call) {                            \
-    mln_test_target_call* edited = call;                                 \
-    for (size_t index = 1; index < MLN_TEST_RING_TEXTURES; index += 1) { \
-      edited->textures.entries[index] = edited->textures.entries[0];     \
-    }                                                                    \
-    edited->descriptor.member.textures = edited->textures.entries;       \
-    edited->descriptor.member.texture_count = MLN_TEST_RING_TEXTURES;    \
-  }
-
-#define MLN_TEST_RING_RULE_CASES(member)                                \
-  {"zero texture count", member##_without_texture_count,                \
-   MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},                \
-    {"a ring too deep", member##_too_deep, MLN_STATUS_INVALID_ARGUMENT, \
+#define MLN_TEST_BORROWED_CASES(member)                                    \
+  {"zero logical width", member##_zero_width, MLN_STATUS_INVALID_ARGUMENT, \
+   "must be positive"},                                                    \
+    {"zero physical width", member##_zero_physical_width,                  \
+     MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},          \
+    {"null textures array", member##_without_textures,                     \
+     MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},                 \
+    {"zero texture count", member##_without_texture_count,                 \
+     MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},                 \
+    {"a texture named twice", member##_with_a_texture_twice,               \
+     MLN_STATUS_INVALID_ARGUMENT, "distinct textures"},                    \
+    {"a ring too deep", member##_too_deep, MLN_STATUS_INVALID_ARGUMENT,    \
      "MLN_TEXTURE_RING_MAX_DEPTH"}
-
-// Defines `name`, a validation-table call that submits through the backend
-// function `function`, an attach or a set_target.
-#define MLN_TEST_ATTACH_SUBMITTER(name, function)                      \
-  static mln_status name##_call(                                       \
-    mln_map map, const void* descriptor,                               \
-    const mln_render_session_attach_options* options,                  \
-    mln_render_session* out_session, const mln_completion* completion, \
-    mln_diagnostic* diagnostic                                         \
-  ) {                                                                  \
-    return function(                                                   \
-      map, descriptor, options, out_session, completion, diagnostic    \
-    );                                                                 \
-  }                                                                    \
-  static mln_status name(                                              \
-    void* context, const void* call, mln_diagnostic* diagnostic        \
-  ) {                                                                  \
-    (void)context;                                                     \
-    return mln_test_submit_attach(name##_call, call, diagnostic);      \
-  }
-
-#define MLN_TEST_SET_TARGET_SUBMITTER(name, function)                 \
-  static mln_status name##_call(                                      \
-    mln_render_session session, const void* replacement,              \
-    const mln_completion* completion, mln_diagnostic* diagnostic      \
-  ) {                                                                 \
-    return function(session, replacement, completion, diagnostic);    \
-  }                                                                   \
-  static mln_status name(                                             \
-    void* context, const void* call, mln_diagnostic* diagnostic       \
-  ) {                                                                 \
-    (void)context;                                                    \
-    return mln_test_submit_set_target(name##_call, call, diagnostic); \
-  }
 
 // A logical size every descriptor default can take.
 static inline mln_logical_size mln_test_target_size(void) {

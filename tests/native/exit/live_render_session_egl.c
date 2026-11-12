@@ -24,18 +24,8 @@ static mln_status attach(
       map, &target, MLN_HANDLE_NULL, options, out_session, completion, NULL
     );
   }
-  const mln_open_gl_borrowed_texture entry = {
-    .texture = texture->opengl_texture
-  };
-  mln_open_gl_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
-  };
-  descriptor.logical_size = probe_size;
-  descriptor.physical_width = texture->width;
-  descriptor.physical_height = texture->height;
-  descriptor.context = (mln_open_gl_context_descriptor){
+  const mln_open_gl_context_descriptor host = {
     .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
-    .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED,
     .data = {
       .egl = {
         .display = context->egl_display,
@@ -44,12 +34,29 @@ static mln_status attach(
       }
     },
   };
-  descriptor.textures = &entry;
-  descriptor.texture_count = 1;
-  descriptor.target = texture->opengl_target;
-  return mln_map_attach_open_gl_borrowed_texture(
-    map, &descriptor, options, out_session, completion, NULL
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  const mln_status wrapped = mln_gpu_device_wrap_open_gl(&host, &device, NULL);
+  if (wrapped != MLN_STATUS_OK) return wrapped;
+  const mln_open_gl_borrowed_texture entry = {
+    .texture = texture->opengl_texture
+  };
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES,
+    .data.open_gl_borrowed_textures = {
+      .logical_size = probe_size,
+      .physical_width = texture->width,
+      .physical_height = texture->height,
+      .textures = &entry,
+      .texture_count = 1,
+      .target = texture->opengl_target,
+    },
+  };
+  const mln_status status = mln_map_attach(
+    map, &target, device, options, out_session, completion, NULL
   );
+  mln_gpu_device_release(device);
+  return status;
 }
 
 int main(void) {

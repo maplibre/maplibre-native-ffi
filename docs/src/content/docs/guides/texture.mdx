@@ -28,17 +28,20 @@ two textures at the map's size in device pixels, which is its logical size times
 its scale factor.
 
 <Aside type="note">
-  The snippets below use Vulkan. For another backend, use that backend's calls
-  to attach and replace the texture ring, and to get each frame's texture. The
-  other steps are the same.
+  The snippets below use Vulkan. For another backend, use that backend's
+  device, target kind, and call to get each frame's texture. The other steps
+  are the same.
 </Aside>
 
-On Vulkan, you can have the library create the device with
-[](api:mln_gpu_device_create), and create your textures on the context from
-[](api:mln_gpu_device_get_vulkan_context). To share the textures with another
-graphics API on the same GPU, name that GPU by its UUID or LUID in the options.
-If your renderer submits to the same queue as the session, pass a lock in the
-attach options, and hold it around your own submissions.
+The session renders on a GPU device that shares your textures: wrap your own
+with [](api:mln_gpu_device_wrap_vulkan), [](api:mln_gpu_device_wrap_metal), or
+[](api:mln_gpu_device_wrap_open_gl). On Vulkan, you can instead have the
+library create the device with [](api:mln_gpu_device_create), and create your
+textures on the context from [](api:mln_gpu_device_get_vulkan_context). To
+share the textures with another graphics API on the same GPU, name that GPU by
+its UUID or LUID in the options. If your renderer submits to the same queue as
+the session, give the device your queue lock, and hold it around your own
+submissions.
 
 As with a window, use your graphics thread as the driver for OpenGL and WebGPU
 textures, and the library thread otherwise. See
@@ -46,9 +49,9 @@ textures, and the library thread otherwise. See
 
 <Snippet page="texture" region="attach-options" />
 
-Then attach your textures, with your graphics context, such as your device and
-queue, and the textures' size in device pixels. Keep the textures alive until
-you replace them, or until the session detaches.
+Then attach your textures on the device, with the textures' size in device
+pixels. Keep the textures alive until you replace them, or until the session
+detaches.
 
 <Snippet page="texture" region="attach-borrowed" />
 

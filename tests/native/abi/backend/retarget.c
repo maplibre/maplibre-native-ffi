@@ -721,16 +721,22 @@ static mln_status submit_metal_texture(
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   const mln_metal_borrowed_texture entry = {.texture = texture};
-  const mln_metal_borrowed_texture_replacement replacement = {
-    .size = sizeof(mln_metal_borrowed_texture_replacement),
-    .logical_size =
-      {.width = MLN_TEST_HOST_TARGET_SIZE, .height = MLN_TEST_HOST_TARGET_SIZE},
-    .physical_width = MLN_TEST_HOST_TARGET_SIZE,
-    .physical_height = MLN_TEST_HOST_TARGET_SIZE,
-    .textures = &entry,
-    .texture_count = 1,
+  const mln_render_target replacement = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES,
+    .data.metal_borrowed_textures = {
+      .logical_size =
+        {
+          .width = MLN_TEST_HOST_TARGET_SIZE,
+          .height = MLN_TEST_HOST_TARGET_SIZE,
+        },
+      .physical_width = MLN_TEST_HOST_TARGET_SIZE,
+      .physical_height = MLN_TEST_HOST_TARGET_SIZE,
+      .textures = &entry,
+      .texture_count = 1,
+    },
   };
-  return mln_render_session_set_metal_borrowed_texture_target(
+  return mln_render_session_set_target(
     fixture->session, &replacement, &completion->descriptor, MLN_TEST_DIAGNOSTIC
   );
 #else

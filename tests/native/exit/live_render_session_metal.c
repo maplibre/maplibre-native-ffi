@@ -11,19 +11,30 @@ static mln_status attach(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) {
-  (void)context;
-  const mln_metal_borrowed_texture entry = {.texture = texture->metal_texture};
-  mln_metal_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_metal_borrowed_texture_descriptor)
+  const mln_metal_device_descriptor host = {
+    .size = sizeof(mln_metal_device_descriptor),
+    .device = context->metal_device,
   };
-  descriptor.logical_size = probe_size;
-  descriptor.physical_width = texture->width;
-  descriptor.physical_height = texture->height;
-  descriptor.textures = &entry;
-  descriptor.texture_count = 1;
-  return mln_map_attach_metal_borrowed_texture(
-    map, &descriptor, options, out_session, completion, NULL
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  const mln_status wrapped = mln_gpu_device_wrap_metal(&host, &device, NULL);
+  if (wrapped != MLN_STATUS_OK) return wrapped;
+  const mln_metal_borrowed_texture entry = {.texture = texture->metal_texture};
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES,
+    .data.metal_borrowed_textures = {
+      .logical_size = probe_size,
+      .physical_width = texture->width,
+      .physical_height = texture->height,
+      .textures = &entry,
+      .texture_count = 1,
+    },
+  };
+  const mln_status status = mln_map_attach(
+    map, &target, device, options, out_session, completion, NULL
   );
+  mln_gpu_device_release(device);
+  return status;
 }
 
 int main(void) {

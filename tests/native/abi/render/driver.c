@@ -978,41 +978,44 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
 
 static void lock_nothing(void* context) { (void)context; }
 
-// Only a Vulkan target takes a queue lock, because only the Vulkan driver
-// submits to a queue that the host names.
-static void attach_checks_the_queue_lock(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_render_session_attach_options options = {
-    .size = sizeof(mln_render_session_attach_options)
-  };
+// Only a Vulkan device takes a queue lock, because only the Vulkan driver
+// submits to a queue that the host can share.
+static void device_create_checks_the_queue_lock(void) {
+  mln_gpu_device_options options = {.size = sizeof(mln_gpu_device_options)};
+  mln_gpu_device device = MLN_HANDLE_NULL;
   options.queue_lock.release_user_data = lock_nothing;
-  mln_test_completion attach = mln_test_completion_default(0);
-  mln_test_render_fixture fixture = {0};
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_render_fixture_start_attach(
-                                   map, &options, &attach.descriptor, &fixture
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
   );
   options.queue_lock.release_user_data = NULL;
   options.queue_lock.lock = lock_nothing;
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_render_fixture_start_attach(
-                                   map, &options, &attach.descriptor, &fixture
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
   );
-#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
   options.queue_lock.unlock = lock_nothing;
-  MLN_TEST_STATUS(
-    MLN_STATUS_UNSUPPORTED, mln_test_render_fixture_start_attach(
-                              map, &options, &attach.descriptor, &fixture
-                            )
-  );
-#endif
-  mln_test_completion_reject(&attach);
-  mln_test_completion_destroy(&attach);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
+  static const struct {
+    mln_render_backend backend;
+    uint32_t flag;
+  } others[] = {
+    {MLN_RENDER_BACKEND_METAL, MLN_RENDER_BACKEND_FLAG_METAL},
+    {MLN_RENDER_BACKEND_OPEN_GL, MLN_RENDER_BACKEND_FLAG_OPEN_GL},
+    {MLN_RENDER_BACKEND_WEB_GPU, MLN_RENDER_BACKEND_FLAG_WEB_GPU},
+  };
+  for (size_t index = 0; index < sizeof(others) / sizeof(others[0]);
+       index += 1) {
+    if ((mln_supported_render_backend_mask() & others[index].flag) == 0) {
+      continue;
+    }
+    options.fields = MLN_GPU_DEVICE_OPTION_BACKEND;
+    options.backend = others[index].backend;
+    MLN_TEST_STATUS(
+      MLN_STATUS_UNSUPPORTED,
+      mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
+    );
+  }
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
 }
 
 // Zero accepts the target's default.
@@ -1366,7 +1369,7 @@ MLN_TEST_GROUP {
   RUN_TEST(release_rejects_a_session_whose_frame_the_host_holds);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
   RUN_TEST(wakes_may_call_back_into_the_session);
-  RUN_TEST(attach_checks_the_queue_lock);
+  RUN_TEST(device_create_checks_the_queue_lock);
   RUN_TEST(attach_picks_a_producer_sync_kind);
   RUN_TEST(a_released_caller_driven_session_detaches_at_its_next_service);
   RUN_TEST(a_released_caller_driven_session_is_abandoned_when_its_map_releases);

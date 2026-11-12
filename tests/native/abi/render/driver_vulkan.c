@@ -1,7 +1,4 @@
-// What the Vulkan driver does with the host's device and queue. Vulkan is the
-// one backend that checks a context the submission accepted once the driver
-// has it: the other backends reject a bad descriptor at submission or cannot
-// fail after it.
+// What the Vulkan driver does with the host's device and queue.
 
 #include <vulkan/vulkan_core.h>
 
@@ -10,96 +7,48 @@
 #include "support/host_graphics.h"
 #include "support/test_support.h"
 
-static void a_failed_attach_still_owns_the_session_it_published(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
+// A wrap checks the queue family against the physical device before any
+// session uses the device, so a session never fails on it.
+static void a_wrap_checks_the_queue_family_against_the_physical_device(void) {
   mln_test_graphics* graphics =
     mln_test_graphics_create(MLN_TEST_GRAPHICS_BACKEND_VULKAN);
   TEST_ASSERT_NOT_NULL_MESSAGE(graphics, mln_test_graphics_last_error());
   mln_test_graphics_context context = {0};
   TEST_ASSERT_TRUE(mln_test_graphics_get_context(graphics, &context));
-  mln_test_graphics_texture* texture =
-    mln_test_graphics_texture_create(graphics, 32, 32);
-  TEST_ASSERT_NOT_NULL_MESSAGE(texture, mln_test_graphics_last_error());
-  mln_test_graphics_texture_info info = {0};
-  TEST_ASSERT_TRUE(mln_test_graphics_texture_get_info(texture, &info));
-  const mln_vulkan_borrowed_texture image = {
-    .image = info.vulkan_image,
-    .image_view = info.vulkan_image_view,
+  mln_vulkan_device_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_device_descriptor),
+    .context = {
+      .instance = context.vulkan_instance,
+      .physical_device = context.vulkan_physical_device,
+      .device = context.vulkan_device,
+      .graphics_queue = context.vulkan_queue,
+      .graphics_queue_family_index = UINT32_MAX,
+      .get_instance_proc_addr = context.vulkan_get_instance_proc_addr,
+      .get_device_proc_addr = context.vulkan_get_device_proc_addr,
+    },
   };
-
-  mln_vulkan_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
-  };
-  descriptor.logical_size = (mln_logical_size){.width = 32, .height = 32};
-  descriptor.physical_width = 32;
-  descriptor.physical_height = 32;
-  descriptor.context = (mln_vulkan_context_descriptor){
-    .instance = context.vulkan_instance,
-    .physical_device = context.vulkan_physical_device,
-    .device = context.vulkan_device,
-    .graphics_queue = context.vulkan_queue,
-    // Submission checks only that every handle is present; the driver
-    // measures the family against the physical device.
-    .graphics_queue_family_index = UINT32_MAX,
-    .get_instance_proc_addr = context.vulkan_get_instance_proc_addr,
-    .get_device_proc_addr = context.vulkan_get_device_proc_addr,
-  };
-  descriptor.textures = &image;
-  descriptor.texture_count = 1;
-  descriptor.format = info.format;
-  descriptor.final_layout = info.vulkan_final_layout;
-  mln_render_session_attach_options options = {
-    .size = sizeof(mln_render_session_attach_options)
-  };
-  options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
-  options.driver_work_wake = mln_test_pulse_wake();
-  mln_render_session session = MLN_HANDLE_NULL;
-  mln_test_completion attach = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_attach_vulkan_borrowed_texture(
-    map, &descriptor, &options, &session, &attach.descriptor, NULL
-  ));
-  // The caller driver attaches only when serviced, so this demand waits behind
-  // the attach and ends with it.
-  const mln_frame_demand demand = {
-    .size = sizeof(mln_frame_demand),
-    .flags = MLN_FRAME_DEMAND_FORCE,
-    .token = 1,
-  };
-  MLN_TEST_OK(mln_render_session_demand_frame(session, &demand, NULL));
-  MLN_TEST_OK(mln_render_session_service_driver_work(session, NULL));
+  mln_gpu_device device = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&attach)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_gpu_device_wrap_vulkan(&descriptor, &device, MLN_TEST_DIAGNOSTIC)
   );
-  mln_test_completion_destroy(&attach);
-
-  mln_render_session_snapshot snapshot = {
-    .size = sizeof(mln_render_session_snapshot)
-  };
-  MLN_TEST_OK(mln_render_session_get_snapshot(session, &snapshot, NULL));
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_FAILED, snapshot.state);
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_drain_frame_results(session, &batch, NULL));
-  TEST_ASSERT_EQUAL_size_t(1, mln_test_render_batch_view(batch).result_count);
-  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
-  mln_render_frame_batch_release(batch);
-  TEST_ASSERT_EQUAL_UINT64(1, result.token);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_FAILED, result.disposition);
-  mln_render_abandon_result abandoned = {
-    .size = sizeof(mln_render_abandon_result)
-  };
-  MLN_TEST_OK(mln_render_session_abandon(session, &abandoned, NULL));
-  MLN_TEST_AWAIT_OK(
-    mln_render_session_release(session, &completion.descriptor, NULL)
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
+  descriptor.context.graphics_queue_family_index =
+    context.vulkan_queue_family_index;
+  MLN_TEST_OK(mln_gpu_device_wrap_vulkan(&descriptor, &device, NULL));
+  mln_gpu_device_capabilities capabilities = {.size = sizeof(capabilities)};
+  MLN_TEST_OK(mln_gpu_device_get_capabilities(device, &capabilities, NULL));
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_BACKEND_VULKAN, capabilities.backend);
+  TEST_ASSERT_BITS_HIGH(
+    MLN_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES,
+    capabilities.target_kinds
   );
-
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create_borrowed(map, &fixture));
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_graphics_texture_destroy(texture);
+  mln_gpu_device_vulkan_context_result result = {.size = sizeof(result)};
+  MLN_TEST_OK(mln_gpu_device_get_vulkan_context(device, &result, NULL));
+  TEST_ASSERT_EQUAL_PTR(context.vulkan_device, result.context.device);
+  TEST_ASSERT_EQUAL_PTR(context.vulkan_queue, result.context.graphics_queue);
+  mln_gpu_device_release(device);
   mln_test_graphics_destroy(graphics);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
 }
 
 // Watches the device functions a session resolves through its context's
@@ -476,7 +425,8 @@ static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE, atomic_load(&shared_lock.reentry_status)
   );
-  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&shared_lock.releases));
+  // The device releases the lock once it and its last session are gone.
+  TEST_ASSERT_LESS_OR_EQUAL_UINT(1, atomic_load(&shared_lock.releases));
 
   mln_test_render_fixture_destroy(&fixture);
   TEST_ASSERT_EQUAL_UINT(1, atomic_load(&shared_lock.releases));
@@ -931,7 +881,7 @@ static void detach_destroys_a_borrowed_ring_with_a_disposed_frame(void) {
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(a_failed_attach_still_owns_the_session_it_published);
+  RUN_TEST(a_wrap_checks_the_queue_family_against_the_physical_device);
   RUN_TEST(sessions_sharing_a_queue_call_their_own_device_functions);
   RUN_TEST(a_session_takes_the_host_queue_lock_around_its_queue_calls);
   RUN_TEST(abandon_drains_under_the_host_queue_lock_and_releases_it);
