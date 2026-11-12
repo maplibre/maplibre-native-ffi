@@ -79,7 +79,8 @@ static void android_initialization_requires_its_environment_and_context(void) {
 #endif
 }
 
-// The backend mask decides which render targets a binding offers.
+// The backend mask decides which render targets a binding offers. A build
+// can draw with more backends than the preset's.
 static void the_library_reports_its_built_backend(void) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   const uint32_t expected = MLN_RENDER_BACKEND_FLAG_METAL;
@@ -92,7 +93,9 @@ static void the_library_reports_its_built_backend(void) {
 #else
 #error "the native suite builds for exactly one render backend"
 #endif
-  TEST_ASSERT_EQUAL_HEX32(expected, mln_supported_render_backend_mask());
+  TEST_ASSERT_EQUAL_HEX32(
+    expected, mln_supported_render_backend_mask() & expected
+  );
 }
 
 MLN_TEST_GROUP {

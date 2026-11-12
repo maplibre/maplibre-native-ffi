@@ -14,28 +14,15 @@ static const mln_vulkan_non_dispatchable_handle high_handle =
 static const mln_vulkan_non_dispatchable_handle high_view_handle =
   UINT64_C(0x0000000100000000);
 
-MLN_TEST_DESCRIPTOR_EDITS(vulkan_surface, mln_vulkan_surface_descriptor)
-MLN_TEST_OVERFLOW_EDIT(vulkan_surface)
 MLN_TEST_DESCRIPTOR_EDITS(
   vulkan_borrowed, mln_vulkan_borrowed_texture_descriptor
 )
 MLN_TEST_BORROWED_EDITS(vulkan_borrowed, vulkan)
 MLN_TEST_DESCRIPTOR_EDITS(
-  vulkan_surface_replacement, mln_vulkan_surface_replacement
-)
-MLN_TEST_DESCRIPTOR_EDITS(
   vulkan_borrowed_replacement, mln_vulkan_borrowed_texture_replacement
 )
 MLN_TEST_BORROWED_EDITS(vulkan_borrowed_replacement, vulkan)
 
-static void surface_without_surface(void* call) {
-  ((mln_test_target_call*)call)->descriptor.vulkan_surface.surface =
-    MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
-}
-static void replacement_without_surface(void* call) {
-  ((mln_test_target_call*)call)->descriptor.vulkan_surface_replacement.surface =
-    MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
-}
 static void borrowed_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.context.device =
     NULL;
@@ -95,12 +82,8 @@ static void borrowed_with_unknown_owner(void* call) {
     (mln_vulkan_image_owner)99;
 }
 
-MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_vulkan_surface)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_map_attach_vulkan_borrowed_texture
-)
-MLN_TEST_SET_TARGET_SUBMITTER(
-  submit_surface_set_target, mln_render_session_set_vulkan_surface_target
 )
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_borrowed_set_target,
@@ -113,24 +96,6 @@ static mln_vulkan_context_descriptor fake_context(void) {
     .physical_device = MLN_TEST_FAKE_HANDLE,
     .device = MLN_TEST_FAKE_HANDLE,
     .graphics_queue = MLN_TEST_FAKE_HANDLE,
-  };
-}
-
-static mln_vulkan_surface_descriptor surface_descriptor(void) {
-  mln_vulkan_surface_descriptor descriptor = {
-    .size = sizeof(mln_vulkan_surface_descriptor)
-  };
-  descriptor.logical_size = mln_test_target_size();
-  descriptor.context = fake_context();
-  descriptor.surface = high_handle;
-  return descriptor;
-}
-
-static mln_vulkan_surface_replacement surface_replacement(void) {
-  return (mln_vulkan_surface_replacement){
-    .size = sizeof(mln_vulkan_surface_replacement),
-    .logical_size = mln_test_target_size(),
-    .surface = high_handle,
   };
 }
 
@@ -181,24 +146,6 @@ static void vulkan_attach_rejects_malformed_calls(void) {
   mln_map map = mln_test_create_target_map(runtime);
 
   mln_test_target_call call =
-    mln_test_target_call_default(map, MLN_RENDER_DRIVER_CORE_WORKER);
-  call.descriptor.vulkan_surface = surface_descriptor();
-  static const mln_test_validation_case surface_rows[] = {
-    MLN_TEST_DESCRIPTOR_CASES(vulkan_surface),
-    MLN_TEST_OVERFLOW_CASE(vulkan_surface),
-    {"null surface", surface_without_surface, MLN_STATUS_INVALID_ARGUMENT,
-     NULL},
-#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
-  };
-  mln_test_run_attach_table(
-    submit_surface_attach, &call, surface_rows,
-    sizeof(surface_rows) / sizeof(surface_rows[0])
-  );
-
-  call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
   describe_borrowed(&call);
   static const mln_test_validation_case borrowed_rows[] = {
@@ -239,18 +186,6 @@ static void vulkan_set_target_rejects_malformed_replacements(void) {
   mln_test_target_call call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CORE_WORKER);
   call.session = mln_test_create_disposed_session(map);
-  call.descriptor.vulkan_surface_replacement = surface_replacement();
-  static const mln_test_validation_case surface_rows[] = {
-    MLN_TEST_DESCRIPTOR_CASES(vulkan_surface_replacement),
-    {"null surface", replacement_without_surface, MLN_STATUS_INVALID_ARGUMENT,
-     NULL},
-  };
-  mln_test_run_set_target_table(
-    submit_surface_set_target, &call, surface_rows,
-    sizeof(surface_rows) / sizeof(surface_rows[0]),
-    MLN_RENDER_BACKEND_FLAG_VULKAN
-  );
-
   describe_borrowed_replacement(&call);
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(vulkan_borrowed_replacement),

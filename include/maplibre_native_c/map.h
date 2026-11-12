@@ -213,8 +213,8 @@ typedef struct mln_map_options {
   uint32_t size;
   mln_map_option_fields fields;
   /**
-   * The map's first size, and its scale factor. The scale factor stays fixed
-   * for the map's life, and every render session of the map renders at it.
+   * The map's first size, and its scale factor. Render sessions of the map
+   * render at its scale factor, and mln_render_session_resize() changes it.
    */
   mln_logical_extent initial_extent MLN_BINDING("required=true");
   mln_map_mode map_mode;

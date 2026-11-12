@@ -1,7 +1,7 @@
 /**
  * @file maplibre_native_c/platform/android.h
- * Set up the library in an Android app, present to its windows, render into
- * hardware buffers, and pace its frames to the display.
+ * Set up the library in an Android app, render into hardware buffers, and
+ * pace its frames to the display.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_PLATFORM_ANDROID_H
@@ -53,106 +53,6 @@ MLN_API mln_status mln_android_frame_pacer_create(
 ) MLN_NOEXCEPT;
 
 /**
- * An Android window to present to, for mln_map_attach_android_surface().
- *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes
- * its own reference to the window, so you can release yours once the call
- * returns.
- */
-typedef struct mln_android_surface_descriptor {
-  uint32_t size;
-  mln_logical_size logical_size MLN_BINDING("required=true");
-  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
-  void* window;
-  /** The calling thread's `JNIEnv*`, with `surface`. */
-  void* jni_env;
-  /** An `android.view.Surface`, with `jni_env`. */
-  void* surface;
-} mln_android_surface_descriptor;
-
-/**
- * A new Android window for mln_render_session_set_android_surface_target().
- *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes
- * its own reference to the window, so you can release yours once the call
- * returns.
- */
-typedef struct mln_android_surface_replacement {
-  uint32_t size;
-  mln_logical_size logical_size MLN_BINDING("required=true");
-  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
-  void* window;
-  /** The calling thread's `JNIEnv*`, with `surface`. */
-  void* jni_env;
-  /** An `android.view.Surface`, with `jni_env`. */
-  void* surface;
-} mln_android_surface_replacement;
-
-/**
- * Creates a session that presents the map to an Android window, with a
- * graphics context that the library creates.
- *
- * A Vulkan build presents with `device`, or, when `device` is null, with a
- * device that the library creates. An OpenGL build uses an EGL context on the
- * default display, and `device` must be null. Attach with
- * MLN_RENDER_DRIVER_CORE_WORKER.
- *
- * When the platform destroys the window, such as in
- * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
- * mln_render_session_release_target(), or give the session a new window with
- * mln_render_session_set_android_surface_target(), without waiting for that to
- * complete. The session keeps its own reference to the window and stays
- * usable for the next window. A frame to the destroyed window finishes with
- * MLN_RENDER_RESULT_TARGET_NOT_READY, or with MLN_RENDER_RESULT_RENDERED if the
- * window went away while the frame was presenting.
- *
- * Returns:
- * - MLN_STATUS_INVALID_ARGUMENT when `surface` has no window, such as after
- *   the platform destroyed it.
- * - MLN_STATUS_UNSUPPORTED when you created `device` without
- *   mln_vulkan_device_options.presentation.
- *
- * Completes with:
- * - MLN_STATUS_UNSUPPORTED when the GPU or the Vulkan loader can't present.
- * - MLN_STATUS_NATIVE_ERROR when the library can't create the graphics context
- *   or the window's surface.
- */
-MLN_BINDING("execution=lifecycle;platforms=android")
-MLN_API mln_status mln_map_attach_android_surface(
-  mln_map map, const mln_android_surface_descriptor* descriptor,
-  mln_vulkan_device device MLN_BINDING("nullable=true"),
-  const mln_render_session_attach_options* options,
-  mln_render_session* out_session MLN_BINDING("direction=out"),
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Replaces the Android window that the session presents to.
- *
- * Use it to give the session a window again after
- * mln_render_session_release_target(), to move it to another window, or to
- * resize it. Once the replacement completes, the session no longer uses the
- * old window.
- *
- * Returns:
- * - MLN_STATUS_INVALID_ARGUMENT when `surface` has no window, such as after
- *   the platform destroyed it.
- *
- * Completes with:
- * - MLN_STATUS_UNSUPPORTED when, in a Vulkan build, the new window needs a
- *   different color format or pre-rotation support than the old one. Attach a
- *   new session instead.
- * - MLN_STATUS_NATIVE_ERROR when the library can't create the window's
- *   surface.
- */
-MLN_BINDING("execution=operation;platforms=android")
-MLN_API mln_status mln_render_session_set_android_surface_target(
-  mln_render_session session,
-  const mln_android_surface_replacement* replacement,
-  const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * A ring of Android hardware buffers that the library allocates, for
  * mln_map_attach_android_hardware_buffer_ring().
  *
@@ -193,9 +93,9 @@ typedef struct mln_android_hardware_buffer_frame {
  * buffer with mln_acquired_frame_get_android_hardware_buffer().
  * mln_render_session_resize() gives the ring new buffers of the new size.
  *
- * A Vulkan build renders with `device`, or, when `device` is null, with a
- * device that the library creates. An OpenGL build uses an EGL context on the
- * default display, and `device` must be null. Attach with
+ * The session renders with `device`, a Vulkan or OpenGL device, or, when
+ * `device` is null, with one that the library creates. An OpenGL device
+ * renders with an EGL context on the default display. Attach with
  * MLN_RENDER_DRIVER_CORE_WORKER.
  *
  * To show the buffers through Android's UI, such as with
@@ -207,7 +107,7 @@ typedef struct mln_android_hardware_buffer_frame {
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when Android is older than 8.0, API level 26, or
- *   when the graphics context can't render into hardware buffers: the Vulkan
+ *   when the device can't render into hardware buffers: the Vulkan
  *   device lacks VK_ANDROID_external_memory_android_hardware_buffer, or the EGL
  *   display lacks EGL_ANDROID_get_native_client_buffer or
  *   EGL_ANDROID_image_native_buffer.
@@ -217,7 +117,7 @@ typedef struct mln_android_hardware_buffer_frame {
 MLN_BINDING("execution=lifecycle;platforms=android")
 MLN_API mln_status mln_map_attach_android_hardware_buffer_ring(
   mln_map map, const mln_android_hardware_buffer_ring_descriptor* descriptor,
-  mln_vulkan_device device MLN_BINDING("nullable=true"),
+  mln_gpu_device device MLN_BINDING("nullable=true"),
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic

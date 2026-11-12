@@ -97,6 +97,14 @@ typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
 /** A set of mln_render_backend_flag bits. */
 typedef uint32_t mln_render_backend_flags;
 
+/** A render backend. */
+typedef enum mln_render_backend : uint32_t {
+  MLN_RENDER_BACKEND_METAL = 1u,
+  MLN_RENDER_BACKEND_VULKAN = 2u,
+  MLN_RENDER_BACKEND_OPEN_GL = 3u,
+  MLN_RENDER_BACKEND_WEB_GPU = 4u,
+} mln_render_backend;
+
 /** The handle that names no object. */
 #define MLN_HANDLE_NULL ((uint64_t)0)
 
@@ -115,15 +123,10 @@ typedef uint64_t mln_style_expression MLN_BINDING(
   "kind=handle;release=mln_style_expression_release;"
   "dispose=mln_style_expression_release"
 );
-/** A GPU device that the library creates to render maps offscreen. */
-typedef uint64_t mln_offscreen_device MLN_BINDING(
-  "kind=handle;release=mln_offscreen_device_release;"
-  "dispose=mln_offscreen_device_release"
-);
-/** A Vulkan instance, device, and queue that the library creates and owns. */
-typedef uint64_t mln_vulkan_device MLN_BINDING(
-  "kind=handle;release=mln_vulkan_device_release;"
-  "dispose=mln_vulkan_device_release"
+/** A GPU, and the queue that render sessions on it share. */
+typedef uint64_t mln_gpu_device MLN_BINDING(
+  "kind=handle;release=mln_gpu_device_release;"
+  "dispose=mln_gpu_device_release"
 );
 /** A camera view for converting between screen points and coordinates. */
 typedef uint64_t mln_map_projection MLN_BINDING(

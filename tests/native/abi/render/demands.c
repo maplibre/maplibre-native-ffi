@@ -320,14 +320,21 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   const mln_logical_size extent = {.width = 96, .height = 48};
   mln_completion rejected = mln_test_discard_completion();
   MLN_TEST_INVALID(mln_render_session_resize(
-    fixture.session, (mln_logical_size){.width = 0, .height = 48}, &rejected,
-    NULL
+    fixture.session,
+    (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 1.0},
+    &rejected, NULL
+  ));
+  MLN_TEST_INVALID(mln_render_session_resize(
+    fixture.session,
+    (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 0.0},
+    &rejected, NULL
   ));
   mln_test_render_demand_forced(&fixture, 302);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, extent, &completion.descriptor, NULL
+      fixture.session, mln_test_session_extent(fixture.session, extent),
+      &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT64(
@@ -349,10 +356,12 @@ static void resizes_apply_in_order_and_publish_generations(void) {
   mln_test_completion first_resize = mln_test_completion_default(0);
   mln_test_completion second_resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, extent, &first_resize.descriptor, NULL
+    fixture.session, mln_test_session_extent(fixture.session, extent),
+    &first_resize.descriptor, NULL
   ));
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, second, &second_resize.descriptor, NULL
+    fixture.session, mln_test_session_extent(fixture.session, second),
+    &second_resize.descriptor, NULL
   ));
   MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture, &first_resize)
@@ -381,7 +390,10 @@ static void a_session_renders_at_its_maps_scale_factor(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, (mln_logical_size){.width = 96, .height = 48},
+      fixture.session,
+      mln_test_session_extent(
+        fixture.session, (mln_logical_size){.width = 96, .height = 48}
+      ),
       &completion.descriptor, NULL
     )
   );
@@ -435,7 +447,10 @@ static void a_resize_applies_while_a_command_group_holds_the_update(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, (mln_logical_size){.width = 96, .height = 48},
+      fixture.session,
+      mln_test_session_extent(
+        fixture.session, (mln_logical_size){.width = 96, .height = 48}
+      ),
       &completion.descriptor, NULL
     )
   );

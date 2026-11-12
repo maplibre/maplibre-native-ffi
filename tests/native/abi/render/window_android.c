@@ -92,24 +92,36 @@ static void expect_red_frame(window_reader* reader) {
 
 // Submits an attach to `window` without waiting for it. The fixture holds the
 // session once the call succeeds.
+static mln_render_target window_target(
+  ANativeWindow* window, mln_logical_size logical_size
+) {
+  mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_ANDROID_WINDOW,
+  };
+  target.data.android_window = (mln_android_window_target){
+    .logical_size = logical_size,
+    .window = window,
+  };
+  return target;
+}
+
 static mln_status start_attach(
-  mln_map map, ANativeWindow* window, mln_vulkan_device device,
+  mln_map map, ANativeWindow* window, mln_gpu_device device,
   mln_render_driver_kind driver, mln_test_completion* completion,
   mln_test_render_fixture* fixture
 ) {
-  const mln_android_surface_descriptor descriptor = {
-    .size = sizeof(mln_android_surface_descriptor),
-    .logical_size = {.width = window_size, .height = window_size},
-    .window = window,
-  };
+  const mln_render_target target = window_target(
+    window, (mln_logical_size){.width = window_size, .height = window_size}
+  );
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options), .driver = driver
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = driver;
-  const mln_status status = mln_map_attach_android_surface(
-    map, &descriptor, device, &options, &fixture->session,
-    &completion->descriptor, MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_map_attach(
+    map, &target, device, &options, &fixture->session, &completion->descriptor,
+    MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
@@ -155,16 +167,12 @@ static mln_render_frame_result render_frame(
 static void set_window(
   const mln_test_render_fixture* fixture, const window_reader* reader
 ) {
-  const mln_android_surface_replacement replacement = {
-    .size = sizeof(mln_android_surface_replacement),
-    .logical_size = reader->window_size,
-    .window = reader->window,
-  };
+  const mln_render_target target =
+    window_target(reader->window, reader->window_size);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
-    mln_render_session_set_android_surface_target(
-      fixture->session, &replacement, &completion.descriptor,
-      MLN_TEST_DIAGNOSTIC
+    mln_render_session_set_target(
+      fixture->session, &target, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
 }
@@ -275,7 +283,8 @@ static void a_session_survives_a_window_whose_reader_went_away(void) {
     MLN_TEST_RENDER_AWAIT(
       MLN_STATUS_OK, &fixture,
       mln_render_session_resize(
-        fixture.session, rotated, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+        fixture.session, mln_test_session_extent(fixture.session, rotated),
+        &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );
     for (int frame = 0; frame < 2; frame += 1) {
@@ -326,14 +335,12 @@ static void an_android_surface_rejects_the_callers_graphics_thread(void) {
 }
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-static mln_vulkan_device create_device(bool presentation) {
-  mln_vulkan_device_options options = {
-    .size = sizeof(mln_vulkan_device_options)
-  };
-  options.fields = MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
-  options.presentation = presentation;
-  mln_vulkan_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_vulkan_device_create(&options, &device, MLN_TEST_DIAGNOSTIC));
+static mln_gpu_device create_device(void) {
+  mln_gpu_device_options options = {.size = sizeof(mln_gpu_device_options)};
+  options.fields = MLN_GPU_DEVICE_OPTION_BACKEND;
+  options.backend = MLN_RENDER_BACKEND_VULKAN;
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC));
   return device;
 }
 
@@ -346,13 +353,13 @@ static void a_session_presents_with_the_hosts_device(void) {
   mln_test_render_fixture fixture = {0};
   if (TEST_PROTECT()) {
     reader_create(&reader);
-    const mln_vulkan_device device = create_device(true);
+    const mln_gpu_device device = create_device();
     mln_test_completion completion = mln_test_completion_default(0);
     const mln_status attached = start_attach(
       map, reader.window, device, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
       &fixture
     );
-    mln_vulkan_device_release(device);
+    mln_gpu_device_release(device);
     MLN_TEST_OK(attached);
     finish_attach(&fixture, &completion);
 
@@ -364,30 +371,6 @@ static void a_session_presents_with_the_hosts_device(void) {
   destroy_map_and_runtime(map, runtime);
 }
 
-static void a_device_without_presentation_cannot_present(void) {
-  const mln_runtime runtime = mln_test_create_runtime();
-  const mln_map map = mln_test_create_map(runtime);
-  window_reader reader = {0};
-  mln_vulkan_device device = MLN_HANDLE_NULL;
-  if (TEST_PROTECT()) {
-    reader_create(&reader);
-    device = create_device(false);
-    mln_test_render_fixture fixture = {0};
-    mln_test_completion completion = mln_test_completion_default(0);
-    MLN_TEST_STATUS(
-      MLN_STATUS_UNSUPPORTED,
-      start_attach(
-        map, reader.window, device, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
-        &fixture
-      )
-    );
-    mln_test_completion_destroy(&completion);
-    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, fixture.session);
-  }
-  mln_vulkan_device_release(device);
-  reader_destroy(&reader);
-  destroy_map_and_runtime(map, runtime);
-}
 #endif
 
 MLN_TEST_GROUP {
@@ -397,6 +380,5 @@ MLN_TEST_GROUP {
   RUN_TEST(an_android_surface_rejects_the_callers_graphics_thread);
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   RUN_TEST(a_session_presents_with_the_hosts_device);
-  RUN_TEST(a_device_without_presentation_cannot_present);
 #endif
 }

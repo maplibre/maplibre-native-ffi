@@ -260,16 +260,13 @@ static bool attach_transferred_surface(
 
   char target[sizeof(state->id) + 1];
   (void)snprintf(target, sizeof(target), "#%s", state->id);
-  mln_open_gl_surface_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_surface_descriptor)
+  mln_render_target descriptor = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_HTML_CANVAS,
   };
-  descriptor.logical_size.width = 64;
-  descriptor.logical_size.height = 64;
-  descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
-  descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
-  descriptor.context.data.web_gl = (mln_web_gl_context_descriptor){
-    .kind = MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS,
-    .canvas_selector = mln_buffer_view_from_cstr(target),
+  descriptor.data.html_canvas = (mln_html_canvas_target){
+    .logical_size = {.width = 64, .height = 64},
+    .selector = mln_buffer_view_from_cstr(target),
   };
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
@@ -282,9 +279,9 @@ static bool attach_transferred_surface(
     .callback = mln_test_render_count_wake, .user_data = &fixture->driver_wakes
   };
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status = mln_map_attach_open_gl_surface(
-    map, &descriptor, &options, &fixture->session, &completion.descriptor,
-    MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_map_attach(
+    map, &descriptor, MLN_HANDLE_NULL, &options, &fixture->session,
+    &completion.descriptor, MLN_TEST_DIAGNOSTIC
   );
   const mln_status finish_status =
     status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL

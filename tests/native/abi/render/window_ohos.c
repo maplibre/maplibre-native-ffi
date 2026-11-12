@@ -58,27 +58,34 @@ static void consumer_destroy(window_consumer* consumer) {
   consumer->window = NULL;
 }
 
-// Submits an attach to `window`, or to the surface `surface_id` names, without
-// waiting for it. The fixture holds the session once the call succeeds.
-static mln_status start_attach(
-  mln_map map, OHNativeWindow* window, uint64_t surface_id,
-  mln_vulkan_device device, mln_render_driver_kind driver,
-  mln_test_completion* completion, mln_test_render_fixture* fixture
-) {
-  const mln_ohos_surface_descriptor descriptor = {
-    .size = sizeof(mln_ohos_surface_descriptor),
+static mln_render_target window_target(OHNativeWindow* window) {
+  mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_OHOS_WINDOW,
+  };
+  target.data.ohos_window = (mln_ohos_window_target){
     .logical_size = {.width = window_size, .height = window_size},
     .window = window,
-    .surface_id = surface_id,
   };
+  return target;
+}
+
+// Submits an attach to `window` without waiting for it. The fixture holds the
+// session once the call succeeds.
+static mln_status start_attach(
+  mln_map map, OHNativeWindow* window, mln_gpu_device device,
+  mln_render_driver_kind driver, mln_test_completion* completion,
+  mln_test_render_fixture* fixture
+) {
+  const mln_render_target target = window_target(window);
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options), .driver = driver
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = driver;
-  const mln_status status = mln_map_attach_ohos_surface(
-    map, &descriptor, device, &options, &fixture->session,
-    &completion->descriptor, MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_map_attach(
+    map, &target, device, &options, &fixture->session, &completion->descriptor,
+    MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
@@ -98,15 +105,6 @@ static void destroy_map_and_runtime(mln_map map, mln_runtime runtime) {
 // OpenGL builds. The Android window cases cover the presentation code that both
 // platforms share.
 #if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
-static uint64_t consumer_surface_id(const window_consumer* consumer) {
-  uint64_t surface_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    0, OH_NativeImage_GetSurfaceId(consumer->image, &surface_id)
-  );
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, surface_id);
-  return surface_id;
-}
-
 // Waits for the window's next frame, and expects the style's red at its center.
 static void expect_red_frame(window_consumer* consumer) {
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&consumer->frame_available));
@@ -155,7 +153,7 @@ static void attach(
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK(start_attach(
-    map, window, 0, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
+    map, window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
     fixture
   ));
   finish_attach(fixture, &completion);
@@ -175,20 +173,13 @@ static void render_frame(const mln_test_render_fixture* fixture) {
 }
 
 static void set_window(
-  const mln_test_render_fixture* fixture, OHNativeWindow* window,
-  uint64_t surface_id
+  const mln_test_render_fixture* fixture, OHNativeWindow* window
 ) {
-  const mln_ohos_surface_replacement replacement = {
-    .size = sizeof(mln_ohos_surface_replacement),
-    .logical_size = {.width = window_size, .height = window_size},
-    .window = window,
-    .surface_id = surface_id,
-  };
+  const mln_render_target target = window_target(window);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
-    mln_render_session_set_ohos_surface_target(
-      fixture->session, &replacement, &completion.descriptor,
-      MLN_TEST_DIAGNOSTIC
+    mln_render_session_set_target(
+      fixture->session, &target, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
 }
@@ -236,8 +227,7 @@ static void a_session_presents_to_a_window_that_the_host_let_go_of(void) {
 }
 
 // A session keeps its graphics context without a window, and presents to the
-// next one, whether it gets that after a release or in place of a window, and
-// whether the host names it by pointer or by surface ID.
+// next one, whether it gets that after a release or in place of a window.
 static void a_session_presents_to_each_window_that_it_gets(void) {
   const mln_runtime runtime = mln_test_create_runtime();
   const mln_map map = create_red_map(runtime);
@@ -257,11 +247,11 @@ static void a_session_presents_to_each_window_that_it_gets(void) {
         fixture.session, &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );
-    set_window(&fixture, NULL, consumer_surface_id(&second));
+    set_window(&fixture, second.window);
     render_frame(&fixture);
     expect_red_frame(&second);
 
-    set_window(&fixture, first.window, 0);
+    set_window(&fixture, first.window);
     render_frame(&fixture);
     expect_red_frame(&first);
   }
@@ -323,7 +313,7 @@ static void an_ohos_surface_rejects_the_callers_graphics_thread(void) {
     MLN_TEST_STATUS(
       MLN_STATUS_UNSUPPORTED,
       start_attach(
-        map, consumer.window, 0, MLN_HANDLE_NULL,
+        map, consumer.window, MLN_HANDLE_NULL,
         MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, &completion, &fixture
       )
     );
@@ -334,44 +324,6 @@ static void an_ohos_surface_rejects_the_callers_graphics_thread(void) {
   destroy_map_and_runtime(map, runtime);
 }
 
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-static mln_vulkan_device create_device(bool presentation) {
-  mln_vulkan_device_options options = {
-    .size = sizeof(mln_vulkan_device_options)
-  };
-  options.fields = MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
-  options.presentation = presentation;
-  mln_vulkan_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_vulkan_device_create(&options, &device, MLN_TEST_DIAGNOSTIC));
-  return device;
-}
-
-static void a_device_without_presentation_cannot_present(void) {
-  const mln_runtime runtime = mln_test_create_runtime();
-  const mln_map map = mln_test_create_map(runtime);
-  window_consumer consumer = {0};
-  mln_vulkan_device device = MLN_HANDLE_NULL;
-  if (TEST_PROTECT()) {
-    consumer_create(&consumer);
-    device = create_device(false);
-    mln_test_render_fixture fixture = {0};
-    mln_test_completion completion = mln_test_completion_default(0);
-    MLN_TEST_STATUS(
-      MLN_STATUS_UNSUPPORTED,
-      start_attach(
-        map, consumer.window, 0, device, MLN_RENDER_DRIVER_CORE_WORKER,
-        &completion, &fixture
-      )
-    );
-    mln_test_completion_destroy(&completion);
-    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, fixture.session);
-  }
-  mln_vulkan_device_release(device);
-  consumer_destroy(&consumer);
-  destroy_map_and_runtime(map, runtime);
-}
-#endif
-
 MLN_TEST_GROUP {
 #if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
   RUN_TEST(a_session_presents_to_a_window_that_the_host_let_go_of);
@@ -379,7 +331,4 @@ MLN_TEST_GROUP {
   RUN_TEST(a_session_survives_a_window_whose_consumer_went_away);
 #endif
   RUN_TEST(an_ohos_surface_rejects_the_callers_graphics_thread);
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  RUN_TEST(a_device_without_presentation_cannot_present);
-#endif
 }

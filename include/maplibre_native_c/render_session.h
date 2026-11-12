@@ -157,6 +157,67 @@ typedef struct mln_render_abandon_result {
   uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_render_abandon_result;
 
+/**
+ * Attaches a render session that renders the map into `target`.
+ *
+ * The session renders on `device`. When `device` is null, the session creates
+ * a device with the default options, and releases it when the session ends.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session, or a
+ *   window is minimized or has no client area.
+ * - MLN_STATUS_UNSUPPORTED when the device's
+ *   mln_gpu_device_capabilities.target_kinds lacks the target's kind, or, for
+ *   a null `device`, when no backend of this build renders to it.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE when a window was minimized or had no client
+ *   area when the attach ran.
+ * - MLN_STATUS_UNSUPPORTED when the GPU or the graphics driver can't present
+ *   to the window.
+ * - MLN_STATUS_NATIVE_ERROR when `device` is null and the platform can't
+ *   create a device, or when the library can't create its graphics context or
+ *   present to the window.
+ */
+MLN_BINDING("execution=lifecycle")
+MLN_API mln_status mln_map_attach(
+  mln_map map, const mln_render_target* target,
+  mln_gpu_device device MLN_BINDING("nullable=true"),
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Replaces the window or surface that the session presents to, and resizes
+ * the map to it.
+ *
+ * Use it to give the session a target again after
+ * mln_render_session_release_target(), or to move it to another window or
+ * surface. The session presents to `target` with the device that it attached
+ * with. Once the replacement completes, the session no longer uses the old
+ * target.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_STATE when a window is minimized or has no client area.
+ * - MLN_STATUS_UNSUPPORTED when the session renders offscreen, when `target`
+ *   is offscreen, or when no backend of this build presents to the target's
+ *   kind.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE when a window was minimized or had no client
+ *   area when the replacement ran.
+ * - MLN_STATUS_UNSUPPORTED when the session's device can't present to
+ *   `target`, or the new target needs a different color format or
+ *   pre-rotation support than the old one. Attach a new session instead.
+ * - MLN_STATUS_NATIVE_ERROR when the library can't present to the new target.
+ */
+MLN_BINDING("execution=operation")
+MLN_API mln_status mln_render_session_set_target(
+  mln_render_session session, const mln_render_target* target,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
 /** Reads what the session supports. */
 MLN_API mln_status mln_render_session_get_capabilities(
   mln_render_session session,
@@ -398,11 +459,13 @@ MLN_API void mln_acquired_frame_view_end(
 ) MLN_NOEXCEPT;
 
 /**
- * Resizes the session's target and its map.
+ * Resizes the session's target and its map, and sets the map's scale factor.
  *
- * The session renders at the map's scale factor. Release every acquired frame
- * first. You can call it once the attach call returns. While the attach runs,
- * the resize waits for it to complete.
+ * Use it when the window changes size, or moves to a display with another
+ * scale factor. The map keeps its loaded tiles, and draws its next frame at
+ * the new size and scale factor. Release every acquired frame first. You can
+ * call it once the attach call returns. While the attach runs, the resize
+ * waits for it to complete.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders into a borrowed ring. Give
@@ -417,7 +480,7 @@ MLN_API void mln_acquired_frame_view_end(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_render_session_resize(
-  mln_render_session session, mln_logical_size logical_size,
+  mln_render_session session, mln_logical_extent extent,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -430,8 +493,7 @@ MLN_API mln_status mln_render_session_resize(
  * still pending, and later ones until you give the session a new target,
  * finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release completes,
  * you can destroy the old target. An Android or OpenHarmony window can go away
- * sooner, as mln_map_attach_android_surface() and mln_map_attach_ohos_surface()
- * say.
+ * sooner, as mln_android_window_target and mln_ohos_window_target say.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into Android
@@ -439,7 +501,7 @@ MLN_API mln_status mln_render_session_resize(
  *   allocates.
  *
  * Completes with:
- * - MLN_STATUS_UNSUPPORTED when the target is a WebGL canvas.
+ * - MLN_STATUS_UNSUPPORTED when the target is an HTML canvas.
  * - MLN_STATUS_TARGET_LOST when the session loses its target before the
  *   release runs.
  */

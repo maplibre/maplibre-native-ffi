@@ -21,17 +21,19 @@ static void render_and_read_back_red(uint8_t* pixels) {
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
 
   mln_test_render_fixture fixture = {.driver = MLN_RENDER_DRIVER_CORE_WORKER};
-  mln_offscreen_descriptor descriptor = {
-    .size = sizeof(mln_offscreen_descriptor)
+  mln_render_target descriptor = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_OFFSCREEN,
   };
-  descriptor.logical_size = (mln_logical_size){.width = side, .height = side};
+  descriptor.data.offscreen.logical_size =
+    (mln_logical_size){.width = side, .height = side};
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   mln_test_completion attach = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_attach_offscreen(
-    map, &descriptor, &options, MLN_HANDLE_NULL, &fixture.session,
+  MLN_TEST_OK(mln_map_attach(
+    map, &descriptor, MLN_HANDLE_NULL, &options, &fixture.session,
     &attach.descriptor, MLN_TEST_DIAGNOSTIC
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));

@@ -904,28 +904,6 @@ static void abandon_destroys_a_borrowed_rings_objects_under_a_held_frame(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A swapchain is a child of both the device and the host's surface, so abandon
-// destroys it before the host may destroy either.
-static void abandon_destroys_a_surface_swapchain(void) {
-  counter_reset();
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(map);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_vulkan_surface(map, &fixture, counting_wrap),
-    mln_test_graphics_last_error()
-  );
-  render_one_frame(&fixture, 1);
-  TEST_ASSERT_EQUAL_INT(1, atomic_load(&live_objects[COUNTED_SWAPCHAIN]));
-
-  abandon_destroying_everything(fixture.session);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // The quarantined slot's image belongs to the host, so detach still destroys
 // every object the session created.
 static void detach_destroys_a_borrowed_ring_with_a_disposed_frame(void) {
@@ -958,6 +936,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_session_takes_the_host_queue_lock_around_its_queue_calls);
   RUN_TEST(abandon_drains_under_the_host_queue_lock_and_releases_it);
   RUN_TEST(abandon_destroys_a_borrowed_rings_objects_under_a_held_frame);
-  RUN_TEST(abandon_destroys_a_surface_swapchain);
   RUN_TEST(detach_destroys_a_borrowed_ring_with_a_disposed_frame);
 }

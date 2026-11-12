@@ -31,7 +31,8 @@ set(MLN_NATIVE_BROWSER_SHARDS
     "delivery,binding,platform,plugin")
 
 # Tags a test file can end its name with to build only on matching targets,
-# such as backend/dedicated_egl.c or platform/browser_http_emscripten.c.
+# such as backend/single_context_device_egl.c or
+# platform/browser_http_emscripten.c.
 set(MLN_NATIVE_FILE_TAGS
     metal
     opengl
@@ -393,11 +394,6 @@ function(mln_native_configure_suite target registry_dir)
     set(render_backend_files "render_${MLN_FFI_RENDER_BACKEND}.c")
   else()
     set(render_backend_files "render_graphics.c")
-    # Only an EGL context has a dedicated surface fixture.
-    if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl"
-       AND NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER MATCHES "^(wgl|webgl)$")
-      list(APPEND render_backend_files "render_dedicated.c")
-    endif()
   endif()
   list(TRANSFORM render_backend_files PREPEND "${support_dir}/")
   target_sources(

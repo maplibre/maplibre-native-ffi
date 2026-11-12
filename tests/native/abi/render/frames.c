@@ -622,7 +622,8 @@ static void a_resize_renders_and_reads_back_at_the_new_size(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, resized, &completion.descriptor, NULL
+      fixture.session, mln_test_session_extent(fixture.session, resized),
+      &completion.descriptor, NULL
     )
   );
   render_forced(&fixture, 302);

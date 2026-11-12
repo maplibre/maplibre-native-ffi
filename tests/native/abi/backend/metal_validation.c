@@ -11,21 +11,13 @@
 #include <objc/runtime.h>
 #endif
 
-MLN_TEST_DESCRIPTOR_EDITS(metal_surface, mln_metal_surface_descriptor)
-MLN_TEST_OVERFLOW_EDIT(metal_surface)
 MLN_TEST_DESCRIPTOR_EDITS(metal_borrowed, mln_metal_borrowed_texture_descriptor)
 MLN_TEST_BORROWED_EDITS(metal_borrowed, metal)
-MLN_TEST_DESCRIPTOR_EDITS(
-  metal_surface_replacement, mln_metal_surface_replacement
-)
 MLN_TEST_DESCRIPTOR_EDITS(
   metal_borrowed_replacement, mln_metal_borrowed_texture_replacement
 )
 MLN_TEST_BORROWED_EDITS(metal_borrowed_replacement, metal)
 
-static void surface_without_layer(void* call) {
-  ((mln_test_target_call*)call)->descriptor.metal_surface.layer = NULL;
-}
 static void borrowed_without_texture(void* call) {
   mln_test_target_call* edited = call;
   edited->textures.metal[0].texture = NULL;
@@ -33,10 +25,6 @@ static void borrowed_without_texture(void* call) {
 }
 static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_borrowed.physical_width = 0;
-}
-static void replacement_without_layer(void* call) {
-  ((mln_test_target_call*)call)->descriptor.metal_surface_replacement.layer =
-    NULL;
 }
 static void replacement_without_texture(void* call) {
   mln_test_target_call* edited = call;
@@ -105,26 +93,13 @@ static void replacement_with_another_depth(void* call) {
 }
 #endif
 
-MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_metal_surface)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_map_attach_metal_borrowed_texture
-)
-MLN_TEST_SET_TARGET_SUBMITTER(
-  submit_surface_set_target, mln_render_session_set_metal_surface_target
 )
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_borrowed_set_target,
   mln_render_session_set_metal_borrowed_texture_target
 )
-
-static mln_metal_surface_descriptor surface_descriptor(void) {
-  mln_metal_surface_descriptor descriptor = {
-    .size = sizeof(mln_metal_surface_descriptor)
-  };
-  descriptor.logical_size = mln_test_target_size();
-  descriptor.layer = MLN_TEST_FAKE_HANDLE;
-  return descriptor;
-}
 
 // A Metal build reads the textures' size and usage when it validates a
 // borrowed descriptor, so there the descriptor names a real texture: a ring of
@@ -177,25 +152,6 @@ static void metal_attach_rejects_malformed_calls(void) {
 #endif
 
   mln_test_target_call call =
-    mln_test_target_call_default(map, MLN_RENDER_DRIVER_CORE_WORKER);
-  call.descriptor.metal_surface = surface_descriptor();
-  static const mln_test_validation_case surface_rows[] = {
-    MLN_TEST_DESCRIPTOR_CASES(metal_surface),
-    MLN_TEST_OVERFLOW_CASE(metal_surface),
-    {"null layer", surface_without_layer, MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"zero driver", mln_test_call_with_zero_driver, MLN_STATUS_INVALID_ARGUMENT,
-     "render driver kind"},
-#if !defined(MLN_FFI_TEST_BACKEND_METAL)
-    {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
-     "not supported by this build"},
-#endif
-  };
-  mln_test_run_attach_table(
-    submit_surface_attach, &call, surface_rows,
-    sizeof(surface_rows) / sizeof(surface_rows[0])
-  );
-
-  call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
   describe_borrowed(&call, borrowed_texture);
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
@@ -245,22 +201,6 @@ static void metal_set_target_rejects_malformed_replacements(void) {
   mln_test_target_call call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CORE_WORKER);
   call.session = mln_test_create_disposed_session(map);
-  call.descriptor.metal_surface_replacement = (mln_metal_surface_replacement){
-    .size = sizeof(mln_metal_surface_replacement),
-    .logical_size = mln_test_target_size(),
-    .layer = MLN_TEST_FAKE_HANDLE,
-  };
-  static const mln_test_validation_case surface_rows[] = {
-    MLN_TEST_DESCRIPTOR_CASES(metal_surface_replacement),
-    {"null layer", replacement_without_layer, MLN_STATUS_INVALID_ARGUMENT,
-     NULL},
-  };
-  mln_test_run_set_target_table(
-    submit_surface_set_target, &call, surface_rows,
-    sizeof(surface_rows) / sizeof(surface_rows[0]),
-    MLN_RENDER_BACKEND_FLAG_METAL
-  );
-
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   // A Metal build reads the replacement's textures, which come from the live
   // ring that the ring-depth row needs.

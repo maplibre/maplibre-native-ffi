@@ -90,24 +90,22 @@ static void attach_and_dispose_here(void* context) {
 
   register_main_thread_canvas(canvas_shared);
   const char* selector = "#" CANVAS_ID;
-  mln_open_gl_surface_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_surface_descriptor)
+  mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_HTML_CANVAS,
   };
-  descriptor.logical_size.width = 64;
-  descriptor.logical_size.height = 64;
-  descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
-  descriptor.context.ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED;
-  descriptor.context.data.web_gl = (mln_web_gl_context_descriptor){
-    .kind = MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS,
-    .canvas_selector = mln_buffer_view_from_cstr(selector),
+  target.data.html_canvas = (mln_html_canvas_target){
+    .logical_size = {.width = 64, .height = 64},
+    .selector = mln_buffer_view_from_cstr(selector),
   };
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   mln_render_session session = MLN_HANDLE_NULL;
-  run->attach_status = mln_map_attach_open_gl_surface(
-    run->map, &descriptor, &options, &session, &run->attach_completion, NULL
+  run->attach_status = mln_map_attach(
+    run->map, &target, MLN_HANDLE_NULL, &options, &session,
+    &run->attach_completion, NULL
   );
   if (run->attach_status != MLN_STATUS_OK) return;
 
