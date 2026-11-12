@@ -3,12 +3,27 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "env.h"
 #include "host_graphics.h"
 #include "mln_test_graphics.h"
 #include "render.h"
 #include "render_backend.h"
+#include "status.h"
+#include "unity.h"
+
+// Linux and FreeBSD windows are Wayland surfaces on a compositor in the test
+// process, since tests/graphics surfaces there are headless.
+#if (defined(__linux__) || defined(__FreeBSD__)) && !defined(__ANDROID__) && \
+  !defined(__OHOS__)
+#define WAYLAND_SURFACES 1
+#include "wayland_compositor.h"
+#endif
+
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) && defined(WAYLAND_SURFACES)
+#include <vulkan/vulkan_core.h>
+#endif
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 #define HOST_BACKEND MLN_TEST_GRAPHICS_BACKEND_METAL
@@ -24,6 +39,16 @@
 
 #define EXTRA_TARGETS 2
 
+struct mln_test_render_surface {
+  uint32_t width;
+  uint32_t height;
+#if defined(WAYLAND_SURFACES)
+  void* wayland_surface;
+#else
+  mln_test_graphics_surface* graphics;
+#endif
+};
+
 typedef struct host_state {
   mln_test_graphics* graphics;
   // False when the graphics object belongs to another fixture.
@@ -31,9 +56,13 @@ typedef struct host_state {
   mln_test_graphics_context context;
   mln_test_graphics_texture* textures[MLN_TEXTURE_RING_MAX_DEPTH];
   size_t texture_count;
-  mln_test_graphics_surface* surface;
+  mln_test_render_surface* surface;
   mln_test_graphics_texture* extra_textures[EXTRA_TARGETS];
-  mln_test_graphics_surface* extra_surfaces[EXTRA_TARGETS];
+  mln_test_render_surface* extra_surfaces[EXTRA_TARGETS];
+#if defined(WAYLAND_SURFACES)
+  // The compositor of the fixture's surfaces, started with the first one.
+  mln_test_wayland* wayland;
+#endif
   // The Metal command queue that the session attached with, or null. A Metal
   // texture target must name the same one.
   void* command_queue;
@@ -56,7 +85,54 @@ static mln_vulkan_image_owner attach_vulkan_owner =
 // fixture that accepts queue order also names the graphics object's queue.
 static mln_gpu_sync_kind_flags attach_sync_kinds = 0;
 
+static mln_test_render_surface* surface_create(
+  host_state* state, uint32_t width, uint32_t height
+) {
+  mln_test_render_surface* surface = calloc(1, sizeof(*surface));
+  if (surface == NULL) {
+    return NULL;
+  }
+  surface->width = width;
+  surface->height = height;
+#if defined(WAYLAND_SURFACES)
+  if (state->wayland == NULL) {
+    mln_test_wayland_start(&state->wayland);
+  }
+  surface->wayland_surface = mln_test_wayland_create_surface(state->wayland);
+  if (surface->wayland_surface == NULL) {
+    free(surface);
+    return NULL;
+  }
+#else
+  surface->graphics =
+    mln_test_graphics_surface_create(state->graphics, width, height);
+  if (surface->graphics == NULL) {
+    free(surface);
+    return NULL;
+  }
+#endif
+  return surface;
+}
+
+static void surface_destroy(
+  host_state* state, mln_test_render_surface* surface
+) {
+  if (surface == NULL) {
+    return;
+  }
+#if defined(WAYLAND_SURFACES)
+  mln_test_wayland_destroy_surface(state->wayland, surface->wayland_surface);
+#else
+  (void)state;
+  mln_test_graphics_surface_destroy(surface->graphics);
+#endif
+  free(surface);
+}
+
 static void host_state_free(host_state* state) {
+#if defined(WAYLAND_SURFACES)
+  mln_test_wayland_stop(state->wayland);
+#endif
   if (state->owns_graphics) {
     mln_test_graphics_destroy(state->graphics);
   }
@@ -98,10 +174,10 @@ void mln_test_backend_destroy(void* opaque_state) {
     return;
   }
   for (size_t index = 0; index < EXTRA_TARGETS; index += 1) {
-    mln_test_graphics_surface_destroy(state->extra_surfaces[index]);
+    surface_destroy(state, state->extra_surfaces[index]);
     mln_test_graphics_texture_destroy(state->extra_textures[index]);
   }
-  mln_test_graphics_surface_destroy(state->surface);
+  surface_destroy(state, state->surface);
   for (size_t index = 0; index < state->texture_count; index += 1) {
     mln_test_graphics_texture_destroy(state->textures[index]);
   }
@@ -184,15 +260,12 @@ static mln_open_gl_context_descriptor host_context(
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 typedef mln_metal_borrowed_texture_descriptor borrowed_descriptor;
 typedef mln_metal_borrowed_texture borrowed_entry;
-typedef mln_metal_surface_descriptor surface_descriptor;
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
 typedef mln_vulkan_borrowed_texture_descriptor borrowed_descriptor;
 typedef mln_vulkan_borrowed_texture borrowed_entry;
-typedef mln_vulkan_surface_descriptor surface_descriptor;
 #else
 typedef mln_open_gl_borrowed_texture_descriptor borrowed_descriptor;
 typedef mln_open_gl_borrowed_texture borrowed_entry;
-typedef mln_open_gl_surface_descriptor surface_descriptor;
 #endif
 
 // Describes `textures`, which the graphics object with `context` created, as a
@@ -250,35 +323,120 @@ static bool describe_ring(
   return true;
 }
 
+// Describes `surface`, which the fixture with `state` created, as a target of
+// the surface's size.
 static bool describe_surface(
-  const mln_test_graphics_context* context,
-  const mln_test_graphics_surface* surface, surface_descriptor* out
+  const host_state* state, const mln_test_render_surface* surface,
+  mln_render_target* out
 ) {
+  *out = (mln_render_target){.size = sizeof(mln_render_target)};
+  const mln_logical_size logical_size = {
+    .width = surface->width, .height = surface->height
+  };
+#if defined(WAYLAND_SURFACES)
+  out->kind = MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE;
+  out->data.wayland_surface = (mln_wayland_surface_target){
+    .logical_size = logical_size,
+    .display = mln_test_wayland_display(state->wayland),
+    .surface = surface->wayland_surface,
+  };
+  return true;
+#else
+  (void)state;
   mln_test_graphics_surface_info info = {0};
-  if (!mln_test_graphics_surface_get_info(surface, &info)) {
+  if (!mln_test_graphics_surface_get_info(surface->graphics, &info)) {
     report("the render fixture could not describe a surface");
     return false;
   }
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  *out = (mln_metal_surface_descriptor){
-    .size = sizeof(mln_metal_surface_descriptor)
-  };
-  out->layer = info.metal_layer;
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  *out = (mln_vulkan_surface_descriptor){
-    .size = sizeof(mln_vulkan_surface_descriptor)
-  };
-  out->surface = info.vulkan_surface;
-#else
-  *out = (mln_open_gl_surface_descriptor){
-    .size = sizeof(mln_open_gl_surface_descriptor)
-  };
-  out->surface = info.opengl_surface;
-#endif
-  out->logical_size =
-    (mln_logical_size){.width = info.width, .height = info.height};
-  out->context = host_context(context);
+  if (info.metal_layer != NULL) {
+    out->kind = MLN_RENDER_TARGET_KIND_METAL_LAYER;
+    out->data.metal_layer = (mln_metal_layer_target){
+      .logical_size = logical_size, .layer = info.metal_layer
+    };
+  } else if (info.win32_window != NULL) {
+    out->kind = MLN_RENDER_TARGET_KIND_WIN32_WINDOW;
+    out->data.win32_window = (mln_win32_window_target){
+      .logical_size = logical_size, .window = info.win32_window
+    };
+  } else if (info.android_window != NULL) {
+    out->kind = MLN_RENDER_TARGET_KIND_ANDROID_WINDOW;
+    out->data.android_window = (mln_android_window_target){
+      .logical_size = logical_size, .window = info.android_window
+    };
+  } else {
+    report("the render fixture's surface has no window or layer");
+    return false;
+  }
   return true;
+#endif
+}
+
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) && defined(WAYLAND_SURFACES)
+// Finds the CPU's Vulkan device, such as lavapipe, through the instance of a
+// tests/graphics device.
+static bool find_cpu_device(uint8_t out_uuid[VK_UUID_SIZE]) {
+  mln_test_graphics* graphics =
+    mln_test_graphics_create(MLN_TEST_GRAPHICS_BACKEND_VULKAN);
+  mln_test_graphics_context context = {0};
+  TEST_ASSERT_NOT_NULL_MESSAGE(graphics, mln_test_graphics_last_error());
+  TEST_ASSERT_TRUE(mln_test_graphics_get_context(graphics, &context));
+  const PFN_vkGetInstanceProcAddr get_instance_proc_addr =
+    (PFN_vkGetInstanceProcAddr)(uintptr_t)context.vulkan_get_instance_proc_addr;
+  VkInstance instance = (VkInstance)context.vulkan_instance;
+  const PFN_vkEnumeratePhysicalDevices enumerate =
+    (PFN_vkEnumeratePhysicalDevices)get_instance_proc_addr(
+      instance, "vkEnumeratePhysicalDevices"
+    );
+  const PFN_vkGetPhysicalDeviceProperties2 get_properties =
+    (PFN_vkGetPhysicalDeviceProperties2)get_instance_proc_addr(
+      instance, "vkGetPhysicalDeviceProperties2"
+    );
+  VkPhysicalDevice devices[16];
+  uint32_t count = 16;
+  const VkResult listed = enumerate(instance, &count, devices);
+  bool found = false;
+  for (uint32_t index = 0; index < count && !found; ++index) {
+    VkPhysicalDeviceIDProperties ids = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
+    };
+    VkPhysicalDeviceProperties2 properties = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+      .pNext = &ids,
+    };
+    get_properties(devices[index], &properties);
+    if (properties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) {
+      memcpy(out_uuid, ids.deviceUUID, VK_UUID_SIZE);
+      found = true;
+    }
+  }
+  mln_test_graphics_destroy(graphics);
+  TEST_ASSERT_TRUE(listed == VK_SUCCESS || listed == VK_INCOMPLETE);
+  TEST_ASSERT_TRUE_MESSAGE(found, "no CPU Vulkan device, such as lavapipe");
+  return found;
+}
+#endif
+
+mln_gpu_device mln_test_create_presenting_device(void) {
+  mln_gpu_device_options options = {.size = sizeof(options)};
+  options.fields = MLN_GPU_DEVICE_OPTION_BACKEND;
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  options.backend = MLN_RENDER_BACKEND_METAL;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  options.backend = MLN_RENDER_BACKEND_VULKAN;
+#if defined(WAYLAND_SURFACES)
+  static uint8_t uuid[VK_UUID_SIZE];
+  if (find_cpu_device(uuid)) {
+    options.fields |= MLN_GPU_DEVICE_OPTION_ADAPTER_UUID;
+    options.adapter_uuid =
+      (mln_buffer_view){.data = uuid, .size = sizeof(uuid)};
+  }
+#endif
+#else
+  options.backend = MLN_RENDER_BACKEND_OPEN_GL;
+#endif
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC));
+  return device;
 }
 
 bool mln_test_backend_attach_borrowed(
@@ -336,6 +494,8 @@ bool mln_test_backend_attach_borrowed(
   return true;
 }
 
+// The session holds the device, so the fixture releases it once the attach
+// call returns.
 static bool attach_surface(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
@@ -345,32 +505,22 @@ static bool attach_surface(
   if (state == NULL) {
     return false;
   }
-  state->surface = mln_test_graphics_surface_create(
-    state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
-  );
-  surface_descriptor descriptor;
+  state->surface =
+    surface_create(state, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE);
+  mln_render_target target;
   if (
-    state->surface == NULL ||
-    !describe_surface(&state->context, state->surface, &descriptor)
+    state->surface == NULL || !describe_surface(state, state->surface, &target)
   ) {
     report("the render fixture could not create a surface");
     mln_test_backend_destroy(state);
     return false;
   }
   *out_state = state;
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  *out_status = mln_map_attach_metal_surface(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+  const mln_gpu_device device = mln_test_create_presenting_device();
+  *out_status = mln_map_attach(
+    map, &target, device, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  *out_status = mln_map_attach_vulkan_surface(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-#else
-  *out_status = mln_map_attach_open_gl_surface(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-#endif
+  mln_gpu_device_release(device);
   return true;
 }
 
@@ -419,17 +569,6 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
   return attached;
 }
 
-bool mln_test_render_fixture_create_vulkan_surface(
-  mln_map map, mln_test_render_fixture* fixture,
-  mln_test_vulkan_device_proc_addr_wrap wrap
-) {
-  wrap_device_proc_addr = wrap;
-  const bool attached =
-    mln_test_render_fixture_create_with(map, fixture, attach_surface);
-  wrap_device_proc_addr = NULL;
-  return attached;
-}
-
 bool mln_test_render_fixture_create_vulkan_on(
   mln_map map, mln_test_render_fixture* fixture, mln_test_graphics* graphics
 ) {
@@ -456,10 +595,22 @@ void mln_test_render_fixture_destroy_textures(
   state->texture_count = 0;
 }
 
+mln_status mln_test_render_fixture_start_surface_attach(
+  mln_map map, const mln_render_session_attach_options* options,
+  const mln_completion* completion, mln_test_render_fixture* fixture
+) {
+  return mln_test_render_fixture_start_attach_with(
+    map, options, completion, fixture, attach_surface,
+    MLN_RENDER_DRIVER_CORE_WORKER
+  );
+}
+
 bool mln_test_render_fixture_create_surface(
   mln_map map, mln_test_render_fixture* fixture
 ) {
-  return mln_test_render_fixture_create_with(map, fixture, attach_surface);
+  return mln_test_render_fixture_create_on(
+    map, fixture, attach_surface, MLN_RENDER_DRIVER_CORE_WORKER
+  );
 }
 
 bool mln_test_render_fixture_read_texture(
@@ -577,7 +728,7 @@ mln_test_graphics_texture* mln_test_render_fixture_new_sized_texture(
   return NULL;
 }
 
-mln_test_graphics_surface* mln_test_render_fixture_new_surface(
+mln_test_render_surface* mln_test_render_fixture_new_surface(
   const mln_test_render_fixture* fixture
 ) {
   return mln_test_render_fixture_new_sized_surface(
@@ -585,14 +736,13 @@ mln_test_graphics_surface* mln_test_render_fixture_new_surface(
   );
 }
 
-mln_test_graphics_surface* mln_test_render_fixture_new_sized_surface(
+mln_test_render_surface* mln_test_render_fixture_new_sized_surface(
   const mln_test_render_fixture* fixture, uint32_t width, uint32_t height
 ) {
   host_state* state = fixture->backend_state;
   for (size_t index = 0; state != NULL && index < EXTRA_TARGETS; index += 1) {
     if (state->extra_surfaces[index] == NULL) {
-      state->extra_surfaces[index] =
-        mln_test_graphics_surface_create(state->graphics, width, height);
+      state->extra_surfaces[index] = surface_create(state, width, height);
       if (state->extra_surfaces[index] == NULL) {
         report("the render fixture could not create another surface");
       }
@@ -601,6 +751,47 @@ mln_test_graphics_surface* mln_test_render_fixture_new_sized_surface(
   }
   return NULL;
 }
+
+mln_test_render_surface* mln_test_render_surface_create(
+  const mln_test_render_fixture* fixture
+) {
+  host_state* state = fixture->backend_state;
+  if (state == NULL) {
+    return NULL;
+  }
+  mln_test_render_surface* surface =
+    surface_create(state, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE);
+  if (surface == NULL) {
+    report("the render fixture could not create a surface");
+  }
+  return surface;
+}
+
+void mln_test_render_surface_destroy(
+  const mln_test_render_fixture* fixture, mln_test_render_surface* surface
+) {
+  host_state* state = fixture->backend_state;
+  if (state != NULL) {
+    surface_destroy(state, surface);
+  }
+}
+
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+void* mln_test_render_surface_metal_layer(
+  const mln_test_render_surface* surface
+) {
+#if defined(WAYLAND_SURFACES)
+  (void)surface;
+  return NULL;
+#else
+  mln_test_graphics_surface_info info = {0};
+  if (!mln_test_graphics_surface_get_info(surface->graphics, &info)) {
+    return NULL;
+  }
+  return info.metal_layer;
+#endif
+}
+#endif
 
 mln_status mln_test_render_fixture_set_textures(
   const mln_test_render_fixture* fixture,
@@ -648,42 +839,13 @@ mln_status mln_test_render_fixture_set_textures(
 
 mln_status mln_test_render_fixture_set_surface(
   const mln_test_render_fixture* fixture,
-  const mln_test_graphics_surface* surface, const mln_completion* completion
+  const mln_test_render_surface* surface, const mln_completion* completion
 ) {
-  mln_test_graphics_surface_info info = {0};
-  if (!mln_test_graphics_surface_get_info(surface, &info)) {
-    report("the render fixture could not describe a surface");
+  mln_render_target target;
+  if (!describe_surface(fixture->backend_state, surface, &target)) {
     return MLN_STATUS_NATIVE_ERROR;
   }
-  const mln_logical_size logical_size = {
-    .width = info.width, .height = info.height
-  };
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  const mln_metal_surface_replacement replacement = {
-    .size = sizeof(replacement),
-    .logical_size = logical_size,
-    .layer = info.metal_layer,
-  };
-  return mln_render_session_set_metal_surface_target(
-    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
+  return mln_render_session_set_target(
+    fixture->session, &target, completion, MLN_TEST_DIAGNOSTIC
   );
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  const mln_vulkan_surface_replacement replacement = {
-    .size = sizeof(replacement),
-    .logical_size = logical_size,
-    .surface = info.vulkan_surface,
-  };
-  return mln_render_session_set_vulkan_surface_target(
-    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
-  );
-#else
-  const mln_open_gl_surface_replacement replacement = {
-    .size = sizeof(replacement),
-    .logical_size = logical_size,
-    .surface = info.opengl_surface,
-  };
-  return mln_render_session_set_open_gl_surface_target(
-    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
-  );
-#endif
 }

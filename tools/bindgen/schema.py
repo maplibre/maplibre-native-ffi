@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .model import Api, CType, Function, ModelError
+from .model import Api, CType, Field, Function, ModelError
 from .names import type_name
 from .protocol import (
     BUFFER_VIEW,
@@ -37,7 +37,8 @@ COMPLETION_EXECUTIONS = frozenset({"command", "query", "operation", "lifecycle"}
 ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # The operating systems that a native build targets, as the presets name them.
 # A `platforms=` annotation lists, in this order and without repeats, the ones
-# where a function can do its work; a function without one serves them all.
+# where a function, or a tagged union's variant, can do its work; one without
+# it serves them all.
 PLATFORMS = (
     "android",
     "freebsd",
@@ -143,6 +144,7 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "stride",
         "required",
         "native_object",
+        "platforms",
     }
 )
 # Field roles that hold control state rather than a value a host chooses, so a
@@ -226,13 +228,13 @@ def integer_type(type_: CType) -> bool:
     )
 
 
-def platforms(function: Function) -> frozenset[str]:
-    value = function.metadata.get("platforms")
+def platforms(declaration: Function | Field) -> frozenset[str]:
+    value = declaration.metadata.get("platforms")
     return frozenset(value.split(",")) if value else frozenset(PLATFORMS)
 
 
-def platform_errors(function: Function, context: str) -> list[str]:
-    value = function.metadata.get("platforms")
+def platform_errors(declaration: Function | Field, context: str) -> list[str]:
+    value = declaration.metadata.get("platforms")
     if value is None:
         return []
     names = value.split(",")
@@ -1037,6 +1039,9 @@ def validate(api: Api) -> None:
                 errors.append(f"{fcontext}: native_object requires an integer")
             if "variant" in field.metadata and record.kind != "union":
                 errors.append(f"{fcontext}: variant requires a union member")
+            if "platforms" in field.metadata and "variant" not in field.metadata:
+                errors.append(f"{fcontext}: platforms requires a union variant")
+            errors.extend(platform_errors(field, fcontext))
             if "empty_variant" in field.metadata and "tag" not in field.metadata:
                 errors.append(f"{fcontext}: empty_variant requires a tagged union")
             # A required member is one whose zero native rejects because no

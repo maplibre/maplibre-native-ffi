@@ -2,8 +2,8 @@
 #define MLN_NATIVE_TESTS_ATTACH_TABLE_H
 
 // Validation tables for render target attach and set_target calls. A row edits
-// one call's arguments or its backend descriptor or replacement, and the runner
-// submits it
+// one call's arguments, its target, or its borrowed descriptor or replacement,
+// and the runner submits it
 // with a completion that no accepted row may reach: every row here expects a
 // rejection, and a rejected attach must leave its output session as it was.
 
@@ -30,27 +30,21 @@
 typedef struct mln_test_target_call {
   mln_map map;
   mln_render_session session;
+  mln_gpu_device device;
   mln_render_session_attach_options options;
   bool null_descriptor;
   bool null_options;
   bool null_session;
   bool null_completion;
   union {
-    mln_metal_surface_descriptor metal_surface;
+    mln_render_target target;
     mln_metal_borrowed_texture_descriptor metal_borrowed;
-    mln_vulkan_surface_descriptor vulkan_surface;
     mln_vulkan_borrowed_texture_descriptor vulkan_borrowed;
-    mln_open_gl_surface_descriptor opengl_surface;
     mln_open_gl_borrowed_texture_descriptor opengl_borrowed;
-    mln_web_gpu_surface_descriptor webgpu_surface;
     mln_web_gpu_borrowed_texture_descriptor webgpu_borrowed;
-    mln_metal_surface_replacement metal_surface_replacement;
     mln_metal_borrowed_texture_replacement metal_borrowed_replacement;
-    mln_vulkan_surface_replacement vulkan_surface_replacement;
     mln_vulkan_borrowed_texture_replacement vulkan_borrowed_replacement;
-    mln_open_gl_surface_replacement opengl_surface_replacement;
     mln_open_gl_borrowed_texture_replacement opengl_borrowed_replacement;
-    mln_web_gpu_surface_replacement webgpu_surface_replacement;
     mln_web_gpu_borrowed_texture_replacement webgpu_borrowed_replacement;
   } descriptor;
   // Storage for a borrowed descriptor's textures array. A row works on a copy
@@ -111,6 +105,42 @@ static inline mln_status mln_test_submit_attach(
     );
   }
   return status;
+}
+
+// Submits `call`'s target through mln_map_attach(), on its device, and checks
+// that a rejection left the output session as it was.
+static inline mln_status mln_test_submit_target_attach(
+  void* context, const void* raw, mln_diagnostic* diagnostic
+) {
+  (void)context;
+  const mln_test_target_call* call = raw;
+  mln_render_session session = call->session;
+  const mln_completion completion = mln_test_discard_completion();
+  const mln_status status = mln_map_attach(
+    call->map, call->null_descriptor ? NULL : &call->descriptor.target,
+    call->device, call->null_options ? NULL : &call->options,
+    call->null_session ? NULL : &session,
+    call->null_completion ? NULL : &completion, diagnostic
+  );
+  if (status != MLN_STATUS_OK) {
+    TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+      call->session, session, "a rejected attach wrote its session"
+    );
+  }
+  return status;
+}
+
+// Submits `call`'s target through mln_render_session_set_target().
+static inline mln_status mln_test_submit_target_set_target(
+  void* context, const void* raw, mln_diagnostic* diagnostic
+) {
+  (void)context;
+  const mln_test_target_call* call = raw;
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_render_session_set_target(
+    call->session, call->null_descriptor ? NULL : &call->descriptor.target,
+    call->null_completion ? NULL : &completion, diagnostic
+  );
 }
 
 static inline mln_status mln_test_submit_set_target(
@@ -245,18 +275,6 @@ static inline void mln_test_run_set_target_table(
     {"zero logical width", member##_zero_width, MLN_STATUS_INVALID_ARGUMENT,  \
      "must be positive"}
 
-// Defines the other way a logical size breaks the positivity rule that every
-// descriptor shares, for one union member. MLN_TEST_SIZE_RULE_CASES(member)
-// names its row.
-#define MLN_TEST_SIZE_RULE_EDITS(member)                                      \
-  static void member##_zero_height(void* call) {                              \
-    ((mln_test_target_call*)call)->descriptor.member.logical_size.height = 0; \
-  }
-
-#define MLN_TEST_SIZE_RULE_CASES(member)                                     \
-  {"zero logical height", member##_zero_height, MLN_STATUS_INVALID_ARGUMENT, \
-   "must be positive"}
-
 // Defines the edits every borrowed descriptor checks itself, for the union
 // member `member` whose entries live in the call's `textures.entries`: no
 // textures array for a count of one, and one texture named twice, which each
@@ -302,20 +320,6 @@ static inline void mln_test_run_set_target_table(
     {"a ring too deep", member##_too_deep, MLN_STATUS_INVALID_ARGUMENT, \
      "MLN_TEXTURE_RING_MAX_DEPTH"}
 
-// For a target whose physical size follows from its logical size and the
-// map's scale factor: a width that overflows 32 bits once scaled by the map
-// that mln_test_create_target_map() creates. MLN_TEST_OVERFLOW_CASE(member)
-// names its row.
-#define MLN_TEST_OVERFLOW_EDIT(member)                                    \
-  static void member##_overflowing_size(void* call) {                     \
-    ((mln_test_target_call*)call)->descriptor.member.logical_size.width = \
-      UINT32_MAX;                                                         \
-  }
-
-#define MLN_TEST_OVERFLOW_CASE(member)                                   \
-  {"logical size that overflows once scaled", member##_overflowing_size, \
-   MLN_STATUS_INVALID_ARGUMENT, "too large"}
-
 // Defines `name`, a validation-table call that submits through the backend
 // function `function`, an attach or a set_target.
 #define MLN_TEST_ATTACH_SUBMITTER(name, function)                      \
@@ -355,8 +359,8 @@ static inline mln_logical_size mln_test_target_size(void) {
   return (mln_logical_size){.width = 64, .height = 64};
 }
 
-// A map for the attach tables, at a scale factor of 2, so that a logical size
-// of MLN_TEST_OVERFLOW_EDIT overflows once scaled.
+// A map for the attach tables, at a scale factor of 2, so that a logical width
+// of UINT32_MAX overflows once scaled.
 static inline mln_map mln_test_create_target_map(mln_runtime runtime) {
   mln_map_options options = mln_test_map_options();
   options.initial_extent.width = 64;

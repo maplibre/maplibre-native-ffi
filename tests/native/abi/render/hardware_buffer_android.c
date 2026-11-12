@@ -347,7 +347,10 @@ static void a_resize_gives_the_ring_buffers_of_the_new_size(void) {
       MLN_STATUS_OK, &fixture,
       mln_render_session_resize(
         fixture.session,
-        (mln_logical_size){.width = ring_height, .height = ring_width},
+        mln_test_session_extent(
+          fixture.session,
+          (mln_logical_size){.width = ring_height, .height = ring_width}
+        ),
         &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );

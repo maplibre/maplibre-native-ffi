@@ -1,4 +1,5 @@
-"""A `platforms=` annotation limits a function to the platforms it serves."""
+"""A `platforms=` annotation limits a function, or a tagged union's variant, to
+the platforms it serves."""
 
 import unittest
 
@@ -61,6 +62,34 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
                 self.assertRaisesRegex(ModelError, message),
             ):
                 validate(header)
+
+    def test_a_union_variant_names_its_platforms_and_no_other_member_does(self):
+        variants = """typedef enum mln_target_kind : unsigned int {
+  MLN_TARGET_KIND_IMAGE = 1,
+  MLN_TARGET_KIND_WINDOW = 2,
+} mln_target_kind;
+typedef struct mln_image_target { unsigned int width; } mln_image_target;
+typedef struct mln_window_target { void *window; } mln_window_target;
+typedef union mln_target_data {
+  mln_image_target image BIND("variant=MLN_TARGET_KIND_IMAGE");
+  mln_window_target window BIND("variant=MLN_TARGET_KIND_WINDOW;platforms={platforms}");
+} mln_target_data;
+typedef struct mln_target {
+  unsigned int size;
+  mln_target_kind kind;
+  mln_target_data data BIND("tag=kind");
+} mln_target;
+mln_status mln_target_use(const mln_target *target, mln_diagnostic *out_diagnostic);
+"""
+        validate(parse(variants.replace("{platforms}", "windows")))
+        with self.assertRaisesRegex(ModelError, "each platform once, in order"):
+            validate(parse(variants.replace("{platforms}", "windows,android")))
+        with self.assertRaisesRegex(ModelError, "platforms requires a union variant"):
+            validate(
+                parse("""typedef struct mln_box { unsigned int width BIND("platforms=web"); } mln_box;
+mln_status mln_box_use(const mln_box *box, mln_diagnostic *out_diagnostic);
+""")
+            )
 
     def test_a_binding_leaves_out_what_none_of_its_targets_serve(self):
         bound = compile_api(api(), frozenset({"linux", "macos"}))

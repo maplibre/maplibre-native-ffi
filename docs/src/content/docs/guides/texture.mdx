@@ -34,8 +34,8 @@ its scale factor.
 </Aside>
 
 On Vulkan, you can have the library create the device with
-[](api:mln_vulkan_device_create), and create your textures on the context from
-[](api:mln_vulkan_device_get_context). To share the textures with another
+[](api:mln_gpu_device_create), and create your textures on the context from
+[](api:mln_gpu_device_get_vulkan_context). To share the textures with another
 graphics API on the same GPU, name that GPU by its UUID or LUID in the options.
 If your renderer submits to the same queue as the session, pass a lock in the
 attach options, and hold it around your own submissions.

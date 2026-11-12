@@ -194,7 +194,10 @@ static void render_the_tile_and_expect_one_request(const tile_case* item) {
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
       fixture.session,
-      (mln_logical_size){.width = item->side, .height = item->side},
+      mln_test_session_extent(
+        fixture.session,
+        (mln_logical_size){.width = item->side, .height = item->side}
+      ),
       &completion.descriptor, NULL
     )
   );

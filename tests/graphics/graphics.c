@@ -1399,6 +1399,7 @@ static bool vulkan_surface_create(
     graphics->objc.pool_pop(pool);
     if (device != NULL) objc_send_void(graphics, device, "release");
     if (surface->vulkan_layer == NULL) return false;
+    surface->info.metal_layer = surface->vulkan_layer;
     const vulkan_metal_surface_info info = {
       .sType = (VkStructureType)1000217000,
       .pLayer = surface->vulkan_layer,
@@ -1420,6 +1421,7 @@ static bool vulkan_surface_create(
     // Mesa presents through StretchBlt, which needs a visible destination.
     ShowWindow(surface->window, SW_SHOWNOACTIVATE);
     UpdateWindow(surface->window);
+    surface->info.win32_window = surface->window;
     const vulkan_win32_surface_info info = {
       .sType = (VkStructureType)1000009000,
       .hinstance = GetModuleHandleA(NULL),
@@ -1438,6 +1440,7 @@ static bool vulkan_surface_create(
   ) {
     void* window = android_window_create(graphics, surface);
     if (window == NULL) return false;
+    surface->info.android_window = window;
     const vulkan_android_surface_info info = {
       .sType = (VkStructureType)1000008000,
       .window = window,
@@ -2036,6 +2039,7 @@ static bool wgl_surface_create(
   surface->window =
     wgl_create_window(surface->info.width, surface->info.height);
   if (surface->window == NULL) return false;
+  surface->info.win32_window = surface->window;
   HDC device_context = GetDC(surface->window);
   surface->info.opengl_surface = device_context;
   if (!SetPixelFormat(

@@ -169,7 +169,10 @@ static void a_session_barrier_fences_a_discarded_resize(void) {
   mln_render_session_snapshot before = {.size = sizeof(before)};
   MLN_TEST_OK(mln_render_session_get_snapshot(fixture.session, &before, NULL));
   const mln_logical_size extent = {.width = 96, .height = 80};
-  MLN_TEST_OK(mln_render_session_resize(fixture.session, extent, NULL, NULL));
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.session, mln_test_session_extent(fixture.session, extent), NULL,
+    NULL
+  ));
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)

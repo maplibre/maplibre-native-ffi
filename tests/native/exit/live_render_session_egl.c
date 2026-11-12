@@ -15,12 +15,13 @@ static mln_status attach(
   // A borrowed OpenGL texture needs the host's graphics thread, so the core
   // worker renders offscreen instead.
   if (options->driver == MLN_RENDER_DRIVER_CORE_WORKER) {
-    const mln_offscreen_descriptor descriptor = {
-      .size = sizeof(mln_offscreen_descriptor),
-      .logical_size = probe_size,
+    const mln_render_target target = {
+      .size = sizeof(mln_render_target),
+      .kind = MLN_RENDER_TARGET_KIND_OFFSCREEN,
+      .data.offscreen = {.logical_size = probe_size},
     };
-    return mln_map_attach_offscreen(
-      map, &descriptor, options, MLN_HANDLE_NULL, out_session, completion, NULL
+    return mln_map_attach(
+      map, &target, MLN_HANDLE_NULL, options, out_session, completion, NULL
     );
   }
   const mln_open_gl_borrowed_texture entry = {

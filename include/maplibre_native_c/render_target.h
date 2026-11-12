@@ -1,7 +1,7 @@
 /**
  * @file maplibre_native_c/render_target.h
- * Options, capabilities, graphics contexts, and GPU synchronization that every
- * render target shares.
+ * The targets that render sessions render into, and the options,
+ * capabilities, graphics contexts, and GPU synchronization that they share.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_RENDER_TARGET_H
@@ -128,13 +128,13 @@ typedef struct mln_render_session_attach_options {
    * The thread that runs the session's graphics work, which depends on the
    * target:
    *
-   * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for a shared or dedicated EGL or
-   *   WGL context, an existing WebGL context, or a browser's WebGPU device.
-   * - MLN_RENDER_DRIVER_CORE_WORKER for a transferred WebGL canvas, an Android,
-   *   OpenHarmony, or Win32 window, a Wayland surface, a ring of Android
-   *   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces, or an
-   *   offscreen session.
-   * - Either one for another Metal or Vulkan target.
+   * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for a WebGPU surface, or a
+   *   borrowed ring of OpenGL or WebGPU textures.
+   * - MLN_RENDER_DRIVER_CORE_WORKER for an offscreen target, a window, an HTML
+   *   canvas, or a ring of Android hardware buffers, dmabufs, DXGI shared
+   *   textures, or IOSurfaces.
+   * - Either one for a Metal layer, or a borrowed ring of Metal or Vulkan
+   *   textures.
    *
    * An attach with another driver fails with MLN_STATUS_UNSUPPORTED.
    */
@@ -339,6 +339,211 @@ typedef struct mln_open_gl_context_descriptor {
   mln_open_gl_context_ownership ownership;
   mln_open_gl_context_descriptor_data data MLN_BINDING("tag=platform");
 } mln_open_gl_context_descriptor;
+
+/** The kind of a render target, which says what its descriptor holds. */
+typedef enum mln_render_target_kind : uint32_t {
+  /** An image that the session allocates, and that you read back. */
+  MLN_RENDER_TARGET_KIND_OFFSCREEN = 1u,
+  /** A `CAMetalLayer`. */
+  MLN_RENDER_TARGET_KIND_METAL_LAYER = 2u,
+  /** A Win32 window. */
+  MLN_RENDER_TARGET_KIND_WIN32_WINDOW = 3u,
+  /** An X11 window, through Xlib. */
+  MLN_RENDER_TARGET_KIND_XLIB_WINDOW = 4u,
+  /** A Wayland surface. */
+  MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE = 5u,
+  /** An Android `ANativeWindow`. */
+  MLN_RENDER_TARGET_KIND_ANDROID_WINDOW = 6u,
+  /** An OpenHarmony `OHNativeWindow`. */
+  MLN_RENDER_TARGET_KIND_OHOS_WINDOW = 7u,
+  /** A WebGPU surface on the device that you wrapped. */
+  MLN_RENDER_TARGET_KIND_WEB_GPU_SURFACE = 8u,
+  /** An HTML canvas in the page. */
+  MLN_RENDER_TARGET_KIND_HTML_CANVAS = 9u,
+} mln_render_target_kind;
+
+/** A render target kind, as a bit in a set. */
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_render_target_kind_flag : uint32_t {
+  MLN_RENDER_TARGET_KIND_FLAG_OFFSCREEN = 1u << 0u,
+  MLN_RENDER_TARGET_KIND_FLAG_METAL_LAYER = 1u << 1u,
+  MLN_RENDER_TARGET_KIND_FLAG_WIN32_WINDOW = 1u << 2u,
+  MLN_RENDER_TARGET_KIND_FLAG_XLIB_WINDOW = 1u << 3u,
+  MLN_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE = 1u << 4u,
+  MLN_RENDER_TARGET_KIND_FLAG_ANDROID_WINDOW = 1u << 5u,
+  MLN_RENDER_TARGET_KIND_FLAG_OHOS_WINDOW = 1u << 6u,
+  MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_SURFACE = 1u << 7u,
+  MLN_RENDER_TARGET_KIND_FLAG_HTML_CANVAS = 1u << 8u,
+} mln_render_target_kind_flag;
+
+/** A set of mln_render_target_kind_flag bits. */
+typedef uint32_t mln_render_target_kind_flags;
+
+/**
+ * An image that the session allocates, renders at the map's scale factor, and
+ * reads back with mln_render_session_read_texture().
+ */
+typedef struct mln_offscreen_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+} mln_offscreen_target;
+
+/**
+ * A `CAMetalLayer` to present to.
+ *
+ * The session sets the layer's device, pixel format, and drawable size.
+ */
+typedef struct mln_metal_layer_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your `CAMetalLayer*`. */
+  void* layer MLN_BINDING("required=true");
+} mln_metal_layer_target;
+
+/**
+ * A Win32 window to present to.
+ *
+ * On an OpenGL device, the session sets the window's pixel format, so don't
+ * set one yourself. While the window is minimized, frame demands finish with
+ * MLN_RENDER_RESULT_TARGET_NOT_READY.
+ */
+typedef struct mln_win32_window_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your `HWND`. */
+  void* window MLN_BINDING("required=true");
+} mln_win32_window_target;
+
+/**
+ * An X11 window to present to, through Xlib.
+ *
+ * Keep the display connected until the session's detach completes.
+ */
+typedef struct mln_xlib_window_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your `Display*`. */
+  void* display MLN_BINDING("required=true");
+  /** Your `Window`, on `display`. */
+  uint64_t window MLN_BINDING("required=true;native_object=true");
+} mln_xlib_window_target;
+
+/**
+ * A Wayland surface to present to.
+ *
+ * Keep the display connected until the session's detach completes. On an
+ * OpenGL device, if you also use EGL on the display, initialize it before you
+ * attach.
+ */
+typedef struct mln_wayland_surface_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your `wl_display*`. */
+  void* display MLN_BINDING("required=true");
+  /** Your `wl_surface*`, on `display`. */
+  void* surface MLN_BINDING("required=true");
+} mln_wayland_surface_target;
+
+/**
+ * An Android window to present to.
+ *
+ * The session takes its own reference to the window, so you can release yours
+ * once the call returns. When the platform destroys the window, such as in
+ * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+ * mln_render_session_release_target(), or give the session another window
+ * with mln_render_session_set_target(), without waiting for that to complete.
+ * A frame to the destroyed window finishes with
+ * MLN_RENDER_RESULT_TARGET_NOT_READY, or with MLN_RENDER_RESULT_RENDERED if
+ * the window went away while the frame was presenting.
+ */
+typedef struct mln_android_window_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your `ANativeWindow*`. */
+  void* window MLN_BINDING("required=true");
+} mln_android_window_target;
+
+/**
+ * An OpenHarmony window to present to.
+ *
+ * The session takes its own reference to the window, so you can release yours
+ * once the call returns. When the platform destroys the window, such as in an
+ * `XComponent`'s `onSurfaceDestroyed` callback, release the target or give
+ * the session another window without waiting, as for an Android window.
+ */
+typedef struct mln_ohos_window_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your `OHNativeWindow*`. */
+  void* window MLN_BINDING("required=true");
+} mln_ohos_window_target;
+
+/**
+ * A WebGPU surface to present to, which the session configures.
+ *
+ * Make it with the instance of the device that mln_gpu_device_wrap_web_gpu()
+ * wrapped, and attach on that device.
+ */
+typedef struct mln_web_gpu_surface_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** Your `WGPUSurface`. */
+  void* surface MLN_BINDING("required=true");
+  /** The `WGPUTextureFormat` to configure the surface with. */
+  uint32_t format MLN_BINDING("required=true");
+} mln_web_gpu_surface_target;
+
+/**
+ * An HTML canvas to present to.
+ *
+ * The library transfers the canvas to a worker, and makes its context there
+ * with the device's backend.
+ */
+typedef struct mln_html_canvas_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** The canvas's CSS selector, such as `#map`. */
+  mln_buffer_view selector MLN_BINDING("required=true");
+} mln_html_canvas_target;
+
+/** The descriptor of each kind of render target. */
+typedef union mln_render_target_data {
+  mln_offscreen_target offscreen
+    MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_OFFSCREEN");
+  mln_metal_layer_target metal_layer MLN_BINDING(
+    "variant=MLN_RENDER_TARGET_KIND_METAL_LAYER;"
+    "platforms=ios,macos,tvos,visionos"
+  );
+  mln_win32_window_target win32_window MLN_BINDING(
+    "variant=MLN_RENDER_TARGET_KIND_WIN32_WINDOW;platforms=windows"
+  );
+  mln_xlib_window_target xlib_window MLN_BINDING(
+    "variant=MLN_RENDER_TARGET_KIND_XLIB_WINDOW;platforms=freebsd,linux"
+  );
+  mln_wayland_surface_target wayland_surface MLN_BINDING(
+    "variant=MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE;platforms=freebsd,linux"
+  );
+  mln_android_window_target android_window MLN_BINDING(
+    "variant=MLN_RENDER_TARGET_KIND_ANDROID_WINDOW;platforms=android"
+  );
+  mln_ohos_window_target ohos_window
+    MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_OHOS_WINDOW;platforms=ohos");
+  mln_web_gpu_surface_target web_gpu_surface
+    MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_WEB_GPU_SURFACE;platforms=web");
+  mln_html_canvas_target html_canvas
+    MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_HTML_CANVAS;platforms=web");
+} mln_render_target_data;
+
+/**
+ * What a render session renders into: one kind of target, and its
+ * descriptor.
+ *
+ * Every target has a size in logical pixels, which sets the map's size. The
+ * session renders it at the map's scale factor.
+ *
+ * The session uses the objects that the descriptor names until a replacement
+ * or release of the target completes, a detach or release of the session
+ * completes, or an abandon of it returns, except as a kind's descriptor says.
+ * A window target presents without waiting for the display, so demand at most
+ * one frame per display refresh.
+ */
+typedef struct mln_render_target {
+  uint32_t size;
+  mln_render_target_kind kind;
+  mln_render_target_data data MLN_BINDING("tag=kind");
+} mln_render_target;
 
 /**
  * Computes the size in pixels of a target with a logical size and scale factor.

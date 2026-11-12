@@ -152,24 +152,32 @@ static void restore_window(test_window* window) {
 
 // Submits an attach to `window` without waiting for it. The fixture holds the
 // session once the call succeeds.
-static mln_status start_attach(
-  mln_map map, HWND window, mln_vulkan_device device,
-  mln_render_driver_kind driver, mln_test_completion* completion,
-  mln_test_render_fixture* fixture
-) {
-  const mln_win32_window_descriptor descriptor = {
-    .size = sizeof(mln_win32_window_descriptor),
+static mln_render_target window_target(HWND window) {
+  mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_WIN32_WINDOW,
+  };
+  target.data.win32_window = (mln_win32_window_target){
     .logical_size = {.width = window_size, .height = window_size},
     .window = window,
   };
+  return target;
+}
+
+static mln_status start_attach(
+  mln_map map, HWND window, mln_gpu_device device,
+  mln_render_driver_kind driver, mln_test_completion* completion,
+  mln_test_render_fixture* fixture
+) {
+  const mln_render_target target = window_target(window);
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options), .driver = driver
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = driver;
-  const mln_status status = mln_map_attach_win32_window(
-    map, &descriptor, device, &options, &fixture->session,
-    &completion->descriptor, MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_map_attach(
+    map, &target, device, &options, &fixture->session, &completion->descriptor,
+    MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
@@ -199,16 +207,11 @@ static mln_render_result render_frame(const mln_test_render_fixture* fixture) {
 static void set_window(
   const mln_test_render_fixture* fixture, const test_window* window
 ) {
-  const mln_win32_window_replacement replacement = {
-    .size = sizeof(mln_win32_window_replacement),
-    .logical_size = {.width = window_size, .height = window_size},
-    .window = window->window,
-  };
+  const mln_render_target target = window_target(window->window);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
-    mln_render_session_set_win32_window_target(
-      fixture->session, &replacement, &completion.descriptor,
-      MLN_TEST_DIAGNOSTIC
+    mln_render_session_set_target(
+      fixture->session, &target, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
 }
@@ -334,13 +337,9 @@ static void a_minimized_window_is_rejected(void) {
     TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, fixture.session);
 
     attach(map, &windows[1], &fixture);
-    const mln_win32_window_replacement replacement = {
-      .size = sizeof(mln_win32_window_replacement),
-      .logical_size = {.width = window_size, .height = window_size},
-      .window = windows[0].window,
-    };
+    const mln_render_target replacement = window_target(windows[0].window);
     mln_test_completion completion = mln_test_completion_default(0);
-    const mln_status replaced = mln_render_session_set_win32_window_target(
+    const mln_status replaced = mln_render_session_set_target(
       fixture.session, &replacement, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     );
     if (replaced != MLN_STATUS_OK) mln_test_completion_reject(&completion);
@@ -377,37 +376,19 @@ static void a_win32_window_rejects_the_callers_graphics_thread(void) {
   destroy_map_and_runtime(map, runtime);
 }
 
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-static void a_device_without_presentation_cannot_present(void) {
-  const mln_runtime runtime = mln_test_create_runtime();
-  const mln_map map = mln_test_create_map(runtime);
-  test_window windows[1] = {0};
-  mln_vulkan_device device = MLN_HANDLE_NULL;
-  if (TEST_PROTECT()) {
-    window_create(&windows[0]);
-    mln_vulkan_device_options options = {
-      .size = sizeof(mln_vulkan_device_options)
-    };
-    MLN_TEST_OK(
-      mln_vulkan_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
-    );
-    mln_test_render_fixture fixture = {0};
-    mln_test_completion completion = mln_test_completion_default(0);
-    MLN_TEST_STATUS(
-      MLN_STATUS_UNSUPPORTED,
-      start_attach(
-        map, windows[0].window, device, MLN_RENDER_DRIVER_CORE_WORKER,
-        &completion, &fixture
-      )
-    );
-    mln_test_completion_destroy(&completion);
-    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, fixture.session);
-  }
-  mln_vulkan_device_release(device);
-  windows_destroy(windows, 1);
-  destroy_map_and_runtime(map, runtime);
+// A device that presents to Win32 windows says so.
+static void the_native_device_reports_win32_windows(void) {
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_gpu_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
+  mln_gpu_device_capabilities capabilities = {.size = sizeof(capabilities)};
+  MLN_TEST_OK(
+    mln_gpu_device_get_capabilities(device, &capabilities, MLN_TEST_DIAGNOSTIC)
+  );
+  mln_gpu_device_release(device);
+  TEST_ASSERT_NOT_EQUAL_UINT32(
+    0, capabilities.target_kinds & MLN_RENDER_TARGET_KIND_FLAG_WIN32_WINDOW
+  );
 }
-#endif
 
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL)
 // Windows lets a window set its pixel format only once, so a window that has
@@ -462,9 +443,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_session_waits_out_a_minimized_window_and_detaches);
   RUN_TEST(a_minimized_window_is_rejected);
   RUN_TEST(a_win32_window_rejects_the_callers_graphics_thread);
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  RUN_TEST(a_device_without_presentation_cannot_present);
-#endif
+  RUN_TEST(the_native_device_reports_win32_windows);
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL)
   RUN_TEST(a_window_with_another_pixel_format_is_rejected);
 #endif

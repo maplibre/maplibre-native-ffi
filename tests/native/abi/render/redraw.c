@@ -2,6 +2,7 @@
 // draw.
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 
 static atomic_int redraws;
@@ -85,7 +86,7 @@ static void a_change_asks_for_one_redraw_until_the_next_demand(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_EGL)
+#if !defined(__EMSCRIPTEN__)
 static void a_session_without_a_target_asks_for_no_redraw(void) {
   atomic_store(&redraws, 0);
   mln_runtime runtime = mln_test_create_runtime();
@@ -93,9 +94,12 @@ static void a_session_without_a_target_asks_for_no_redraw(void) {
   mln_test_render_prepare_map(map);
   const mln_render_session_attach_options options = redraw_options();
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(
-    mln_test_dedicated_egl_surface_create_with_options(map, &options, &fixture)
-  );
+  mln_test_completion attach = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_test_render_fixture_start_surface_attach(
+    map, &options, &attach.descriptor, &fixture
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
+  mln_test_completion_destroy(&attach);
   mln_test_render_until_idle(runtime, map, &fixture);
   // Answers any redraw that the settling map asked for.
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, redraw(&fixture));
@@ -112,11 +116,16 @@ static void a_session_without_a_target_asks_for_no_redraw(void) {
   TEST_ASSERT_EQUAL_INT(released, atomic_load(&redraws));
 
   // The new target holds no frame, so the session asks to draw one.
-  MLN_TEST_OK(mln_test_dedicated_egl_surface_restore(&fixture));
+  mln_test_render_surface* next = mln_test_render_fixture_new_surface(&fixture);
+  TEST_ASSERT_NOT_NULL(next);
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_test_render_fixture_set_surface(&fixture, next, &completion.descriptor)
+  );
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&redraws, released + 1));
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, redraw(&fixture));
 
-  mln_test_dedicated_egl_surface_destroy(&fixture);
+  mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -124,7 +133,7 @@ static void a_session_without_a_target_asks_for_no_redraw(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_change_asks_for_one_redraw_until_the_next_demand);
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_EGL)
+#if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_session_without_a_target_asks_for_no_redraw);
 #endif
 }

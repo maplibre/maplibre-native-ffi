@@ -13,15 +13,17 @@
 
 #if !defined(DESKTOP_GL_SUPPORTED)
 static void a_gles_only_egl_device_rejects_desktop_gl(void) {
-  mln_offscreen_device_options options = {
-    .size = sizeof(mln_offscreen_device_options),
-    .fields = MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API,
-    .client_api = MLN_OPEN_GL_CLIENT_API_GL,
+  mln_gpu_device_options options = {
+    .size = sizeof(mln_gpu_device_options),
+    .fields =
+      MLN_GPU_DEVICE_OPTION_BACKEND | MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API,
+    .backend = MLN_RENDER_BACKEND_OPEN_GL,
+    .open_gl_client_api = MLN_OPEN_GL_CLIENT_API_GL,
   };
-  mln_offscreen_device device = MLN_HANDLE_NULL;
+  mln_gpu_device device = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
-    mln_offscreen_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
+    mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
 }
@@ -40,37 +42,36 @@ static const char fill_style_json[] =
   "{\"id\":\"square\",\"type\":\"fill\",\"source\":\"square\","
   "\"paint\":{\"fill-color\":\"#0080ff\"}}]}";
 
-static mln_offscreen_device create_desktop_gl_device(bool single_context) {
-  mln_offscreen_device_options options = {
-    .size = sizeof(mln_offscreen_device_options)
-  };
-  options.fields = MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API |
-                   MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
-  options.client_api = MLN_OPEN_GL_CLIENT_API_GL;
-  options.single_context = single_context;
-  mln_offscreen_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_offscreen_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
-  );
+static mln_gpu_device create_desktop_gl_device(bool single_context) {
+  mln_gpu_device_options options = {.size = sizeof(mln_gpu_device_options)};
+  options.fields = MLN_GPU_DEVICE_OPTION_BACKEND |
+                   MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API |
+                   MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT;
+  options.backend = MLN_RENDER_BACKEND_OPEN_GL;
+  options.open_gl_client_api = MLN_OPEN_GL_CLIENT_API_GL;
+  options.open_gl_single_context = single_context;
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC));
   return device;
 }
 
 static mln_test_render_fixture attach_offscreen_session(
-  mln_map map, mln_offscreen_device device
+  mln_map map, mln_gpu_device device
 ) {
   mln_test_render_fixture fixture = {.driver = MLN_RENDER_DRIVER_CORE_WORKER};
-  mln_offscreen_descriptor descriptor = {
-    .size = sizeof(mln_offscreen_descriptor)
+  mln_render_target descriptor = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_OFFSCREEN,
   };
-  descriptor.logical_size =
+  descriptor.data.offscreen.logical_size =
     (mln_logical_size){.width = extent, .height = extent};
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options)
   };
   options.driver = fixture.driver;
   mln_test_completion attach = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_map_attach_offscreen(
-    map, &descriptor, &options, device, &fixture.session, &attach.descriptor,
+  MLN_TEST_OK(mln_map_attach(
+    map, &descriptor, device, &options, &fixture.session, &attach.descriptor,
     MLN_TEST_DIAGNOSTIC
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
@@ -101,7 +102,7 @@ static void renders_a_still_image(bool single_context) {
   static uint8_t pixels[pixel_bytes];
   static const uint8_t fill[4] = {0x00, 0x80, 0xff, 0xff};
   static const uint8_t background[4] = {0xff, 0xff, 0xff, 0xff};
-  mln_offscreen_device device = create_desktop_gl_device(single_context);
+  mln_gpu_device device = create_desktop_gl_device(single_context);
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options map_options = mln_test_map_options();
   map_options.initial_extent = (mln_logical_extent){
@@ -121,7 +122,7 @@ static void renders_a_still_image(bool single_context) {
   expect_pixel(pixels, 0, 0, background);
 
   detach_offscreen_session(&fixture);
-  mln_offscreen_device_release(device);
+  mln_gpu_device_release(device);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

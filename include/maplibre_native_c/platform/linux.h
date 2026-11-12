@@ -92,10 +92,10 @@ typedef struct mln_dma_buf_frame {
  * buffer with mln_acquired_frame_get_dma_buf(). mln_render_session_resize()
  * gives the ring new buffers of the new size.
  *
- * A Vulkan build renders with `device`, or, when `device` is null, with a
- * device that the library creates. An OpenGL build uses an EGL context of its
- * own, and `device` must be null.
- * Attach with MLN_RENDER_DRIVER_CORE_WORKER.
+ * The session renders with `device`, a Vulkan or OpenGL device, or, when
+ * `device` is null, with one that the library creates. An OpenGL device
+ * renders with an EGL context of its own. Attach with
+ * MLN_RENDER_DRIVER_CORE_WORKER.
  *
  * For a reader that waits on no sync file, such as a Wayland compositor
  * without explicit synchronization, attach without
@@ -106,15 +106,15 @@ typedef struct mln_dma_buf_frame {
  * while you hold two frames.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when the graphics context can't render into a
- *   dmabuf of any of `formats`.
+ * - MLN_STATUS_UNSUPPORTED when the device can't render into a dmabuf of any
+ *   of `formats`.
  * - MLN_STATUS_NATIVE_ERROR when the library can't create its Vulkan device or
  *   initialize an EGL display.
  */
 MLN_BINDING("execution=lifecycle;platforms=freebsd,linux")
 MLN_API mln_status mln_map_attach_dma_buf_ring(
   mln_map map, const mln_dma_buf_ring_descriptor* descriptor,
-  mln_vulkan_device device MLN_BINDING("nullable=true"),
+  mln_gpu_device device MLN_BINDING("nullable=true"),
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic

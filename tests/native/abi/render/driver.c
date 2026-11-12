@@ -144,7 +144,9 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   const mln_render_session detached = fixture.session;
   const mln_completion discard = mln_test_discard_completion();
   const mln_frame_demand demand = {.size = sizeof(mln_frame_demand)};
-  const mln_logical_size extent = {.width = 32, .height = 32};
+  const mln_logical_extent extent = {
+    .width = 32, .height = 32, .scale_factor = 1.0
+  };
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)

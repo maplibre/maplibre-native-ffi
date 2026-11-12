@@ -1,5 +1,6 @@
-// Targets that the host creates: a session renders into a borrowed ring and
-// presents to a surface, both made by tests/graphics for the preset's backend.
+// Targets that the host creates: a session renders into a borrowed ring that
+// tests/graphics makes for the preset's backend, and presents to a window or
+// layer.
 // The browser presets have no such fixtures, because JavaScript owns their
 // canvases.
 
@@ -220,7 +221,8 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
     mln_render_session_resize(
-      fixture.session, smaller, &resize.descriptor, MLN_TEST_DIAGNOSTIC
+      fixture.session, mln_test_session_extent(fixture.session, smaller),
+      &resize.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "sized by its owner"));
@@ -987,7 +989,8 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, size, &completion.descriptor, NULL
+      fixture.session, mln_test_session_extent(fixture.session, size),
+      &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT32(

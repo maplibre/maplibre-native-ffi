@@ -1,10 +1,11 @@
 #ifndef MLN_NATIVE_TESTS_HOST_GRAPHICS_H
 #define MLN_NATIVE_TESTS_HOST_GRAPHICS_H
 
-// The tests/graphics objects behind a native target's borrowed and surface
-// fixtures, and the fixtures that only native targets have: a
-// presentation surface, and variants of the others for the preset's backend.
-// The browser presets have none, because their contexts come from JavaScript.
+// The tests/graphics objects behind a native target's borrowed fixtures, the
+// windows and layers behind its surface fixtures, and the fixtures that only
+// native targets have: a presentation surface, and variants of the others for
+// the preset's backend. The browser presets have none, because their contexts
+// come from JavaScript.
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -73,13 +74,6 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
   mln_map map, mln_test_render_fixture* fixture, mln_vulkan_image_owner owner
 );
 
-// mln_test_render_fixture_create_surface() for a session whose context names
-// `wrap`'s vkGetDeviceProcAddr.
-bool mln_test_render_fixture_create_vulkan_surface(
-  mln_map map, mln_test_render_fixture* fixture,
-  mln_test_vulkan_device_proc_addr_wrap wrap
-);
-
 // Attaches a session on the preset's driver to a borrowed ring of one texture
 // that the fixture creates on `graphics`, which must outlive the fixture.
 bool mln_test_render_fixture_create_vulkan_on(
@@ -94,8 +88,26 @@ void mln_test_render_fixture_destroy_textures(
   const mln_test_render_fixture* fixture
 );
 
-// Attaches a session to a presentation surface that the fixture creates, with
-// the preset's driver.
+// mln_test_render_fixture_start_attach() for a surface fixture, which the core
+// worker drives.
+mln_status mln_test_render_fixture_start_surface_attach(
+  mln_map map, const mln_render_session_attach_options* options,
+  const mln_completion* completion, mln_test_render_fixture* fixture
+);
+
+// A window or layer that a surface fixture presents to: on Linux and FreeBSD,
+// a Wayland surface on a compositor in the test process, and elsewhere the
+// window or layer of a tests/graphics surface.
+typedef struct mln_test_render_surface mln_test_render_surface;
+
+// Creates a device of the preset's backend that can present to the fixtures'
+// surfaces. A Vulkan build on Linux or FreeBSD picks the CPU's device, such as
+// lavapipe, which presents through shared memory that the test compositor can
+// map, as Mesa's EGL does when a compositor offers no dmabufs.
+mln_gpu_device mln_test_create_presenting_device(void);
+
+// Attaches a session on the core worker, on a device from
+// mln_test_create_presenting_device(), to a surface that the fixture creates.
 bool mln_test_render_fixture_create_surface(
   mln_map map, mln_test_render_fixture* fixture
 );
@@ -129,22 +141,39 @@ mln_test_graphics* mln_test_render_fixture_graphics(
 mln_test_graphics_texture* mln_test_render_fixture_new_texture(
   const mln_test_render_fixture* fixture
 );
-mln_test_graphics_surface* mln_test_render_fixture_new_surface(
+mln_test_render_surface* mln_test_render_fixture_new_surface(
   const mln_test_render_fixture* fixture
 );
 // The same, at `width` by `height` pixels.
 mln_test_graphics_texture* mln_test_render_fixture_new_sized_texture(
   const mln_test_render_fixture* fixture, uint32_t width, uint32_t height
 );
-mln_test_graphics_surface* mln_test_render_fixture_new_sized_surface(
+mln_test_render_surface* mln_test_render_fixture_new_sized_surface(
   const mln_test_render_fixture* fixture, uint32_t width, uint32_t height
 );
 
-// Submits the backend's borrowed-texture or surface set_target for the
-// fixture's session, naming the `count` `textures`, up to
-// MLN_TEXTURE_RING_MAX_DEPTH, or `surface`, at their own size in logical
-// pixels. Returns the submission status, or MLN_STATUS_NATIVE_ERROR when the
-// target cannot be described.
+// Creates a surface of the host size on a surface fixture's compositor or
+// graphics object, which the case destroys with
+// mln_test_render_surface_destroy() once the session no longer uses it.
+mln_test_render_surface* mln_test_render_surface_create(
+  const mln_test_render_fixture* fixture
+);
+void mln_test_render_surface_destroy(
+  const mln_test_render_fixture* fixture, mln_test_render_surface* surface
+);
+
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+// The CAMetalLayer* of a surface.
+void* mln_test_render_surface_metal_layer(
+  const mln_test_render_surface* surface
+);
+#endif
+
+// Submits the backend's borrowed-texture set_target, or
+// mln_render_session_set_target() with a surface, for the fixture's session,
+// naming the `count` `textures`, up to MLN_TEXTURE_RING_MAX_DEPTH, or
+// `surface`, at their own size in logical pixels. Returns the submission
+// status, or MLN_STATUS_NATIVE_ERROR when the target cannot be described.
 mln_status mln_test_render_fixture_set_textures(
   const mln_test_render_fixture* fixture,
   mln_test_graphics_texture* const* textures, size_t count,
@@ -152,7 +181,7 @@ mln_status mln_test_render_fixture_set_textures(
 );
 mln_status mln_test_render_fixture_set_surface(
   const mln_test_render_fixture* fixture,
-  const mln_test_graphics_surface* surface, const mln_completion* completion
+  const mln_test_render_surface* surface, const mln_completion* completion
 );
 #endif
 
