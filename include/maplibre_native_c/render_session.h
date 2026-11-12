@@ -299,12 +299,20 @@ typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_frame_pacer_option_field : uint32_t {
   MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1U << 0U,
+  /**
+   * Removes the frame rate limit, so the pacer can demand frames at every
+   * display refresh, as it does by default. It can't be combined with
+   * MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND.
+   */
+  MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND = 1U << 1U,
 } mln_frame_pacer_option_field;
 
 /** A set of mln_frame_pacer_option_field bits. */
 typedef uint32_t mln_frame_pacer_option_fields;
 
-/** Options for creating a frame pacer. */
+/**
+ * Options for creating a frame pacer, or for mln_frame_pacer_set_options().
+ */
 typedef struct mln_frame_pacer_options {
   uint32_t size;
   mln_frame_pacer_option_fields fields;
@@ -351,6 +359,34 @@ typedef struct mln_frame_pacer_options {
 MLN_API mln_status mln_frame_pacer_create(
   const mln_frame_pacer_options* options MLN_BINDING("nullable=true"),
   mln_frame_pacer* out_pacer MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Changes a frame pacer's settings.
+ *
+ * Settings that `options` doesn't set keep their current values. To remove the
+ * frame rate limit, set MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND. You
+ * can call it on any thread.
+ *
+ * The sessions that the pacer serves follow the new settings from the next
+ * display refresh, including a refresh that they already wait for. The pacer
+ * counts a new limit from the last frames it demanded, so a higher limit can
+ * demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
+ * the system for the new limit's refresh rate, or for the display's own rate
+ * once the limit is removed.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when `pacer` is the null handle or names no
+ *   frame pacer, or when `options` sets `maximum_frames_per_second` to 0 or
+ *   sets both MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND and
+ *   MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND. The pacer keeps its
+ *   settings.
+ * - MLN_STATUS_INVALID_STATE when you released `pacer`, even while sessions
+ *   still use it.
+ */
+MLN_API mln_status mln_frame_pacer_set_options(
+  mln_frame_pacer pacer, const mln_frame_pacer_options* options,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
