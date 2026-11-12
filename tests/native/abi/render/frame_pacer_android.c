@@ -25,8 +25,7 @@ typedef struct looper_thread {
 static void* run_looper(void* context) {
   looper_thread* state = context;
   state->looper = ALooper_prepare(0);
-  state->create_status =
-    mln_android_frame_pacer_create(NULL, &state->pacer, NULL);
+  state->create_status = mln_frame_pacer_create(NULL, &state->pacer, NULL);
   mln_test_flag_set(&state->ready);
   while (!atomic_load(&state->stop)) {
     (void)ALooper_pollOnce(-1, NULL, NULL, NULL);
@@ -98,8 +97,7 @@ static void expect_paced_frames(mln_frame_pacer pacer, bool release) {
 
 static void* create_pacer_without_looper(void* context) {
   looper_thread* state = context;
-  state->create_status =
-    mln_android_frame_pacer_create(NULL, &state->pacer, NULL);
+  state->create_status = mln_frame_pacer_create(NULL, &state->pacer, NULL);
   return NULL;
 }
 

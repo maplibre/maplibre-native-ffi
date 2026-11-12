@@ -12,7 +12,7 @@ static void visionos_has_no_apple_frame_pacer(void) {
   mln_frame_pacer pacer = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
-    mln_apple_frame_pacer_create(NULL, &pacer, MLN_TEST_DIAGNOSTIC)
+    mln_frame_pacer_create(NULL, &pacer, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, pacer);
 }
@@ -20,9 +20,7 @@ static void visionos_has_no_apple_frame_pacer(void) {
 
 static mln_frame_pacer create_pacer(const mln_frame_pacer_options* options) {
   mln_frame_pacer pacer = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_apple_frame_pacer_create(options, &pacer, MLN_TEST_DIAGNOSTIC)
-  );
+  MLN_TEST_OK(mln_frame_pacer_create(options, &pacer, MLN_TEST_DIAGNOSTIC));
   return pacer;
 }
 

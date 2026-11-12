@@ -267,12 +267,15 @@ mln_status mln_log_set_callback(
 
 A function that only some platforms can use lists those platforms in its
 annotation, and so does a tagged union's variant. A function that integrates
-with one platform's own objects, such as its display timing, goes in that
-platform's header under `include/maplibre_native_c/platform/`.
+with one platform's own objects, such as Android's Java VM, goes in that
+platform's header under `include/maplibre_native_c/platform/`. A feature that
+each platform provides in its own way, such as pacing frames to the display, is
+one function for every platform, which returns `MLN_STATUS_UNSUPPORTED` where
+the platform lacks it.
 
 ```c
-MLN_BINDING("platforms=ios,macos,tvos")
-MLN_API mln_status mln_apple_frame_pacer_create(/* ... */);
+MLN_BINDING("platforms=android")
+MLN_API mln_status mln_android_init(/* ... */);
 
 typedef union mln_render_target_data {
   mln_metal_layer_target metal_layer MLN_BINDING(

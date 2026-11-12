@@ -319,6 +319,42 @@ typedef struct mln_frame_pacer_options {
 } mln_frame_pacer_options;
 
 /**
+ * Creates a frame pacer that follows the platform's display.
+ *
+ * On iOS, macOS, and tvOS, the pacer follows the display through a
+ * `CADisplayLink`. You can call it on any thread, and the pacer needs no run
+ * loop of yours. On macOS, it follows the main display, the one with the menu
+ * bar. With mln_frame_pacer_options.maximum_frames_per_second, the pacer also
+ * asks the system for that refresh rate. On iPhone, a rate above 60 needs
+ * `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+ *
+ * On Android, the pacer follows the display through the calling thread's
+ * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+ * main thread, and keep that thread running its looper while sessions use the
+ * pacer. `AChoreographer` can stop while the phone's display is off, even while
+ * a Surface on another display, such as an Android Auto projection, still shows
+ * the map. The pacer then keeps demanding frames from a timer on the looper,
+ * within the frame rate limit, until vsyncs arrive again.
+ *
+ * On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
+ * can call it on any thread, and the pacer needs no event loop of yours.
+ *
+ * Returns:
+ * - MLN_STATUS_UNSUPPORTED on the other platforms, such as visionOS, Linux, and
+ *   Windows, where the library has no source of display refreshes.
+ * - MLN_STATUS_INVALID_STATE on Android when the calling thread has no
+ *   `ALooper`.
+ * - MLN_STATUS_NATIVE_ERROR on iOS, macOS, and tvOS when the system has no
+ *   display to follow, and on OpenHarmony when the system can't report the
+ *   display's refreshes to the process.
+ */
+MLN_API mln_status mln_frame_pacer_create(
+  const mln_frame_pacer_options* options MLN_BINDING("nullable=true"),
+  mln_frame_pacer* out_pacer MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
  * Sets the frame pacer that demands the session's frames.
  *
  * At the first display refresh after the session has something new to draw,

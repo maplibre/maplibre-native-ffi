@@ -7,7 +7,7 @@
 
 static mln_frame_pacer create_pacer(void) {
   mln_frame_pacer pacer = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_ohos_frame_pacer_create(NULL, &pacer, MLN_TEST_DIAGNOSTIC));
+  MLN_TEST_OK(mln_frame_pacer_create(NULL, &pacer, MLN_TEST_DIAGNOSTIC));
   return pacer;
 }
 
