@@ -499,6 +499,40 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   detach(runtime, map, &fixture);
 }
 
+// A view keeps its frame's texture and sync objects in place, which an abandon
+// would let go of.
+static void an_open_view_holds_an_abandon_back(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture, mln_test_empty_style_json);
+  mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
+  void* scope = NULL;
+  MLN_TEST_OK(mln_acquired_frame_view_begin(frame, &scope, NULL));
+
+  mln_render_abandon_result abandoned = {
+    .size = sizeof(mln_render_abandon_result)
+  };
+  MLN_TEST_STATUS(
+    MLN_STATUS_BUSY,
+    mln_render_session_abandon(fixture.session, &abandoned, NULL)
+  );
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
+  mln_gpu_sync sync = {.size = sizeof(mln_gpu_sync)};
+  MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &sync, NULL));
+
+  mln_acquired_frame_view_end(scope);
+  MLN_TEST_OK(mln_render_session_abandon(fixture.session, &abandoned, NULL));
+  mln_test_render_release_frame(&frame);
+  detach(runtime, map, &fixture);
+}
+
 // Waits for earlier driver work and verifies that parked demands have no
 // result.
 static void expect_parked_demand(const mln_test_render_fixture* fixture) {
@@ -781,6 +815,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_acquired_frame_still_releases_after_abandon);
   RUN_TEST(a_stale_release_during_detach_is_refused_before_its_sync);
   RUN_TEST(borrowed_views_hold_a_frame_until_every_view_ends);
+  RUN_TEST(an_open_view_holds_an_abandon_back);
   RUN_TEST(disposing_a_frame_quarantines_only_its_slot);
   RUN_TEST(a_fully_quarantined_ring_takes_no_more_demands);
   RUN_TEST(a_resize_renders_and_reads_back_at_the_new_size);
