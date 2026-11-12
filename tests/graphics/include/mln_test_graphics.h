@@ -248,6 +248,27 @@ MLN_TEST_GRAPHICS_API bool mln_test_graphics_texture_read_rgba8(
   uint8_t* MLN_TEST_GRAPHICS_NONNULL pixels, size_t size
 );
 
+// Creates a width x height depth and stencil texture that a borrowed ring can
+// carry beside a color texture: VK_FORMAT_D32_SFLOAT_S8_UINT, whose view has
+// both aspects, and whose info names
+// VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL as the final layout. Only a
+// Vulkan graphics object makes one. Destroy it with
+// mln_test_graphics_texture_destroy().
+MLN_TEST_GRAPHICS_API mln_test_graphics_texture* MLN_TEST_GRAPHICS_NULLABLE
+mln_test_graphics_depth_texture_create(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics, uint32_t width,
+  uint32_t height
+);
+
+// Copies the depth of a depth texture into `depths`, one value per pixel, row 0
+// of the texture first, under the same conditions as
+// mln_test_graphics_texture_read_rgba8(). `count` must be at least width *
+// height.
+MLN_TEST_GRAPHICS_API bool mln_test_graphics_depth_texture_read(
+  mln_test_graphics_texture* MLN_TEST_GRAPHICS_NONNULL texture,
+  float* MLN_TEST_GRAPHICS_NONNULL depths, size_t count
+);
+
 // Creates a width x height presentation surface with no window on screen.
 MLN_TEST_GRAPHICS_API mln_test_graphics_surface* MLN_TEST_GRAPHICS_NULLABLE
 mln_test_graphics_surface_create(

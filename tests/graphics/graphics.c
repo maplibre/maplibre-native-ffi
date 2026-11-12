@@ -269,6 +269,8 @@ struct mln_test_graphics_texture {
   mln_test_graphics* graphics;
   mln_test_graphics_texture_info info;
   VkDeviceMemory vulkan_memory;
+  // Whether the texture holds depth and stencil rather than color.
+  bool depth;
 };
 
 struct mln_test_graphics_surface {
@@ -1019,22 +1021,36 @@ static bool vulkan_memory_type(
   return false;
 }
 
+// The aspects of the texture's image that its view and readback cover.
+static VkImageAspectFlags vulkan_aspects(
+  const mln_test_graphics_texture* texture
+) {
+  return texture->depth
+           ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+           : VK_IMAGE_ASPECT_COLOR_BIT;
+}
+
+// A color texture is RGBA8, and a depth texture 32-bit float depth with
+// 8-bit stencil.
 static bool vulkan_texture_create(
   mln_test_graphics* graphics, mln_test_graphics_texture* texture
 ) {
   const vulkan_functions* vk = &graphics->vk;
   VkDevice device = (VkDevice)graphics->context.vulkan_device;
+  const VkFormat format =
+    texture->depth ? VK_FORMAT_D32_SFLOAT_S8_UINT : VK_FORMAT_R8G8B8A8_UNORM;
   const VkImageCreateInfo image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .imageType = VK_IMAGE_TYPE_2D,
-    .format = VK_FORMAT_R8G8B8A8_UNORM,
+    .format = format,
     .extent = {texture->info.width, texture->info.height, 1},
     .mipLevels = 1,
     .arrayLayers = 1,
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .tiling = VK_IMAGE_TILING_OPTIMAL,
-    .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-             VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+    .usage = (texture->depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                             : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
@@ -1072,8 +1088,8 @@ static bool vulkan_texture_create(
     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     .image = image,
     .viewType = VK_IMAGE_VIEW_TYPE_2D,
-    .format = VK_FORMAT_R8G8B8A8_UNORM,
-    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+    .format = format,
+    .subresourceRange = {vulkan_aspects(texture), 0, 1, 0, 1},
   };
   VkImageView view = VK_NULL_HANDLE;
   if (vk->create_image_view(device, &view_info, NULL, &view) != VK_SUCCESS) {
@@ -1081,8 +1097,10 @@ static bool vulkan_texture_create(
     return false;
   }
   texture->info.vulkan_image_view = (uint64_t)(uintptr_t)view;
-  texture->info.format = VK_FORMAT_R8G8B8A8_UNORM;
-  texture->info.vulkan_final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  texture->info.format = format;
+  texture->info.vulkan_final_layout =
+    texture->depth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                   : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   return true;
 }
 
@@ -1107,9 +1125,9 @@ static void vulkan_texture_destroy(mln_test_graphics_texture* texture) {
 
 static void vulkan_image_barrier(
   const vulkan_functions* vk, VkCommandBuffer commands, VkImage image,
-  VkImageLayout from, VkImageLayout to, VkAccessFlags source_access,
-  VkAccessFlags destination_access, VkPipelineStageFlags source_stage,
-  VkPipelineStageFlags destination_stage
+  VkImageAspectFlags aspects, VkImageLayout from, VkImageLayout to,
+  VkAccessFlags source_access, VkAccessFlags destination_access,
+  VkPipelineStageFlags source_stage, VkPipelineStageFlags destination_stage
 ) {
   const VkImageMemoryBarrier barrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1120,7 +1138,7 @@ static void vulkan_image_barrier(
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .image = image,
-    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+    .subresourceRange = {aspects, 0, 1, 0, 1},
   };
   vk->cmd_pipeline_barrier(
     commands, source_stage, destination_stage, 0, 0, NULL, 0, NULL, 1, &barrier
@@ -1128,7 +1146,8 @@ static void vulkan_image_barrier(
 }
 
 // Copies the image through a host-visible buffer on the context's queue, and
-// returns the image to its final layout afterwards.
+// returns the image to its final layout afterwards. A depth texture's copy is
+// of its depth aspect, a 32-bit float per pixel.
 static bool vulkan_texture_read(
   mln_test_graphics_texture* texture, uint8_t* pixels
 ) {
@@ -1212,21 +1231,25 @@ static bool vulkan_texture_read(
     .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
   };
   vk->begin_command_buffer(commands, &begin_info);
+  const VkImageAspectFlags aspects = vulkan_aspects(texture);
   vulkan_image_barrier(
-    vk, commands, image, final_layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-    VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
-    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT
+    vk, commands, image, aspects, final_layout,
+    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_MEMORY_WRITE_BIT,
+    VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+    VK_PIPELINE_STAGE_TRANSFER_BIT
   );
   const VkBufferImageCopy region = {
-    .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+    .imageSubresource =
+      {texture->depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+       0, 0, 1},
     .imageExtent = {texture->info.width, texture->info.height, 1},
   };
   vk->cmd_copy_image_to_buffer(
     commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &region
   );
   vulkan_image_barrier(
-    vk, commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, final_layout,
-    VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_MEMORY_READ_BIT,
+    vk, commands, image, aspects, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    final_layout, VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_MEMORY_READ_BIT,
     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
   );
   const VkBufferMemoryBarrier to_host = {
@@ -2660,6 +2683,60 @@ bool mln_test_graphics_texture_read_rgba8(
       set_error("unknown backend");
       return false;
   }
+}
+
+mln_test_graphics_texture* mln_test_graphics_depth_texture_create(
+  mln_test_graphics* graphics, uint32_t width, uint32_t height
+) {
+  if (graphics == NULL || width == 0 || height == 0) {
+    set_error("a texture needs a graphics object and a nonzero size");
+    return NULL;
+  }
+#if !defined(__EMSCRIPTEN__)
+  if (graphics->context.backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN) {
+    mln_test_graphics_texture* texture = calloc(1, sizeof(*texture));
+    if (texture == NULL) {
+      set_error("out of memory");
+      return NULL;
+    }
+    texture->graphics = graphics;
+    texture->info.width = width;
+    texture->info.height = height;
+    texture->depth = true;
+    if (!vulkan_texture_create(graphics, texture)) {
+      char reason[sizeof(last_error)];
+      memcpy(reason, last_error, sizeof(reason));
+      mln_test_graphics_texture_destroy(texture);
+      set_error("%s", reason);
+      return NULL;
+    }
+    return texture;
+  }
+#endif
+  set_error("only a Vulkan graphics object makes depth textures");
+  return NULL;
+}
+
+bool mln_test_graphics_depth_texture_read(
+  mln_test_graphics_texture* texture, float* depths, size_t count
+) {
+  if (texture == NULL || depths == NULL || !texture->depth) {
+    set_error("a depth readback needs a depth texture and a buffer");
+    return false;
+  }
+  if (count / texture->info.width < texture->info.height) {
+    set_error(
+      "a %ux%u depth readback needs %zu values", texture->info.width,
+      texture->info.height, (size_t)texture->info.width * texture->info.height
+    );
+    return false;
+  }
+#if !defined(__EMSCRIPTEN__)
+  return vulkan_texture_read(texture, (uint8_t*)depths);
+#else
+  set_error("only a Vulkan graphics object makes depth textures");
+  return false;
+#endif
 }
 
 mln_test_graphics_surface* mln_test_graphics_surface_create(

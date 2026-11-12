@@ -33,6 +33,9 @@ static mln_gpu_device create_device(bool* out_exports) {
   return device;
 }
 
+// Set only while attach_keeping_depth() attaches.
+static bool attach_keep_depth = false;
+
 static mln_status start_attach(
   mln_map map, mln_gpu_device device, mln_test_completion* completion,
   mln_test_render_fixture* fixture
@@ -49,6 +52,7 @@ static mln_status start_attach(
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options),
     .driver = MLN_RENDER_DRIVER_CORE_WORKER,
+    .keep_depth = attach_keep_depth,
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
@@ -164,14 +168,19 @@ static void a_frame_renders_into_memory_that_the_host_imports(void) {
         MLN_STATUS_UNSUPPORTED,
         mln_acquired_frame_get_dma_buf(frame, &buffer, MLN_TEST_DIAGNOSTIC)
       );
+      // On the device, the ring's image is the one whose memory it shares.
+      // The ring keeps no depth unless the attach asks it to.
       mln_vulkan_texture_frame texture = {
         .size = sizeof(mln_vulkan_texture_frame)
       };
-      MLN_TEST_STATUS(
-        MLN_STATUS_UNSUPPORTED, mln_acquired_frame_get_vulkan_texture(
-                                  frame, &texture, MLN_TEST_DIAGNOSTIC
-                                )
-      );
+      MLN_TEST_OK(mln_acquired_frame_get_vulkan_texture(
+        frame, &texture, MLN_TEST_DIAGNOSTIC
+      ));
+      TEST_ASSERT_NOT_EQUAL_UINT64(0, texture.image);
+      TEST_ASSERT_EQUAL_UINT32(memory.format, texture.format);
+      TEST_ASSERT_EQUAL_UINT32(memory.width, texture.width);
+      TEST_ASSERT_EQUAL_UINT64(0, texture.depth_image);
+      TEST_ASSERT_EQUAL_INT32(-1, memory.depth_fd);
       struct stat status = {0};
       TEST_ASSERT_EQUAL_INT(0, fstat(memory.fd, &status));
       release_frame(&frame);
@@ -227,6 +236,57 @@ static void a_resize_keeps_the_memory_of_a_held_frame(void) {
   destroy_map_and_runtime(map, runtime);
 }
 
+// A ring that keeps depth shares each frame's depth memory beside its color
+// memory, where the device exports depth, and names the depth image on the
+// device in any case.
+static void a_ring_that_keeps_depth_shares_its_frames_depth(void) {
+  const mln_runtime runtime = mln_test_create_runtime();
+  const mln_map map = create_red_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  bool exports = false;
+  const mln_gpu_device device = create_device(&exports);
+  mln_gpu_device_capabilities capabilities = {
+    .size = sizeof(mln_gpu_device_capabilities)
+  };
+  MLN_TEST_OK(mln_gpu_device_get_capabilities(device, &capabilities, NULL));
+  const bool exports_depth =
+    (capabilities.depth_export_kinds & MLN_GPU_EXPORT_KIND_FLAG_OPAQUE_FD) != 0;
+  if (TEST_PROTECT() && exports) {
+    attach_keep_depth = true;
+    attach(map, device, &fixture);
+    attach_keep_depth = false;
+    frame = mln_test_render_and_acquire(&fixture, 1);
+    const mln_opaque_fd_frame memory =
+      frame_memory(frame, ring_width, ring_height);
+    mln_vulkan_texture_frame texture = {
+      .size = sizeof(mln_vulkan_texture_frame)
+    };
+    MLN_TEST_OK(mln_acquired_frame_get_vulkan_texture(
+      frame, &texture, MLN_TEST_DIAGNOSTIC
+    ));
+    TEST_ASSERT_NOT_EQUAL_UINT64(0, texture.depth_image);
+    TEST_ASSERT_NOT_EQUAL_UINT64(0, texture.depth_image_view);
+    // VK_IMAGE_LAYOUT_GENERAL.
+    TEST_ASSERT_EQUAL_UINT32(1, texture.depth_layout);
+    if (exports_depth) {
+      TEST_ASSERT_TRUE(memory.depth_fd >= 0);
+      TEST_ASSERT_NOT_EQUAL_INT(-1, fcntl(memory.depth_fd, F_GETFD));
+      TEST_ASSERT_NOT_EQUAL_INT(memory.fd, memory.depth_fd);
+      TEST_ASSERT_TRUE(memory.depth_allocation_size > 0);
+      TEST_ASSERT_EQUAL_UINT32(texture.depth_format, memory.depth_format);
+    } else {
+      TEST_ASSERT_EQUAL_INT32(-1, memory.depth_fd);
+    }
+    release_frame(&frame);
+  }
+  attach_keep_depth = false;
+  release_frame(&frame);
+  release_session(&fixture);
+  mln_gpu_device_release(device);
+  destroy_map_and_runtime(map, runtime);
+}
+
 static void getting_an_opaque_fd_needs_a_live_frame(void) {
   mln_opaque_fd_frame memory = {.size = sizeof(mln_opaque_fd_frame)};
   MLN_TEST_INVALID(
@@ -237,5 +297,6 @@ static void getting_an_opaque_fd_needs_a_live_frame(void) {
 MLN_TEST_GROUP {
   RUN_TEST(a_frame_renders_into_memory_that_the_host_imports);
   RUN_TEST(a_resize_keeps_the_memory_of_a_held_frame);
+  RUN_TEST(a_ring_that_keeps_depth_shares_its_frames_depth);
   RUN_TEST(getting_an_opaque_fd_needs_a_live_frame);
 }

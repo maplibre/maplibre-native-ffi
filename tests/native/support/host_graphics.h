@@ -75,6 +75,19 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
   mln_map map, mln_test_render_fixture* fixture, mln_vulkan_image_owner owner
 );
 
+// Attaches a borrowed ring of `depth` images with a depth image beside each,
+// in which the session keeps each frame's depth, and whose frames hand over
+// with MLN_GPU_SYNC_CPU_COMPLETE.
+bool mln_test_render_fixture_create_vulkan_depth_ring(
+  mln_map map, mln_test_render_fixture* fixture, size_t depth
+);
+
+// The depth image at `index` of a fixture's ring, or null past its end or for
+// a ring without them.
+mln_test_graphics_texture* mln_test_render_fixture_depth_texture(
+  const mln_test_render_fixture* fixture, size_t index
+);
+
 // Attaches a session on the preset's driver to a borrowed ring of one texture
 // that the fixture creates on `graphics`, which must outlive the fixture. The
 // session renders on `device`, which `graphics` borrowed its objects from.
