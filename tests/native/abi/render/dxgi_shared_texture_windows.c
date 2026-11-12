@@ -12,10 +12,14 @@ static mln_status start_attach(
   mln_map map, mln_render_driver_kind driver, mln_test_completion* completion,
   mln_test_render_fixture* fixture
 ) {
-  const mln_dxgi_shared_texture_ring_descriptor descriptor = {
-    .size = sizeof(mln_dxgi_shared_texture_ring_descriptor),
-    .logical_size = {.width = ring_width, .height = ring_height},
-    .texture_count = texture_count,
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_EXPORTED_RING,
+    .data.exported_ring = {
+      .logical_size = {.width = ring_width, .height = ring_height},
+      .texture_count = texture_count,
+      .export_kinds = MLN_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE,
+    },
   };
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options),
@@ -25,8 +29,8 @@ static mln_status start_attach(
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = driver;
-  const mln_status status = mln_map_attach_dxgi_shared_texture_ring(
-    map, &descriptor, MLN_HANDLE_NULL, &options, &fixture->session,
+  const mln_status status = mln_map_attach(
+    map, &target, MLN_HANDLE_NULL, &options, &fixture->session,
     &completion->descriptor, MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);

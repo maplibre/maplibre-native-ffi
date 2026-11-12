@@ -18,10 +18,14 @@ static mln_status start_attach(
   mln_gpu_sync_kind_flags producer_sync_kinds, mln_test_completion* completion,
   mln_test_render_fixture* fixture
 ) {
-  const mln_io_surface_ring_descriptor descriptor = {
-    .size = sizeof(mln_io_surface_ring_descriptor),
-    .logical_size = {.width = ring_width, .height = ring_height},
-    .buffer_count = buffer_count,
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_EXPORTED_RING,
+    .data.exported_ring = {
+      .logical_size = {.width = ring_width, .height = ring_height},
+      .texture_count = buffer_count,
+      .export_kinds = MLN_GPU_EXPORT_KIND_FLAG_IO_SURFACE,
+    },
   };
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options),
@@ -30,9 +34,9 @@ static mln_status start_attach(
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = driver;
-  const mln_status status = mln_map_attach_io_surface_ring(
-    map, &descriptor, &options, &fixture->session, &completion->descriptor,
-    MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_map_attach(
+    map, &target, MLN_HANDLE_NULL, &options, &fixture->session,
+    &completion->descriptor, MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
@@ -178,6 +182,9 @@ static void a_frame_renders_into_a_surface_that_the_host_reads(void) {
       0
     );
     TEST_ASSERT_EQUAL_UINT32(
+      MLN_GPU_EXPORT_KIND_IO_SURFACE, capabilities.export_kind
+    );
+    TEST_ASSERT_EQUAL_UINT32(
       MLN_GPU_SYNC_METAL_SHARED_EVENT, capabilities.producer_sync_kind
     );
     TEST_ASSERT_EQUAL_HEX32(
@@ -262,6 +269,47 @@ static void a_resize_gives_the_ring_surfaces_of_the_new_size(void) {
   destroy_map_and_runtime(map, runtime);
 }
 
+// A host holds the surface it shows while its view resizes: the held frame
+// keeps its surface of the old size, and new frames get the new size.
+static void a_resize_keeps_the_surface_of_a_held_frame(void) {
+  const mln_runtime runtime = mln_test_create_runtime();
+  const mln_map map = create_red_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  mln_acquired_frame held = MLN_HANDLE_NULL;
+  mln_acquired_frame next = MLN_HANDLE_NULL;
+  if (TEST_PROTECT()) {
+    attach(map, 0, &fixture);
+    held = mln_test_render_and_acquire(&fixture, 1);
+    const mln_io_surface_frame first = frame_surface(held);
+
+    MLN_TEST_RENDER_AWAIT(
+      MLN_STATUS_OK, &fixture,
+      mln_render_session_resize(
+        fixture.session,
+        mln_test_session_extent(
+          fixture.session,
+          (mln_logical_size){.width = ring_height, .height = ring_width}
+        ),
+        &completion.descriptor, MLN_TEST_DIAGNOSTIC
+      )
+    );
+    next = mln_test_render_and_acquire(&fixture, 2);
+    expect_surface_size(next, ring_height, ring_width);
+    expect_red_surface(next);
+    release_frame(&next);
+
+    const mln_io_surface_frame again = frame_surface(held);
+    TEST_ASSERT_TRUE(first.surface == again.surface);
+    expect_surface_size(held, ring_width, ring_height);
+    expect_red_surface(held);
+    release_frame(&held);
+  }
+  release_frame(&next);
+  release_frame(&held);
+  release_session(&fixture);
+  destroy_map_and_runtime(map, runtime);
+}
+
 // The library owns the command queue, so it drives the session itself.
 static void an_io_surface_ring_rejects_the_callers_graphics_thread(void) {
   const mln_runtime runtime = mln_test_create_runtime();
@@ -313,6 +361,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_frame_renders_into_a_surface_that_the_host_reads);
   RUN_TEST(a_held_frame_keeps_its_surface);
   RUN_TEST(a_resize_gives_the_ring_surfaces_of_the_new_size);
+  RUN_TEST(a_resize_keeps_the_surface_of_a_held_frame);
   RUN_TEST(an_io_surface_ring_rejects_the_callers_graphics_thread);
 #else
   RUN_TEST(an_io_surface_ring_needs_the_metal_backend);

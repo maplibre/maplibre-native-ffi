@@ -209,10 +209,12 @@ MLN_API mln_status mln_map_attach(
  *   textures than it attached with.
  * - MLN_STATUS_INVALID_STATE when a window is minimized or has no client
  *   area, or while you hold one of a borrowed ring's acquired frames.
- * - MLN_STATUS_UNSUPPORTED when the session renders offscreen, when `target`
- *   is offscreen, when a session that presents gets a borrowed ring or a
- *   borrowed ring gets anything else, or when no backend of this build
- *   renders to the target's kind.
+ * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into an
+ *   exported ring, when `target` is offscreen or an exported ring, when a
+ *   session that presents gets a borrowed ring or a borrowed ring gets
+ *   anything else, or when no backend of this build renders to the target's
+ *   kind. An exported ring takes a new size from mln_render_session_resize()
+ *   instead.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_STATE when a window was minimized or had no client
@@ -475,16 +477,17 @@ MLN_API void mln_acquired_frame_view_end(
  *
  * Use it when the window changes size, or moves to a display with another
  * scale factor. The map keeps its loaded tiles, and draws its next frame at
- * the new size and scale factor. Release every acquired frame first. You can
- * call it once the attach call returns. While the attach runs, the resize
- * waits for it to complete.
+ * the new size and scale factor. You can call it once the attach call returns.
+ * While the attach runs, the resize waits for it to complete.
+ *
+ * An exported ring gets textures of the new size. The frames that you hold
+ * keep their textures, of the old size, until you release or discard them.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders into a borrowed ring. Give
  *   it new textures of the new size instead.
- * - MLN_STATUS_INVALID_STATE while you hold one of the session's acquired
- *   frames, or when the session failed, or you detached, abandoned, released,
- *   or disposed it.
+ * - MLN_STATUS_INVALID_STATE when the session failed, or you detached,
+ *   abandoned, released, or disposed it.
  *
  * Completes with:
  * - MLN_STATUS_TARGET_LOST when the session loses its target before the resize
@@ -513,9 +516,8 @@ MLN_API mln_status mln_render_session_resize(
  * most for that sync, and logs a warning when the wait runs out.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into Android
- *   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
- *   allocates.
+ * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into an
+ *   exported ring.
  *
  * Completes with:
  * - MLN_STATUS_UNSUPPORTED when the target is an HTML canvas.

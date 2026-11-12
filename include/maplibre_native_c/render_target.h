@@ -134,6 +134,34 @@ typedef enum MLN_BINDING("kind=bitmask") mln_gpu_sync_kind_flag : uint32_t {
 /** A set of mln_gpu_sync_kind_flag bits. */
 typedef uint32_t mln_gpu_sync_kind_flags;
 
+/** A way to share a texture's memory with another API or process. */
+typedef enum mln_gpu_export_kind : uint32_t {
+  /** The texture isn't shared. */
+  MLN_GPU_EXPORT_KIND_NONE = 0U,
+  /** An `IOSurfaceRef`. */
+  MLN_GPU_EXPORT_KIND_IO_SURFACE = 1U,
+  /** A Linux dmabuf, as file descriptors with a DRM format and modifier. */
+  MLN_GPU_EXPORT_KIND_DMA_BUF = 2U,
+  /** An `AHardwareBuffer*`. */
+  MLN_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER = 3U,
+  /** A DXGI shared texture's NT handle. */
+  MLN_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE = 4U,
+  /** A Vulkan or OpenGL opaque memory file descriptor. */
+  MLN_GPU_EXPORT_KIND_OPAQUE_FD = 5U,
+} mln_gpu_export_kind;
+
+/** A way to share a texture's memory, as a bit in a set. */
+typedef enum MLN_BINDING("kind=bitmask") mln_gpu_export_kind_flag : uint32_t {
+  MLN_GPU_EXPORT_KIND_FLAG_IO_SURFACE = 1U << 0U,
+  MLN_GPU_EXPORT_KIND_FLAG_DMA_BUF = 1U << 1U,
+  MLN_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER = 1U << 2U,
+  MLN_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE = 1U << 3U,
+  MLN_GPU_EXPORT_KIND_FLAG_OPAQUE_FD = 1U << 4U,
+} mln_gpu_export_kind_flag;
+
+/** A set of mln_gpu_export_kind_flag bits. */
+typedef uint32_t mln_gpu_export_kind_flags;
+
 /** Options for attaching a render session to a map. */
 typedef struct mln_render_session_attach_options {
   uint32_t size;
@@ -144,8 +172,7 @@ typedef struct mln_render_session_attach_options {
    * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for a WebGPU surface, or a
    *   borrowed ring of WebGPU textures.
    * - MLN_RENDER_DRIVER_CORE_WORKER for an offscreen target, a window, an HTML
-   *   canvas, or a ring of Android hardware buffers, dmabufs, DXGI shared
-   *   textures, or IOSurfaces.
+   *   canvas, or an exported ring.
    * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
    *   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
    *   these on MLN_RENDER_DRIVER_CORE_WORKER only, and fails an attach with
@@ -197,6 +224,11 @@ typedef struct mln_render_session_capabilities {
    * They depend on the target and on what the device supports.
    */
   mln_gpu_sync_kind_flags consumer_sync_kinds;
+  /**
+   * How an exported ring shares its textures, which says which getter gets an
+   * acquired frame's texture, or MLN_GPU_EXPORT_KIND_NONE for another target.
+   */
+  mln_gpu_export_kind export_kind;
 } mln_render_session_capabilities;
 
 /** A point in GPU work that the other side waits for before using a texture. */
@@ -377,6 +409,8 @@ typedef enum mln_render_target_kind : uint32_t {
   MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES = 14u,
   /** A ring of your WebGPU textures. */
   MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES = 15u,
+  /** A ring of textures that the session allocates and shares with you. */
+  MLN_RENDER_TARGET_KIND_EXPORTED_RING = 16u,
 } mln_render_target_kind;
 
 /** A render target kind, as a bit in a set. */
@@ -398,6 +432,7 @@ typedef enum MLN_BINDING(
   MLN_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES = 1u << 12u,
   MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES = 1u << 13u,
   MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 1u << 14u,
+  MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 1u << 15u,
 } mln_render_target_kind_flag;
 
 /** A set of mln_render_target_kind_flag bits. */
@@ -678,6 +713,90 @@ typedef struct mln_web_gpu_borrowed_textures_target {
   uint32_t format MLN_BINDING("required=true");
 } mln_web_gpu_borrowed_textures_target;
 
+/** A DRM format and modifier that you can import. */
+typedef struct mln_dma_buf_format {
+  /** A DRM fourcc code, such as DRM_FORMAT_ABGR8888. */
+  uint32_t fourcc;
+  /** A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR. */
+  uint64_t modifier;
+} mln_dma_buf_format;
+
+/**
+ * A ring of textures that the session allocates on its device and shares with
+ * you, in one of the ways that you can import.
+ *
+ * Each texture has the size in pixels of `logical_size` at the map's scale
+ * factor. mln_render_session_resize() gives the ring textures of the new size,
+ * and a frame that you hold keeps its texture of the old size until you
+ * release or discard it.
+ *
+ * The ring shares its textures in the first kind of `export_kinds` that the
+ * device exports, in this order, and
+ * mln_render_session_capabilities.export_kind reports it:
+ *
+ * - MLN_GPU_EXPORT_KIND_IO_SURFACE: IOSurfaces of the pixel format
+ *   kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm.
+ *   Get each frame's surface with mln_acquired_frame_get_io_surface().
+ * - MLN_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER: hardware buffers of the
+ *   format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage
+ *   AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+ *   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+ *   `android_hardware_buffer_usage`. Get each frame's buffer with
+ *   mln_acquired_frame_get_android_hardware_buffer().
+ * - MLN_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE: D3D11 textures of the format
+ *   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
+ *   resources and render targets. Open them on a D3D11 or D3D12 device of the
+ *   same adapter, which you pick with mln_gpu_device_options.adapter_luid.
+ *   Get each frame's texture with mln_acquired_frame_get_dxgi_shared_texture().
+ * - MLN_GPU_EXPORT_KIND_DMA_BUF: dmabufs of a format and modifier from
+ *   `dma_buf_formats`. Get each frame's buffer with
+ *   mln_acquired_frame_get_dma_buf().
+ * - MLN_GPU_EXPORT_KIND_OPAQUE_FD: the memory of Vulkan images, which only a
+ *   Vulkan device or an OpenGL context with GL_EXT_memory_object_fd on the
+ *   same GPU and driver imports. To pick the GPU, create the device with
+ *   mln_gpu_device_options.adapter_uuid set to your context's
+ *   GL_DEVICE_UUID_EXT. Get each frame's memory with
+ *   mln_acquired_frame_get_opaque_fd().
+ *
+ * mln_gpu_device_capabilities.export_kinds reports the kinds that a device
+ * exports. Attach with MLN_RENDER_DRIVER_CORE_WORKER. Without a device, the
+ * session renders on the first of the platform's backends whose device exports
+ * one of `export_kinds`.
+ *
+ * Each frame hands over with MLN_GPU_SYNC_CPU_COMPLETE or with the sync kind
+ * that crosses APIs on its platform: MLN_GPU_SYNC_METAL_SHARED_EVENT for an
+ * IOSurface, and MLN_GPU_SYNC_SYNC_FD for the others, where the device has
+ * them. For a reader that waits on neither, such as a Wayland compositor
+ * without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
+ * out of mln_render_session_attach_options.producer_sync_kinds, so that each
+ * frame finishes before you acquire it, and release each frame only once the
+ * reader is done with its texture. Give the ring 3 textures, so the session
+ * can render while you hold two frames.
+ */
+typedef struct mln_exported_ring_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  /** How many textures the ring has, from 1 to MLN_TEXTURE_RING_MAX_DEPTH. */
+  uint32_t texture_count MLN_BINDING("required=true");
+  /** The ways of sharing a texture that you can import. */
+  mln_gpu_export_kind_flags export_kinds MLN_BINDING("required=true");
+  /**
+   * The dmabuf formats and modifiers that you import, most preferred first,
+   * such as those that eglQueryDmaBufModifiersEXT() reports. A ring exports
+   * dmabufs only of one of them. The library renders only DRM_FORMAT_ABGR8888
+   * and DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+   * format has, such as a plane of compression metadata, and the library takes
+   * any such modifier that its GPU can render into and share.
+   */
+  const mln_dma_buf_format* dma_buf_formats
+    MLN_BINDING("length=dma_buf_format_count");
+  size_t dma_buf_format_count;
+  /**
+   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads of a hardware buffer
+   * need, such as AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+   */
+  uint64_t android_hardware_buffer_usage;
+} mln_exported_ring_target;
+
 /** The descriptor of each kind of render target. */
 typedef union mln_render_target_data {
   mln_offscreen_target offscreen
@@ -723,6 +842,8 @@ typedef union mln_render_target_data {
   mln_web_gpu_borrowed_textures_target web_gpu_borrowed_textures MLN_BINDING(
     "variant=MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES;platforms=web"
   );
+  mln_exported_ring_target exported_ring
+    MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_EXPORTED_RING");
 } mln_render_target_data;
 
 /**
@@ -730,9 +851,9 @@ typedef union mln_render_target_data {
  * descriptor.
  *
  * Every target has a size in logical pixels, which sets the map's size. The
- * session renders it at the map's scale factor. A borrowed ring hands each
- * frame back to you: acquire it with mln_render_session_acquire_frame(), and
- * release it with your GPU's synchronization once you have read it.
+ * session renders it at the map's scale factor. A borrowed or exported ring
+ * hands each frame to you: acquire it with mln_render_session_acquire_frame(),
+ * and release it with your GPU's synchronization once you have read it.
  *
  * The session uses the objects that the descriptor names until a replacement
  * or release of the target completes, a detach or release of the session
