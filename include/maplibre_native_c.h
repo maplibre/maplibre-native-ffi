@@ -17,9 +17,7 @@
 #include "maplibre_native_c/map.h"               // IWYU pragma: export
 #include "maplibre_native_c/platform/android.h"  // IWYU pragma: export
 #include "maplibre_native_c/platform/apple.h"    // IWYU pragma: export
-#include "maplibre_native_c/platform/linux.h"    // IWYU pragma: export
 #include "maplibre_native_c/platform/ohos.h"     // IWYU pragma: export
-#include "maplibre_native_c/platform/win32.h"    // IWYU pragma: export
 #include "maplibre_native_c/projection.h"        // IWYU pragma: export
 #include "maplibre_native_c/query.h"             // IWYU pragma: export
 #include "maplibre_native_c/render_session.h"    // IWYU pragma: export

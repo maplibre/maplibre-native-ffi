@@ -93,30 +93,18 @@ typedef struct mln_gpu_device_options {
   mln_queue_lock queue_lock;
 } mln_gpu_device_options;
 
-/** A way to share a texture's memory with another API or process. */
-typedef enum MLN_BINDING("kind=bitmask") mln_gpu_export_kind_flag : uint32_t {
-  /** An `IOSurfaceRef`. */
-  MLN_GPU_EXPORT_KIND_FLAG_IO_SURFACE = 1U << 0U,
-  /** A Linux dmabuf, as file descriptors with a DRM format and modifier. */
-  MLN_GPU_EXPORT_KIND_FLAG_DMA_BUF = 1U << 1U,
-  /** An `AHardwareBuffer*`. */
-  MLN_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER = 1U << 2U,
-  /** A DXGI shared texture's NT handle. */
-  MLN_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE = 1U << 3U,
-  /** A Vulkan or OpenGL opaque memory file descriptor. */
-  MLN_GPU_EXPORT_KIND_FLAG_OPAQUE_FD = 1U << 4U,
-} mln_gpu_export_kind_flag;
-
-/** A set of mln_gpu_export_kind_flag bits. */
-typedef uint32_t mln_gpu_export_kind_flags;
-
 /** What a GPU device can do. */
 typedef struct mln_gpu_device_capabilities {
   uint32_t size;
   mln_render_backend backend;
   /** The kinds of mln_render_target that sessions on the device render to. */
   mln_render_target_kind_flags target_kinds;
-  /** The ways that the device can share the textures it renders. */
+  /**
+   * The ways that the device can share the textures of an exported ring. A
+   * kind is here only once the device has exported a texture of it, so a
+   * driver that offers an extension but can't allocate the memory reports no
+   * kind of it.
+   */
   mln_gpu_export_kind_flags export_kinds;
   /** The kinds of mln_gpu_sync that the device can signal and wait on. */
   mln_gpu_sync_kind_flags sync_kinds;
@@ -126,10 +114,13 @@ typedef struct mln_gpu_device_capabilities {
  * Your Vulkan device and queue, for mln_gpu_device_wrap_vulkan().
  *
  * The device must have the extensions that its sessions use enabled:
- * `VK_KHR_swapchain` for windows and Vulkan surfaces, and
- * `VK_KHR_external_semaphore_fd` for MLN_GPU_SYNC_SYNC_FD. When the GPU
- * supports timeline semaphores, also enable the `timelineSemaphore` feature,
- * of Vulkan 1.2 or `VK_KHR_timeline_semaphore`: the device offers
+ * `VK_KHR_swapchain` for windows and Vulkan surfaces,
+ * `VK_KHR_external_semaphore_fd` for MLN_GPU_SYNC_SYNC_FD,
+ * `VK_KHR_external_memory_fd` for MLN_GPU_EXPORT_KIND_OPAQUE_FD, and that with
+ * `VK_EXT_external_memory_dma_buf` and `VK_EXT_image_drm_format_modifier` for
+ * MLN_GPU_EXPORT_KIND_DMA_BUF. When the GPU supports timeline semaphores, also
+ * enable the `timelineSemaphore` feature, of Vulkan 1.2 or
+ * `VK_KHR_timeline_semaphore`: the device offers
  * MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE wherever the GPU supports it.
  */
 typedef struct mln_vulkan_device_descriptor {
@@ -272,7 +263,12 @@ MLN_API mln_status mln_gpu_device_wrap_web_gpu(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Reads what the device can do. */
+/**
+ * Reads what the device can do.
+ *
+ * Check `export_kinds` before you attach an exported ring, to choose between
+ * the ring and a way of your own to show the map.
+ */
 MLN_API mln_status mln_gpu_device_get_capabilities(
   mln_gpu_device device,
   mln_gpu_device_capabilities* out_capabilities MLN_BINDING("direction=out"),

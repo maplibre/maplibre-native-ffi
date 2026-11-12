@@ -43,11 +43,15 @@ static mln_status start_attach(
   mln_map map, mln_render_driver_kind driver, const mln_queue_lock* queue_lock,
   mln_test_completion* completion, mln_test_render_fixture* fixture
 ) {
-  const mln_android_hardware_buffer_ring_descriptor descriptor = {
-    .size = sizeof(mln_android_hardware_buffer_ring_descriptor),
-    .logical_size = {.width = ring_width, .height = ring_height},
-    .buffer_count = buffer_count,
-    .usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN,
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_EXPORTED_RING,
+    .data.exported_ring = {
+      .logical_size = {.width = ring_width, .height = ring_height},
+      .texture_count = buffer_count,
+      .export_kinds = MLN_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER,
+      .android_hardware_buffer_usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN,
+    },
   };
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options),
@@ -68,9 +72,9 @@ static mln_status start_attach(
     MLN_TEST_OK(mln_gpu_device_create(&device_options, &device, NULL));
   }
   fixture->driver = driver;
-  const mln_status status = mln_map_attach_android_hardware_buffer_ring(
-    map, &descriptor, device, &options, &fixture->session,
-    &completion->descriptor, MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_map_attach(
+    map, &target, device, &options, &fixture->session, &completion->descriptor,
+    MLN_TEST_DIAGNOSTIC
   );
   mln_gpu_device_release(device);
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);

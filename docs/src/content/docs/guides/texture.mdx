@@ -1,9 +1,8 @@
 ---
 title: Render to a texture
 description: Share rendered frames with your renderer.
-# Scope: rings of your textures, of Android hardware buffers, of dmabufs, of
-# DXGI shared textures, or of IOSurfaces, acquiring frames, and replacing the
-# ring.
+# Scope: rings of your textures, rings that the library allocates and
+# exports, acquiring frames, and replacing or resizing the ring.
 # Reading pixels back belongs in Render images. Running driver work on your
 # graphics thread belongs in Render to a window.
 ---
@@ -55,50 +54,39 @@ detaches.
 
 <Snippet page="texture" region="attach-borrowed" />
 
-### Android hardware buffers
+### Rings that the library allocates
 
-On Android 8.0 and later, the library can allocate the ring itself, as hardware
-buffers that your UI draws, such as through `Bitmap.wrapHardwareBuffer`. Attach
-with [](api:mln_map_attach_android_hardware_buffer_ring) and the library's
-thread as the driver, and get each frame's buffer with
-[](api:mln_acquired_frame_get_android_hardware_buffer). To resize the ring, use
-[](api:mln_render_session_resize) instead of replacing it. Attach with three
-buffers, and keep each frame acquired until the next one replaces it on screen.
+The library can allocate the ring itself and share its textures with your
+renderer, compositor, or UI. Attach an [](api:mln_exported_ring_target) with the
+library's thread as the driver, and list the ways of sharing a texture that you
+can import. The session uses the first of these that its device exports:
 
-### Linux dmabufs
+- On Apple platforms with Metal, IOSurfaces that your UI draws, such as through
+  a `CVPixelBuffer` from `CVPixelBufferCreateWithIOSurface`. Get each frame's
+  surface with [](api:mln_acquired_frame_get_io_surface).
+- On Android 8.0 and later, hardware buffers that your UI draws, such as through
+  `Bitmap.wrapHardwareBuffer`. Get each frame's buffer with
+  [](api:mln_acquired_frame_get_android_hardware_buffer).
+- On Windows, D3D11 textures that your D3D11 or D3D12 renderer opens through
+  their shared handles. Create the device with your adapter's LUID, and get each
+  frame's texture with [](api:mln_acquired_frame_get_dxgi_shared_texture).
+- On Linux and FreeBSD, dmabufs that your compositor or renderer imports, such as
+  through `EGL_EXT_image_dma_buf_import` or `zwp_linux_dmabuf_v1`. List the
+  formats and modifiers that your importer takes, get each frame's buffer with
+  [](api:mln_acquired_frame_get_dma_buf), and import all of its planes. A
+  modifier with compression, such as AMD's DCC, adds a plane to the buffer, and
+  the planes often share one file descriptor.
+- On Linux, the memory of Vulkan images, for an OpenGL context that imports
+  memory through `GL_EXT_memory_object_fd` but not dmabufs, such as one of GLX.
+  Create the device with your context's GPU UUID, and get each frame's memory
+  with [](api:mln_acquired_frame_get_opaque_fd).
 
-On Linux and FreeBSD, the library can allocate the ring itself, as dmabufs that
-your compositor or renderer imports, such as through
-`EGL_EXT_image_dma_buf_import` or `zwp_linux_dmabuf_v1`. Attach with
-[](api:mln_map_attach_dma_buf_ring) and the library's thread as the driver, and
-list the formats and modifiers that your importer takes. Get each frame's buffer
-with [](api:mln_acquired_frame_get_dma_buf), and import all of its planes. A
-modifier with compression, such as AMD's DCC, adds a plane to the buffer, and
-the planes often share one file descriptor. To resize the ring, use
-[](api:mln_render_session_resize) instead of replacing it. Attach with three
-buffers, and keep each frame acquired until your importer is done with it.
-
-### Windows DXGI shared textures
-
-On Windows, a Vulkan build can allocate the ring itself, as D3D11 textures that
-your D3D11 or D3D12 renderer opens through their shared handles. Attach with
-[](api:mln_map_attach_dxgi_shared_texture_ring) and the library's thread as the
-driver, and render on your renderer's GPU by passing a Vulkan device that you
-created with its adapter's LUID. Get each frame's texture with
-[](api:mln_acquired_frame_get_dxgi_shared_texture). To resize the ring, use
-[](api:mln_render_session_resize) instead of replacing it. Attach with three
-textures, and keep each frame acquired until your renderer is done with it.
-
-### Apple IOSurfaces
-
-On Apple platforms with Metal, the library can allocate the ring itself, as
-IOSurfaces that your UI draws, such as through a `CVPixelBuffer` from
-`CVPixelBufferCreateWithIOSurface`. Attach with
-[](api:mln_map_attach_io_surface_ring) and the library's thread as the driver,
-and get each frame's surface with [](api:mln_acquired_frame_get_io_surface). To
-resize the ring, use [](api:mln_render_session_resize) instead of replacing it.
-Attach with three surfaces, and keep each frame acquired until your UI is done
-with it.
+[](api:mln_render_session_capabilities.export_kind) says which one the session
+uses. To learn before you attach whether a device exports a kind, read
+[](api:mln_gpu_device_capabilities.export_kinds). To resize the ring, use
+[](api:mln_render_session_resize) instead of replacing it: the frames that you
+hold keep their textures until you release them. Attach with three textures,
+and keep each frame acquired until your reader is done with it.
 
 ## Draw each frame
 
