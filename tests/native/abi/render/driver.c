@@ -344,10 +344,9 @@ static void maintenance_waits_behind_a_demand_for_map_commands(void) {
 
   mln_test_gate gate;
   mln_test_gate_init(&gate);
-  const mln_completion hold = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_map_get_camera(map, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+    mln_test_park_map_worker_in_query(map, &gate),
+    "the runtime worker never parked"
   );
   mln_test_completion logged = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_dump_debug_logs(map, &logged.descriptor, NULL));

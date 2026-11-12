@@ -81,6 +81,12 @@ mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options);
 // publishes nothing and cannot fence work that the runtime worker starts on
 // its own, such as handling a frame that a render session finished.
 mln_status mln_test_map_fence(mln_map map);
+// Parks the map's runtime worker on `gate`, inside the completion of a command
+// that sets the map's debug flags to none, as mln_test_gate_park_worker() does.
+bool mln_test_park_map_worker(mln_map map, mln_test_gate* gate);
+// The same, inside the completion of a camera query, which publishes no render
+// update.
+bool mln_test_park_map_worker_in_query(mln_map map, mln_test_gate* gate);
 mln_status mln_test_runtime_release(mln_runtime runtime);
 // Map options with a 256 by 256 initial extent at one device pixel per UI
 // pixel, the extent the cases assume unless they set their own.

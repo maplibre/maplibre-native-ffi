@@ -167,11 +167,22 @@ void discard_completion(
   (void)result;
 }
 
+// The gate whose work this thread is submitting, and whether that work
+// completed before its submission returned.
+thread_local mln_test_gate* submitting_gate = nullptr;
+thread_local bool completed_while_submitting = false;
+
 void park_on_gate(
   void* user_data, const mln_completion_result* result
 ) noexcept {
   (void)result;
-  mln_test_gate_park(static_cast<mln_test_gate*>(user_data));
+  auto* gate = static_cast<mln_test_gate*>(user_data);
+  // The submitting thread runs the completion itself, and must go on.
+  if (gate == submitting_gate) {
+    completed_while_submitting = true;
+    return;
+  }
+  mln_test_gate_park(gate);
 }
 
 void release_gate(void* user_data) noexcept { (void)user_data; }
@@ -334,14 +345,25 @@ extern "C" void mln_test_gate_release(mln_test_gate* gate) {
   mln_test_flag_set(&gate->released);
 }
 
-extern "C" auto mln_test_gate_completion(mln_test_gate* gate)
-  -> mln_completion {
-  return mln_completion{
+extern "C" auto mln_test_gate_park_worker(
+  mln_test_gate* gate, mln_test_gate_submit submit, void* context
+) -> bool {
+  const auto completion = mln_completion{
     .size = sizeof(mln_completion),
     .callback = park_on_gate,
     .user_data = gate,
     .release_user_data = release_gate,
   };
+  const auto deadline = mln_test_deadline_default();
+  for (;;) {
+    submitting_gate = gate;
+    completed_while_submitting = false;
+    const auto status = submit(context, &completion);
+    submitting_gate = nullptr;
+    if (status != MLN_STATUS_OK) return false;
+    if (!completed_while_submitting) return mln_test_gate_wait_entered(gate);
+    if (mln_test_deadline_passed(deadline)) return false;
+  }
 }
 
 extern "C" auto mln_test_completion_default(const size_t value_size)
