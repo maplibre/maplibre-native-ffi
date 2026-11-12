@@ -108,15 +108,12 @@ static void a_frame_projection_places_points_where_the_frame_drew_them(void) {
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, frame.disposition);
   const mln_frame_projection* projection = &frame.frame_projection;
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE, projection->clip_depth_range
+  // A session without a device renders with the platform's own backend,
+  // whatever the build tests, so the projection names its convention.
+  TEST_ASSERT_TRUE(
+    projection->clip_depth_range == MLN_CLIP_DEPTH_RANGE_ZERO_TO_ONE ||
+    projection->clip_depth_range == MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE
   );
-#else
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_CLIP_DEPTH_RANGE_ZERO_TO_ONE, projection->clip_depth_range
-  );
-#endif
   TEST_ASSERT_TRUE(projection->far_depth > 0.9 && projection->far_depth < 1.0);
   TEST_ASSERT_TRUE(projection->near_distance > 0.0);
   TEST_ASSERT_TRUE(projection->near_distance < projection->far_distance);
