@@ -16,6 +16,7 @@
 #include "base.h"
 #include "completion.h"
 #include "map.h"
+#include "render_target.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -971,6 +972,354 @@ MLN_API mln_status mln_map_add_style_layer_json(
   mln_map map, mln_buffer_view layer_json MLN_BINDING("encoding=json"),
   mln_buffer_view before_layer_id MLN_BINDING("nullable=true"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * The frame that a custom layer draws into, as its callbacks get it.
+ *
+ * The view and the projection are the ones that the frame draws the map with,
+ * so they are never newer than the frame, unlike the map's camera.
+ */
+typedef struct mln_custom_layer_frame {
+  /** The camera, extent, and scale factor that the frame shows. */
+  mln_map_view view;
+  /** Where the frame draws the map, and the depth that it writes there. */
+  mln_frame_projection projection;
+  /** The width of the frame's attachments, in physical pixels. */
+  uint32_t width;
+  /** The height of the frame's attachments, in physical pixels. */
+  uint32_t height;
+} mln_custom_layer_frame;
+
+/**
+ * The frame's Metal command buffer, outside the map's render pass.
+ *
+ * End each encoder that you make on `command_buffer` before the callback
+ * returns, and don't commit the buffer.
+ */
+typedef struct mln_metal_custom_layer_encoder {
+  /** The frame's `MTLCommandBuffer`, with no encoder open. */
+  void* command_buffer;
+} mln_metal_custom_layer_encoder;
+
+/**
+ * The frame's Vulkan command buffer, outside the map's render pass.
+ *
+ * Record work such as copies, compute dispatches, and render passes of your
+ * own, with the barriers that it needs. The map's render pass loads its
+ * attachments after a barrier of its own, but it doesn't wait for writes to
+ * your images: give those the barriers that your later reads need. Don't end
+ * or submit `command_buffer`.
+ */
+typedef struct mln_vulkan_custom_layer_encoder {
+  /**
+   * The device that the session renders on. Make the objects that your
+   * commands use on `context.device`. Don't submit to `context.graphics_queue`
+   * from a callback.
+   */
+  mln_vulkan_context_descriptor context;
+  /** The frame's `VkCommandBuffer`, recording outside a render pass. */
+  void* command_buffer;
+} mln_vulkan_custom_layer_encoder;
+
+/**
+ * The frame's WebGPU command encoder, outside the map's render pass.
+ *
+ * End each pass that you begin on `encoder` before the callback returns, and
+ * don't finish the encoder.
+ */
+typedef struct mln_web_gpu_custom_layer_encoder {
+  /** The `WGPUDevice` that the session renders on. */
+  void* device;
+  /** The frame's `WGPUCommandEncoder`, with no pass open. */
+  void* encoder;
+} mln_web_gpu_custom_layer_encoder;
+
+/**
+ * The GPU commands of a frame outside the map's render pass, by the backend
+ * that the session renders with.
+ *
+ * An OpenGL session has no variant: its context is current, and it draws
+ * through no object that the callback needs.
+ */
+typedef union mln_custom_layer_encoder_data {
+  mln_metal_custom_layer_encoder metal MLN_BINDING(
+    "variant=MLN_RENDER_BACKEND_METAL;platforms=ios,macos,tvos,visionos"
+  );
+  mln_vulkan_custom_layer_encoder vulkan MLN_BINDING(
+    "variant=MLN_RENDER_BACKEND_VULKAN;"
+    "platforms=android,freebsd,linux,macos,ohos,windows"
+  );
+  mln_web_gpu_custom_layer_encoder web_gpu
+    MLN_BINDING("variant=MLN_RENDER_BACKEND_WEB_GPU;platforms=web");
+} mln_custom_layer_encoder_data;
+
+/** What a custom layer's prerender callback gets. */
+typedef struct mln_custom_layer_prerender_parameters {
+  uint32_t size;
+  mln_render_backend backend;
+  mln_custom_layer_encoder_data encoder
+    MLN_BINDING("tag=backend;empty_variant=MLN_RENDER_BACKEND_OPEN_GL");
+  mln_custom_layer_frame frame;
+} mln_custom_layer_prerender_parameters;
+
+/**
+ * The map's Metal render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline state, depth-stencil state, buffers, textures, and
+ * samplers on `encoder`, and any other state that your draws need. After the
+ * callback returns, the map sets the state that its own draws need again. Don't
+ * end `encoder`.
+ */
+typedef struct mln_metal_custom_layer_pass {
+  /** The pass's `MTLRenderCommandEncoder`. */
+  void* encoder;
+  /** The `MTLCommandBuffer` that `encoder` encodes into. Don't commit it. */
+  void* command_buffer;
+  /** The `MTLPixelFormat` of the pass's color attachment. */
+  uint64_t color_format;
+  /**
+   * The `MTLPixelFormat` of the pass's depth attachment, or
+   * `MTLPixelFormatInvalid` when it has none.
+   */
+  uint64_t depth_format;
+  /**
+   * The `MTLPixelFormat` of the pass's stencil attachment, or
+   * `MTLPixelFormatInvalid` when it has none.
+   */
+  uint64_t stencil_format;
+  /** The sample count of the pass's attachments. */
+  uint32_t sample_count;
+} mln_metal_custom_layer_pass;
+
+/**
+ * The map's Vulkan render pass, at a custom layer's place in the style.
+ *
+ * Record draws into `command_buffer`, with pipelines that you make for
+ * `render_pass`, `subpass`, and `sample_count`. Bind your own pipeline,
+ * descriptor sets, vertex and index buffers, and push constants, and set the
+ * dynamic state that your pipelines have, such as the viewport and scissor.
+ * After the callback returns, the map binds and sets again what its own draws
+ * need. Your pipeline layouts can differ from the map's. Record nothing that a
+ * render pass can't hold, and don't end the render pass.
+ */
+typedef struct mln_vulkan_custom_layer_pass {
+  /**
+   * The device that the session renders on. Make the objects that your
+   * commands use on `context.device`. Don't submit to `context.graphics_queue`
+   * from a callback.
+   */
+  mln_vulkan_context_descriptor context;
+  /** The frame's `VkCommandBuffer`, recording inside `render_pass`. */
+  void* command_buffer;
+  /** The `VkRenderPass` that `command_buffer` records in. */
+  mln_vulkan_non_dispatchable_handle render_pass;
+  /** The index of the subpass that `command_buffer` records in. */
+  uint32_t subpass;
+  /** The `VkSampleCountFlagBits` of the render pass's attachments. */
+  uint32_t sample_count;
+  /** The `VkFormat` of the render pass's color attachment. */
+  uint32_t color_format;
+  /**
+   * The `VkFormat` of the render pass's depth-stencil attachment, or
+   * `VK_FORMAT_UNDEFINED` when it has none.
+   */
+  uint32_t depth_stencil_format;
+} mln_vulkan_custom_layer_pass;
+
+/**
+ * The map's OpenGL framebuffer, at a custom layer's place in the style.
+ *
+ * The session's context is current, with `framebuffer` bound and the
+ * viewport covering it. You can change the program, the vertex array, the
+ * buffers bound to each target, the framebuffer, the viewport, the active
+ * texture unit and the textures bound to each unit, the uniform buffer
+ * bindings, and the scissor, depth, stencil, blend, color mask, cull face, and
+ * line width state. After the callback returns, the map sets again what its
+ * own draws need of these. The vertex array bound when the callback starts is
+ * 0, so bind your own before you set vertex attributes. Leave any other state
+ * as you found it, such as the sampler objects bound to texture units, the
+ * pixel pack and unpack buffers and parameters, polygon offset, and
+ * rasterizer discard. Don't clear or invalidate the framebuffer's attachments.
+ */
+typedef struct mln_open_gl_custom_layer_pass {
+  /** The framebuffer that the map draws into, or 0 for the default one. */
+  uint32_t framebuffer;
+} mln_open_gl_custom_layer_pass;
+
+/**
+ * The map's WebGPU render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline, bind groups, vertex and index buffers, viewport,
+ * scissor rectangle, and stencil reference on `encoder`. After the callback
+ * returns, the map sets again what its own draws need. Don't end `encoder`.
+ */
+typedef struct mln_web_gpu_custom_layer_pass {
+  /** The `WGPUDevice` that the session renders on. */
+  void* device;
+  /** The pass's `WGPURenderPassEncoder`. */
+  void* encoder;
+  /** The `WGPUTextureFormat` of the pass's color attachment. */
+  uint32_t color_format;
+  /**
+   * The `WGPUTextureFormat` of the pass's depth-stencil attachment, or
+   * `WGPUTextureFormat_Undefined` when it has none.
+   */
+  uint32_t depth_stencil_format;
+  /** The sample count of the pass's attachments. */
+  uint32_t sample_count;
+} mln_web_gpu_custom_layer_pass;
+
+/**
+ * The map's render pass at a custom layer's place in the style, by the backend
+ * that the session renders with.
+ */
+typedef union mln_custom_layer_pass_data {
+  mln_metal_custom_layer_pass metal MLN_BINDING(
+    "variant=MLN_RENDER_BACKEND_METAL;platforms=ios,macos,tvos,visionos"
+  );
+  mln_vulkan_custom_layer_pass vulkan MLN_BINDING(
+    "variant=MLN_RENDER_BACKEND_VULKAN;"
+    "platforms=android,freebsd,linux,macos,ohos,windows"
+  );
+  mln_open_gl_custom_layer_pass open_gl
+    MLN_BINDING("variant=MLN_RENDER_BACKEND_OPEN_GL");
+  mln_web_gpu_custom_layer_pass web_gpu
+    MLN_BINDING("variant=MLN_RENDER_BACKEND_WEB_GPU;platforms=web");
+} mln_custom_layer_pass_data;
+
+/** What a custom layer's render callback gets. */
+typedef struct mln_custom_layer_render_parameters {
+  uint32_t size;
+  mln_render_backend backend;
+  mln_custom_layer_pass_data pass MLN_BINDING("tag=backend");
+  mln_custom_layer_frame frame;
+  /**
+   * The depth that a 2D layer at the layer's place in the style writes, as
+   * mln_frame_projection describes, between `frame.projection.far_depth` and
+   * 1.
+   *
+   * The map draws the opaque fragments of its 2D layers before the render
+   * callback runs, those above the custom layer too. A fragment that you draw
+   * at this depth, tested with less-or-equal, stays under those above that
+   * wrote depth.
+   */
+  double layer_depth;
+} mln_custom_layer_render_parameters;
+
+/**
+ * Records a custom layer's GPU work that can't run in the map's render pass,
+ * such as drawing into textures of your own.
+ *
+ * Each frame that shows the layer runs the prerender callbacks of its custom
+ * layers, from the bottom of the style to the top, before the map begins its
+ * render pass, and so before any render callback.
+ *
+ * Threads:
+ * Runs on the thread that runs the session's graphics work: a library thread,
+ * or yours with MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. It can't call the
+ * library.
+ *
+ * Lifetimes:
+ * `parameters` and the objects it names stay valid until the callback returns.
+ */
+MLN_BINDING("synchronous=true")
+typedef void (*mln_custom_layer_prerender_callback)(
+  void* user_data, const mln_custom_layer_prerender_parameters* parameters
+);
+
+/**
+ * Draws a custom layer into the map's render pass, at its place in the style.
+ *
+ * The map draws its layers below the custom layer before the callback, and
+ * those above it after, except for the opaque fragments of 2D layers, which it
+ * draws before either, as mln_custom_layer_render_parameters.layer_depth
+ * describes. Draw through `frame.projection.matrix` to depth-test against the
+ * map's 3D layers.
+ *
+ * Threads:
+ * Runs on the thread that runs the session's graphics work, as
+ * mln_custom_layer_prerender_callback says. It can't call the library.
+ *
+ * Lifetimes:
+ * `parameters` and the objects it names stay valid until the callback returns.
+ */
+MLN_BINDING("synchronous=true")
+typedef void (*mln_custom_layer_render_callback)(
+  void* user_data, const mln_custom_layer_render_parameters* parameters
+);
+
+/**
+ * Tells a custom layer that a session stopped drawing it.
+ *
+ * `deinitialize` runs once a session that ran the layer's prerender or render
+ * callback stops drawing the layer: when the layer leaves the style, or the
+ * session detaches, is released, or replaces its device's backend. Destroy the
+ * GPU objects that you made for that session then. The session's GPU no longer
+ * uses them, and an OpenGL session's context is current. `context_lost` runs
+ * instead when the session is abandoned. Its graphics objects may be gone
+ * already, so forget yours without destroying them.
+ *
+ * A later prerender or render callback is for a new session, which can render
+ * on another device or backend.
+ *
+ * Threads:
+ * Runs on the thread that runs the session's graphics work, as
+ * mln_custom_layer_prerender_callback says. It can't call the library.
+ */
+MLN_BINDING("synchronous=true")
+typedef void (*mln_custom_layer_session_end_callback)(void* user_data);
+
+/**
+ * The callbacks of a custom layer, which draws with your own GPU commands in
+ * the map's frame.
+ *
+ * A session runs the callbacks only when it can hand you its commands as one
+ * of mln_custom_layer_pass_data's variants, so a session on another backend,
+ * such as WebGPU outside a browser, doesn't draw the layer. Leave unset the
+ * callbacks that you don't need.
+ */
+typedef struct mln_custom_layer_host {
+  uint32_t size;
+  mln_custom_layer_prerender_callback prerender MLN_BINDING("nullable=true");
+  mln_custom_layer_render_callback render MLN_BINDING("nullable=true");
+  mln_custom_layer_session_end_callback deinitialize
+    MLN_BINDING("nullable=true");
+  mln_custom_layer_session_end_callback context_lost
+    MLN_BINDING("nullable=true");
+  void* user_data MLN_BINDING("kind=context");
+  mln_user_data_release release_user_data;
+} mln_custom_layer_host MLN_BINDING(
+  "kind=callback_registration;release=release_user_data"
+);
+
+/**
+ * Adds a layer that draws with your own GPU commands, through `host`.
+ *
+ * The layer goes below the layer named `before_layer_id`, or above every layer
+ * when `before_layer_id` is empty. Its type is `custom`, and it takes the
+ * `visibility`, `minzoom`, and `maxzoom` properties, but no paint properties.
+ * mln_map_remove_style_layer() removes it.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when the style has no layer named `before_layer_id`.
+ * - MLN_STATUS_ALREADY_EXISTS when the style already has a layer named
+ *   `layer_id`.
+ * - MLN_STATUS_INVALID_STATE while the style isn't loaded, as
+ *   mln_map_set_style_url() describes.
+ *
+ * Lifetimes:
+ * When this function returns an error, the caller keeps `user_data` and the
+ * library doesn't call `release_user_data`. Otherwise the library calls
+ * `release_user_data` once the style no longer has the layer and no session
+ * draws it, after the last callback.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_add_custom_layer(
+  mln_map map, mln_buffer_view layer_id,
+  mln_buffer_view before_layer_id MLN_BINDING("nullable=true"),
+  const mln_custom_layer_host* host, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
