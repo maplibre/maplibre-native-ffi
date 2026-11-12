@@ -624,6 +624,12 @@ MLN_API mln_status mln_render_session_detach(
  * exits, and reports how many it kept. Detach the session instead to free
  * them.
  *
+ * A session lets go of your graphics objects later when you call this on the
+ * thread that runs its graphics work: from a callback that the session runs
+ * there, once the callback returns, and for a session driven by
+ * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, at your next
+ * mln_render_session_service_driver_work() for it.
+ *
  * Returns:
  * - MLN_STATUS_BUSY while mln_render_session_service_driver_work() runs for the
  *   session on another thread, or while a view that
@@ -675,7 +681,9 @@ MLN_API mln_status mln_render_session_dispose(
  * Gives up an acquired frame without saying when your GPU stops reading it.
  *
  * Because your GPU may still read the frame's texture, the session never
- * renders into that texture again.
+ * renders into that texture again, even when mln_render_session_set_target()
+ * gives it the texture again. A view that is open on the frame keeps the
+ * frame's sync objects in place until it ends.
  */
 MLN_API mln_status mln_acquired_frame_discard(
   mln_acquired_frame frame, mln_diagnostic* out_diagnostic
