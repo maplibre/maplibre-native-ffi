@@ -69,6 +69,11 @@ typedef struct host_state {
   // The owner that the session's ring attached with, which a replacement
   // keeps.
   mln_vulkan_image_owner vulkan_owner;
+  // The depth image beside each of `textures`, when the ring has them, and
+  // the ring descriptor's entries for them.
+  mln_test_graphics_texture* depth_textures[MLN_TEXTURE_RING_MAX_DEPTH];
+  size_t depth_texture_count;
+  mln_vulkan_borrowed_texture depth_entries[MLN_TEXTURE_RING_MAX_DEPTH];
 #endif
   bool keep_until_exit;
 } host_state;
@@ -87,6 +92,16 @@ static mln_gpu_device shared_device = MLN_HANDLE_NULL;
 // attaches.
 static mln_vulkan_image_owner attach_vulkan_owner =
   MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE;
+// Set only while mln_test_render_fixture_create_vulkan_depth_ring() attaches.
+static bool attach_vulkan_depth = false;
+
+static void destroy_depth_textures(host_state* state) {
+  for (size_t index = 0; index < state->depth_texture_count; index += 1) {
+    mln_test_graphics_texture_destroy(state->depth_textures[index]);
+    state->depth_textures[index] = NULL;
+  }
+  state->depth_texture_count = 0;
+}
 #endif
 // Set only while mln_test_render_fixture_create_synced() attaches. A Metal
 // fixture that accepts queue order also names the graphics object's queue.
@@ -188,6 +203,9 @@ void mln_test_backend_destroy(void* opaque_state) {
   for (size_t index = 0; index < state->texture_count; index += 1) {
     mln_test_graphics_texture_destroy(state->textures[index]);
   }
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  destroy_depth_textures(state);
+#endif
   host_state_free(state);
 }
 
@@ -362,6 +380,18 @@ static bool describe_ring(
     .final_layout = info.vulkan_final_layout,
     .owner = state->vulkan_owner,
   };
+  if (state->depth_texture_count == count) {
+    mln_test_graphics_texture_info depth = {0};
+    if (!mln_test_graphics_texture_get_info(state->depth_textures[0], &depth)) {
+      report("the render fixture could not describe a depth texture");
+      return false;
+    }
+    out->data.vulkan_borrowed_textures.depth_textures = state->depth_entries;
+    out->data.vulkan_borrowed_textures.depth_texture_count = count;
+    out->data.vulkan_borrowed_textures.depth_format = depth.format;
+    out->data.vulkan_borrowed_textures.depth_final_layout =
+      depth.vulkan_final_layout;
+  }
 #else
   (void)state;
   out->kind = MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES;
@@ -511,6 +541,25 @@ bool mln_test_backend_attach_borrowed(
   }
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   state->vulkan_owner = attach_vulkan_owner;
+  for (size_t index = 0; attach_vulkan_depth && index < depth; index += 1) {
+    mln_test_graphics_texture* texture = mln_test_graphics_depth_texture_create(
+      state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
+    );
+    mln_test_graphics_texture_info info = {0};
+    if (
+      texture == NULL || !mln_test_graphics_texture_get_info(texture, &info)
+    ) {
+      report("the render fixture could not create a depth texture");
+      mln_test_graphics_texture_destroy(texture);
+      mln_test_backend_destroy(state);
+      return false;
+    }
+    state->depth_textures[index] = texture;
+    state->depth_texture_count += 1;
+    state->depth_entries[index] = (mln_vulkan_borrowed_texture){
+      .image = info.vulkan_image, .image_view = info.vulkan_image_view
+    };
+  }
 #endif
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   if (attach_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
@@ -622,6 +671,29 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
   return attached;
 }
 
+bool mln_test_render_fixture_create_vulkan_depth_ring(
+  mln_map map, mln_test_render_fixture* fixture, size_t depth
+) {
+  attach_vulkan_depth = true;
+  attach_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE;
+  const bool attached = mln_test_render_fixture_create_borrowed_ring(
+    map, fixture, depth, MLN_TEST_PRESET_DRIVER
+  );
+  attach_vulkan_depth = false;
+  attach_sync_kinds = 0;
+  return attached;
+}
+
+mln_test_graphics_texture* mln_test_render_fixture_depth_texture(
+  const mln_test_render_fixture* fixture, size_t index
+) {
+  const host_state* state = fixture->backend_state;
+  if (state == NULL || index >= state->depth_texture_count) {
+    return NULL;
+  }
+  return state->depth_textures[index];
+}
+
 bool mln_test_render_fixture_create_vulkan_on(
   mln_map map, mln_test_render_fixture* fixture, mln_test_graphics* graphics,
   mln_gpu_device device
@@ -649,6 +721,9 @@ void mln_test_render_fixture_destroy_textures(
     state->textures[index] = NULL;
   }
   state->texture_count = 0;
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  destroy_depth_textures(state);
+#endif
 }
 
 mln_status mln_test_render_fixture_start_surface_attach(
