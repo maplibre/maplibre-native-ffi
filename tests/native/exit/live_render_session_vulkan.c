@@ -65,40 +65,52 @@ static mln_status attach(
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion
 ) {
+  // Each session's device wraps the host's with the lock.
+  const mln_vulkan_device_descriptor host = {
+    .size = sizeof(mln_vulkan_device_descriptor),
+    .context =
+      {
+        .instance = context->vulkan_instance,
+        .physical_device = context->vulkan_physical_device,
+        .device = context->vulkan_device,
+        .graphics_queue = context->vulkan_queue,
+        .graphics_queue_family_index = context->vulkan_queue_family_index,
+        .get_instance_proc_addr = context->vulkan_get_instance_proc_addr,
+        .get_device_proc_addr = context->vulkan_get_device_proc_addr,
+      },
+    .queue_lock = {
+      .lock = session_locks_queue,
+      .unlock = session_unlocks_queue,
+      .user_data = &queue_lock,
+      .release_user_data = session_releases_queue_lock,
+    },
+  };
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  const mln_status wrapped = mln_gpu_device_wrap_vulkan(&host, &device, NULL);
+  if (wrapped != MLN_STATUS_OK) return wrapped;
   const mln_vulkan_borrowed_texture entry = {
     .image = texture->vulkan_image,
     .image_view = texture->vulkan_image_view,
   };
-  mln_vulkan_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES,
+    .data.vulkan_borrowed_textures = {
+      .logical_size = probe_size,
+      .physical_width = texture->width,
+      .physical_height = texture->height,
+      .textures = &entry,
+      .texture_count = 1,
+      .format = texture->format,
+      .final_layout = texture->vulkan_final_layout,
+    },
   };
-  descriptor.logical_size = probe_size;
-  descriptor.physical_width = texture->width;
-  descriptor.physical_height = texture->height;
-  descriptor.context.instance = context->vulkan_instance;
-  descriptor.context.physical_device = context->vulkan_physical_device;
-  descriptor.context.device = context->vulkan_device;
-  descriptor.context.graphics_queue = context->vulkan_queue;
-  descriptor.context.graphics_queue_family_index =
-    context->vulkan_queue_family_index;
-  descriptor.context.get_instance_proc_addr =
-    context->vulkan_get_instance_proc_addr;
-  descriptor.context.get_device_proc_addr =
-    context->vulkan_get_device_proc_addr;
-  descriptor.textures = &entry;
-  descriptor.texture_count = 1;
-  descriptor.format = texture->format;
-  descriptor.final_layout = texture->vulkan_final_layout;
-  mln_render_session_attach_options locked = *options;
-  locked.queue_lock = (mln_queue_lock){
-    .lock = session_locks_queue,
-    .unlock = session_unlocks_queue,
-    .user_data = &queue_lock,
-    .release_user_data = session_releases_queue_lock,
-  };
-  return mln_map_attach_vulkan_borrowed_texture(
-    map, &descriptor, &locked, out_session, completion, NULL
+  const mln_status status = mln_map_attach(
+    map, &target, device, options, out_session, completion, NULL
   );
+  // The session holds the device, and with it the lock.
+  mln_gpu_device_release(device);
+  return status;
 }
 
 int main(void) {
@@ -113,7 +125,8 @@ int main(void) {
   queue_lock.closed = true;
   const int releases = queue_lock.releases;
   probe_queue_lock_give(&queue_lock);
-  // Abandon lets go of each session's lock once it can no longer be called.
+  // Abandon lets go of each session's device, and the lock with it, once the
+  // lock can no longer be called.
   if (releases != 2) {
     (void)fprintf(stderr, "abandon released %d queue locks\n", releases);
     return 1;

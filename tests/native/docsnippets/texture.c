@@ -8,9 +8,7 @@
 
 static atomic_bool finished;
 
-static void on_done(
-  void* user_data, const mln_completion_result* result
-) {
+static void on_done(void* user_data, const mln_completion_result* result) {
   (void)user_data;
   (void)result;
   atomic_store(&finished, true);
@@ -52,16 +50,13 @@ static void draw_frame(void) {
   // #region acquire
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   if (
-    mln_render_session_acquire_frame(session, &frame, NULL) !=
-      MLN_STATUS_OK ||
+    mln_render_session_acquire_frame(session, &frame, NULL) != MLN_STATUS_OK ||
     frame == MLN_HANDLE_NULL
   ) {
     return;  // The session failed, or no new frame is ready yet.
   }
 
-  mln_vulkan_texture_frame texture = {
-    .size = sizeof(mln_vulkan_texture_frame)
-  };
+  mln_vulkan_texture_frame texture = {.size = sizeof(mln_vulkan_texture_frame)};
   mln_acquired_frame_get_vulkan_texture(frame, &texture, NULL);
 
   // Sample the texture, and wait for those reads to finish.
@@ -94,34 +89,44 @@ void mln_doc_texture(
     .size = sizeof(mln_render_session_attach_options),
     .driver = MLN_RENDER_DRIVER_CORE_WORKER,
     .frame_wake = {.callback = on_frame_wake},
-    // Only if your renderer also submits to the graphics queue.
-    .queue_lock = {.lock = lock_queue, .unlock = unlock_queue},
   };
   // #endregion attach-options
 
   // #region attach-borrowed
+  // Your VkDevice and graphics queue.
+  const mln_vulkan_device_descriptor host = {
+    .size = sizeof(mln_vulkan_device_descriptor),
+    .context = vulkan,
+    // Only if your renderer also submits to the graphics queue.
+    .queue_lock = {.lock = lock_queue, .unlock = unlock_queue},
+  };
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  mln_gpu_device_wrap_vulkan(&host, &device, NULL);
+
   // Your VkImage and VkImageView for each texture of the ring.
   const mln_vulkan_borrowed_texture textures[2] = {
     {.image = images[0], .image_view = views[0]},
     {.image = images[1], .image_view = views[1]},
   };
-  const mln_vulkan_borrowed_texture_descriptor ring = {
-    .size = sizeof(mln_vulkan_borrowed_texture_descriptor),
-    // The map's size in logical pixels.
-    .logical_size = {.width = 800, .height = 600},
-    // The size of your textures in device pixels.
-    .physical_width = 1600,
-    .physical_height = 1200,
-    .context = vulkan,
-    .textures = textures,
-    .texture_count = 2,
-    .format = 37,       // VK_FORMAT_R8G8B8A8_UNORM
-    .final_layout = 5,  // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+  const mln_render_target ring = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES,
+    .data.vulkan_borrowed_textures = {
+      // The map's size in logical pixels.
+      .logical_size = {.width = 800, .height = 600},
+      // The size of your textures in device pixels.
+      .physical_width = 1600,
+      .physical_height = 1200,
+      .textures = textures,
+      .texture_count = 2,
+      .format = 37,       // VK_FORMAT_R8G8B8A8_UNORM
+      .final_layout = 5,  // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    },
   };
 
-  mln_map_attach_vulkan_borrowed_texture(
-    map, &ring, &options, &session, &done, NULL
-  );
+  mln_map_attach(map, &ring, device, &options, &session, &done, NULL);
+  // The session keeps the device until it detaches.
+  mln_gpu_device_release(device);
   // #endregion attach-borrowed
   wait_for_done();
 
@@ -133,18 +138,21 @@ void mln_doc_texture(
     {.image = new_images[0], .image_view = new_views[0]},
     {.image = new_images[1], .image_view = new_views[1]},
   };
-  const mln_vulkan_borrowed_texture_replacement resized = {
-    .size = sizeof(mln_vulkan_borrowed_texture_replacement),
-    .logical_size = {.width = 1024, .height = 768},
-    .physical_width = 2048,
-    .physical_height = 1536,
-    .textures = new_textures,
-    .texture_count = 2,
+  const mln_render_target resized = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES,
+    .data.vulkan_borrowed_textures = {
+      .logical_size = {.width = 1024, .height = 768},
+      .physical_width = 2048,
+      .physical_height = 1536,
+      .textures = new_textures,
+      .texture_count = 2,
+      .format = 37,
+      .final_layout = 5,
+    },
   };
 
-  mln_render_session_set_vulkan_borrowed_texture_target(
-    session, &resized, &done, NULL
-  );
+  mln_render_session_set_target(session, &resized, &done, NULL);
   // #endregion resize-borrowed
   wait_for_done();
 

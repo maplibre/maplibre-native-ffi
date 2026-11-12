@@ -147,12 +147,9 @@ class RustEmitterTests(unittest.TestCase):
         files = emitted(rust, api)
         session = files["crates/maplibre-native-ffi/src/generated/render_session.rs"]
         frame = files["crates/maplibre-native-ffi/src/generated/acquired_frame.rs"]
-        # A replacement carries only Vulkan handles, an X11 window, or a GL
-        # texture name, and a consumer sync only an integer handle, with no
-        # pointer.
-        self.assertIn("pub unsafe fn set_vulkan_borrowed_texture_target(", session)
+        # A target names the host's objects, and a consumer sync carries only an
+        # integer handle, with no pointer.
         self.assertIn("pub unsafe fn set_target(", session)
-        self.assertIn("pub unsafe fn set_open_gl_borrowed_texture_target(", session)
         self.assertIn("pub unsafe fn release(", frame)
         self.assertIn("pub fn resize(", session)
 

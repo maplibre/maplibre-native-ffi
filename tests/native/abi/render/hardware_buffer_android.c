@@ -56,12 +56,23 @@ static mln_status start_attach(
       MLN_GPU_SYNC_KIND_FLAG_SYNC_FD | MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
   };
   options.frame_wake = mln_test_pulse_wake();
-  if (queue_lock != NULL) options.queue_lock = *queue_lock;
+  // A host's queue lock is its device's.
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  if (queue_lock != NULL) {
+    mln_gpu_device_options device_options = {
+      .size = sizeof(mln_gpu_device_options),
+      .fields = MLN_GPU_DEVICE_OPTION_BACKEND,
+      .backend = MLN_RENDER_BACKEND_VULKAN,
+      .queue_lock = *queue_lock,
+    };
+    MLN_TEST_OK(mln_gpu_device_create(&device_options, &device, NULL));
+  }
   fixture->driver = driver;
   const mln_status status = mln_map_attach_android_hardware_buffer_ring(
-    map, &descriptor, MLN_HANDLE_NULL, &options, &fixture->session,
+    map, &descriptor, device, &options, &fixture->session,
     &completion->descriptor, MLN_TEST_DIAGNOSTIC
   );
+  mln_gpu_device_release(device);
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
 }
@@ -401,8 +412,8 @@ static void give_host_lock(void* user_data) {
   atomic_fetch_add(&((counted_queue_lock*)user_data)->unlocks, 1);
 }
 
-// A host that submits to the device's queue itself passes its lock, which the
-// session holds around its own queue calls.
+// A host that submits to the device's queue itself gives the device its lock,
+// which the session holds around its own queue calls.
 static void a_hardware_buffer_ring_takes_the_host_queue_lock(void) {
   atomic_store(&host_lock.locks, 0);
   atomic_store(&host_lock.unlocks, 0);

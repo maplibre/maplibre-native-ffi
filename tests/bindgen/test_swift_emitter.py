@@ -65,12 +65,7 @@ class SwiftEmitterTests(unittest.TestCase):
         ]
         self.assertIn("#if os(Android)", android)
         self.assertIn("public func `initAndroid`", android)
-        for group in (
-            "GpuDeviceGpuDevice",
-            "TextureMap",
-            "TextureRenderSession",
-            "TextureAcquiredFrame",
-        ):
+        for group in ("GpuDeviceGpuDevice", "TextureAcquiredFrame"):
             operations = outputs[
                 f"Generated/Operations/Generated{group}Operations.swift"
             ]

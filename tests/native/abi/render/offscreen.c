@@ -444,8 +444,6 @@ static void sessions_on_two_maps_share_one_device(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void queue_lock_callback(void* user_data) { (void)user_data; }
-
 static void attach_rejects_what_an_offscreen_session_cannot_take(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -477,12 +475,6 @@ static void attach_rejects_what_an_offscreen_session_cannot_take(void) {
   caller_thread.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   expect_attach_status(
     MLN_STATUS_UNSUPPORTED, map, device, &descriptor, &caller_thread
-  );
-  mln_render_session_attach_options locked = options;
-  locked.queue_lock.lock = queue_lock_callback;
-  locked.queue_lock.unlock = queue_lock_callback;
-  expect_attach_status(
-    MLN_STATUS_UNSUPPORTED, map, device, &descriptor, &locked
   );
 
   mln_gpu_device_release(device);

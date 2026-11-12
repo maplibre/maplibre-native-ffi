@@ -168,7 +168,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
                 "mln_wake": ["callback", "user_data", "release_user_data"],
             },
         )
-        options = self.bound.values["mln_render_session_attach_options"]
+        options = self.bound.values["mln_gpu_device_options"]
         members = {f.name: f for f in self.values.fields(options)}
         self.assertIn("queue_lock", members)
         self.assertTrue(self.values.member_optional(options, members["queue_lock"]))

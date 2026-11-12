@@ -189,28 +189,37 @@ MLN_API mln_status mln_map_attach(
 ) MLN_NOEXCEPT;
 
 /**
- * Replaces the window or surface that the session presents to, and resizes
- * the map to it.
+ * Replaces the window, surface, or borrowed ring that the session renders to,
+ * and resizes the map to it.
  *
  * Use it to give the session a target again after
- * mln_render_session_release_target(), or to move it to another window or
- * surface. The session presents to `target` with the device that it attached
- * with. Once the replacement completes, the session no longer uses the old
- * target.
+ * mln_render_session_release_target(), to move it to another window or
+ * surface, or to give a borrowed ring new textures, such as of a new size. The
+ * session renders to `target` with the device that it attached with. Once the
+ * replacement completes, the session no longer uses the old target. A
+ * borrowed ring takes only a ring of the kind it attached with, with as many
+ * textures, and with the same format, final layout, and owner. Release every
+ * acquired frame of a borrowed ring first.
  *
  * Returns:
- * - MLN_STATUS_INVALID_STATE when a window is minimized or has no client area.
+ * - MLN_STATUS_INVALID_ARGUMENT when a borrowed ring gets more or fewer
+ *   textures than it attached with.
+ * - MLN_STATUS_INVALID_STATE when a window is minimized or has no client
+ *   area, or while you hold one of a borrowed ring's acquired frames.
  * - MLN_STATUS_UNSUPPORTED when the session renders offscreen, when `target`
- *   is offscreen, or when no backend of this build presents to the target's
- *   kind.
+ *   is offscreen, when a session that presents gets a borrowed ring or a
+ *   borrowed ring gets anything else, or when no backend of this build
+ *   renders to the target's kind.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_STATE when a window was minimized or had no client
  *   area when the replacement ran.
- * - MLN_STATUS_UNSUPPORTED when the session's device can't present to
- *   `target`, or the new target needs a different color format or
- *   pre-rotation support than the old one. Attach a new session instead.
- * - MLN_STATUS_NATIVE_ERROR when the library can't present to the new target.
+ * - MLN_STATUS_UNSUPPORTED when the session's device can't render to
+ *   `target`, the new target needs a different color format or pre-rotation
+ *   support than the old one, or a borrowed ring's new textures differ from
+ *   the old ones in their format, final layout, or owner. Attach a new
+ *   session instead.
+ * - MLN_STATUS_NATIVE_ERROR when the library can't render to the new target.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_set_target(

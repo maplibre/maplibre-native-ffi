@@ -327,7 +327,7 @@ static void a_session_renders_with_the_device_context(void) {
   mln_test_load_style_and_wait(map, mln_test_red_background_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_vulkan_on(map, &fixture, graphics),
+    mln_test_render_fixture_create_vulkan_on(map, &fixture, graphics, device),
     mln_test_graphics_last_error()
   );
 
@@ -440,7 +440,7 @@ static void a_released_device_lasts_until_its_session_detaches(void) {
   mln_test_render_prepare_map(map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_vulkan_on(map, &fixture, graphics),
+    mln_test_render_fixture_create_vulkan_on(map, &fixture, graphics, device),
     mln_test_graphics_last_error()
   );
   render_one_frame(&fixture, 1);

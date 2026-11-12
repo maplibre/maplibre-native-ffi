@@ -220,21 +220,33 @@ bool mln_test_backend_attach_borrowed(
     destroy_backend_state(state);
     return false;
   }
-  mln_open_gl_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  if (
+    mln_gpu_device_wrap_open_gl(&context, &device, MLN_TEST_DIAGNOSTIC) !=
+    MLN_STATUS_OK
+  ) {
+    fprintf(stderr, "wrapping the WebGL context failed\n");
+    destroy_backend_state(state);
+    return false;
+  }
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES,
+    .data.open_gl_borrowed_textures = {
+      .logical_size = {.width = 64, .height = 64},
+      .physical_width = 64,
+      .physical_height = 64,
+      .textures = entries,
+      .texture_count = depth,
+      .target = GL_TEXTURE_2D,
+    },
   };
-  descriptor.logical_size.width = 64;
-  descriptor.logical_size.height = 64;
-  descriptor.physical_width = 64;
-  descriptor.physical_height = 64;
-  descriptor.context = context;
-  descriptor.textures = entries;
-  descriptor.texture_count = depth;
-  descriptor.target = GL_TEXTURE_2D;
   *out_state = state;
-  *out_status = mln_map_attach_open_gl_borrowed_texture(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+  *out_status = mln_map_attach(
+    map, &target, device, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
+  // The session holds the device.
+  mln_gpu_device_release(device);
   return true;
 }
 

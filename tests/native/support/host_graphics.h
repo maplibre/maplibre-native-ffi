@@ -60,7 +60,8 @@ typedef void* (*mln_test_vulkan_device_proc_addr_wrap)(
 // session whose context names `wrap`'s vkGetDeviceProcAddr, so that a case can
 // observe the device functions the session calls. With a non-null `share`,
 // the session attaches on the device and queue of that fixture, which must
-// outlive this one. A non-null `queue_lock` is the session's host queue lock.
+// outlive this one, through a device of its own that wraps them. A non-null
+// `queue_lock` is the wrapped device's host queue lock.
 bool mln_test_render_fixture_create_vulkan_borrowed_texture(
   mln_map map, mln_test_render_fixture* fixture, size_t depth,
   mln_test_vulkan_device_proc_addr_wrap wrap,
@@ -75,9 +76,11 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
 );
 
 // Attaches a session on the preset's driver to a borrowed ring of one texture
-// that the fixture creates on `graphics`, which must outlive the fixture.
+// that the fixture creates on `graphics`, which must outlive the fixture. The
+// session renders on `device`, which `graphics` borrowed its objects from.
 bool mln_test_render_fixture_create_vulkan_on(
-  mln_map map, mln_test_render_fixture* fixture, mln_test_graphics* graphics
+  mln_map map, mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  mln_gpu_device device
 );
 #endif
 

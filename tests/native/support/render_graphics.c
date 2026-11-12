@@ -63,9 +63,13 @@ typedef struct host_state {
   // The compositor of the fixture's surfaces, started with the first one.
   mln_test_wayland* wayland;
 #endif
-  // The Metal command queue that the session attached with, or null. A Metal
-  // texture target must name the same one.
+  // The Metal command queue that the session's device wraps, or null.
   void* command_queue;
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  // The owner that the session's ring attached with, which a replacement
+  // keeps.
+  mln_vulkan_image_owner vulkan_owner;
+#endif
   bool keep_until_exit;
 } host_state;
 
@@ -75,6 +79,9 @@ static void report(const char* what) {
 
 // Set only while a fixture attaches on a graphics object that it doesn't own.
 static mln_test_graphics* shared_graphics = NULL;
+// Set only while a fixture attaches on a device of the caller's, in place of
+// one that wraps its graphics object.
+static mln_gpu_device shared_device = MLN_HANDLE_NULL;
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 // Set only while mln_test_render_fixture_create_vulkan_handoff_ring()
 // attaches.
@@ -194,42 +201,51 @@ uint32_t mln_test_backend_driver(void) {
 
 void mln_test_release_thread_gpu_resources(void) {}
 
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-static mln_metal_context_descriptor host_context(
-  const mln_test_graphics_context* context
-) {
-  return (mln_metal_context_descriptor){
-    .device = context->metal_device,
-  };
-}
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 // Set only while one of the mln_test_render_fixture_create_vulkan_*()
 // functions attaches, to replace the context's PFN_vkGetDeviceProcAddr and to
-// give the session a host queue lock.
+// give the device a host queue lock.
 static mln_test_vulkan_device_proc_addr_wrap wrap_device_proc_addr = NULL;
 static const mln_queue_lock* attach_queue_lock = NULL;
+#endif
 
-static mln_vulkan_context_descriptor host_context(
-  const mln_test_graphics_context* context
+// Wraps the device or context of the graphics object with `context` as a
+// device for the fixture's session, or returns the null handle.
+static mln_gpu_device host_device(
+  const mln_test_graphics_context* context, host_state* state
 ) {
-  return (mln_vulkan_context_descriptor){
-    .instance = context->vulkan_instance,
-    .physical_device = context->vulkan_physical_device,
-    .device = context->vulkan_device,
-    .graphics_queue = context->vulkan_queue,
-    .graphics_queue_family_index = context->vulkan_queue_family_index,
-    .get_instance_proc_addr = context->vulkan_get_instance_proc_addr,
-    .get_device_proc_addr =
-      wrap_device_proc_addr == NULL
-        ? context->vulkan_get_device_proc_addr
-        : wrap_device_proc_addr(context->vulkan_get_device_proc_addr),
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  mln_status status = MLN_STATUS_UNSUPPORTED;
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  const mln_metal_device_descriptor descriptor = {
+    .size = sizeof(mln_metal_device_descriptor),
+    .device = context->metal_device,
+    .command_queue = state->command_queue,
   };
-}
+  status = mln_gpu_device_wrap_metal(&descriptor, &device, MLN_TEST_DIAGNOSTIC);
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  (void)state;
+  mln_vulkan_device_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_device_descriptor),
+    .context = {
+      .instance = context->vulkan_instance,
+      .physical_device = context->vulkan_physical_device,
+      .device = context->vulkan_device,
+      .graphics_queue = context->vulkan_queue,
+      .graphics_queue_family_index = context->vulkan_queue_family_index,
+      .get_instance_proc_addr = context->vulkan_get_instance_proc_addr,
+      .get_device_proc_addr =
+        wrap_device_proc_addr == NULL
+          ? context->vulkan_get_device_proc_addr
+          : wrap_device_proc_addr(context->vulkan_get_device_proc_addr),
+    },
+  };
+  if (attach_queue_lock != NULL) descriptor.queue_lock = *attach_queue_lock;
+  status =
+    mln_gpu_device_wrap_vulkan(&descriptor, &device, MLN_TEST_DIAGNOSTIC);
 #elif defined(MLN_FFI_TEST_OPENGL_WGL)
-static mln_open_gl_context_descriptor host_context(
-  const mln_test_graphics_context* context
-) {
-  return (mln_open_gl_context_descriptor){
+  (void)state;
+  const mln_open_gl_context_descriptor descriptor = {
     .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL,
     .data = {
       .wgl = {
@@ -239,42 +255,48 @@ static mln_open_gl_context_descriptor host_context(
       }
     },
   };
-}
+  status =
+    mln_gpu_device_wrap_open_gl(&descriptor, &device, MLN_TEST_DIAGNOSTIC);
 #else
-static mln_open_gl_context_descriptor host_context(
-  const mln_test_graphics_context* context
-) {
-  return (mln_open_gl_context_descriptor){
+  (void)state;
+  const mln_open_gl_context_descriptor descriptor = {
     .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
     .data = {
       .egl = {
         .display = context->egl_display,
         .config = context->egl_config,
         .share_context = context->egl_context,
+        .get_proc_address = context->get_proc_address,
       }
     },
   };
-}
+  status =
+    mln_gpu_device_wrap_open_gl(&descriptor, &device, MLN_TEST_DIAGNOSTIC);
 #endif
+  if (status != MLN_STATUS_OK) {
+    fprintf(
+      stderr, "the render fixture could not wrap its device: %s\n",
+      mln_test_last_error()
+    );
+    return MLN_HANDLE_NULL;
+  }
+  return device;
+}
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-typedef mln_metal_borrowed_texture_descriptor borrowed_descriptor;
 typedef mln_metal_borrowed_texture borrowed_entry;
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-typedef mln_vulkan_borrowed_texture_descriptor borrowed_descriptor;
 typedef mln_vulkan_borrowed_texture borrowed_entry;
 #else
-typedef mln_open_gl_borrowed_texture_descriptor borrowed_descriptor;
 typedef mln_open_gl_borrowed_texture borrowed_entry;
 #endif
 
-// Describes `textures`, which the graphics object with `context` created, as a
-// borrowed ring of their size. The descriptor's array points at `entries`,
-// which has room for `count` entries.
+// Describes `textures` as a borrowed ring target of their size, for the
+// fixture with `state`. The target's array points at `entries`, which has
+// room for `count` entries.
 static bool describe_ring(
-  const mln_test_graphics_context* context,
-  mln_test_graphics_texture* const* textures, size_t count,
-  borrowed_entry* entries, borrowed_descriptor* out
+  const host_state* state, mln_test_graphics_texture* const* textures,
+  size_t count, borrowed_entry* entries, mln_render_target* out
 ) {
   mln_test_graphics_texture_info info = {0};
   for (size_t index = 0; index < count; index += 1) {
@@ -294,32 +316,44 @@ static bool describe_ring(
 #endif
   }
   // Every texture of the ring shares the last one's format and size.
+  const mln_logical_size logical_size = {
+    .width = info.width, .height = info.height
+  };
+  *out = (mln_render_target){.size = sizeof(mln_render_target)};
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  (void)context;
-  *out = (mln_metal_borrowed_texture_descriptor){
-    .size = sizeof(mln_metal_borrowed_texture_descriptor)
+  (void)state;
+  out->kind = MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES;
+  out->data.metal_borrowed_textures = (mln_metal_borrowed_textures_target){
+    .logical_size = logical_size,
+    .physical_width = info.width,
+    .physical_height = info.height,
+    .textures = entries,
+    .texture_count = count,
   };
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  *out = (mln_vulkan_borrowed_texture_descriptor){
-    .size = sizeof(mln_vulkan_borrowed_texture_descriptor)
+  out->kind = MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES;
+  out->data.vulkan_borrowed_textures = (mln_vulkan_borrowed_textures_target){
+    .logical_size = logical_size,
+    .physical_width = info.width,
+    .physical_height = info.height,
+    .textures = entries,
+    .texture_count = count,
+    .format = info.format,
+    .final_layout = info.vulkan_final_layout,
+    .owner = state->vulkan_owner,
   };
-  out->context = host_context(context);
-  out->format = info.format;
-  out->final_layout = info.vulkan_final_layout;
-  out->owner = attach_vulkan_owner;
 #else
-  *out = (mln_open_gl_borrowed_texture_descriptor){
-    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
+  (void)state;
+  out->kind = MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES;
+  out->data.open_gl_borrowed_textures = (mln_open_gl_borrowed_textures_target){
+    .logical_size = logical_size,
+    .physical_width = info.width,
+    .physical_height = info.height,
+    .textures = entries,
+    .texture_count = count,
+    .target = info.opengl_target,
   };
-  out->context = host_context(context);
-  out->target = info.opengl_target;
 #endif
-  out->textures = entries;
-  out->texture_count = count;
-  out->logical_size =
-    (mln_logical_size){.width = info.width, .height = info.height};
-  out->physical_width = info.width;
-  out->physical_height = info.height;
   return true;
 }
 
@@ -455,42 +489,41 @@ bool mln_test_backend_attach_borrowed(
     );
     state->texture_count += state->textures[index] != NULL;
   }
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  state->vulkan_owner = attach_vulkan_owner;
+#endif
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  if (attach_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
+    state->command_queue =
+      mln_test_graphics_metal_command_queue(state->graphics);
+#endif
   borrowed_entry entries[MLN_TEXTURE_RING_MAX_DEPTH];
-  borrowed_descriptor descriptor;
+  mln_render_target target;
   if (
     state->texture_count != depth ||
     !describe_ring(
-      &state->context, state->textures, state->texture_count, entries,
-      &descriptor
+      state, state->textures, state->texture_count, entries, &target
     )
   ) {
     report("the render fixture could not create a borrowed texture");
     mln_test_backend_destroy(state);
     return false;
   }
+  const mln_gpu_device device = shared_device != MLN_HANDLE_NULL
+                                  ? shared_device
+                                  : host_device(&state->context, state);
+  if (device == MLN_HANDLE_NULL) {
+    mln_test_backend_destroy(state);
+    return false;
+  }
   *out_state = state;
   mln_render_session_attach_options attach = *options;
   attach.producer_sync_kinds |= attach_sync_kinds;
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  if (attach_sync_kinds & MLN_GPU_SYNC_KIND_FLAG_QUEUE_ORDER)
-    state->command_queue =
-      mln_test_graphics_metal_command_queue(state->graphics);
-  descriptor.command_queue = state->command_queue;
-  *out_status = mln_map_attach_metal_borrowed_texture(
-    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
+  *out_status = mln_map_attach(
+    map, &target, device, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  if (attach_queue_lock != NULL) {
-    attach.queue_lock = *attach_queue_lock;
-  }
-  *out_status = mln_map_attach_vulkan_borrowed_texture(
-    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-#else
-  *out_status = mln_map_attach_open_gl_borrowed_texture(
-    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
-  );
-#endif
+  // The session holds the device.
+  if (device != shared_device) mln_gpu_device_release(device);
   return true;
 }
 
@@ -570,13 +603,16 @@ bool mln_test_render_fixture_create_vulkan_handoff_ring(
 }
 
 bool mln_test_render_fixture_create_vulkan_on(
-  mln_map map, mln_test_render_fixture* fixture, mln_test_graphics* graphics
+  mln_map map, mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  mln_gpu_device device
 ) {
   shared_graphics = graphics;
+  shared_device = device;
   const bool attached = mln_test_render_fixture_create_borrowed_ring(
     map, fixture, 1, MLN_TEST_PRESET_DRIVER
   );
   shared_graphics = NULL;
+  shared_device = MLN_HANDLE_NULL;
   return attached;
 }
 #endif
@@ -798,43 +834,22 @@ mln_status mln_test_render_fixture_set_textures(
   mln_test_graphics_texture* const* textures, size_t count,
   const mln_completion* completion
 ) {
-  // A replacement keeps the session's context, so the ring's goes unused.
-  const mln_test_graphics_context context = {0};
+  // A fixture without a ring, such as an offscreen one, describes the
+  // textures with the defaults.
+  const host_state defaults = {0};
+  const host_state* state =
+    fixture->backend_state != NULL ? fixture->backend_state : &defaults;
   borrowed_entry entries[MLN_TEXTURE_RING_MAX_DEPTH];
-  borrowed_descriptor descriptor;
+  mln_render_target target;
   if (
     count > MLN_TEXTURE_RING_MAX_DEPTH ||
-    !describe_ring(&context, textures, count, entries, &descriptor)
+    !describe_ring(state, textures, count, entries, &target)
   ) {
     return MLN_STATUS_NATIVE_ERROR;
   }
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  const mln_metal_borrowed_texture_replacement replacement = {
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  const mln_vulkan_borrowed_texture_replacement replacement = {
-#else
-  const mln_open_gl_borrowed_texture_replacement replacement = {
-#endif
-    .size = sizeof(replacement),
-    .logical_size = descriptor.logical_size,
-    .physical_width = descriptor.physical_width,
-    .physical_height = descriptor.physical_height,
-    .textures = descriptor.textures,
-    .texture_count = descriptor.texture_count,
-  };
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  return mln_render_session_set_metal_borrowed_texture_target(
-    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
+  return mln_render_session_set_target(
+    fixture->session, &target, completion, MLN_TEST_DIAGNOSTIC
   );
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  return mln_render_session_set_vulkan_borrowed_texture_target(
-    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
-  );
-#else
-  return mln_render_session_set_open_gl_borrowed_texture_target(
-    fixture->session, &replacement, completion, MLN_TEST_DIAGNOSTIC
-  );
-#endif
 }
 
 mln_status mln_test_render_fixture_set_surface(

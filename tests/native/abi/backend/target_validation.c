@@ -54,6 +54,8 @@ TARGET_SIZE_EDITS(android_window)
 TARGET_SIZE_EDITS(ohos_window)
 TARGET_SIZE_EDITS(web_gpu_surface)
 TARGET_SIZE_EDITS(html_canvas)
+TARGET_SIZE_EDITS(vulkan_surface)
+TARGET_SIZE_EDITS(open_gl_surface)
 TARGET_NULL_EDIT(metal_layer, layer)
 TARGET_NULL_EDIT(win32_window, window)
 TARGET_NULL_EDIT(xlib_window, display)
@@ -62,6 +64,12 @@ TARGET_NULL_EDIT(wayland_surface, surface)
 TARGET_NULL_EDIT(android_window, window)
 TARGET_NULL_EDIT(ohos_window, window)
 TARGET_NULL_EDIT(web_gpu_surface, surface)
+TARGET_NULL_EDIT(open_gl_surface, surface)
+
+static void vulkan_surface_without_surface(void* call) {
+  ((mln_test_target_call*)call)->descriptor.target.data.vulkan_surface.surface =
+    MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
+}
 
 static void xlib_window_without_window(void* call) {
   ((mln_test_target_call*)call)->descriptor.target.data.xlib_window.window = 0;
@@ -148,6 +156,20 @@ static mln_render_target describe(mln_render_target_kind kind) {
         .selector = {canvas_selector, sizeof(canvas_selector) - 1},
       };
       break;
+    case MLN_RENDER_TARGET_KIND_VULKAN_SURFACE:
+      // A surface with bits above the low 32, so a carrier that truncated it
+      // would pass another surface.
+      target.data.vulkan_surface = (mln_vulkan_surface_target){
+        .logical_size = size, .surface = UINT64_C(0x8000000000000001)
+      };
+      break;
+    case MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE:
+      target.data.open_gl_surface = (mln_open_gl_surface_target){
+        .logical_size = size, .surface = MLN_TEST_FAKE_HANDLE
+      };
+      break;
+    default:
+      break;
   }
   return target;
 }
@@ -219,6 +241,19 @@ static const kind_rows every_kind[] = {
      MLN_STATUS_INVALID_ARGUMENT, "selector"}},
    3,
    TARGET_OVERFLOW_CASE(html_canvas)},
+  {MLN_RENDER_TARGET_KIND_VULKAN_SURFACE,
+   MLN_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE,
+   {TARGET_SIZE_CASES(vulkan_surface),
+    {"null vulkan_surface surface", vulkan_surface_without_surface,
+     MLN_STATUS_INVALID_ARGUMENT, "must not be null"}},
+   3,
+   TARGET_OVERFLOW_CASE(vulkan_surface)},
+  {MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE,
+   MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_SURFACE,
+   {TARGET_SIZE_CASES(open_gl_surface),
+    TARGET_NULL_CASE(open_gl_surface, surface)},
+   3,
+   TARGET_OVERFLOW_CASE(open_gl_surface)},
 };
 
 enum { kind_count = sizeof(every_kind) / sizeof(every_kind[0]) };
