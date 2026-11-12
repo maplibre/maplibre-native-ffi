@@ -1263,8 +1263,9 @@ typedef enum mln_clip_depth_range : uint32_t {
  * World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at
  * 180° east, and on past both into the copies of the world beside the first.
  * y runs from 0 at the north edge of the Mercator world, about 85.05° north, to
- * 1 at its south edge. z is the altitude in meters above sea level, where the
- * map draws its ground at 0.
+ * 1 at its south edge. z is the altitude in meters above sea level, at the
+ * scale of the heights of the map's 3D layers, and the map draws its ground at
+ * 0.
  *
  * `matrix` takes a world point to the clip coordinates where the frame drew
  * it, with the camera's padding, roll, field of view, and center altitude, and
@@ -1283,12 +1284,12 @@ typedef enum mln_clip_depth_range : uint32_t {
  * them.
  *
  * The frame's depth starts at 1. The map's 3D layers write the depth of each of
- * their fragments. Each 2D layer below every 3D layer of the style, such as a
- * background or a fill, writes one depth over all its opaque fragments,
+ * their fragments. A 2D layer below every 3D layer of the style that draws
+ * opaque fragments, such as an opaque fill, writes one depth over all of them,
  * wherever they are: the higher the layer, the lower its depth, and every one
- * between `far_depth` and 1. The other 2D layers, such as labels above a 3D
- * layer, and translucent fragments, write no depth. So what you draw through
- * `matrix`, even on the ground, lies in front of every 2D layer.
+ * between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D
+ * layers above a 3D layer, such as labels, write no depth. So what you draw
+ * through `matrix`, even on the ground, lies in front of every 2D layer.
  *
  * While `globe` is true, the frame drew the map onto a globe, and its 2D layers
  * wrote no depth. `matrix` then is the map's Mercator one, which doesn't place

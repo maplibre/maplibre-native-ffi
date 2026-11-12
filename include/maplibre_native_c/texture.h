@@ -225,10 +225,11 @@ typedef struct mln_dxgi_shared_texture_frame {
  * frame's depth image in the same way. Otherwise `depth_fd` is -1 and the
  * others are zero. The depth image is 2D, of `depth_format`, with one mip
  * level, one layer, optimal tiling, and the usage
- * VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT and VK_IMAGE_USAGE_SAMPLED_BIT.
- * Each frame leaves it in VK_IMAGE_LAYOUT_GENERAL, released to
- * VK_QUEUE_FAMILY_EXTERNAL. In OpenGL, make its texture with the internal
- * format that mln_depth_stencil_format_flag names for `depth_format`.
+ * VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_USAGE_SAMPLED_BIT, and
+ * VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame leaves it in
+ * VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL. In OpenGL,
+ * make its texture with the internal format that mln_depth_stencil_format_flag
+ * names for `depth_format`.
  */
 typedef struct mln_opaque_fd_frame {
   uint32_t size;
@@ -353,7 +354,9 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
  * device: the texture of the dmabuf that mln_acquired_frame_get_dma_buf()
  * gets, and the frame's depth texture with
  * mln_render_session_attach_options.keep_depth, in the device's share group.
- * Wait for mln_acquired_frame_get_producer_sync() before you use them.
+ * An exported ring's textures hold the frame upside down from OpenGL's rows,
+ * top row first, as a dmabuf's readers take it, so negate clip y to draw into
+ * them. Wait for mln_acquired_frame_get_producer_sync() before you use them.
  *
  * Returns:
  * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
