@@ -236,6 +236,8 @@ struct mln_test_graphics {
   vulkan_functions vk;
   // Set when the instance and device are the caller's.
   bool vulkan_borrowed;
+  // The device extensions that the library's device enabled.
+  const char* vulkan_device_extensions[6];
   VkCommandPool vulkan_command_pool;
   bool vulkan_headless_surface;
   bool vulkan_metal_surface;
@@ -906,6 +908,12 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
       graphics->context.vulkan_device = device;
       graphics->context.vulkan_queue = queue;
       graphics->context.vulkan_queue_family_index = q;
+      for (uint32_t e = 0; e < enabled_count; e += 1) {
+        graphics->vulkan_device_extensions[e] = enabled[e];
+      }
+      graphics->context.vulkan_device_extensions =
+        graphics->vulkan_device_extensions;
+      graphics->context.vulkan_device_extension_count = enabled_count;
       break;
     }
     free(queues);

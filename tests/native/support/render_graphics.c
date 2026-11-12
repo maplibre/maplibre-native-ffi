@@ -209,6 +209,21 @@ static mln_test_vulkan_device_proc_addr_wrap wrap_device_proc_addr = NULL;
 static const mln_queue_lock* attach_queue_lock = NULL;
 #endif
 
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+// The device extensions that the fixture's device enabled, as a wrap lists
+// them.
+static size_t vulkan_extension_views(
+  const mln_test_graphics_context* context, mln_buffer_view out[8]
+) {
+  size_t count = 0;
+  for (; count < context->vulkan_device_extension_count && count < 8; ++count) {
+    out[count] =
+      mln_buffer_view_from_cstr(context->vulkan_device_extensions[count]);
+  }
+  return count;
+}
+#endif
+
 // Wraps the device or context of the graphics object with `context` as a
 // device for the fixture's session, or returns the null handle.
 static mln_gpu_device host_device(
@@ -225,20 +240,25 @@ static mln_gpu_device host_device(
   status = mln_gpu_device_wrap_metal(&descriptor, &device, MLN_TEST_DIAGNOSTIC);
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
   (void)state;
+  mln_buffer_view extensions[8];
+  const size_t extension_count = vulkan_extension_views(context, extensions);
   mln_vulkan_device_descriptor descriptor = {
     .size = sizeof(mln_vulkan_device_descriptor),
-    .context = {
-      .instance = context->vulkan_instance,
-      .physical_device = context->vulkan_physical_device,
-      .device = context->vulkan_device,
-      .graphics_queue = context->vulkan_queue,
-      .graphics_queue_family_index = context->vulkan_queue_family_index,
-      .get_instance_proc_addr = context->vulkan_get_instance_proc_addr,
-      .get_device_proc_addr =
-        wrap_device_proc_addr == NULL
-          ? context->vulkan_get_device_proc_addr
-          : wrap_device_proc_addr(context->vulkan_get_device_proc_addr),
-    },
+    .context =
+      {
+        .instance = context->vulkan_instance,
+        .physical_device = context->vulkan_physical_device,
+        .device = context->vulkan_device,
+        .graphics_queue = context->vulkan_queue,
+        .graphics_queue_family_index = context->vulkan_queue_family_index,
+        .get_instance_proc_addr = context->vulkan_get_instance_proc_addr,
+        .get_device_proc_addr =
+          wrap_device_proc_addr == NULL
+            ? context->vulkan_get_device_proc_addr
+            : wrap_device_proc_addr(context->vulkan_get_device_proc_addr),
+      },
+    .enabled_extensions = extensions,
+    .enabled_extension_count = extension_count,
   };
   if (attach_queue_lock != NULL) descriptor.queue_lock = *attach_queue_lock;
   status =

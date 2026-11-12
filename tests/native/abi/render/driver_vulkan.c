@@ -1,11 +1,25 @@
 // What the Vulkan driver does with the host's device and queue.
 
+#include <string.h>
 #include <vulkan/vulkan_core.h>
 
 #include "mln_test_graphics.h"
 #include "support/frames.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
+
+// The device extensions that the fixture's device enabled, as a wrap lists
+// them.
+static size_t vulkan_extension_views(
+  const mln_test_graphics_context* context, mln_buffer_view out[8]
+) {
+  size_t count = 0;
+  for (; count < context->vulkan_device_extension_count && count < 8; ++count) {
+    out[count] =
+      mln_buffer_view_from_cstr(context->vulkan_device_extensions[count]);
+  }
+  return count;
+}
 
 // A wrap checks the queue family against the physical device before any
 // session uses the device, so a session never fails on it.
@@ -43,10 +57,59 @@ static void a_wrap_checks_the_queue_family_against_the_physical_device(void) {
     MLN_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES,
     capabilities.target_kinds
   );
+  // Without the host's extensions, the device offers nothing that needs one.
+  TEST_ASSERT_EQUAL_HEX32(0, capabilities.export_kinds);
+  TEST_ASSERT_BITS_LOW(MLN_GPU_SYNC_KIND_FLAG_SYNC_FD, capabilities.sync_kinds);
   mln_gpu_device_vulkan_context_result result = {.size = sizeof(result)};
   MLN_TEST_OK(mln_gpu_device_get_vulkan_context(device, &result, NULL));
   TEST_ASSERT_EQUAL_PTR(context.vulkan_device, result.context.device);
   TEST_ASSERT_EQUAL_PTR(context.vulkan_queue, result.context.graphics_queue);
+  mln_gpu_device_release(device);
+  mln_test_graphics_destroy(graphics);
+}
+
+// A wrapped device offers a sync file only once the host lists the extension
+// that it needs, and the GPU supports it.
+static void a_wrap_offers_what_the_hosts_extensions_allow(void) {
+  mln_test_graphics* graphics =
+    mln_test_graphics_create(MLN_TEST_GRAPHICS_BACKEND_VULKAN);
+  TEST_ASSERT_NOT_NULL_MESSAGE(graphics, mln_test_graphics_last_error());
+  mln_test_graphics_context context = {0};
+  TEST_ASSERT_TRUE(mln_test_graphics_get_context(graphics, &context));
+  mln_buffer_view extensions[8];
+  mln_vulkan_device_descriptor descriptor = {
+    .size = sizeof(mln_vulkan_device_descriptor),
+    .context =
+      {
+        .instance = context.vulkan_instance,
+        .physical_device = context.vulkan_physical_device,
+        .device = context.vulkan_device,
+        .graphics_queue = context.vulkan_queue,
+        .graphics_queue_family_index = context.vulkan_queue_family_index,
+        .get_instance_proc_addr = context.vulkan_get_instance_proc_addr,
+        .get_device_proc_addr = context.vulkan_get_device_proc_addr,
+      },
+    .enabled_extensions = extensions,
+    .enabled_extension_count = vulkan_extension_views(&context, extensions),
+  };
+  bool listed = false;
+  for (size_t index = 0; index < descriptor.enabled_extension_count; ++index) {
+    listed |=
+      strcmp(
+        context.vulkan_device_extensions[index], "VK_KHR_external_semaphore_fd"
+      ) == 0;
+  }
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_gpu_device_wrap_vulkan(&descriptor, &device, NULL));
+  mln_gpu_device_capabilities capabilities = {.size = sizeof(capabilities)};
+  MLN_TEST_OK(mln_gpu_device_get_capabilities(device, &capabilities, NULL));
+  if (!listed) {
+    TEST_ASSERT_BITS_LOW(
+      MLN_GPU_SYNC_KIND_FLAG_SYNC_FD, capabilities.sync_kinds
+    );
+  }
+  // The fixture enables no external memory extension.
+  TEST_ASSERT_EQUAL_HEX32(0, capabilities.export_kinds);
   mln_gpu_device_release(device);
   mln_test_graphics_destroy(graphics);
 }
@@ -882,6 +945,7 @@ static void detach_destroys_a_borrowed_ring_with_a_disposed_frame(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_wrap_checks_the_queue_family_against_the_physical_device);
+  RUN_TEST(a_wrap_offers_what_the_hosts_extensions_allow);
   RUN_TEST(sessions_sharing_a_queue_call_their_own_device_functions);
   RUN_TEST(a_session_takes_the_host_queue_lock_around_its_queue_calls);
   RUN_TEST(abandon_drains_under_the_host_queue_lock_and_releases_it);
