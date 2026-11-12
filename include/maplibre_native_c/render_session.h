@@ -199,7 +199,10 @@ MLN_API mln_status mln_map_attach(
  * replacement completes, the session no longer uses the old target. A
  * borrowed ring takes only a ring of the kind it attached with, with as many
  * textures, and with the same format, final layout, and owner. Release every
- * acquired frame of a borrowed ring first.
+ * acquired frame of a borrowed ring first. Once the replacement completes, the
+ * session has also stopped waiting on the consumer sync of the textures that
+ * the new ring doesn't have, as mln_render_session_release_target() says, so
+ * you can reuse or destroy them.
  *
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when a borrowed ring gets more or fewer
@@ -503,6 +506,11 @@ MLN_API mln_status mln_render_session_resize(
  * finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release completes,
  * you can destroy the old target. An Android or OpenHarmony window can go away
  * sooner, as mln_android_window_target and mln_ohos_window_target say.
+ *
+ * For a borrowed ring, a completed release also means that the session has
+ * stopped waiting on the consumer sync that you released its frames with, so
+ * you can reuse or destroy the textures. The session waits about a second at
+ * most for that sync, and logs a warning when the wait runs out.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into Android
