@@ -108,6 +108,15 @@ typedef struct mln_gpu_device_capabilities {
   mln_gpu_export_kind_flags export_kinds;
   /** The kinds of mln_gpu_sync that the device can signal and wait on. */
   mln_gpu_sync_kind_flags sync_kinds;
+  /** The formats of the depth textures that a borrowed ring takes. */
+  mln_depth_stencil_format_flags depth_stencil_formats;
+  /**
+   * The kinds of `export_kinds` whose rings also share each frame's depth
+   * texture, with mln_render_session_attach_options.keep_depth. An IOSurface
+   * or a dmabuf holds no depth format, so only MLN_GPU_EXPORT_KIND_OPAQUE_FD
+   * can be here.
+   */
+  mln_gpu_export_kind_flags depth_export_kinds;
 } mln_gpu_device_capabilities;
 
 /**

@@ -162,6 +162,27 @@ typedef enum MLN_BINDING("kind=bitmask") mln_gpu_export_kind_flag : uint32_t {
 /** A set of mln_gpu_export_kind_flag bits. */
 typedef uint32_t mln_gpu_export_kind_flags;
 
+/** A format of depth and stencil textures, as a bit in a set. */
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_depth_stencil_format_flag : uint32_t {
+  /**
+   * 24-bit normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
+   * MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
+   * WGPUTextureFormat_Depth24PlusStencil8.
+   */
+  MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8 = 1U << 0U,
+  /**
+   * 32-bit float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
+   * MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
+   * WGPUTextureFormat_Depth32FloatStencil8.
+   */
+  MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8 = 1U << 1U,
+} mln_depth_stencil_format_flag;
+
+/** A set of mln_depth_stencil_format_flag bits. */
+typedef uint32_t mln_depth_stencil_format_flags;
+
 /** Options for attaching a render session to a map. */
 typedef struct mln_render_session_attach_options {
   uint32_t size;
@@ -205,6 +226,19 @@ typedef struct mln_render_session_attach_options {
    * again until a service runs.
    */
   mln_wake driver_work_wake;
+  /**
+   * Whether an exported ring keeps the depth and stencil of each frame for
+   * you, so that you can draw into the frame depth-tested against the map, as
+   * mln_frame_projection says. The getter of the device's API, such as
+   * mln_acquired_frame_get_vulkan_texture(), gets a frame's depth texture on
+   * the device, and mln_acquired_frame_get_opaque_fd() shares it across APIs
+   * when mln_gpu_device_capabilities.depth_export_kinds has the ring's kind.
+   * Keeping depth costs memory bandwidth, most on tile-based GPUs. A borrowed
+   * ring keeps depth in the textures that you give it instead, and the other
+   * targets keep none, so an attach to them with `keep_depth` fails with
+   * MLN_STATUS_UNSUPPORTED.
+   */
+  bool keep_depth;
 } mln_render_session_attach_options;
 
 /** What an attached render session supports. */
@@ -600,6 +634,15 @@ typedef struct mln_metal_borrowed_texture {
  * must all have that size, the device's `MTLDevice`, one pixel format, one
  * sample, and `MTLTextureUsageRenderTarget`. The ring holds up to
  * MLN_TEXTURE_RING_MAX_DEPTH distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as mln_frame_projection says: one for each of `textures`, at the
+ * same index, or none. Each frame clears the one at its slot, renders the
+ * map's depth and stencil into it, and stores them. They must have the size of
+ * `textures`, one pixel format of
+ * mln_gpu_device_capabilities.depth_stencil_formats, one sample,
+ * `MTLTextureUsageRenderTarget`, and a storage mode other than
+ * `MTLStorageModeMemoryless`.
  */
 typedef struct mln_metal_borrowed_textures_target {
   mln_logical_size logical_size MLN_BINDING("required=true");
@@ -608,6 +651,9 @@ typedef struct mln_metal_borrowed_textures_target {
   const mln_metal_borrowed_texture* textures
     MLN_BINDING("length=texture_count;required=true");
   size_t texture_count;
+  const mln_metal_borrowed_texture* depth_textures
+    MLN_BINDING("length=depth_texture_count");
+  size_t depth_texture_count;
 } mln_metal_borrowed_textures_target;
 
 /** A Vulkan image of a borrowed ring. */
@@ -643,6 +689,15 @@ typedef enum mln_vulkan_image_owner : uint32_t {
  * have that size, `format`, and `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT`, and
  * belong to the device's `VkDevice`. The ring holds up to
  * MLN_TEXTURE_RING_MAX_DEPTH distinct images.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as mln_frame_projection says: one for each of `textures`, at the
+ * same index, or none. Each frame clears the one at its slot, renders the
+ * map's depth and stencil into it, stores them, and leaves it in
+ * `depth_final_layout`, with `owner` as for the color image. They must have the
+ * size of `textures`, `depth_format`, one sample, and
+ * `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and their views both the
+ * depth and the stencil aspect.
  */
 typedef struct mln_vulkan_borrowed_textures_target {
   mln_logical_size logical_size MLN_BINDING("required=true");
@@ -656,6 +711,16 @@ typedef struct mln_vulkan_borrowed_textures_target {
   /** The `VkImageLayout` that each frame leaves its image in. */
   uint32_t final_layout MLN_BINDING("required=true");
   mln_vulkan_image_owner owner;
+  const mln_vulkan_borrowed_texture* depth_textures
+    MLN_BINDING("length=depth_texture_count");
+  size_t depth_texture_count;
+  /**
+   * The depth images' `VkFormat`, of
+   * mln_gpu_device_capabilities.depth_stencil_formats.
+   */
+  uint32_t depth_format;
+  /** The `VkImageLayout` that each frame leaves its depth image in. */
+  uint32_t depth_final_layout;
 } mln_vulkan_borrowed_textures_target;
 
 /** An OpenGL texture of a borrowed ring. */
@@ -672,6 +737,13 @@ typedef struct mln_open_gl_borrowed_texture {
  * which is usually `logical_size` times the map's scale factor. Each texture
  * must be in your context's share group, with RGBA8 storage of that size. The
  * ring holds up to MLN_TEXTURE_RING_MAX_DEPTH distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as mln_frame_projection says: one for each of `textures`, at the
+ * same index, or none. Each frame clears the one at its slot, and renders the
+ * map's depth and stencil into it. They must be `GL_TEXTURE_2D` textures in the
+ * share group, with storage of the size of `textures` in a format of
+ * mln_gpu_device_capabilities.depth_stencil_formats.
  */
 typedef struct mln_open_gl_borrowed_textures_target {
   mln_logical_size logical_size MLN_BINDING("required=true");
@@ -682,6 +754,9 @@ typedef struct mln_open_gl_borrowed_textures_target {
   size_t texture_count;
   /** The textures' target. It must be `GL_TEXTURE_2D`. */
   uint32_t target MLN_BINDING("required=true");
+  const mln_open_gl_borrowed_texture* depth_textures
+    MLN_BINDING("length=depth_texture_count");
+  size_t depth_texture_count;
 } mln_open_gl_borrowed_textures_target;
 
 /** A WebGPU texture of a borrowed ring. */
@@ -701,6 +776,14 @@ typedef struct mln_web_gpu_borrowed_texture {
  * must be 2D with that size, `format`, one layer, one mip level, one sample,
  * and `WGPUTextureUsage_RenderAttachment`. The ring holds up to
  * MLN_TEXTURE_RING_MAX_DEPTH distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as mln_frame_projection says: one for each of `textures`, at the
+ * same index, or none. Each frame clears the one at its slot, renders the
+ * map's depth and stencil into it, and stores them. They must be 2D with the
+ * size of `textures`, `depth_format`, one layer, one mip level, one sample, and
+ * `WGPUTextureUsage_RenderAttachment`, and their views both the depth and the
+ * stencil aspect.
  */
 typedef struct mln_web_gpu_borrowed_textures_target {
   mln_logical_size logical_size MLN_BINDING("required=true");
@@ -711,6 +794,14 @@ typedef struct mln_web_gpu_borrowed_textures_target {
   size_t texture_count;
   /** The textures' `WGPUTextureFormat`. */
   uint32_t format MLN_BINDING("required=true");
+  const mln_web_gpu_borrowed_texture* depth_textures
+    MLN_BINDING("length=depth_texture_count");
+  size_t depth_texture_count;
+  /**
+   * The depth textures' `WGPUTextureFormat`, of
+   * mln_gpu_device_capabilities.depth_stencil_formats.
+   */
+  uint32_t depth_format;
 } mln_web_gpu_borrowed_textures_target;
 
 /** A DRM format and modifier that you can import. */

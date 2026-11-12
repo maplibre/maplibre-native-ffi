@@ -22,7 +22,13 @@
 extern "C" {
 #endif
 
-/** The Metal texture of an acquired frame. */
+/**
+ * The Metal texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture: one of a
+ * borrowed ring's `depth_textures`, or an exported ring's with
+ * mln_render_session_attach_options.keep_depth. Otherwise they are zero.
+ */
 typedef struct mln_metal_texture_frame {
   uint32_t size;
   uint32_t width;
@@ -36,9 +42,18 @@ typedef struct mln_metal_texture_frame {
   void* device MLN_BINDING("lifetime=owner");
   /** The texture's MTLPixelFormat. */
   uint64_t pixel_format;
+  /** The MTLTexture that holds the frame's depth and stencil. */
+  void* depth_texture MLN_BINDING("lifetime=owner");
+  /** The depth texture's MTLPixelFormat. */
+  uint64_t depth_pixel_format;
 } mln_metal_texture_frame;
 
-/** The Vulkan image of an acquired frame. */
+/**
+ * The Vulkan image of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth image, as for
+ * mln_metal_texture_frame. Otherwise they are zero.
+ */
 typedef struct mln_vulkan_texture_frame {
   uint32_t size;
   uint32_t width;
@@ -56,9 +71,23 @@ typedef struct mln_vulkan_texture_frame {
   uint32_t format;
   /** The VkImageLayout that the frame left the image in. */
   uint32_t layout;
+  /** The VkImage that holds the frame's depth and stencil. */
+  mln_vulkan_non_dispatchable_handle depth_image MLN_BINDING("lifetime=owner");
+  /** A VkImageView of the depth image's depth and stencil aspects. */
+  mln_vulkan_non_dispatchable_handle depth_image_view
+    MLN_BINDING("lifetime=owner");
+  /** The depth image's VkFormat. */
+  uint32_t depth_format;
+  /** The VkImageLayout that the frame left the depth image in. */
+  uint32_t depth_layout;
 } mln_vulkan_texture_frame;
 
-/** The WebGPU texture of an acquired frame. */
+/**
+ * The WebGPU texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * mln_metal_texture_frame. Otherwise they are zero.
+ */
 typedef struct mln_web_gpu_texture_frame {
   uint32_t size;
   uint32_t width;
@@ -74,9 +103,20 @@ typedef struct mln_web_gpu_texture_frame {
   void* device MLN_BINDING("lifetime=owner");
   /** The texture's WGPUTextureFormat. */
   uint32_t format;
+  /** The WGPUTexture that holds the frame's depth and stencil. */
+  void* depth_texture MLN_BINDING("lifetime=owner");
+  /** A WGPUTextureView of the depth texture. */
+  void* depth_texture_view MLN_BINDING("lifetime=owner");
+  /** The depth texture's WGPUTextureFormat. */
+  uint32_t depth_format;
 } mln_web_gpu_texture_frame;
 
-/** The OpenGL texture of an acquired frame. */
+/**
+ * The OpenGL texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * mln_metal_texture_frame. Otherwise they are zero.
+ */
 typedef struct mln_open_gl_texture_frame {
   uint32_t size;
   uint32_t width;
@@ -86,6 +126,13 @@ typedef struct mln_open_gl_texture_frame {
   uint32_t slot;
   uint32_t texture MLN_BINDING("lifetime=owner");
   uint32_t target;
+  /** The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil. */
+  uint32_t depth_texture MLN_BINDING("lifetime=owner");
+  /**
+   * The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero
+   * for a borrowed ring's.
+   */
+  uint32_t depth_internal_format;
 } mln_open_gl_texture_frame;
 
 /** The IOSurface of an exported ring's acquired frame. */
@@ -171,6 +218,17 @@ typedef struct mln_dxgi_shared_texture_frame {
  * with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
  * glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
  * VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+ *
+ * With mln_render_session_attach_options.keep_depth, on a device whose
+ * mln_gpu_device_capabilities.depth_export_kinds has
+ * MLN_GPU_EXPORT_KIND_OPAQUE_FD, the depth members share the memory of the
+ * frame's depth image in the same way. Otherwise `depth_fd` is -1 and the
+ * others are zero. The depth image is 2D, of `depth_format`, with one mip
+ * level, one layer, optimal tiling, and the usage
+ * VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT and VK_IMAGE_USAGE_SAMPLED_BIT.
+ * Each frame leaves it in VK_IMAGE_LAYOUT_GENERAL, released to
+ * VK_QUEUE_FAMILY_EXTERNAL. In OpenGL, make its texture with the internal
+ * format that mln_depth_stencil_format_flag names for `depth_format`.
  */
 typedef struct mln_opaque_fd_frame {
   uint32_t size;
@@ -190,6 +248,14 @@ typedef struct mln_opaque_fd_frame {
   bool dedicated;
   /** The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8. */
   uint32_t format;
+  /** The file descriptor of the depth image's memory. */
+  int32_t depth_fd MLN_BINDING("lifetime=owner");
+  /** The size of the depth image's memory in bytes. */
+  uint64_t depth_allocation_size;
+  /** Whether the memory is the depth image's own. */
+  bool depth_dedicated;
+  /** The depth image's `VkFormat`. */
+  uint32_t depth_format;
 } mln_opaque_fd_frame;
 
 /** The layout of the pixels that mln_render_session_read_texture() reads. */
@@ -229,6 +295,12 @@ MLN_API mln_status mln_render_session_read_texture(
 /**
  * Gets the Metal texture of an acquired frame.
  *
+ * It gets a borrowed ring's texture, or an exported ring's on a Metal device:
+ * the texture of the IOSurface that mln_acquired_frame_get_io_surface()
+ * gets, and the frame's depth texture with
+ * mln_render_session_attach_options.keep_depth. Wait for
+ * mln_acquired_frame_get_producer_sync() before you use them.
+ *
  * Returns:
  * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
  *   or disposed it.
@@ -248,6 +320,12 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
 
 /**
  * Gets the Vulkan image of an acquired frame.
+ *
+ * It gets a borrowed ring's image, or an exported ring's on a Vulkan device:
+ * the image whose memory the ring shares, and the frame's depth image with
+ * mln_render_session_attach_options.keep_depth. An exported ring's frame
+ * releases them to VK_QUEUE_FAMILY_EXTERNAL, so acquire them from there. Wait
+ * for mln_acquired_frame_get_producer_sync() before you use them.
  *
  * Returns:
  * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
@@ -270,6 +348,12 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
 
 /**
  * Gets the OpenGL texture of an acquired frame.
+ *
+ * It gets a borrowed ring's texture, or an exported ring's on an OpenGL
+ * device: the texture of the dmabuf that mln_acquired_frame_get_dma_buf()
+ * gets, and the frame's depth texture with
+ * mln_render_session_attach_options.keep_depth, in the device's share group.
+ * Wait for mln_acquired_frame_get_producer_sync() before you use them.
  *
  * Returns:
  * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
