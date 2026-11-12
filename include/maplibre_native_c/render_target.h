@@ -69,6 +69,11 @@ typedef void (*mln_queue_lock_callback)(void* user_data);
  * submits the empty batch that drains its work from the queue. It never holds
  * the lock while it waits. Set both `lock` and `unlock`, or neither when you
  * don't submit to the queue yourself.
+ *
+ * Don't hold the lock while you call the library. A call such as
+ * mln_render_session_abandon(), mln_render_session_release(),
+ * mln_render_session_dispose(), or mln_render_session_service_driver_work()
+ * can wait for a session's work, which takes the lock.
  */
 typedef struct mln_queue_lock {
   mln_queue_lock_callback lock MLN_BINDING("nullable=true");
@@ -100,7 +105,11 @@ typedef enum mln_gpu_sync_kind : uint32_t {
   MLN_GPU_SYNC_QUEUE_ORDER = 2U,
   /** `handle` is a `VkSemaphore`. Wait until it reaches `value`. */
   MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 3U,
-  /** `handle` is a sync file descriptor. */
+  /**
+   * `handle` is a sync file descriptor. A descriptor of -1, as Vulkan exports
+   * for a semaphore that has already signaled, counts as
+   * MLN_GPU_SYNC_CPU_COMPLETE.
+   */
   MLN_GPU_SYNC_SYNC_FD = 4U,
   /** `handle` is an `MTLSharedEvent`. Wait until it reaches `value`. */
   MLN_GPU_SYNC_METAL_SHARED_EVENT = 5U,
@@ -138,7 +147,9 @@ typedef struct mln_render_session_attach_options {
    *   canvas, or a ring of Android hardware buffers, dmabufs, DXGI shared
    *   textures, or IOSurfaces.
    * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
-   *   borrowed ring of Metal, Vulkan, or OpenGL textures.
+   *   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
+   *   these on MLN_RENDER_DRIVER_CORE_WORKER only, and fails an attach with
+   *   MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD then.
    *
    * An attach with another driver fails with MLN_STATUS_UNSUPPORTED.
    */

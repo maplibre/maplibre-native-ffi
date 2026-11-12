@@ -126,9 +126,11 @@ typedef struct mln_gpu_device_capabilities {
  * Your Vulkan device and queue, for mln_gpu_device_wrap_vulkan().
  *
  * The device must have the extensions that its sessions use enabled:
- * `VK_KHR_swapchain` for windows and Vulkan surfaces, Vulkan 1.2 or
- * `VK_KHR_timeline_semaphore` for MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE, and
- * `VK_KHR_external_semaphore_fd` for MLN_GPU_SYNC_SYNC_FD.
+ * `VK_KHR_swapchain` for windows and Vulkan surfaces, and
+ * `VK_KHR_external_semaphore_fd` for MLN_GPU_SYNC_SYNC_FD. When the GPU
+ * supports timeline semaphores, also enable the `timelineSemaphore` feature,
+ * of Vulkan 1.2 or `VK_KHR_timeline_semaphore`: the device offers
+ * MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE wherever the GPU supports it.
  */
 typedef struct mln_vulkan_device_descriptor {
   uint32_t size;
