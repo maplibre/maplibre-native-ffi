@@ -538,8 +538,8 @@ static void free_camera_options_and_a_constraining_resize_cancel(void) {
   pitch.animation.end_handler = mln_test_transition_end_handler(&resized);
   update_camera(map, &pitch);
   MLN_TEST_AWAIT_OK(mln_map_resize(
-    map, (mln_logical_size){.width = 128, .height = 64}, &completion.descriptor,
-    NULL
+    map, (mln_logical_extent){.width = 128, .height = 64, .scale_factor = 1.0},
+    &completion.descriptor, NULL
   ));
   assert_ended(&resized, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED, "resize");
   TEST_ASSERT_TRUE(query_camera(map).center.longitude < 9.0);
