@@ -415,7 +415,9 @@ MLN_API mln_status mln_acquired_frame_get_result(
  *
  * Lifetimes:
  * The object that `out_sync` names belongs to the session. It stays valid until
- * you release or discard the frame, or the session is abandoned or disposed.
+ * you release or discard the frame, or the session is abandoned or disposed. A
+ * view from mln_acquired_frame_view_begin() keeps it valid until
+ * mln_acquired_frame_view_end().
  */
 MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_producer_sync(
@@ -513,7 +515,11 @@ MLN_API mln_status mln_render_session_resize(
  * For a borrowed ring, a completed release also means that the session has
  * stopped waiting on the consumer sync that you released its frames with, so
  * you can reuse or destroy the textures. The session waits about a second at
- * most for that sync, and logs a warning when the wait runs out.
+ * most for that sync, and logs a warning when the wait runs out. It checks the
+ * sync without blocking a thread: keep servicing a session driven by
+ * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD until the release completes. The
+ * session keeps nothing of the released textures: a texture that a later target
+ * gives it again is a new one, even one that you discarded a frame of.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into an
@@ -692,8 +698,9 @@ MLN_API mln_status mln_render_session_dispose(
  *
  * Because your GPU may still read the frame's texture, the session never
  * renders into that texture again, even when mln_render_session_set_target()
- * gives it the texture again. A view that is open on the frame keeps the
- * frame's sync objects in place until it ends.
+ * gives it the texture again, until mln_render_session_release_target()
+ * releases the ring. A view that is open on the frame keeps the frame's sync
+ * objects in place until it ends.
  */
 MLN_API mln_status mln_acquired_frame_discard(
   mln_acquired_frame frame, mln_diagnostic* out_diagnostic
