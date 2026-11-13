@@ -83,42 +83,28 @@ final class TestGraphics: @unchecked Sendable {
     return textures
   }
 
-  /// Attaches a session that renders into `textures`, a borrowed ring. An
-  /// OpenGL session shares the fixture's context, so it needs a caller-driven
-  /// session on a thread with that context current.
-  func attachBorrowedTexture(
-    map: MapHandle,
-    textures: [TestTexture],
-    options: RenderSessionAttachOptions
-  ) throws -> RenderSessionHandle {
-    guard let info = textures.last?.info else {
-      throw FixtureError("a borrowed ring needs a texture")
-    }
-    let logicalSize = LogicalSize(width: info.width, height: info.height)
+  /// Wraps the fixture's device, or its OpenGL context, in a GPU device for
+  /// sessions to render on. Only a Vulkan device takes `queueLock`, the lock
+  /// on the queue that the fixture submits to.
+  func makeDevice(queueLock: QueueLock = QueueLock()) throws
+    -> GpuDeviceHandle
+  {
     switch backend {
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
       #if canImport(Metal)
-        return try map.attachMetalBorrowedTexture(
-          descriptor: MetalBorrowedTextureDescriptor(
-            logicalSize: logicalSize,
-            physicalWidth: info.width,
-            physicalHeight: info.height,
-            textures: textures.map {
-              MetalBorrowedTexture(texture: pointer($0.info.metal_texture))
-            }
-          ),
-          options: options
+        return try GpuDeviceHandle.wrapMetal(
+          descriptor: MetalDeviceDescriptor(device: metalDevice)
         )
       #else
         throw FixtureError("a Metal backend needs the Metal framework")
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       #if os(Android) || os(Linux) || os(macOS) || os(Windows)
-        return try map.attachVulkanBorrowedTexture(
-          descriptor: VulkanBorrowedTextureDescriptor(
-            logicalSize: logicalSize,
-            physicalWidth: info.width,
-            physicalHeight: info.height,
+        let extensions = (0 ..< Int(context.vulkan_device_extension_count))
+          .compactMap { context.vulkan_device_extensions?[$0] }
+          .map { String(cString: $0) }
+        return try GpuDeviceHandle.wrapVulkan(
+          descriptor: VulkanDeviceDescriptor(
             context: VulkanContextDescriptor(
               instance: pointer(context.vulkan_instance),
               physicalDevice: pointer(context.vulkan_physical_device),
@@ -129,16 +115,9 @@ final class TestGraphics: @unchecked Sendable {
                 .vulkan_get_instance_proc_addr),
               getDeviceProcAddr: pointer(context.vulkan_get_device_proc_addr)
             ),
-            textures: textures.map {
-              VulkanBorrowedTexture(
-                image: $0.info.vulkan_image,
-                imageView: $0.info.vulkan_image_view
-              )
-            },
-            format: info.format,
-            finalLayout: info.vulkan_final_layout
-          ),
-          options: options
+            queueLock: queueLock,
+            enabledExtensions: extensions
+          )
         )
       #else
         throw FixtureError(
@@ -146,48 +125,79 @@ final class TestGraphics: @unchecked Sendable {
         )
       #endif
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
-      return try map.attachOpenGlBorrowedTexture(
-        descriptor: OpenGlBorrowedTextureDescriptor(
-          logicalSize: logicalSize,
-          physicalWidth: info.width,
-          physicalHeight: info.height,
-          context: OpenGlContextDescriptor(
-            ownership: .shared,
-            data: .wgl(WglContextDescriptor(
-              deviceContext: pointer(context.wgl_device_context),
-              shareContext: pointer(context.wgl_context)
-            ))
-          ),
-          textures: textures.map {
-            OpenGlBorrowedTexture(texture: $0.info.opengl_texture)
-          },
-          target: info.opengl_target
-        ),
-        options: options
-      )
+      return try GpuDeviceHandle.wrapOpenGl(context: .wgl(WglContextDescriptor(
+        deviceContext: pointer(context.wgl_device_context),
+        shareContext: pointer(context.wgl_context),
+        getProcAddress: pointer(context.get_proc_address)
+      )))
     default:
-      return try map.attachOpenGlBorrowedTexture(
-        descriptor: OpenGlBorrowedTextureDescriptor(
-          logicalSize: logicalSize,
-          physicalWidth: info.width,
-          physicalHeight: info.height,
-          context: OpenGlContextDescriptor(
-            ownership: .shared,
-            data: .egl(EglContextDescriptor(
-              display: pointer(context.egl_display),
-              config: pointer(context.egl_config),
-              shareContext: pointer(context.egl_context),
-              clientApi: .gles
-            ))
-          ),
-          textures: textures.map {
-            OpenGlBorrowedTexture(texture: $0.info.opengl_texture)
-          },
-          target: info.opengl_target
-        ),
-        options: options
-      )
+      return try GpuDeviceHandle.wrapOpenGl(context: .egl(EglContextDescriptor(
+        display: pointer(context.egl_display),
+        config: pointer(context.egl_config),
+        shareContext: pointer(context.egl_context),
+        getProcAddress: pointer(context.get_proc_address)
+      )))
     }
+  }
+
+  /// The borrowed ring of `textures`, for the build's backend.
+  func borrowedRing(_ textures: [TestTexture]) throws -> RenderTarget {
+    guard let info = textures.last?.info else {
+      throw FixtureError("a borrowed ring needs a texture")
+    }
+    let logicalSize = LogicalSize(width: info.width, height: info.height)
+    switch backend {
+    case MLN_TEST_GRAPHICS_BACKEND_METAL:
+      return .metalBorrowedTextures(MetalBorrowedTexturesTarget(
+        logicalSize: logicalSize,
+        physicalWidth: info.width,
+        physicalHeight: info.height,
+        textures: textures.map {
+          MetalBorrowedTexture(texture: pointer($0.info.metal_texture))
+        }
+      ))
+    case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
+      return .vulkanBorrowedTextures(VulkanBorrowedTexturesTarget(
+        logicalSize: logicalSize,
+        physicalWidth: info.width,
+        physicalHeight: info.height,
+        textures: textures.map {
+          VulkanBorrowedTexture(
+            image: $0.info.vulkan_image,
+            imageView: $0.info.vulkan_image_view
+          )
+        },
+        format: info.format,
+        finalLayout: info.vulkan_final_layout
+      ))
+    default:
+      return .openGlBorrowedTextures(OpenGlBorrowedTexturesTarget(
+        logicalSize: logicalSize,
+        physicalWidth: info.width,
+        physicalHeight: info.height,
+        textures: textures.map {
+          OpenGlBorrowedTexture(texture: $0.info.opengl_texture)
+        },
+        target: info.opengl_target
+      ))
+    }
+  }
+
+  /// Attaches a session that renders into `textures`, a borrowed ring, on a
+  /// device that wraps the fixture's. The session keeps the device, and with
+  /// it `queueLock`, until it ends. An OpenGL session shares the fixture's
+  /// context, so it needs a caller-driven session on a thread with that
+  /// context current.
+  func attachBorrowedTexture(
+    map: MapHandle,
+    textures: [TestTexture],
+    options: RenderSessionAttachOptions,
+    queueLock: QueueLock = QueueLock()
+  ) throws -> RenderSessionHandle {
+    let target = try borrowedRing(textures)
+    let device = try makeDevice(queueLock: queueLock)
+    defer { device.release() }
+    return try map.attach(target: target, device: device, options: options)
   }
 
   func withTextureView<Result>(
