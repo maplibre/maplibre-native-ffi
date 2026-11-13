@@ -447,6 +447,20 @@ static bool describe_surface(
     out->data.android_window = (mln_android_window_target){
       .logical_size = logical_size, .window = info.android_window
     };
+  } else if (info.ohos_window != NULL) {
+    out->kind = MLN_RENDER_TARGET_KIND_OHOS_WINDOW;
+    out->data.ohos_window = (mln_ohos_window_target){
+      .logical_size = logical_size, .window = info.ohos_window
+    };
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  } else if (info.vulkan_surface != 0) {
+    // OpenHarmony's emulator presents Vulkan to no window, so its surfaces
+    // are headless ones on the fixture's instance.
+    out->kind = MLN_RENDER_TARGET_KIND_VULKAN_SURFACE;
+    out->data.vulkan_surface = (mln_vulkan_surface_target){
+      .logical_size = logical_size, .surface = info.vulkan_surface
+    };
+#endif
   } else {
     report("the render fixture's surface has no window or layer");
     return false;
@@ -617,8 +631,17 @@ static bool attach_surface(
     mln_test_backend_destroy(state);
     return false;
   }
+  // A window takes a device of the library's, and a surface of the fixture's
+  // instance one that wraps the fixture's device.
+  const mln_gpu_device device =
+    target.kind == MLN_RENDER_TARGET_KIND_VULKAN_SURFACE
+      ? host_device(&state->context, state)
+      : mln_test_create_presenting_device();
+  if (device == MLN_HANDLE_NULL) {
+    mln_test_backend_destroy(state);
+    return false;
+  }
   *out_state = state;
-  const mln_gpu_device device = mln_test_create_presenting_device();
   *out_status = mln_map_attach(
     map, &target, device, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
