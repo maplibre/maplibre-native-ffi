@@ -142,21 +142,27 @@ def consumer_commands(target: Target) -> list[tuple[list[str], str | None]]:
             commands.append(
                 (["mise", "run", "//bindings/gobject:archive", target.preset], None)
             )
-        # These exercise additional contracts on one representative target,
-        # with its default backend.
-        extra = None
+        # These exercise additional contracts on one representative target.
+        # A suite runs with the target's default backend; the other checks
+        # render nothing.
+        extra, suite = None, False
         if target.preset == "linux-gnu-x64":
-            extra = {
-                "go": "//bindings/go:test:package",
-                "python": "//bindings/python:test:floor",
-            }.get(binding)
+            extra, suite = {
+                "go": ("//bindings/go:test:package", False),
+                "python": ("//bindings/python:test:floor", True),
+            }.get(binding, (None, False))
         elif target.preset == "macos-arm64" and binding == "go":
             extra = "//bindings/go:test:package"
         elif target.preset == "web-wasm32-webgl" and binding == "kotlin-native":
             extra = "//bindings/kotlin:test:wasm-canary"
         backend = target.default_backend
         if extra and backend in tested:
-            commands.append((["mise", "run", extra, target.preset, backend], backend))
+            if suite:
+                commands.append(
+                    (["mise", "run", extra, target.preset, backend], backend)
+                )
+            else:
+                commands.append((["mise", "run", extra, target.preset], None))
         if target.preset == "linux-gnu-x64" and binding == "kotlin-native":
             commands.append((["mise", "run", LINUX_ARM64_KLIB], None))
     return commands

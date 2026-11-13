@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
-#MISE description="Test the Go binding against a native preset's install."
-#MISE extends="ffi:preset"
+#MISE description="Test the Go binding against a native preset's install, with one of its render backends."
+#MISE extends="ffi:test"
 #MISE shell="bash"
 set -euo pipefail
 
 case "$usage_preset" in
-  android-arm-*)
+  android-arm)
     echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/go:build and test an android-arm64 or android-x64 preset instead." >&2
     exit 2
     ;;
-  ohos-x64-*) ;;
+  ohos-x64) ;;
   ohos-*)
-    echo "The OpenHarmony emulator runs an x64 guest; check $usage_preset with //bindings/go:build and test ohos-x64-egl instead." >&2
+    echo "The OpenHarmony emulator runs an x64 guest; check $usage_preset with //bindings/go:build and test ohos-x64 instead." >&2
     exit 2
     ;;
 esac
 
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 source "$MISE_MONOREPO_ROOT/tools/env/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
-source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset" "$MLN_FFI_TEST_BACKEND"
 source "$MISE_MONOREPO_ROOT/tools/env/go-cross-env.sh" "$usage_preset"
 if [[ -n "$goos" ]]; then
   # The render tests load tests/graphics, which travels beside the C API
@@ -44,7 +45,7 @@ fi
 # race detector for windows/arm64.
 race=-race
 case "$usage_preset" in
-  windows-arm64-* | mingw-arm64-*) race= ;;
+  windows-arm64 | mingw-arm64) race= ;;
 esac
 # Go's test cache cannot see the native library, so always rerun the suite.
 go test -count=1 ${race:+"$race"} -tags "$go_test_tags" ./...

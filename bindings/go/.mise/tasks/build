@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
-#MISE description="Build the Go binding against a native preset's install, and run its tests on a host preset."
+#MISE description="Build the Go binding against a native preset's install, and run its tests on a host preset with its default backend."
 #MISE extends="ffi:preset"
 #MISE shell="bash"
 set -euo pipefail
 
 source "$MISE_MONOREPO_ROOT/tools/env/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
-source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset"
-
-# A host build runs the suite; a cross build proves the package and its tests
-# compile and link for the target.
 source "$MISE_MONOREPO_ROOT/tools/env/go-cross-env.sh" "$usage_preset"
+
+# A host build runs the suite with the default backend; a cross build proves
+# the package and each backend's tests compile and link for the target.
 if [[ -n "$goos" ]]; then
-  exec go test -c -tags "$go_test_tags" -o /dev/null ./maplibre
+  for backend in $(jq -r '.backends[]' "$native_install_dir/share/maplibre-native-c/artifact.json"); do
+    source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset" "$backend"
+    go test -c -tags "$go_test_tags" -o /dev/null ./maplibre
+  done
+  exit 0
 fi
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset" "$MLN_FFI_TEST_BACKEND"
 # Go's test cache cannot see the native library, so always rerun the suite.
 exec go test -count=1 -tags "$go_test_tags" ./...
