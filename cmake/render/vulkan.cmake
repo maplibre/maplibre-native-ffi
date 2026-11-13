@@ -1,56 +1,12 @@
+# The library loads the Vulkan loader at run time, so only the test harness,
+# which drives Vulkan directly the way a host does, compiles against the Vulkan
+# headers and links a loader.
 function(mln_ffi_configure_render_dependencies target)
-  mln_ffi_add_component(
-    ${target}
-    Vulkan-Headers
-    https://github.com/KhronosGroup/Vulkan-Headers
-    "Apache-2.0 OR MIT"
-    SOURCE
-    "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers"
-    NOTICES
-    "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/LICENSE.md"
-    vulkan-headers.md)
-  mln_ffi_add_component(
-    ${target}
-    VulkanMemoryAllocator
-    https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
-    MIT
-    SOURCE
-    "${MLN_FFI_SOURCE_DIR}/vendor/VulkanMemoryAllocator"
-    NOTICES
-    "${MLN_FFI_SOURCE_DIR}/vendor/VulkanMemoryAllocator/LICENSE.txt"
-    vulkan-memory-allocator.txt)
-  # The preprocessor's NVIDIA terms are reproduced in glslang.txt.
-  mln_ffi_add_component(
-    ${target}
-    glslang
-    https://github.com/KhronosGroup/glslang
-    "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0 AND LicenseRef-NVIDIA-glslang"
-    SOURCE
-    "${MLN_FFI_SOURCE_DIR}/vendor/glslang"
-    NOTICES
-    "${MLN_FFI_SOURCE_DIR}/vendor/glslang/LICENSE.txt"
-    glslang.txt)
-
-  # glslang builds with the SPIR-V optimizer off, so no separately licensed
-  # SPIRV-Tools code reaches the artifacts and the notices above cover the whole
-  # shader toolchain. Turning the optimizer on means registering that notice
-  # too.
-  if(TARGET SPIRV-Tools-opt)
-    message(
-      FATAL_ERROR
-        "glslang now links SPIRV-Tools; register its license notice and add the archives here"
-    )
-  endif()
-
-  get_target_property(MLN_FFI_VULKAN_INCLUDE_DIRS mbgl-vendor-vulkan-headers
-                      INTERFACE_INCLUDE_DIRECTORIES)
   set_target_properties(
     ${target}
     PROPERTIES
-      MLN_FFI_INCLUDE_DIRS "${MLN_FFI_VULKAN_INCLUDE_DIRS}"
-      MLN_FFI_STATIC_ARCHIVES
-      "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen"
-  )
+      MLN_FFI_INCLUDE_DIRS
+      "${PROJECT_SOURCE_DIR}/third_party/Vulkan-Headers/include")
 
   # The loader belongs to the test harness, which drives Vulkan directly the way
   # a host does. The library resolves it at runtime, so build-host loader paths
@@ -126,31 +82,4 @@ function(mln_ffi_configure_render_dependencies target)
       TARGET ${target}
       PROPERTY MLN_FFI_RUNTIME_DIRS "${MLN_FFI_VULKAN_RUNTIME_DIR}")
   endif()
-endfunction()
-
-function(mln_ffi_configure_renderer target)
-  target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_VULKAN=1)
-
-  set(MLN_FFI_VENDOR_VULKAN_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/vulkan/headless_backend.cpp
-  )
-  set(MLN_FFI_VULKAN_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_d3d12_fence.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_device.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dispatch.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_offscreen_device.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_queue_access.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_session.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_backend.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_surface_session.cpp)
-  # The D3D11 textures that a Vulkan session renders into on Windows.
-  if(WIN32)
-    list(APPEND MLN_FFI_VULKAN_SOURCES
-         ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dxgi_texture.cpp)
-  endif()
-
-  mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_VULKAN_SOURCES})
-  mln_ffi_target_project_sources(${target} ${MLN_FFI_VULKAN_SOURCES})
-
-  target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
 endfunction()

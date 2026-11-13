@@ -295,7 +295,6 @@
       "cacheVariables": {
         "ANDROID_PLATFORM": "android-24",
         "ANDROID_STL": "c++_static",
-        "MLN_FFI_CARGO_TARGET_DIR": "${sourceDir}/build/${presetName}/cargo",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
       },
       "vendor": {
@@ -385,7 +384,6 @@
       "cacheVariables": {
         "OHOS_STL": "c++_shared",
         "OHOS_COMPATIBLE_SDK_VERSION": "20",
-        "MLN_FFI_ENABLE_CLANG_TIDY": false,
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
       }
     },
@@ -436,7 +434,6 @@
       "toolchainFile": "${fileDir}/cmake/toolchains/clang-cl.cmake",
       "cacheVariables": {
         "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
-        "HAVE_FSEEKO": { "type": "BOOL", "value": "OFF" },
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
       },
       "vendor": { "maplibre-native-ffi": { "softwareGpu": true } }

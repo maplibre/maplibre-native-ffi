@@ -1,24 +1,11 @@
 function(mln_ffi_configure_options)
-  set(MLN_WITH_CORE_ONLY ON CACHE BOOL "Build only MapLibre Native core" FORCE)
-  set(MLN_WITH_GLFW OFF
-      CACHE BOOL "Disable MapLibre Native GLFW platform" FORCE)
-  set(MLN_WITH_PMTILES ON
-      CACHE BOOL "Build MapLibre Native PMTiles support" FORCE)
-  set(MLN_WITH_PLUGINS ON
-      CACHE BOOL "Build MapLibre Native plugin layer support" FORCE)
-  # The C API exposes no annotation entry points, so the source and layer that
-  # the legacy annotation manager adds to every style would only leak through
-  # the style listing and lookup entry points.
-  set(MLN_WITH_LEGACY_ANNOTATIONS OFF
-      CACHE BOOL "Build MapLibre Native legacy annotations" FORCE)
-
   set(MLN_FFI_RENDER_BACKEND ""
-      CACHE STRING "Render backend for this wrapper build")
+      CACHE STRING "Render backend that this preset tests and describes")
   set_property(
     CACHE MLN_FFI_RENDER_BACKEND
     PROPERTY STRINGS metal opengl vulkan webgpu)
   set(MLN_FFI_OPENGL_CONTEXT_PROVIDER ""
-      CACHE STRING "OpenGL context provider for this wrapper build")
+      CACHE STRING "OpenGL context provider for this preset")
   set_property(
     CACHE MLN_FFI_OPENGL_CONTEXT_PROVIDER
     PROPERTY STRINGS egl wgl webgl)
@@ -32,7 +19,8 @@ function(mln_ffi_configure_options)
   set(MLN_FFI_TARGET_PLATFORM ""
       CACHE STRING "Platform name that bindings match this artifact by")
   set(MLN_FFI_ZIG_TARGET "" CACHE STRING "Zig target triple for this build")
-  foreach(variable IN ITEMS MLN_FFI_TARGET_PLATFORM MLN_FFI_ZIG_TARGET)
+  foreach(variable IN ITEMS MLN_FFI_TARGET_PLATFORM MLN_FFI_ZIG_TARGET
+          MLN_FFI_RUST_TARGET)
     if(NOT ${variable})
       message(FATAL_ERROR "The build needs ${variable}, which the preset sets")
     endif()
@@ -48,9 +36,8 @@ function(mln_ffi_configure_options)
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal" AND NOT APPLE)
     message(FATAL_ERROR "Metal builds require an Apple platform")
   endif()
-  # emdawnwebgpu forwards webgpu.h to the browser's own navigator.gpu, so a
-  # WebGPU build here is a browser build by construction. Native WebGPU would
-  # need Dawn or wgpu-native bootstrapped instead.
+  # The browser's WebGPU is the only one that a host hands the library a
+  # device of: native hosts drive Vulkan, Metal, or OpenGL.
   if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu" AND NOT EMSCRIPTEN)
     message(FATAL_ERROR "WebGPU builds require the Emscripten toolchain")
   endif()
@@ -77,59 +64,16 @@ function(mln_ffi_configure_options)
         "MLN_FFI_OPENGL_CONTEXT_PROVIDER is only valid for OpenGL builds")
   endif()
 
-  set(MLN_WITH_METAL OFF CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
-  set(MLN_WITH_OPENGL OFF
-      CACHE BOOL "Build MapLibre Native OpenGL backend" FORCE)
-  set(MLN_WITH_VULKAN OFF
-      CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
-  set(MLN_WITH_WEBGPU OFF
-      CACHE BOOL "Build MapLibre Native WebGPU backend" FORCE)
-  set(MLN_WEBGPU_IMPL_DAWN OFF
-      CACHE BOOL "Build MapLibre Native WebGPU with Dawn" FORCE)
-  set(MLN_WEBGPU_IMPL_WGPU OFF
-      CACHE BOOL "Build MapLibre Native WebGPU with wgpu-native" FORCE)
-  set(MLN_WEBGPU_EMDAWN OFF
-      CACHE BOOL "Use the Emscripten Dawn WebGPU port" FORCE)
-  set(MLN_WITH_EGL OFF CACHE BOOL "Build MapLibre Native EGL support" FORCE)
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
-    set(MLN_WITH_METAL ON
-        CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
-    set(MLN_WITH_OPENGL ON
-        CACHE BOOL "Build MapLibre Native OpenGL backend" FORCE)
-    if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
-      set(MLN_WITH_EGL ON CACHE BOOL "Build MapLibre Native EGL support" FORCE)
-    endif()
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
-    set(MLN_WITH_VULKAN ON
-        CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
-    set(MLN_WITH_WEBGPU ON
-        CACHE BOOL "Build MapLibre Native WebGPU backend" FORCE)
-    # emdawnwebgpu supplies Dawn's webgpu.h against the browser implementation,
-    # so the Dawn path is the one that applies; upstream's vendor/dawn.cmake
-    # carries the port flags on mbgl-vendor-dawn.
-    set(MLN_WEBGPU_IMPL_DAWN ON
-        CACHE BOOL "Build MapLibre Native WebGPU with Dawn" FORCE)
-    set(MLN_WEBGPU_EMDAWN ON
-        CACHE BOOL "Use the Emscripten Dawn WebGPU port" FORCE)
-  endif()
-
-  set(MLN_WITH_WERROR OFF
-      CACHE BOOL "Do not fail wrapper builds on MapLibre Native warnings" FORCE)
-
-  set(MLN_FFI_ENABLE_CLANG_TIDY_DEFAULT OFF)
-  option(MLN_FFI_ENABLE_CLANG_TIDY "Run clang-tidy for wrapper sources"
-         ${MLN_FFI_ENABLE_CLANG_TIDY_DEFAULT})
-
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
     message(
       STATUS
-        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend with ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
+        "Configuring maplibre-native-c for ${MLN_FFI_RUST_TARGET}, testing ${MLN_FFI_RENDER_BACKEND} with ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
     )
   else()
     message(
-      STATUS "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend")
+      STATUS
+        "Configuring maplibre-native-c for ${MLN_FFI_RUST_TARGET}, testing ${MLN_FFI_RENDER_BACKEND}"
+    )
   endif()
 
   set(MLN_FFI_RENDER_BACKEND "${MLN_FFI_RENDER_BACKEND}" PARENT_SCOPE)

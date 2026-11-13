@@ -311,9 +311,6 @@ if ctest --test-dir "$build_dir" -C Release --show-only | grep -q '^Total Tests:
 fi
 # The device boots here rather than inside the first test's timeout.
 MLN_FFI_DEVICE_INSTALL="$build_dir/install" "$MISE_MONOREPO_ROOT/tools/devices/run" --boot
-# The Rust platform crate's pure helpers, such as redirect resolution, have
-# unit tests that run on the host.
-cargo test --locked -p maplibre-native-ffi-platform --lib
 ctest --test-dir "$build_dir" -C Release --output-on-failure --no-tests=error --timeout 300 --parallel
 '''
 

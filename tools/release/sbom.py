@@ -164,7 +164,7 @@ def source_version(source: pathlib.Path) -> tuple[str, list[dict]]:
 def cargo_components(
     about: dict,
     target: str,
-    manifest: pathlib.Path = REPOSITORY / "src/platform/rust/Cargo.toml",
+    manifest: pathlib.Path = REPOSITORY / "third_party/mln-rs/crates/mln_c/Cargo.toml",
     flags: tuple[str, ...] = (),
 ) -> tuple[list[dict], dict[str, set[str]], str]:
     packages = {entry["package"]["id"]: entry for entry in about["crates"]}
@@ -273,8 +273,8 @@ def native(
         item = component(record["name"], version, record["license"], record["url"])
         if properties:
             item["properties"] = properties
-        if record["name"] == "maplibre-native":
-            patches = sorted((REPOSITORY / "patches/maplibre-native").glob("*.patch"))
+        if record["name"] == "mln-rs":
+            patches = sorted((REPOSITORY / "patches/mln-rs").glob("*.patch"))
             item.setdefault("properties", []).extend(
                 {
                     "name": f"maplibre:patch:{patch.name}",

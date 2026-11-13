@@ -110,7 +110,7 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
                 "--manifest-path",
                 str(manifest),
                 "--config",
-                str(REPOSITORY / "src/platform/rust/about.toml"),
+                str(REPOSITORY / "cmake/about.toml"),
                 "--target",
                 target,
                 "--locked",
