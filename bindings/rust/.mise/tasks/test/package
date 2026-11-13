@@ -8,8 +8,8 @@
 #USAGE arg "[preset]" env="MLN_FFI_HOST_NATIVE_PRESET"
 set -euo pipefail
 
-# Tests the packaged sys crate with the packaged platform crate that it
-# requires: the crates above them add nothing to how the native library arrives.
+# Tests the packaged sys crate: the crate above it adds nothing to how the native
+# library arrives.
 archive="$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz"
 tag=v0.202601.0
 scratch="$(mktemp -d)"
@@ -20,7 +20,7 @@ trap 'rm -rf "$scratch"' EXIT
 workspace="$scratch/workspace"
 mkdir -p "$workspace"
 git ls-files -z --cached --others --exclude-standard -- \
-  Cargo.toml Cargo.lock LICENSE bindings/python bindings/rust src/platform/rust |
+  Cargo.toml Cargo.lock LICENSE bindings/python bindings/rust |
   tar -c --null -T - | tar -x -C "$workspace"
 PYTHONPATH=tools/release python3 - "$scratch/artifacts.json" "$tag" "$archive" <<'PY'
 import json, pathlib, sys, tarfile
@@ -36,21 +36,15 @@ PY
 python3 tools/release/rust_release.py "$workspace" "$tag" --artifacts "$scratch/artifacts.json"
 cargo package --manifest-path "$workspace/Cargo.toml" --no-verify \
   --target-dir "$scratch/target" \
-  -p maplibre-native-ffi-platform \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi
 
-for crate in maplibre-native-ffi-platform maplibre-native-ffi-sys; do
-  mkdir "$scratch/$crate"
-  tar -xzf "$scratch/target/package/$crate-${tag#v}.crate" -C "$scratch/$crate" --strip-components 1
-done
-package="$scratch/maplibre-native-ffi-sys/Cargo.toml"
-# The packaged platform crate stands in for the one crates.io would serve, which
-# re-resolves that crate alone in the packaged lockfile.
-patch="patch.crates-io.maplibre-native-ffi-platform.path='$scratch/maplibre-native-ffi-platform'"
-cargo update --offline --manifest-path "$package" --config "$patch" -p maplibre-native-ffi-platform
+crate=maplibre-native-ffi-sys
+mkdir "$scratch/$crate"
+tar -xzf "$scratch/target/package/$crate-${tag#v}.crate" -C "$scratch/$crate" --strip-components 1
+package="$scratch/$crate/Cargo.toml"
 # An empty cache makes the build script download the archive.
 python3 tools/release/native_download_fixture.py "$archive" "$tag" -- \
   env -u MAPLIBRE_NATIVE_FFI_LOCAL_BUILD XDG_CACHE_HOME="$scratch/cache" \
-  cargo test --locked --manifest-path "$package" --config "$patch" \
+  cargo test --locked --manifest-path "$package" \
   --target-dir "$MISE_MONOREPO_ROOT/target"

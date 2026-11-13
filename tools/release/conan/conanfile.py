@@ -94,7 +94,7 @@ class MaplibreNativeC(ConanFile):
             if self.settings.os == "Windows"
             else "maplibre-native-c"
         )
-        return [main, "mln_ffi_platform"]
+        return [main]
 
     def package_id(self):
         self.info.settings.rm_safe("compiler")

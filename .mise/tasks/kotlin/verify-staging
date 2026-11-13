@@ -524,10 +524,6 @@ def verify_native(root: pathlib.Path) -> None:
                 for name in names
             ):
                 raise SystemExit(f"{interop} does not embed libmaplibre-native-c.a")
-            if target.startswith(("android-", "linux-")) and not any(
-                name.endswith("/included/libmln_ffi_platform.a") for name in names
-            ):
-                raise SystemExit(f"{interop} does not embed libmln_ffi_platform.a")
             for license_name in native_licenses(backend, target):
                 expected = f"resources/licenses/maplibre-native-c/{license_name}"
                 if expected not in names:

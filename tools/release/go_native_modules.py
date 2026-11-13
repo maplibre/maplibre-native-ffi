@@ -41,7 +41,6 @@ ARCHIVE_SUFFIX = ".tar.gz"
 # names them.
 ARCHIVES = {
     "-lmaplibre-native-c": "libmaplibre-native-c.a",
-    "-lmln_ffi_platform": "libmln_ffi_platform.a",
 }
 DESCRIPTOR = "share/maplibre-native-c/artifact.json"
 PKG_CONFIG = "share/pkgconfig/maplibre-native-c.pc"

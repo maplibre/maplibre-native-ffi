@@ -194,7 +194,7 @@ def wasm(
             "emdawnwebgpu",
             dawn_version,
             "BSD-3-Clause AND (MIT OR NCSA)",
-            REPOSITORY / "third_party/maplibre-native/vendor/emdawnwebgpu.LICENSE",
+            REPOSITORY / "tools/release/licenses/emdawnwebgpu.LICENSE",
         )
     inventories = [inventory, document(runtime, components, graph)]
     if emnapi:

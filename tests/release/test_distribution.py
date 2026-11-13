@@ -24,14 +24,14 @@ def linux_archive(path: pathlib.Path, backend: str) -> None:
     descriptor = {
         "platform": {"id": "linux-gnu-x64", "defaultBackend": "vulkan"},
         "backend": backend,
-        "link": {"libraries": ["m", "dl"]},
+        "link": {"libraries": ["m", "dl", "gcc_s"]},
     }
     with tarfile.open(path, "w:gz") as archive:
         for name, content in (
             ("share/maplibre-native-c/artifact.json", json.dumps(descriptor)),
             (
                 "share/pkgconfig/maplibre-native-c.pc",
-                "Libs: -L${libdir} -lmaplibre-native-c -lmln_ffi_platform -ldl -lgcc_s\n",
+                "Libs: -L${libdir} -lmaplibre-native-c\nLibs.private: -lm -ldl -lgcc_s\n",
             ),
         ):
             member = tarfile.TarInfo(f"{root}/{name}")
