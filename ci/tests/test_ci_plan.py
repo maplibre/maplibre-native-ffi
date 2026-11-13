@@ -27,7 +27,8 @@ def preset(name: str, inherits=None, hidden=False, vendor=None, **variables) -> 
 
 TARGET = {
     "MLN_FFI_TARGET_PLATFORM": "linux-gnu-x64",
-    "MLN_FFI_RENDER_BACKEND": "vulkan",
+    "MLN_FFI_RENDER_BACKENDS": "vulkan",
+    "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
 }
 RUNS = {"unit": "linux-x64", "runner": "linux"}
 
@@ -45,8 +46,8 @@ class ResolverTest(unittest.TestCase):
             )
         )
         self.assertEqual(
-            (target.platform, target.architecture, target.backend, target.unit),
-            ("linux-gnu", "x64", "vulkan", "linux-x64"),
+            (target.platform, target.architecture, target.backends, target.unit),
+            ("linux-gnu", "x64", ("vulkan",), "linux-x64"),
         )
 
     def test_a_list_inherits_takes_each_key_from_its_first_parent_depth_first(self):
@@ -64,7 +65,8 @@ class ResolverTest(unittest.TestCase):
                     hidden=True,
                     vendor={"unit": "second", "runner": "shallow"},
                     MLN_FFI_TARGET_PLATFORM="second-arm64",
-                    MLN_FFI_RENDER_BACKEND="metal",
+                    MLN_FFI_RENDER_BACKENDS="metal",
+                    MLN_FFI_DEFAULT_RENDER_BACKEND="metal",
                 ),
                 preset("child", inherits=["_first", "_second"]),
             )
@@ -72,8 +74,8 @@ class ResolverTest(unittest.TestCase):
         # The first parent's own ancestor outranks the second parent, and each
         # vendor field merges on its own.
         self.assertEqual(
-            (target.platform, target.backend, target.unit, target.runner),
-            ("first", "metal", "second", "deep"),
+            (target.platform, target.backends, target.unit, target.runner),
+            ("first", ("metal",), "second", "deep"),
         )
 
     def test_a_preset_value_outranks_every_parent(self):
@@ -93,7 +95,7 @@ class ResolverTest(unittest.TestCase):
             ("arm64", "linux-x64", "own"),
         )
 
-    def test_an_opengl_target_takes_its_backend_from_the_context_provider(self):
+    def test_a_target_carries_a_list_of_backends_and_its_opengl_provider(self):
         target = self.only(
             presets(
                 preset(
@@ -101,13 +103,28 @@ class ResolverTest(unittest.TestCase):
                     vendor=RUNS,
                     **{
                         **TARGET,
-                        "MLN_FFI_RENDER_BACKEND": "opengl",
+                        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
                         "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl",
                     },
                 )
             )
         )
-        self.assertEqual(target.backend, "egl")
+        self.assertEqual(target.backends, ("vulkan", "opengl"))
+        self.assertEqual(
+            [target.driver(backend) for backend in target.backends], ["vulkan", "egl"]
+        )
+
+    def test_a_default_backend_that_the_target_lacks_fails(self):
+        with self.assertRaisesRegex(SystemExit, "defaults to metal"):
+            plan.targets(
+                presets(
+                    preset(
+                        "child",
+                        vendor=RUNS,
+                        **{**TARGET, "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"},
+                    )
+                )
+            )
 
     def test_a_missing_parent_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown preset '_gone'"):
@@ -168,8 +185,8 @@ class PresetTest(unittest.TestCase):
             ("arm64", "linux-musl-arm64"),
         ):
             with self.subTest(architecture=architecture):
-                musl = self.targets[f"linux-musl-{architecture}-egl"]
-                gnu = self.targets[f"linux-gnu-{architecture}-egl"]
+                musl = self.targets[f"linux-musl-{architecture}"]
+                gnu = self.targets[f"linux-gnu-{architecture}"]
                 self.assertEqual(
                     (musl.platform, musl.unit, musl.runner),
                     ("linux-musl", unit, gnu.runner),
@@ -220,7 +237,17 @@ class PresetTest(unittest.TestCase):
                 and target.architecture == "arm64"
             ):
                 packages = "skip"
-            expected[name] = (mise_env, target.backend if gpu else "", packages)
+            drivers = {
+                "linux-gnu": "vulkan,egl",
+                "linux-musl": "vulkan,egl",
+                "windows": "vulkan,wgl",
+                "windows-mingw": "vulkan,wgl",
+            }
+            expected[name] = (
+                mise_env,
+                drivers[target.platform] if gpu else "",
+                packages,
+            )
         matrix = plan.plan(self.presets, True, [])["matrix"]
         self.assertEqual(
             {
@@ -235,19 +262,19 @@ class PresetTest(unittest.TestCase):
             {
                 name: self.targets[name].platform
                 for name in (
-                    "ios-arm64-metal",
-                    "ios-simulator-arm64-metal",
-                    "ios-maccatalyst-arm64-metal",
-                    "tvos-simulator-arm64-metal",
-                    "visionos-simulator-arm64-metal",
+                    "ios-arm64",
+                    "ios-simulator-arm64",
+                    "ios-maccatalyst-arm64",
+                    "tvos-simulator-arm64",
+                    "visionos-simulator-arm64",
                 )
             },
             {
-                "ios-arm64-metal": "ios",
-                "ios-simulator-arm64-metal": "ios-simulator",
-                "ios-maccatalyst-arm64-metal": "ios-maccatalyst",
-                "tvos-simulator-arm64-metal": "tvos-simulator",
-                "visionos-simulator-arm64-metal": "visionos-simulator",
+                "ios-arm64": "ios",
+                "ios-simulator-arm64": "ios-simulator",
+                "ios-maccatalyst-arm64": "ios-maccatalyst",
+                "tvos-simulator-arm64": "tvos-simulator",
+                "visionos-simulator-arm64": "visionos-simulator",
             },
         )
 
@@ -315,21 +342,15 @@ class PresetTest(unittest.TestCase):
     def test_conan_runs_the_linux_archive_it_consumes(self):
         result = plan.plan(self.presets, False, ["conan"])
         self.assertEqual(result["jobs"], ["conan-recipes"])
-        self.assertEqual(
-            [row["preset"] for row in result["matrix"]], ["linux-gnu-x64-vulkan"]
-        )
+        self.assertEqual([row["preset"] for row in result["matrix"]], ["linux-gnu-x64"])
 
     def test_pypi_selects_runtime_wheel_producers_including_android(self):
         matrix = plan.plan(self.presets, False, ["pypi"])["matrix"]
-        self.assertEqual(len(matrix), 26)
+        self.assertEqual(len(matrix), 14)
         self.assertTrue(all(row["python_wheel"] for row in matrix))
         self.assertEqual(
             {row["preset"] for row in matrix if row["preset"].startswith("android-")},
-            {
-                f"android-{arch}-{backend}"
-                for arch in ("x64", "arm64")
-                for backend in ("egl", "vulkan")
-            },
+            {"android-x64", "android-arm64"},
         )
 
     def test_maven_runs_both_browser_runtime_inputs(self):
@@ -342,6 +363,37 @@ class PresetTest(unittest.TestCase):
         self.assertEqual(
             browser_presets,
             {"web-wasm32-webgl", "web-wasm32-webgpu"},
+        )
+
+    def test_every_platform_has_one_target_with_all_of_its_backends(self):
+        self.assertEqual(
+            {
+                name: target.backends
+                for name, target in self.targets.items()
+                if target.platform in ("linux-gnu", "android", "windows", "macos")
+            },
+            {
+                **{
+                    f"linux-gnu-{arch}": ("vulkan", "opengl")
+                    for arch in ("x64", "arm64", "riscv64", "loongarch64")
+                },
+                **{
+                    f"android-{arch}": ("vulkan", "opengl")
+                    for arch in ("arm", "arm64", "x86", "x64")
+                },
+                "windows-x64": ("vulkan", "opengl"),
+                "windows-arm64": ("vulkan", "opengl"),
+                "macos-arm64": ("metal",),
+                "macos-x64": ("metal",),
+            },
+        )
+        self.assertEqual(
+            {
+                name: target.backends
+                for name, target in self.targets.items()
+                if target.platform == "web"
+            },
+            {"web-wasm32-webgl": ("opengl",), "web-wasm32-webgpu": ("webgpu",)},
         )
 
     def test_an_unknown_unit_fails(self):

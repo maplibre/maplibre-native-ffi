@@ -25,11 +25,11 @@ jobs:
       - uses: useblacksmith/begin-testbox@22ff2ea5697369864347140857d218e42815b33c # v2
         with:
           testbox_id: ${{ inputs.testbox_id }}
-      # Matches the linux-gnu-arm64-egl target job. Covers ARM64 GNU and musl
-      # presets with EGL or Vulkan. The runner has no KVM.
+      # Matches the linux-gnu-arm64 target job. Covers the ARM64 GNU and musl
+      # presets, with EGL and Vulkan. The runner has no KVM.
       - uses: ./.github/actions/setup-ci-deps
         with:
-          software-gpu: egl
+          software-gpu: vulkan,egl
           zig: cache
           save-toolchains: true
       - name: Preserve the environment for Testbox SSH commands

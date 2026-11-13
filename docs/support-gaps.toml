@@ -4,6 +4,9 @@ issue = 936
 # the support matrix share these selectors; omitting an axis matches all its
 # values. `operations` can narrow a gap to build, test, package production,
 # or the combined Apple XCFramework (separate from per-target native archives).
+# A platform's package carries all of its backends, so it builds and packages
+# where any backend has no gap; `backends` narrows a test gap to the backends
+# whose suites a runner can't run.
 # A C gap applies to every binding on that target, including targets
 # that do not yet have a CMake preset. `simulators` distinguishes Apple
 # devices from simulators; omitting it matches both.
