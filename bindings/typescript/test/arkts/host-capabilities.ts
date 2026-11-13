@@ -137,6 +137,7 @@ export const capabilities: Capabilities = {
   httpOrigin,
   realmSpawn,
   forcedGc: () => ArkTools.forceFullGC(),
+  borrowedTextures: true,
   testGraphics: () => testGraphics,
   // An application process does not end when its event loop empties, so no
   // timer holds it.

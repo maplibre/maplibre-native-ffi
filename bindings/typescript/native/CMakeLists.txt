@@ -1,12 +1,12 @@
-# The Node-API addon of the TypeScript binding, or its browser module for an
-# Emscripten preset, which emscripten.cmake links.
+# The Node-API addon of the TypeScript binding, or its browser module for a web
+# preset, which web.cmake builds.
 #
 # The presets include the root presets, so a preset name selects the same
 # toolchain, libc floor, and target as the native build. A Node-API addon
 # links the shared C library from that install prefix, which its package ships
 # beside it, so a host's own native code can use the same handles. The browser
-# module embeds the complete static archive, since a WebAssembly module has no
-# shared library to load.
+# module links the C library in, since a WebAssembly module has no shared
+# library to load.
 cmake_minimum_required(VERSION 3.28)
 project(maplibre_native_ffi_node LANGUAGES C)
 
@@ -29,17 +29,8 @@ add_compile_definitions(NAPI_VERSION=8)
 
 set(MLN_FFI_SOURCES generated_addon.c generated_values.c realm.c runtime.c)
 
-if(EMSCRIPTEN)
-  find_library(
-    MLN_FFI_NATIVE_ARCHIVE
-    NAMES libmaplibre-native-c.a
-    PATHS "${MLN_FFI_NATIVE_PREFIX}/lib" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
-    REQUIRED)
-  # The archives that ship beside the complete one, such as the Rust platform
-  # layer.
-  file(GLOB MLN_FFI_COMPANION_ARCHIVES
-       "${MLN_FFI_NATIVE_PREFIX}/lib/libmln_ffi_*.a")
-  include("${CMAKE_CURRENT_SOURCE_DIR}/emscripten.cmake")
+if(MLN_FFI_TARGET_PLATFORM STREQUAL "web-wasm32")
+  include("${CMAKE_CURRENT_SOURCE_DIR}/web.cmake")
   return()
 endif()
 

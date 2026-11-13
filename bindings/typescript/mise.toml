@@ -13,7 +13,7 @@ pnpm exec typedoc --entryPoints src/index.ts src/browser.ts src/hermes.ts --excl
 '''
 
 [tasks.pack]
-description = "Pack the facade, a desktop or Emscripten preset's backend package, and its addon package into npm tarballs."
+description = "Pack the facade, a desktop or web preset's backend package, and its addon package into npm tarballs."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}"
 flag "--version <version>" default="0.0.0" help="The version of every package"

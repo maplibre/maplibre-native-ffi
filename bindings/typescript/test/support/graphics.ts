@@ -29,7 +29,7 @@ import {
   teardown,
   turn,
 } from "./harness.ts";
-import { capabilities } from "./host-capabilities.ts";
+import { capabilities, type TestCanvas } from "./host-capabilities.ts";
 
 interface GraphicsContext {
   readonly graphics: bigint;
@@ -69,7 +69,6 @@ interface TestTexture {
   readonly vulkanImageView: bigint;
   readonly metalTexture: bigint;
   readonly webGpuTexture: number;
-  readonly webGpuTextureView: number;
   readonly width: number;
   readonly height: number;
   readonly format: number;
@@ -91,8 +90,8 @@ const addon = capabilities.testGraphics() as GraphicsAddon;
 
 /**
  * The backend that this build renders through, by its test graphics number.
- * The browser's test graphics create a WebGL context or import a WebGPU
- * device from the page for the browser's two.
+ * The browser's test graphics create a WebGL context or lend the page's WebGPU
+ * device for the browser's two.
  */
 const backends = {
   metal: 1,
@@ -142,8 +141,9 @@ function buildBackend(): Backend {
 export const backend = buildBackend();
 
 /**
- * Browser texture targets take only the caller-graphics-thread driver, so this
- * thread services every borrowed session there.
+ * mln-rs's browser build renders into canvases only, so a browser's sessions
+ * present to canvases of the page's, which the host's webCanvas lends, and
+ * the page reads their pixels.
  */
 const browser = backend === "webgl" || backend === "webgpu";
 
@@ -279,18 +279,39 @@ function attachBorrowedTexture(
 }
 
 /**
- * Attaches an offscreen session that a core worker drives, with `options` in
- * place of the defaults, and releases the session in a teardown.
+ * The target of a session on a device of its own: offscreen, or in a browser
+ * a canvas, which a teardown closes.
+ */
+function ownTarget(): { target: RenderTarget; canvas?: TestCanvas } {
+  if (!browser) {
+    return {
+      target: { kind: "offscreen", value: { logicalSize: renderLogicalSize } },
+    };
+  }
+  const canvas = capabilities.webCanvas!(renderSize);
+  teardown(() => canvas.close());
+  return {
+    target: {
+      kind: "webCanvas",
+      value: { logicalSize: renderLogicalSize, canvas: canvas.handle },
+    },
+    canvas,
+  };
+}
+
+/**
+ * Attaches an offscreen session, or in a browser a canvas, that a core worker
+ * drives, with `options` in place of the defaults, and releases the session
+ * in a teardown.
  */
 export function attachSession(
   map: MapHandle,
   options: Partial<RenderSessionAttachOptions>,
 ): RenderSessionHandle {
-  const session = map.attach(
-    { kind: "offscreen", value: { logicalSize: renderLogicalSize } },
-    undefined,
-    { driver: RenderDriverKind.coreWorker, ...options },
-  );
+  const session = map.attach(ownTarget().target, undefined, {
+    driver: RenderDriverKind.coreWorker,
+    ...options,
+  });
   teardown(() => releaseSession(session));
   return session;
 }
@@ -320,11 +341,18 @@ export function attachVulkanSession(
 }
 
 /**
- * Starts attaching a borrowed texture that this thread drives, and releases
- * the session in a teardown. The attach finishes only as this thread services
- * the session.
+ * Starts attaching a borrowed texture, or in a browser a canvas, that this
+ * thread drives, and releases the session in a teardown. The attach finishes
+ * only as this thread services the session.
  */
 export function attachCallerSession(map: MapHandle): RenderSessionHandle {
+  if (browser) {
+    const session = map.attach(ownTarget().target, undefined, {
+      driver: RenderDriverKind.callerGraphicsThread,
+    });
+    teardown(() => releaseSession(session));
+    return session;
+  }
   const context = openGraphics();
   const openGl = backend === "egl" || backend === "wgl" || backend === "webgl";
   if (openGl && !addon.makeCurrent(context.graphics)) {
@@ -439,6 +467,8 @@ export class TestSession {
   readonly wake: AwaitableWake;
   readonly #serviced: boolean;
   #token = 0n;
+  /** A browser canvas's center pixel, as the last frame left it. */
+  #pixel: number[] | undefined;
 
   private constructor(
     session: RenderSessionHandle,
@@ -450,21 +480,79 @@ export class TestSession {
     this.#serviced = serviced;
   }
 
-  /** Attaches an offscreen worker session on `map`, released by a teardown. */
-  static async offscreen(map: MapHandle): Promise<TestSession> {
+  /**
+   * Attaches a session on a device of its own, which `driver` drives:
+   * offscreen, or in a browser a canvas, whose center pixel each frame wake
+   * reads in the task that presented the frame. A teardown releases it.
+   */
+  static async #own(
+    map: MapHandle,
+    driver: RenderDriverKind,
+  ): Promise<TestSession> {
     const wake = new AwaitableWake();
-    const session = attachSession(map, {
-      frameWake: { callback: wake.wake },
+    const { target, canvas } = ownTarget();
+    let attached: TestSession | undefined;
+    const serviced = driver === RenderDriverKind.callerGraphicsThread;
+    const session = map.attach(target, undefined, {
+      driver,
+      frameWake: {
+        callback: () => {
+          if (canvas !== undefined && attached !== undefined) {
+            attached.#pixel = canvas.centerPixel();
+          }
+          wake.wake();
+        },
+      },
+      driverWorkWake: serviced ? { callback: wake.wake } : undefined,
     });
-    const attached = new TestSession(session, wake, false);
+    teardown(() => releaseSession(session));
+    attached = new TestSession(session, wake, serviced);
     await attached.settle(session.ready, "the attachment");
     return attached;
   }
 
   /**
-   * Attaches a texture of the test graphics on `map`, released by a teardown.
-   * Browser and OpenGL textures take only a caller session, whatever `driver`
-   * asks for.
+   * Attaches an offscreen worker session on `map`, or in a browser a canvas,
+   * released by a teardown.
+   */
+  static offscreen(map: MapHandle): Promise<TestSession> {
+    return TestSession.#own(map, RenderDriverKind.coreWorker);
+  }
+
+  /**
+   * Attaches a session that this thread services: a texture of the test
+   * graphics, or in a browser a canvas. A teardown releases it.
+   */
+  static serviced(map: MapHandle): Promise<TestSession> {
+    return browser
+      ? TestSession.#own(map, RenderDriverKind.callerGraphicsThread)
+      : TestSession.borrowed(map, "caller");
+  }
+
+  /**
+   * The RGBA bytes of the center pixel of the last frame: a readback, or in
+   * a browser what the canvas showed.
+   */
+  async centerPixel(): Promise<number[]> {
+    if (browser) {
+      if (this.#pixel === undefined) {
+        throw new Error("the canvas presented no frame");
+      }
+      return this.#pixel;
+    }
+    const image = await this.settle(this.session.readTexture(), "the readback");
+    if (image.info.width !== renderSize || image.info.height !== renderSize) {
+      throw new Error(
+        `the readback is ${image.info.width}x${image.info.height}, not ${renderSize}x${renderSize}`,
+      );
+    }
+    return centerPixel(image);
+  }
+
+  /**
+   * Attaches a texture of the test graphics on `map`, released by a teardown,
+   * for a host that has `borrowedTextures`. OpenGL textures take only a
+   * caller session, whatever `driver` asks for.
    */
   static async borrowed(
     map: MapHandle,
@@ -473,7 +561,7 @@ export class TestSession {
     const context = openGraphics();
     const openGl =
       backend === "egl" || backend === "wgl" || backend === "webgl";
-    const serviced = driver === "caller" || browser || openGl;
+    const serviced = driver === "caller" || openGl;
     if (openGl && !addon.makeCurrent(context.graphics)) {
       throw new Error("the test graphics context could not be made current");
     }
@@ -568,7 +656,7 @@ export class TestSession {
 }
 
 /** The RGBA bytes of the center pixel of a tightly sized readback. */
-export function centerPixel(image: {
+function centerPixel(image: {
   readonly data: Uint8Array;
   readonly info: { readonly width: number; readonly stride: number };
 }): number[] {

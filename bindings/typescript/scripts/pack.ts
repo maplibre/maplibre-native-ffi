@@ -7,7 +7,7 @@
 // pins one addon package per platform through optionalDependencies, and each
 // desktop addon package declares the platform it serves, so a package manager
 // installs only the addon for the host. A browser addon package carries the
-// module of an Emscripten preset, which no host platform selects, so it
+// browser module of a web preset, which no host platform selects, so it
 // installs wherever its backend package does. Each addon package carries what
 // the build task installed for its preset, with the licenses of the native
 // library that it embeds.
@@ -107,15 +107,23 @@ interface Addon {
 }
 
 function addonOf(preset: string): Addon {
-  const browser = /^emscripten-wasm32-(webgl|webgpu)$/.exec(preset);
+  const browser = /^web-wasm32-(webgl|webgpu)$/.exec(preset);
   if (browser !== null) {
     const backend = backends[browser[1]!]!;
+    // The wasm-bindgen package, whose tile worker script is under snippets/,
+    // and mln-rs's shaper module, which loads from beside it.
     return {
       preset,
       backend,
       name: `${source.name}-${backend}-wasm32`,
       platform: undefined,
-      files: ["maplibre_native_ffi.mjs", "maplibre_native_ffi.wasm"],
+      files: [
+        "maplibre_native_ffi.js",
+        "maplibre_native_ffi_bg.wasm",
+        "snippets",
+        "mln_web_shaper.js",
+        "mln_web_shaper_bg.wasm",
+      ],
     };
   }
   const match =
@@ -124,7 +132,7 @@ function addonOf(preset: string): Addon {
     );
   if (match === null) {
     throw new Error(
-      `${preset} has no addon package; only the Linux, macOS, FreeBSD, Windows, and Emscripten presets do`,
+      `${preset} has no addon package; only the Linux, macOS, FreeBSD, Windows, and web presets do`,
     );
   }
   const { os, libc } = platforms[match[1]!]!;
@@ -218,8 +226,7 @@ function pack(
 
 // Node strips types only outside node_modules, so the published facade is the
 // bundle rather than the sources: entries for Node, browser, and Hermes
-// share their chunks. The browser entry bundles emnapi's
-// runtime, a development dependency, so the facade depends on nothing.
+// share their chunks. The facade depends on nothing.
 const dist = join(binding, "build", "dist");
 rmSync(dist, { recursive: true, force: true });
 execFileSync(
@@ -255,7 +262,7 @@ for (const addon of addons) {
   const install = join(binding, "native", "build", addon.preset, "install");
   mkdirSync(directory, { recursive: true });
   for (const file of addon.files) {
-    cpSync(join(install, file), join(directory, file));
+    cpSync(join(install, file), join(directory, file), { recursive: true });
   }
   cpSync(join(install, "licenses"), join(directory, "licenses"), {
     recursive: true,
@@ -368,10 +375,7 @@ pack(
     files: ["dist", "native"],
   },
   [],
-  [
-    join(binding, "node_modules/@emnapi/runtime"),
-    join(binding, "node_modules/node-api-headers"),
-  ],
+  [join(binding, "node_modules/node-api-headers")],
 );
 
 // The React Native package, whose podspec and Gradle module compile the

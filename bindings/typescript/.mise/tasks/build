@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Build the Node-API addon, or the browser module for an Emscripten preset, against a native preset's archive."
+#MISE description="Build the Node-API addon, or the browser module for a web preset, against a native preset's install."
 #MISE extends="ffi:preset"
 #MISE depends=[{ task = "//:build", args = ["{{usage.preset}}"] }]
 #MISE env={ MLN_FFI_GLIBC_FLOOR = '{{ vars.glibc_floor | default(value="") }}' }
@@ -13,10 +13,10 @@ cmake --build "build/$usage_preset" --target install --config Release --parallel
 addon="build/$usage_preset/install/maplibre_native_ffi.node"
 nm=nm
 case "$usage_preset" in
-  emscripten-*)
-    # A browser module exports what its link names, which emnapi's loader
-    # calls, and carries no dynamic symbol table to check.
-    ls "build/$usage_preset/install/maplibre_native_ffi".{mjs,wasm}
+  web-*)
+    # A browser module is a wasm-bindgen package, whose bindings name what
+    # the module exports, and carries no dynamic symbol table to check.
+    ls "build/$usage_preset/install/maplibre_native_ffi"{.js,_bg.wasm}
     exit 0
     ;;
   linux-gnu-*)

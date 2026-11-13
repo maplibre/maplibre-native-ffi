@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Run the TypeScript binding suite under Node, Bun, and Deno, on ArkTS for an OpenHarmony preset, or in headless Chromium for an Emscripten preset."
+#MISE description="Run the TypeScript binding suite under Node, Bun, and Deno, on ArkTS for an OpenHarmony preset, or in headless Chromium for a web preset."
 #MISE extends="ffi:preset"
 #MISE depends=[{ task = ":build", args = ["{{usage.preset}}"] }]
 #MISE shell="bash"
@@ -16,9 +16,9 @@ case "$usage_preset" in
     fi
     exec mise run :_test-arkts "$usage_preset"
     ;;
-  emscripten-*)
+  web-*)
     if [[ -n "${usage_runtime:-}" ]]; then
-      echo "error: an Emscripten preset runs the suite in a browser, not $usage_runtime" >&2
+      echo "error: a web preset runs the suite in a browser, not $usage_runtime" >&2
       exit 2
     fi
     exec scripts/test-browser.sh "$usage_preset"

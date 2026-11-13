@@ -23,7 +23,8 @@ export type Capability =
   | "processExit"
   | "bufferTransfer"
   | "disposers"
-  | "beforeLoad";
+  | "beforeLoad"
+  | "borrowedTextures";
 
 export interface ChildResult {
   readonly code: number | null;
@@ -65,6 +66,18 @@ export interface Realm {
   terminate(): Promise<void>;
 }
 
+/** A canvas that a session presents to, whose pixels the host reads. */
+export interface TestCanvas {
+  /** The canvas's `mln_web_object` handle. */
+  readonly handle: number;
+  /**
+   * The RGBA bytes of the canvas's center pixel. Read it in the task that
+   * presented the frame, such as from the session's frame wake.
+   */
+  centerPixel(): number[];
+  close(): void;
+}
+
 export interface Capabilities {
   readonly host: Host;
   /** Capabilities that this host cannot provide at all. */
@@ -90,6 +103,16 @@ export interface Capabilities {
   readonly bufferTransfer?: (buffer: ArrayBuffer, length: number) => void;
   /** The host defines `Symbol.dispose` and `Symbol.asyncDispose`. */
   readonly disposers?: true;
+  /**
+   * Sessions render into textures that the test graphics create. mln-rs's
+   * browser build renders into canvases only.
+   */
+  readonly borrowedTextures?: true;
+  /**
+   * A canvas of `size` x `size` that the host lends a web canvas target, in a
+   * browser, which has no readback.
+   */
+  readonly webCanvas?: (size: number) => TestCanvas;
   /**
    * What a call made before the browser module loaded threw. Other hosts load
    * the addon as they import the binding, so no call precedes the load.
@@ -311,6 +334,7 @@ export const capabilities: Capabilities = {
   processExit: (code) => process.exit(code),
   bufferTransfer: (buffer, length) => void buffer.transfer(length),
   disposers: true,
+  borrowedTextures: true,
   testGraphics: () => {
     const path = process.env.MAPLIBRE_NATIVE_FFI_TEST_GRAPHICS;
     if (!path) {

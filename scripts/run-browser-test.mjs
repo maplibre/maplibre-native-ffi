@@ -1,12 +1,11 @@
-// Runs an emcc HTML page in isolated headless Chromium.
+// Runs a test page in headless Chromium.
 //
 // Usage: node scripts/run-browser-test.mjs <page.html>
 //        [--timeout-seconds N] [--render-backend NAME] [--browser-arg FLAG]...
 //        [--module-arg ARG]... [--print-output] [--hardware-gpu]
 //
 // Backend-specific browser flags live here for every suite. Module arguments
-// reach the page through its query string, which the native suite's page shell
-// reads.
+// reach the page through its query string.
 //
 // The browser is slower than a native run, so the page gets the timeout scale
 // the native suite stretches its waits by: MLN_TEST_TIMEOUT_SCALE, or 3.
@@ -174,9 +173,6 @@ function serveOrigin(url, request, response) {
 }
 
 const server = createServer((request, response) => {
-  // Cross-origin isolation, so the page may use SharedArrayBuffer.
-  response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
   response.setHeader("Cache-Control", "no-store");
 
   const url = new URL(request.url ?? "/", "http://localhost");

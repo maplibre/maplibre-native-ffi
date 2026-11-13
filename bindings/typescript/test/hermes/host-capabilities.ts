@@ -17,6 +17,7 @@ export const capabilities: Capabilities = {
     "beforeLoad",
   ],
   forcedGc: () => globals.__mlnCollect(),
+  borrowedTextures: true,
   testGraphics: () => globals.__mlnTestGraphics,
   unrefTimer: () => {},
 };
