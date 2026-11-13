@@ -4,13 +4,10 @@
 const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
-// Targets without Vulkan, such as Mac Catalyst, have no Vulkan attach methods.
 comptime {
-    if (@TypeOf(maplibre.Map.attachVulkanSurface) != void) {
-        _ = &renderToWindow;
-        _ = &surfaceLost;
-        _ = &surfaceRestored;
-    }
+    _ = &renderToWindow;
+    _ = &surfaceLost;
+    _ = &surfaceRestored;
 }
 
 const allocator = std.heap.smp_allocator;
@@ -68,11 +65,14 @@ fn onFrameWake(_: ?*anyopaque) anyerror!void {
 // #endregion frame-wake
 
 // #region resize
-fn onWindowResized(width: u32, height: u32) !void {
-    // The window's new size in logical pixels.
+// Runs when the window changes size, or moves to a display with another
+// scale factor.
+fn onWindowResized(width: u32, height: u32, scale_factor: f64) !void {
+    // The window's new size in logical pixels, and its scale factor.
     try session.discarding().resize(.{
         .width = width,
         .height = height,
+        .scale_factor = scale_factor,
     }, null);
 }
 // #endregion resize
@@ -95,28 +95,31 @@ fn surfaceLost() !void {
     // #endregion lost-surface
 }
 
-fn surfaceRestored(new_surface: u64) !void {
+fn surfaceRestored(display: ?*anyopaque, new_surface: ?*anyopaque) !void {
     // #region lost-surface
-    const replaced = try session.setVulkanSurfaceTarget(.{
+    const replaced = try session.setTarget(allocator, .{ .wayland_surface = .{
         .logical_size = .{ .width = 800, .height = 600 },
+        .display = display,
         .surface = new_surface,
-    }, null);
+    } }, null);
     try replaced.await(null);
     // #endregion lost-surface
 }
 
-fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, window_surface: u64) !void {
+fn renderToWindow(map: maplibre.Map, display: ?*anyopaque, window_surface: ?*anyopaque) !void {
     // #region attach
-    const attached = try map.attachVulkanSurface(.{
-        // The window's size in logical pixels. The map's scale factor
-        // turns it into pixels.
-        .logical_size = .{ .width = 800, .height = 600 },
-        // Your VkInstance, VkPhysicalDevice,
-        // VkDevice, and graphics VkQueue.
-        .context = vulkan,
-        // Your VkSurfaceKHR.
-        .surface = window_surface,
-    }, .{
+    // With no device, the session creates one on the platform's own
+    // backend.
+    const attached = try map.attach(allocator, .{
+        .wayland_surface = .{
+            // The window's size in logical pixels. The map's scale factor
+            // turns it into pixels.
+            .logical_size = .{ .width = 800, .height = 600 },
+            // Your wl_display and wl_surface.
+            .display = display,
+            .surface = window_surface,
+        },
+    }, null, .{
         .driver = .core_worker,
         .redraw_wake = .{ .callback = onRedrawWake },
         .frame_wake = .{ .callback = onFrameWake },
@@ -125,7 +128,7 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
     try attached.ready.await(null);
     // #endregion attach
 
-    try onWindowResized(1024, 768);
+    try onWindowResized(1024, 768, 2);
 
     // #region service
     const graphics_thread_options =
@@ -140,5 +143,5 @@ fn renderToWindow(map: maplibre.Map, vulkan: maplibre.VulkanContextDescriptor, w
 
     try (try session.release(null)).await(null);
 
-    destroySurface(); // For example, with vkDestroySurfaceKHR.
+    destroySurface(); // For example, with wl_surface_destroy.
 }

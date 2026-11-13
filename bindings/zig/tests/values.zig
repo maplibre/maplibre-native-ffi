@@ -8,8 +8,8 @@ const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
 // Host strings cross as views with their length, so a NUL inside one reaches
-// native rather than ending the string.
-test "host strings use views and native-lent strings decode" {
+// native, which rejects it, rather than ending the string.
+test "native-lent text decodes, and host text with an embedded NUL is rejected" {
     const RawRequest = @typeInfo(@TypeOf(maplibre.ResourceRequestInfo.fromNative)).@"fn".param_types[0].?;
     var raw_request = std.mem.zeroes(RawRequest);
     const lent_url = "custom://native-lent/é";
@@ -18,15 +18,12 @@ test "host strings use views and native-lent strings decode" {
     const request = try maplibre.ResourceRequestInfo.fromNative(raw_request);
     try testing.expectEqual(@as([*]const u8, lent_url), request.resolved_url.ptr);
 
+    // Text crosses as a view with an explicit length, and native rejects an
+    // embedded NUL rather than reading the text up to it.
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
     try fixture.loadStyle();
-    const source_id = "nul\x00source";
-    try support.expectCommitted(try fixture.map.addStyleSourceJson(source_id, "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}", null));
-    var info = (try (try fixture.map.getStyleSource(testing.allocator, source_id, null)).await(null)).?;
-    defer info.deinit();
-    try testing.expectEqual(maplibre.StyleSourceType.geo_json, info.value.type);
-    try testing.expect(try (try fixture.map.getStyleSource(testing.allocator, "nul", null)).await(null) == null);
+    try testing.expectError(error.InvalidArgument, fixture.map.addStyleSourceJson("nul\x00source", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}", null));
 }
 
 // A null optional field sets no presence bit, so the command leaves that value
