@@ -1,7 +1,8 @@
 // Locale-sensitive style expressions on Apple platforms, which evaluate them
 // with Foundation: number formatting keeps its defaults and honors explicit
-// fraction limits, and a collator rejects malformed UTF-8 and keeps embedded
-// NULs. The `_metal` suffix builds this file on Apple targets only.
+// fraction limits, and a collator ignores diacritics on request and compares
+// past embedded NULs. The `_metal` suffix builds this file on Apple targets
+// only.
 
 #include "support/map.h"
 #include "support/style.h"
@@ -60,8 +61,8 @@ static void number_format_keeps_defaults_and_honors_fraction_limits(void) {
   expect_formatted(",\"currency\":\"USD\",\"max-fraction-digits\":0", "$12");
 }
 
-// Returns a mask of the indices of the names that `filter` keeps. A name and
-// the filter may hold bytes that are not valid UTF-8.
+// Returns a mask of the indices of the names that `filter` keeps. The names
+// are JSON string contents, so they may hold escapes.
 static uint32_t selected_names(
   const char* filter, const char* const* names, size_t count
 ) {
@@ -132,10 +133,10 @@ static uint32_t selected_names(
   "[\"collator\",{\"locale\":\"en-US\",\"case-sensitive\":false," \
   "\"diacritic-sensitive\":false}]"
 
-static void collation_rejects_malformed_utf8_and_keeps_embedded_nuls(void) {
-  // A byte that is never valid UTF-8 compares equal to nothing, while the
-  // diacritic-insensitive comparison still matches the accented name.
-  static const char* const accents[] = {"cafe", "caf\xC3\xA9", "\xFF"};
+static void collation_ignores_diacritics_and_keeps_embedded_nuls(void) {
+  // The diacritic-insensitive comparison matches the accented name, but not
+  // the replacement character that stands in for an undecodable byte.
+  static const char* const accents[] = {"cafe", "caf\xC3\xA9", "caf\\uFFFD"};
   TEST_ASSERT_EQUAL_HEX32(
     0x3, selected_names(
            "[\"==\",[\"get\",\"name\"],\"cafe\"," INSENSITIVE_COLLATOR "]",
@@ -155,5 +156,5 @@ static void collation_rejects_malformed_utf8_and_keeps_embedded_nuls(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(number_format_keeps_defaults_and_honors_fraction_limits);
-  RUN_TEST(collation_rejects_malformed_utf8_and_keeps_embedded_nuls);
+  RUN_TEST(collation_ignores_diacritics_and_keeps_embedded_nuls);
 }
