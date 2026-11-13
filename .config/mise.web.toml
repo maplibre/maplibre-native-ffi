@@ -4,6 +4,14 @@
 # (cmake/mln_ffi_web.cmake). It runs wasm-bindgen, whose version must be the
 # wasm-bindgen crate's in mln-rs's Cargo.lock, and binaryen's wasm-opt. These
 # follow mln-rs's mise.toml.
+#
+# The TypeScript binding's browser module also compiles C for
+# wasm32-unknown-unknown, with a clang that has the WebAssembly backend and its
+# llvm-ar. On Linux, the distribution's clang, which .config/mise.linux.toml
+# installs, has both: Ubuntu 24.04's clang 18 is the one that CI uses. Apple's
+# clang has no WebAssembly backend, so on macOS install LLVM's own, such as
+# Homebrew's llvm, and point CC_wasm32_unknown_unknown and
+# AR_wasm32_unknown_unknown at its clang and llvm-ar.
 
 [tools]
 "aqua:casey/just" = "1.59.0"
