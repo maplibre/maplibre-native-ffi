@@ -339,7 +339,19 @@ def run_android(preset, work):
     )
     subprocess.run([*device, "shell", "am", "force-stop", package], check=True)
     process = subprocess.Popen(
-        [*device, "logcat", "-T", "1", "-s", "HermesTest:I", "AndroidRuntime:E"],
+        # A native crash reaches the log only as libc's fatal signal and the
+        # crash dumper's tombstone.
+        [
+            *device,
+            "logcat",
+            "-T",
+            "1",
+            "-s",
+            "HermesTest:I",
+            "AndroidRuntime:E",
+            "libc:F",
+            "DEBUG:F",
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -354,6 +366,7 @@ def run_android(preset, work):
     threading.Thread(target=read, daemon=True).start()
     token = uuid.uuid4().hex
     deadline = time.monotonic() + 240
+    crashed = False
     try:
         subprocess.run(
             [
@@ -374,6 +387,8 @@ def run_android(preset, work):
                 try:
                     line = lines.get(timeout=max(0, deadline - time.monotonic()))
                 except queue.Empty as error:
+                    if crashed:
+                        raise RuntimeError("Hermes Android host crashed") from None
                     raise RuntimeError("Hermes Android suite timed out") from error
                 if line is None:
                     raise RuntimeError(
@@ -389,6 +404,10 @@ def run_android(preset, work):
                     break
                 if "FATAL EXCEPTION" in line:
                     raise RuntimeError("Hermes Android host crashed")
+                if not crashed and f">>> {package} <<<" in line:
+                    # Read on briefly for the tombstone's backtrace.
+                    crashed = True
+                    deadline = min(deadline, time.monotonic() + 5)
     finally:
         process.terminate()
         process.wait(timeout=10)
