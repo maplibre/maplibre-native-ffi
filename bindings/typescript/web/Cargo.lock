@@ -1387,7 +1387,6 @@ dependencies = [
  "mln-rs-tile-id",
  "mln-rs-util",
  "mln-rs-vec-map",
- "mln-rs-vulkan",
  "mln-rs-web-host",
  "objc2",
  "objc2-core-foundation",
@@ -1846,22 +1845,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mln-rs-vulkan"
-version = "0.0.11"
-dependencies = [
- "ash",
- "bytemuck",
- "gpu-allocator",
- "libc",
- "mln-rs-gfx",
- "mln-rs-tile-id",
- "mln-rs-util",
- "naga",
- "parking_lot",
- "windows",
-]
-
-[[package]]
 name = "mln-rs-web-host"
 version = "0.0.11"
 dependencies = [
@@ -1944,7 +1927,6 @@ dependencies = [
  "naga-types",
  "num-traits",
  "once_cell",
- "pp-rs",
  "rustc-hash 1.1.0",
  "spirv",
  "thiserror",
@@ -2351,15 +2333,6 @@ dependencies = [
  "serde_core",
  "writeable",
  "zerovec",
-]
-
-[[package]]
-name = "pp-rs"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb458bb7f6e250e6eb79d5026badc10a3ebb8f9a15d1fff0f13d17c71f4d6dee"
-dependencies = [
- "unicode-xid",
 ]
 
 [[package]]
@@ -3108,12 +3081,6 @@ name = "unicode-width"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca718471876992059f251e33aafc334346ada08042b7661dd1fe313a9bced557"
-
-[[package]]
-name = "unicode-xid"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "union-find"
