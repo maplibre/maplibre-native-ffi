@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.lifecycle
 
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,6 +49,7 @@ class RenderSessionExitTest {
 
 object RenderSessionExitProbe {
   @Volatile private var exiting = false
+  private val resolvedAtExit = CountDownLatch(1)
 
   @JvmStatic
   fun main(args: Array<String>) {
@@ -64,7 +66,7 @@ object RenderSessionExitProbe {
    * no update after its still image, so nothing but abandon resolves that demand before exit.
    */
   private fun exitWithParkedDemand(): Unit = runSuspendTest {
-    withOffscreenSession(onFrameWake = { if (exiting) println(ABANDONED_AT_EXIT) }) {
+    withOffscreenSession(onFrameWake = { if (exiting) resolvedAtExit.countDown() }) {
       setStyle(EMPTY_STYLE_JSON)
       renderStill()
       val rendered = renderFrame().disposition
@@ -76,6 +78,17 @@ object RenderSessionExitProbe {
       // logs publishes no map update, so a demand without a result by then is waiting.
       complete(session.dumpDebugLogs(), "the fence")
       check(session.drainFrameResults().isEmpty()) { "the parked demand resolved before exit" }
+      // The abandon resolves the demand on the session's worker, whose frame wake can arrive after
+      // the binding's hook returns. Hooks run at once and the JVM halts after the last, so this one
+      // keeps the JVM up until the wake arrives.
+      Runtime.getRuntime()
+        .addShutdownHook(
+          Thread {
+            if (resolvedAtExit.await(EXIT_WAKE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+              println(ABANDONED_AT_EXIT)
+            }
+          },
+        )
       exiting = true
       exitProcess(0)
     }
@@ -112,5 +125,6 @@ object RenderSessionExitProbe {
 }
 
 private const val PARKED_TOKEN = 99uL
+private const val EXIT_WAKE_TIMEOUT_SECONDS = 10L
 private const val ABANDONED_AT_EXIT = "The parked demand resolved during exit"
 private const val EXITING_FROM_CALLBACK = "Requesting JVM exit from a render-session completion"
