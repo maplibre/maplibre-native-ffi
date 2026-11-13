@@ -71,11 +71,14 @@ public sealed unsafe partial class GpuDeviceHandle : IDisposable, INativeOwner<M
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when this build or platform
     /// lacks <c>backend</c>, when the device can't render with
-    /// <c>open_gl_client_api</c>, when a device that doesn't render with Vulkan
-    /// gets a <c>queue_lock</c>, or in a browser for every backend: WebGPU
-    /// makes devices asynchronously, and a WebGL2 context needs a canvas.
-    /// Attach without a device, which the session makes itself, or wrap your
-    /// WebGL2 context.</description></item>
+    /// <c>open_gl_client_api</c>, when options name a GPU that the backend
+    /// can't select (an OpenGL device takes no <c>adapter_index</c>,
+    /// <c>adapter_uuid</c>, or <c>adapter_luid</c>, and only a Vulkan device
+    /// takes <c>adapter_uuid</c> or <c>adapter_luid</c>), when a device that
+    /// doesn't render with Vulkan gets a <c>queue_lock</c>, or in a browser for
+    /// every backend: WebGPU makes devices asynchronously, and a WebGL2 context
+    /// needs a canvas. Attach without a device, which the session makes itself,
+    /// or wrap your WebGL2 context.</description></item>
     /// <item><description><c>Status.NotFound</c> when no GPU matches
     /// <c>adapter_index</c>, <c>adapter_uuid</c>, or
     /// <c>adapter_luid</c>.</description></item>

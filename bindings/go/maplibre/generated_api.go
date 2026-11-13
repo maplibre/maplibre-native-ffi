@@ -3679,7 +3679,8 @@ func copyGPUDeviceCapabilities(raw C.mln_gpu_device_capabilities) GPUDeviceCapab
 // NewGPUDevice().
 //
 // Name the GPU by at most one of adapter_index, adapter_uuid, and adapter_luid.
-// Without one, the device prefers a discrete GPU.
+// Without one, the device prefers a discrete GPU. An OpenGL device takes none
+// of them: it renders on the GPU that the platform picks.
 //
 // See mln_gpu_device_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
@@ -3692,11 +3693,11 @@ type GPUDeviceOptions struct {
 	// The GPU to use, as an index into the backend's list of GPUs.
 	AdapterIndex *uint32
 	// The 16-byte UUID of the GPU to use: Vulkan's
-	// VkPhysicalDeviceIDProperties.deviceUUID, or OpenGL's GL_DEVICE_UUID_EXT.
+	// VkPhysicalDeviceIDProperties.deviceUUID. Only a Vulkan device takes one.
 	AdapterUuid *[]byte
 	// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
-	// Vulkan reports as VkPhysicalDeviceIDProperties.deviceLUID, and on Apple
-	// platforms, its MTLDevice.registryID, in the platform's byte order.
+	// Vulkan reports as VkPhysicalDeviceIDProperties.deviceLUID. Only a Vulkan
+	// device takes one.
 	AdapterLuid *[]byte
 	// The OpenGL API that an OpenGL device renders with. An EGL device defaults to
 	// OpenGLClientAPIGLES, and takes OpenGLClientAPIGL too on Linux and FreeBSD. A
@@ -8371,11 +8372,14 @@ func (receiver *FramePacerHandle) SetOptions(options FramePacerOptions) error {
 //
 // Errors:
 //   - StatusUnsupported when this build or platform lacks backend, when the
-//     device can't render with open_gl_client_api, when a device that doesn't
-//     render with Vulkan gets a queue_lock, or in a browser for every backend:
-//     WebGPU makes devices asynchronously, and a WebGL2 context needs a canvas.
-//     Attach without a device, which the session makes itself, or wrap your
-//     WebGL2 context.
+//     device can't render with open_gl_client_api, when options name a GPU that
+//     the backend can't select (an OpenGL device takes no adapter_index,
+//     adapter_uuid, or adapter_luid, and only a Vulkan device takes
+//     adapter_uuid or adapter_luid), when a device that doesn't render with
+//     Vulkan gets a queue_lock, or in a browser for every backend: WebGPU makes
+//     devices asynchronously, and a WebGL2 context needs a canvas. Attach
+//     without a device, which the session makes itself, or wrap your WebGL2
+//     context.
 //   - StatusNotFound when no GPU matches adapter_index, adapter_uuid, or
 //     adapter_luid.
 //   - StatusNativeError when the platform can't create the device.
