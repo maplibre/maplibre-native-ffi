@@ -114,7 +114,8 @@ void describe_vulkan(
     get_properties2(chosen, &extended);
     out.gpu_driver = std::string{driver.driverName} + " " + driver.driverInfo;
   }
-  // An offscreen device names its GPU by its index in the same list.
+  // A GPU device that the library creates names its GPU by its index in the
+  // same list.
   uint32_t count = 0;
   enumerate(instance, &count, nullptr);
   VkPhysicalDevice devices[16] = {};
@@ -322,18 +323,67 @@ void gpu_create_ring(void** textures, uint32_t* texture_count) {
 
 namespace {
 
-// What every backend's borrowed texture descriptor shares.
-template <typename Descriptor, typename Entry>
+// What every backend's borrowed ring target shares.
+template <typename Target, typename Entry>
 void describe_ring(
-  Descriptor& descriptor, Entry* entries,
-  const mln_test_graphics_texture_info& info
+  Target& target, Entry* entries, const mln_test_graphics_texture_info& info
 ) {
+  target.logical_size = {info.width, info.height};
+  target.physical_width = info.width;
+  target.physical_height = info.height;
+  target.textures = entries;
+  target.texture_count = kDepth;
+}
+
+// Wraps the host's device or context for one session, as each borrowed
+// texture attach took the host's context.
+auto wrap_host_device(mln_gpu_device* out_device, mln_diagnostic* diagnostic)
+  -> mln_status {
+  const auto& context = host().context;
+#if defined(BENCH_BACKEND_VULKAN)
+  mln_buffer_view extensions[16] = {};
+  size_t extension_count = 0;
+  for (; extension_count < context.vulkan_device_extension_count &&
+         extension_count < 16;
+       ++extension_count) {
+    extensions[extension_count] =
+      view(context.vulkan_device_extensions[extension_count]);
+  }
+  mln_vulkan_device_descriptor descriptor{};
   descriptor.size = sizeof(descriptor);
-  descriptor.logical_size = {info.width, info.height};
-  descriptor.physical_width = info.width;
-  descriptor.physical_height = info.height;
-  descriptor.textures = entries;
-  descriptor.texture_count = kDepth;
+  descriptor.context.instance = context.vulkan_instance;
+  descriptor.context.physical_device = context.vulkan_physical_device;
+  descriptor.context.device = context.vulkan_device;
+  descriptor.context.graphics_queue = context.vulkan_queue;
+  descriptor.context.graphics_queue_family_index =
+    context.vulkan_queue_family_index;
+  descriptor.context.get_instance_proc_addr =
+    context.vulkan_get_instance_proc_addr;
+  descriptor.context.get_device_proc_addr = context.vulkan_get_device_proc_addr;
+  descriptor.enabled_extensions = extensions;
+  descriptor.enabled_extension_count = extension_count;
+  return mln_gpu_device_wrap_vulkan(&descriptor, out_device, diagnostic);
+#elif defined(BENCH_BACKEND_METAL)
+  mln_metal_device_descriptor descriptor{};
+  descriptor.size = sizeof(descriptor);
+  descriptor.device = context.metal_device;
+  return mln_gpu_device_wrap_metal(&descriptor, out_device, diagnostic);
+#else
+  mln_open_gl_context_descriptor descriptor{};
+#if defined(BENCH_OPENGL_WGL)
+  descriptor.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
+  descriptor.data.wgl.device_context = context.wgl_device_context;
+  descriptor.data.wgl.share_context = context.wgl_context;
+  descriptor.data.wgl.get_proc_address = context.get_proc_address;
+#else
+  descriptor.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
+  descriptor.data.egl.display = context.egl_display;
+  descriptor.data.egl.config = context.egl_config;
+  descriptor.data.egl.share_context = context.egl_context;
+  descriptor.data.egl.get_proc_address = context.get_proc_address;
+#endif
+  return mln_gpu_device_wrap_open_gl(&descriptor, out_device, diagnostic);
+#endif
 }
 
 }  // namespace
@@ -349,63 +399,45 @@ auto gpu_attach_ring(
       static_cast<mln_test_graphics_texture*>(textures[index]), &info[index]
     );
   }
+  mln_render_target target{};
+  target.size = sizeof(target);
 #if defined(BENCH_BACKEND_VULKAN)
   mln_vulkan_borrowed_texture entries[kDepth] = {};
   for (uint32_t index = 0; index < kDepth; ++index) {
     entries[index].image = info[index].vulkan_image;
     entries[index].image_view = info[index].vulkan_image_view;
   }
-  const auto& context = host().context;
-  mln_vulkan_borrowed_texture_descriptor descriptor{};
-  describe_ring(descriptor, entries, info[0]);
-  descriptor.context.instance = context.vulkan_instance;
-  descriptor.context.physical_device = context.vulkan_physical_device;
-  descriptor.context.device = context.vulkan_device;
-  descriptor.context.graphics_queue = context.vulkan_queue;
-  descriptor.context.graphics_queue_family_index =
-    context.vulkan_queue_family_index;
-  descriptor.context.get_instance_proc_addr =
-    context.vulkan_get_instance_proc_addr;
-  descriptor.context.get_device_proc_addr = context.vulkan_get_device_proc_addr;
-  descriptor.format = info[0].format;
-  descriptor.final_layout = info[0].vulkan_final_layout;
-  return mln_map_attach_vulkan_borrowed_texture(
-    map, &descriptor, &options, out_session, completion, diagnostic
-  );
+  target.kind = MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES;
+  auto& ring = target.data.vulkan_borrowed_textures;
+  describe_ring(ring, entries, info[0]);
+  ring.format = info[0].format;
+  ring.final_layout = info[0].vulkan_final_layout;
 #elif defined(BENCH_BACKEND_METAL)
   mln_metal_borrowed_texture entries[kDepth] = {};
   for (uint32_t index = 0; index < kDepth; ++index) {
     entries[index].texture = info[index].metal_texture;
   }
-  mln_metal_borrowed_texture_descriptor descriptor{};
-  describe_ring(descriptor, entries, info[0]);
-  return mln_map_attach_metal_borrowed_texture(
-    map, &descriptor, &options, out_session, completion, diagnostic
-  );
+  target.kind = MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES;
+  describe_ring(target.data.metal_borrowed_textures, entries, info[0]);
 #else
   mln_open_gl_borrowed_texture entries[kDepth] = {};
   for (uint32_t index = 0; index < kDepth; ++index) {
     entries[index].texture = info[index].opengl_texture;
   }
-  const auto& context = host().context;
-  mln_open_gl_borrowed_texture_descriptor descriptor{};
-  describe_ring(descriptor, entries, info[0]);
-#if defined(BENCH_OPENGL_WGL)
-  descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
-  descriptor.context.data.wgl.device_context = context.wgl_device_context;
-  descriptor.context.data.wgl.share_context = context.wgl_context;
-  descriptor.context.data.wgl.get_proc_address = context.get_proc_address;
-#else
-  descriptor.context.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
-  descriptor.context.data.egl.display = context.egl_display;
-  descriptor.context.data.egl.config = context.egl_config;
-  descriptor.context.data.egl.share_context = context.egl_context;
+  target.kind = MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES;
+  auto& ring = target.data.open_gl_borrowed_textures;
+  describe_ring(ring, entries, info[0]);
+  ring.target = info[0].opengl_target;
 #endif
-  descriptor.target = info[0].opengl_target;
-  return mln_map_attach_open_gl_borrowed_texture(
-    map, &descriptor, &options, out_session, completion, diagnostic
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  const auto wrapped = wrap_host_device(&device, diagnostic);
+  if (wrapped != MLN_STATUS_OK) return wrapped;
+  const auto status = mln_map_attach(
+    map, &target, device, &options, out_session, completion, diagnostic
   );
-#endif
+  // The session keeps the device until it detaches.
+  mln_gpu_device_release(device);
+  return status;
 }
 
 void gpu_destroy_ring(void** textures, uint32_t texture_count) {
