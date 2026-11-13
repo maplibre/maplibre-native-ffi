@@ -222,6 +222,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
+name = "cheap-ruler"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "038d6b7abd3a709310d655cbf336f42fd0f0237c84ed0b37caf3e66e0cee5067"
+dependencies = [
+ "geo-types",
+ "num-traits",
+]
+
+[[package]]
 name = "cobs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1400,13 +1410,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mln-rs-cheap-ruler"
-version = "0.0.11"
-dependencies = [
- "mln-rs-geometry",
-]
-
-[[package]]
 name = "mln-rs-conversion"
 version = "0.0.11"
 dependencies = [
@@ -1420,6 +1423,7 @@ dependencies = [
 name = "mln-rs-expression"
 version = "0.0.11"
 dependencies = [
+ "cheap-ruler",
  "fixed_decimal",
  "icu_collator",
  "icu_decimal",
@@ -1427,7 +1431,6 @@ dependencies = [
  "icu_locale",
  "icu_provider",
  "js-sys",
- "mln-rs-cheap-ruler",
  "mln-rs-conversion",
  "mln-rs-feature",
  "mln-rs-geojson",
