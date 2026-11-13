@@ -174,6 +174,9 @@ typedef uint64_t mln_delivery_queue MLN_BINDING(
 /**
  * A range of bytes, such as UTF-8 text.
  *
+ * Text that you pass can't contain a NUL. A function rejects it with
+ * MLN_STATUS_INVALID_ARGUMENT.
+ *
  * Lifetimes:
  * `data` can be null when `size` is 0. Text ends at `size` and needs no NUL
  * terminator.
