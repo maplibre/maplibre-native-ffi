@@ -35,11 +35,9 @@ runtime: maplibre.Runtime,
 map: maplibre.Map,
 session: maplibre.RenderSession,
 pacer: Pacer,
-/// The map's scale factor, which it keeps for its life. The map renders for
-/// the display that the window started on.
-scale: f64,
-/// The size that the session last got.
-size: maplibre.LogicalSize,
+/// The scale factor of the window's display, and the window's size in logical
+/// pixels, as the session last got them.
+extent: maplibre.LogicalExtent,
 /// SDL's view of the window on macOS, which holds the Metal layer.
 metal_view: if (builtin.os.tag == .macos) c.SDL_MetalView else void,
 
@@ -66,31 +64,21 @@ pub fn init(self: *MapView, window: *c.SDL_Window, wake: *const fn () void) !voi
     var diagnostic: maplibre.Diagnostic = .{};
     errdefer log.err("couldn't start the map: {s}", .{diagnostic.message()});
 
-    var width: c_int = 0;
-    var height: c_int = 0;
-    if (!c.SDL_GetWindowSizeInPixels(window, &width, &height)) return error.SdlFailed;
-    const scale: f64 = c.SDL_GetWindowDisplayScale(window);
     self.* = .{
         .window = window,
         .wake = wake,
-        .scale = if (scale > 0) scale else 1,
         .runtime = undefined,
         .map = undefined,
         .session = undefined,
         .pacer = undefined,
-        .size = undefined,
+        .extent = try windowExtent(window),
         .metal_view = undefined,
     };
-    self.size = self.logicalSize(width, height);
 
     self.runtime = try maplibre.Runtime.create(null, &diagnostic);
     errdefer self.runtime.dispose(null) catch {};
     const created = try self.runtime.createMap(.{
-        .initial_extent = .{
-            .width = self.size.width,
-            .height = self.size.height,
-            .scale_factor = self.scale,
-        },
+        .initial_extent = self.extent,
         .map_mode = .continuous,
         .event_mask = .{
             .map_style_loaded = true,
@@ -158,13 +146,14 @@ pub fn redraw(self: *MapView) void {
     self.demandFrame();
 }
 
-/// Gives the session the window's new size in pixels.
-pub fn resize(self: *MapView, width: c_int, height: c_int) void {
-    const size = self.logicalSize(width, height);
-    if (std.meta.eql(size, self.size)) return;
-    self.size = size;
+/// Gives the session the window's new size and scale factor, after the window
+/// changes size or moves to a display with another scale factor.
+pub fn resize(self: *MapView) void {
+    const extent = windowExtent(self.window) catch return;
+    if (std.meta.eql(extent, self.extent)) return;
+    self.extent = extent;
     var diagnostic: maplibre.Diagnostic = .{};
-    self.session.discarding().resize(size, &diagnostic) catch self.fail(diagnostic.message());
+    self.session.discarding().resize(extent, &diagnostic) catch self.fail(diagnostic.message());
 }
 
 /// Moves the camera, as a gesture asks.
@@ -177,7 +166,7 @@ pub fn applyCameraDelta(self: *MapView, delta: maplibre.CameraDelta) void {
 /// spans. Window coordinates are pixels on some platforms, and scaled ones on
 /// others.
 pub fn logicalPerPoint(self: *const MapView) f64 {
-    return c.SDL_GetWindowPixelDensity(self.window) / self.scale;
+    return c.SDL_GetWindowPixelDensity(self.window) / self.extent.scale_factor;
 }
 
 fn attach(self: *MapView, diagnostic: *maplibre.Diagnostic) !maplibre.NewRenderSession {
@@ -187,26 +176,39 @@ fn attach(self: *MapView, diagnostic: *maplibre.Diagnostic) !maplibre.NewRenderS
         .frame_wake = .init(self, onFrameWake, null),
     };
     const properties = c.SDL_GetWindowProperties(self.window);
-    switch (builtin.os.tag) {
-        .linux, .freebsd => return self.map.attachWaylandSurface(.{
-            .logical_size = self.size,
+    const size = self.logicalSize();
+    const target: maplibre.RenderTarget = switch (builtin.os.tag) {
+        .linux, .freebsd => if (usesWayland()) .{ .wayland_surface = .{
+            .logical_size = size,
             .display = c.SDL_GetPointerProperty(properties, c.SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, null),
             .surface = c.SDL_GetPointerProperty(properties, c.SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, null),
-        }, null, options, diagnostic),
-        .windows => return self.map.attachWin32Window(.{
-            .logical_size = self.size,
+        } } else .{ .xlib_window = .{
+            .logical_size = size,
+            .display = c.SDL_GetPointerProperty(properties, c.SDL_PROP_WINDOW_X11_DISPLAY_POINTER, null),
+            .window = @bitCast(c.SDL_GetNumberProperty(properties, c.SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0)),
+        } },
+        .windows => .{ .win32_window = .{
+            .logical_size = size,
             .window = c.SDL_GetPointerProperty(properties, c.SDL_PROP_WINDOW_WIN32_HWND_POINTER, null),
-        }, null, options, diagnostic),
-        .macos => {
+        } },
+        .macos => target: {
             self.metal_view = c.SDL_Metal_CreateView(self.window) orelse return error.SdlFailed;
-            errdefer c.SDL_Metal_DestroyView(self.metal_view);
-            return self.map.attachMetalSurface(.{
-                .logical_size = self.size,
+            break :target .{ .metal_layer = .{
+                .logical_size = size,
                 .layer = c.SDL_Metal_GetLayer(self.metal_view),
-            }, options, diagnostic);
+            } };
         },
         else => @compileError("unsupported platform"),
-    }
+    };
+    errdefer if (builtin.os.tag == .macos) c.SDL_Metal_DestroyView(self.metal_view);
+    // With no device, the session creates one on the platform's own backend.
+    return self.map.attach(allocator, target, null, options, diagnostic);
+}
+
+/// Whether SDL drives the window through Wayland rather than X11.
+pub fn usesWayland() bool {
+    const driver = c.SDL_GetCurrentVideoDriver() orelse return false;
+    return std.mem.eql(u8, std.mem.span(driver), "wayland");
 }
 
 /// Demands a frame when the session has one to draw and the display is ready
@@ -256,10 +258,22 @@ fn drainFrameResults(self: *MapView) void {
     }
 }
 
-fn logicalSize(self: *const MapView, width: c_int, height: c_int) maplibre.LogicalSize {
+fn logicalSize(self: *const MapView) maplibre.LogicalSize {
+    return .{ .width = self.extent.width, .height = self.extent.height };
+}
+
+/// The window's size in logical pixels, from its size in pixels and its
+/// display's scale factor.
+fn windowExtent(window: *c.SDL_Window) !maplibre.LogicalExtent {
+    var width: c_int = 0;
+    var height: c_int = 0;
+    if (!c.SDL_GetWindowSizeInPixels(window, &width, &height)) return error.SdlFailed;
+    const display_scale: f64 = c.SDL_GetWindowDisplayScale(window);
+    const scale = if (display_scale > 0) display_scale else 1;
     return .{
-        .width = @max(1, @as(u32, @intFromFloat(@round(@as(f64, @floatFromInt(width)) / self.scale)))),
-        .height = @max(1, @as(u32, @intFromFloat(@round(@as(f64, @floatFromInt(height)) / self.scale)))),
+        .width = @max(1, @as(u32, @intFromFloat(@round(@as(f64, @floatFromInt(width)) / scale)))),
+        .height = @max(1, @as(u32, @intFromFloat(@round(@as(f64, @floatFromInt(height)) / scale)))),
+        .scale_factor = scale,
     };
 }
 
