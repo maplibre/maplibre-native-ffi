@@ -6,74 +6,35 @@ set -euo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR
 
 repo_root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
-mln_path="third_party/maplibre-native"
+# The engine, which the native build compiles with Cargo, and the Vulkan
+# headers that the test fixtures and the binding suites compile against.
+mln_path="third_party/mln-rs"
+submodule_paths=("$mln_path" third_party/Vulkan-Headers)
 
 cd "$repo_root"
 
-# Paths relative to the maplibre-native submodule (not the FFI repo root).
-# Nested test/mason/glfw trees inside these repos are not fetched (submodule.recurse=false).
-vendor_paths=(
-  vendor/earcut.hpp # polygon triangulation
-  vendor/polylabel # polygon label placement
-  vendor/protozero # MVT / glyph PBF
-  vendor/vector-tile # MVT decode headers
-  vendor/unique_resource # OpenGL headless RAII
-  vendor/boost # header-only utilities
-  vendor/rapidjson # style JSON (not thirdparty/gtest)
-  vendor/eternal # interned strings
-  vendor/expected-lite # expected<> types
-  vendor/unordered_dense # hash maps
-  vendor/supercluster # clustering
-  vendor/kdbush.hpp # spatial index
-  vendor/PMTiles # PMTiles headers (MLN_WITH_PMTILES)
-  vendor/maplibre-tile-spec # mlt-cpp (MLT JSON/TESTS off in FFI)
-  vendor/maplibre-native-base/deps/cheap-ruler-cpp
-  vendor/maplibre-native-base/deps/geojson-vt-cpp
-  vendor/maplibre-native-base/deps/geojson.hpp
-  vendor/maplibre-native-base/deps/geometry.hpp
-  vendor/maplibre-native-base/deps/shelf-pack-cpp
-  vendor/maplibre-native-base/deps/variant
-  vendor/maplibre-native-base/deps/jni.hpp # configure-time base dep
-  vendor/maplibre-native-base/deps/pixelmatch-cpp # configure-time base dep
-  vendor/freetype # text shaping (MLN_TEXT_SHAPING_HARFBUZZ)
-  vendor/harfbuzz
-  vendor/metal-cpp # Metal API headers
-  vendor/Vulkan-Headers # Vulkan headers + Zig bindgen include path
-  vendor/VulkanMemoryAllocator
-  vendor/glslang # SPIR-V toolchain (MLN_WITH_VULKAN)
-)
-
-mlt_path="$mln_path/vendor/maplibre-tile-spec"
-mlt_vendor_paths=(
-  cpp/vendor/earcut # MLT polygon triangulation
-  cpp/vendor/fsst # MLT string compression
-)
-
 # Changes we carry against the pinned commit until they land upstream. They are
 # applied to the worktree rather than tracked as a fork, so the submodule keeps
-# pointing at maplibre/maplibre-native. Each patch file opens with its reason,
-# and the patches apply in filename order. A patch may reach into the vendored
-# maplibre-tile-spec, so they apply after the nested submodules check out.
-mln_patches=("$repo_root"/patches/maplibre-native/*.patch)
+# pointing at louwers/mln-rs. Each patch file opens with its reason, and the
+# patches apply in filename order.
+shopt -s nullglob
+mln_patches=("$repo_root"/patches/mln-rs/*.patch)
+shopt -u nullglob
 
-# The patches overlap, so no single patch reverses cleanly on its own once the
-# later ones are on. A sync instead records what it produced: the pinned
+# The patches may overlap, so no single patch reverses cleanly on its own once
+# the later ones are on. A sync instead records what it produced: the pinned
 # commit, a hash of the worktree's diff against it, and a hash of the patch
 # list. A worktree that still matches that record is synced. Any edit since,
 # patched path or not, changes the diff hash, and adding, editing, or dropping
-# a patch changes the list hash. The diff includes maplibre-tile-spec's, which
-# its parent's diff leaves out.
+# a patch changes the list hash.
 mln_stamp_path() {
-  printf '%s/mln-ffi-sync.stamp' "$(git -C "$mln_path" rev-parse --git-dir)"
+  printf '%s/mln-ffi-sync.stamp' "$(git -C "$mln_path" rev-parse --absolute-git-dir)"
 }
 
 mln_state() {
   printf '%s %s %s\n' "$(git -C "$mln_path" rev-parse HEAD)" \
-    "$({
-      git -C "$mln_path" diff --binary HEAD
-      git -C "$mlt_path" diff --binary HEAD
-    } | git hash-object --stdin)" \
-    "$(cat "${mln_patches[@]}" | git hash-object --stdin)"
+    "$(git -C "$mln_path" diff --binary HEAD | git hash-object --stdin)" \
+    "$(cat /dev/null "${mln_patches[@]}" | git hash-object --stdin)"
 }
 
 mln_synced() {
@@ -111,9 +72,7 @@ mln_patch_introduced_paths() {
 # on in order. The checkout restores the files a patch changes or renames
 # away, but leaves the files it introduces in place, so remove those before
 # the patch goes back on. A path that a patch only changes stays, since an
-# earlier patch may have introduced it. The clean runs from the file's
-# directory, because one run from the parent stops at a nested submodule's
-# boundary.
+# earlier patch may have introduced it.
 apply_mln_patches() {
   local patch path paths
   for patch in "${mln_patches[@]}"; do
@@ -132,9 +91,7 @@ apply_mln_patches() {
 
 # A synced worktree is modified in exactly the paths that the listed patches
 # touch, so a tracked change anywhere else is an edit made by hand or a
-# leftover from a patch that has since left the list. A nested submodule
-# carrying tracked edits reports as modified too, which a patch inside it
-# accounts for; untracked content inside one is build noise, and stays ignored.
+# leftover from a patch that has since left the list.
 mln_unexplained_paths() {
   local patch patched path
   patched="$(
@@ -143,17 +100,14 @@ mln_unexplained_paths() {
       git -C "$mln_path" apply --numstat "$patch" | cut -f3
     done
   )"
-  git -C "$mln_path" status --porcelain --untracked-files=no \
-    --ignore-submodules=untracked | cut -c4- |
+  git -C "$mln_path" status --porcelain --untracked-files=no | cut -c4- |
     while read -r path; do
-      grep -qxF "$path" <<<"$patched" ||
-        grep -qF "$path/" <<<"$patched" ||
-        printf '%s\n' "$path"
+      grep -qxF "$path" <<<"$patched" || printf '%s\n' "$path"
     done
 }
 
-# The submodule worktrees below are managed rather than edited, so the update
-# runs with --force: it throws away local changes and checks out even when a
+# The submodule worktrees are managed rather than edited, so the update runs
+# with --force: it throws away local changes and checks out even when a
 # submodule already sits at its pinned commit. That is what puts a worktree
 # carrying an applied patch back on the pinned files before the patch goes on
 # again, whether the patch was since edited or dropped from the list entirely.
@@ -173,38 +127,20 @@ report_discarded_mln_changes() {
   fi
 }
 
-# Skipped by design (full MapLibre tree only): googletest, benchmark, cpp-httplib, args,
-# zip-archive, webgpu-cpp, wgpu-native, docs/doxygen, platform/windows/vendor/vcpkg, and
-# other nested .mason / test fixture / glfw submodules under the paths above.
-
-top_status="$(git submodule status "$mln_path" 2>/dev/null || true)"
-if [[ "$top_status" == " "* ]]; then
-  nested_status="$(git -C "$mln_path" submodule status "${vendor_paths[@]}" 2>/dev/null || true)"
-  nested_count="$(printf '%s\n' "$nested_status" | sed '/^$/d' | wc -l | tr -d ' ')"
-  if [[ "$nested_count" == "${#vendor_paths[@]}" ]] &&
-    ! grep -qE '^[+-U]' <<<"$nested_status"; then
-    mlt_status="$(git -C "$mlt_path" submodule status "${mlt_vendor_paths[@]}" 2>/dev/null || true)"
-    mlt_count="$(printf '%s\n' "$mlt_status" | sed '/^$/d' | wc -l | tr -d ' ')"
-    if [[ "$mlt_count" == "${#mlt_vendor_paths[@]}" ]] &&
-      ! grep -qE '^[+-U]' <<<"$mlt_status" &&
-      mln_synced; then
-      exit 0
-    fi
-  fi
+status="$(git submodule status "${submodule_paths[@]}" 2>/dev/null || true)"
+status_count="$(printf '%s\n' "$status" | sed '/^$/d' | wc -l | tr -d ' ')"
+if [[ "$status_count" == "${#submodule_paths[@]}" ]] &&
+  ! grep -qE '^[+-U]' <<<"$status" &&
+  mln_synced; then
+  exit 0
 fi
 
 report_discarded_mln_changes
 
-git -c submodule.recurse=false submodule sync "$mln_path"
-# .gitmodules marks this submodule `update = none` so that Cargo and SwiftPM
-# skip it when resolving a git dependency on this repository. --checkout is the
-# opt back in for the builds that do need the source.
-git -c submodule.recurse=false submodule update --init --checkout --force --depth 1 "$mln_path"
-
-git -C "$mln_path" -c submodule.recurse=false submodule sync "${vendor_paths[@]}"
-git -C "$mln_path" -c submodule.recurse=false submodule update --init --force --depth 1 "${vendor_paths[@]}"
-
-git -C "$mlt_path" -c submodule.recurse=false submodule sync "${mlt_vendor_paths[@]}"
-git -C "$mlt_path" -c submodule.recurse=false submodule update --init --force --depth 1 "${mlt_vendor_paths[@]}"
+git -c submodule.recurse=false submodule sync "${submodule_paths[@]}"
+# .gitmodules marks these submodules `update = none` so that Cargo and SwiftPM
+# skip them when resolving a git dependency on this repository. --checkout is
+# the opt back in for the builds that do need the source.
+git -c submodule.recurse=false submodule update --init --checkout --force --depth 1 "${submodule_paths[@]}"
 
 apply_mln_patches
