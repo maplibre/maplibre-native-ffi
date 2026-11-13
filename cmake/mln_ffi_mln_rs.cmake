@@ -171,15 +171,10 @@ esac
   set(${out_var} "${shim}" PARENT_SCOPE)
 endfunction()
 
-# The Cargo feature of mln-rs-c that builds the preset's backend, or nothing
-# for the crate's default features. The crate draws with Metal alone on Apple
-# platforms, so the Apple presets of another backend build every feature.
+# The Cargo feature of mln-rs-c that builds the preset's backend.
 function(mln_ffi_native_feature out_var)
-  set(feature "")
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     set(feature metal)
-  elseif(APPLE)
-    set(feature "")
   elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
     set(feature vulkan)
   elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
@@ -416,12 +411,8 @@ function(mln_ffi_add_c_api_library target)
   set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/build/cargo"
       CACHE PATH "Cargo target directory for mln-rs")
   mln_ffi_native_feature(feature)
-  set(feature_arguments)
-  set(MLN_FFI_CARGO_BUILD_DIR "${MLN_FFI_CARGO_TARGET_DIR}/default")
-  if(feature)
-    set(feature_arguments --no-default-features --features "${feature}")
-    set(MLN_FFI_CARGO_BUILD_DIR "${MLN_FFI_CARGO_TARGET_DIR}/${feature}")
-  endif()
+  set(feature_arguments --no-default-features --features "${feature}")
+  set(MLN_FFI_CARGO_BUILD_DIR "${MLN_FFI_CARGO_TARGET_DIR}/${feature}")
 
   get_target_property(shared_supported mln_ffi_platform_dependencies
                       MLN_FFI_SHARED_SUPPORTED)

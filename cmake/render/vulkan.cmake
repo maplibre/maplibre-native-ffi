@@ -47,20 +47,7 @@ function(mln_ffi_configure_render_dependencies target)
     TARGET ${target}
     PROPERTY MLN_FFI_RUNTIME_DIRS "${MLN_FFI_VULKAN_LOADER_DIR}")
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    set(MLN_FFI_VULKAN_ICD_FILE "$ENV{VK_DRIVER_FILES}")
-    if(NOT EXISTS "${MLN_FFI_VULKAN_ICD_FILE}")
-      find_file(
-        MLN_FFI_VULKAN_ICD_FILE
-        NAMES MoltenVK_icd.json
-        HINTS
-          "$ENV{VULKAN_SDK}" PATH_SUFFIXES etc/vulkan/icd.d share/vulkan/icd.d
-        REQUIRED)
-    endif()
-    set_property(
-      TARGET ${target}
-      PROPERTY MLN_FFI_VULKAN_ICD_FILE "${MLN_FFI_VULKAN_ICD_FILE}")
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # The SDK keeps the loader under runtime/<architecture>. Requiring it here
     # is what keeps the runtime directory honest: tests bind vulkan-1.dll at
     # load time, so accepting a miss leaves this property on the import library

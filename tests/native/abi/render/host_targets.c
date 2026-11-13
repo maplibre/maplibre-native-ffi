@@ -778,7 +778,7 @@ static bool event_reached(void* context) {
          target->value;
 }
 
-// Metal, MoltenVK, and ANGLE all hand frames over this way.
+// Metal hands frames over this way.
 static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

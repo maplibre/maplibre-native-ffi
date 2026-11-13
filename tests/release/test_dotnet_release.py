@@ -27,7 +27,7 @@ class RuntimeTargetTests(unittest.TestCase):
             targets["Metal"],
         )
         self.assertEqual("win-x64", targets["OpenGL"]["windows-x64-wgl"])
-        self.assertEqual("osx-arm64", targets["OpenGL"]["macos-arm64-egl"])
+        self.assertEqual("linux-x64", targets["OpenGL"]["linux-gnu-x64-egl"])
         self.assertEqual(
             "linux-musl-arm64", targets["Vulkan"]["linux-musl-arm64-vulkan"]
         )

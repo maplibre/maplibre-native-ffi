@@ -65,9 +65,9 @@ publish() {
 
   publication_tasks=()
   add_publications :bindings:kotlin KotlinMultiplatform Jvm WasmJs "${apple[@]}"
-  add_publications :bindings:kotlin:runtimes:opengl KotlinMultiplatform Jvm MacosArm64 WasmJs
+  add_publications :bindings:kotlin:runtimes:opengl KotlinMultiplatform Jvm WasmJs
   add_publications :bindings:kotlin:runtimes:webgpu KotlinMultiplatform WasmJs
-  add_publications :bindings:kotlin:runtimes:vulkan KotlinMultiplatform Jvm MacosArm64
+  add_publications :bindings:kotlin:runtimes:vulkan KotlinMultiplatform Jvm
   add_publications :bindings:kotlin:runtimes:metal KotlinMultiplatform Jvm "${apple[@]}"
   ./gradlew "$@" "${publication_tasks[@]}"
 }

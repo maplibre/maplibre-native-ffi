@@ -28,7 +28,7 @@
 #if defined(__APPLE__)
 #define MLN_TG_HAS_METAL 1
 #endif
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__APPLE__)
 #define MLN_TG_HAS_EGL 1
 #endif
 #if defined(_WIN32)
@@ -122,7 +122,6 @@ typedef struct vulkan_functions {
   PFN_vkDestroySurfaceKHR destroy_surface;
   PFN_vkGetPhysicalDeviceSurfaceSupportKHR get_surface_support;
   PFN_vkCreateHeadlessSurfaceEXT create_headless_surface;
-  PFN_vkVoidFunction create_metal_surface;
   PFN_vkVoidFunction create_win32_surface;
   PFN_vkVoidFunction create_android_surface;
   PFN_vkDestroyDevice destroy_device;
@@ -272,7 +271,6 @@ struct mln_test_graphics {
   const char* vulkan_device_extensions[6];
   VkCommandPool vulkan_command_pool;
   bool vulkan_headless_surface;
-  bool vulkan_metal_surface;
   bool vulkan_win32_surface;
   bool vulkan_android_surface;
 #if defined(__ANDROID__)
@@ -312,7 +310,6 @@ struct mln_test_graphics_texture {
 struct mln_test_graphics_surface {
   mln_test_graphics* graphics;
   mln_test_graphics_surface_info info;
-  void* vulkan_layer;
 #if defined(MLN_TG_HAS_WGL)
   HWND window;
 #endif
@@ -617,9 +614,7 @@ static void metal_surface_destroy(mln_test_graphics_surface* surface) {
 #endif
 
 static const char* vulkan_loader_name(void) {
-#if defined(__APPLE__)
-  return "libvulkan.1.dylib";
-#elif defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__)
   // Neither platform's loader carries a versioned soname.
   return "libvulkan.so";
 #elif defined(_WIN32)
@@ -690,13 +685,7 @@ static bool vulkan_create_instance(mln_test_graphics* graphics) {
   if (portability) enabled[enabled_count++] = "VK_KHR_portability_enumeration";
   if (has_extension(available, available_count, "VK_KHR_surface")) {
     enabled[enabled_count++] = "VK_KHR_surface";
-#if defined(__APPLE__)
-    graphics->vulkan_metal_surface =
-      has_extension(available, available_count, "VK_EXT_metal_surface");
-    if (graphics->vulkan_metal_surface) {
-      enabled[enabled_count++] = "VK_EXT_metal_surface";
-    }
-#elif defined(_WIN32)
+#if defined(_WIN32)
     graphics->vulkan_win32_surface =
       has_extension(available, available_count, "VK_KHR_win32_surface");
     if (graphics->vulkan_win32_surface) {
@@ -792,7 +781,6 @@ static bool vulkan_load_functions(mln_test_graphics* graphics) {
     vulkan_proc(graphics, "vkGetPhysicalDeviceSurfaceSupportKHR");
   *(PFN_vkVoidFunction*)&vk->create_headless_surface =
     vulkan_proc(graphics, "vkCreateHeadlessSurfaceEXT");
-  vk->create_metal_surface = vulkan_proc(graphics, "vkCreateMetalSurfaceEXT");
   vk->create_win32_surface = vulkan_proc(graphics, "vkCreateWin32SurfaceKHR");
   vk->create_android_surface =
     vulkan_proc(graphics, "vkCreateAndroidSurfaceKHR");
@@ -1340,13 +1328,6 @@ done:
   return read;
 }
 
-typedef struct vulkan_metal_surface_info {
-  VkStructureType sType;
-  const void* pNext;
-  VkFlags flags;
-  const void* pLayer;
-} vulkan_metal_surface_info;
-
 #if defined(_WIN32)
 typedef struct vulkan_win32_surface_info {
   VkStructureType sType;
@@ -1555,28 +1536,6 @@ static bool vulkan_surface_create(
   VkInstance instance = (VkInstance)graphics->context.vulkan_instance;
   VkSurfaceKHR handle = VK_NULL_HANDLE;
   VkResult result = VK_ERROR_EXTENSION_NOT_PRESENT;
-#if defined(MLN_TG_HAS_METAL)
-  if (graphics->vulkan_metal_surface && vk->create_metal_surface != NULL) {
-    if (!metal_load(&graphics->objc)) return false;
-    void* device = graphics->objc.create_device();
-    void* pool = graphics->objc.pool_push();
-    surface->vulkan_layer = metal_layer_create(
-      graphics, device, surface->info.width, surface->info.height
-    );
-    graphics->objc.pool_pop(pool);
-    if (device != NULL) objc_send_void(graphics, device, "release");
-    if (surface->vulkan_layer == NULL) return false;
-    surface->info.metal_layer = surface->vulkan_layer;
-    const vulkan_metal_surface_info info = {
-      .sType = (VkStructureType)1000217000,
-      .pLayer = surface->vulkan_layer,
-    };
-    result = ((VkResult(VKAPI_PTR*)(
-      VkInstance, const vulkan_metal_surface_info*,
-      const VkAllocationCallbacks*, VkSurfaceKHR*
-    ))vk->create_metal_surface)(instance, &info, NULL, &handle);
-  }
-#endif
 #if defined(_WIN32)
   if (
     handle == VK_NULL_HANDLE && graphics->vulkan_win32_surface &&
@@ -1667,11 +1626,6 @@ static void vulkan_surface_destroy(mln_test_graphics_surface* surface) {
       (VkSurfaceKHR)(uintptr_t)surface->info.vulkan_surface, NULL
     );
   }
-#if defined(MLN_TG_HAS_METAL)
-  if (surface->vulkan_layer != NULL) {
-    objc_send_void(graphics, surface->vulkan_layer, "release");
-  }
-#endif
 }
 
 // OpenGL objects, shared by EGL and WGL
@@ -1847,11 +1801,6 @@ enum {
   EGL_CONTEXT_CLIENT_VERSION_VALUE = 0x3098,
   EGL_DRAW_VALUE = 0x3059,
   EGL_READ_VALUE = 0x305A,
-  EGL_PLATFORM_ANGLE_ANGLE_VALUE = 0x3202,
-  EGL_PLATFORM_ANGLE_TYPE_ANGLE_VALUE = 0x3203,
-  EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE_VALUE = 0x3489,
-  EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE_VALUE = 0x3209,
-  EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE_VALUE = 0x320A,
   EGL_PLATFORM_SURFACELESS_MESA_VALUE = 0x31DD,
 };
 
@@ -1876,10 +1825,7 @@ static void* egl_open_library(
 }
 
 static bool egl_load(mln_test_graphics* graphics) {
-#if defined(__APPLE__)
-  static const char* const egl_names[] = {"libEGL.dylib"};
-  static const char* const gles_names[] = {"libGLESv2.dylib"};
-#elif defined(__ANDROID__)
+#if defined(__ANDROID__)
   static const char* const egl_names[] = {"libEGL.so"};
   static const char* const gles_names[] = {"libGLESv3.so", "libGLESv2.so"};
 #else
@@ -1937,9 +1883,8 @@ static bool egl_load(mln_test_graphics* graphics) {
 
 // Test contexts render into pbuffers and never present, so desktop Linux names
 // the surfaceless platform: the default display resolves to whatever libEGL was
-// built for, commonly X11, which fails without a display server. Apple uses
-// ANGLE on Metal. Android and OpenHarmony keep the default display, which
-// serves their own window systems.
+// built for, commonly X11, which fails without a display server. Android and
+// OpenHarmony keep the default display, which serves their own window systems.
 static void* egl_display(const mln_test_graphics* graphics) {
   const egl_functions* egl = &graphics->egl;
 #if defined(__ANDROID__) || defined(__OHOS__)
@@ -1948,18 +1893,7 @@ static void* egl_display(const mln_test_graphics* graphics) {
   void* (*get_platform_display)(uint32_t, void*, const intptr_t*) =
     egl->get_platform_display;
   if (get_platform_display == NULL) return NULL;
-#if defined(__APPLE__)
-  const intptr_t attributes[] = {
-    EGL_PLATFORM_ANGLE_TYPE_ANGLE_VALUE,
-    EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE_VALUE,
-    EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE_VALUE,
-    EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE_VALUE,
-    EGL_NONE_VALUE,
-  };
-  return get_platform_display(EGL_PLATFORM_ANGLE_ANGLE_VALUE, NULL, attributes);
-#else
   return get_platform_display(EGL_PLATFORM_SURFACELESS_MESA_VALUE, NULL, NULL);
-#endif
 #endif
 }
 

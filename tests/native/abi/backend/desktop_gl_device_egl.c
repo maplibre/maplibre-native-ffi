@@ -4,8 +4,8 @@
 #include "support/map.h"
 #include "support/test_support.h"
 
-// Only desktop EGL on Linux and FreeBSD renders with desktop OpenGL. ANGLE on
-// Apple platforms and the EGL of Android and OpenHarmony implement OpenGL ES.
+// Only desktop EGL on Linux and FreeBSD renders with desktop OpenGL. The EGL of
+// Android and OpenHarmony implements OpenGL ES.
 #if (defined(__linux__) || defined(__FreeBSD__)) && !defined(__ANDROID__) && \
   !defined(__OHOS__)
 #define DESKTOP_GL_SUPPORTED 1

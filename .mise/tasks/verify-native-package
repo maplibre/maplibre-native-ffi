@@ -126,12 +126,11 @@ REMEDIES = {
         "and link the loader into the test harness only."
     ),
     VENDORED_LOADER: (
-        "The host supplies the graphics loader. Install a local stand-in "
-        "through the loader component, which stays out of the package."
+        "The host supplies the graphics loader. Leave it out of the package."
     ),
     VENDORED_HEADER: (
-        "Graphics headers come with the host's implementation. Install a local "
-        "stand-in through the loader component, which stays out of the package."
+        "Graphics headers come with the host's implementation. Leave them out "
+        "of the package."
     ),
     UNSTRIPPED: (
         "An Apple library's local symbols belong in its dSYM. CPack strips "

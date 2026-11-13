@@ -210,6 +210,15 @@ reason = "Debian and Alpine's Java 25 Zero/libffi runtimes pass 76 of 77 binding
 # No supported toolchain or ABI.
 
 [[entry]]
+bindings = ["c"]
+platforms = ["macos"]
+archs = ["arm64"]
+backends = ["vulkan", "opengl"]
+status = "blocked"
+reason = "mln-rs draws with Metal alone on Apple platforms. It has no path through MoltenVK for Vulkan or ANGLE for OpenGL."
+link = "https://github.com/louwers/mln-rs"
+
+[[entry]]
 bindings = ["gobject"]
 platforms = [
   "android",

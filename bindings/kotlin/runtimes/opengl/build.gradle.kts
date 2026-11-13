@@ -28,7 +28,6 @@ kotlin {
   androidNativeX64()
   linuxArm64()
   linuxX64()
-  macosArm64()
 
   android {
     namespace = "org.maplibre.nativeffi.runtime.opengl"

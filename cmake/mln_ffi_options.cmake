@@ -40,6 +40,10 @@ function(mln_ffi_configure_options)
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal" AND NOT APPLE)
     message(FATAL_ERROR "Metal builds require an Apple platform")
   endif()
+  # mln-rs draws with Metal alone on Apple platforms.
+  if(APPLE AND NOT MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    message(FATAL_ERROR "Apple builds use the Metal backend")
+  endif()
   # The browser's WebGPU is the only one that a host hands the library a
   # device of: native hosts drive Vulkan, Metal, or OpenGL.
   if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu" AND NOT MLN_FFI_WEB)

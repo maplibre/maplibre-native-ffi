@@ -1,6 +1,6 @@
 function(mln_ffi_configure_render_dependencies target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
-    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR MLN_FFI_EGL_ROOT)
+    if(MLN_FFI_EGL_ROOT)
       include(render/egl)
       mln_ffi_import_egl()
       # Headers alone: the library defines its own EGL entry points and resolves
@@ -10,8 +10,6 @@ function(mln_ffi_configure_render_dependencies target)
       get_target_property(MLN_FFI_EGL_INCLUDE_DIRS MLN_FFI::EGL
                           INTERFACE_INCLUDE_DIRECTORIES)
       get_target_property(MLN_FFI_EGL_LIBRARY MLN_FFI::EGL IMPORTED_LOCATION)
-      get_target_property(
-        MLN_FFI_GLES_LIBRARY MLN_FFI::GLESv2 IMPORTED_LOCATION)
       get_filename_component(
         MLN_FFI_EGL_LIBRARY_DIR "${MLN_FFI_EGL_LIBRARY}"
         DIRECTORY)
@@ -28,33 +26,6 @@ function(mln_ffi_configure_render_dependencies target)
         set_property(
           TARGET ${target}
           PROPERTY MLN_FFI_TEST_LINK_LIBRARIES MLN_FFI::EGL MLN_FFI::GLESv2)
-      endif()
-      if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-        # An Apple host has no system EGL, so both the implementation and the
-        # headers to build against come from the ANGLE distribution the host
-        # brings. The local stand-in installs the two together through the
-        # loader component, which the artifact leaves out.
-        file(READ "${PROJECT_SOURCE_DIR}/third_party/angle/manifest.json"
-             angle_manifest)
-        string(JSON angle_version GET "${angle_manifest}" version)
-        mln_ffi_add_component(
-          ${target}
-          angle
-          https://chromium.googlesource.com/angle/angle
-          BSD-3-Clause
-          VERSION
-          "${angle_version}"
-          NOTICES
-          "${MLN_FFI_EGL_ROOT}/LICENSE"
-          angle.txt)
-        set_target_properties(
-          ${target}
-          PROPERTIES
-            MLN_FFI_INSTALL_LOADER_FILES
-            "${MLN_FFI_EGL_LIBRARY};${MLN_FFI_GLES_LIBRARY}"
-            MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS
-            "${MLN_FFI_EGL_INCLUDE_DIRS}/EGL;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES2;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES3;${MLN_FFI_EGL_INCLUDE_DIRS}/KHR"
-        )
       endif()
     elseif(CMAKE_SYSTEM_NAME MATCHES "^(Android|OHOS)$")
       find_library(MLN_FFI_EGL_LIBRARY NAMES EGL REQUIRED)

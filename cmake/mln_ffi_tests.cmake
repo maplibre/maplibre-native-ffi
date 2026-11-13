@@ -190,11 +190,6 @@ function(mln_native_test_environment out_environment out_modifications)
   # compiled objects: an object carrying it would send a second checkout reading
   # fixtures out of the tree that happened to compile it first.
   set(environment "MLN_FFI_TEST_FIXTURE_DIR=${MLN_NATIVE_TESTS_DIR}/fixtures")
-  get_target_property(vulkan_icd_file mln_ffi_render_dependencies
-                      MLN_FFI_VULKAN_ICD_FILE)
-  if(vulkan_icd_file)
-    list(APPEND environment "VK_ICD_FILENAMES=${vulkan_icd_file}")
-  endif()
   set(${out_environment} ${environment} PARENT_SCOPE)
   set(${out_modifications} ${modifications} PARENT_SCOPE)
 endfunction()
@@ -378,13 +373,6 @@ endfunction()
 # run the suites side by side; any other device runs one test at a time.
 function(mln_native_bound_test test_name target timeout)
   set_tests_properties(${test_name} PROPERTIES TIMEOUT ${timeout})
-  # On macOS, ANGLE's Metal backend can stop completing a process's GPU work
-  # when several processes render at once on a virtual GPU, as CI runners have:
-  # reads then return zeros or an earlier frame, with no GL error. EGL tests
-  # there take turns. CMake can't tell which files render, so all of them do.
-  if(APPLE AND MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
-    set_tests_properties(${test_name} PROPERTIES RESOURCE_LOCK gpu)
-  endif()
   mln_native_runs_off_host(off_host)
   if(NOT off_host)
     return()

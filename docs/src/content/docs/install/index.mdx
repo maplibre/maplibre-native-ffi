@@ -20,10 +20,11 @@ architectures, and backends each language supports.
 ## Choose a backend
 
 The library renders with one graphics backend, which you choose when you install
-it. Where a package has a default, it's Metal on Apple platforms, OpenGL on
-Android and OpenHarmony, WebGPU in browsers, and Vulkan elsewhere. Choose OpenGL
-in emulators and virtual machines, which often lack Vulkan, and choose the
-backend your application already uses if it draws its own graphics.
+it. Apple platforms have one, Metal. Elsewhere, where a package has a default,
+it's OpenGL on Android and OpenHarmony, WebGPU in browsers, and Vulkan on other
+platforms. Choose OpenGL in emulators and virtual machines, which often lack
+Vulkan, and choose the backend your application already uses if it draws its own
+graphics.
 
 ## Web
 
@@ -39,9 +40,3 @@ On the page's thread it works too, but every frame and style parse runs there.
 
 The module starts Web Workers of its own for tile work, and needs no
 cross-origin isolation, so any static host serves it.
-
-## macOS
-
-macOS has neither Vulkan nor EGL. To use the Vulkan or OpenGL backend there,
-load [MoltenVK](https://github.com/KhronosGroup/MoltenVK) or
-[ANGLE](https://chromium.googlesource.com/angle/angle) yourself.

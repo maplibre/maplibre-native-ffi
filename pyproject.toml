@@ -15,7 +15,6 @@ dev = [
   # The GObject binding builds with meson and documents with gi-docgen.
   "gi-docgen==2026.1",
   "libclang==18.1.1",
-  "lief==1.0.0; sys_platform == 'darwin'",
   "meson==1.12.1",
   "ruamel-yaml==0.19.1",
   "ruff==0.17.4",

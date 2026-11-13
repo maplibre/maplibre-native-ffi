@@ -101,7 +101,6 @@ endfunction()
 
 function(mln_ffi_install_c_api_library target)
   set(MLN_FFI_NATIVE_COMPONENT native)
-  set(MLN_FFI_LOADER_COMPONENT loader)
   mln_ffi_install_zig_libc()
 
   get_target_property(shared ${target} MLN_FFI_SHARED_FILE)
@@ -233,27 +232,4 @@ function(mln_ffi_install_c_api_library target)
         COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
     endif()
   endforeach()
-  # The host supplies the graphics implementation and its headers, so this
-  # component stays out of the package. The build task installs it for tests.
-  get_target_property(MLN_FFI_INSTALL_LOADER_FILES mln_ffi_render_dependencies
-                      MLN_FFI_INSTALL_LOADER_FILES)
-  if(MLN_FFI_INSTALL_LOADER_FILES
-     AND NOT MLN_FFI_INSTALL_LOADER_FILES MATCHES "-NOTFOUND$")
-    install(
-      FILES ${MLN_FFI_INSTALL_LOADER_FILES}
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-      COMPONENT "${MLN_FFI_LOADER_COMPONENT}"
-      EXCLUDE_FROM_ALL)
-  endif()
-  get_target_property(
-    MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS mln_ffi_render_dependencies
-    MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS)
-  if(MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS
-     AND NOT MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS MATCHES "-NOTFOUND$")
-    install(
-      DIRECTORY ${MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS}
-      DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-      COMPONENT "${MLN_FFI_LOADER_COMPONENT}"
-      EXCLUDE_FROM_ALL)
-  endif()
 endfunction()
