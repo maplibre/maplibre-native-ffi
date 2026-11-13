@@ -68,18 +68,19 @@ function(mln_ffi_json_string_array out_var)
   set(${out_var} "${MLN_FFI_JOINED}" PARENT_SCOPE)
 endfunction()
 
-# Writes a dSYM beside an installed Apple binary from the unstripped build-tree
+# Writes a dSYM for an installed Apple binary from the unstripped build-tree
 # binary, so debuggers and crash reports can name what stripping removes.
 # Release builds have no debug information, so the dSYM holds only the symbol
-# table. `binary` is the build-tree file, and `installed` the path under the
-# prefix that the dSYM goes beside.
-function(mln_ffi_install_apple_dsym binary installed component)
+# table. `binary` is the build-tree file, `installed` the binary's path under
+# the prefix, and `dsym` the dSYM's: beside a bare library, or beside the
+# bundle of a framework's binary.
+function(mln_ffi_install_apple_dsym binary installed dsym component)
   if(NOT APPLE)
     return()
   endif()
   find_program(MLN_FFI_DSYMUTIL NAMES dsymutil llvm-dsymutil REQUIRED)
   set(prefix "\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}")
-  set(dsym "${prefix}/${installed}.dSYM")
+  set(dsym "${prefix}/${dsym}")
   # --quiet hides the warning that there's no debug information, and the
   # relocation list is empty but records the build tree's path.
   install(
@@ -198,6 +199,7 @@ function(mln_ffi_install_c_api_library target)
         COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
       mln_ffi_install_apple_dsym(
         "${shared}" "${CMAKE_INSTALL_LIBDIR}/${shared_name}"
+        "${CMAKE_INSTALL_LIBDIR}/${shared_name}.dSYM"
         "${MLN_FFI_NATIVE_COMPONENT}")
     endif()
   endif()

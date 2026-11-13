@@ -79,7 +79,8 @@ function(mln_ffi_install_c_api_framework target shared component)
     DESTINATION "${content}"
     COMPONENT "${component}")
   mln_ffi_install_apple_dsym(
-    "${binary}" "${content}/${MLN_FFI_APPLE_FRAMEWORK_NAME}" "${component}")
+    "${binary}" "${content}/${MLN_FFI_APPLE_FRAMEWORK_NAME}" "${framework}.dSYM"
+    "${component}")
   install(
     FILES "${info_plist}"
     DESTINATION "${resources}"
