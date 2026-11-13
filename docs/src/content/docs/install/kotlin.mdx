@@ -39,6 +39,18 @@ androidMain.dependencies {
 }
 ```
 
+HTTPS verifies certificates with Android's own verifier, through the Android
+component of rustls-platform-verifier, which the binding depends on. That
+component is published to its own Maven repository:
+
+```kotlin title="build.gradle.kts"
+repositories {
+  maven("https://github.com/rustls/rustls-platform-verifier/raw/maven-archive/android-release-support/maven/") {
+    content { includeGroup("org.rustls") }
+  }
+}
+```
+
 Call `initAndroid(context)` once before you create a runtime.
 
 ## Native
