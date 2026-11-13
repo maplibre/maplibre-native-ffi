@@ -103,6 +103,14 @@ class PythonReleaseTest(unittest.TestCase):
             [path.name for path in module.glob("*.dll")], ["maplibre-native-c.dll"]
         )
 
+        # An LLVM MinGW package also carries the toolchain's unwinder.
+        (self.prefix / "bin" / "libunwind.dll").write_text("libunwind.dll")
+        stage_runtime_dlls(module.parents[1], self.prefix, "windows-mingw-arm64")
+        self.assertEqual(
+            sorted(path.name for path in module.glob("*.dll")),
+            ["libunwind.dll", "maplibre-native-c.dll"],
+        )
+
         stage_runtime_dlls(module.parents[1], self.prefix, "linux-gnu-x64")
         self.assertEqual(list(module.glob("*.dll")), [])
 
