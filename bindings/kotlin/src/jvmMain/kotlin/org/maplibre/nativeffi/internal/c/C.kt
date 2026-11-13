@@ -987,8 +987,6 @@ internal actual object C {
     Ffm.downcall("mln_offscreen_device_release", null, JAVA_LONG)
   private val mln_open_gl_supported_context_provider_mask =
     Ffm.downcall("mln_open_gl_supported_context_provider_mask", JAVA_INT)
-  private val mln_plugin_get_register_function_v1 =
-    Ffm.downcall("mln_plugin_get_register_function_v1", JAVA_LONG)
   private val mln_projected_meters_for_lat_lng =
     Ffm.downcall("mln_projected_meters_for_lat_lng", JAVA_INT, mln_lat_lng, JAVA_LONG, JAVA_LONG)
   private val mln_render_frame_batch_release =
@@ -2927,9 +2925,6 @@ internal actual object C {
 
   actual fun mln_open_gl_supported_context_provider_mask(): Int =
     mln_open_gl_supported_context_provider_mask.invokeExact() as Int
-
-  actual fun mln_plugin_get_register_function_v1(): Long =
-    mln_plugin_get_register_function_v1.invokeExact() as Long
 
   actual fun mln_projected_meters_for_lat_lng(
     coordinate: Long,

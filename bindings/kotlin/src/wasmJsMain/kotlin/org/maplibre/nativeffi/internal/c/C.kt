@@ -1465,9 +1465,6 @@ internal actual object C {
   actual fun mln_open_gl_supported_context_provider_mask(): Int =
     mln_kw_mln_open_gl_supported_context_provider_mask()
 
-  actual fun mln_plugin_get_register_function_v1(): Long =
-    unsignedWord(mln_kw_mln_plugin_get_register_function_v1())
-
   actual fun mln_projected_meters_for_lat_lng(
     coordinate: Long,
     outMeters: Long,
@@ -3226,11 +3223,6 @@ private fun mln_kw_mln_offscreen_device_release(p0: Long): Unit =
 private fun mln_kw_mln_open_gl_supported_context_provider_mask(): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_open_gl_supported_context_provider_mask()",
-  )
-
-private fun mln_kw_mln_plugin_get_register_function_v1(): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_plugin_get_register_function_v1()",
   )
 
 private fun mln_kw_mln_projected_meters_for_lat_lng(p0: Int, p1: Int, p2: Int): Int =

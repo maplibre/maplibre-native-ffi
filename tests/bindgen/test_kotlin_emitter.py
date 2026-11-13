@@ -6,7 +6,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from support import (
-    NATIVE_INCLUDE,
     ROOT,
     emitted,
     parse,
@@ -132,13 +131,11 @@ class KotlinLayoutTests(unittest.TestCase):
                 self.compile(
                     (
                         "maplibre_native_c.h",
-                        "maplibre_native_c/plugin.h",
                         "maplibre_native_c/binding_support.h",
                     ),
                     layout_assertions(api, width, scalar64_align),
                     target,
                     ROOT / "include",
-                    NATIVE_INCLUDE,
                 )
 
     def test_fixture_layouts_match_the_compiler_for_all_data_models(self):
@@ -171,7 +168,6 @@ class KotlinLayoutTests(unittest.TestCase):
                     source,
                     target,
                     ROOT / "include",
-                    NATIVE_INCLUDE,
                     ROOT / "bindings/kotlin/src/androidMain/jni",
                     home / "include",
                     machine,
@@ -198,7 +194,6 @@ class KotlinLayoutTests(unittest.TestCase):
                     "-Werror",
                     "-DMLN_STATIC",
                     f"-I{ROOT / 'include'}",
-                    f"-I{NATIVE_INCLUDE}",
                     f"-I{ROOT / 'bindings/kotlin/wasm'}",
                     str(check),
                 ],
@@ -527,7 +522,6 @@ class KotlinLayoutTests(unittest.TestCase):
                     else "-Wl,--gc-sections"
                 ),
                 f"-I{ROOT / 'include'}",
-                f"-I{NATIVE_INCLUDE}",
                 f"-I{ROOT / 'bindings/kotlin/src/androidMain/jni'}",
                 f"-I{home / 'include'}",
                 f"-I{machine}",

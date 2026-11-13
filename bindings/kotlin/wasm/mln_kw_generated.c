@@ -4,7 +4,6 @@
 // primitive that wasm32 passes to JavaScript, and a record crosses by
 // address.
 #include <maplibre_native_c.h>
-#include <maplibre_native_c/plugin.h>
 #include <stddef.h>
 
 #include "mln_kw_runtime.h"
@@ -1397,10 +1396,6 @@ void mln_kw_mln_offscreen_device_release(int64_t device) {
 
 int32_t mln_kw_mln_open_gl_supported_context_provider_mask(void) {
   return (int32_t)mln_open_gl_supported_context_provider_mask();
-}
-
-uintptr_t mln_kw_mln_plugin_get_register_function_v1(void) {
-  return (uintptr_t)mln_plugin_get_register_function_v1();
 }
 
 int32_t mln_kw_mln_projected_meters_for_lat_lng(

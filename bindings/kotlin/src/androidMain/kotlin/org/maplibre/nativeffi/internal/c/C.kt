@@ -1083,8 +1083,6 @@ internal actual object C {
 
   @JvmStatic actual external fun mln_open_gl_supported_context_provider_mask(): Int
 
-  @JvmStatic actual external fun mln_plugin_get_register_function_v1(): Long
-
   @JvmStatic
   actual external fun mln_projected_meters_for_lat_lng(
     coordinate: Long,

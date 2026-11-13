@@ -3171,7 +3171,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_open_gl_supported_context_provider_mask() -> mln_open_gl_context_provider_flags;
-    pub fn mln_plugin_get_register_function_v1() -> mln_plugin_register_function_v1;
     pub fn mln_projected_meters_for_lat_lng(
         coordinate: mln_lat_lng,
         out_meters: *mut mln_projected_meters,

@@ -13,7 +13,6 @@
 #include "maplibre_native_c/platform/ohos.h"
 #include "maplibre_native_c/platform/wayland.h"
 #include "maplibre_native_c/platform/win32.h"
-#include "maplibre_native_c/plugin.h"
 #include "maplibre_native_c/projection.h"
 #include "maplibre_native_c/query.h"
 #include "maplibre_native_c/render_session.h"

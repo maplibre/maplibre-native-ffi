@@ -9,7 +9,7 @@
   loader is enough to record `/opt/homebrew/opt/...`.
 - No graphics loader is linked or carried, since the host supplies its own.
   Android and OpenHarmony ship theirs with the platform.
-- The only headers are the C API's and MapLibre Native's plugin header.
+- The only headers are the C API's.
 - Each Apple library is stripped, with a matching dSYM beside it.
 - The relocatable CMake package links shared and complete static consumers.
 - A complete ELF archive keeps no COMDAT group, since a consumer's link would
@@ -96,8 +96,6 @@ PACKAGED_FRAMEWORK_BINARY = "MaplibreNativeC"
 HEADER_ROOTS = ("include", "Headers")
 # The umbrella header and the directory of domain headers.
 PACKAGED_HEADER_ENTRIES = frozenset({"maplibre_native_c.h", "maplibre_native_c"})
-# MapLibre Native's plugin header, at the path plugin.h includes it from.
-PACKAGED_PLUGIN_HEADER = pathlib.PurePath("mln/plugin/plugin_api.h")
 
 BUILD_HOST_PATH = "names a build-host path"
 PRIVATE_EXPORT = "exports a private symbol"
@@ -311,11 +309,7 @@ def vendored_header(relative: pathlib.PurePath) -> bool:
     under_include = pathlib.PurePath(
         *(part.removeprefix("._") for part in parts[parts.index(root) + 1 :])
     )
-    if under_include.parts[0] in PACKAGED_HEADER_ENTRIES:
-        return False
-    return under_include != PACKAGED_PLUGIN_HEADER and not (
-        under_include.parts and under_include in PACKAGED_PLUGIN_HEADER.parents
-    )
+    return under_include.parts[0] not in PACKAGED_HEADER_ENTRIES
 
 
 def comdat_problems(archive: pathlib.Path) -> list[tuple[str, str]]:

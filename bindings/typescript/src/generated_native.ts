@@ -711,7 +711,6 @@ export interface NativeOperations {
   mln_offscreen_device_release(device: bigint, token: object | undefined): void;
   mln_ohos_frame_pacer_create(options: FramePacerOptions | undefined): bigint;
   mln_open_gl_supported_context_provider_mask(): OpenGlContextProviderFlag;
-  mln_plugin_get_register_function_v1(): bigint;
   mln_projected_meters_for_lat_lng(coordinate: LatLng): ProjectedMeters;
   mln_render_session_abandon(session: bigint): RenderAbandonResult;
   mln_render_session_acquire_frame(session: bigint): bigint | undefined;

@@ -1098,9 +1098,6 @@ internal static unsafe partial class NativeMethods
     internal static partial uint mln_open_gl_supported_context_provider_mask();
 
     [LibraryImport(LibraryName)]
-    internal static partial void* mln_plugin_get_register_function_v1();
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_projected_meters_for_lat_lng(
         mln_lat_lng coordinate,
         mln_projected_meters* out_meters,

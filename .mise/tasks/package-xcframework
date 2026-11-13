@@ -62,9 +62,8 @@ PY
 # Catalyst slices also run.
 cat >"$work/consumer.m" <<'EOF'
 @import MaplibreNativeC;
-@import MaplibreNativeC.Plugin;
 
-int main(void) { return mln_plugin_get_register_function_v1() == NULL; }
+int main(void) { return mln_supported_render_backend_mask() == 0; }
 EOF
 
 frameworks=()

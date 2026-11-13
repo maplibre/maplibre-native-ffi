@@ -98,10 +98,6 @@ function(mln_ffi_install_c_api_framework target shared component)
     PATTERN "*.h"
     PATTERN "binding_support.h" EXCLUDE)
   install(
-    FILES "${PROJECT_SOURCE_DIR}/include/mln/plugin/plugin_api.h"
-    DESTINATION "${content}/Headers/mln/plugin"
-    COMPONENT "${component}")
-  install(
     FILES "${PROJECT_SOURCE_DIR}/cmake/apple/module.modulemap"
     DESTINATION "${content}/Modules"
     COMPONENT "${component}")

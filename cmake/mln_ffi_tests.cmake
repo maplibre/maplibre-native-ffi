@@ -7,8 +7,7 @@ include(mln_ffi_test_graphics)
 set(MLN_NATIVE_TESTS_DIR "${PROJECT_SOURCE_DIR}/tests/native")
 
 # The ABI suite's domains, one directory each under tests/native/abi, in the
-# order the registry runs them. Plugin runs last: a plugin registration lasts
-# for the rest of the process.
+# order the registry runs them.
 set(MLN_NATIVE_ABI_DOMAINS
     base
     completion
@@ -21,14 +20,13 @@ set(MLN_NATIVE_ABI_DOMAINS
     backend
     delivery
     binding
-    platform
-    plugin)
+    platform)
 
 # The browser runs the ABI suite as four pages rather than one per file, which
 # would launch Chromium once per file. Each shard names its domains.
 set(MLN_NATIVE_BROWSER_SHARDS
     "base,completion,runtime" "resources,map,projection,style" "render,backend"
-    "delivery,binding,platform,plugin")
+    "delivery,binding,platform")
 
 # Tags a test file can end its name with to build only on matching targets,
 # such as backend/single_context_device_egl.c or
@@ -277,48 +275,6 @@ function(mln_native_fetch_unity)
     # Unity's Unix -Wall flag means -Weverything to clang-cl. Neutralize it to
     # match the framework's MSVC warning behavior.
     target_compile_options(unity PRIVATE -Wno-everything)
-  endif()
-endfunction()
-
-# The plugin the plugin group registers. It is its own shared library that
-# includes only upstream's plugin header and registers through the function
-# pointer the host passes in, which is how a plugin reaches this library in a
-# real deployment.
-function(mln_native_add_test_plugin)
-  get_target_property(shared_supported mln_ffi_platform_dependencies
-                      MLN_FFI_SHARED_SUPPORTED)
-  if(shared_supported)
-    add_library(mln_native_test_plugin SHARED)
-  else()
-    add_library(mln_native_test_plugin STATIC)
-  endif()
-  target_sources(
-    mln_native_test_plugin
-    PRIVATE "${MLN_NATIVE_TESTS_DIR}/plugin/square_plugin.c")
-  set_target_properties(
-    mln_native_test_plugin
-    PROPERTIES
-      OUTPUT_NAME
-      mln-native-test-plugin
-      C_STANDARD
-      23
-      C_STANDARD_REQUIRED
-      YES
-      C_EXTENSIONS
-      OFF
-      C_VISIBILITY_PRESET
-      hidden)
-  target_include_directories(
-    mln_native_test_plugin
-    PUBLIC "${MLN_NATIVE_TESTS_DIR}/plugin"
-    PRIVATE "${PROJECT_SOURCE_DIR}/include")
-  target_compile_definitions(
-    mln_native_test_plugin
-    PRIVATE MLN_NATIVE_TEST_PLUGIN_BUILDING)
-  if(NOT shared_supported)
-    target_compile_definitions(
-      mln_native_test_plugin
-      PUBLIC MLN_NATIVE_TEST_PLUGIN_STATIC)
   endif()
 endfunction()
 
@@ -601,9 +557,7 @@ function(mln_native_add_abi_suite out_sources)
        test_sources)
   add_executable(mln_native_abi_tests ${test_sources})
   mln_native_configure_suite(mln_native_abi_tests "${registry_dir}")
-  target_link_libraries(
-    mln_native_abi_tests
-    PRIVATE maplibre_native_c mln_native_test_plugin)
+  target_link_libraries(mln_native_abi_tests PRIVATE maplibre_native_c)
   set(${out_sources} ${sources} PARENT_SCOPE)
 endfunction()
 
@@ -653,12 +607,6 @@ function(mln_native_bound_test test_name target timeout)
   math(EXPR deadline "${timeout} - 30")
   set(environment "MLN_FFI_DEVICE_INSTALL=${CMAKE_INSTALL_PREFIX}"
       "MLN_FFI_DEVICE_TIMEOUT=${deadline}")
-  # An emulator receives the plugin beside the executable.
-  get_target_property(plugin_type mln_native_test_plugin TYPE)
-  if(plugin_type STREQUAL "SHARED_LIBRARY")
-    list(APPEND environment
-         "MLN_FFI_DEVICE_LIBRARIES=$<TARGET_FILE:mln_native_test_plugin>")
-  endif()
   if(NOT CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$"
      AND NOT MLN_FFI_TARGET_ARCHITECTURE MATCHES "^(riscv64|loongarch64)$")
     set_tests_properties(${test_name} PROPERTIES RESOURCE_LOCK device)
@@ -727,7 +675,6 @@ function(mln_ffi_add_native_tests)
   endif()
 
   mln_native_fetch_unity()
-  mln_native_add_test_plugin()
   mln_native_add_abi_suite(abi_sources)
   mln_native_add_doc_snippets()
 
@@ -743,16 +690,10 @@ function(mln_ffi_add_native_tests)
   mln_native_runs_off_host(off_host)
   if(off_host)
     # Off the host, each suite runs as one entry, since a simulator spawns and
-    # an emulator receives one process per run, with the plugin group in an
-    # invocation of its own after the ABI suite.
-    add_test(NAME native-abi COMMAND mln_native_abi_tests -x /abi/plugin/)
+    # an emulator receives one process per run.
+    add_test(NAME native-abi COMMAND mln_native_abi_tests)
     mln_native_bound_test(native-abi mln_native_abi_tests 300)
-    add_test(
-      NAME native-abi/plugin
-      COMMAND mln_native_abi_tests -f /abi/plugin/)
-    mln_native_bound_test(native-abi/plugin mln_native_abi_tests 120)
-    set_tests_properties(native-abi/plugin PROPERTIES DEPENDS native-abi)
-    list(APPEND registered_tests native-abi native-abi/plugin)
+    list(APPEND registered_tests native-abi)
     if(NOT CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$")
       mln_native_add_exit_tests(exit_tests)
       list(APPEND registered_tests ${exit_tests})

@@ -9810,14 +9810,6 @@ fn open_gl_supported_context_provider_mask(py: Python<'_>) -> PyResult<Py<PyAny>
 }
 
 #[pyfunction]
-#[pyo3(signature = ())]
-fn get_plugin_register_function_v1(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py);
-    let result = unsafe { call.run(|| sys::mln_plugin_get_register_function_v1()) };
-    generated_value(py, result.map_or(0, |function| function as usize))
-}
-
-#[pyfunction]
 #[pyo3(signature = (coordinate))]
 fn projected_meters_for_lat_lng(
     py: Python<'_>,
@@ -9872,7 +9864,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
         open_gl_supported_context_provider_mask,
         module
     )?)?;
-    module.add_function(wrap_pyfunction!(get_plugin_register_function_v1, module)?)?;
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backend_mask, module)?)?;
     Ok(())

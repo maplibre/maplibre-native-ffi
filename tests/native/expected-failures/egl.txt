@@ -15,7 +15,6 @@ abi/map/still_image.c:a_still_image_waits_for_the_next_session  # a still image 
 abi/map/still_image.c:host_demands_and_a_still_image_demand_never_replace_each_other  # a still image is one attempt per update, not a demand that waits, parks and ends
 abi/map/tile_cache.c:a_map_keeps_the_tiles_that_left_the_view_by_default  # likely: a still map loads the tiles that come back into view again
 abi/map/tile_cache.c:a_map_with_the_tile_cache_enabled_keeps_them  # likely: a still map loads the tiles that come back into view again
-abi/plugin/plugin_layer.c:a_registered_layer_type_renders_through_the_c_api  # plugins are stubs: mln_plugin_get_register_function_v1 returns NULL
 abi/render/invalidation.c:a_frame_shows_feature_state_moved_between_features  # feature state stays in mln_runtime's store and never reaches the renderer
 abi/render/invalidation.c:each_mutation_publishes_a_render_update_only_when_it_changes  # a feature-state change publishes no render update
 abi/render/invalidation.c:each_mutation_reaches_the_pixels_of_an_update_driven_host  # feature state stays in mln_runtime's store and never reaches the renderer

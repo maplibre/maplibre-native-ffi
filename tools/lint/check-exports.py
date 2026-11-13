@@ -2,8 +2,7 @@
 """Check that an installed native library exports exactly the public C API.
 
 The shared library's dynamic symbol table has to hold every function that a
-public header declares with MLN_API, plus the MapLibre Native plugin entry
-point the plugin header documents, and nothing else. No exported name may
+public header declares with MLN_API, and nothing else. No exported name may
 belong to the test seams: a name containing `mln_test`, `testing`, or
 `sync_point` fails the check even if a header declared it.
 
@@ -31,9 +30,6 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LIBRARY_STEM = "maplibre-native-c"
-# The plugin registration function that include/mln/plugin/plugin_api.h
-# declares, which the library exports for include/maplibre_native_c/plugin.h.
-EXTRA_EXPORTS = frozenset({"mln_plugin_register_v1"})
 FORBIDDEN = re.compile(r"mln_test|testing|sync_point", re.IGNORECASE)
 # Symbols a linker can define in a shared library's dynamic table on its own.
 # The version script keeps them local with GNU ld, and the check ignores them in
@@ -175,7 +171,7 @@ def main() -> int:
         # C names only: mangled C++ names start with an underscore and a
         # capital, or with `?` on Windows.
         exported = {name for name in exported if name.startswith("mln_")}
-    expected = declared_functions() | EXTRA_EXPORTS
+    expected = declared_functions()
 
     errors = []
     for name in sorted(exported - expected):

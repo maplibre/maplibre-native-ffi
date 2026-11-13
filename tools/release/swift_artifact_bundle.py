@@ -37,19 +37,11 @@ TRIPLES = {
 ARTIFACTS = {"opengl": "MaplibreNativeCOpenGL", "vulkan": "MaplibreNativeCVulkan"}
 STATIC_HEADER = "maplibre_native_c_static.h"
 MODULE_MAP = f"""\
-// maplibre_native_c.h leaves out plugin.h, so it is an explicit submodule
-// that a consumer imports by name. {STATIC_HEADER} comes first to define
-// MLN_STATIC for the headers after it.
+// {STATIC_HEADER} comes first to define MLN_STATIC for the headers after it.
 module MaplibreNativeC [system] {{
   header "{STATIC_HEADER}"
   header "MaplibreNativeC/maplibre_native_c.h"
   export *
-
-  explicit module Plugin {{
-    header "MaplibreNativeC/maplibre_native_c/plugin.h"
-    header "MaplibreNativeC/mln/plugin/plugin_api.h"
-    export *
-  }}
 }}
 """
 STATIC_HEADER_TEXT = """\

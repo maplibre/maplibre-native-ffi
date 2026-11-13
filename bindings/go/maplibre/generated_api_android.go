@@ -6,7 +6,6 @@ package maplibre
 /*
 #include <stdlib.h>
 #include <stdbool.h>
-#include "maplibre_native_c/plugin.h"
 #include "generated_callbacks.h"
 */
 import "C"
