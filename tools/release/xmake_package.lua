@@ -96,7 +96,7 @@ package("maplibre-native-c")
             version = package:version_str(),
             includedirs = {path.join(prefix, "include")},
             linkdirs = {path.join(prefix, "lib")},
-            links = {"maplibre-native-c", "mln_ffi_platform"},
+            links = {"maplibre-native-c"},
             defines = {"MLN_STATIC"},
             syslinks = artifact.link.libraries,
             cxflags = os.argv(cflags),

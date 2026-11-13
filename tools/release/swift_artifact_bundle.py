@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import pathlib
 import shutil
-import subprocess
 import tarfile
 import tempfile
 import zipfile
@@ -71,28 +70,14 @@ def descriptor(root: pathlib.Path) -> dict:
     )
 
 
-def merge(root: pathlib.Path, output: pathlib.Path) -> None:
-    """Merges the prefix's C and Rust archives into `output`."""
+def copy_archive(root: pathlib.Path, output: pathlib.Path) -> None:
+    """Copies the prefix's static archive to `output`."""
     lib = root / "lib"
     if output.suffix == ".lib":
-        command = [
-            "zig",
-            "lib",
-            f"/out:{output}",
-            str(lib / "maplibre-native-c-static.lib"),
-            str(lib / "mln_ffi_platform.lib"),
-        ]
+        source = lib / "maplibre-native-c-static.lib"
     else:
-        command = [
-            "zig",
-            "ar",
-            "qcsL",
-            "--format=gnu",
-            str(output),
-            str(lib / "libmaplibre-native-c.a"),
-            str(lib / "libmln_ffi_platform.a"),
-        ]
-    subprocess.run(command, check=True)
+        source = lib / "libmaplibre-native-c.a"
+    shutil.copyfile(source, output)
 
 
 def headers(root: pathlib.Path) -> dict[str, bytes]:
@@ -162,7 +147,7 @@ def write_bundles(
                     else "libmaplibre-native-c.a"
                 )
                 (bundle / platform).mkdir(parents=True)
-                merge(root, bundle / platform / library)
+                copy_archive(root, bundle / platform / library)
                 shutil.copytree(
                     root / "share/maplibre-native-c", bundle / platform / "share"
                 )

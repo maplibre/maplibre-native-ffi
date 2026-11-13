@@ -112,7 +112,7 @@ def inventory(platform: str, backend: str) -> dict:
     root = component("maplibre-native-c", "0.1.0", "BSD-2-Clause")
     root["bom-ref"] = f"native:{platform}:{backend}"
     root["group"] = "org.maplibre.nativeffi"
-    local = component("maplibre-native-ffi-platform", "0.1.0", "BSD-2-Clause")
+    local = component("mln-rs-c", "0.1.0", "BSD-2-Clause")
     local["group"] = "org.maplibre.nativeffi"
     vendor = component("vendor", "1.2.3", "MIT")
     return document(
@@ -152,11 +152,7 @@ def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> 
             json.dumps(descriptor(preset, backend)).encode(),
         )
         add_bytes(archive, f"{root}/lib/libmaplibre-native-c.so", b"binary")
-        for name, member in (
-            ("libmaplibre-native-c.a", "c.o"),
-            ("libmln_ffi_platform.a", "rust.o"),
-        ):
-            add_bytes(archive, f"{root}/lib/{name}", ar_archive(member))
+        add_bytes(archive, f"{root}/lib/libmaplibre-native-c.a", ar_archive("c.o"))
         add_bytes(archive, f"{root}/include/maplibre_native_c.h", b"// header\n")
         add_bytes(archive, f"{root}/share/maplibre-native-c/LICENSE", b"license\n")
         for relative in (
@@ -557,7 +553,6 @@ class NativePackageReleaseTest(unittest.TestCase):
             info["artifacts"]["MaplibreNativeCVulkan"]["version"], self.version
         )
         self.assertIn(b"c.o/", library)
-        self.assertIn(b"rust.o/", library)
         self.assertIn(b"#define MLN_STATIC", static)
         self.assertEqual(header, b"// header\n")
         self.assertEqual(descriptor["version"], self.version)

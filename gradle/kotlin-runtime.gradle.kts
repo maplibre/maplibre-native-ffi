@@ -74,7 +74,7 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
             target.kotlinNativeTarget,
             NativeTargetConfiguration(
               "android-${backend.id}.def",
-              listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+              listOf("libmaplibre-native-c.a"),
             ),
           )
         }
@@ -82,14 +82,14 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
           "linuxArm64",
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
-            listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+            listOf("libmaplibre-native-c.a"),
           ),
         )
         put(
           "linuxX64",
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
-            listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+            listOf("libmaplibre-native-c.a"),
           ),
         )
         put("macosArm64", NativeTargetConfiguration("macos-${backend.id}.def"))

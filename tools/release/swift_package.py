@@ -43,7 +43,7 @@ TRAIT_DESCRIPTIONS = {
 }
 DEFAULT_TRAIT = "DefaultBackend"
 PKG_CONFIG_LIBRARY = re.compile(r"(?:^|\s)-l(\S+)")
-OWN_LIBRARIES = {"maplibre-native-c", "mln_ffi_platform"}
+OWN_LIBRARIES = {"maplibre-native-c"}
 LINKAGE_SOURCE = """\
 // This target compiles nothing. It links the C library, and the system
 // libraries that the library needs, into whatever depends on it.
