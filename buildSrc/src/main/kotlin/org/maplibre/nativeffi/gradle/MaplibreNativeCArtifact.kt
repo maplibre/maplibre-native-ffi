@@ -22,11 +22,30 @@ class MaplibreNativeCArtifact(val installDir: File) {
   val linkDir: File
     get() = installDir.resolve("lib")
 
+  /**
+   * The libraries that a link of the C library names: the shared library where the install has one,
+   * which carries its own dependencies, or else the static archive and what it needs. An MSVC
+   * archive's needs, such as `legacy_stdio_definitions`, don't exist for Kotlin/Native's MinGW
+   * linker, which links the DLL.
+   */
   val linkLibraries: List<String>
-    get() = listOf("maplibre-native-c") + linkStringList("libraries")
+    get() = listOf("maplibre-native-c") + staticOnly("libraries")
 
+  /** The Apple frameworks that the static archive needs, where the C library is only that. */
   val frameworks: List<String>
-    get() = linkStringList("frameworks")
+    get() = staticOnly("frameworks")
+
+  private val hasSharedLibrary: Boolean
+    get() =
+      listOf(
+          "bin/maplibre-native-c.dll",
+          "lib/libmaplibre-native-c.so",
+          "lib/libmaplibre-native-c.dylib",
+        )
+        .any { installDir.resolve(it).isFile }
+
+  private fun staticOnly(name: String): List<String> =
+    if (hasSharedLibrary) emptyList() else linkStringList(name)
 
   private val artifactMetadata: Map<*, *> by lazy {
     val descriptor = installDir.resolve(NATIVE_DESCRIPTOR_PATH)
