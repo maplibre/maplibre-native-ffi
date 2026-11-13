@@ -36,7 +36,7 @@ android {
 dependencies {
   // An app outside this repository uses the Maven coordinates that the README shows instead.
   implementation(project(":bindings:kotlin"))
-  implementation(project(":bindings:kotlin:runtimes:opengl"))
+  implementation(project(":bindings:kotlin:runtimes:native"))
   implementation(libs.androidx.activity.compose)
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.compose.foundation)

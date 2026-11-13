@@ -1,43 +1,44 @@
 #!/usr/bin/env bash
-#MISE description="Run the Kotlin/Native suite against a native preset's install, on a simulator or emulator where the target needs one."
-#MISE extends="ffi:preset"
+#MISE description="Run the Kotlin/Native suite against a native preset's install, with one of its render backends, on a simulator or emulator where the target needs one."
+#MISE extends="ffi:test"
 #MISE dir="../.."
 #MISE shell="bash"
 set -euo pipefail
 
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 gradle_tasks=()
 case "$usage_preset" in
-  linux-gnu-x64-*) kotlin_target=linuxX64 ;;
-  windows-x64-*)
+  linux-gnu-x64) kotlin_target=linuxX64 ;;
+  windows-x64)
     kotlin_target=mingwX64
     export PATH="$PWD/build/$usage_preset/install/bin:$PATH"
     ;;
-  macos-arm64-*) kotlin_target=macosArm64 ;;
-  macos-x64-metal)
+  macos-arm64) kotlin_target=macosArm64 ;;
+  macos-x64)
     kotlin_target=macosX64
-    gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
+    gradle_tasks+=(":bindings:kotlin:runtimes:native:${kotlin_target}Klib")
     ;;
-  android-arm64-*) kotlin_target=androidNativeArm64 ;;
-  android-x86-*) kotlin_target=androidNativeX86 ;;
-  android-x64-*) kotlin_target=androidNativeX64 ;;
-  ios-simulator-arm64-metal)
+  android-arm64) kotlin_target=androidNativeArm64 ;;
+  android-x86) kotlin_target=androidNativeX86 ;;
+  android-x64) kotlin_target=androidNativeX64 ;;
+  ios-simulator-arm64)
     kotlin_target=iosSimulatorArm64
-    gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
+    gradle_tasks+=(":bindings:kotlin:runtimes:native:${kotlin_target}Klib")
     MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(devices-cli get ios)
     export MLN_FFI_IOS_SIMULATOR_DEVICE_ID
     ;;
-  tvos-simulator-arm64-metal)
+  tvos-simulator-arm64)
     kotlin_target=tvosSimulatorArm64
-    gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
+    gradle_tasks+=(":bindings:kotlin:runtimes:native:${kotlin_target}Klib")
     MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(devices-cli get tvos)
     export MLN_FFI_IOS_SIMULATOR_DEVICE_ID
     ;;
-  ios-arm64-metal)
-    echo "The Kotlin iOS tests need a runnable target; test ios-simulator-arm64-metal instead of $usage_preset." >&2
+  ios-arm64)
+    echo "The Kotlin iOS tests need a runnable target; test ios-simulator-arm64 instead of $usage_preset." >&2
     exit 2
     ;;
-  tvos-arm64-metal)
-    echo "The Kotlin tvOS tests need a runnable target; test tvos-simulator-arm64-metal instead of $usage_preset." >&2
+  tvos-arm64)
+    echo "The Kotlin tvOS tests need a runnable target; test tvos-simulator-arm64 instead of $usage_preset." >&2
     exit 2
     ;;
   *)

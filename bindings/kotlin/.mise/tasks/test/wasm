@@ -3,6 +3,7 @@
 #MISE dir="../.."
 #MISE shell="bash"
 #USAGE arg "<preset>"
+#USAGE arg "[backend]" default="" help="The preset's backend, which its module carries alone"
 #USAGE flag "--filter <filter>" help="Run only the tests that match this Gradle test filter"
 set -euo pipefail
 

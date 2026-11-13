@@ -60,3 +60,5 @@ private fun weakRef(value: JsReference<Any>): JsAny = js("new WeakRef(value)")
 private fun deref(reference: JsAny): JsReference<Any>? = js("reference.deref()")
 
 private fun collectGarbage(): Unit = js("globalThis.gc()")
+
+internal actual fun testBackendName(): String? = null

@@ -530,12 +530,12 @@ ci:
           then: apply
     android-multi-abi:
       covers: >-
-        Builds the Kotlin Android runtime AARs for OpenGL ES and Vulkan with
-        every Android ABI's native library, from the native packages of every
-        Android target, so it runs those targets. Only changes to how the AAR
-        gathers ABIs need it: the verification task, and the Kotlin Android
-        build's ABI selection and native library packaging. Ordinary Kotlin or
-        Android changes and one ABI's native packaging don't.
+        Builds the Kotlin Android runtime AAR with every Android ABI's native
+        library, from the native packages of every Android target, so it runs
+        those targets. Only changes to how the AAR gathers ABIs need it: the
+        verification task, and the Kotlin Android build's ABI selection and
+        native library packaging. Ordinary Kotlin or Android changes and one
+        ABI's native packaging don't.
       rules:
         - if:
             files:

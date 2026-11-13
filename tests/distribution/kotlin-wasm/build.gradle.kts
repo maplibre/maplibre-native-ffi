@@ -26,8 +26,7 @@ kotlin {
     implementation(kotlin("test"))
     implementation(libs.coroutines.test)
     implementation("org.maplibre.nativeffi:maplibre-native-ffi:$version")
-    val runtime = if (backend == "webgl") "opengl" else "webgpu"
-    implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-$runtime:$version")
+    implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-$backend:$version")
   }
 }
 

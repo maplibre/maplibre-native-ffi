@@ -191,9 +191,10 @@ class RenderSessionTest {
       val nextCanvas = createTestCanvas(32, 16)
       try {
         val next =
-          mapFixture.map.attach(
+          mapFixture.map.attachOwn(
             ownTarget(32, 16, nextCanvas),
-            options = RenderSessionAttachOptions(driver = RenderDriverKind.CORE_WORKER),
+            RenderSessionAttachOptions(driver = RenderDriverKind.CORE_WORKER),
+            nextCanvas,
           )
         next.use { next.ready.awaitWithin("the next attach") }
       } finally {

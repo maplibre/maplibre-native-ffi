@@ -24,10 +24,11 @@ kotlin {
 }
 ```
 
-Then add a runtime to each target, as the sections below show. A runtime holds
-the native library for one
-[backend](/maplibre-native-ffi/install/#choose-a-backend):
-`maplibre-native-ffi-runtime-opengl`, `-metal`, `-vulkan`, or `-webgpu`.
+Then add a runtime to each target, as the sections below show.
+`maplibre-native-ffi-runtime` holds the native library of every native platform,
+with every [backend](/maplibre-native-ffi/install/#choose-a-backend) of each. In
+a browser, `maplibre-native-ffi-runtime-webgpu` and
+`maplibre-native-ffi-runtime-webgl` each hold one backend.
 
 ## Android
 
@@ -35,7 +36,7 @@ Android needs API level 24 or later. Add a runtime to `androidMain`:
 
 ```kotlin title="build.gradle.kts"
 androidMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:{{version}}")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime:{{version}}")
 }
 ```
 
@@ -55,15 +56,15 @@ Call `initAndroid(context)` once before you create a runtime.
 
 ## Native
 
-Add a runtime to the source set of each native target, such as Metal for Apple
-platforms and Vulkan for Linux:
+Add the runtime to the source set of each native target, such as Apple platforms
+and Linux:
 
 ```kotlin title="build.gradle.kts"
 appleMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal:{{version}}")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime:{{version}}")
 }
 linuxMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:{{version}}")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime:{{version}}")
 }
 ```
 
@@ -77,7 +78,7 @@ application runs on, by its classifier: `natives-<os>-<arch>`, such as
 
 ```kotlin title="build.gradle.kts"
 jvmMain.dependencies {
-  runtimeOnly("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan-jvm:{{version}}:natives-linux-x64")
+  runtimeOnly("org.maplibre.nativeffi:maplibre-native-ffi-runtime-jvm:{{version}}:natives-linux-x64")
 }
 ```
 
@@ -86,12 +87,13 @@ JVM with `--enable-native-access=ALL-UNNAMED`.
 
 ## Wasm
 
-Add the OpenGL runtime to `wasmJsMain` to render with WebGL 2, or the WebGPU
-runtime to render with WebGPU. Before you use the binding, call
-`loadWasmModule()` and wait for it, on the thread that runs your Kotlin: a Web
-Worker, as the [web requirements](/maplibre-native-ffi/install/#web) suggest, or
-the page. Lend the module your canvas and other JavaScript objects as
-`WebObject`s, whose handles the descriptors take.
+Add `maplibre-native-ffi-runtime-webgpu` to `wasmJsMain` to render with WebGPU,
+or `maplibre-native-ffi-runtime-webgl` to render with WebGL 2. Before you use
+the binding, call `loadWasmModule()` and wait for it, on the thread that runs
+your Kotlin: a Web Worker, as the
+[web requirements](/maplibre-native-ffi/install/#web) suggest, or the page. Lend
+the module your canvas and other JavaScript objects as `WebObject`s, whose
+handles the descriptors take.
 
 ## Snapshots
 

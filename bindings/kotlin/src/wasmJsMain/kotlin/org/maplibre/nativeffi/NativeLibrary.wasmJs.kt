@@ -9,7 +9,7 @@ public actual fun loadNativeLibrary() {
 }
 
 /**
- * Loads the browser module bundled by the selected `maplibre-native-ffi-runtime-opengl` or
+ * Loads the browser module bundled by the selected `maplibre-native-ffi-runtime-webgl` or
  * `maplibre-native-ffi-runtime-webgpu` dependency. The runtime and binding must have the same
  * version. This checks the module's C ABI version. Every other call throws an
  * `IllegalStateException` until this returns. A later call returns once the first load finishes.
