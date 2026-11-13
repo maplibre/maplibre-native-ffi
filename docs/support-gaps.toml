@@ -139,6 +139,13 @@ link = "https://github.com/dart-lang/native/issues/961"
 
 [[entry]]
 bindings = ["c"]
+platforms = ["emscripten"]
+status = "path-known"
+reason = "mln-rs, which implements the C library, builds for the browser as `wasm32-unknown-unknown`, with wasm-bindgen and tile workers in WebAssembly instances of their own. It doesn't build for `wasm32-unknown-emscripten`, whose pthreads and modules the browser builds and the TypeScript binding use: mln-rs's OpenGL and storage crates take their wasm-bindgen paths for every `wasm32` target."
+link = "https://github.com/louwers/mln-rs"
+
+[[entry]]
+bindings = ["c"]
 platforms = ["freebsd"]
 archs = ["arm64"]
 backends = ["vulkan", "opengl"]

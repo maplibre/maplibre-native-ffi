@@ -66,6 +66,10 @@ These SDKs are large, so they're opt-in. Install one with
 to every later command, or set `MISE_ENV`. After an NDK update, run
 `mise run clean <preset>` for each Android preset.
 
+The Emscripten presets are disabled for now: mln-rs builds for the browser as
+`wasm32-unknown-unknown`, not as the Emscripten modules that the browser builds
+link. `docs/support-gaps.toml` says why.
+
 The browser example in `examples/browser`, which the site serves as its live
 demo, loads the TypeScript binding's browser modules. Build them with
 `mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgl`,
