@@ -66,10 +66,16 @@ def on_frame_wake() -> None:
 
 
 # #region resize
-def on_window_resized(width: int, height: int) -> None:
-    # The window's new size in logical pixels.
+# Runs when the window changes size, or moves to a display with
+# another scale factor.
+def on_window_resized(
+    width: int, height: int, scale_factor: float
+) -> None:
+    # The window's new size in logical pixels, and its scale factor.
     session.discarding.resize(
-        mln.LogicalSize(width=width, height=height)
+        mln.LogicalExtent(
+            width=width, height=height, scale_factor=scale_factor
+        )
     )
 
 
@@ -96,12 +102,15 @@ def surface_lost() -> None:
     # #endregion lost-surface
 
 
-def surface_restored(new_surface: int) -> None:
+def surface_restored(display: int, new_surface: int) -> None:
     # #region lost-surface
-    session.set_vulkan_surface_target(
-        mln.VulkanSurfaceReplacement(
-            logical_size=mln.LogicalSize(width=800, height=600),
-            surface=new_surface,
+    session.set_target(
+        mln.RenderTargetWaylandSurfaceVariant(
+            mln.WaylandSurfaceTarget(
+                logical_size=mln.LogicalSize(width=800, height=600),
+                display=display,
+                surface=new_surface,
+            )
         )
     ).result()
     # #endregion lost-surface
@@ -109,22 +118,25 @@ def surface_restored(new_surface: int) -> None:
 
 def render_to_window(
     map_handle: mln.MapHandle,
-    vulkan: mln.VulkanContextDescriptor,
+    display: int,
     window_surface: int,
 ) -> None:
     global session
     # #region attach
-    session = map_handle.attach_vulkan_surface(
-        mln.VulkanSurfaceDescriptor(
-            # The window's size in logical pixels. The map's
-            # scale factor turns it into pixels.
-            logical_size=mln.LogicalSize(width=800, height=600),
-            # Your VkInstance, VkPhysicalDevice,
-            # VkDevice, and graphics VkQueue.
-            context=vulkan,
-            # Your VkSurfaceKHR.
-            surface=window_surface,
+    # With no device, the session creates one on the platform's own
+    # backend.
+    session = map_handle.attach(
+        mln.RenderTargetWaylandSurfaceVariant(
+            mln.WaylandSurfaceTarget(
+                # The window's size in logical pixels. The map's
+                # scale factor turns it into pixels.
+                logical_size=mln.LogicalSize(width=800, height=600),
+                # Your wl_display and wl_surface.
+                display=display,
+                surface=window_surface,
+            )
         ),
+        None,
         mln.RenderSessionAttachOptions(
             driver=mln.RenderDriverKind.CORE_WORKER,
             redraw_wake=mln.Wake(on_redraw_wake),
@@ -134,7 +146,7 @@ def render_to_window(
     session.ready.result()
     # #endregion attach
 
-    on_window_resized(1024, 768)
+    on_window_resized(1024, 768, 2.0)
 
     # #region service
     graphics_thread_options = mln.RenderSessionAttachOptions(
@@ -147,4 +159,4 @@ def render_to_window(
     del graphics_thread_options
 
     session.release().result()
-    destroy_surface()  # For example, with vkDestroySurfaceKHR.
+    destroy_surface()  # For example, with wl_surface_destroy.

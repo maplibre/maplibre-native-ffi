@@ -63,29 +63,62 @@ _GRAPHICS = {
     "egl": graphics.EGL,
     "wgl": graphics.WGL,
 }
+_RENDER_BACKENDS = {
+    "metal": mln.RenderBackend.METAL,
+    "vulkan": mln.RenderBackend.VULKAN,
+    "egl": mln.RenderBackend.OPEN_GL,
+    "wgl": mln.RenderBackend.OPEN_GL,
+}
 
 
-def _opengl_context(backend: str, context: graphics.Context) -> object:
-    if backend == "egl":
-        platform: object = mln.OpenGlContextDescriptorEglVariant(
-            mln.EglContextDescriptor(
-                display=context.egl_display or 0,
-                config=context.egl_config or 0,
-                share_context=context.egl_context or 0,
-                client_api=mln.OpenGlClientApi.GLES,
-                get_proc_address=context.get_proc_address or 0,
+def _wrap_device(
+    backend: str,
+    context: graphics.Context,
+    queue_lock: mln.QueueLock | mln.NativeQueueLock | None = None,
+) -> mln.GpuDeviceHandle:
+    """A GPU device that wraps the graphics object's device or OpenGL context.
+    Vulkan takes ``queue_lock``, the lock on the queue that the graphics
+    object submits to.
+    """
+    if backend == "metal":
+        return mln.GpuDeviceHandle.wrap_metal(
+            mln.MetalDeviceDescriptor(device=context.metal_device or 0)
+        )
+    if backend == "vulkan":
+        return mln.GpuDeviceHandle.wrap_vulkan(
+            mln.VulkanDeviceDescriptor(
+                context=mln.VulkanContextDescriptor(
+                    instance=context.vulkan_instance or 0,
+                    physical_device=context.vulkan_physical_device or 0,
+                    device=context.vulkan_device or 0,
+                    graphics_queue=context.vulkan_queue or 0,
+                    graphics_queue_family_index=context.vulkan_queue_family_index,
+                    get_instance_proc_addr=context.vulkan_get_instance_proc_addr or 0,
+                    get_device_proc_addr=context.vulkan_get_device_proc_addr or 0,
+                ),
+                queue_lock=mln.QueueLock() if queue_lock is None else queue_lock,
+                enabled_extensions=graphics.vulkan_device_extensions(context),
             )
         )
-    else:
-        platform = mln.OpenGlContextDescriptorWglVariant(
+    if backend == "egl":
+        return mln.GpuDeviceHandle.wrap_open_gl(
+            mln.OpenGlContextDescriptorEglVariant(
+                mln.EglContextDescriptor(
+                    display=context.egl_display or 0,
+                    config=context.egl_config or 0,
+                    share_context=context.egl_context or 0,
+                    get_proc_address=context.get_proc_address or 0,
+                )
+            )
+        )
+    return mln.GpuDeviceHandle.wrap_open_gl(
+        mln.OpenGlContextDescriptorWglVariant(
             mln.WglContextDescriptor(
                 device_context=context.wgl_device_context or 0,
                 share_context=context.wgl_context or 0,
                 get_proc_address=context.get_proc_address or 0,
             )
         )
-    return mln.OpenGlContextDescriptor(
-        ownership=mln.OpenGlContextOwnership.SHARED, data=platform
     )
 
 
@@ -175,8 +208,11 @@ class Offscreen(_Target):
         self, options: mln.RenderSessionAttachOptions
     ) -> mln.RenderSessionHandle:
         assert self.map is not None
-        return self.map.attach_offscreen(
-            mln.OffscreenDescriptor(logical_size=SIZE), options
+        # With no device, the session creates its own.
+        return self.map.attach(
+            mln.RenderTargetOffscreenVariant(mln.OffscreenTarget(logical_size=SIZE)),
+            None,
+            options,
         )
 
     def render_red(self) -> mln.TextureReadbackResult:
@@ -260,9 +296,7 @@ class BorrowedTexture(_Target):
                 frame_wake=mln.Wake(self.frames.notify),
                 driver_work_wake=mln.Wake(self._work.set),
             )
-            if queue_lock is not None:
-                options = replace(options, queue_lock=queue_lock)
-            self.session = self._attach(options)
+            self.session = self._attach(options, queue_lock)
             # A wake that fired before the session was stored found nothing
             # to service, so the graphics thread checks again.
             self._work.set()
@@ -283,16 +317,21 @@ class BorrowedTexture(_Target):
             self.textures.pop().close()
 
     def _attach(
-        self, options: mln.RenderSessionAttachOptions
+        self,
+        options: mln.RenderSessionAttachOptions,
+        queue_lock: mln.QueueLock | mln.NativeQueueLock | None = None,
     ) -> mln.RenderSessionHandle:
+        """Attach to the textures on a device that wraps the graphics object's,
+        with ``queue_lock`` on a Vulkan device.
+        """
         assert self.graphics is not None and self.map is not None
-        context = self.graphics.context
         infos = [texture.info for texture in self.textures]
         # Every texture of the ring shares the first one's format and size.
         width, height = infos[0].width, infos[0].height
+        target: mln.RenderTarget
         if self.backend == "metal":
-            return self.map.attach_metal_borrowed_texture(
-                mln.MetalBorrowedTextureDescriptor(
+            target = mln.RenderTargetMetalBorrowedTexturesVariant(
+                mln.MetalBorrowedTexturesTarget(
                     logical_size=SIZE,
                     physical_width=width,
                     physical_height=height,
@@ -300,25 +339,14 @@ class BorrowedTexture(_Target):
                         mln.MetalBorrowedTexture(texture=info.metal_texture or 0)
                         for info in infos
                     ],
-                ),
-                options,
+                )
             )
-        if self.backend == "vulkan":
-            return self.map.attach_vulkan_borrowed_texture(
-                mln.VulkanBorrowedTextureDescriptor(
+        elif self.backend == "vulkan":
+            target = mln.RenderTargetVulkanBorrowedTexturesVariant(
+                mln.VulkanBorrowedTexturesTarget(
                     logical_size=SIZE,
                     physical_width=width,
                     physical_height=height,
-                    context=mln.VulkanContextDescriptor(
-                        instance=context.vulkan_instance or 0,
-                        physical_device=context.vulkan_physical_device or 0,
-                        device=context.vulkan_device or 0,
-                        graphics_queue=context.vulkan_queue or 0,
-                        graphics_queue_family_index=context.vulkan_queue_family_index,
-                        get_instance_proc_addr=context.vulkan_get_instance_proc_addr
-                        or 0,
-                        get_device_proc_addr=context.vulkan_get_device_proc_addr or 0,
-                    ),
                     textures=[
                         mln.VulkanBorrowedTexture(
                             image=info.vulkan_image, image_view=info.vulkan_image_view
@@ -327,23 +355,28 @@ class BorrowedTexture(_Target):
                     ],
                     format=infos[0].format,
                     final_layout=infos[0].vulkan_final_layout,
-                ),
-                options,
+                )
             )
-        return self.map.attach_open_gl_borrowed_texture(
-            mln.OpenGlBorrowedTextureDescriptor(
-                logical_size=SIZE,
-                physical_width=width,
-                physical_height=height,
-                context=_opengl_context(self.backend, context),
-                textures=[
-                    mln.OpenGlBorrowedTexture(texture=info.opengl_texture)
-                    for info in infos
-                ],
-                target=infos[0].opengl_target,
-            ),
-            options,
-        )
+        else:
+            target = mln.RenderTargetOpenGlBorrowedTexturesVariant(
+                mln.OpenGlBorrowedTexturesTarget(
+                    logical_size=SIZE,
+                    physical_width=width,
+                    physical_height=height,
+                    textures=[
+                        mln.OpenGlBorrowedTexture(texture=info.opengl_texture)
+                        for info in infos
+                    ],
+                    target=infos[0].opengl_target,
+                )
+            )
+        device = _wrap_device(self.backend, self.graphics.context, queue_lock)
+        try:
+            return self.map.attach(target, device, options)
+        finally:
+            # The session keeps the device, and the device its queue lock,
+            # until the session ends.
+            device.release()
 
     def _serve(self, opengl: bool) -> None:
         try:
@@ -757,6 +790,71 @@ def test_a_native_wake_reaches_native_and_the_first_call_consumes_it(
     assert frames.releases == [frames.user_data]
 
 
+_CUSTOM_LAYER_CALLBACK = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p)
+
+
+def test_a_native_custom_layer_draws_until_its_layer_leaves_the_style(
+    harness: Harness,
+) -> None:
+    user_data = 0xC057
+    calls: list[tuple[str, int | None]] = []
+    drawn = threading.Event()
+    released = threading.Event()
+
+    def render(context: int | None, parameters: int | None) -> None:
+        calls.append(("render", context))
+        drawn.set()
+
+    def deinitialize(context: int | None) -> None:
+        calls.append(("deinitialize", context))
+
+    def release(context: int | None) -> None:
+        calls.append(("release", context))
+        released.set()
+
+    # Native code calls these synchronously on the session's graphics thread,
+    # which only a native registration can serve. The ctypes objects own the
+    # function pointers, so they stay alive until the test returns.
+    functions = (
+        _CUSTOM_LAYER_CALLBACK(render),
+        _NATIVE_CALLBACK(deinitialize),
+        _NATIVE_CALLBACK(release),
+    )
+    render_address, deinitialize_address, release_address = (
+        ctypes.cast(function, ctypes.c_void_p).value or 0 for function in functions
+    )
+    host = mln.CustomLayerHost.native(
+        prerender=0,
+        render=render_address,
+        deinitialize=deinitialize_address,
+        context_lost=0,
+        user_data=user_data,
+        release_user_data=release_address,
+    )
+    with Offscreen(harness) as target:
+        assert target.map is not None
+        result(target.map.set_style_json(RED_STYLE))
+        result(target.map.add_custom_layer("custom", None, host))
+        # The first call consumed the registration.
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.INVALID_STATE,
+        ):
+            target.map.add_custom_layer("again", None, host)
+        target.render(wait_for_update=True)
+        assert drawn.wait(TIMEOUT)
+
+        result(target.map.remove_style_layer("custom"))
+        # The session stops drawing the layer in its next frame.
+        target.render(wait_for_update=True)
+        assert released.wait(TIMEOUT)
+
+    assert {context for _, context in calls} == {user_data}
+    names = [name for name, _ in calls]
+    assert names[0] == "render"
+    assert names[-2:] == ["deinitialize", "release"]
+
+
 def test_leaving_an_attached_sessions_scope_disposes_it(harness: Harness) -> None:
     frames = _NativeCode(user_data=0x5C0)
     with Offscreen(harness, frame_wake=frames.wake) as target:
@@ -789,17 +887,14 @@ def test_a_native_queue_lock_reaches_native(harness: Harness, backend: str) -> N
         assert host.released.wait(TIMEOUT)
         assert host.calls
     else:
-        # Only a Vulkan target takes a queue lock, so native code reports the
+        # Only a Vulkan device takes a queue lock, so native code reports the
         # lock as unsupported, and the binding releases its context.
-        with (
-            BorrowedTexture(harness, backend, driver) as target,
-            pytest.raises(
-                mln.MaplibreError,
-                check=lambda error: error.status == mln.Status.UNSUPPORTED,
-            ),
+        with pytest.raises(
+            mln.MaplibreError,
+            check=lambda error: error.status == mln.Status.UNSUPPORTED,
         ):
-            target._attach(
-                mln.RenderSessionAttachOptions(driver=driver, queue_lock=lock)
+            mln.GpuDeviceHandle.create(
+                mln.GpuDeviceOptions(backend=_RENDER_BACKENDS[backend], queue_lock=lock)
             )
     assert host.releases == [host.user_data]
 
