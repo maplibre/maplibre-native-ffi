@@ -1,7 +1,7 @@
 # The library loads the Vulkan loader at run time, so only the test harness,
 # which drives Vulkan directly the way a host does, compiles against the Vulkan
 # headers and links a loader.
-function(mln_ffi_configure_render_dependencies target)
+function(mln_ffi_configure_vulkan_dependencies target)
   set_target_properties(
     ${target}
     PROPERTIES

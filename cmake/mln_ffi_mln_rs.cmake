@@ -6,10 +6,9 @@
 # always had, so the CMake package, pkg-config, the artifact descriptor, and the
 # bindings see no difference.
 #
-# Each preset builds the crate with the Cargo feature of its render backend
-# alone, so the library draws with that backend and reports only it as
-# supported. A preset's Cargo build goes in a target directory of its feature,
-# so presets of one platform keep apart the libraries that they build.
+# Each preset builds the crate with the Cargo features of the render backends
+# that its platform carries, and no others, so the library reports exactly those
+# backends as supported.
 
 set(MLN_FFI_MLN_RS_DIR "${PROJECT_SOURCE_DIR}/third_party/mln-rs")
 set(MLN_FFI_LIBRARY_NAME maplibre-native-c)
@@ -171,20 +170,21 @@ esac
   set(${out_var} "${shim}" PARENT_SCOPE)
 endfunction()
 
-# The Cargo feature of mln-rs-c that builds the preset's backend.
-function(mln_ffi_native_feature out_var)
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
-    set(feature metal)
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
-    set(feature vulkan)
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
-    set(feature gl)
-  else()
-    message(
-      FATAL_ERROR
-        "No mln-rs-c feature builds the ${MLN_FFI_RENDER_BACKEND} backend")
-  endif()
-  set(${out_var} "${feature}" PARENT_SCOPE)
+# The Cargo features of mln-rs-c that build the preset's backends.
+function(mln_ffi_native_features out_var)
+  set(features)
+  foreach(backend IN LISTS MLN_FFI_RENDER_BACKENDS)
+    if(backend STREQUAL "metal")
+      list(APPEND features metal)
+    elseif(backend STREQUAL "vulkan")
+      list(APPEND features vulkan)
+    elseif(backend STREQUAL "opengl")
+      list(APPEND features gl)
+    else()
+      message(FATAL_ERROR "No mln-rs-c feature builds the ${backend} backend")
+    endif()
+  endforeach()
+  set(${out_var} ${features} PARENT_SCOPE)
 endfunction()
 
 # The environment and rustc arguments that build the crate for this preset.
@@ -410,9 +410,10 @@ function(mln_ffi_add_c_api_library target)
   endif()
   set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/build/cargo"
       CACHE PATH "Cargo target directory for mln-rs")
-  mln_ffi_native_feature(feature)
-  set(feature_arguments --no-default-features --features "${feature}")
-  set(MLN_FFI_CARGO_BUILD_DIR "${MLN_FFI_CARGO_TARGET_DIR}/${feature}")
+  mln_ffi_native_features(features)
+  list(JOIN features "," feature_list)
+  set(feature_arguments --no-default-features --features "${feature_list}")
+  set(MLN_FFI_CARGO_BUILD_DIR "${MLN_FFI_CARGO_TARGET_DIR}")
 
   get_target_property(shared_supported mln_ffi_platform_dependencies
                       MLN_FFI_SHARED_SUPPORTED)
@@ -586,7 +587,7 @@ function(mln_ffi_add_c_api_library target)
       MLN_FFI_NATIVE_LIBRARIES_FILE
       "${native_libraries}")
 
-  mln_ffi_add_mln_rs_components(${target} FEATURES ${feature})
+  mln_ffi_add_mln_rs_components(${target} FEATURES ${features})
 endfunction()
 
 # The components that the library carries: mln-rs, with its patches, the Rust

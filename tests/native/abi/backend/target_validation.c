@@ -4,6 +4,7 @@
 // render to the kind, so these tables run on every preset.
 
 #include "support/attach_table.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 
 // Edits a kind's logical size: zero width, zero height, and a width that
@@ -337,7 +338,7 @@ static void set_target_rejects_malformed_targets(void) {
 // well-formed target of any other kind before it uses the target's objects.
 static void attach_refuses_the_kinds_that_the_device_lacks(void) {
   mln_gpu_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_gpu_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
+  device = mln_test_create_device();
   mln_gpu_device_capabilities capabilities = {.size = sizeof(capabilities)};
   MLN_TEST_OK(
     mln_gpu_device_get_capabilities(device, &capabilities, MLN_TEST_DIAGNOSTIC)

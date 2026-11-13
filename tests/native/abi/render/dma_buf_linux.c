@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 
 enum { ring_width = 64, ring_height = 48, buffer_count = 3 };
@@ -36,10 +37,10 @@ static mln_render_target ring_target(
   };
 }
 
-// The library's default device, and whether it exports dmabufs.
+// A device of the suite's backend, and whether it exports dmabufs.
 static mln_gpu_device create_device(bool* out_exports) {
   mln_gpu_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_gpu_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
+  device = mln_test_create_device();
   mln_gpu_device_capabilities capabilities = {
     .size = sizeof(mln_gpu_device_capabilities)
   };

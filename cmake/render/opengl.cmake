@@ -1,4 +1,4 @@
-function(mln_ffi_configure_render_dependencies target)
+function(mln_ffi_configure_opengl_dependencies target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     if(MLN_FFI_EGL_ROOT)
       include(render/egl)
@@ -77,12 +77,6 @@ function(mln_ffi_configure_render_dependencies target)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
     target_link_libraries(${target} INTERFACE OpenGL::GL gdi32 user32)
-  elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
-    # WebGL2 is GLES 3.0, which is what MapLibre's GL backend targets. FULL_ES3
-    # supplies the client-side array emulation the backend expects.
-    target_link_options(
-      ${target}
-      INTERFACE "-sMIN_WEBGL_VERSION=2" "-sMAX_WEBGL_VERSION=2" "-sFULL_ES3=1")
   else()
     message(
       FATAL_ERROR

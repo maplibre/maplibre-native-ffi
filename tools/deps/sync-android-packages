@@ -7,7 +7,7 @@ set -euo pipefail
 #
 # The `android-*` CMake presets resolve their toolchain file out of the NDK, so an
 # SDK without it builds nothing. Gradle can fetch most of these itself, but not
-# the NDK for a plain `mise run build android-arm64-vulkan`.
+# the NDK for a plain `mise run build android-arm64`.
 #
 # Installing a package accepts its license, which asking for an Android build is
 # taken as consent for. A contributor who would rather not have that happen installs

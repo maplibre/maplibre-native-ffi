@@ -34,12 +34,21 @@ static mln_render_target ring_target(mln_gpu_export_kind_flags kinds) {
   };
 }
 
-// The library's default device, or none where a build makes none, and the
+// A device of the suite's backend, or none where a build makes none, and the
 // kinds that it exports.
 static mln_gpu_device create_device(mln_gpu_export_kind_flags* out_kinds) {
   mln_gpu_device device = MLN_HANDLE_NULL;
   *out_kinds = 0;
-  if (mln_gpu_device_create(NULL, &device, NULL) != MLN_STATUS_OK) {
+  mln_gpu_device_options options = {.size = sizeof(options)};
+  options.fields = MLN_GPU_DEVICE_OPTION_BACKEND;
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  options.backend = MLN_RENDER_BACKEND_METAL;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  options.backend = MLN_RENDER_BACKEND_VULKAN;
+#else
+  options.backend = MLN_RENDER_BACKEND_OPEN_GL;
+#endif
+  if (mln_gpu_device_create(&options, &device, NULL) != MLN_STATUS_OK) {
     return MLN_HANDLE_NULL;
   }
   mln_gpu_device_capabilities capabilities = {

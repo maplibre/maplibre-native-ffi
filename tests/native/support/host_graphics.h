@@ -112,7 +112,11 @@ mln_status mln_test_render_fixture_start_surface_attach(
 // window or layer of a tests/graphics surface.
 typedef struct mln_test_render_surface mln_test_render_surface;
 
-// Creates a device of the preset's backend that can present to the fixtures'
+// Creates a device of the suite's backend, which a build of more than one
+// backend would not otherwise pick by default.
+mln_gpu_device mln_test_create_device(void);
+
+// Creates a device of the suite's backend that can present to the fixtures'
 // surfaces. A Vulkan build on Linux or FreeBSD picks the CPU's device, such as
 // lavapipe, which presents through shared memory that the test compositor can
 // map, as Mesa's EGL does when a compositor offers no dmabufs.

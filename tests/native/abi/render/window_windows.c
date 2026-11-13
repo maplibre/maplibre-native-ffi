@@ -10,6 +10,7 @@
 #include <windows.h>
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 
 enum { window_size = 64 };
@@ -379,7 +380,7 @@ static void a_win32_window_rejects_the_callers_graphics_thread(void) {
 // A device that presents to Win32 windows says so.
 static void the_native_device_reports_win32_windows(void) {
   mln_gpu_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_gpu_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
+  device = mln_test_create_device();
   mln_gpu_device_capabilities capabilities = {.size = sizeof(capabilities)};
   MLN_TEST_OK(
     mln_gpu_device_get_capabilities(device, &capabilities, MLN_TEST_DIAGNOSTIC)

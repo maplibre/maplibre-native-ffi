@@ -3,8 +3,8 @@
 # shellcheck shell=bash
 
 case "$1" in
-  mingw-x64-*) cargo_target=x86_64-pc-windows-gnu ;;
-  mingw-arm64-*) cargo_target=aarch64-pc-windows-gnullvm ;;
+  mingw-x64) cargo_target=x86_64-pc-windows-gnu ;;
+  mingw-arm64) cargo_target=aarch64-pc-windows-gnullvm ;;
   *)
     echo "No Cargo cross-compilation settings serve $1." >&2
     return 2

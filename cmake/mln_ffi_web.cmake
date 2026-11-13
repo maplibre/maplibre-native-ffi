@@ -12,9 +12,9 @@ include(mln_ffi_mln_rs)
 
 # The Cargo feature of mln-rs-c that builds the preset's backend.
 function(mln_ffi_web_feature out_var)
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+  if(MLN_FFI_RENDER_BACKENDS STREQUAL "webgpu")
     set(feature webgpu)
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl"
+  elseif(MLN_FFI_RENDER_BACKENDS STREQUAL "opengl"
          AND MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
     set(feature gl)
   else()
@@ -108,6 +108,7 @@ function(mln_ffi_add_web_package target)
   mln_ffi_add_mln_rs_components(${target} FEATURES ${feature})
 
   mln_ffi_c_version(MLN_FFI_SCHEMA_VERSION)
+  mln_ffi_artifact_backend_json()
   set(MLN_FFI_ANDROID_JSON null)
   set(MLN_FFI_STATIC_LINK_LIBRARIES_JSON "")
   set(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON "")

@@ -289,33 +289,53 @@ run = [
 ]
 
 [tasks.test]
-description = "Build and run the native C tests for a CMake preset."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+description = "Build and run the native C tests for a CMake preset, for one render backend or all of them."
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}"
+arg "[backend]" default="" help="Render backend whose suites run, such as vulkan or opengl; empty runs every backend the build compiled suites for"
+'''
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # ctest runs the suites: on the host, one entry per test file and one per
 # program in tests/native/exit; off the host, one entry per suite and exit
-# program through tools/devices/run. A web preset builds no C, so mln-rs's
-# browser check drives the package's raw C ABI from a Web Worker in headless
-# Chromium instead; scripts/find-chromium.mjs says how a browser is located.
+# program through tools/devices/run. Each backend's entries carry its name as
+# a label. A web preset builds no C, so mln-rs's browser check drives the
+# package's raw C ABI from a Web Worker in headless Chromium instead;
+# scripts/find-chromium.mjs says how a browser is located.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
+share="$build_dir/install/share/maplibre-native-c"
+if [[ -n "$usage_backend" ]] && ! jq -e --arg backend "$usage_backend" '.backends | index($backend)' "$share/artifact.json" >/dev/null; then
+  echo "error: $usage_preset carries no $usage_backend backend; it carries $(jq -r '.backends | join(", ")' "$share/artifact.json")" >&2
+  exit 2
+fi
 case "$usage_preset" in
 web-*)
-  share="$build_dir/install/share/maplibre-native-c"
-  feature="$(jq -r '{webgpu: "webgpu", opengl: "gl"}[.backend]' "$share/artifact.json")"
+  feature="$(jq -r '{webgpu: "webgpu", opengl: "gl"}[.backends[0]]' "$share/artifact.json")"
   exec node "$MISE_MONOREPO_ROOT/third_party/mln-rs/crates/mln_c/web-check/check.mjs" \
     "$share/web" "$feature" --chromium "$(node "$MISE_MONOREPO_ROOT/scripts/find-chromium.mjs")"
   ;;
 esac
-# A device build that no emulator or simulator runs registers no tests, so it
-# fails before a device boots for nothing.
-if ctest --test-dir "$build_dir" -C Release --show-only | grep -q '^Total Tests: 0[[:space:]]*$'; then
-  echo "error: $usage_preset registers no native tests to run" >&2
-  exit 2
+# CTest labels each test with its backend.
+backends=$usage_backend
+if [[ -z "$backends" ]]; then
+  backends=$(ctest --test-dir "$build_dir" --print-labels | sed -n 's/^  *//p')
+  if [[ -z "$backends" ]]; then
+    echo "error: $usage_preset registers no native tests to run" >&2
+    exit 2
+  fi
 fi
-# The device boots here rather than inside the first test's timeout.
-MLN_FFI_DEVICE_INSTALL="$build_dir/install" "$MISE_MONOREPO_ROOT/tools/devices/run" --boot
-ctest --test-dir "$build_dir" -C Release --output-on-failure --no-tests=error --timeout 300 --parallel
+for backend in $backends; do
+  # A device build that no emulator or simulator runs registers no tests, so it
+  # fails before a device boots for nothing.
+  if ctest --test-dir "$build_dir" -C Release -L "^$backend\$" --show-only | grep -q '^Total Tests: 0[[:space:]]*$'; then
+    echo "error: $usage_preset registers no native $backend tests to run" >&2
+    exit 2
+  fi
+  export MLN_FFI_TEST_BACKEND="$backend"
+  # The device boots here rather than inside the first test's timeout.
+  MLN_FFI_DEVICE_INSTALL="$build_dir/install" "$MISE_MONOREPO_ROOT/tools/devices/run" --boot
+  ctest --test-dir "$build_dir" -C Release -L "^$backend\$" --output-on-failure --no-tests=error --timeout 300 --parallel
+done
 '''
 
 # The C API benchmarks, in benchmarks/. `mise run bench -- --help` and
