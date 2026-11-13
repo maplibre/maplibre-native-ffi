@@ -335,10 +335,10 @@ ci:
           then: apply
     macos:
       covers: >-
-        macOS ARM64 with Metal, Vulkan (MoltenVK), and OpenGL (ANGLE). Runs the
-        C tests and the desktop binding suites, including Swift. Catches Apple
-        Clang, Apple SDK, Metal, and macOS packaging problems.
-        Platform-independent code that Linux x64 tests doesn't need it.
+        macOS ARM64 with Metal. Runs the C tests and the desktop binding suites,
+        including Swift. Catches Apple Clang, Apple SDK, Metal, and macOS
+        packaging problems. Platform-independent code that Linux x64 tests
+        doesn't need it.
       rules:
         - if:
             files:

@@ -47,7 +47,6 @@ ROOT_TARGET_MODULES = {
         "jvm": "maplibre-native-ffi-runtime-opengl-jvm",
         "linuxArm64": "maplibre-native-ffi-runtime-opengl-linuxarm64",
         "linuxX64": "maplibre-native-ffi-runtime-opengl-linuxx64",
-        "macosArm64": "maplibre-native-ffi-runtime-opengl-macosarm64",
         "wasmJs": "maplibre-native-ffi-runtime-opengl-wasm-js",
     },
     "maplibre-native-ffi-runtime-vulkan": {
@@ -59,7 +58,6 @@ ROOT_TARGET_MODULES = {
         "jvm": "maplibre-native-ffi-runtime-vulkan-jvm",
         "linuxArm64": "maplibre-native-ffi-runtime-vulkan-linuxarm64",
         "linuxX64": "maplibre-native-ffi-runtime-vulkan-linuxx64",
-        "macosArm64": "maplibre-native-ffi-runtime-vulkan-macosarm64",
     },
     "maplibre-native-ffi-runtime-metal": {
         "iosArm64": "maplibre-native-ffi-runtime-metal-iosarm64",
@@ -132,8 +130,6 @@ def native_licenses(backend: str, target: str) -> set[str]:
         licenses.update(
             {"glslang.txt", "vulkan-headers.md", "vulkan-memory-allocator.txt"}
         )
-    if backend == "opengl" and target.startswith("macos-"):
-        licenses.add("angle.txt")
     if target.startswith("windows-mingw-"):
         licenses.update(
             {"libc++.txt", "libunwind.txt"}

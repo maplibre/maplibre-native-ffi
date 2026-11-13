@@ -116,8 +116,7 @@ typedef struct mln_test_graphics_surface_info {
   // OpenHarmony, a headless surface, since the emulator's driver presents to
   // no window.
   uint64_t vulkan_surface;
-  // Metal: CAMetalLayer* on the context's device. Vulkan on Apple platforms:
-  // the CAMetalLayer* that the VkSurfaceKHR presents to.
+  // Metal: CAMetalLayer* on the context's device.
   void* MLN_TEST_GRAPHICS_NULLABLE metal_layer;
   // Vulkan and WGL on Windows: the HWND of the surface's window.
   void* MLN_TEST_GRAPHICS_NULLABLE win32_window;

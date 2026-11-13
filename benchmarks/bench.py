@@ -402,12 +402,11 @@ def build_library(side: Side, preset: str) -> None:
         cwd=root,
         env=env,
     )
-    for component in ("loader", "test-graphics"):
-        run(
-            [*prefix, "cmake", "--install", build, "--component", component],
-            cwd=root,
-            env=env,
-        )
+    run(
+        [*prefix, "cmake", "--install", build, "--component", "test-graphics"],
+        cwd=root,
+        env=env,
+    )
 
 
 def build_harness(side: Side, preset: str, fixtures: Path) -> None:
