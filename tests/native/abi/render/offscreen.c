@@ -483,25 +483,11 @@ static void attach_rejects_what_an_offscreen_session_cannot_take(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// OpenGL picks no GPU, so a build that draws with OpenGL alone refuses to
-// name one.
 static void the_first_named_adapter_renders(void) {
   mln_gpu_device_options options = {.size = sizeof(mln_gpu_device_options)};
   options.fields = MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX;
   options.adapter_index = 0;
   mln_gpu_device device = MLN_HANDLE_NULL;
-  if (
-    (mln_supported_render_backend_mask() &
-     (MLN_RENDER_BACKEND_FLAG_METAL | MLN_RENDER_BACKEND_FLAG_VULKAN |
-      MLN_RENDER_BACKEND_FLAG_WEB_GPU)) == 0
-  ) {
-    MLN_TEST_STATUS(
-      MLN_STATUS_UNSUPPORTED,
-      mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
-    );
-    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
-    return;
-  }
   MLN_TEST_OK(mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC));
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
