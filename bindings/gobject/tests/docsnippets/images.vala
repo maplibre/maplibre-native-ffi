@@ -28,8 +28,13 @@ namespace Images {
 			// The library renders on its own thread.
 			driver = RenderDriverKind.CORE_WORKER,
 		};
-		var session = map.attach_offscreen (
-			{ logical_size: { width: 800, height: 600 } }, attach, null
+		// With no device, the session creates one.
+		var session = map.attach (
+			new RenderTarget.offscreen (
+				{ logical_size: { width: 800, height: 600 } }
+			),
+			null,
+			attach
 		);
 		yield session.ready_async ();
 		// #endregion attach

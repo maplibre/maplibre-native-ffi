@@ -471,7 +471,7 @@ static void a_rejected_call_frees_its_registrations(void) {
 }
 
 #if defined(__linux__)
-static void a_dma_buf_ring_converts_its_formats(void) {
+static void an_exported_ring_converts_its_dma_buf_formats(void) {
   MaplibreNativeFfiRuntime* runtime = create_runtime();
   MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 48);
   // NV12, which the library never renders, with a linear modifier.
@@ -479,22 +479,23 @@ static void a_dma_buf_ring_converts_its_formats(void) {
     .fourcc = 0x3231564e, .modifier = 0
   };
   const MaplibreNativeFfiLogicalSize size = {.width = 64, .height = 48};
-  g_autoptr(MaplibreNativeFfiDmaBufRingDescriptor) descriptor = g_object_new(
-    MAPLIBRE_NATIVE_FFI_TYPE_DMA_BUF_RING_DESCRIPTOR, "logical-size", &size,
-    "buffer-count", 3, NULL
+  g_autoptr(MaplibreNativeFfiExportedRingTarget) ring = g_object_new(
+    MAPLIBRE_NATIVE_FFI_TYPE_EXPORTED_RING_TARGET, "logical-size", &size,
+    "texture-count", 3, "export-kinds",
+    MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_DMA_BUF, NULL
   );
-  maplibre_native_ffi_dma_buf_ring_descriptor_set_formats(
-    descriptor, &format, 1
+  maplibre_native_ffi_exported_ring_target_set_dma_buf_formats(
+    ring, &format, 1
   );
+  g_autoptr(MaplibreNativeFfiRenderTarget) render_target =
+    maplibre_native_ffi_render_target_new_exported_ring(ring);
   g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options = g_object_new(
     MAPLIBRE_NATIVE_FFI_TYPE_RENDER_SESSION_ATTACH_OPTIONS, "driver",
     MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER, NULL
   );
   g_autoptr(GError) error = NULL;
   g_autoptr(MaplibreNativeFfiRenderSession) session =
-    maplibre_native_ffi_map_attach_dma_buf_ring(
-      map, descriptor, NULL, options, &error
-    );
+    maplibre_native_ffi_map_attach(map, render_target, NULL, options, &error);
   g_assert_null(session);
   g_assert_error(
     error, MAPLIBRE_NATIVE_FFI_ERROR, MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED
@@ -509,6 +510,7 @@ typedef struct {
   MaplibreNativeFfiRuntime* runtime;
   MaplibreNativeFfiMap* map;
   MaplibreNativeFfiRenderSession* session;
+  MaplibreNativeFfiGpuDevice* device;
   mln_test_graphics* graphics;
   mln_test_graphics_texture* texture;
   gboolean woken;
@@ -607,6 +609,7 @@ static void release_target(Target* target) {
   ));
   g_assert_no_error(error);
   g_clear_object(&target->session);
+  g_clear_object(&target->device);
   release_map(target->map);
   release_runtime(target->runtime);
   if (target->texture != NULL) {
@@ -615,22 +618,30 @@ static void release_target(Target* target) {
   if (target->graphics != NULL) mln_test_graphics_destroy(target->graphics);
 }
 
+/** Attaches an offscreen image of 32 by 16 on a device of the session's own. */
+static void attach_offscreen(Target* target) {
+  const MaplibreNativeFfiOffscreenTarget offscreen = {
+    .logical_size = {.width = 32, .height = 16}
+  };
+  g_autoptr(MaplibreNativeFfiRenderTarget) render_target =
+    maplibre_native_ffi_render_target_new_offscreen(&offscreen);
+  g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
+    attach_options(target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER);
+  g_autoptr(GError) error = NULL;
+  target->session = maplibre_native_ffi_map_attach(
+    target->map, render_target, NULL, options, &error
+  );
+  g_assert_no_error(error);
+  wait_until_ready(target);
+}
+
 static void a_session_renders_pixels_that_the_library_reads_back(void) {
   Target target = {.thread = g_thread_self()};
   target.runtime = create_runtime();
   target.map = create_map(target.runtime, 0, 32, 16);
-  const MaplibreNativeFfiOffscreenDescriptor descriptor = {
-    .logical_size = {.width = 32, .height = 16}
-  };
-  g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
-    attach_options(&target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER);
-  g_autoptr(GError) error = NULL;
-  target.session = maplibre_native_ffi_map_attach_offscreen(
-    target.map, &descriptor, options, NULL, &error
-  );
-  g_assert_no_error(error);
-  wait_until_ready(&target);
+  attach_offscreen(&target);
   set_style(target.map, red_style);
+  g_autoptr(GError) error = NULL;
 
   // A frame may draw before the style's paint applies, so keep rendering
   // until one is red.
@@ -721,17 +732,7 @@ static void a_custom_source_answers_through_the_map_it_borrows(void) {
   Target target = {.thread = g_thread_self()};
   target.runtime = create_runtime();
   target.map = create_map(target.runtime, 0, 32, 16);
-  const MaplibreNativeFfiOffscreenDescriptor descriptor = {
-    .logical_size = {.width = 32, .height = 16}
-  };
-  g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
-    attach_options(&target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER);
-  g_autoptr(GError) error = NULL;
-  target.session = maplibre_native_ffi_map_attach_offscreen(
-    target.map, &descriptor, options, NULL, &error
-  );
-  g_assert_no_error(error);
-  wait_until_ready(&target);
+  attach_offscreen(&target);
   set_style(target.map, empty_style);
 
   g_autoptr(MaplibreNativeFfiCustomGeometrySourceOptions) source =
@@ -775,8 +776,10 @@ static void attach_borrowed(Target* target, uint32_t backend) {
   g_assert_true(mln_test_graphics_get_context(target->graphics, &context));
   const MaplibreNativeFfiLogicalSize size = {.width = 32, .height = 16};
   g_autoptr(GError) error = NULL;
+  g_autoptr(MaplibreNativeFfiRenderTarget) render_target = NULL;
+  g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options = NULL;
   if (backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN) {
-    g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
+    options =
       attach_options(target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER);
     g_autoptr(MaplibreNativeFfiVulkanContextDescriptor) vulkan = g_object_new(
       MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_CONTEXT_DESCRIPTOR, "instance",
@@ -787,57 +790,58 @@ static void attach_borrowed(Target* target, uint32_t backend) {
       context.vulkan_get_instance_proc_addr, "get-device-proc-addr",
       context.vulkan_get_device_proc_addr, NULL
     );
+    g_autoptr(MaplibreNativeFfiVulkanDeviceDescriptor) device = g_object_new(
+      MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_DEVICE_DESCRIPTOR, "context", vulkan, NULL
+    );
+    target->device = maplibre_native_ffi_gpu_device_wrap_vulkan(device, &error);
+    g_assert_no_error(error);
     MaplibreNativeFfiVulkanBorrowedTexture texture = {
       .image = info.vulkan_image, .image_view = info.vulkan_image_view
     };
-    g_autoptr(MaplibreNativeFfiVulkanBorrowedTextureDescriptor) descriptor =
+    g_autoptr(MaplibreNativeFfiVulkanBorrowedTexturesTarget) ring =
       g_object_new(
-        MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURE_DESCRIPTOR,
+        MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURES_TARGET,
         "logical-size", &size, "physical-width", info.width, "physical-height",
-        info.height, "context", vulkan, "format", info.format, "final-layout",
+        info.height, "format", info.format, "final-layout",
         info.vulkan_final_layout, NULL
       );
-    maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures(
-      descriptor, &texture, 1
+    maplibre_native_ffi_vulkan_borrowed_textures_target_set_textures(
+      ring, &texture, 1
     );
-    target->session = maplibre_native_ffi_map_attach_vulkan_borrowed_texture(
-      target->map, descriptor, options, &error
-    );
+    render_target =
+      maplibre_native_ffi_render_target_new_vulkan_borrowed_textures(ring);
   } else {
-    g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
-      attach_options(
-        target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
-      );
+    options = attach_options(
+      target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+    );
     g_autoptr(MaplibreNativeFfiEglContextDescriptor) egl = g_object_new(
       MAPLIBRE_NATIVE_FFI_TYPE_EGL_CONTEXT_DESCRIPTOR, "display",
       context.egl_display, "config", context.egl_config, "share-context",
-      context.egl_context, "client-api",
-      MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES, "get-proc-address",
-      context.get_proc_address, NULL
+      context.egl_context, "get-proc-address", context.get_proc_address, NULL
     );
-    g_autoptr(MaplibreNativeFfiOpenGlContextDescriptorData) platform =
-      maplibre_native_ffi_open_gl_context_descriptor_data_new_egl(egl);
-    g_autoptr(MaplibreNativeFfiOpenGlContextDescriptor) opengl = g_object_new(
-      MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_CONTEXT_DESCRIPTOR, "ownership",
-      MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_SHARED, "data", platform,
-      NULL
-    );
+    g_autoptr(MaplibreNativeFfiOpenGlContextDescriptor) opengl =
+      maplibre_native_ffi_open_gl_context_descriptor_new_egl(egl);
+    target->device =
+      maplibre_native_ffi_gpu_device_wrap_open_gl(opengl, &error);
+    g_assert_no_error(error);
     MaplibreNativeFfiOpenGlBorrowedTexture texture = {
       .texture = info.opengl_texture
     };
-    g_autoptr(MaplibreNativeFfiOpenGlBorrowedTextureDescriptor) descriptor =
+    g_autoptr(MaplibreNativeFfiOpenGlBorrowedTexturesTarget) ring =
       g_object_new(
-        MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURE_DESCRIPTOR,
+        MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURES_TARGET,
         "logical-size", &size, "physical-width", info.width, "physical-height",
-        info.height, "context", opengl, "target", info.opengl_target, NULL
+        info.height, "target", info.opengl_target, NULL
       );
-    maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures(
-      descriptor, &texture, 1
+    maplibre_native_ffi_open_gl_borrowed_textures_target_set_textures(
+      ring, &texture, 1
     );
-    target->session = maplibre_native_ffi_map_attach_open_gl_borrowed_texture(
-      target->map, descriptor, options, &error
-    );
+    render_target =
+      maplibre_native_ffi_render_target_new_open_gl_borrowed_textures(ring);
   }
+  target->session = maplibre_native_ffi_map_attach(
+    target->map, render_target, target->device, options, &error
+  );
   g_assert_no_error(error);
   wait_until_ready(target);
 }
@@ -939,6 +943,7 @@ static void a_disposed_session_takes_driver_work_until_it_ends(void) {
     error, MAPLIBRE_NATIVE_FFI_ERROR, MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE
   );
   g_object_unref(session);
+  g_object_unref(target.device);
   release_map(target.map);
   release_runtime(target.runtime);
   mln_test_graphics_texture_destroy(target.texture);
@@ -990,8 +995,8 @@ int main(int argc, char** argv) {
   );
 #if defined(__linux__)
   g_test_add_func(
-    "/render/a-dma-buf-ring-converts-its-formats",
-    a_dma_buf_ring_converts_its_formats
+    "/render/an-exported-ring-converts-its-dma-buf-formats",
+    an_exported_ring_converts_its_dma_buf_formats
   );
 #endif
   g_test_add_func(
