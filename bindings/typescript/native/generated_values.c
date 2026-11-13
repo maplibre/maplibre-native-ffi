@@ -3206,22 +3206,16 @@ napi_value mln_ts_read_web_gpu_texture_frame(
       ))
     return NULL;
   if (!mln_ts_set(
-        env, result, "texture",
-        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->texture))
+        env, result, "texture", mln_ts_number(env, (double)(source->texture))
       ))
     return NULL;
   if (!mln_ts_set(
-        env, result, "textureView",
-        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->texture_view))
+        env, result, "device", mln_ts_number(env, (double)(source->device))
       ))
     return NULL;
   if (!mln_ts_set(
-        env, result, "device",
-        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->device))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "format", mln_ts_number(env, (double)(source->format))
+        env, result, "format",
+        mln_ts_text(env, (source->format).data, (source->format).size)
       ))
     return NULL;
   return result;
@@ -7979,33 +7973,13 @@ bool mln_ts_write_web_gl_context_descriptor(
   napi_value member;
   char child[256];
   (void)child;
-  if (!mln_ts_member(call, value, "kind", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "kind");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->kind = (mln_web_gl_context_kind)number;
-    }
-  }
   if (!mln_ts_member(call, value, "context", &member)) return false;
   mln_ts_path(child, sizeof child, path, "context");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(
-            call, member, -2147483648LL, 2147483647LL, &number, child
-          ))
-        return false;
-      out->context = (int32_t)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "canvasSelector", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "canvasSelector");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->canvas_selector, child))
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
       return false;
+    out->context = (uint32_t)number;
   }
   return true;
 }
@@ -8020,16 +7994,10 @@ bool mln_ts_write_web_gpu_borrowed_texture(
   if (!mln_ts_member(call, value, "texture", &member)) return false;
   mln_ts_path(child, sizeof child, path, "texture");
   {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->texture = (void*)(uintptr_t)number;
-  }
-  if (!mln_ts_member(call, value, "textureView", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "textureView");
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->texture_view = (void*)(uintptr_t)number;
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->texture = (uint32_t)number;
   }
   return true;
 }
@@ -8085,12 +8053,7 @@ bool mln_ts_write_web_gpu_borrowed_texture_descriptor(
   }
   if (!mln_ts_member(call, value, "format", &member)) return false;
   mln_ts_path(child, sizeof child, path, "format");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->format = (uint32_t)number;
-  }
+  if (!mln_ts_read_text_view(call, member, &out->format, child)) return false;
   return true;
 }
 
@@ -8145,30 +8108,13 @@ bool mln_ts_write_web_gpu_context_descriptor(
   napi_value member;
   char child[256];
   (void)child;
-  if (!mln_ts_member(call, value, "instance", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "instance");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->instance = (void*)(uintptr_t)number;
-    }
-  }
   if (!mln_ts_member(call, value, "device", &member)) return false;
   mln_ts_path(child, sizeof child, path, "device");
   {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->device = (void*)(uintptr_t)number;
-  }
-  if (!mln_ts_member(call, value, "queue", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "queue");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->queue = (void*)(uintptr_t)number;
-    }
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->device = (uint32_t)number;
   }
   return true;
 }
@@ -8194,20 +8140,18 @@ bool mln_ts_write_web_gpu_surface_descriptor(
         call, member, &out->context, child
       ))
     return false;
-  if (!mln_ts_member(call, value, "surface", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surface");
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->surface = (void*)(uintptr_t)number;
-  }
-  if (!mln_ts_member(call, value, "format", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "format");
+  if (!mln_ts_member(call, value, "canvas", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "canvas");
   {
     int64_t number = 0;
     if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
       return false;
-    out->format = (uint32_t)number;
+    out->canvas = (uint32_t)number;
+  }
+  if (!mln_ts_member(call, value, "format", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "format");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->format, child)) return false;
   }
   return true;
 }
@@ -8225,12 +8169,13 @@ bool mln_ts_write_web_gpu_surface_replacement(
   if (!mln_ts_read_record(call, member, child)) return false;
   if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
     return false;
-  if (!mln_ts_member(call, value, "surface", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surface");
+  if (!mln_ts_member(call, value, "canvas", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "canvas");
   {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->surface = (void*)(uintptr_t)number;
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->canvas = (uint32_t)number;
   }
   return true;
 }

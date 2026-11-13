@@ -613,7 +613,6 @@ MLN_API mln_status mln_render_session_resize(
  *   exported ring.
  *
  * Completes with:
- * - MLN_STATUS_UNSUPPORTED when the target is an HTML canvas.
  * - MLN_STATUS_TARGET_LOST when the session loses its target before the
  *   release runs.
  */

@@ -34,7 +34,7 @@ public class ImagesTest {
 
   @Test(timeout = SnippetFixture.TEST_TIMEOUT_MS)
   public void images() {
-    RuntimeHandle runtime = RuntimeHandle.create(null).join();
+    RuntimeHandle runtime = RuntimeHandle.create(null);
     try {
       // The demo style is empty here.
       SnippetFixture.serve(

@@ -18,7 +18,7 @@ declare function attachTarget(
 
 export async function createAMap(): Promise<void> {
   // #region runtime
-  await using runtime = await RuntimeHandle.create();
+  await using runtime = RuntimeHandle.create();
   // #endregion runtime
 
   // #region map

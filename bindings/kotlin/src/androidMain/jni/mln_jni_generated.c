@@ -2415,6 +2415,22 @@ static void mln_vulkan_device_release_jni(
   mln_vulkan_device_release((mln_vulkan_device)device);
 }
 
+static jlong mln_web_alloc_jni(
+  JNIEnv* env, jclass type, jlong size, jlong align
+) {
+  return MLN_JNI_ADDRESS(mln_web_alloc((size_t)size, (size_t)align));
+}
+
+static void mln_web_free_jni(
+  JNIEnv* env, jclass type, jlong pointer, jlong size, jlong align
+) {
+  mln_web_free(MLN_JNI_POINTER(void*, pointer), (size_t)size, (size_t)align);
+}
+
+static void mln_web_object_release_jni(JNIEnv* env, jclass type, jint object) {
+  mln_web_object_release((mln_web_object)object);
+}
+
 const JNINativeMethod mln_jni_methods[] = {
   {"mln_acquired_frame_discard", "(JJ)I",
    (void*)mln_acquired_frame_discard_jni},
@@ -2812,6 +2828,9 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_vulkan_device_get_context", "(JJJ)I",
    (void*)mln_vulkan_device_get_context_jni},
   {"mln_vulkan_device_release", "(J)V", (void*)mln_vulkan_device_release_jni},
+  {"mln_web_alloc", "(JJ)J", (void*)mln_web_alloc_jni},
+  {"mln_web_free", "(JJJ)V", (void*)mln_web_free_jni},
+  {"mln_web_object_release", "(I)V", (void*)mln_web_object_release_jni},
 };
 const size_t mln_jni_method_count =
   sizeof mln_jni_methods / sizeof mln_jni_methods[0];
@@ -3213,6 +3232,9 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_vulkan_device_get_context", "(JJJ)I",
    (void*)mln_vulkan_device_get_context_jni},
   {"mln_vulkan_device_release", "(J)V", (void*)mln_vulkan_device_release_jni},
+  {"mln_web_alloc", "(JJ)J", (void*)mln_web_alloc_jni},
+  {"mln_web_free", "(JJJ)V", (void*)mln_web_free_jni},
+  {"mln_web_object_release", "(I)V", (void*)mln_web_object_release_jni},
 };
 
 static mln_jni_upcall mln_jni_completion_upcall = {

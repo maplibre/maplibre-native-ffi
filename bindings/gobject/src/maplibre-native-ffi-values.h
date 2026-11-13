@@ -318,13 +318,6 @@ G_DECLARE_FINAL_TYPE(
   maplibre_native_ffi_wgl_context_descriptor, MAPLIBRE_NATIVE_FFI,
   WGL_CONTEXT_DESCRIPTOR, GObject
 )
-#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GL_CONTEXT_DESCRIPTOR \
-  (maplibre_native_ffi_web_gl_context_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiWebGlContextDescriptor,
-  maplibre_native_ffi_web_gl_context_descriptor, MAPLIBRE_NATIVE_FFI,
-  WEB_GL_CONTEXT_DESCRIPTOR, GObject
-)
 typedef struct _MaplibreNativeFfiOpenGlContextDescriptorData
   MaplibreNativeFfiOpenGlContextDescriptorData;
 #define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_CONTEXT_DESCRIPTOR \
@@ -1178,6 +1171,19 @@ typedef struct {
 typedef struct {
   guint32 texture;
 } MaplibreNativeFfiOpenGlBorrowedTexture;
+
+/**
+ * MaplibreNativeFfiWebGlContextDescriptor:
+ * @context: Your `WebGL2RenderingContext`.
+ *
+ * The WebGL2 context that an OpenGL device wraps.
+ *
+ * See `mln_web_gl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef struct {
+  guint32 context;
+} MaplibreNativeFfiWebGlContextDescriptor;
 
 /**
  * MaplibreNativeFfiOpenGlTextureFrame:
@@ -9440,101 +9446,36 @@ void maplibre_native_ffi_wgl_context_descriptor_set_get_proc_address(
   MaplibreNativeFfiWglContextDescriptor* self, gpointer value
 );
 
+GType maplibre_native_ffi_web_gl_context_descriptor_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GL_CONTEXT_DESCRIPTOR \
+  (maplibre_native_ffi_web_gl_context_descriptor_get_type())
+
 /**
- * MaplibreNativeFfiWebGlContextDescriptor:
+ * maplibre_native_ffi_web_gl_context_descriptor_copy:
  *
- * The WebGL context or canvas that a render session uses.
+ * Copies the value.
  *
- * See `mln_web_gl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiWebGlContextDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
+ * Returns: (transfer full): the copy
  */
 MaplibreNativeFfiWebGlContextDescriptor*
-maplibre_native_ffi_web_gl_context_descriptor_new(void);
+maplibre_native_ffi_web_gl_context_descriptor_copy(
+  const MaplibreNativeFfiWebGlContextDescriptor* self
+);
 
 /**
- * MaplibreNativeFfiWebGlContextDescriptor:kind: (setter set_kind) (getter get_kind)
+ * maplibre_native_ffi_web_gl_context_descriptor_free:
+ * @self: (transfer full) (nullable): the value
  *
- * The `kind` member.
+ * Frees the value.
  */
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_get_kind: (get-property kind)
- *
- * Gets `MaplibreNativeFfiWebGlContextDescriptor:kind`.
- *
- * Returns: the value
- */
-MaplibreNativeFfiWebGlContextKind
-maplibre_native_ffi_web_gl_context_descriptor_get_kind(
+void maplibre_native_ffi_web_gl_context_descriptor_free(
   MaplibreNativeFfiWebGlContextDescriptor* self
 );
 
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_set_kind: (set-property kind)
- *
- * Sets `MaplibreNativeFfiWebGlContextDescriptor:kind`.
- */
-void maplibre_native_ffi_web_gl_context_descriptor_set_kind(
-  MaplibreNativeFfiWebGlContextDescriptor* self,
-  MaplibreNativeFfiWebGlContextKind value
-);
-
-/**
- * MaplibreNativeFfiWebGlContextDescriptor:context: (setter set_context) (getter get_context)
- *
- * Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
- */
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_get_context: (get-property context)
- *
- * Gets `MaplibreNativeFfiWebGlContextDescriptor:context`.
- *
- * Returns: the value
- */
-gint32 maplibre_native_ffi_web_gl_context_descriptor_get_context(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_set_context: (set-property context)
- *
- * Sets `MaplibreNativeFfiWebGlContextDescriptor:context`.
- */
-void maplibre_native_ffi_web_gl_context_descriptor_set_context(
-  MaplibreNativeFfiWebGlContextDescriptor* self, gint32 value
-);
-
-/**
- * MaplibreNativeFfiWebGlContextDescriptor:canvas-selector: (setter set_canvas_selector) (getter get_canvas_selector)
- *
- * The canvas's CSS selector, for a transferred canvas.
- */
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_get_canvas_selector: (get-property canvas-selector)
- *
- * Gets `MaplibreNativeFfiWebGlContextDescriptor:canvas-selector`.
- *
- * Returns: (transfer none): the text
- */
-const char* maplibre_native_ffi_web_gl_context_descriptor_get_canvas_selector(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_set_canvas_selector: (set-property canvas-selector)
- * @value: the UTF-8 text
- *
- * Sets `MaplibreNativeFfiWebGlContextDescriptor:canvas-selector`.
- */
-void maplibre_native_ffi_web_gl_context_descriptor_set_canvas_selector(
-  MaplibreNativeFfiWebGlContextDescriptor* self, const char* value
-);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiWebGlContextDescriptor,
+  maplibre_native_ffi_web_gl_context_descriptor_free
+)
 
 /**
  * MaplibreNativeFfiOpenGlContextDescriptorData:
@@ -9654,7 +9595,7 @@ maplibre_native_ffi_open_gl_context_descriptor_data_get_egl(
  */
 MaplibreNativeFfiOpenGlContextDescriptorData*
 maplibre_native_ffi_open_gl_context_descriptor_data_new_web_gl(
-  MaplibreNativeFfiWebGlContextDescriptor* value
+  const MaplibreNativeFfiWebGlContextDescriptor* value
 );
 
 /**

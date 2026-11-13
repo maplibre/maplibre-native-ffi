@@ -5,7 +5,6 @@ import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
-import org.maplibre.nativeffi.internal.c.DiagnosticLayout
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope
 import org.maplibre.nativeffi.internal.callback.CallbackScope
@@ -41,28 +40,6 @@ internal class NativeCall(val handle: Long, var completion: Long = 0L) : NativeA
 
   fun check(status: Int) {
     checkStatus(status) { NativeDiagnostics.message(NativeDiagnostics.buffer()) }
-  }
-
-  /**
-   * Runs [call], a C call that returns once a native thread that it starts is running. Once it
-   * returns, the result fails with the status error, as [check] would throw it, or completes with
-   * what [adopt] returns, and this call's memory is freed. The call writes a diagnostic of its own,
-   * because other calls run while Kotlin/Wasm waits for it.
-   */
-  fun <T> threadStart(call: (diagnostic: Long) -> Int, adopt: () -> T): Completion<T> {
-    val diagnostic = sized(DiagnosticLayout.SIZEOF, DiagnosticLayout.ALIGNOF)
-    val result = Completion.pending<T>()
-    ThreadStart.run({ call(diagnostic) }) { status ->
-      try {
-        checkStatus(status) { NativeDiagnostics.message(diagnostic) }
-        result.succeed(adopt())
-      } catch (failure: Throwable) {
-        result.fail(failure)
-      } finally {
-        close()
-      }
-    }
-    return result
   }
 
   /**
@@ -205,21 +182,6 @@ internal fun <T> nativeCall(owner: Any?, state: HandleState?, body: NativeCall.(
 internal inline fun <T> nativeUncheckedCall(body: () -> T): T {
   loadNativeLibraryUnchecked()
   return body()
-}
-
-/**
- * Runs a call whose result arrives once a native thread that it starts is running. [body] ends with
- * [NativeCall.threadStart], which frees the call's memory once the thread start returns.
- */
-internal fun <T> nativeThreadStart(body: NativeCall.() -> Completion<T>): Completion<T> {
-  ensureNativeLibrary()
-  val call = NativeCall(0L)
-  try {
-    return call.body()
-  } catch (failure: Throwable) {
-    call.close()
-    throw failure
-  }
 }
 
 /**

@@ -335,38 +335,10 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertIn("  assetPath?: string;\n", values)
         self.assertIn("createMap(options: MapOptions): MapHandle", operations)
         self.assertIn(
-            "  static create(options?: RuntimeOptions): Promise<RuntimeHandle> {",
+            "  static create(options?: RuntimeOptions): RuntimeHandle {",
             operations,
         )
         self.assertIn("  resize(logicalSize: LogicalSize): void {", operations)
-
-    def test_a_call_that_waits_for_a_thread_start_runs_on_its_own_thread(self):
-        # A browser page cannot wait for a thread to start, so the export
-        # copies its converted arguments and returns, and the Promise settles
-        # when the call's thread has created the owner.
-        generated = emitted(typescript, self.api)
-        operations = generated["bindings/typescript/src/generated_operations.ts"]
-        addon = generated["bindings/typescript/native/generated_addon.c"]
-        self.assertIn(
-            "    return threadStart((start) => native.mln_runtime_create(options, start), ",
-            operations,
-        )
-        self.assertIn("so a browser page, which cannot block,", operations)
-        # An absent nullable argument copies only its absence.
-        self.assertIn(
-            "  mln_status status = mln_runtime_create(arguments->present_options "
-            "? &arguments->arg_options : NULL, &handle, diagnostic);\n",
-            addon,
-        )
-        self.assertIn("  mln_runtime_dispose((mln_runtime)handle, NULL);\n", addon)
-        self.assertIn(
-            "  arguments.present_options = present_options != NULL;\n"
-            "  if (present_options) arguments.arg_options = arg_options;\n"
-            "  mln_ts_start_thread(call, call->argv[1], mln_ts_run_mln_runtime_create, "
-            "mln_ts_dispose_mln_runtime_create, &arguments, sizeof arguments);\n",
-            addon,
-        )
-        self.assertNotIn("mln_runtime arg_out_runtime", addon)
 
     def test_a_factory_is_static_and_a_global_names_its_verb_first(self):
         operations = emitted(typescript, self.api)[
@@ -389,9 +361,8 @@ class TypeScriptEmitterTests(unittest.TestCase):
 
     def test_only_synchronous_categories_return_without_a_promise(self):
         # An operation that the headers complete later returns a Promise or an
-        # owner whose `ready` is one, and one that waits for a thread to start runs on a thread
-        # of its own, so only the categories that return synchronously can
-        # hold the calling thread.
+        # owner whose `ready` is one, so only the categories that return
+        # synchronously can hold the calling thread.
         asynchronous = {
             "command",
             "query",
@@ -405,14 +376,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
                 self.assertEqual(
                     entry.shape in asynchronous, entry.plan.completion is not None
                 )
-                self.assertEqual(
-                    entry.shape == "thread_start", entry.plan.blocks is not None
-                )
-        synchronous = [
-            e
-            for e in self.lowered
-            if e.shape not in asynchronous and e.shape != "thread_start"
-        ]
+        synchronous = [e for e in self.lowered if e.shape not in asynchronous]
         self.assertEqual(
             {e.plan.execution for e in synchronous},
             {"event_batch", "immediate", "snapshot"},

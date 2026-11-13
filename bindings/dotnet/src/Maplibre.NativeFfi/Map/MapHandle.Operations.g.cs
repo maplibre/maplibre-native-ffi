@@ -829,7 +829,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     )
     {
         using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenGlSurfaceDescriptor(descriptor, scope);
+        var nativeDescriptor = NativeOpenGlSurfaceDescriptor(descriptor);
         var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
         MlnRenderSession outSession = default;
         mln_completion nativeCompletion;

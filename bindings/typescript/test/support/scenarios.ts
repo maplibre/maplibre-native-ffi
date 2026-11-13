@@ -67,7 +67,7 @@ export async function routeRequests(
  * `started` runs after the first round; the burst never ends on its own.
  */
 export async function burst(started: () => void): Promise<never> {
-  const runtime: RuntimeHandle = await RuntimeHandle.create();
+  const runtime: RuntimeHandle = RuntimeHandle.create();
   await runtime.setEventHandler({ callback: () => {} });
   const map = runtime.createMap({ initialExtent: renderExtent });
   await map.ready;
@@ -106,7 +106,7 @@ const liveWork: object[] = [];
  */
 export async function liveNativeWork(): Promise<RenderSessionHandle> {
   setLogCallback({ callback: () => {} });
-  const runtime = await RuntimeHandle.create();
+  const runtime = RuntimeHandle.create();
   await runtime.setEventHandler({ callback: () => {} });
   let hold!: (handle: ResourceRequestHandle) => void;
   const held = new Promise<ResourceRequestHandle>(

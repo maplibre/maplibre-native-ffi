@@ -1551,28 +1551,6 @@ GType maplibre_native_ffi_vulkan_image_owner_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_IMAGE_OWNER \
   (maplibre_native_ffi_vulkan_image_owner_get_type())
 
-/**
- * MaplibreNativeFfiWebGlContextKind:
- * @MAPLIBRE_NATIVE_FFI_WEB_GL_CONTEXT_EXISTING: The session uses a context that
- *   you created with `emscripten_webgl_create_context()`.
- * @MAPLIBRE_NATIVE_FFI_WEB_GL_CONTEXT_TRANSFERRED_CANVAS: The library transfers
- *   the canvas that `canvas_selector` names to a worker and creates the context
- *   there.
- *
- * How a render session gets its WebGL context.
- *
- * See `mln_web_gl_context_kind` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-typedef enum {
-  MAPLIBRE_NATIVE_FFI_WEB_GL_CONTEXT_EXISTING = 0,
-  MAPLIBRE_NATIVE_FFI_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1,
-} MaplibreNativeFfiWebGlContextKind;
-
-GType maplibre_native_ffi_web_gl_context_kind_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GL_CONTEXT_KIND \
-  (maplibre_native_ffi_web_gl_context_kind_get_type())
-
 G_END_DECLS
 
 #endif

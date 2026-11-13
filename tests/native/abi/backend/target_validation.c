@@ -52,8 +52,7 @@ TARGET_SIZE_EDITS(xlib_window)
 TARGET_SIZE_EDITS(wayland_surface)
 TARGET_SIZE_EDITS(android_window)
 TARGET_SIZE_EDITS(ohos_window)
-TARGET_SIZE_EDITS(web_gpu_surface)
-TARGET_SIZE_EDITS(html_canvas)
+TARGET_SIZE_EDITS(web_canvas)
 TARGET_SIZE_EDITS(vulkan_surface)
 TARGET_SIZE_EDITS(open_gl_surface)
 TARGET_NULL_EDIT(metal_layer, layer)
@@ -63,7 +62,6 @@ TARGET_NULL_EDIT(wayland_surface, display)
 TARGET_NULL_EDIT(wayland_surface, surface)
 TARGET_NULL_EDIT(android_window, window)
 TARGET_NULL_EDIT(ohos_window, window)
-TARGET_NULL_EDIT(web_gpu_surface, surface)
 TARGET_NULL_EDIT(open_gl_surface, surface)
 
 static void vulkan_surface_without_surface(void* call) {
@@ -74,13 +72,13 @@ static void vulkan_surface_without_surface(void* call) {
 static void xlib_window_without_window(void* call) {
   ((mln_test_target_call*)call)->descriptor.target.data.xlib_window.window = 0;
 }
-static void web_gpu_surface_without_format(void* call) {
-  ((mln_test_target_call*)call)->descriptor.target.data.web_gpu_surface.format =
-    0;
+static void web_canvas_without_canvas(void* call) {
+  ((mln_test_target_call*)call)->descriptor.target.data.web_canvas.canvas = 0;
 }
-static void html_canvas_without_selector(void* call) {
-  ((mln_test_target_call*)call)->descriptor.target.data.html_canvas.selector =
-    (mln_buffer_view){0};
+static const char unknown_canvas_format[] = "r8unorm";
+static void web_canvas_with_unknown_format(void* call) {
+  ((mln_test_target_call*)call)->descriptor.target.data.web_canvas.format =
+    (mln_buffer_view){unknown_canvas_format, sizeof(unknown_canvas_format) - 1};
 }
 static void undersized_target(void* call) {
   ((mln_test_target_call*)call)->descriptor.target.size =
@@ -97,8 +95,6 @@ static void unknown_kind(void* call) {
 static void stale_device(void* call) {
   ((mln_test_target_call*)call)->device = UINT64_MAX;
 }
-
-static const char canvas_selector[] = "#map";
 
 // A well-formed descriptor of `kind`, whose objects only validation reads.
 static mln_render_target describe(mln_render_target_kind kind) {
@@ -144,17 +140,10 @@ static mln_render_target describe(mln_render_target_kind kind) {
         .logical_size = size, .window = MLN_TEST_FAKE_HANDLE
       };
       break;
-    case MLN_RENDER_TARGET_KIND_WEB_GPU_SURFACE:
-      // WGPUTextureFormat_BGRA8Unorm.
-      target.data.web_gpu_surface = (mln_web_gpu_surface_target){
-        .logical_size = size, .surface = MLN_TEST_FAKE_HANDLE, .format = 0x1B
-      };
-      break;
-    case MLN_RENDER_TARGET_KIND_HTML_CANVAS:
-      target.data.html_canvas = (mln_html_canvas_target){
-        .logical_size = size,
-        .selector = {canvas_selector, sizeof(canvas_selector) - 1},
-      };
+    case MLN_RENDER_TARGET_KIND_WEB_CANVAS:
+      // A handle that names no object outside a browser.
+      target.data.web_canvas =
+        (mln_web_canvas_target){.logical_size = size, .canvas = 1};
       break;
     case MLN_RENDER_TARGET_KIND_VULKAN_SURFACE:
       // A surface with bits above the low 32, so a carrier that truncated it
@@ -226,21 +215,15 @@ static const kind_rows every_kind[] = {
    {TARGET_SIZE_CASES(ohos_window), TARGET_NULL_CASE(ohos_window, window)},
    3,
    TARGET_OVERFLOW_CASE(ohos_window)},
-  {MLN_RENDER_TARGET_KIND_WEB_GPU_SURFACE,
-   MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_SURFACE,
-   {TARGET_SIZE_CASES(web_gpu_surface),
-    TARGET_NULL_CASE(web_gpu_surface, surface),
-    {"zero surface format", web_gpu_surface_without_format,
+  {MLN_RENDER_TARGET_KIND_WEB_CANVAS,
+   MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS,
+   {TARGET_SIZE_CASES(web_canvas),
+    {"zero canvas", web_canvas_without_canvas, MLN_STATUS_INVALID_ARGUMENT,
+     "canvas"},
+    {"unknown canvas format", web_canvas_with_unknown_format,
      MLN_STATUS_INVALID_ARGUMENT, "format"}},
    4,
-   TARGET_OVERFLOW_CASE(web_gpu_surface)},
-  {MLN_RENDER_TARGET_KIND_HTML_CANVAS,
-   MLN_RENDER_TARGET_KIND_FLAG_HTML_CANVAS,
-   {TARGET_SIZE_CASES(html_canvas),
-    {"empty canvas selector", html_canvas_without_selector,
-     MLN_STATUS_INVALID_ARGUMENT, "selector"}},
-   3,
-   TARGET_OVERFLOW_CASE(html_canvas)},
+   TARGET_OVERFLOW_CASE(web_canvas)},
   {MLN_RENDER_TARGET_KIND_VULKAN_SURFACE,
    MLN_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE,
    {TARGET_SIZE_CASES(vulkan_surface),
@@ -360,10 +343,9 @@ static void attach_refuses_the_kinds_that_the_device_lacks(void) {
   MLN_TEST_OK(
     mln_gpu_device_get_capabilities(device, &capabilities, MLN_TEST_DIAGNOSTIC)
   );
-  // No library device presents to a WebGPU surface, which only a wrapped
-  // device can.
+  // Only a browser build presents to a web canvas.
   TEST_ASSERT_EQUAL_UINT32(
-    0, capabilities.target_kinds & MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_SURFACE
+    0, capabilities.target_kinds & MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS
   );
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_target_map(runtime);

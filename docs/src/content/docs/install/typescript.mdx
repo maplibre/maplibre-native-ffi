@@ -44,7 +44,7 @@ them before any other call:
 import { loadModule, RuntimeHandle } from "@maplibre/native-ffi";
 
 await loadModule(new URL("/maplibre_native_ffi.mjs", location.href));
-const runtime = await RuntimeHandle.create();
+const runtime = RuntimeHandle.create();
 ```
 
 The page must meet the [web requirements](/maplibre-native-ffi/install/#web).
@@ -104,7 +104,7 @@ For Vulkan, replace `@maplibre/native-ffi-opengl` with
 ```ts title="Index.ets"
 import { RuntimeHandle } from "@maplibre/native-ffi";
 
-const runtime = await RuntimeHandle.create();
+const runtime = RuntimeHandle.create();
 ```
 
 ## Use your own build

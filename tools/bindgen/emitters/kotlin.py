@@ -11,7 +11,6 @@ source sets also hold the declarations of the C functions and upcall stubs that
 the shared code uses (see kotlin_native).
 """
 
-import dataclasses
 import re
 
 from tools.bindgen import async_hosts, docs
@@ -180,21 +179,10 @@ import org.maplibre.nativeffi.internal.memory.*
 # An optional expectation, which only the shared source sets can name.
 SYNTHETIC_IMPORT = "import org.maplibre.nativeffi.internal.JvmSynthetic\n"
 
-# What a call that waits for a thread to start does on each target, which the C
-# reference cannot say.
-THREAD_START_NOTE = (
-    "The result completes once the call's thread starts. On the JVM, Android, "
-    "and Kotlin/Native the call waits on the calling thread, which it blocks "
-    "until then, and returns a completed result. On Kotlin/Wasm it runs on a "
-    "thread of its own, so the page can call it."
-)
-
 
 def operation_doc(bound, plan, indent: str = "") -> str:
-    """The KDoc of an operation, with what a thread-start call does in Kotlin."""
+    """The KDoc of an operation."""
     native = bound.doc(plan.name)
-    if native is not None and plan.blocks == "thread_start":
-        native = dataclasses.replace(native, notes=(THREAD_START_NOTE,))
     return docs.block_comment(native, symbols(bound), indent)
 
 

@@ -161,7 +161,7 @@ class MapController(application: Application) : AndroidViewModel(application) {
 
   private suspend fun start() {
     showStatus("Loading the library…")
-    val runtime = RuntimeHandle.create().await()
+    val runtime = RuntimeHandle.create()
     this.runtime = runtime
     val size = size ?: LogicalSize(1u, 1u)
     val map =

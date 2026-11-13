@@ -197,10 +197,9 @@ static void expect_preset_texture(const frame_record* record) {
   TEST_ASSERT_EQUAL_HEX32(0x0DE1, frame->target);
 #else
   const mln_web_gpu_texture_frame* frame = &record->webgpu;
-  TEST_ASSERT_NOT_NULL(frame->texture);
-  TEST_ASSERT_NOT_NULL(frame->texture_view);
-  TEST_ASSERT_NOT_NULL(frame->device);
-  TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->format);
+  TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->texture);
+  TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->device);
+  TEST_ASSERT_NOT_EQUAL_size_t(0, frame->format.size);
 #endif
   TEST_ASSERT_EQUAL_UINT32(64, frame->width);
   TEST_ASSERT_EQUAL_UINT32(64, frame->height);

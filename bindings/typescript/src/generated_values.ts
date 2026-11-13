@@ -4606,45 +4606,17 @@ export interface WaylandSurfaceReplacement {
 }
 
 /**
- * The WebGL context or canvas that a render session uses.
+ * The WebGL2 context that an OpenGL device wraps.
  *
  * See `mln_web_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface WebGlContextDescriptor {
-  kind?: WebGlContextKind;
   /**
-   * Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
+   * Your `WebGL2RenderingContext`.
    */
-  context?: number;
-  /**
-   * The canvas's CSS selector, for a transferred canvas.
-   */
-  canvasSelector?: string;
+  context: number;
 }
-
-/**
- * How a render session gets its WebGL context.
- *
- * See `mln_web_gl_context_kind` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-export const WebGlContextKind = {
-  /**
-   * The session uses a context that you created with
-   * `emscripten_webgl_create_context()`.
-   */
-  existing: 0,
-  /**
-   * The library transfers the canvas that `canvas_selector` names to a worker
-   * and creates the context there.
-   */
-  transferredCanvas: 1,
-} as const;
-/** One of the WebGlContextKind values, or a value this binding does not know. */
-export type WebGlContextKind =
-  | (typeof WebGlContextKind)[keyof typeof WebGlContextKind]
-  | (number & {});
 
 /**
  * A WebGPU texture of a borrowed ring.
@@ -4654,13 +4626,9 @@ export type WebGlContextKind =
  */
 export interface WebGpuBorrowedTexture {
   /**
-   * Your WGPUTexture.
+   * Your `GPUTexture`.
    */
-  texture: bigint;
-  /**
-   * A WGPUTextureView of `texture`.
-   */
-  textureView: bigint;
+  texture: number;
 }
 
 /**
@@ -4687,9 +4655,9 @@ export interface WebGpuBorrowedTextureDescriptor {
   context: WebGpuContextDescriptor;
   textures: readonly WebGpuBorrowedTexture[];
   /**
-   * The textures' WGPUTextureFormat.
+   * The textures' `GPUTextureFormat`, such as `rgba8unorm`.
    */
-  format: number;
+  format: string;
 }
 
 /**
@@ -4719,17 +4687,9 @@ export interface WebGpuBorrowedTextureReplacement {
  */
 export interface WebGpuContextDescriptor {
   /**
-   * A `WGPUInstance`, or null.
+   * Your `GPUDevice`. Sessions submit to its `queue`.
    */
-  instance?: bigint;
-  /**
-   * A `WGPUDevice`.
-   */
-  device: bigint;
-  /**
-   * A `WGPUQueue`, or null to use the device's queue.
-   */
-  queue?: bigint;
+  device: number;
 }
 
 /**
@@ -4746,13 +4706,14 @@ export interface WebGpuSurfaceDescriptor {
   logicalSize: LogicalSize;
   context: WebGpuContextDescriptor;
   /**
-   * Your WGPUSurface.
+   * Your `OffscreenCanvas` or `HTMLCanvasElement`.
    */
-  surface: bigint;
+  canvas: number;
   /**
-   * The WGPUTextureFormat to configure the surface with.
+   * The `GPUTextureFormat` to configure the canvas with, such as `bgra8unorm`.
+   * Empty for a format that the device's adapter prefers.
    */
-  format: number;
+  format?: string;
 }
 
 /**
@@ -4768,9 +4729,9 @@ export interface WebGpuSurfaceDescriptor {
 export interface WebGpuSurfaceReplacement {
   logicalSize: LogicalSize;
   /**
-   * Your WGPUSurface.
+   * Your `OffscreenCanvas` or `HTMLCanvasElement`.
    */
-  surface: bigint;
+  canvas: number;
 }
 
 /**
@@ -4788,21 +4749,17 @@ export interface WebGpuTextureFrame {
    */
   readonly slot: number;
   /**
-   * The WGPUTexture.
+   * The `GPUTexture`.
    */
-  readonly texture: bigint;
+  readonly texture: number;
   /**
-   * The WGPUTextureView.
+   * The texture's `GPUDevice`.
    */
-  readonly textureView: bigint;
+  readonly device: number;
   /**
-   * The texture's WGPUDevice.
+   * The texture's `GPUTextureFormat`.
    */
-  readonly device: bigint;
-  /**
-   * The texture's WGPUTextureFormat.
-   */
-  readonly format: number;
+  readonly format: string;
 }
 
 /**

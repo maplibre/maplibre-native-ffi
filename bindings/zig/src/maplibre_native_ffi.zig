@@ -2907,8 +2907,15 @@ pub const Runtime = struct {
     /// Creates a runtime.
     ///
     /// A runtime holds maps and the resource loading, cache, and offline regions
-    /// that they share. In a browser, create runtimes on a Web Worker, not on the
-    /// main thread.
+    /// that they share.
+    ///
+    /// In a browser, the library runs on the thread that loaded its module and
+    /// never blocks it: commands, render sessions, completions, wakes and callbacks
+    /// all run on that thread, in tasks of the library's own after the call that
+    /// started them returns. Wait for a completion with a callback, or yield to the
+    /// event loop; a blocking wait can't end. Load the module on a dedicated Web
+    /// Worker, so that the map's work doesn't delay the page. On the page's thread
+    /// it works too, but every frame and style parse runs there.
     ///
     /// See `mln_runtime_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -2917,6 +2924,8 @@ pub const Runtime = struct {
     ///
     /// - `error.InvalidArgument` when the cache database file that `options` names
     ///   can't be opened or created.
+    /// - `error.Unsupported` in a browser for a cache path: the browser caches the
+    ///   runtime's requests.
     pub fn create(options: ?RuntimeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!Runtime {
         return call.invoke("mln_runtime_create", .none, {}, null, diagnostic, .{ options, call.adopt(Runtime) });
     }
@@ -6543,19 +6552,20 @@ pub const OpenGlContextDescriptor = struct {
             },
             .web_gl => |item| {
                 raw.platform = c.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
-                raw.data.web_gl = try item.toNative();
+                raw.data.web_gl = item.toNative();
             },
         }
         return raw;
     }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_context_descriptor) status.Error!OpenGlContextDescriptor {
+        _ = allocator;
         return .{
             .ownership = OpenGlContextOwnership.fromNative(raw.ownership),
             .data = switch (raw.platform) {
                 c.MLN_OPEN_GL_CONTEXT_PLATFORM_WGL => .{ .wgl = WglContextDescriptor.fromNative(raw.data.wgl) },
                 c.MLN_OPEN_GL_CONTEXT_PLATFORM_EGL => .{ .egl = EglContextDescriptor.fromNative(raw.data.egl) },
-                c.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL => .{ .web_gl = try WebGlContextDescriptor.fromNative(allocator, raw.data.web_gl) },
+                c.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL => .{ .web_gl = WebGlContextDescriptor.fromNative(raw.data.web_gl) },
                 else => return error.NativeError,
             },
         };
@@ -9657,47 +9667,23 @@ pub const WaylandSurfaceReplacement = struct {
     }
 };
 
-/// The WebGL context or canvas that a render session uses.
+/// The WebGL2 context that an OpenGL device wraps.
 ///
 /// See `mln_web_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebGlContextDescriptor = struct {
-    kind: WebGlContextKind = .existing,
-    /// Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
-    context: i32 = 0,
-    /// The canvas's CSS selector, for a transferred canvas.
-    canvas_selector: []const u8 = &.{},
-    pub fn toNative(self: WebGlContextDescriptor) status.Error!c.mln_web_gl_context_descriptor {
+    /// Your `WebGL2RenderingContext`.
+    context: u32,
+    pub fn toNative(self: WebGlContextDescriptor) c.mln_web_gl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_web_gl_context_descriptor);
-        raw.kind = self.kind.toNative();
         raw.context = self.context;
-        raw.canvas_selector = marshal.view(self.canvas_selector);
         return raw;
     }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_web_gl_context_descriptor) status.Error!WebGlContextDescriptor {
+    pub fn fromNative(raw: c.mln_web_gl_context_descriptor) WebGlContextDescriptor {
         return .{
-            .kind = WebGlContextKind.fromNative(raw.kind),
             .context = raw.context,
-            .canvas_selector = try marshal.copyView(allocator, raw.canvas_selector),
         };
     }
-};
-
-/// How a render session gets its WebGL context.
-///
-/// See `mln_web_gl_context_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub const WebGlContextKind = enum(u32) {
-    /// The session uses a context that you created with
-    /// `emscripten_webgl_create_context()`.
-    existing = 0,
-    /// The library transfers the canvas that `canvas_selector` names to a
-    /// worker and creates the context there.
-    transferred_canvas = 1,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// The WGL objects that a render session makes its OpenGL context from.

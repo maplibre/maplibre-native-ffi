@@ -7,7 +7,7 @@ import { RuntimeEventType, RuntimeHandle } from "../../src/index.ts";
 import { listen, mapOptions } from "../support/fixture.ts";
 import { backgroundStyle } from "../support/styles.ts";
 
-const runtime = await RuntimeHandle.create();
+const runtime = RuntimeHandle.create();
 const events = await listen(runtime);
 const map = runtime.createMap(mapOptions);
 await map.ready;

@@ -24,7 +24,6 @@ import org.maplibre.nativeffi.VulkanBorrowedTexture
 import org.maplibre.nativeffi.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.VulkanContextDescriptor
 import org.maplibre.nativeffi.WebGlContextDescriptor
-import org.maplibre.nativeffi.WebGlContextKind
 import org.maplibre.nativeffi.WebGpuBorrowedTexture
 import org.maplibre.nativeffi.WebGpuBorrowedTextureDescriptor
 import org.maplibre.nativeffi.WebGpuContextDescriptor
@@ -34,8 +33,8 @@ import org.maplibre.nativeffi.supportedRenderBackendMask
 
 /**
  * The handles of a test graphics context, as addresses. Only its backend's fields are set. A WebGL
- * context is an `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, and a WebGPU device is an emdawnwebgpu handle:
- * the page creates them, and the binding imports them through `WebGraphics`.
+ * context and a WebGPU device are `mln_web_object` handles: the page creates them, and lends them
+ * to the module as `WebObject`s.
  */
 internal class TestGraphicsContext(
   val metalDevice: Long = 0,
@@ -51,29 +50,29 @@ internal class TestGraphicsContext(
   val eglContext: Long = 0,
   val wglDeviceContext: Long = 0,
   val wglContext: Long = 0,
-  val webGlContext: Int = 0,
-  val webGpuDevice: Long = 0,
+  val webGlContext: UInt = 0u,
+  val webGpuDevice: UInt = 0u,
 )
 
 /**
  * A texture of a test graphics context that a borrowed ring can name, and its size. Only its
- * backend's fields are set. A WebGL texture is a name in the module's GL table, and a WebGPU
- * texture and its view are emdawnwebgpu handles: the page creates them on its own context or
- * device. [close] destroys it.
+ * backend's fields are set. A WebGL texture and a WebGPU texture are `mln_web_object` handles: the
+ * page creates them on its own context or device. [close] destroys it.
  */
 internal class TestTexture(
   val width: UInt,
   val height: UInt,
-  /** The MTLPixelFormat, VkFormat, or WGPUTextureFormat. */
+  /** The MTLPixelFormat or VkFormat. */
   val format: UInt = 0u,
+  /** The GPUTextureFormat. */
+  val webGpuFormat: String = "",
   val metalTexture: Long = 0,
   val vulkanImage: ULong = 0uL,
   val vulkanImageView: ULong = 0uL,
   val vulkanFinalLayout: UInt = 0u,
   val openGlTexture: UInt = 0u,
   val openGlTarget: UInt = 0u,
-  val webGpuTexture: Long = 0,
-  val webGpuTextureView: Long = 0,
+  val webGpuTexture: UInt = 0u,
   private val destroy: () -> Unit,
 ) : AutoCloseable {
   override fun close() = destroy()
@@ -114,8 +113,8 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
   WGL(4u),
   /**
    * WebGL 2 in the browser. tests/graphics leaves WebGL to JavaScript, so this value, past the
-   * tests/graphics values, names the browser fixtures: the page creates the context, and the
-   * binding imports it through `WebGraphics`.
+   * tests/graphics values, names the browser fixtures: the page creates the context, and the page
+   * lends it to the module as a `WebObject`.
    */
   WEBGL(5u),
   /** WebGPU in the browser, from the browser fixtures, as for [WEBGL]. */
@@ -236,7 +235,7 @@ internal object TestGraphics {
           )
         TestBackend.WEBGL ->
           OpenGlContextDescriptorData.WebGl(
-            WebGlContextDescriptor(WebGlContextKind.EXISTING, context.webGlContext),
+            WebGlContextDescriptor(context.webGlContext),
           )
         TestBackend.METAL,
         TestBackend.VULKAN,
@@ -311,19 +310,9 @@ internal object TestGraphics {
       LogicalSize(texture.width, texture.height),
       physicalWidth = texture.width,
       physicalHeight = texture.height,
-      // Sessions use no instance, and null names the device's default queue, as a browser host
-      // without a queue of its own hands over.
-      context =
-        WebGpuContextDescriptor(
-          NativePointer.NULL_POINTER,
-          pointer(context.webGpuDevice),
-          NativePointer.NULL_POINTER,
-        ),
-      textures =
-        textures.map {
-          WebGpuBorrowedTexture(pointer(it.webGpuTexture), pointer(it.webGpuTextureView))
-        },
-      format = texture.format,
+      context = WebGpuContextDescriptor(context.webGpuDevice),
+      textures = textures.map { WebGpuBorrowedTexture(it.webGpuTexture) },
+      format = texture.webGpuFormat,
     )
   }
 

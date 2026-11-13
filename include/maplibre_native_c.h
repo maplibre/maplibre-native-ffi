@@ -25,5 +25,6 @@
 #include "maplibre_native_c/style_expression.h"  // IWYU pragma: export
 #include "maplibre_native_c/texture.h"           // IWYU pragma: export
 #include "maplibre_native_c/wake.h"              // IWYU pragma: export
+#include "maplibre_native_c/web.h"               // IWYU pragma: export
 
 #endif  // MAPLIBRE_NATIVE_C_H

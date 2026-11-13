@@ -532,10 +532,6 @@ G_GNUC_INTERNAL void maplibre_native_ffi_web_gl_context_descriptor_to_native(
   const MaplibreNativeFfiWebGlContextDescriptor* self,
   mln_web_gl_context_descriptor* out, MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL MaplibreNativeFfiWebGlContextDescriptor*
-maplibre_native_ffi_web_gl_context_descriptor_copy(
-  const MaplibreNativeFfiWebGlContextDescriptor* self
-);
 G_GNUC_INTERNAL void
 maplibre_native_ffi_open_gl_context_descriptor_data_to_native(
   const MaplibreNativeFfiOpenGlContextDescriptorData* self,

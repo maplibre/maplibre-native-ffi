@@ -2002,15 +2002,12 @@ final class mln_wayland_surface_replacement extends Struct {
 
 final class mln_web_gl_context_descriptor extends Struct {
   @Uint32()
-  external int kind;
-  @Int32()
   external int context;
-  external mln_buffer_view canvas_selector;
 }
 
 final class mln_web_gpu_borrowed_texture extends Struct {
-  external Pointer<Void> texture;
-  external Pointer<Void> texture_view;
+  @Uint32()
+  external int texture;
 }
 
 final class mln_web_gpu_borrowed_texture_descriptor extends Struct {
@@ -2025,8 +2022,7 @@ final class mln_web_gpu_borrowed_texture_descriptor extends Struct {
   external Pointer<mln_web_gpu_borrowed_texture> textures;
   @Size()
   external int texture_count;
-  @Uint32()
-  external int format;
+  external mln_buffer_view format;
 }
 
 final class mln_web_gpu_borrowed_texture_replacement extends Struct {
@@ -2043,9 +2039,8 @@ final class mln_web_gpu_borrowed_texture_replacement extends Struct {
 }
 
 final class mln_web_gpu_context_descriptor extends Struct {
-  external Pointer<Void> instance;
-  external Pointer<Void> device;
-  external Pointer<Void> queue;
+  @Uint32()
+  external int device;
 }
 
 final class mln_web_gpu_surface_descriptor extends Struct {
@@ -2053,16 +2048,17 @@ final class mln_web_gpu_surface_descriptor extends Struct {
   external int size;
   external mln_logical_size logical_size;
   external mln_web_gpu_context_descriptor context;
-  external Pointer<Void> surface;
   @Uint32()
-  external int format;
+  external int canvas;
+  external mln_buffer_view format;
 }
 
 final class mln_web_gpu_surface_replacement extends Struct {
   @Uint32()
   external int size;
   external mln_logical_size logical_size;
-  external Pointer<Void> surface;
+  @Uint32()
+  external int canvas;
 }
 
 final class mln_web_gpu_texture_frame extends Struct {
@@ -2076,11 +2072,11 @@ final class mln_web_gpu_texture_frame extends Struct {
   external double scale_factor;
   @Uint32()
   external int slot;
-  external Pointer<Void> texture;
-  external Pointer<Void> texture_view;
-  external Pointer<Void> device;
   @Uint32()
-  external int format;
+  external int texture;
+  @Uint32()
+  external int device;
+  external mln_buffer_view format;
 }
 
 final class mln_wgl_context_descriptor extends Struct {
@@ -2708,10 +2704,6 @@ const MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID = 4;
 const MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0;
 const MLN_VULKAN_IMAGE_OWNER_EXTERNAL = 1;
 const MLN_VULKAN_IMAGE_OWNER_FOREIGN = 2;
-
-// mln_web_gl_context_kind
-const MLN_WEB_GL_CONTEXT_EXISTING = 0;
-const MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1;
 
 @Native<Int32 Function(mln_acquired_frame, Pointer<mln_diagnostic>)>()
 external int mln_acquired_frame_discard(

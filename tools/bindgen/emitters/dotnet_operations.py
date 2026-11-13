@@ -281,10 +281,6 @@ def emit_operation(
             return release_async(op)
         case "answer":
             return released(op)
-        case "thread_start":
-            # A .NET thread may wait for a native thread to start, so the call
-            # lowers as it would if it did not wait.
-            return called(op, converted(op))
         case "attach":
             return attach(op, converted(op))
         case "command":

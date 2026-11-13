@@ -1567,7 +1567,7 @@ internal static unsafe class GeneratedValues
         native.logical_size = NativeLogicalSize(value.LogicalSize);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
-        native.context = NativeOpenGlContextDescriptor(value.Context, scope);
+        native.context = NativeOpenGlContextDescriptor(value.Context);
         native.textures = scope.Array<mln_open_gl_borrowed_texture, OpenGlBorrowedTexture>(
             value.TexturesStorage.Items,
             static (item, scope) => NativeOpenGlBorrowedTexture(item)
@@ -1596,8 +1596,7 @@ internal static unsafe class GeneratedValues
     }
 
     internal static mln_open_gl_context_descriptor NativeOpenGlContextDescriptor(
-        OpenGlContextDescriptor value,
-        NativeCallScope scope
+        OpenGlContextDescriptor value
     )
     {
         var native = new mln_open_gl_context_descriptor();
@@ -1614,7 +1613,7 @@ internal static unsafe class GeneratedValues
                 break;
             case OpenGlContextDescriptor.DataValue.WebGl selected:
                 native.platform = mln_open_gl_context_platform.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
-                native.data.web_gl = NativeWebGlContextDescriptor(selected.Value, scope);
+                native.data.web_gl = NativeWebGlContextDescriptor(selected.Value);
                 break;
             default:
                 throw new ArgumentException("A union variant is required.", nameof(value));
@@ -1623,14 +1622,13 @@ internal static unsafe class GeneratedValues
     }
 
     internal static mln_open_gl_surface_descriptor NativeOpenGlSurfaceDescriptor(
-        OpenGlSurfaceDescriptor value,
-        NativeCallScope scope
+        OpenGlSurfaceDescriptor value
     )
     {
         var native = new mln_open_gl_surface_descriptor();
         native.size = (uint)sizeof(mln_open_gl_surface_descriptor);
         native.logical_size = NativeLogicalSize(value.LogicalSize);
-        native.context = NativeOpenGlContextDescriptor(value.Context, scope);
+        native.context = NativeOpenGlContextDescriptor(value.Context);
         native.surface = (void*)value.Surface.Address;
         return native;
     }
@@ -3001,15 +2999,11 @@ internal static unsafe class GeneratedValues
     }
 
     internal static mln_web_gl_context_descriptor NativeWebGlContextDescriptor(
-        WebGlContextDescriptor value,
-        NativeCallScope scope
+        WebGlContextDescriptor value
     )
     {
-        Required(value.CanvasSelector, "WebGlContextDescriptor.CanvasSelector must not be null.");
         var native = new mln_web_gl_context_descriptor();
-        native.kind = (mln_web_gl_context_kind)value.Kind;
         native.context = value.Context;
-        native.canvas_selector = scope.Utf8(value.CanvasSelector);
         return native;
     }
 

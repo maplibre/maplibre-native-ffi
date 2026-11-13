@@ -3466,53 +3466,6 @@ public class VulkanImageOwner(@get:JvmName("getRawValue") public val rawValue: U
 }
 
 /**
- * How a render session gets its WebGL context.
- *
- * Later versions may add values; an unknown one keeps its `rawValue`.
- *
- * See `mln_web_gl_context_kind` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public class WebGlContextKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "EXISTING"
-      1u -> "TRANSFERRED_CANVAS"
-      else -> "WebGlContextKind($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is WebGlContextKind && other.rawValue == rawValue
-
-  override fun hashCode(): Int = rawValue.hashCode()
-
-  public companion object {
-    /** The session uses a context that you created with `emscripten_webgl_create_context()`. */
-    @JvmField public val EXISTING: WebGlContextKind = WebGlContextKind(EXISTING_VALUE)
-    /** The `rawValue` of [EXISTING]. */
-    public const val EXISTING_VALUE: UInt = 0u
-    /**
-     * The library transfers the canvas that `canvas_selector` names to a worker and creates the
-     * context there.
-     */
-    @JvmField
-    public val TRANSFERRED_CANVAS: WebGlContextKind = WebGlContextKind(TRANSFERRED_CANVAS_VALUE)
-    /** The `rawValue` of [TRANSFERRED_CANVAS]. */
-    public const val TRANSFERRED_CANVAS_VALUE: UInt = 1u
-
-    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
-    @JvmStatic
-    @JvmName("of")
-    public fun of(rawValue: UInt): WebGlContextKind =
-      when (rawValue) {
-        EXISTING_VALUE -> EXISTING
-        TRANSFERRED_CANVAS_VALUE -> TRANSFERRED_CANVAS
-        else -> WebGlContextKind(rawValue)
-      }
-  }
-}
-
-/**
  * The Android hardware buffer of an acquired frame.
  *
  * See `mln_android_hardware_buffer_frame` in the
@@ -4392,35 +4345,35 @@ public class WebGpuTextureFrame(
   public val scaleFactor: Double,
   /** The texture's index in the descriptor's `textures`. */
   @get:JvmName("getSlot") public val slot: UInt,
-  /** The WGPUTexture. */
-  texture: NativePointer,
-  /** The WGPUTextureView. */
-  textureView: NativePointer,
-  /** The texture's WGPUDevice. */
-  device: NativePointer,
-  /** The texture's WGPUTextureFormat. */
-  @get:JvmName("getFormat") public val format: UInt,
+  /** The `GPUTexture`. */
+  texture: UInt,
+  /** The texture's `GPUDevice`. */
+  device: UInt,
+  /** The texture's `GPUTextureFormat`. */
+  format: String,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
-  private val storedTexture: NativePointer = texture
-  public val texture: NativePointer
+  private val storedTexture: UInt = texture
+  @get:JvmName("getTexture")
+  public val texture: UInt
     get() {
       bindingScope?.ensureActive()
       return storedTexture
     }
 
-  private val storedTextureView: NativePointer = textureView
-  public val textureView: NativePointer
-    get() {
-      bindingScope?.ensureActive()
-      return storedTextureView
-    }
-
-  private val storedDevice: NativePointer = device
-  public val device: NativePointer
+  private val storedDevice: UInt = device
+  @get:JvmName("getDevice")
+  public val device: UInt
     get() {
       bindingScope?.ensureActive()
       return storedDevice
+    }
+
+  private val storedFormat: String = format
+  public val format: String
+    get() {
+      bindingScope?.ensureActive()
+      return storedFormat
     }
 
   public companion object {
@@ -4432,20 +4385,18 @@ public class WebGpuTextureFrame(
       height: Int,
       scaleFactor: Double,
       slot: Int,
-      texture: NativePointer,
-      textureView: NativePointer,
-      device: NativePointer,
-      format: Int,
+      texture: Int,
+      device: Int,
+      format: String,
     ): WebGpuTextureFrame =
       WebGpuTextureFrame(
         width = width.toUInt(),
         height = height.toUInt(),
         scaleFactor = scaleFactor,
         slot = slot.toUInt(),
-        texture = texture,
-        textureView = textureView,
-        device = device,
-        format = format.toUInt(),
+        texture = texture.toUInt(),
+        device = device.toUInt(),
+        format = format,
       )
   }
 }
@@ -5753,34 +5704,21 @@ public data class EglContextDescriptor(
 }
 
 /**
- * The WebGL context or canvas that a render session uses.
+ * The WebGL2 context that an OpenGL device wraps.
  *
  * See `mln_web_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class WebGlContextDescriptor(
-  public val kind: WebGlContextKind = WebGlContextKind.EXISTING,
-  /** Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context. */
-  public val context: Int = 0,
-  /** The canvas's CSS selector, for a transferred canvas. */
-  public val canvasSelector: String = "",
+  /** Your `WebGL2RenderingContext`. */
+  @get:JvmName("getContext") public val context: UInt,
 ) {
-  @PublishedApi
-  internal fun withKind(kind: WebGlContextKind): WebGlContextDescriptor = copy(kind = kind)
-
-  @PublishedApi
-  internal fun withContext(context: Int): WebGlContextDescriptor = copy(context = context)
-
-  @PublishedApi
-  internal fun withCanvasSelector(canvasSelector: String): WebGlContextDescriptor =
-    copy(canvasSelector = canvasSelector)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): WebGlContextDescriptor = WebGlContextDescriptor()
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(context: Int): WebGlContextDescriptor =
+      WebGlContextDescriptor(context = context.toUInt())
   }
 }
 
@@ -6146,13 +6084,17 @@ public data class WaylandSurfaceDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class WebGpuContextDescriptor(
-  /** A `WGPUInstance`, or null. */
-  public val instance: NativePointer,
-  /** A `WGPUDevice`. */
-  public val device: NativePointer,
-  /** A `WGPUQueue`, or null to use the device's queue. */
-  public val queue: NativePointer,
-)
+  /** Your `GPUDevice`. Sessions submit to its `queue`. */
+  @get:JvmName("getDevice") public val device: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(device: Int): WebGpuContextDescriptor =
+      WebGpuContextDescriptor(device = device.toUInt())
+  }
+}
 
 /**
  * A WebGPU texture of a borrowed ring.
@@ -6161,11 +6103,17 @@ public data class WebGpuContextDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class WebGpuBorrowedTexture(
-  /** Your WGPUTexture. */
-  public val texture: NativePointer,
-  /** A WGPUTextureView of `texture`. */
-  public val textureView: NativePointer,
-)
+  /** Your `GPUTexture`. */
+  @get:JvmName("getTexture") public val texture: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(texture: Int): WebGpuBorrowedTexture =
+      WebGpuBorrowedTexture(texture = texture.toUInt())
+  }
+}
 
 /**
  * A ring of your WebGPU textures, for `MapHandle.attachWebGpuBorrowedTexture()`.
@@ -6188,8 +6136,8 @@ public data class WebGpuBorrowedTextureDescriptor(
   @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
   public val context: WebGpuContextDescriptor,
   public val textures: List<WebGpuBorrowedTexture>,
-  /** The textures' WGPUTextureFormat. */
-  @get:JvmName("getFormat") public val format: UInt,
+  /** The textures' `GPUTextureFormat`, such as `rgba8unorm`. */
+  public val format: String,
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
@@ -6201,7 +6149,7 @@ public data class WebGpuBorrowedTextureDescriptor(
       physicalHeight: Int,
       context: WebGpuContextDescriptor,
       textures: List<WebGpuBorrowedTexture>,
-      format: Int,
+      format: String,
     ): WebGpuBorrowedTextureDescriptor =
       WebGpuBorrowedTextureDescriptor(
         logicalSize = logicalSize,
@@ -6209,7 +6157,7 @@ public data class WebGpuBorrowedTextureDescriptor(
         physicalHeight = physicalHeight.toUInt(),
         context = context,
         textures = textures,
-        format = format.toUInt(),
+        format = format,
       )
   }
 }
@@ -6226,26 +6174,49 @@ public data class WebGpuBorrowedTextureDescriptor(
 public data class WebGpuSurfaceDescriptor(
   public val logicalSize: LogicalSize,
   public val context: WebGpuContextDescriptor,
-  /** Your WGPUSurface. */
-  public val surface: NativePointer,
-  /** The WGPUTextureFormat to configure the surface with. */
-  @get:JvmName("getFormat") public val format: UInt,
+  /** Your `OffscreenCanvas` or `HTMLCanvasElement`. */
+  @get:JvmName("getCanvas") public val canvas: UInt,
+  /**
+   * The `GPUTextureFormat` to configure the canvas with, such as `bgra8unorm`. Empty for a format
+   * that the device's adapter prefers.
+   */
+  public val format: String = "",
 ) {
+  @PublishedApi
+  internal fun withFormat(format: String): WebGpuSurfaceDescriptor = copy(format = format)
+
   public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      context: WebGpuContextDescriptor,
+      canvas: Int,
+    ): WebGpuSurfaceDescriptor =
+      WebGpuSurfaceDescriptor(
+        logicalSize = logicalSize,
+        context = context,
+        canvas = canvas.toUInt(),
+      )
+
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
     @PublishedApi
     internal fun of(
       logicalSize: LogicalSize,
       context: WebGpuContextDescriptor,
-      surface: NativePointer,
-      format: Int,
+      canvas: Int,
+      format: String,
     ): WebGpuSurfaceDescriptor =
       WebGpuSurfaceDescriptor(
         logicalSize = logicalSize,
         context = context,
-        surface = surface,
-        format = format.toUInt(),
+        canvas = canvas.toUInt(),
+        format = format,
       )
   }
 }
@@ -7794,9 +7765,17 @@ public data class WebGpuBorrowedTextureReplacement(
  */
 public data class WebGpuSurfaceReplacement(
   public val logicalSize: LogicalSize,
-  /** Your WGPUSurface. */
-  public val surface: NativePointer,
-)
+  /** Your `OffscreenCanvas` or `HTMLCanvasElement`. */
+  @get:JvmName("getCanvas") public val canvas: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(logicalSize: LogicalSize, canvas: Int): WebGpuSurfaceReplacement =
+      WebGpuSurfaceReplacement(logicalSize = logicalSize, canvas = canvas.toUInt())
+  }
+}
 
 /**
  * A new Win32 window for `RenderSessionHandle.setWin32WindowTarget()`.

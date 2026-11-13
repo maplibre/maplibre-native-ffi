@@ -79,18 +79,17 @@ static void wrap_web_gpu_rejects_malformed_contexts(void) {
   MLN_TEST_INVALID(
     mln_gpu_device_wrap_web_gpu(&context, &device, MLN_TEST_DIAGNOSTIC)
   );
-  // Validation reads the handles, and only a browser build uses them.
-  context.device = (void*)(uintptr_t)1;
+  // Validation reads the handle, which names no object outside a browser.
+  context.device = 1;
   MLN_TEST_INVALID(
     mln_gpu_device_wrap_web_gpu(&context, NULL, MLN_TEST_DIAGNOSTIC)
   );
-#if !defined(__EMSCRIPTEN__)
+  // No build wraps a GPUDevice yet.
   MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
     mln_gpu_device_wrap_web_gpu(&context, &device, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
-#endif
 }
 
 static const mln_render_backend all_backends[] = {

@@ -1160,4 +1160,10 @@ internal expect object C {
   fun mln_vulkan_device_get_context(device: Long, outResult: Long, outDiagnostic: Long): Int
 
   fun mln_vulkan_device_release(device: Long): Unit
+
+  fun mln_web_alloc(size: Long, align: Long): Long
+
+  fun mln_web_free(pointer: Long, size: Long, align: Long): Unit
+
+  fun mln_web_object_release(`object`: Int): Unit
 }

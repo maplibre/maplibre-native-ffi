@@ -5385,8 +5385,15 @@ maplibre_native_ffi_runtime_clear_resource_transform_finish(
  * Creates a runtime.
  *
  * A runtime holds maps and the resource loading, cache, and offline regions
- * that they share. In a browser, create runtimes on a Web Worker, not on the
- * main thread.
+ * that they share.
+ *
+ * In a browser, the library runs on the thread that loaded its module and never
+ * blocks it: commands, render sessions, completions, wakes and callbacks all
+ * run on that thread, in tasks of the library's own after the call that started
+ * them returns. Wait for a completion with a callback, or yield to the event
+ * loop; a blocking wait can't end. Load the module on a dedicated Web Worker,
+ * so that the map's work doesn't delay the page. On the page's thread it works
+ * too, but every frame and style parse runs there.
  *
  * See `mln_runtime_create` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5395,6 +5402,8 @@ maplibre_native_ffi_runtime_clear_resource_transform_finish(
  *
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the cache database file
  *   that `options` names can't be opened or created.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` in a browser for a cache path: the
+ *   browser caches the runtime's requests.
  *
  * Returns: (transfer full): the object
  */

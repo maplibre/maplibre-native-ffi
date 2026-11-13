@@ -3,8 +3,6 @@
 
 package org.maplibre.nativeffi.internal.c
 
-import org.maplibre.nativeffi.internal.call.ThreadStart
-
 /** The C wrapper behind each C function, in the module that `loadWasmModule` loads. */
 internal actual object C {
   actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
@@ -1892,12 +1890,7 @@ internal actual object C {
     mln_kw_mln_runtime_clear_resource_transform(runtime, word(completion), word(outDiagnostic))
 
   actual fun mln_runtime_create(options: Long, outRuntime: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_runtime_create(
-      ThreadStart.staged(),
-      word(options),
-      word(outRuntime),
-      word(outDiagnostic),
-    )
+    mln_kw_mln_runtime_create(word(options), word(outRuntime), word(outDiagnostic))
 
   actual fun mln_runtime_create_map(
     runtime: Long,
@@ -2181,6 +2174,17 @@ internal actual object C {
 
   actual fun mln_vulkan_device_release(device: Long) {
     mln_kw_mln_vulkan_device_release(device)
+  }
+
+  actual fun mln_web_alloc(size: Long, align: Long): Long =
+    unsignedWord(mln_kw_mln_web_alloc(word(size), word(align)))
+
+  actual fun mln_web_free(pointer: Long, size: Long, align: Long) {
+    mln_kw_mln_web_free(word(pointer), word(size), word(align))
+  }
+
+  actual fun mln_web_object_release(`object`: Int) {
+    mln_kw_mln_web_object_release(`object`)
   }
 }
 
@@ -3571,10 +3575,8 @@ private fun mln_kw_mln_runtime_clear_resource_transform(p0: Long, p1: Int, p2: I
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_clear_resource_transform(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_runtime_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_create(p0, p1, p2, p3)",
-  )
+private fun mln_kw_mln_runtime_create(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_create(p0, p1, p2)")
 
 private fun mln_kw_mln_runtime_create_map(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
   js(
@@ -3755,3 +3757,12 @@ private fun mln_kw_mln_vulkan_device_get_context(p0: Long, p1: Int, p2: Int): In
 
 private fun mln_kw_mln_vulkan_device_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_device_release(p0)")
+
+private fun mln_kw_mln_web_alloc(p0: Int, p1: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_web_alloc(p0, p1)")
+
+private fun mln_kw_mln_web_free(p0: Int, p1: Int, p2: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_web_free(p0, p1, p2)")
+
+private fun mln_kw_mln_web_object_release(p0: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_web_object_release(p0)")

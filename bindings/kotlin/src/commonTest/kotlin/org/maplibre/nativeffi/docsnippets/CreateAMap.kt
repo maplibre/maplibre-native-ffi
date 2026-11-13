@@ -23,7 +23,7 @@ private suspend fun attachTarget(
 
 private suspend fun createAMap() {
   // #region runtime
-  val runtime = RuntimeHandle.create().await()
+  val runtime = RuntimeHandle.create()
   // #endregion runtime
 
   // #region map

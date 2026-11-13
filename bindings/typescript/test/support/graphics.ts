@@ -20,7 +20,6 @@ import {
   type RenderSessionAttachOptions,
   type RenderSessionHandle,
   supportedRenderBackendMask,
-  WebGlContextKind,
 } from "../../src/index.ts";
 import {
   bounded,
@@ -183,17 +182,15 @@ function attachBorrowedTexture(
     physicalHeight: texture.height,
   };
   if (backend === "webgpu") {
+    // TODO(part 2 of the move off Emscripten): the browser fixtures still
+    // describe Emscripten's WebGPU handles, where the descriptor now takes
+    // `mln_web_object` handles and a `GPUTextureFormat` name.
     return map.attachWebGpuBorrowedTexture(
       {
         ...ring,
-        context: { device: context.webGpuDevice },
-        textures: [
-          {
-            texture: texture.webGpuTexture,
-            textureView: texture.webGpuTextureView,
-          },
-        ],
-        format: texture.format,
+        context: { device: Number(context.webGpuDevice) },
+        textures: [{ texture: Number(texture.webGpuTexture) }],
+        format: "rgba8unorm",
       },
       options,
     );
@@ -233,10 +230,7 @@ function attachBorrowedTexture(
     backend === "webgl"
       ? {
           kind: "webGl",
-          value: {
-            kind: WebGlContextKind.existing,
-            context: context.webGlContext,
-          },
+          value: { context: context.webGlContext },
         }
       : backend === "wgl"
         ? {

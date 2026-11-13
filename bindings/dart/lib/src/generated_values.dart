@@ -1514,28 +1514,6 @@ final class VulkanImageOwner extends _Enum {
   };
 }
 
-/// How a render session gets its WebGL context.
-///
-/// See `mln_web_gl_context_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class WebGlContextKind extends _Enum {
-  const WebGlContextKind.fromRawValue(super.rawValue);
-
-  /// The session uses a context that you created with
-  /// `emscripten_webgl_create_context()`.
-  static const existing = WebGlContextKind.fromRawValue(0);
-
-  /// The library transfers the canvas that `canvas_selector` names to a worker
-  /// and creates the context there.
-  static const transferredCanvas = WebGlContextKind.fromRawValue(1);
-  @override
-  String toString() => switch (rawValue) {
-    0 => 'WebGlContextKind.existing',
-    1 => 'WebGlContextKind.transferredCanvas',
-    _ => 'WebGlContextKind($rawValue)',
-  };
-}
-
 /// The Android hardware buffer of an acquired frame.
 ///
 /// See `mln_android_hardware_buffer_frame` in the
@@ -4000,43 +3978,24 @@ final class EglContextDescriptor extends _Value {
   ]);
 }
 
-/// The WebGL context or canvas that a render session uses.
+/// The WebGL2 context that an OpenGL device wraps.
 ///
 /// See `mln_web_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class WebGlContextDescriptor extends _Value {
-  const WebGlContextDescriptor({
-    this.kind = const WebGlContextKind.fromRawValue(0),
-    this.context = 0,
-    this.canvasSelector = '',
-  });
-  final WebGlContextKind kind;
+  const WebGlContextDescriptor({required this.context});
 
-  /// Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
+  /// Your `WebGL2RenderingContext`.
   final int context;
 
-  /// The canvas's CSS selector, for a transferred canvas.
-  final String canvasSelector;
-
   /// A copy of this value with the given members replaced.
-  WebGlContextDescriptor copyWith({
-    WebGlContextKind? kind,
-    int? context,
-    String? canvasSelector,
-  }) => WebGlContextDescriptor(
-    kind: kind ?? this.kind,
-    context: context ?? this.context,
-    canvasSelector: canvasSelector ?? this.canvasSelector,
-  );
+  WebGlContextDescriptor copyWith({int? context}) =>
+      WebGlContextDescriptor(context: context ?? this.context);
 
   @override
-  List<Object?> get _members => [kind, context, canvasSelector];
+  List<Object?> get _members => [context];
   @override
-  String toString() => _describe('WebGlContextDescriptor', const [
-    'kind',
-    'context',
-    'canvasSelector',
-  ]);
+  String toString() => _describe('WebGlContextDescriptor', const ['context']);
 }
 
 /// How a render session gets the OpenGL context that it renders with.

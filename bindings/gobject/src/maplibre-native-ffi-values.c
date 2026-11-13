@@ -12514,224 +12514,49 @@ void maplibre_native_ffi_wgl_context_descriptor_to_native(
   out->get_proc_address = (void*)(self->get_proc_address);
 }
 
-struct _MaplibreNativeFfiWebGlContextDescriptor {
-  GObject parent_instance;
-  MaplibreNativeFfiWebGlContextKind kind;
-  gint32 context;
-  char* canvas_selector;
-};
-
-enum {
-  WEB_GL_CONTEXT_DESCRIPTOR_PROP_0,
-  WEB_GL_CONTEXT_DESCRIPTOR_PROP_KIND,
-  WEB_GL_CONTEXT_DESCRIPTOR_PROP_CONTEXT,
-  WEB_GL_CONTEXT_DESCRIPTOR_PROP_CANVAS_SELECTOR,
-  WEB_GL_CONTEXT_DESCRIPTOR_N_PROPERTIES
-};
-
-static GParamSpec*
-  web_gl_context_descriptor_properties[WEB_GL_CONTEXT_DESCRIPTOR_N_PROPERTIES];
-
-G_DEFINE_FINAL_TYPE(
+G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiWebGlContextDescriptor,
-  maplibre_native_ffi_web_gl_context_descriptor, G_TYPE_OBJECT
+  maplibre_native_ffi_web_gl_context_descriptor,
+  maplibre_native_ffi_web_gl_context_descriptor_copy,
+  maplibre_native_ffi_web_gl_context_descriptor_free
 )
-
-static void maplibre_native_ffi_web_gl_context_descriptor_finalize(
-  GObject* object
-) {
-  MaplibreNativeFfiWebGlContextDescriptor* self =
-    MAPLIBRE_NATIVE_FFI_WEB_GL_CONTEXT_DESCRIPTOR(object);
-  g_free(self->canvas_selector);
-  G_OBJECT_CLASS(maplibre_native_ffi_web_gl_context_descriptor_parent_class)
-    ->finalize(object);
-}
-
-static void maplibre_native_ffi_web_gl_context_descriptor_get_property(
-  GObject* object, guint id, GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiWebGlContextDescriptor* self =
-    MAPLIBRE_NATIVE_FFI_WEB_GL_CONTEXT_DESCRIPTOR(object);
-  switch (id) {
-    case WEB_GL_CONTEXT_DESCRIPTOR_PROP_KIND:
-      g_value_set_enum(value, self->kind);
-      break;
-    case WEB_GL_CONTEXT_DESCRIPTOR_PROP_CONTEXT:
-      g_value_set_int(value, self->context);
-      break;
-    case WEB_GL_CONTEXT_DESCRIPTOR_PROP_CANVAS_SELECTOR:
-      g_value_set_string(value, self->canvas_selector);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_web_gl_context_descriptor_set_property(
-  GObject* object, guint id, const GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiWebGlContextDescriptor* self =
-    MAPLIBRE_NATIVE_FFI_WEB_GL_CONTEXT_DESCRIPTOR(object);
-  switch (id) {
-    case WEB_GL_CONTEXT_DESCRIPTOR_PROP_KIND:
-      maplibre_native_ffi_web_gl_context_descriptor_set_kind(
-        self, g_value_get_enum(value)
-      );
-      break;
-    case WEB_GL_CONTEXT_DESCRIPTOR_PROP_CONTEXT:
-      maplibre_native_ffi_web_gl_context_descriptor_set_context(
-        self, g_value_get_int(value)
-      );
-      break;
-    case WEB_GL_CONTEXT_DESCRIPTOR_PROP_CANVAS_SELECTOR:
-      maplibre_native_ffi_web_gl_context_descriptor_set_canvas_selector(
-        self, g_value_get_string(value)
-      );
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_web_gl_context_descriptor_class_init(
-  MaplibreNativeFfiWebGlContextDescriptorClass* klass
-) {
-  GObjectClass* object_class = G_OBJECT_CLASS(klass);
-  object_class->finalize =
-    maplibre_native_ffi_web_gl_context_descriptor_finalize;
-  object_class->get_property =
-    maplibre_native_ffi_web_gl_context_descriptor_get_property;
-  object_class->set_property =
-    maplibre_native_ffi_web_gl_context_descriptor_set_property;
-  web_gl_context_descriptor_properties[WEB_GL_CONTEXT_DESCRIPTOR_PROP_KIND] =
-    g_param_spec_enum(
-      "kind", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_WEB_GL_CONTEXT_KIND, 0,
-      PROPERTY_FLAGS
-    );
-  web_gl_context_descriptor_properties[WEB_GL_CONTEXT_DESCRIPTOR_PROP_CONTEXT] =
-    g_param_spec_int(
-      "context", NULL, NULL, G_MININT32, G_MAXINT32, 0, PROPERTY_FLAGS
-    );
-  web_gl_context_descriptor_properties
-    [WEB_GL_CONTEXT_DESCRIPTOR_PROP_CANVAS_SELECTOR] =
-      g_param_spec_string("canvas-selector", NULL, NULL, "", PROPERTY_FLAGS);
-  g_object_class_install_properties(
-    object_class, WEB_GL_CONTEXT_DESCRIPTOR_N_PROPERTIES,
-    web_gl_context_descriptor_properties
-  );
-}
-
-static void maplibre_native_ffi_web_gl_context_descriptor_init(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-) {
-  self->canvas_selector = g_strdup("");
-}
-
-MaplibreNativeFfiWebGlContextDescriptor*
-maplibre_native_ffi_web_gl_context_descriptor_new(void) {
-  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_WEB_GL_CONTEXT_DESCRIPTOR, NULL);
-}
-
-MaplibreNativeFfiWebGlContextKind
-maplibre_native_ffi_web_gl_context_descriptor_get_kind(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-) {
-  g_return_val_if_fail(
-    MAPLIBRE_NATIVE_FFI_IS_WEB_GL_CONTEXT_DESCRIPTOR(self),
-    (MaplibreNativeFfiWebGlContextKind)0
-  );
-  return self->kind;
-}
-
-void maplibre_native_ffi_web_gl_context_descriptor_set_kind(
-  MaplibreNativeFfiWebGlContextDescriptor* self,
-  MaplibreNativeFfiWebGlContextKind value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_WEB_GL_CONTEXT_DESCRIPTOR(self));
-  gboolean changed = self->kind != value;
-  self->kind = value;
-  if (changed)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      web_gl_context_descriptor_properties[WEB_GL_CONTEXT_DESCRIPTOR_PROP_KIND]
-    );
-}
-
-gint32 maplibre_native_ffi_web_gl_context_descriptor_get_context(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-) {
-  g_return_val_if_fail(
-    MAPLIBRE_NATIVE_FFI_IS_WEB_GL_CONTEXT_DESCRIPTOR(self), 0
-  );
-  return self->context;
-}
-
-void maplibre_native_ffi_web_gl_context_descriptor_set_context(
-  MaplibreNativeFfiWebGlContextDescriptor* self, gint32 value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_WEB_GL_CONTEXT_DESCRIPTOR(self));
-  gboolean changed = self->context != value;
-  self->context = value;
-  if (changed)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), web_gl_context_descriptor_properties
-                        [WEB_GL_CONTEXT_DESCRIPTOR_PROP_CONTEXT]
-    );
-}
-
-const char* maplibre_native_ffi_web_gl_context_descriptor_get_canvas_selector(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-) {
-  g_return_val_if_fail(
-    MAPLIBRE_NATIVE_FFI_IS_WEB_GL_CONTEXT_DESCRIPTOR(self), NULL
-  );
-  return self->canvas_selector;
-}
-
-void maplibre_native_ffi_web_gl_context_descriptor_set_canvas_selector(
-  MaplibreNativeFfiWebGlContextDescriptor* self, const char* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_WEB_GL_CONTEXT_DESCRIPTOR(self));
-  char* previous = self->canvas_selector;
-  self->canvas_selector = g_strdup(value != NULL ? value : "");
-  gboolean changed = g_strcmp0(previous, self->canvas_selector) != 0;
-  g_free(previous);
-  if (changed)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), web_gl_context_descriptor_properties
-                        [WEB_GL_CONTEXT_DESCRIPTOR_PROP_CANVAS_SELECTOR]
-    );
-}
 
 MaplibreNativeFfiWebGlContextDescriptor*
 maplibre_native_ffi_web_gl_context_descriptor_copy(
   const MaplibreNativeFfiWebGlContextDescriptor* self
 ) {
-  MaplibreNativeFfiWebGlContextDescriptor* copy =
-    maplibre_native_ffi_web_gl_context_descriptor_new();
-  copy->kind = self->kind;
-  copy->context = self->context;
-  g_free(copy->canvas_selector);
-  copy->canvas_selector = g_strdup(self->canvas_selector);
-  return copy;
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
 }
+
+void maplibre_native_ffi_web_gl_context_descriptor_free(
+  MaplibreNativeFfiWebGlContextDescriptor* self
+) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiWebGlContextDescriptor) ==
+  sizeof(mln_web_gl_context_descriptor)
+);
+SAME_MEMBER(
+  MaplibreNativeFfiWebGlContextDescriptor, mln_web_gl_context_descriptor,
+  context
+);
 
 void maplibre_native_ffi_web_gl_context_descriptor_to_native(
   const MaplibreNativeFfiWebGlContextDescriptor* self,
   mln_web_gl_context_descriptor* out, MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memset(out, 0, sizeof *out);
-  out->kind = (mln_web_gl_context_kind)(self->kind);
-  out->context = (int32_t)(self->context);
-  out->canvas_selector = maplibre_native_ffi_text_view(self->canvas_selector);
+  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiOpenGlContextDescriptorData {
   gint64 tag;
   MaplibreNativeFfiWglContextDescriptor* wgl;
   MaplibreNativeFfiEglContextDescriptor* egl;
-  MaplibreNativeFfiWebGlContextDescriptor* web_gl;
+  MaplibreNativeFfiWebGlContextDescriptor web_gl;
 };
 
 G_DEFINE_BOXED_TYPE(
@@ -12754,10 +12579,6 @@ maplibre_native_ffi_open_gl_context_descriptor_data_copy(
   copy->egl = self->egl != NULL
                 ? maplibre_native_ffi_egl_context_descriptor_copy(self->egl)
                 : NULL;
-  copy->web_gl =
-    self->web_gl != NULL
-      ? maplibre_native_ffi_web_gl_context_descriptor_copy(self->web_gl)
-      : NULL;
   return copy;
 }
 
@@ -12767,7 +12588,6 @@ void maplibre_native_ffi_open_gl_context_descriptor_data_free(
   if (self == NULL) return;
   g_clear_object(&self->wgl);
   g_clear_object(&self->egl);
-  g_clear_object(&self->web_gl);
   g_free(self);
 }
 
@@ -12839,18 +12659,13 @@ maplibre_native_ffi_open_gl_context_descriptor_data_get_egl(
 
 MaplibreNativeFfiOpenGlContextDescriptorData*
 maplibre_native_ffi_open_gl_context_descriptor_data_new_web_gl(
-  MaplibreNativeFfiWebGlContextDescriptor* value
+  const MaplibreNativeFfiWebGlContextDescriptor* value
 ) {
-  g_return_val_if_fail(
-    MAPLIBRE_NATIVE_FFI_IS_WEB_GL_CONTEXT_DESCRIPTOR(value), NULL
-  );
+  g_return_val_if_fail(value != NULL, NULL);
   MaplibreNativeFfiOpenGlContextDescriptorData* self =
     g_new0(MaplibreNativeFfiOpenGlContextDescriptorData, 1);
   self->tag = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
-  self->web_gl = maplibre_native_ffi_web_gl_context_descriptor_new();
-  MaplibreNativeFfiWebGlContextDescriptor* previous = self->web_gl;
-  self->web_gl = maplibre_native_ffi_web_gl_context_descriptor_copy(value);
-  if (previous != NULL) g_object_unref(previous);
+  self->web_gl = *value;
   return self;
 }
 
@@ -12867,7 +12682,7 @@ maplibre_native_ffi_open_gl_context_descriptor_data_get_web_gl(
 ) {
   g_return_val_if_fail(self != NULL, NULL);
   g_return_val_if_fail(self->tag == MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL, NULL);
-  return self->web_gl;
+  return (MaplibreNativeFfiWebGlContextDescriptor*)&self->web_gl;
 }
 
 void maplibre_native_ffi_open_gl_context_descriptor_data_to_native(
@@ -12892,10 +12707,9 @@ void maplibre_native_ffi_open_gl_context_descriptor_data_to_native(
         );
       break;
     case MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL:
-      if (self->web_gl != NULL)
-        maplibre_native_ffi_web_gl_context_descriptor_to_native(
-          self->web_gl, &data->web_gl, call
-        );
+      maplibre_native_ffi_web_gl_context_descriptor_to_native(
+        &self->web_gl, &data->web_gl, call
+      );
       break;
     default:
       break;

@@ -122,7 +122,6 @@ import {
   query,
   run,
   submitRun,
-  threadStart,
 } from "./internal/completions.ts";
 import { type NativeRegistration } from "./internal/native_registrations.ts";
 import {
@@ -397,6 +396,43 @@ export function setNetworkStatus(status: NetworkStatus): void {
  */
 export function supportedRenderBackendMask(): RenderBackendFlag {
   return native.mln_supported_render_backend_mask();
+}
+
+/**
+ * Allocates `size` bytes of the instance's memory, aligned to `align`, a power
+ * of two, for the descriptors and buffers that you pass the library.
+ *
+ * Returns null when `size` is 0, `align` isn't a power of two, or the memory
+ * can't grow. The memory's `buffer` detaches when it grows, so make new views
+ * of it after each call.
+ *
+ * See `mln_web_alloc` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/web_8h.html).
+ */
+export function webAlloc(size: bigint, align: bigint): bigint {
+  return native.mln_web_alloc(size, align);
+}
+
+/**
+ * Frees what `webAlloc()` allocated, with the same `size` and `align`. Freeing
+ * null does nothing.
+ *
+ * See `mln_web_free` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/web_8h.html).
+ */
+export function webFree(pointer: bigint, size: bigint, align: bigint): void {
+  native.mln_web_free(pointer, size, align);
+}
+
+/**
+ * Releases a handle that you made. Releasing 0, or a handle that names no
+ * object, does nothing.
+ *
+ * See `mln_web_object_release` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/web_8h.html).
+ */
+export function webObjectRelease(object: number): void {
+  native.mln_web_object_release(object);
 }
 
 /**
@@ -6059,11 +6095,15 @@ export class RuntimeHandle extends Owner {
    * Creates a runtime.
    *
    * A runtime holds maps and the resource loading, cache, and offline regions
-   * that they share. In a browser, create runtimes on a Web Worker, not on the
-   * main thread.
+   * that they share.
    *
-   * Resolves once the call completes, so a browser page, which cannot block,
-   * can call it.
+   * In a browser, the library runs on the thread that loaded its module and
+   * never blocks it: commands, render sessions, completions, wakes and
+   * callbacks all run on that thread, in tasks of the library's own after the
+   * call that started them returns. Wait for a completion with a callback, or
+   * yield to the event loop; a blocking wait can't end. Load the module on a
+   * dedicated Web Worker, so that the map's work doesn't delay the page. On the
+   * page's thread it works too, but every frame and style parse runs there.
    *
    * See `mln_runtime_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -6072,16 +6112,15 @@ export class RuntimeHandle extends Owner {
    *
    * - `Status.invalidArgument` when the cache database file that `options`
    *   names can't be opened or created.
+   * - `Status.unsupported` in a browser for a cache path: the browser caches
+   *   the runtime's requests.
    */
-  static create(options?: RuntimeOptions): Promise<RuntimeHandle> {
-    return threadStart(
-      (start) => native.mln_runtime_create(options, start),
-      (handle) =>
-        adopt(
-          handle,
-          () => new RuntimeHandle(ADOPT, handle),
-          (disposed) => native.mln_runtime_dispose(disposed, undefined),
-        ),
+  static create(options?: RuntimeOptions): RuntimeHandle {
+    const handle = native.mln_runtime_create(options);
+    return adopt(
+      handle,
+      () => new RuntimeHandle(ADOPT, handle),
+      (disposed) => native.mln_runtime_dispose(disposed, undefined),
     );
   }
 
@@ -7223,16 +7262,12 @@ export class ScopedWebGpuTextureFrame {
     return this.#scope.active(this.#value).texture;
   }
 
-  get textureView(): WebGpuTextureFrame["textureView"] {
-    return this.#scope.active(this.#value).textureView;
-  }
-
   get device(): WebGpuTextureFrame["device"] {
     return this.#scope.active(this.#value).device;
   }
 
   get format(): WebGpuTextureFrame["format"] {
-    return this.#value.format;
+    return this.#scope.active(this.#value).format;
   }
 }
 

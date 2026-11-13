@@ -3761,12 +3761,9 @@ fn generated_input_mln_web_gl_context_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_web_gl_context_descriptor> {
+    let _ = storage;
     let mut raw: sys::mln_web_gl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.kind = value
-        .getattr("kind")?
-        .extract::<sys::mln_web_gl_context_kind>()?;
-    raw.context = value.getattr("context")?.extract::<i32>()?;
-    raw.canvas_selector = storage.buffer(value.getattr("canvas_selector")?, true)?;
+    raw.context = value.getattr("context")?.extract::<u32>()?;
     Ok(raw)
 }
 

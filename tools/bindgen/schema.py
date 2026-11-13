@@ -104,7 +104,6 @@ ANNOTATION_VALUES = {
     "lifetime": frozenset({"call", "owner", "process"}),
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
-    "blocks": frozenset({"thread_start"}),
     "consumes": frozenset({"always"}),
     "required": frozenset({"true"}),
     "native_object": frozenset({"true"}),
@@ -122,7 +121,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "length",
         "accepted_unless",
         "view_owner",
-        "blocks",
         "consumes",
         "platforms",
         "after_release",
@@ -851,12 +849,6 @@ def validate(api: Api) -> None:
                     f"{context}: after_release requires an immediate function "
                     "that returns a status and takes a released handle first"
                 )
-        if "blocks" in metadata and (
-            execution not in {None, "immediate"} or not returns_status
-        ):
-            errors.append(
-                f"{context}: blocks requires an immediate function that returns a status"
-            )
         if any(
             parameter.metadata.get("direction") == "out"
             and "nullable" in parameter.metadata
