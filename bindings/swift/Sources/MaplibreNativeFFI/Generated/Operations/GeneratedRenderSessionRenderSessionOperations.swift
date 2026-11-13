@@ -24,11 +24,15 @@ public extension RenderSessionHandle {
   ///
   /// See `mln_render_session_abandon` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-func `abandon`() throws -> RenderAbandonResult {
-  var value0: mln_render_abandon_result = mln_render_abandon_result()
-  value0.`size` = UInt32(MemoryLayout<mln_render_abandon_result>.size)
-  return try nativeInvoke() { raw, arena, diagnostic in mln_render_session_abandon(raw, &value0, diagnostic) } result: { RenderAbandonResult(raw: value0) }
-}
+  func abandon() throws -> RenderAbandonResult {
+    var value0 = mln_render_abandon_result()
+    value0.size = UInt32(MemoryLayout<mln_render_abandon_result>.size)
+    return try nativeInvoke { raw, _, diagnostic in mln_render_session_abandon(
+      raw,
+      &value0,
+      diagnostic
+    ) } result: { RenderAbandonResult(raw: value0) }
+  }
 
   /// Takes the newest rendered frame from the session's texture ring, if one is
   /// ready.
@@ -50,13 +54,19 @@ func `abandon`() throws -> RenderAbandonResult {
   ///   failed.
   /// - `Status.invalidState` when you detached, abandoned, released, or
   ///   disposed the session.
-func `acquireFrame`() throws -> AcquiredFrameHandle? {
-  var value0: mln_acquired_frame = 0
-  return try nativeInvoke() { raw, arena, diagnostic in mln_render_session_acquire_frame(raw, &value0, diagnostic) } result: {
-    guard value0 != 0 else { return nil }
-    return try AcquiredFrameHandle(adopting: value0, parent: self)
+  func acquireFrame() throws -> AcquiredFrameHandle? {
+    var value0: mln_acquired_frame = 0
+    return try nativeInvoke { raw, _, diagnostic in
+      mln_render_session_acquire_frame(
+        raw,
+        &value0,
+        diagnostic
+      )
+    } result: {
+      guard value0 != 0 else { return nil }
+      return try AcquiredFrameHandle(adopting: value0, parent: self)
+    }
   }
-}
 
   /// Ends the session's pending frame demands and waits for its earlier work.
   ///
@@ -70,9 +80,15 @@ func `acquireFrame`() throws -> AcquiredFrameHandle? {
   ///
   /// - `Status.targetLost` when the session loses its target before the barrier
   ///   runs.
-func `barrier`() async throws {
-  try await nativeUnit() { raw, arena, completion, diagnostic in mln_render_session_barrier(raw, completion, diagnostic) }
-}
+  func barrier() async throws {
+    try await nativeUnit { raw, _, completion, diagnostic in
+      mln_render_session_barrier(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
 
   /// Clears the data that the session's renderer holds, such as loaded tiles,
   /// and draws the map again.
@@ -84,9 +100,15 @@ func `barrier`() async throws {
   ///
   /// - `Status.targetLost` when the session loses its target before the work
   ///   runs.
-func `clearData`() async throws {
-  try await nativeUnit() { raw, arena, completion, diagnostic in mln_render_session_clear_data(raw, completion, diagnostic) }
-}
+  func clearData() async throws {
+    try await nativeUnit { raw, _, completion, diagnostic in
+      mln_render_session_clear_data(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
 
   /// Asks the session to render a frame.
   ///
@@ -112,9 +134,15 @@ func `clearData`() async throws {
   /// - `Status.invalidState` when you detached, abandoned, released, or
   ///   disposed the session, or discarded a frame from every texture of its
   ///   ring.
-func `demandFrame`(_ bindingArg0: FrameDemand) throws {
-  try nativeInvoke() { raw, arena, diagnostic in mln_render_session_demand_frame(raw, arena.store(bindingArg0.nativeValue()), diagnostic) }
-}
+  func demandFrame(_ bindingArg0: FrameDemand) throws {
+    try nativeInvoke { raw, arena, diagnostic in
+      mln_render_session_demand_frame(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        diagnostic
+      )
+    }
+  }
 
   /// Detaches the session from its map and frees its graphics objects.
   ///
@@ -130,9 +158,15 @@ func `demandFrame`(_ bindingArg0: FrameDemand) throws {
   ///
   /// - `Status.targetLost` when the session loses its target before the detach
   ///   runs.
-func `detach`() async throws {
-  try await nativeUnit() { raw, arena, completion, diagnostic in mln_render_session_detach(raw, completion, diagnostic) }
-}
+  func detach() async throws {
+    try await nativeUnit { raw, _, completion, diagnostic in
+      mln_render_session_detach(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
 
   /// Releases the session in any state, and finishes in the background.
   ///
@@ -145,9 +179,12 @@ func `detach`() async throws {
   ///
   /// See `mln_render_session_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-func dispose() throws {
-  try nativeClose { raw, diagnostic in mln_render_session_dispose(raw, diagnostic) }
-}
+  func dispose() throws {
+    try nativeClose { raw, diagnostic in mln_render_session_dispose(
+      raw,
+      diagnostic
+    ) }
+  }
 
   /// Takes the frame results that the session has queued.
   ///
@@ -156,16 +193,27 @@ func dispose() throws {
   ///
   /// See `mln_render_session_drain_frame_results` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-func `drainFrameResults`() throws -> [RenderFrameResult] {
-  var value0: mln_render_frame_batch = 0
-  var value1 = mln_render_frame_batch_view()
-  value1.`size` = UInt32(MemoryLayout<mln_render_frame_batch_view>.size)
-  return try nativeInvoke() { raw, arena, diagnostic in mln_render_session_drain_frame_results(raw, &value0, &value1, diagnostic) } result: {
-    guard value0 != 0 else { return [] }
-    defer { mln_render_frame_batch_release(value0) }
-    return try NativeInputArena.copyStrided(value1.`results`, count: value1.`result_count`, stride: value1.`result_size`) { item, _ in RenderFrameResult(raw: item) }
+  func drainFrameResults() throws -> [RenderFrameResult] {
+    var value0: mln_render_frame_batch = 0
+    var value1 = mln_render_frame_batch_view()
+    value1.size = UInt32(MemoryLayout<mln_render_frame_batch_view>.size)
+    return try nativeInvoke { raw, _, diagnostic in
+      mln_render_session_drain_frame_results(
+        raw,
+        &value0,
+        &value1,
+        diagnostic
+      )
+    } result: {
+      guard value0 != 0 else { return [] }
+      defer { mln_render_frame_batch_release(value0) }
+      return try NativeInputArena.copyStrided(
+        value1.results,
+        count: value1.result_count,
+        stride: value1.result_size
+      ) { item, _ in RenderFrameResult(raw: item) }
+    }
   }
-}
 
   /// Logs debugging information about the session's renderer.
   ///
@@ -176,19 +224,31 @@ func `drainFrameResults`() throws -> [RenderFrameResult] {
   ///
   /// - `Status.targetLost` when the session loses its target before the work
   ///   runs.
-func `dumpDebugLogs`() async throws {
-  try await nativeUnit() { raw, arena, completion, diagnostic in mln_render_session_dump_debug_logs(raw, completion, diagnostic) }
-}
+  func dumpDebugLogs() async throws {
+    try await nativeUnit { raw, _, completion, diagnostic in
+      mln_render_session_dump_debug_logs(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
 
   /// Reads what the session supports.
   ///
   /// See `mln_render_session_get_capabilities` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-func `getCapabilities`() throws -> RenderSessionCapabilities {
-  var value0: mln_render_session_capabilities = mln_render_session_capabilities()
-  value0.`size` = UInt32(MemoryLayout<mln_render_session_capabilities>.size)
-  return try nativeInvoke() { raw, arena, diagnostic in mln_render_session_get_capabilities(raw, &value0, diagnostic) } result: { RenderSessionCapabilities(raw: value0) }
-}
+  func getCapabilities() throws -> RenderSessionCapabilities {
+    var value0 = mln_render_session_capabilities()
+    value0.size = UInt32(MemoryLayout<mln_render_session_capabilities>.size)
+    return try nativeInvoke { raw, _, diagnostic in
+      mln_render_session_get_capabilities(
+        raw,
+        &value0,
+        diagnostic
+      )
+    } result: { RenderSessionCapabilities(raw: value0) }
+  }
 
   /// Reads the message of the error that made the session fail.
   ///
@@ -198,20 +258,37 @@ func `getCapabilities`() throws -> RenderSessionCapabilities {
   ///
   /// See `mln_render_session_get_failure` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-func `getFailure`() throws -> String {
-  var bindingText = ""
-  return try nativeInvoke() { raw, arena, diagnostic in return try NativeString.callerSized(&bindingText) { bindingTextStorage, bindingTextCapacity, bindingTextLength in mln_render_session_get_failure(raw, bindingTextStorage, bindingTextCapacity, bindingTextLength, diagnostic) } } result: { bindingText }
-}
+  func getFailure() throws -> String {
+    var bindingText = ""
+    return try nativeInvoke { raw, _, diagnostic in
+      try NativeString
+        .callerSized(&bindingText) { bindingTextStorage, bindingTextCapacity, bindingTextLength in
+          mln_render_session_get_failure(
+            raw,
+            bindingTextStorage,
+            bindingTextCapacity,
+            bindingTextLength,
+            diagnostic
+          )
+        }
+    } result: { bindingText }
+  }
 
   /// Reads the session's current state.
   ///
   /// See `mln_render_session_get_snapshot` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-func `getSnapshot`() throws -> RenderSessionSnapshot {
-  var value0: mln_render_session_snapshot = mln_render_session_snapshot()
-  value0.`size` = UInt32(MemoryLayout<mln_render_session_snapshot>.size)
-  return try nativeInvoke() { raw, arena, diagnostic in mln_render_session_get_snapshot(raw, &value0, diagnostic) } result: { RenderSessionSnapshot(raw: value0) }
-}
+  func getSnapshot() throws -> RenderSessionSnapshot {
+    var value0 = mln_render_session_snapshot()
+    value0.size = UInt32(MemoryLayout<mln_render_session_snapshot>.size)
+    return try nativeInvoke { raw, _, diagnostic in
+      mln_render_session_get_snapshot(
+        raw,
+        &value0,
+        diagnostic
+      )
+    } result: { RenderSessionSnapshot(raw: value0) }
+  }
 
   /// Frees memory that the session's renderer can rebuild, such as caches.
   ///
@@ -222,9 +299,15 @@ func `getSnapshot`() throws -> RenderSessionSnapshot {
   ///
   /// - `Status.targetLost` when the session loses its target before the work
   ///   runs.
-func `reduceMemoryUse`() async throws {
-  try await nativeUnit() { raw, arena, completion, diagnostic in mln_render_session_reduce_memory_use(raw, completion, diagnostic) }
-}
+  func reduceMemoryUse() async throws {
+    try await nativeUnit { raw, _, completion, diagnostic in
+      mln_render_session_reduce_memory_use(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
 
   /// Releases the session, detaching it first when it is attached.
   ///
@@ -246,13 +329,20 @@ func `reduceMemoryUse`() async throws {
   ///
   /// - `Status.invalidState` while you hold one of the session's acquired
   ///   frames. Release or discard them first.
-func release() async throws {
-  guard let future = try startRelease() else { return }
-  try await future.value()
-}
-internal func startRelease() throws -> NativeFuture<Void>? {
-  try nativeStartClose { raw, completion, diagnostic in mln_render_session_release(raw, completion, diagnostic) }
-}
+  func release() async throws {
+    guard let future = try startRelease() else { return }
+    try await future.value()
+  }
+
+  internal func startRelease() throws -> NativeFuture<Void>? {
+    try nativeStartClose { raw, completion, diagnostic in
+      mln_render_session_release(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
 
   /// Lets go of the session's surface or textures, and keeps the rest of the
   /// session.
@@ -283,9 +373,15 @@ internal func startRelease() throws -> NativeFuture<Void>? {
   ///   exported ring.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
-func `releaseTarget`() async throws {
-  try await nativeUnit() { raw, arena, completion, diagnostic in mln_render_session_release_target(raw, completion, diagnostic) }
-}
+  func releaseTarget() async throws {
+    try await nativeUnit { raw, _, completion, diagnostic in
+      mln_render_session_release_target(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
 
   /// Resizes the session's target and its map, and sets the map's scale factor.
   ///
@@ -308,10 +404,19 @@ func `releaseTarget`() async throws {
   ///   abandoned, released, or disposed it.
   /// - `Status.targetLost` when the session loses its target before the resize
   ///   applies.
-@discardableResult
-func `resize`(`extent` bindingArg0: LogicalExtent) async throws -> CommandCompletion {
-  try await nativeCommand() { raw, arena, completion, diagnostic in mln_render_session_resize(raw, bindingArg0.nativeValue(), completion, diagnostic) }
-}
+  @discardableResult
+  func resize(extent bindingArg0: LogicalExtent) async throws
+    -> CommandCompletion
+  {
+    try await nativeCommand { raw, _, completion, diagnostic in
+      mln_render_session_resize(
+        raw,
+        bindingArg0.nativeValue(),
+        completion,
+        diagnostic
+      )
+    }
+  }
 
   /// Runs the session's ready graphics work on your graphics thread.
   ///
@@ -326,9 +431,14 @@ func `resize`(`extent` bindingArg0: LogicalExtent) async throws -> CommandComple
   ///
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-func `serviceDriverWork`() throws {
-  try nativeInvoke() { raw, arena, diagnostic in mln_render_session_service_driver_work(raw, diagnostic) }
-}
+  func serviceDriverWork() throws {
+    try nativeInvoke { raw, _, diagnostic in
+      mln_render_session_service_driver_work(
+        raw,
+        diagnostic
+      )
+    }
+  }
 
   /// Sets the frame pacer that demands the session's frames.
   ///
@@ -347,9 +457,15 @@ func `serviceDriverWork`() throws {
   ///   failed.
   /// - `Status.invalidState` when you attached the session with a redraw wake,
   ///   or detached, abandoned, released, or disposed it.
-func `setFramePacer`(_ bindingArg0: FramePacerHandle? = nil) throws {
-  try nativeInvoke() { raw, arena, diagnostic in mln_render_session_set_frame_pacer(raw, bindingArg0.map { arena.use($0.handle) } ?? 0, diagnostic) }
-}
+  func setFramePacer(_ bindingArg0: FramePacerHandle? = nil) throws {
+    try nativeInvoke { raw, arena, diagnostic in
+      mln_render_session_set_frame_pacer(
+        raw,
+        bindingArg0.map { arena.use($0.handle) } ?? 0,
+        diagnostic
+      )
+    }
+  }
 
   /// Replaces the window, surface, or borrowed ring that the session renders
   /// to, and resizes the map to it.
@@ -391,13 +507,25 @@ func `setFramePacer`(_ bindingArg0: FramePacerHandle? = nil) throws {
   ///   ones in their formats, final layouts, or owner, or in having depth
   ///   textures. Attach a new session instead.
   /// - `Status.nativeError` when the library can't render to the new target.
-func `setTarget`(_ bindingArg0: RenderTarget) async throws {
-  try await nativeUnit() { raw, arena, completion, diagnostic in try mln_render_session_set_target(raw, arena.store(try bindingArg0.nativeValue(arena: arena)), completion, diagnostic) }
-}
+  func setTarget(_ bindingArg0: RenderTarget) async throws {
+    try await nativeUnit { raw, arena, completion, diagnostic in
+      try mln_render_session_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        completion,
+        diagnostic
+      )
+    }
+  }
 }
 
 public extension RenderSessionHandleDiscarding {
-func `resize`(`extent` bindingArg0: LogicalExtent) throws {
-  try owner.nativeInvoke() { raw, arena, diagnostic in mln_render_session_resize(raw, bindingArg0.nativeValue(), nil, diagnostic) }
-}
+  func resize(extent bindingArg0: LogicalExtent) throws {
+    try owner.nativeInvoke { raw, _, diagnostic in mln_render_session_resize(
+      raw,
+      bindingArg0.nativeValue(),
+      nil,
+      diagnostic
+    ) }
+  }
 }

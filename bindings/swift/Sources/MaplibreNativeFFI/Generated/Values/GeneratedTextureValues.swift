@@ -8,26 +8,33 @@ import Foundation
 /// See `mln_android_hardware_buffer_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct AndroidHardwareBufferFrame: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
   /// The buffer's index in the ring.
-  public var `slot`: UInt32
+  public var slot: UInt32
   /// The `AHardwareBuffer*`.
-  public var `buffer`: NativePointer
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0, `slot`: UInt32 = 0, `buffer`: NativePointer = .null) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
-    self.`slot` = `slot`
-    self.`buffer` = `buffer`
+  public var buffer: NativePointer
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    buffer: NativePointer = .null
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.buffer = buffer
   }
+
   init(raw: mln_android_hardware_buffer_frame) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
-    self.`slot` = raw.`slot`
-    self.`buffer` = NativePointer(bitPattern: unsafeBitCast(raw.`buffer`, to: UInt.self))
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    buffer = NativePointer(bitPattern: unsafeBitCast(raw.buffer, to: UInt.self))
   }
 }
 
@@ -36,34 +43,49 @@ public struct AndroidHardwareBufferFrame: Equatable, Hashable, Sendable {
 /// See `mln_dma_buf_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct DmaBufFrame: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
   /// The buffer's index in the ring.
-  public var `slot`: UInt32
-  public var `fourcc`: UInt32
-  public var `modifier`: UInt64
+  public var slot: UInt32
+  public var fourcc: UInt32
+  public var modifier: UInt64
   /// The buffer's planes, in the order that its fourcc and modifier define.
   /// Import all of them, as EGL_EXT_image_dma_buf_import_modifiers planes 0 and
   /// up, or with one `zwp_linux_buffer_params_v1.add` call each.
-  public var `planes`: [DmaBufPlane]
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0, `slot`: UInt32 = 0, `fourcc`: UInt32 = 0, `modifier`: UInt64 = 0, `planes`: [DmaBufPlane] = []) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
-    self.`slot` = `slot`
-    self.`fourcc` = `fourcc`
-    self.`modifier` = `modifier`
-    self.`planes` = `planes`
+  public var planes: [DmaBufPlane]
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    fourcc: UInt32 = 0,
+    modifier: UInt64 = 0,
+    planes: [DmaBufPlane] = []
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.fourcc = fourcc
+    self.modifier = modifier
+    self.planes = planes
   }
-  init(raw: mln_dma_buf_frame, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
-    self.`slot` = raw.`slot`
-    self.`fourcc` = raw.`fourcc`
-    self.`modifier` = raw.`modifier`
-    self.`planes` = try NativeInputArena.copyArray(raw.`planes`, count: Int(raw.`plane_count`)).map { DmaBufPlane(raw: $0) }
+
+  init(
+    raw: mln_dma_buf_frame,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    fourcc = raw.fourcc
+    modifier = raw.modifier
+    planes = try NativeInputArena.copyArray(
+      raw.planes,
+      count: Int(raw.plane_count)
+    ).map { DmaBufPlane(raw: $0) }
   }
 }
 
@@ -74,20 +96,21 @@ public struct DmaBufFrame: Equatable, Hashable, Sendable {
 public struct DmaBufPlane: Equatable, Hashable, Sendable {
   /// The file descriptor of the dmabuf that holds the plane. The planes of a
   /// buffer often share one.
-  public var `fd`: Int32
+  public var fd: Int32
   /// The bytes from the start of the dmabuf to the plane's first byte.
-  public var `offset`: UInt32
+  public var offset: UInt32
   /// The bytes from the start of one row to the start of the next.
-  public var `stride`: UInt32
-  public init(`fd`: Int32 = 0, `offset`: UInt32 = 0, `stride`: UInt32 = 0) {
-    self.`fd` = `fd`
-    self.`offset` = `offset`
-    self.`stride` = `stride`
+  public var stride: UInt32
+  public init(fd: Int32 = 0, offset: UInt32 = 0, stride: UInt32 = 0) {
+    self.fd = fd
+    self.offset = offset
+    self.stride = stride
   }
+
   init(raw: mln_dma_buf_plane) {
-    self.`fd` = raw.`fd`
-    self.`offset` = raw.`offset`
-    self.`stride` = raw.`stride`
+    fd = raw.fd
+    offset = raw.offset
+    self.stride = raw.stride
   }
 }
 
@@ -96,30 +119,38 @@ public struct DmaBufPlane: Equatable, Hashable, Sendable {
 /// See `mln_dxgi_shared_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct DxgiSharedTextureFrame: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
   /// The texture's index in the ring.
-  public var `slot`: UInt32
+  public var slot: UInt32
   /// The texture's `DXGI_FORMAT`.
-  public var `format`: UInt32
+  public var format: UInt32
   /// The texture's shared NT `HANDLE`.
-  public var `handle`: NativePointer
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0, `slot`: UInt32 = 0, `format`: UInt32 = 0, `handle`: NativePointer = .null) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
-    self.`slot` = `slot`
-    self.`format` = `format`
-    self.`handle` = `handle`
+  public var handle: NativePointer
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    format: UInt32 = 0,
+    handle: NativePointer = .null
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.format = format
+    self.handle = handle
   }
+
   init(raw: mln_dxgi_shared_texture_frame) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
-    self.`slot` = raw.`slot`
-    self.`format` = raw.`format`
-    self.`handle` = NativePointer(bitPattern: unsafeBitCast(raw.`handle`, to: UInt.self))
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    format = raw.format
+    handle = NativePointer(bitPattern: unsafeBitCast(raw.handle, to: UInt.self))
   }
 }
 
@@ -128,26 +159,36 @@ public struct DxgiSharedTextureFrame: Equatable, Hashable, Sendable {
 /// See `mln_io_surface_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct IoSurfaceFrame: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
   /// The surface's index in the ring.
-  public var `slot`: UInt32
+  public var slot: UInt32
   /// The `IOSurfaceRef`.
-  public var `surface`: NativePointer
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0, `slot`: UInt32 = 0, `surface`: NativePointer = .null) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
-    self.`slot` = `slot`
-    self.`surface` = `surface`
+  public var surface: NativePointer
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    surface: NativePointer = .null
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.surface = surface
   }
+
   init(raw: mln_io_surface_frame) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
-    self.`slot` = raw.`slot`
-    self.`surface` = NativePointer(bitPattern: unsafeBitCast(raw.`surface`, to: UInt.self))
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    surface = NativePointer(bitPattern: unsafeBitCast(
+      raw.surface,
+      to: UInt.self
+    ))
   }
 }
 
@@ -160,42 +201,59 @@ public struct IoSurfaceFrame: Equatable, Hashable, Sendable {
 /// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalTextureFrame: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
   /// The texture's index in the descriptor's `textures`.
-  public var `slot`: UInt32
+  public var slot: UInt32
   /// The MTLTexture.
-  public var `texture`: NativePointer
+  public var texture: NativePointer
   /// The texture's MTLDevice.
-  public var `device`: NativePointer
+  public var device: NativePointer
   /// The texture's MTLPixelFormat.
-  public var `pixelFormat`: UInt64
+  public var pixelFormat: UInt64
   /// The MTLTexture that holds the frame's depth and stencil.
-  public var `depthTexture`: NativePointer
+  public var depthTexture: NativePointer
   /// The depth texture's MTLPixelFormat.
-  public var `depthPixelFormat`: UInt64
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0, `slot`: UInt32 = 0, `texture`: NativePointer = .null, `device`: NativePointer = .null, `pixelFormat`: UInt64 = 0, `depthTexture`: NativePointer = .null, `depthPixelFormat`: UInt64 = 0) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
-    self.`slot` = `slot`
-    self.`texture` = `texture`
-    self.`device` = `device`
-    self.`pixelFormat` = `pixelFormat`
-    self.`depthTexture` = `depthTexture`
-    self.`depthPixelFormat` = `depthPixelFormat`
+  public var depthPixelFormat: UInt64
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    texture: NativePointer = .null,
+    device: NativePointer = .null,
+    pixelFormat: UInt64 = 0,
+    depthTexture: NativePointer = .null,
+    depthPixelFormat: UInt64 = 0
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.texture = texture
+    self.device = device
+    self.pixelFormat = pixelFormat
+    self.depthTexture = depthTexture
+    self.depthPixelFormat = depthPixelFormat
   }
+
   init(raw: mln_metal_texture_frame) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
-    self.`slot` = raw.`slot`
-    self.`texture` = NativePointer(bitPattern: unsafeBitCast(raw.`texture`, to: UInt.self))
-    self.`device` = NativePointer(bitPattern: unsafeBitCast(raw.`device`, to: UInt.self))
-    self.`pixelFormat` = raw.`pixel_format`
-    self.`depthTexture` = NativePointer(bitPattern: unsafeBitCast(raw.`depth_texture`, to: UInt.self))
-    self.`depthPixelFormat` = raw.`depth_pixel_format`
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    texture = NativePointer(bitPattern: unsafeBitCast(
+      raw.texture,
+      to: UInt.self
+    ))
+    device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
+    pixelFormat = raw.pixel_format
+    depthTexture = NativePointer(bitPattern: unsafeBitCast(
+      raw.depth_texture,
+      to: UInt.self
+    ))
+    depthPixelFormat = raw.depth_pixel_format
   }
 }
 
@@ -225,55 +283,69 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
 /// See `mln_opaque_fd_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpaqueFdFrame: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
   /// The texture's index in the ring.
-  public var `slot`: UInt32
+  public var slot: UInt32
   /// The file descriptor of the image's memory.
-  public var `fd`: Int32
+  public var fd: Int32
   /// The size of the memory in bytes.
-  public var `allocationSize`: UInt64
+  public var allocationSize: UInt64
   /// Whether the memory is the image's own, which an import says, such as with
   /// GL_DEDICATED_MEMORY_OBJECT_EXT.
-  public var `dedicated`: Bool
+  public var dedicated: Bool
   /// The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8.
-  public var `format`: UInt32
+  public var format: UInt32
   /// The file descriptor of the depth image's memory.
-  public var `depthFd`: Int32
+  public var depthFd: Int32
   /// The size of the depth image's memory in bytes.
-  public var `depthAllocationSize`: UInt64
+  public var depthAllocationSize: UInt64
   /// Whether the memory is the depth image's own.
-  public var `depthDedicated`: Bool
+  public var depthDedicated: Bool
   /// The depth image's `VkFormat`.
-  public var `depthFormat`: UInt32
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0, `slot`: UInt32 = 0, `fd`: Int32 = 0, `allocationSize`: UInt64 = 0, `dedicated`: Bool = false, `format`: UInt32 = 0, `depthFd`: Int32 = 0, `depthAllocationSize`: UInt64 = 0, `depthDedicated`: Bool = false, `depthFormat`: UInt32 = 0) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
-    self.`slot` = `slot`
-    self.`fd` = `fd`
-    self.`allocationSize` = `allocationSize`
-    self.`dedicated` = `dedicated`
-    self.`format` = `format`
-    self.`depthFd` = `depthFd`
-    self.`depthAllocationSize` = `depthAllocationSize`
-    self.`depthDedicated` = `depthDedicated`
-    self.`depthFormat` = `depthFormat`
+  public var depthFormat: UInt32
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    fd: Int32 = 0,
+    allocationSize: UInt64 = 0,
+    dedicated: Bool = false,
+    format: UInt32 = 0,
+    depthFd: Int32 = 0,
+    depthAllocationSize: UInt64 = 0,
+    depthDedicated: Bool = false,
+    depthFormat: UInt32 = 0
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.fd = fd
+    self.allocationSize = allocationSize
+    self.dedicated = dedicated
+    self.format = format
+    self.depthFd = depthFd
+    self.depthAllocationSize = depthAllocationSize
+    self.depthDedicated = depthDedicated
+    self.depthFormat = depthFormat
   }
+
   init(raw: mln_opaque_fd_frame) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
-    self.`slot` = raw.`slot`
-    self.`fd` = raw.`fd`
-    self.`allocationSize` = raw.`allocation_size`
-    self.`dedicated` = raw.`dedicated`
-    self.`format` = raw.`format`
-    self.`depthFd` = raw.`depth_fd`
-    self.`depthAllocationSize` = raw.`depth_allocation_size`
-    self.`depthDedicated` = raw.`depth_dedicated`
-    self.`depthFormat` = raw.`depth_format`
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    fd = raw.fd
+    allocationSize = raw.allocation_size
+    dedicated = raw.dedicated
+    format = raw.format
+    depthFd = raw.depth_fd
+    depthAllocationSize = raw.depth_allocation_size
+    depthDedicated = raw.depth_dedicated
+    depthFormat = raw.depth_format
   }
 }
 
@@ -285,37 +357,47 @@ public struct OpaqueFdFrame: Equatable, Hashable, Sendable {
 /// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
   /// The texture's index in the descriptor's `textures`.
-  public var `slot`: UInt32
-  public var `texture`: UInt32
-  public var `target`: UInt32
+  public var slot: UInt32
+  public var texture: UInt32
+  public var target: UInt32
   /// The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil.
-  public var `depthTexture`: UInt32
+  public var depthTexture: UInt32
   /// The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero
   /// for a borrowed ring's.
-  public var `depthInternalFormat`: UInt32
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0, `slot`: UInt32 = 0, `texture`: UInt32 = 0, `target`: UInt32 = 0, `depthTexture`: UInt32 = 0, `depthInternalFormat`: UInt32 = 0) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
-    self.`slot` = `slot`
-    self.`texture` = `texture`
-    self.`target` = `target`
-    self.`depthTexture` = `depthTexture`
-    self.`depthInternalFormat` = `depthInternalFormat`
+  public var depthInternalFormat: UInt32
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    texture: UInt32 = 0,
+    target: UInt32 = 0,
+    depthTexture: UInt32 = 0,
+    depthInternalFormat: UInt32 = 0
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.texture = texture
+    self.target = target
+    self.depthTexture = depthTexture
+    self.depthInternalFormat = depthInternalFormat
   }
+
   init(raw: mln_open_gl_texture_frame) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
-    self.`slot` = raw.`slot`
-    self.`texture` = raw.`texture`
-    self.`target` = raw.`target`
-    self.`depthTexture` = raw.`depth_texture`
-    self.`depthInternalFormat` = raw.`depth_internal_format`
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    texture = raw.texture
+    target = raw.target
+    depthTexture = raw.depth_texture
+    depthInternalFormat = raw.depth_internal_format
   }
 }
 
@@ -324,22 +406,28 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
 /// See `mln_texture_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct TextureImageInfo: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
+  public var width: UInt32
+  public var height: UInt32
   /// The bytes from the start of one row to the start of the next.
-  public var `stride`: UInt32
-  public var `byteLength`: Int
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `stride`: UInt32 = 0, `byteLength`: Int = 0) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`stride` = `stride`
-    self.`byteLength` = `byteLength`
+  public var stride: UInt32
+  public var byteLength: Int
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    stride: UInt32 = 0,
+    byteLength: Int = 0
+  ) {
+    self.width = width
+    self.height = height
+    self.stride = stride
+    self.byteLength = byteLength
   }
+
   init(raw: mln_texture_image_info) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`stride` = raw.`stride`
-    self.`byteLength` = raw.`byte_length`
+    width = raw.width
+    height = raw.height
+    self.stride = raw.stride
+    byteLength = raw.byte_length
   }
 }
 
@@ -350,15 +438,19 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
 public struct TextureReadbackResult: Equatable, Hashable, Sendable {
   /// Premultiplied RGBA pixels with 8 bits per channel, in rows from top to
   /// bottom.
-  public var `data`: Data
-  public var `info`: TextureImageInfo
-  public init(`data`: Data = Data(), `info`: TextureImageInfo = .init()) {
-    self.`data` = `data`
-    self.`info` = `info`
+  public var data: Data
+  public var info: TextureImageInfo
+  public init(data: Data = Data(), info: TextureImageInfo = .init()) {
+    self.data = data
+    self.info = info
   }
-  init(raw: mln_texture_readback_result, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`data` = try NativeString.copyData(data: raw.`data`.data, size: raw.`data`.size)
-    self.`info` = TextureImageInfo(raw: raw.`info`)
+
+  init(
+    raw: mln_texture_readback_result,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    data = try NativeString.copyData(data: raw.data.data, size: raw.data.size)
+    info = TextureImageInfo(raw: raw.info)
   }
 }
 
@@ -370,57 +462,72 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
   /// The image's index in the descriptor's `textures`.
-  public var `slot`: UInt32
+  public var slot: UInt32
   /// The VkImage.
-  public var `image`: UInt64
+  public var image: UInt64
   /// The VkImageView.
-  public var `imageView`: UInt64
+  public var imageView: UInt64
   /// The image's VkDevice.
-  public var `device`: NativePointer
+  public var device: NativePointer
   /// The image's VkFormat.
-  public var `format`: UInt32
+  public var format: UInt32
   /// The VkImageLayout that the frame left the image in.
-  public var `layout`: UInt32
+  public var layout: UInt32
   /// The VkImage that holds the frame's depth and stencil.
-  public var `depthImage`: UInt64
+  public var depthImage: UInt64
   /// A VkImageView of the depth image's depth and stencil aspects.
-  public var `depthImageView`: UInt64
+  public var depthImageView: UInt64
   /// The depth image's VkFormat.
-  public var `depthFormat`: UInt32
+  public var depthFormat: UInt32
   /// The VkImageLayout that the frame left the depth image in.
-  public var `depthLayout`: UInt32
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0, `slot`: UInt32 = 0, `image`: UInt64 = 0, `imageView`: UInt64 = 0, `device`: NativePointer = .null, `format`: UInt32 = 0, `layout`: UInt32 = 0, `depthImage`: UInt64 = 0, `depthImageView`: UInt64 = 0, `depthFormat`: UInt32 = 0, `depthLayout`: UInt32 = 0) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
-    self.`slot` = `slot`
-    self.`image` = `image`
-    self.`imageView` = `imageView`
-    self.`device` = `device`
-    self.`format` = `format`
-    self.`layout` = `layout`
-    self.`depthImage` = `depthImage`
-    self.`depthImageView` = `depthImageView`
-    self.`depthFormat` = `depthFormat`
-    self.`depthLayout` = `depthLayout`
+  public var depthLayout: UInt32
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    image: UInt64 = 0,
+    imageView: UInt64 = 0,
+    device: NativePointer = .null,
+    format: UInt32 = 0,
+    layout: UInt32 = 0,
+    depthImage: UInt64 = 0,
+    depthImageView: UInt64 = 0,
+    depthFormat: UInt32 = 0,
+    depthLayout: UInt32 = 0
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.image = image
+    self.imageView = imageView
+    self.device = device
+    self.format = format
+    self.layout = layout
+    self.depthImage = depthImage
+    self.depthImageView = depthImageView
+    self.depthFormat = depthFormat
+    self.depthLayout = depthLayout
   }
+
   init(raw: mln_vulkan_texture_frame) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
-    self.`slot` = raw.`slot`
-    self.`image` = raw.`image`
-    self.`imageView` = raw.`image_view`
-    self.`device` = NativePointer(bitPattern: unsafeBitCast(raw.`device`, to: UInt.self))
-    self.`format` = raw.`format`
-    self.`layout` = raw.`layout`
-    self.`depthImage` = raw.`depth_image`
-    self.`depthImageView` = raw.`depth_image_view`
-    self.`depthFormat` = raw.`depth_format`
-    self.`depthLayout` = raw.`depth_layout`
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    image = raw.image
+    imageView = raw.image_view
+    device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
+    format = raw.format
+    layout = raw.layout
+    depthImage = raw.depth_image
+    depthImageView = raw.depth_image_view
+    depthFormat = raw.depth_format
+    depthLayout = raw.depth_layout
   }
 }

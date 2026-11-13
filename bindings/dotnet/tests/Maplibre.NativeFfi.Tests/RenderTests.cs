@@ -37,9 +37,7 @@ public sealed class RenderTests
     // layer once the layer leaves the style.
     [Theory]
     [MemberData(nameof(Backends))]
-    public void ACustomLayerDrawsInTheSessionsPassUntilItLeavesTheStyle(
-        TestGraphicsBackend backend
-    )
+    public void ACustomLayerDrawsInTheSessionsPassUntilItLeavesTheStyle(TestGraphicsBackend backend)
     {
         RenderFixture.Run(
             backend,
@@ -63,7 +61,8 @@ public sealed class RenderTests
                 Assert.NotEmpty(passes);
                 var expected = backend switch
                 {
-                    TestGraphicsBackend.Metal => typeof(CustomLayerRenderParameters.PassValue.Metal),
+                    TestGraphicsBackend.Metal =>
+                        typeof(CustomLayerRenderParameters.PassValue.Metal),
                     TestGraphicsBackend.Vulkan =>
                         typeof(CustomLayerRenderParameters.PassValue.Vulkan),
                     _ => typeof(CustomLayerRenderParameters.PassValue.OpenGl),

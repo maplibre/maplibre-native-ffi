@@ -8,24 +8,26 @@ import Foundation
 /// See `mln_canonical_tile_id` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CanonicalTileId: Equatable, Hashable, Sendable {
-  public var `z`: UInt32
-  public var `x`: UInt32
-  public var `y`: UInt32
-  public init(`z`: UInt32 = 0, `x`: UInt32 = 0, `y`: UInt32 = 0) {
-    self.`z` = `z`
-    self.`x` = `x`
-    self.`y` = `y`
+  public var z: UInt32
+  public var x: UInt32
+  public var y: UInt32
+  public init(z: UInt32 = 0, x: UInt32 = 0, y: UInt32 = 0) {
+    self.z = z
+    self.x = x
+    self.y = y
   }
+
   init(raw: mln_canonical_tile_id) {
-    self.`z` = raw.`z`
-    self.`x` = raw.`x`
-    self.`y` = raw.`y`
+    z = raw.z
+    x = raw.x
+    y = raw.y
   }
+
   func nativeValue() -> mln_canonical_tile_id {
     var raw = mln_canonical_tile_id()
-    raw.`z` = self.`z`
-    raw.`x` = self.`x`
-    raw.`y` = self.`y`
+    raw.z = z
+    raw.x = x
+    raw.y = y
     return raw
   }
 }
@@ -37,60 +39,126 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
 /// See `mln_custom_geometry_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptions: Sendable {
-  public var `fetchTile`: CustomSourceFetchTileCallback
-  public var `cancelTile`: CustomSourceCancelTileCallback?
-  public var `minZoom`: Double?
-  public var `maxZoom`: Double?
+  public var fetchTile: CustomSourceFetchTileCallback
+  public var cancelTile: CustomSourceCancelTileCallback?
+  public var minZoom: Double?
+  public var maxZoom: Double?
   /// How far, in pixels, simplified geometry can stray from the original.
-  public var `tolerance`: Double?
+  public var tolerance: Double?
   /// The width of a tile in pixels, a power of two no larger than 8192.
-  public var `tileSize`: UInt32?
+  public var tileSize: UInt32?
   /// The width in pixels of the margin around a tile that holds geometry from
   /// beyond its edges. `buffer` times 8192 / `tile_size` must be at most 65535.
-  public var `buffer`: UInt32?
+  public var buffer: UInt32?
   /// Whether to cut geometry at the outer edge of a tile's margin.
-  public var `clip`: Bool?
+  public var clip: Bool?
   /// Whether to wrap geometry that crosses the antimeridian.
-  public var `wrap`: Bool?
-  public init(`fetchTile`: @escaping CustomSourceFetchTileCallback, `cancelTile`: CustomSourceCancelTileCallback? = nil, `minZoom`: Double? = nil, `maxZoom`: Double? = nil, `tolerance`: Double? = nil, `tileSize`: UInt32? = nil, `buffer`: UInt32? = nil, `clip`: Bool? = nil, `wrap`: Bool? = nil) {
-    self.`fetchTile` = `fetchTile`
-    self.`cancelTile` = `cancelTile`
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
-    self.`tolerance` = `tolerance`
-    self.`tileSize` = `tileSize`
-    self.`buffer` = `buffer`
-    self.`clip` = `clip`
-    self.`wrap` = `wrap`
+  public var wrap: Bool?
+  public init(
+    fetchTile: @escaping CustomSourceFetchTileCallback,
+    cancelTile: CustomSourceCancelTileCallback? = nil,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    tolerance: Double? = nil,
+    tileSize: UInt32? = nil,
+    buffer: UInt32? = nil,
+    clip: Bool? = nil,
+    wrap: Bool? = nil
+  ) {
+    self.fetchTile = fetchTile
+    self.cancelTile = cancelTile
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.tolerance = tolerance
+    self.tileSize = tileSize
+    self.buffer = buffer
+    self.clip = clip
+    self.wrap = wrap
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_custom_geometry_source_options {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_custom_geometry_source_options
+  {
     var raw = mln_custom_geometry_source_options()
     raw.size = UInt32(MemoryLayout<mln_custom_geometry_source_options>.size)
-    raw.`fetch_tile` = invokeCustomGeometrySourceOptionsFetchTile
-    raw.`cancel_tile` = `cancelTile` == nil ? nil : invokeCustomGeometrySourceOptionsCancelTile
-    if let item = `minZoom` { raw.`fields` |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM.rawValue; raw.`min_zoom` = item }
-    if let item = `maxZoom` { raw.`fields` |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM.rawValue; raw.`max_zoom` = item }
-    if let item = `tolerance` { raw.`fields` |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE.rawValue; raw.`tolerance` = item }
-    if let item = `tileSize` { raw.`fields` |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE.rawValue; raw.`tile_size` = item }
-    if let item = `buffer` { raw.`fields` |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER.rawValue; raw.`buffer` = item }
-    if let item = `clip` { raw.`fields` |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP.rawValue; raw.`clip` = item }
-    if let item = `wrap` { raw.`fields` |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP.rawValue; raw.`wrap` = item }
+    raw.fetch_tile = invokeCustomGeometrySourceOptionsFetchTile
+    raw
+      .cancel_tile = cancelTile == nil ? nil :
+      invokeCustomGeometrySourceOptionsCancelTile
+    if let item = minZoom {
+      raw.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM.rawValue; raw
+        .min_zoom = item
+    }
+    if let item = maxZoom {
+      raw.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
+        .max_zoom = item
+    }
+    if let item = tolerance {
+      raw.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE.rawValue; raw
+        .tolerance = item
+    }
+    if let item = tileSize {
+      raw.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE.rawValue; raw
+        .tile_size = item
+    }
+    if let item = buffer {
+      raw.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER.rawValue; raw
+        .buffer = item
+    }
+    if let item = clip {
+      raw.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP.rawValue; raw
+        .clip = item
+    }
+    if let item = wrap {
+      raw.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP.rawValue; raw
+        .wrap = item
+    }
     raw.user_data = arena.callback(self)
     raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
-private func invokeCustomGeometrySourceOptionsFetchTile(`user_data`: UnsafeMutableRawPointer?, `map`: mln_map, `source_id`: mln_buffer_view, `tile_id`: mln_canonical_tile_id) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>.fromOpaque(`user_data`).takeUnretainedValue()
-  guard let borrowedMap = try? MapHandle(borrowing: `map`) else { return }
-  do { box.value.`fetchTile`(borrowedMap, try NativeString.copyUTF8(data: `source_id`.data, size: `source_id`.size), CanonicalTileId(raw: `tile_id`)) } catch { reportToStandardError("mln_custom_source_fetch_tile_callback failed: \(error)\n");  }
+
+private func invokeCustomGeometrySourceOptionsFetchTile(
+  user_data: UnsafeMutableRawPointer?,
+  map: mln_map,
+  source_id: mln_buffer_view,
+  tile_id: mln_canonical_tile_id
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  guard let borrowedMap = try? MapHandle(borrowing: map) else { return }
+  do { try box.value.fetchTile(
+    borrowedMap,
+    NativeString.copyUTF8(data: source_id.data, size: source_id.size),
+    CanonicalTileId(raw: tile_id)
+  ) } catch {
+    reportToStandardError(
+      "mln_custom_source_fetch_tile_callback failed: \(error)\n"
+    )
+  }
 }
-private func invokeCustomGeometrySourceOptionsCancelTile(`user_data`: UnsafeMutableRawPointer?, `map`: mln_map, `source_id`: mln_buffer_view, `tile_id`: mln_canonical_tile_id) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>.fromOpaque(`user_data`).takeUnretainedValue()
-  guard let borrowedMap = try? MapHandle(borrowing: `map`) else { return }
-  do { box.value.`cancelTile`?(borrowedMap, try NativeString.copyUTF8(data: `source_id`.data, size: `source_id`.size), CanonicalTileId(raw: `tile_id`)) } catch { reportToStandardError("mln_custom_source_cancel_tile_callback failed: \(error)\n");  }
+
+private func invokeCustomGeometrySourceOptionsCancelTile(
+  user_data: UnsafeMutableRawPointer?,
+  map: mln_map,
+  source_id: mln_buffer_view,
+  tile_id: mln_canonical_tile_id
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  guard let borrowedMap = try? MapHandle(borrowing: map) else { return }
+  do { try box.value.cancelTile?(
+    borrowedMap,
+    NativeString.copyUTF8(data: source_id.data, size: source_id.size),
+    CanonicalTileId(raw: tile_id)
+  ) } catch {
+    reportToStandardError(
+      "mln_custom_source_cancel_tile_callback failed: \(error)\n"
+    )
+  }
 }
 
 /// The GPU commands of a frame outside the map's render pass, by the backend
@@ -102,9 +170,9 @@ private func invokeCustomGeometrySourceOptionsCancelTile(`user_data`: UnsafeMuta
 /// See `mln_custom_layer_encoder_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public enum CustomLayerEncoderData: Equatable, Hashable, Sendable {
-  case `metal`(MetalCustomLayerEncoder)
-  case `vulkan`(VulkanCustomLayerEncoder)
-  case `webGpu`(WebGpuCustomLayerEncoder)
+  case metal(MetalCustomLayerEncoder)
+  case vulkan(VulkanCustomLayerEncoder)
+  case webGpu(WebGpuCustomLayerEncoder)
   case none
   case unknown(UInt32, Data)
 }
@@ -118,24 +186,30 @@ public enum CustomLayerEncoderData: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomLayerFrame: Equatable, Hashable, Sendable {
   /// The camera, extent, and scale factor that the frame shows.
-  public var `view`: MapView
+  public var view: MapView
   /// Where the frame draws the map, and the depth that it writes there.
-  public var `frameProjection`: FrameProjection
+  public var frameProjection: FrameProjection
   /// The width of the frame's attachments, in physical pixels.
-  public var `width`: UInt32
+  public var width: UInt32
   /// The height of the frame's attachments, in physical pixels.
-  public var `height`: UInt32
-  public init(`view`: MapView = .init(), `frameProjection`: FrameProjection = .init(), `width`: UInt32 = 0, `height`: UInt32 = 0) {
-    self.`view` = `view`
-    self.`frameProjection` = `frameProjection`
-    self.`width` = `width`
-    self.`height` = `height`
+  public var height: UInt32
+  public init(
+    view: MapView = .init(),
+    frameProjection: FrameProjection = .init(),
+    width: UInt32 = 0,
+    height: UInt32 = 0
+  ) {
+    self.view = view
+    self.frameProjection = frameProjection
+    self.width = width
+    self.height = height
   }
+
   init(raw: mln_custom_layer_frame) {
-    self.`view` = MapView(raw: raw.`view`)
-    self.`frameProjection` = FrameProjection(raw: raw.`frame_projection`)
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
+    view = MapView(raw: raw.view)
+    frameProjection = FrameProjection(raw: raw.frame_projection)
+    width = raw.width
+    height = raw.height
   }
 }
 
@@ -158,49 +232,94 @@ public struct CustomLayerFrame: Equatable, Hashable, Sendable {
 /// See `mln_custom_layer_host` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomLayerHost: Sendable {
-  public var `prerender`: CustomLayerPrerenderCallback?
-  public var `render`: CustomLayerRenderCallback?
-  public var `deinitialize`: CustomLayerSessionEndCallback?
-  public var `contextLost`: CustomLayerSessionEndCallback?
-  public init(`prerender`: CustomLayerPrerenderCallback? = nil, `render`: CustomLayerRenderCallback? = nil, `deinitialize`: CustomLayerSessionEndCallback? = nil, `contextLost`: CustomLayerSessionEndCallback? = nil) {
-    self.`prerender` = `prerender`
-    self.`render` = `render`
-    self.`deinitialize` = `deinitialize`
-    self.`contextLost` = `contextLost`
+  public var prerender: CustomLayerPrerenderCallback?
+  public var render: CustomLayerRenderCallback?
+  public var deinitialize: CustomLayerSessionEndCallback?
+  public var contextLost: CustomLayerSessionEndCallback?
+  public init(
+    prerender: CustomLayerPrerenderCallback? = nil,
+    render: CustomLayerRenderCallback? = nil,
+    deinitialize: CustomLayerSessionEndCallback? = nil,
+    contextLost: CustomLayerSessionEndCallback? = nil
+  ) {
+    self.prerender = prerender
+    self.render = render
+    self.deinitialize = deinitialize
+    self.contextLost = contextLost
   }
+
   func nativeValue(arena: NativeInputArena) throws -> mln_custom_layer_host {
     var raw = mln_custom_layer_host()
     raw.size = UInt32(MemoryLayout<mln_custom_layer_host>.size)
-    raw.`prerender` = `prerender` == nil ? nil : invokeCustomLayerHostPrerender
-    raw.`render` = `render` == nil ? nil : invokeCustomLayerHostRender
-    raw.`deinitialize` = `deinitialize` == nil ? nil : invokeCustomLayerHostDeinitialize
-    raw.`context_lost` = `contextLost` == nil ? nil : invokeCustomLayerHostContextLost
-    if `prerender` != nil || `render` != nil || `deinitialize` != nil || `contextLost` != nil {
+    raw.prerender = prerender == nil ? nil : invokeCustomLayerHostPrerender
+    raw.render = render == nil ? nil : invokeCustomLayerHostRender
+    raw
+      .deinitialize = deinitialize == nil ? nil :
+      invokeCustomLayerHostDeinitialize
+    raw
+      .context_lost = contextLost == nil ? nil :
+      invokeCustomLayerHostContextLost
+    if prerender != nil || render != nil || deinitialize != nil ||
+      contextLost !=
+      nil
+    {
       raw.user_data = arena.callback(self)
       raw.release_user_data = releaseGeneratedCallback
     }
     return raw
   }
 }
-private func invokeCustomLayerHostPrerender(`user_data`: UnsafeMutableRawPointer?, `parameters`: UnsafePointer<mln_custom_layer_prerender_parameters>?) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>.fromOpaque(`user_data`).takeUnretainedValue()
-  do { box.value.`prerender`?(try NativeInputArena.copyArray(`parameters`, count: 1).map { try CustomLayerPrerenderParameters(raw: $0) }[0]) } catch { reportToStandardError("mln_custom_layer_prerender_callback failed: \(error)\n");  }
+
+private func invokeCustomLayerHostPrerender(
+  user_data: UnsafeMutableRawPointer?,
+  parameters: UnsafePointer<mln_custom_layer_prerender_parameters>?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  do {
+    try box.value
+      .prerender?(NativeInputArena.copyArray(parameters, count: 1)
+        .map { try CustomLayerPrerenderParameters(raw: $0) }[0])
+  } catch {
+    reportToStandardError(
+      "mln_custom_layer_prerender_callback failed: \(error)\n"
+    )
+  }
 }
-private func invokeCustomLayerHostRender(`user_data`: UnsafeMutableRawPointer?, `parameters`: UnsafePointer<mln_custom_layer_render_parameters>?) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>.fromOpaque(`user_data`).takeUnretainedValue()
-  do { box.value.`render`?(try NativeInputArena.copyArray(`parameters`, count: 1).map { try CustomLayerRenderParameters(raw: $0) }[0]) } catch { reportToStandardError("mln_custom_layer_render_callback failed: \(error)\n");  }
+
+private func invokeCustomLayerHostRender(
+  user_data: UnsafeMutableRawPointer?,
+  parameters: UnsafePointer<mln_custom_layer_render_parameters>?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  do {
+    try box.value
+      .render?(NativeInputArena.copyArray(parameters, count: 1)
+        .map { try CustomLayerRenderParameters(raw: $0) }[0])
+  } catch {
+    reportToStandardError("mln_custom_layer_render_callback failed: \(error)\n")
+  }
 }
-private func invokeCustomLayerHostDeinitialize(`user_data`: UnsafeMutableRawPointer?) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>.fromOpaque(`user_data`).takeUnretainedValue()
-  box.value.`deinitialize`?()
+
+private func invokeCustomLayerHostDeinitialize(
+  user_data: UnsafeMutableRawPointer?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  box.value.deinitialize?()
 }
-private func invokeCustomLayerHostContextLost(`user_data`: UnsafeMutableRawPointer?) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>.fromOpaque(`user_data`).takeUnretainedValue()
-  box.value.`contextLost`?()
+
+private func invokeCustomLayerHostContextLost(
+  user_data: UnsafeMutableRawPointer?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  box.value.contextLost?()
 }
 
 /// The map's render pass at a custom layer's place in the style, by the backend
@@ -209,10 +328,10 @@ private func invokeCustomLayerHostContextLost(`user_data`: UnsafeMutableRawPoint
 /// See `mln_custom_layer_pass_data` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public enum CustomLayerPassData: Equatable, Hashable, Sendable {
-  case `metal`(MetalCustomLayerPass)
-  case `vulkan`(VulkanCustomLayerPass)
-  case `openGl`(OpenGlCustomLayerPass)
-  case `webGpu`(WebGpuCustomLayerPass)
+  case metal(MetalCustomLayerPass)
+  case vulkan(VulkanCustomLayerPass)
+  case openGl(OpenGlCustomLayerPass)
+  case webGpu(WebGpuCustomLayerPass)
   case unknown(UInt32, Data)
 }
 
@@ -229,22 +348,54 @@ public enum CustomLayerPassData: Equatable, Hashable, Sendable {
 ///
 /// See `mln_custom_layer_prerender_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public typealias CustomLayerPrerenderCallback = @Sendable (_ `parameters`: CustomLayerPrerenderParameters) -> Void
+public typealias CustomLayerPrerenderCallback =
+  @Sendable (_ parameters: CustomLayerPrerenderParameters) -> Void
 
 /// What a custom layer's prerender callback gets.
 ///
 /// See `mln_custom_layer_prerender_parameters` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomLayerPrerenderParameters: Equatable, Hashable, Sendable {
-  public var `encoder`: CustomLayerEncoderData
-  public var `frame`: CustomLayerFrame
-  public init(`encoder`: CustomLayerEncoderData = .none, `frame`: CustomLayerFrame = .init()) {
-    self.`encoder` = `encoder`
-    self.`frame` = `frame`
+  public var encoder: CustomLayerEncoderData
+  public var frame: CustomLayerFrame
+  public init(
+    encoder: CustomLayerEncoderData = .none,
+    frame: CustomLayerFrame = .init()
+  ) {
+    self.encoder = encoder
+    self.frame = frame
   }
-  init(raw: mln_custom_layer_prerender_parameters, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`encoder` = try { () throws -> CustomLayerEncoderData in switch raw.`backend`.rawValue { case MLN_RENDER_BACKEND_METAL.rawValue: return .`metal`(MetalCustomLayerEncoder(raw: raw.`encoder`.`metal`)) case MLN_RENDER_BACKEND_VULKAN.rawValue: return .`vulkan`(VulkanCustomLayerEncoder(raw: raw.`encoder`.`vulkan`)) case MLN_RENDER_BACKEND_WEB_GPU.rawValue: return .`webGpu`(WebGpuCustomLayerEncoder(raw: raw.`encoder`.`web_gpu`)) case MLN_RENDER_BACKEND_OPEN_GL.rawValue: return .none default: return .unknown(raw.`backend`.rawValue, recordBytes.map { Data($0.dropFirst(MemoryLayout<mln_custom_layer_prerender_parameters>.offset(of: \.encoder)!)) } ?? withUnsafeBytes(of: raw.`encoder`) { Data($0) }) } }()
-    self.`frame` = CustomLayerFrame(raw: raw.`frame`)
+
+  init(
+    raw: mln_custom_layer_prerender_parameters,
+    recordBytes: UnsafeRawBufferPointer? = nil
+  ) throws {
+    encoder = try { () throws -> CustomLayerEncoderData in
+      switch raw.backend
+        .rawValue
+      {
+      case MLN_RENDER_BACKEND_METAL
+        .rawValue: return .metal(MetalCustomLayerEncoder(raw: raw.encoder
+            .metal)) case MLN_RENDER_BACKEND_VULKAN
+                  .rawValue: return .vulkan(VulkanCustomLayerEncoder(raw: raw
+            .encoder
+            .vulkan)) case MLN_RENDER_BACKEND_WEB_GPU
+                  .rawValue: return .webGpu(WebGpuCustomLayerEncoder(raw: raw
+            .encoder
+            .web_gpu)) case MLN_RENDER_BACKEND_OPEN_GL
+                  .rawValue: return .none default: return .unknown(
+          raw.backend.rawValue,
+          recordBytes
+            .map {
+              Data($0
+                .dropFirst(MemoryLayout<mln_custom_layer_prerender_parameters>
+                  .offset(of: \.encoder)!))
+            } ??
+            withUnsafeBytes(of: raw.encoder) { Data($0) }
+        )
+      }
+    }()
+    frame = CustomLayerFrame(raw: raw.frame)
   }
 }
 
@@ -261,15 +412,16 @@ public struct CustomLayerPrerenderParameters: Equatable, Hashable, Sendable {
 ///
 /// See `mln_custom_layer_render_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public typealias CustomLayerRenderCallback = @Sendable (_ `parameters`: CustomLayerRenderParameters) -> Void
+public typealias CustomLayerRenderCallback =
+  @Sendable (_ parameters: CustomLayerRenderParameters) -> Void
 
 /// What a custom layer's render callback gets.
 ///
 /// See `mln_custom_layer_render_parameters` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomLayerRenderParameters: Equatable, Hashable, Sendable {
-  public var `pass`: CustomLayerPassData
-  public var `frame`: CustomLayerFrame
+  public var pass: CustomLayerPassData
+  public var frame: CustomLayerFrame
   /// The depth that a 2D layer at the layer's place in the style writes, as
   /// `FrameProjection` describes, between `frame.frame_projection.far_depth`
   /// and 1.
@@ -278,16 +430,47 @@ public struct CustomLayerRenderParameters: Equatable, Hashable, Sendable {
   /// callback runs, those above the custom layer too. A fragment that you draw
   /// at this depth, tested with less-or-equal, stays under those above that
   /// wrote depth.
-  public var `layerDepth`: Double
-  public init(`pass`: CustomLayerPassData = .unknown(0, Data()), `frame`: CustomLayerFrame = .init(), `layerDepth`: Double = 0) {
-    self.`pass` = `pass`
-    self.`frame` = `frame`
-    self.`layerDepth` = `layerDepth`
+  public var layerDepth: Double
+  public init(
+    pass: CustomLayerPassData = .unknown(0, Data()),
+    frame: CustomLayerFrame = .init(),
+    layerDepth: Double = 0
+  ) {
+    self.pass = pass
+    self.frame = frame
+    self.layerDepth = layerDepth
   }
-  init(raw: mln_custom_layer_render_parameters, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`pass` = try { () throws -> CustomLayerPassData in switch raw.`backend`.rawValue { case MLN_RENDER_BACKEND_METAL.rawValue: return .`metal`(MetalCustomLayerPass(raw: raw.`pass`.`metal`)) case MLN_RENDER_BACKEND_VULKAN.rawValue: return .`vulkan`(VulkanCustomLayerPass(raw: raw.`pass`.`vulkan`)) case MLN_RENDER_BACKEND_OPEN_GL.rawValue: return .`openGl`(OpenGlCustomLayerPass(raw: raw.`pass`.`open_gl`)) case MLN_RENDER_BACKEND_WEB_GPU.rawValue: return .`webGpu`(try WebGpuCustomLayerPass(raw: raw.`pass`.`web_gpu`)) default: return .unknown(raw.`backend`.rawValue, recordBytes.map { Data($0.dropFirst(MemoryLayout<mln_custom_layer_render_parameters>.offset(of: \.pass)!)) } ?? withUnsafeBytes(of: raw.`pass`) { Data($0) }) } }()
-    self.`frame` = CustomLayerFrame(raw: raw.`frame`)
-    self.`layerDepth` = raw.`layer_depth`
+
+  init(
+    raw: mln_custom_layer_render_parameters,
+    recordBytes: UnsafeRawBufferPointer? = nil
+  ) throws {
+    pass = try { () throws -> CustomLayerPassData in
+      switch raw.backend
+        .rawValue
+      {
+      case MLN_RENDER_BACKEND_METAL
+        .rawValue: return .metal(MetalCustomLayerPass(raw: raw.pass
+            .metal)) case MLN_RENDER_BACKEND_VULKAN
+                  .rawValue: return .vulkan(VulkanCustomLayerPass(raw: raw.pass
+            .vulkan)) case MLN_RENDER_BACKEND_OPEN_GL
+                  .rawValue: return .openGl(OpenGlCustomLayerPass(raw: raw.pass
+            .open_gl)) case MLN_RENDER_BACKEND_WEB_GPU
+                  .rawValue: return try .webGpu(WebGpuCustomLayerPass(raw: raw
+            .pass
+            .web_gpu)) default: return .unknown(
+          raw.backend.rawValue,
+          recordBytes
+            .map {
+              Data($0
+                .dropFirst(MemoryLayout<mln_custom_layer_render_parameters>
+                  .offset(of: \.pass)!))
+            } ?? withUnsafeBytes(of: raw.pass) { Data($0) }
+        )
+      }
+    }()
+    frame = CustomLayerFrame(raw: raw.frame)
+    layerDepth = raw.layer_depth
   }
 }
 
@@ -317,7 +500,11 @@ public typealias CustomLayerSessionEndCallback = @Sendable () -> Void
 ///
 /// See `mln_custom_source_cancel_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public typealias CustomSourceCancelTileCallback = @Sendable (_ `map`: MapHandle, _ `sourceId`: String, _ `tileId`: CanonicalTileId) -> Void
+public typealias CustomSourceCancelTileCallback = @Sendable (
+  _ map: MapHandle,
+  _ sourceId: String,
+  _ tileId: CanonicalTileId
+) -> Void
 
 /// Asks for the data of a tile in a custom source.
 ///
@@ -329,7 +516,11 @@ public typealias CustomSourceCancelTileCallback = @Sendable (_ `map`: MapHandle,
 ///
 /// See `mln_custom_source_fetch_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public typealias CustomSourceFetchTileCallback = @Sendable (_ `map`: MapHandle, _ `sourceId`: String, _ `tileId`: CanonicalTileId) -> Void
+public typealias CustomSourceFetchTileCallback = @Sendable (
+  _ map: MapHandle,
+  _ sourceId: String,
+  _ tileId: CanonicalTileId
+) -> Void
 
 /// The callbacks and options of a custom vector source.
 ///
@@ -338,39 +529,85 @@ public typealias CustomSourceFetchTileCallback = @Sendable (_ `map`: MapHandle, 
 /// See `mln_custom_vector_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomVectorSourceOptions: Sendable {
-  public var `fetchTile`: CustomSourceFetchTileCallback
-  public var `cancelTile`: CustomSourceCancelTileCallback?
-  public var `minZoom`: Double?
-  public var `maxZoom`: Double?
-  public init(`fetchTile`: @escaping CustomSourceFetchTileCallback, `cancelTile`: CustomSourceCancelTileCallback? = nil, `minZoom`: Double? = nil, `maxZoom`: Double? = nil) {
-    self.`fetchTile` = `fetchTile`
-    self.`cancelTile` = `cancelTile`
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
+  public var fetchTile: CustomSourceFetchTileCallback
+  public var cancelTile: CustomSourceCancelTileCallback?
+  public var minZoom: Double?
+  public var maxZoom: Double?
+  public init(
+    fetchTile: @escaping CustomSourceFetchTileCallback,
+    cancelTile: CustomSourceCancelTileCallback? = nil,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil
+  ) {
+    self.fetchTile = fetchTile
+    self.cancelTile = cancelTile
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_custom_vector_source_options {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_custom_vector_source_options
+  {
     var raw = mln_custom_vector_source_options()
     raw.size = UInt32(MemoryLayout<mln_custom_vector_source_options>.size)
-    raw.`fetch_tile` = invokeCustomVectorSourceOptionsFetchTile
-    raw.`cancel_tile` = `cancelTile` == nil ? nil : invokeCustomVectorSourceOptionsCancelTile
-    if let item = `minZoom` { raw.`fields` |= MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM.rawValue; raw.`min_zoom` = item }
-    if let item = `maxZoom` { raw.`fields` |= MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM.rawValue; raw.`max_zoom` = item }
+    raw.fetch_tile = invokeCustomVectorSourceOptionsFetchTile
+    raw
+      .cancel_tile = cancelTile == nil ? nil :
+      invokeCustomVectorSourceOptionsCancelTile
+    if let item = minZoom {
+      raw.fields |= MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM.rawValue; raw
+        .min_zoom = item
+    }
+    if let item = maxZoom {
+      raw.fields |= MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
+        .max_zoom = item
+    }
     raw.user_data = arena.callback(self)
     raw.release_user_data = releaseGeneratedCallback
     return raw
   }
 }
-private func invokeCustomVectorSourceOptionsFetchTile(`user_data`: UnsafeMutableRawPointer?, `map`: mln_map, `source_id`: mln_buffer_view, `tile_id`: mln_canonical_tile_id) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomVectorSourceOptions>>.fromOpaque(`user_data`).takeUnretainedValue()
-  guard let borrowedMap = try? MapHandle(borrowing: `map`) else { return }
-  do { box.value.`fetchTile`(borrowedMap, try NativeString.copyUTF8(data: `source_id`.data, size: `source_id`.size), CanonicalTileId(raw: `tile_id`)) } catch { reportToStandardError("mln_custom_source_fetch_tile_callback failed: \(error)\n");  }
+
+private func invokeCustomVectorSourceOptionsFetchTile(
+  user_data: UnsafeMutableRawPointer?,
+  map: mln_map,
+  source_id: mln_buffer_view,
+  tile_id: mln_canonical_tile_id
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomVectorSourceOptions>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  guard let borrowedMap = try? MapHandle(borrowing: map) else { return }
+  do { try box.value.fetchTile(
+    borrowedMap,
+    NativeString.copyUTF8(data: source_id.data, size: source_id.size),
+    CanonicalTileId(raw: tile_id)
+  ) } catch {
+    reportToStandardError(
+      "mln_custom_source_fetch_tile_callback failed: \(error)\n"
+    )
+  }
 }
-private func invokeCustomVectorSourceOptionsCancelTile(`user_data`: UnsafeMutableRawPointer?, `map`: mln_map, `source_id`: mln_buffer_view, `tile_id`: mln_canonical_tile_id) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CustomVectorSourceOptions>>.fromOpaque(`user_data`).takeUnretainedValue()
-  guard let borrowedMap = try? MapHandle(borrowing: `map`) else { return }
-  do { box.value.`cancelTile`?(borrowedMap, try NativeString.copyUTF8(data: `source_id`.data, size: `source_id`.size), CanonicalTileId(raw: `tile_id`)) } catch { reportToStandardError("mln_custom_source_cancel_tile_callback failed: \(error)\n");  }
+
+private func invokeCustomVectorSourceOptionsCancelTile(
+  user_data: UnsafeMutableRawPointer?,
+  map: mln_map,
+  source_id: mln_buffer_view,
+  tile_id: mln_canonical_tile_id
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomVectorSourceOptions>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  guard let borrowedMap = try? MapHandle(borrowing: map) else { return }
+  do { try box.value.cancelTile?(
+    borrowedMap,
+    NativeString.copyUTF8(data: source_id.data, size: source_id.size),
+    CanonicalTileId(raw: tile_id)
+  ) } catch {
+    reportToStandardError(
+      "mln_custom_source_cancel_tile_callback failed: \(error)\n"
+    )
+  }
 }
 
 /// Options for a GeoJSON
@@ -381,57 +618,115 @@ private func invokeCustomVectorSourceOptionsCancelTile(`user_data`: UnsafeMutabl
 /// See `mln_geo_json_source_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
-  public var `minZoom`: Double?
-  public var `maxZoom`: Double?
-  public var `tolerance`: Double?
+  public var minZoom: Double?
+  public var maxZoom: Double?
+  public var tolerance: Double?
   /// The last zoom level that has clusters, at most 30.
-  public var `clusterMaxZoom`: Double?
+  public var clusterMaxZoom: Double?
   /// The `clusterProperties` object, or empty for none.
-  public var `clusterProperties`: String
-  public var `buffer`: UInt32?
-  public var `clusterRadius`: UInt32?
+  public var clusterProperties: String
+  public var buffer: UInt32?
+  public var clusterRadius: UInt32?
   /// At most 4294967295 on a 32-bit target.
-  public var `clusterMinPoints`: UInt64?
-  public var `lineMetrics`: Bool?
-  public var `cluster`: Bool?
-  public init(`minZoom`: Double? = nil, `maxZoom`: Double? = nil, `tolerance`: Double? = nil, `clusterMaxZoom`: Double? = nil, `clusterProperties`: String = "", `buffer`: UInt32? = nil, `clusterRadius`: UInt32? = nil, `clusterMinPoints`: UInt64? = nil, `lineMetrics`: Bool? = nil, `cluster`: Bool? = nil) {
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
-    self.`tolerance` = `tolerance`
-    self.`clusterMaxZoom` = `clusterMaxZoom`
-    self.`clusterProperties` = `clusterProperties`
-    self.`buffer` = `buffer`
-    self.`clusterRadius` = `clusterRadius`
-    self.`clusterMinPoints` = `clusterMinPoints`
-    self.`lineMetrics` = `lineMetrics`
-    self.`cluster` = `cluster`
+  public var clusterMinPoints: UInt64?
+  public var lineMetrics: Bool?
+  public var cluster: Bool?
+  public init(
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    tolerance: Double? = nil,
+    clusterMaxZoom: Double? = nil,
+    clusterProperties: String = "",
+    buffer: UInt32? = nil,
+    clusterRadius: UInt32? = nil,
+    clusterMinPoints: UInt64? = nil,
+    lineMetrics: Bool? = nil,
+    cluster: Bool? = nil
+  ) {
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.tolerance = tolerance
+    self.clusterMaxZoom = clusterMaxZoom
+    self.clusterProperties = clusterProperties
+    self.buffer = buffer
+    self.clusterRadius = clusterRadius
+    self.clusterMinPoints = clusterMinPoints
+    self.lineMetrics = lineMetrics
+    self.cluster = cluster
   }
-  init(raw: mln_geo_json_source_options, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`minZoom` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM.rawValue != 0 ? raw.`min_zoom` : nil
-    self.`maxZoom` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM.rawValue != 0 ? raw.`max_zoom` : nil
-    self.`tolerance` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE.rawValue != 0 ? raw.`tolerance` : nil
-    self.`clusterMaxZoom` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM.rawValue != 0 ? raw.`cluster_max_zoom` : nil
-    self.`clusterProperties` = try NativeString.copyUTF8(data: raw.`cluster_properties`.data, size: raw.`cluster_properties`.size)
-    self.`buffer` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_BUFFER.rawValue != 0 ? raw.`buffer` : nil
-    self.`clusterRadius` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS.rawValue != 0 ? raw.`cluster_radius` : nil
-    self.`clusterMinPoints` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS.rawValue != 0 ? raw.`cluster_min_points` : nil
-    self.`lineMetrics` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS.rawValue != 0 ? raw.`line_metrics` : nil
-    self.`cluster` = raw.`fields` & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER.rawValue != 0 ? raw.`cluster` : nil
+
+  init(
+    raw: mln_geo_json_source_options,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    minZoom = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM
+      .rawValue != 0 ? raw.min_zoom : nil
+    maxZoom = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM
+      .rawValue != 0 ? raw.max_zoom : nil
+    tolerance = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE
+      .rawValue != 0 ? raw.tolerance : nil
+    clusterMaxZoom = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+      .rawValue != 0 ? raw.cluster_max_zoom : nil
+    clusterProperties = try NativeString.copyUTF8(
+      data: raw.cluster_properties.data,
+      size: raw.cluster_properties.size
+    )
+    buffer = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_BUFFER.rawValue != 0 ? raw
+      .buffer : nil
+    clusterRadius = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS
+      .rawValue != 0 ? raw.cluster_radius : nil
+    clusterMinPoints = raw
+      .fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+      .rawValue != 0 ? raw.cluster_min_points : nil
+    lineMetrics = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS
+      .rawValue != 0 ? raw.line_metrics : nil
+    cluster = raw.fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER
+      .rawValue != 0 ? raw.cluster : nil
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_geo_json_source_options {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_geo_json_source_options
+  {
     var raw = mln_geo_json_source_options()
-    raw.`fields` = 0
-    raw.`size` = UInt32(MemoryLayout<mln_geo_json_source_options>.size)
-    if let item = self.`minZoom` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM.rawValue; raw.`min_zoom` = item }
-    if let item = self.`maxZoom` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM.rawValue; raw.`max_zoom` = item }
-    if let item = self.`tolerance` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE.rawValue; raw.`tolerance` = item }
-    if let item = self.`clusterMaxZoom` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM.rawValue; raw.`cluster_max_zoom` = item }
-    raw.`cluster_properties` = arena.view(self.`clusterProperties`)
-    if let item = self.`buffer` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_BUFFER.rawValue; raw.`buffer` = item }
-    if let item = self.`clusterRadius` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS.rawValue; raw.`cluster_radius` = item }
-    if let item = self.`clusterMinPoints` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS.rawValue; raw.`cluster_min_points` = item }
-    if let item = self.`lineMetrics` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS.rawValue; raw.`line_metrics` = item }
-    if let item = self.`cluster` { raw.`fields` |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER.rawValue; raw.`cluster` = item }
+    raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_geo_json_source_options>.size)
+    if let item = minZoom {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_MIN_ZOOM.rawValue; raw
+        .min_zoom = item
+    }
+    if let item = maxZoom {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_MAX_ZOOM.rawValue; raw
+        .max_zoom = item
+    }
+    if let item = tolerance {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_TOLERANCE.rawValue; raw
+        .tolerance = item
+    }
+    if let item = clusterMaxZoom {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM.rawValue; raw
+        .cluster_max_zoom = item
+    }
+    raw.cluster_properties = arena.view(clusterProperties)
+    if let item = buffer {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_BUFFER.rawValue; raw
+        .buffer = item
+    }
+    if let item = clusterRadius {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS.rawValue; raw
+        .cluster_radius = item
+    }
+    if let item = clusterMinPoints {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS.rawValue; raw
+        .cluster_min_points = item
+    }
+    if let item = lineMetrics {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS.rawValue; raw
+        .line_metrics = item
+    }
+    if let item = cluster {
+      raw.fields |= MLN_GEO_JSON_SOURCE_OPTION_CLUSTER.rawValue; raw
+        .cluster = item
+    }
     return raw
   }
 }
@@ -441,28 +736,35 @@ public struct GeoJsonSourceOptions: Equatable, Hashable, Sendable {
 /// See `mln_image_content` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct ImageContent: Equatable, Hashable, Sendable {
-  public var `left`: Float
-  public var `top`: Float
-  public var `right`: Float
-  public var `bottom`: Float
-  public init(`left`: Float = 0, `top`: Float = 0, `right`: Float = 0, `bottom`: Float = 0) {
-    self.`left` = `left`
-    self.`top` = `top`
-    self.`right` = `right`
-    self.`bottom` = `bottom`
+  public var left: Float
+  public var top: Float
+  public var right: Float
+  public var bottom: Float
+  public init(
+    left: Float = 0,
+    top: Float = 0,
+    right: Float = 0,
+    bottom: Float = 0
+  ) {
+    self.left = left
+    self.top = top
+    self.right = right
+    self.bottom = bottom
   }
+
   init(raw: mln_image_content) {
-    self.`left` = raw.`left`
-    self.`top` = raw.`top`
-    self.`right` = raw.`right`
-    self.`bottom` = raw.`bottom`
+    left = raw.left
+    top = raw.top
+    right = raw.right
+    bottom = raw.bottom
   }
+
   func nativeValue() -> mln_image_content {
     var raw = mln_image_content()
-    raw.`left` = self.`left`
-    raw.`top` = self.`top`
-    raw.`right` = self.`right`
-    raw.`bottom` = self.`bottom`
+    raw.left = left
+    raw.top = top
+    raw.right = right
+    raw.bottom = bottom
     return raw
   }
 }
@@ -472,20 +774,22 @@ public struct ImageContent: Equatable, Hashable, Sendable {
 /// See `mln_image_stretch` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct ImageStretch: Equatable, Hashable, Sendable {
-  public var `from`: Float
-  public var `to`: Float
-  public init(`from`: Float = 0, `to`: Float = 0) {
-    self.`from` = `from`
-    self.`to` = `to`
+  public var from: Float
+  public var to: Float
+  public init(from: Float = 0, to: Float = 0) {
+    self.from = from
+    self.to = to
   }
+
   init(raw: mln_image_stretch) {
-    self.`from` = raw.`from`
-    self.`to` = raw.`to`
+    from = raw.from
+    to = raw.to
   }
+
   func nativeValue() -> mln_image_stretch {
     var raw = mln_image_stretch()
-    raw.`from` = self.`from`
-    raw.`to` = self.`to`
+    raw.from = from
+    raw.to = to
     return raw
   }
 }
@@ -499,12 +803,16 @@ public struct ImageStretch: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct MetalCustomLayerEncoder: Equatable, Hashable, Sendable {
   /// The frame's `MTLCommandBuffer`, with no encoder open.
-  public var `commandBuffer`: NativePointer
-  public init(`commandBuffer`: NativePointer = .null) {
-    self.`commandBuffer` = `commandBuffer`
+  public var commandBuffer: NativePointer
+  public init(commandBuffer: NativePointer = .null) {
+    self.commandBuffer = commandBuffer
   }
+
   init(raw: mln_metal_custom_layer_encoder) {
-    self.`commandBuffer` = NativePointer(bitPattern: unsafeBitCast(raw.`command_buffer`, to: UInt.self))
+    commandBuffer = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_buffer,
+      to: UInt.self
+    ))
   }
 }
 
@@ -519,34 +827,48 @@ public struct MetalCustomLayerEncoder: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct MetalCustomLayerPass: Equatable, Hashable, Sendable {
   /// The pass's `MTLRenderCommandEncoder`.
-  public var `encoder`: NativePointer
+  public var encoder: NativePointer
   /// The `MTLCommandBuffer` that `encoder` encodes into. Don't commit it.
-  public var `commandBuffer`: NativePointer
+  public var commandBuffer: NativePointer
   /// The `MTLPixelFormat` of the pass's color attachment.
-  public var `colorFormat`: UInt64
+  public var colorFormat: UInt64
   /// The `MTLPixelFormat` of the pass's depth attachment, or
   /// `MTLPixelFormatInvalid` when it has none.
-  public var `depthFormat`: UInt64
+  public var depthFormat: UInt64
   /// The `MTLPixelFormat` of the pass's stencil attachment, or
   /// `MTLPixelFormatInvalid` when it has none.
-  public var `stencilFormat`: UInt64
+  public var stencilFormat: UInt64
   /// The sample count of the pass's attachments.
-  public var `sampleCount`: UInt32
-  public init(`encoder`: NativePointer = .null, `commandBuffer`: NativePointer = .null, `colorFormat`: UInt64 = 0, `depthFormat`: UInt64 = 0, `stencilFormat`: UInt64 = 0, `sampleCount`: UInt32 = 0) {
-    self.`encoder` = `encoder`
-    self.`commandBuffer` = `commandBuffer`
-    self.`colorFormat` = `colorFormat`
-    self.`depthFormat` = `depthFormat`
-    self.`stencilFormat` = `stencilFormat`
-    self.`sampleCount` = `sampleCount`
+  public var sampleCount: UInt32
+  public init(
+    encoder: NativePointer = .null,
+    commandBuffer: NativePointer = .null,
+    colorFormat: UInt64 = 0,
+    depthFormat: UInt64 = 0,
+    stencilFormat: UInt64 = 0,
+    sampleCount: UInt32 = 0
+  ) {
+    self.encoder = encoder
+    self.commandBuffer = commandBuffer
+    self.colorFormat = colorFormat
+    self.depthFormat = depthFormat
+    self.stencilFormat = stencilFormat
+    self.sampleCount = sampleCount
   }
+
   init(raw: mln_metal_custom_layer_pass) {
-    self.`encoder` = NativePointer(bitPattern: unsafeBitCast(raw.`encoder`, to: UInt.self))
-    self.`commandBuffer` = NativePointer(bitPattern: unsafeBitCast(raw.`command_buffer`, to: UInt.self))
-    self.`colorFormat` = raw.`color_format`
-    self.`depthFormat` = raw.`depth_format`
-    self.`stencilFormat` = raw.`stencil_format`
-    self.`sampleCount` = raw.`sample_count`
+    encoder = NativePointer(bitPattern: unsafeBitCast(
+      raw.encoder,
+      to: UInt.self
+    ))
+    commandBuffer = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_buffer,
+      to: UInt.self
+    ))
+    colorFormat = raw.color_format
+    depthFormat = raw.depth_format
+    stencilFormat = raw.stencil_format
+    sampleCount = raw.sample_count
   }
 }
 
@@ -568,12 +890,13 @@ public struct MetalCustomLayerPass: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct OpenGlCustomLayerPass: Equatable, Hashable, Sendable {
   /// The framebuffer that the map draws into, or 0 for the default one.
-  public var `framebuffer`: UInt32
-  public init(`framebuffer`: UInt32 = 0) {
-    self.`framebuffer` = `framebuffer`
+  public var framebuffer: UInt32
+  public init(framebuffer: UInt32 = 0) {
+    self.framebuffer = framebuffer
   }
+
   init(raw: mln_open_gl_custom_layer_pass) {
-    self.`framebuffer` = raw.`framebuffer`
+    framebuffer = raw.framebuffer
   }
 }
 
@@ -582,27 +905,30 @@ public struct OpenGlCustomLayerPass: Equatable, Hashable, Sendable {
 /// See `mln_premultiplied_rgba8_image` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
+  public var width: UInt32
+  public var height: UInt32
   /// The number of bytes from the start of one row to the start of the next, at
   /// least `width` \* 4.
-  public var `stride`: UInt32
+  public var stride: UInt32
   /// The rows of pixels, `stride` bytes apart, from the top row down.
-  public var `pixels`: Data
-  public init(`width`: UInt32, `height`: UInt32, `stride`: UInt32, `pixels`: Data) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`stride` = `stride`
-    self.`pixels` = `pixels`
+  public var pixels: Data
+  public init(width: UInt32, height: UInt32, stride: UInt32, pixels: Data) {
+    self.width = width
+    self.height = height
+    self.stride = stride
+    self.pixels = pixels
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_premultiplied_rgba8_image {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_premultiplied_rgba8_image
+  {
     var raw = mln_premultiplied_rgba8_image()
-    raw.`size` = UInt32(MemoryLayout<mln_premultiplied_rgba8_image>.size)
-    raw.`width` = self.`width`
-    raw.`height` = self.`height`
-    raw.`stride` = self.`stride`
-    raw.`pixels` = arena.view(self.`pixels`).data?.assumingMemoryBound(to: UInt8.self)
-    raw.`byte_length` = try NativeInputArena.count(self.`pixels`.count)
+    raw.size = UInt32(MemoryLayout<mln_premultiplied_rgba8_image>.size)
+    raw.width = width
+    raw.height = height
+    raw.stride = self.stride
+    raw.pixels = arena.view(pixels).data?.assumingMemoryBound(to: UInt8.self)
+    raw.byte_length = try NativeInputArena.count(pixels.count)
     return raw
   }
 }
@@ -612,44 +938,76 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageInfo: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
+  public var width: UInt32
+  public var height: UInt32
   /// The premultiplied RGBA pixels, in rows of `width` \* 4 bytes, from the top
   /// row down.
-  public var `pixels`: Data
-  public var `stretchX`: [ImageStretch]
-  public var `stretchY`: [ImageStretch]
-  public var `content`: ImageContent?
-  public var `textFitWidth`: StyleImageTextFit?
-  public var `textFitHeight`: StyleImageTextFit?
-  public var `pixelRatio`: Float
-  public var `sdf`: Bool
-  public var `keepUnused`: Bool
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `pixels`: Data = Data(), `stretchX`: [ImageStretch] = [], `stretchY`: [ImageStretch] = [], `content`: ImageContent? = nil, `textFitWidth`: StyleImageTextFit? = nil, `textFitHeight`: StyleImageTextFit? = nil, `pixelRatio`: Float = 0, `sdf`: Bool = false, `keepUnused`: Bool = false) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`pixels` = `pixels`
-    self.`stretchX` = `stretchX`
-    self.`stretchY` = `stretchY`
-    self.`content` = `content`
-    self.`textFitWidth` = `textFitWidth`
-    self.`textFitHeight` = `textFitHeight`
-    self.`pixelRatio` = `pixelRatio`
-    self.`sdf` = `sdf`
-    self.`keepUnused` = `keepUnused`
+  public var pixels: Data
+  public var stretchX: [ImageStretch]
+  public var stretchY: [ImageStretch]
+  public var content: ImageContent?
+  public var textFitWidth: StyleImageTextFit?
+  public var textFitHeight: StyleImageTextFit?
+  public var pixelRatio: Float
+  public var sdf: Bool
+  public var keepUnused: Bool
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    pixels: Data = Data(),
+    stretchX: [ImageStretch] = [],
+    stretchY: [ImageStretch] = [],
+    content: ImageContent? = nil,
+    textFitWidth: StyleImageTextFit? = nil,
+    textFitHeight: StyleImageTextFit? = nil,
+    pixelRatio: Float = 0,
+    sdf: Bool = false,
+    keepUnused: Bool = false
+  ) {
+    self.width = width
+    self.height = height
+    self.pixels = pixels
+    self.stretchX = stretchX
+    self.stretchY = stretchY
+    self.content = content
+    self.textFitWidth = textFitWidth
+    self.textFitHeight = textFitHeight
+    self.pixelRatio = pixelRatio
+    self.sdf = sdf
+    self.keepUnused = keepUnused
   }
-  init(raw: mln_style_image_info, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`pixels` = try NativeString.copyData(data: raw.`pixels`.data, size: raw.`pixels`.size)
-    self.`stretchX` = try NativeInputArena.copyArray(raw.`stretch_x`, count: Int(raw.`stretch_x_count`)).map { ImageStretch(raw: $0) }
-    self.`stretchY` = try NativeInputArena.copyArray(raw.`stretch_y`, count: Int(raw.`stretch_y_count`)).map { ImageStretch(raw: $0) }
-    self.`content` = raw.`fields` & MLN_STYLE_IMAGE_INFO_CONTENT.rawValue != 0 ? ImageContent(raw: raw.`content`) : nil
-    self.`textFitWidth` = raw.`fields` & MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH.rawValue != 0 ? StyleImageTextFit(rawValue: raw.`text_fit_width`.rawValue) : nil
-    self.`textFitHeight` = raw.`fields` & MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT.rawValue != 0 ? StyleImageTextFit(rawValue: raw.`text_fit_height`.rawValue) : nil
-    self.`pixelRatio` = raw.`pixel_ratio`
-    self.`sdf` = raw.`sdf`
-    self.`keepUnused` = raw.`keep_unused`
+
+  init(
+    raw: mln_style_image_info,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    width = raw.width
+    height = raw.height
+    pixels = try NativeString.copyData(
+      data: raw.pixels.data,
+      size: raw.pixels.size
+    )
+    stretchX = try NativeInputArena.copyArray(
+      raw.stretch_x,
+      count: Int(raw.stretch_x_count)
+    ).map { ImageStretch(raw: $0) }
+    stretchY = try NativeInputArena.copyArray(
+      raw.stretch_y,
+      count: Int(raw.stretch_y_count)
+    ).map { ImageStretch(raw: $0) }
+    content = raw.fields & MLN_STYLE_IMAGE_INFO_CONTENT
+      .rawValue != 0 ? ImageContent(raw: raw.content) : nil
+    textFitWidth = raw.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH
+      .rawValue != 0 ? StyleImageTextFit(
+        rawValue: raw.text_fit_width.rawValue
+      ) :
+      nil
+    textFitHeight = raw.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT
+      .rawValue != 0 ?
+      StyleImageTextFit(rawValue: raw.text_fit_height.rawValue) : nil
+    pixelRatio = raw.pixel_ratio
+    sdf = raw.sdf
+    keepUnused = raw.keep_unused
   }
 }
 
@@ -661,42 +1019,75 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageOptions: Equatable, Hashable, Sendable {
   /// The ranges of columns that stretch, in increasing order without overlap.
-  public var `stretchX`: [ImageStretch]?
+  public var stretchX: [ImageStretch]?
   /// The ranges of rows that stretch, in increasing order without overlap.
-  public var `stretchY`: [ImageStretch]?
-  public var `content`: ImageContent?
-  public var `textFitWidth`: StyleImageTextFit?
-  public var `textFitHeight`: StyleImageTextFit?
-  public var `pixelRatio`: Float?
-  public var `sdf`: Bool?
+  public var stretchY: [ImageStretch]?
+  public var content: ImageContent?
+  public var textFitWidth: StyleImageTextFit?
+  public var textFitHeight: StyleImageTextFit?
+  public var pixelRatio: Float?
+  public var sdf: Bool?
   /// Keeps the image after no layer uses it. Without this, the map can remove
   /// an image that it asked for through
   /// `RuntimeEventType.mapStyleImageMissing`.
-  public var `keepUnused`: Bool?
-  public init(`stretchX`: [ImageStretch]? = nil, `stretchY`: [ImageStretch]? = nil, `content`: ImageContent? = nil, `textFitWidth`: StyleImageTextFit? = nil, `textFitHeight`: StyleImageTextFit? = nil, `pixelRatio`: Float? = nil, `sdf`: Bool? = nil, `keepUnused`: Bool? = nil) {
-    self.`stretchX` = `stretchX`
-    self.`stretchY` = `stretchY`
-    self.`content` = `content`
-    self.`textFitWidth` = `textFitWidth`
-    self.`textFitHeight` = `textFitHeight`
-    self.`pixelRatio` = `pixelRatio`
-    self.`sdf` = `sdf`
-    self.`keepUnused` = `keepUnused`
+  public var keepUnused: Bool?
+  public init(
+    stretchX: [ImageStretch]? = nil,
+    stretchY: [ImageStretch]? = nil,
+    content: ImageContent? = nil,
+    textFitWidth: StyleImageTextFit? = nil,
+    textFitHeight: StyleImageTextFit? = nil,
+    pixelRatio: Float? = nil,
+    sdf: Bool? = nil,
+    keepUnused: Bool? = nil
+  ) {
+    self.stretchX = stretchX
+    self.stretchY = stretchY
+    self.content = content
+    self.textFitWidth = textFitWidth
+    self.textFitHeight = textFitHeight
+    self.pixelRatio = pixelRatio
+    self.sdf = sdf
+    self.keepUnused = keepUnused
   }
+
   func nativeValue(arena: NativeInputArena) throws -> mln_style_image_options {
     var raw = mln_style_image_options()
-    raw.`fields` = 0
-    raw.`size` = UInt32(MemoryLayout<mln_style_image_options>.size)
-    if let item = self.`stretchX` { raw.`fields` |= MLN_STYLE_IMAGE_OPTION_STRETCH_X.rawValue; raw.`stretch_x` = arena.array(item.map { $0.nativeValue() }) }
-    raw.`stretch_x_count` = try NativeInputArena.count(self.`stretchX`?.count ?? 0)
-    if let item = self.`stretchY` { raw.`fields` |= MLN_STYLE_IMAGE_OPTION_STRETCH_Y.rawValue; raw.`stretch_y` = arena.array(item.map { $0.nativeValue() }) }
-    raw.`stretch_y_count` = try NativeInputArena.count(self.`stretchY`?.count ?? 0)
-    if let item = self.`content` { raw.`fields` |= MLN_STYLE_IMAGE_OPTION_CONTENT.rawValue; raw.`content` = item.nativeValue() }
-    if let item = self.`textFitWidth` { raw.`fields` |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH.rawValue; raw.`text_fit_width` = mln_style_image_text_fit(rawValue: item.rawValue) }
-    if let item = self.`textFitHeight` { raw.`fields` |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT.rawValue; raw.`text_fit_height` = mln_style_image_text_fit(rawValue: item.rawValue) }
-    if let item = self.`pixelRatio` { raw.`fields` |= MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO.rawValue; raw.`pixel_ratio` = item }
-    if let item = self.`sdf` { raw.`fields` |= MLN_STYLE_IMAGE_OPTION_SDF.rawValue; raw.`sdf` = item }
-    if let item = self.`keepUnused` { raw.`fields` |= MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED.rawValue; raw.`keep_unused` = item }
+    raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_style_image_options>.size)
+    if let item = stretchX {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_STRETCH_X.rawValue; raw
+        .stretch_x = arena.array(item.map { $0.nativeValue() })
+    }
+    raw.stretch_x_count = try NativeInputArena.count(stretchX?.count ?? 0)
+    if let item = stretchY {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_STRETCH_Y.rawValue; raw
+        .stretch_y = arena.array(item.map { $0.nativeValue() })
+    }
+    raw.stretch_y_count = try NativeInputArena.count(stretchY?.count ?? 0)
+    if let item = content {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_CONTENT.rawValue; raw.content = item
+        .nativeValue()
+    }
+    if let item = textFitWidth {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH.rawValue; raw
+        .text_fit_width = mln_style_image_text_fit(rawValue: item.rawValue)
+    }
+    if let item = textFitHeight {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT.rawValue; raw
+        .text_fit_height = mln_style_image_text_fit(rawValue: item.rawValue)
+    }
+    if let item = pixelRatio {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO.rawValue; raw
+        .pixel_ratio = item
+    }
+    if let item = sdf {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_SDF.rawValue; raw.sdf = item
+    }
+    if let item = keepUnused {
+      raw.fields |= MLN_STYLE_IMAGE_OPTION_KEEP_UNUSED.rawValue; raw
+        .keep_unused = item
+    }
     return raw
   }
 }
@@ -705,17 +1096,22 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_style_image_text_fit` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleImageTextFit: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct StyleImageTextFit: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `stretchOrShrink`: StyleImageTextFit = StyleImageTextFit(rawValue: 0)
-  public static let `stretchOnly`: StyleImageTextFit = StyleImageTextFit(rawValue: 1)
-  public static let `proportional`: StyleImageTextFit = StyleImageTextFit(rawValue: 2)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let stretchOrShrink: StyleImageTextFit = .init(rawValue: 0)
+  public static let stretchOnly: StyleImageTextFit = .init(rawValue: 1)
+  public static let proportional: StyleImageTextFit = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-case 0: return "stretchOrShrink"
-case 1: return "stretchOnly"
-case 2: return "proportional"
+    case 0: return "stretchOrShrink"
+    case 1: return "stretchOnly"
+    case 2: return "proportional"
     default: return "StyleImageTextFit(\(rawValue))"
     }
   }
@@ -726,37 +1122,55 @@ case 2: return "proportional"
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleLayerInfo: Equatable, Hashable, Sendable {
-  public var `id`: String
+  public var id: String
   /// The layer's
   /// \[type\](https://maplibre.org/maplibre-style-spec/layers/#type), such as
   /// `fill`.
-  public var `type`: String
-  public var `sourceId`: String
-  public var `sourceLayer`: String
+  public var type: String
+  public var sourceId: String
+  public var sourceLayer: String
   /// The zoom level where the layer starts to show, or negative infinity when
   /// the layer doesn't set one.
-  public var `minZoom`: Double
+  public var minZoom: Double
   /// The zoom level where the layer stops showing, or infinity when the layer
   /// doesn't set one.
-  public var `maxZoom`: Double
-  public var `visibility`: StyleLayerVisibility
-  public init(`id`: String = "", `type`: String = "", `sourceId`: String = "", `sourceLayer`: String = "", `minZoom`: Double = 0, `maxZoom`: Double = 0, `visibility`: StyleLayerVisibility = .init(rawValue: 0)) {
-    self.`id` = `id`
-    self.`type` = `type`
-    self.`sourceId` = `sourceId`
-    self.`sourceLayer` = `sourceLayer`
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
-    self.`visibility` = `visibility`
+  public var maxZoom: Double
+  public var visibility: StyleLayerVisibility
+  public init(
+    id: String = "",
+    type: String = "",
+    sourceId: String = "",
+    sourceLayer: String = "",
+    minZoom: Double = 0,
+    maxZoom: Double = 0,
+    visibility: StyleLayerVisibility = .init(rawValue: 0)
+  ) {
+    self.id = id
+    self.type = type
+    self.sourceId = sourceId
+    self.sourceLayer = sourceLayer
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.visibility = visibility
   }
-  init(raw: mln_style_layer_info, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`id` = try NativeString.copyUTF8(data: raw.`id`.data, size: raw.`id`.size)
-    self.`type` = try NativeString.copyUTF8(data: raw.`type`.data, size: raw.`type`.size)
-    self.`sourceId` = try NativeString.copyUTF8(data: raw.`source_id`.data, size: raw.`source_id`.size)
-    self.`sourceLayer` = try NativeString.copyUTF8(data: raw.`source_layer`.data, size: raw.`source_layer`.size)
-    self.`minZoom` = raw.`min_zoom`
-    self.`maxZoom` = raw.`max_zoom`
-    self.`visibility` = StyleLayerVisibility(rawValue: raw.`visibility`.rawValue)
+
+  init(
+    raw: mln_style_layer_info,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    id = try NativeString.copyUTF8(data: raw.id.data, size: raw.id.size)
+    type = try NativeString.copyUTF8(data: raw.type.data, size: raw.type.size)
+    sourceId = try NativeString.copyUTF8(
+      data: raw.source_id.data,
+      size: raw.source_id.size
+    )
+    sourceLayer = try NativeString.copyUTF8(
+      data: raw.source_layer.data,
+      size: raw.source_layer.size
+    )
+    minZoom = raw.min_zoom
+    maxZoom = raw.max_zoom
+    visibility = StyleLayerVisibility(rawValue: raw.visibility.rawValue)
   }
 }
 
@@ -764,15 +1178,20 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
 ///
 /// See `mln_style_layer_visibility` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleLayerVisibility: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct StyleLayerVisibility: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `visible`: StyleLayerVisibility = StyleLayerVisibility(rawValue: 0)
-  public static let `none`: StyleLayerVisibility = StyleLayerVisibility(rawValue: 1)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let visible: StyleLayerVisibility = .init(rawValue: 0)
+  public static let none: StyleLayerVisibility = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-case 0: return "visible"
-case 1: return "none"
+    case 0: return "visible"
+    case 1: return "none"
     default: return "StyleLayerVisibility(\(rawValue))"
     }
   }
@@ -782,15 +1201,20 @@ case 1: return "none"
 ///
 /// See `mln_style_raster_dem_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleRasterDemEncoding: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct StyleRasterDemEncoding: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `mapbox`: StyleRasterDemEncoding = StyleRasterDemEncoding(rawValue: 0)
-  public static let `terrarium`: StyleRasterDemEncoding = StyleRasterDemEncoding(rawValue: 1)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let mapbox: StyleRasterDemEncoding = .init(rawValue: 0)
+  public static let terrarium: StyleRasterDemEncoding = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-case 0: return "mapbox"
-case 1: return "terrarium"
+    case 0: return "mapbox"
+    case 1: return "terrarium"
     default: return "StyleRasterDemEncoding(\(rawValue))"
     }
   }
@@ -801,44 +1225,71 @@ case 1: return "terrarium"
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceInfo: Equatable, Hashable, Sendable {
-  public var `id`: String
-  public var `type`: StyleSourceType
-  public var `isVolatile`: Bool
-  public var `attribution`: String
-  public var `url`: String
+  public var id: String
+  public var type: StyleSourceType
+  public var isVolatile: Bool
+  public var attribution: String
+  public var url: String
   /// The tiles that the style lists in the source itself, instead of at a URL.
-  public var `tileJson`: StyleSourceTileInfo?
-  public var `bounds`: LatLngBounds?
-  public var `tileSize`: UInt32?
-  public var `vectorEncoding`: StyleVectorTileEncoding?
-  public var `rasterEncoding`: StyleRasterDemEncoding?
+  public var tileJson: StyleSourceTileInfo?
+  public var bounds: LatLngBounds?
+  public var tileSize: UInt32?
+  public var vectorEncoding: StyleVectorTileEncoding?
+  public var rasterEncoding: StyleRasterDemEncoding?
   /// A GeoJSON source's options, with every field set.
-  public var `geoJson`: GeoJsonSourceOptions?
-  public init(`id`: String = "", `type`: StyleSourceType = .init(rawValue: 0), `isVolatile`: Bool = false, `attribution`: String = "", `url`: String = "", `tileJson`: StyleSourceTileInfo? = nil, `bounds`: LatLngBounds? = nil, `tileSize`: UInt32? = nil, `vectorEncoding`: StyleVectorTileEncoding? = nil, `rasterEncoding`: StyleRasterDemEncoding? = nil, `geoJson`: GeoJsonSourceOptions? = nil) {
-    self.`id` = `id`
-    self.`type` = `type`
-    self.`isVolatile` = `isVolatile`
-    self.`attribution` = `attribution`
-    self.`url` = `url`
-    self.`tileJson` = `tileJson`
-    self.`bounds` = `bounds`
-    self.`tileSize` = `tileSize`
-    self.`vectorEncoding` = `vectorEncoding`
-    self.`rasterEncoding` = `rasterEncoding`
-    self.`geoJson` = `geoJson`
+  public var geoJson: GeoJsonSourceOptions?
+  public init(
+    id: String = "",
+    type: StyleSourceType = .init(rawValue: 0),
+    isVolatile: Bool = false,
+    attribution: String = "",
+    url: String = "",
+    tileJson: StyleSourceTileInfo? = nil,
+    bounds: LatLngBounds? = nil,
+    tileSize: UInt32? = nil,
+    vectorEncoding: StyleVectorTileEncoding? = nil,
+    rasterEncoding: StyleRasterDemEncoding? = nil,
+    geoJson: GeoJsonSourceOptions? = nil
+  ) {
+    self.id = id
+    self.type = type
+    self.isVolatile = isVolatile
+    self.attribution = attribution
+    self.url = url
+    self.tileJson = tileJson
+    self.bounds = bounds
+    self.tileSize = tileSize
+    self.vectorEncoding = vectorEncoding
+    self.rasterEncoding = rasterEncoding
+    self.geoJson = geoJson
   }
-  init(raw: mln_style_source_info, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`id` = try NativeString.copyUTF8(data: raw.`id`.data, size: raw.`id`.size)
-    self.`type` = StyleSourceType(rawValue: raw.`type`.rawValue)
-    self.`isVolatile` = raw.`is_volatile`
-    self.`attribution` = try NativeString.copyUTF8(data: raw.`attribution`.data, size: raw.`attribution`.size)
-    self.`url` = try NativeString.copyUTF8(data: raw.`url`.data, size: raw.`url`.size)
-    self.`tileJson` = raw.`fields` & MLN_STYLE_SOURCE_INFO_TILE_JSON.rawValue != 0 ? try StyleSourceTileInfo(raw: raw.`tile_json`) : nil
-    self.`bounds` = raw.`fields` & MLN_STYLE_SOURCE_INFO_BOUNDS.rawValue != 0 ? LatLngBounds(raw: raw.`bounds`) : nil
-    self.`tileSize` = raw.`fields` & MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue != 0 ? raw.`tile_size` : nil
-    self.`vectorEncoding` = raw.`fields` & MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING.rawValue != 0 ? StyleVectorTileEncoding(rawValue: raw.`vector_encoding`.rawValue) : nil
-    self.`rasterEncoding` = raw.`fields` & MLN_STYLE_SOURCE_INFO_RASTER_ENCODING.rawValue != 0 ? StyleRasterDemEncoding(rawValue: raw.`raster_encoding`.rawValue) : nil
-    self.`geoJson` = raw.`fields` & MLN_STYLE_SOURCE_INFO_GEO_JSON.rawValue != 0 ? try GeoJsonSourceOptions(raw: raw.`geo_json`) : nil
+
+  init(
+    raw: mln_style_source_info,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    id = try NativeString.copyUTF8(data: raw.id.data, size: raw.id.size)
+    type = StyleSourceType(rawValue: raw.type.rawValue)
+    isVolatile = raw.is_volatile
+    attribution = try NativeString.copyUTF8(
+      data: raw.attribution.data,
+      size: raw.attribution.size
+    )
+    url = try NativeString.copyUTF8(data: raw.url.data, size: raw.url.size)
+    tileJson = raw.fields & MLN_STYLE_SOURCE_INFO_TILE_JSON
+      .rawValue != 0 ? try StyleSourceTileInfo(raw: raw.tile_json) : nil
+    bounds = raw.fields & MLN_STYLE_SOURCE_INFO_BOUNDS
+      .rawValue != 0 ? LatLngBounds(raw: raw.bounds) : nil
+    tileSize = raw.fields & MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue != 0 ? raw
+      .tile_size : nil
+    vectorEncoding = raw.fields & MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING
+      .rawValue != 0 ?
+      StyleVectorTileEncoding(rawValue: raw.vector_encoding.rawValue) : nil
+    rasterEncoding = raw.fields & MLN_STYLE_SOURCE_INFO_RASTER_ENCODING
+      .rawValue != 0 ?
+      StyleRasterDemEncoding(rawValue: raw.raster_encoding.rawValue) : nil
+    geoJson = raw.fields & MLN_STYLE_SOURCE_INFO_GEO_JSON
+      .rawValue != 0 ? try GeoJsonSourceOptions(raw: raw.geo_json) : nil
   }
 }
 
@@ -847,21 +1298,33 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
-  public var `tileUrls`: [String]
-  public var `minZoom`: Double
-  public var `maxZoom`: Double
-  public var `scheme`: StyleTileScheme
-  public init(`tileUrls`: [String] = [], `minZoom`: Double = 0, `maxZoom`: Double = 0, `scheme`: StyleTileScheme = .init(rawValue: 0)) {
-    self.`tileUrls` = `tileUrls`
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
-    self.`scheme` = `scheme`
+  public var tileUrls: [String]
+  public var minZoom: Double
+  public var maxZoom: Double
+  public var scheme: StyleTileScheme
+  public init(
+    tileUrls: [String] = [],
+    minZoom: Double = 0,
+    maxZoom: Double = 0,
+    scheme: StyleTileScheme = .init(rawValue: 0)
+  ) {
+    self.tileUrls = tileUrls
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.scheme = scheme
   }
-  init(raw: mln_style_source_tile_info, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`tileUrls` = try NativeInputArena.copyArray(raw.`tile_urls`, count: Int(raw.`tile_url_count`)).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) }
-    self.`minZoom` = raw.`min_zoom`
-    self.`maxZoom` = raw.`max_zoom`
-    self.`scheme` = StyleTileScheme(rawValue: raw.`scheme`.rawValue)
+
+  init(
+    raw: mln_style_source_tile_info,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    tileUrls = try NativeInputArena.copyArray(
+      raw.tile_urls,
+      count: Int(raw.tile_url_count)
+    ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) }
+    minZoom = raw.min_zoom
+    maxZoom = raw.max_zoom
+    scheme = StyleTileScheme(rawValue: raw.scheme.rawValue)
   }
 }
 
@@ -869,29 +1332,34 @@ public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
 ///
 /// See `mln_style_source_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleSourceType: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct StyleSourceType: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `unknown`: StyleSourceType = StyleSourceType(rawValue: 0)
-  public static let `vector`: StyleSourceType = StyleSourceType(rawValue: 1)
-  public static let `raster`: StyleSourceType = StyleSourceType(rawValue: 2)
-  public static let `rasterDem`: StyleSourceType = StyleSourceType(rawValue: 3)
-  public static let `geoJson`: StyleSourceType = StyleSourceType(rawValue: 4)
-  public static let `image`: StyleSourceType = StyleSourceType(rawValue: 5)
-  public static let `video`: StyleSourceType = StyleSourceType(rawValue: 6)
-  public static let `customGeometry`: StyleSourceType = StyleSourceType(rawValue: 7)
-  public static let `customVector`: StyleSourceType = StyleSourceType(rawValue: 8)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let unknown: StyleSourceType = .init(rawValue: 0)
+  public static let vector: StyleSourceType = .init(rawValue: 1)
+  public static let raster: StyleSourceType = .init(rawValue: 2)
+  public static let rasterDem: StyleSourceType = .init(rawValue: 3)
+  public static let geoJson: StyleSourceType = .init(rawValue: 4)
+  public static let image: StyleSourceType = .init(rawValue: 5)
+  public static let video: StyleSourceType = .init(rawValue: 6)
+  public static let customGeometry: StyleSourceType = .init(rawValue: 7)
+  public static let customVector: StyleSourceType = .init(rawValue: 8)
   public var description: String {
     switch rawValue {
-case 0: return "unknown"
-case 1: return "vector"
-case 2: return "raster"
-case 3: return "rasterDem"
-case 4: return "geoJson"
-case 5: return "image"
-case 6: return "video"
-case 7: return "customGeometry"
-case 8: return "customVector"
+    case 0: return "unknown"
+    case 1: return "vector"
+    case 2: return "raster"
+    case 3: return "rasterDem"
+    case 4: return "geoJson"
+    case 5: return "image"
+    case 6: return "video"
+    case 7: return "customGeometry"
+    case 8: return "customVector"
     default: return "StyleSourceType(\(rawValue))"
     }
   }
@@ -901,15 +1369,20 @@ case 8: return "customVector"
 ///
 /// See `mln_style_tile_scheme` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleTileScheme: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct StyleTileScheme: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `xyz`: StyleTileScheme = StyleTileScheme(rawValue: 0)
-  public static let `tms`: StyleTileScheme = StyleTileScheme(rawValue: 1)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let xyz: StyleTileScheme = .init(rawValue: 0)
+  public static let tms: StyleTileScheme = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-case 0: return "xyz"
-case 1: return "tms"
+    case 0: return "xyz"
+    case 1: return "tms"
     default: return "StyleTileScheme(\(rawValue))"
     }
   }
@@ -922,27 +1395,46 @@ case 1: return "tms"
 /// See `mln_style_transition_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
-  public var `durationMs`: Double?
-  public var `delayMs`: Double?
+  public var durationMs: Double?
+  public var delayMs: Double?
   /// Whether symbols fade in and out as the map places them.
-  public var `enablePlacementTransitions`: Bool?
-  public init(`durationMs`: Double? = nil, `delayMs`: Double? = nil, `enablePlacementTransitions`: Bool? = nil) {
-    self.`durationMs` = `durationMs`
-    self.`delayMs` = `delayMs`
-    self.`enablePlacementTransitions` = `enablePlacementTransitions`
+  public var enablePlacementTransitions: Bool?
+  public init(
+    durationMs: Double? = nil,
+    delayMs: Double? = nil,
+    enablePlacementTransitions: Bool? = nil
+  ) {
+    self.durationMs = durationMs
+    self.delayMs = delayMs
+    self.enablePlacementTransitions = enablePlacementTransitions
   }
+
   init(raw: mln_style_transition_options) {
-    self.`durationMs` = raw.`fields` & MLN_STYLE_TRANSITION_OPTION_DURATION.rawValue != 0 ? raw.`duration_ms` : nil
-    self.`delayMs` = raw.`fields` & MLN_STYLE_TRANSITION_OPTION_DELAY.rawValue != 0 ? raw.`delay_ms` : nil
-    self.`enablePlacementTransitions` = raw.`fields` & MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS.rawValue != 0 ? raw.`enable_placement_transitions` : nil
+    durationMs = raw.fields & MLN_STYLE_TRANSITION_OPTION_DURATION
+      .rawValue != 0 ? raw.duration_ms : nil
+    delayMs = raw.fields & MLN_STYLE_TRANSITION_OPTION_DELAY.rawValue != 0 ? raw
+      .delay_ms : nil
+    enablePlacementTransitions = raw
+      .fields & MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+      .rawValue != 0 ? raw.enable_placement_transitions : nil
   }
+
   func nativeValue() -> mln_style_transition_options {
     var raw = mln_style_transition_options()
     raw.fields = 0
-    raw.`size` = UInt32(MemoryLayout<mln_style_transition_options>.size)
-    if let item = self.`durationMs` { raw.`fields` |= MLN_STYLE_TRANSITION_OPTION_DURATION.rawValue; raw.`duration_ms` = item }
-    if let item = self.`delayMs` { raw.`fields` |= MLN_STYLE_TRANSITION_OPTION_DELAY.rawValue; raw.`delay_ms` = item }
-    if let item = self.`enablePlacementTransitions` { raw.`fields` |= MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS.rawValue; raw.`enable_placement_transitions` = item }
+    raw.size = UInt32(MemoryLayout<mln_style_transition_options>.size)
+    if let item = durationMs {
+      raw.fields |= MLN_STYLE_TRANSITION_OPTION_DURATION.rawValue; raw
+        .duration_ms = item
+    }
+    if let item = delayMs {
+      raw.fields |= MLN_STYLE_TRANSITION_OPTION_DELAY.rawValue; raw
+        .delay_ms = item
+    }
+    if let item = enablePlacementTransitions {
+      raw.fields |= MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+        .rawValue; raw.enable_placement_transitions = item
+    }
     return raw
   }
 }
@@ -951,15 +1443,21 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_style_vector_tile_encoding` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleVectorTileEncoding: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct StyleVectorTileEncoding: RawRepresentable,
+  CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `mvt`: StyleVectorTileEncoding = StyleVectorTileEncoding(rawValue: 0)
-  public static let `mlt`: StyleVectorTileEncoding = StyleVectorTileEncoding(rawValue: 1)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let mvt: StyleVectorTileEncoding = .init(rawValue: 0)
+  public static let mlt: StyleVectorTileEncoding = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-case 0: return "mvt"
-case 1: return "mlt"
+    case 0: return "mvt"
+    case 1: return "mlt"
     default: return "StyleVectorTileEncoding(\(rawValue))"
     }
   }
@@ -979,16 +1477,23 @@ public struct VulkanCustomLayerEncoder: Equatable, Hashable, Sendable {
   /// The device that the session renders on. Make the objects that your
   /// commands use on `context.device`. Don't submit to `context.graphics_queue`
   /// from a callback.
-  public var `context`: VulkanContextDescriptor
+  public var context: VulkanContextDescriptor
   /// The frame's `VkCommandBuffer`, recording outside a render pass.
-  public var `commandBuffer`: NativePointer
-  public init(`context`: VulkanContextDescriptor, `commandBuffer`: NativePointer = .null) {
-    self.`context` = `context`
-    self.`commandBuffer` = `commandBuffer`
+  public var commandBuffer: NativePointer
+  public init(
+    context: VulkanContextDescriptor,
+    commandBuffer: NativePointer = .null
+  ) {
+    self.context = context
+    self.commandBuffer = commandBuffer
   }
+
   init(raw: mln_vulkan_custom_layer_encoder) {
-    self.`context` = VulkanContextDescriptor(raw: raw.`context`)
-    self.`commandBuffer` = NativePointer(bitPattern: unsafeBitCast(raw.`command_buffer`, to: UInt.self))
+    context = VulkanContextDescriptor(raw: raw.context)
+    commandBuffer = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_buffer,
+      to: UInt.self
+    ))
   }
 }
 
@@ -1008,37 +1513,49 @@ public struct VulkanCustomLayerPass: Equatable, Hashable, Sendable {
   /// The device that the session renders on. Make the objects that your
   /// commands use on `context.device`. Don't submit to `context.graphics_queue`
   /// from a callback.
-  public var `context`: VulkanContextDescriptor
+  public var context: VulkanContextDescriptor
   /// The frame's `VkCommandBuffer`, recording inside `render_pass`.
-  public var `commandBuffer`: NativePointer
+  public var commandBuffer: NativePointer
   /// The `VkRenderPass` that `command_buffer` records in.
-  public var `renderPass`: UInt64
+  public var renderPass: UInt64
   /// The index of the subpass that `command_buffer` records in.
-  public var `subpass`: UInt32
+  public var subpass: UInt32
   /// The `VkSampleCountFlagBits` of the render pass's attachments.
-  public var `sampleCount`: UInt32
+  public var sampleCount: UInt32
   /// The `VkFormat` of the render pass's color attachment.
-  public var `colorFormat`: UInt32
+  public var colorFormat: UInt32
   /// The `VkFormat` of the render pass's depth-stencil attachment, or
   /// `VK_FORMAT_UNDEFINED` when it has none.
-  public var `depthStencilFormat`: UInt32
-  public init(`context`: VulkanContextDescriptor, `commandBuffer`: NativePointer = .null, `renderPass`: UInt64 = 0, `subpass`: UInt32 = 0, `sampleCount`: UInt32 = 0, `colorFormat`: UInt32 = 0, `depthStencilFormat`: UInt32 = 0) {
-    self.`context` = `context`
-    self.`commandBuffer` = `commandBuffer`
-    self.`renderPass` = `renderPass`
-    self.`subpass` = `subpass`
-    self.`sampleCount` = `sampleCount`
-    self.`colorFormat` = `colorFormat`
-    self.`depthStencilFormat` = `depthStencilFormat`
+  public var depthStencilFormat: UInt32
+  public init(
+    context: VulkanContextDescriptor,
+    commandBuffer: NativePointer = .null,
+    renderPass: UInt64 = 0,
+    subpass: UInt32 = 0,
+    sampleCount: UInt32 = 0,
+    colorFormat: UInt32 = 0,
+    depthStencilFormat: UInt32 = 0
+  ) {
+    self.context = context
+    self.commandBuffer = commandBuffer
+    self.renderPass = renderPass
+    self.subpass = subpass
+    self.sampleCount = sampleCount
+    self.colorFormat = colorFormat
+    self.depthStencilFormat = depthStencilFormat
   }
+
   init(raw: mln_vulkan_custom_layer_pass) {
-    self.`context` = VulkanContextDescriptor(raw: raw.`context`)
-    self.`commandBuffer` = NativePointer(bitPattern: unsafeBitCast(raw.`command_buffer`, to: UInt.self))
-    self.`renderPass` = raw.`render_pass`
-    self.`subpass` = raw.`subpass`
-    self.`sampleCount` = raw.`sample_count`
-    self.`colorFormat` = raw.`color_format`
-    self.`depthStencilFormat` = raw.`depth_stencil_format`
+    context = VulkanContextDescriptor(raw: raw.context)
+    commandBuffer = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_buffer,
+      to: UInt.self
+    ))
+    renderPass = raw.render_pass
+    subpass = raw.subpass
+    sampleCount = raw.sample_count
+    colorFormat = raw.color_format
+    depthStencilFormat = raw.depth_stencil_format
   }
 }
 
@@ -1051,16 +1568,17 @@ public struct VulkanCustomLayerPass: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct WebGpuCustomLayerEncoder: Equatable, Hashable, Sendable {
   /// The `GPUDevice` that the session renders on.
-  public var `device`: UInt32
+  public var device: UInt32
   /// The frame's `GPUCommandEncoder`, with no pass open.
-  public var `encoder`: UInt32
-  public init(`device`: UInt32 = 0, `encoder`: UInt32 = 0) {
-    self.`device` = `device`
-    self.`encoder` = `encoder`
+  public var encoder: UInt32
+  public init(device: UInt32 = 0, encoder: UInt32 = 0) {
+    self.device = device
+    self.encoder = encoder
   }
+
   init(raw: mln_web_gpu_custom_layer_encoder) {
-    self.`device` = raw.`device`
-    self.`encoder` = raw.`encoder`
+    device = raw.device
+    encoder = raw.encoder
   }
 }
 
@@ -1074,28 +1592,44 @@ public struct WebGpuCustomLayerEncoder: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct WebGpuCustomLayerPass: Equatable, Hashable, Sendable {
   /// The `GPUDevice` that the session renders on.
-  public var `device`: UInt32
+  public var device: UInt32
   /// The pass's `GPURenderPassEncoder`.
-  public var `encoder`: UInt32
+  public var encoder: UInt32
   /// The `GPUTextureFormat` of the pass's color attachment.
-  public var `colorFormat`: String
+  public var colorFormat: String
   /// The `GPUTextureFormat` of the pass's depth-stencil attachment, or empty
   /// when it has none.
-  public var `depthStencilFormat`: String
+  public var depthStencilFormat: String
   /// The sample count of the pass's attachments.
-  public var `sampleCount`: UInt32
-  public init(`device`: UInt32 = 0, `encoder`: UInt32 = 0, `colorFormat`: String = "", `depthStencilFormat`: String = "", `sampleCount`: UInt32 = 0) {
-    self.`device` = `device`
-    self.`encoder` = `encoder`
-    self.`colorFormat` = `colorFormat`
-    self.`depthStencilFormat` = `depthStencilFormat`
-    self.`sampleCount` = `sampleCount`
+  public var sampleCount: UInt32
+  public init(
+    device: UInt32 = 0,
+    encoder: UInt32 = 0,
+    colorFormat: String = "",
+    depthStencilFormat: String = "",
+    sampleCount: UInt32 = 0
+  ) {
+    self.device = device
+    self.encoder = encoder
+    self.colorFormat = colorFormat
+    self.depthStencilFormat = depthStencilFormat
+    self.sampleCount = sampleCount
   }
-  init(raw: mln_web_gpu_custom_layer_pass, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`device` = raw.`device`
-    self.`encoder` = raw.`encoder`
-    self.`colorFormat` = try NativeString.copyUTF8(data: raw.`color_format`.data, size: raw.`color_format`.size)
-    self.`depthStencilFormat` = try NativeString.copyUTF8(data: raw.`depth_stencil_format`.data, size: raw.`depth_stencil_format`.size)
-    self.`sampleCount` = raw.`sample_count`
+
+  init(
+    raw: mln_web_gpu_custom_layer_pass,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    device = raw.device
+    encoder = raw.encoder
+    colorFormat = try NativeString.copyUTF8(
+      data: raw.color_format.data,
+      size: raw.color_format.size
+    )
+    depthStencilFormat = try NativeString.copyUTF8(
+      data: raw.depth_stencil_format.data,
+      size: raw.depth_stencil_format.size
+    )
+    sampleCount = raw.sample_count
   }
 }
