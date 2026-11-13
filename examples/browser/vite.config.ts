@@ -2,7 +2,8 @@
 // path, into the site's public/demo, where the site's build picks it up.
 //
 // The browser modules aren't in the repository. The example's mise tasks copy
-// them into public/ from the binding's Emscripten builds.
+// them into public/ from the binding's builds for the web presets. Each page's
+// map runs in a module Web Worker, which loads its page's module.
 
 import { fileURLToPath } from "node:url";
 
@@ -11,22 +12,12 @@ import { defineConfig } from "vite-plus";
 const here = (path: string) =>
   fileURLToPath(new URL(path, import.meta.url).href);
 
-// The library shares memory between threads, which a browser allows only on a
-// cross-origin isolated page. The dev server isolates its pages with these
-// headers. GitHub Pages sets no headers, so the built pages load
-// coi-serviceworker instead, which adds them.
-const isolation = {
-  "Cross-Origin-Opener-Policy": "same-origin",
-  "Cross-Origin-Embedder-Policy": "require-corp",
-};
-
 export default defineConfig({
   base: "/maplibre-native-ffi/demo/",
-  server: { headers: isolation },
-  preview: { headers: isolation },
   // The comparison imports GL JS on demand. Bundling it up front saves the dev
   // server a reload when the comparison first opens.
   optimizeDeps: { include: ["maplibre-gl"] },
+  worker: { format: "es" },
   build: {
     outDir: here("../../docs/public/demo"),
     emptyOutDir: true,
