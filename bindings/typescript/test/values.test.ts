@@ -18,9 +18,9 @@ import { bounded, callbackArrival, test } from "./support/harness.ts";
 import { capabilities } from "./support/host-capabilities.ts";
 import { backgroundStyle } from "./support/styles.ts";
 
-test("host strings use views and native-lent strings decode", async () => {
-  // A path crosses as a view with an explicit length, and native code rejects
-  // the embedded NUL where the path reaches a C-string consumer.
+test("host text with an embedded NUL is rejected", async () => {
+  // Text crosses as a view with an explicit length, and native code rejects
+  // the embedded NUL rather than reading the text up to it.
   assert.throws(
     () => RuntimeHandle.create({ cachePath: "cache\u0000tail" }),
     (error) =>
@@ -29,19 +29,14 @@ test("host strings use views and native-lent strings decode", async () => {
       /embedded NUL/.test(error.diagnostic),
   );
 
-  // A layer ID crosses as a view with an explicit length, so an ID with an
-  // embedded NUL names that layer and not the prefix before the NUL.
   const fixture = await openRuntime();
-  const map = await fixture.openStyledMap({
-    version: 8,
-    sources: {},
-    layers: [{ id: "a\u0000b", type: "background" }],
-  });
-  assert.equal((await map.getStyleLayer("a\u0000b"))?.type, "background");
-  assert.equal(await map.getStyleLayer("a"), undefined);
-  assert.deepEqual(
-    (await map.listStyleLayers()).map((layer) => layer.id),
-    ["a\u0000b"],
+  const map = await fixture.openStyledMap();
+  await assert.rejects(
+    map.getStyleLayer("a\u0000b"),
+    (error) =>
+      error instanceof MaplibreError &&
+      error.status === Status.invalidArgument &&
+      /embedded NUL/.test(error.diagnostic),
   );
 });
 

@@ -2,9 +2,6 @@
 
 import type {
   AndroidHardwareBufferFrame,
-  AndroidHardwareBufferRingDescriptor,
-  AndroidSurfaceDescriptor,
-  AndroidSurfaceReplacement,
   BoundOptions,
   CacheDatabaseOperation,
   CameraDelta,
@@ -14,20 +11,21 @@ import type {
   CameraUpdate,
   CanonicalTileId,
   CustomGeometrySourceOptions,
+  CustomLayerHost,
   CustomVectorSourceOptions,
   DmaBufFrame,
-  DmaBufRingDescriptor,
   DxgiSharedTextureFrame,
-  DxgiSharedTextureRingDescriptor,
   FeatureStateSelector,
   FrameDemand,
   FramePacerOptions,
   FreeCameraOptions,
   GeoJsonSourceOptions,
+  GpuDeviceCapabilities,
+  GpuDeviceOptions,
+  GpuDeviceVulkanContextResult,
   GpuSync,
   HttpHeaderTransform,
   IoSurfaceFrame,
-  IoSurfaceRingDescriptor,
   LatLng,
   LatLngBounds,
   LogHandler,
@@ -41,23 +39,14 @@ import type {
   MapTileOptions,
   MapView,
   MapViewportOptions,
-  MetalBorrowedTextureDescriptor,
-  MetalBorrowedTextureReplacement,
-  MetalSurfaceDescriptor,
-  MetalSurfaceReplacement,
+  MetalDeviceDescriptor,
   MetalTextureFrame,
   NetworkStatus,
   OfflineRegionDefinition,
   OfflineRegionDownloadState,
-  OffscreenDescriptor,
-  OffscreenDeviceOptions,
-  OhosSurfaceDescriptor,
-  OhosSurfaceReplacement,
-  OpenGlBorrowedTextureDescriptor,
-  OpenGlBorrowedTextureReplacement,
+  OpaqueFdFrame,
+  OpenGlContextDescriptor,
   OpenGlContextProviderFlag,
-  OpenGlSurfaceDescriptor,
-  OpenGlSurfaceReplacement,
   OpenGlTextureFrame,
   PremultipliedRgba8Image,
   ProjectedMeters,
@@ -68,6 +57,7 @@ import type {
   RenderSessionAttachOptions,
   RenderSessionCapabilities,
   RenderSessionSnapshot,
+  RenderTarget,
   RenderedFeatureQueryOptions,
   RenderedQueryGeometry,
   ResourceProvider,
@@ -86,22 +76,10 @@ import type {
   StyleImageOptions,
   StyleTransitionOptions,
   StyleVectorTileEncoding,
-  VulkanBorrowedTextureDescriptor,
-  VulkanBorrowedTextureReplacement,
-  VulkanDeviceContextResult,
-  VulkanDeviceOptions,
-  VulkanSurfaceDescriptor,
-  VulkanSurfaceReplacement,
+  VulkanDeviceDescriptor,
   VulkanTextureFrame,
-  WaylandSurfaceDescriptor,
-  WaylandSurfaceReplacement,
-  WebGpuBorrowedTextureDescriptor,
-  WebGpuBorrowedTextureReplacement,
-  WebGpuSurfaceDescriptor,
-  WebGpuSurfaceReplacement,
+  WebGpuContextDescriptor,
   WebGpuTextureFrame,
-  Win32WindowDescriptor,
-  Win32WindowReplacement,
 } from "./generated_values.ts";
 import type { NativeCompletion } from "./internal/addon.ts";
 
@@ -117,6 +95,7 @@ export interface NativeOperations {
   ): DxgiSharedTextureFrame;
   mln_acquired_frame_get_io_surface(frame: bigint): IoSurfaceFrame;
   mln_acquired_frame_get_metal_texture(frame: bigint): MetalTextureFrame;
+  mln_acquired_frame_get_opaque_fd(frame: bigint): OpaqueFdFrame;
   mln_acquired_frame_get_open_gl_texture(frame: bigint): OpenGlTextureFrame;
   mln_acquired_frame_get_producer_sync(frame: bigint): GpuSync;
   mln_acquired_frame_get_result(frame: bigint): RenderFrameResult;
@@ -127,17 +106,25 @@ export interface NativeOperations {
     token: object | undefined,
     consumerCompletion: GpuSync,
   ): void;
-  mln_android_frame_pacer_create(
-    options: FramePacerOptions | undefined,
-  ): bigint;
   mln_android_init(jniEnv: bigint, context: bigint): void;
-  mln_apple_frame_pacer_create(options: FramePacerOptions | undefined): bigint;
   mln_c_version(): number;
   mln_camera_for_tile(
     tile: CanonicalTileId,
     logicalSize: LogicalSize,
   ): CameraOptions;
+  mln_frame_pacer_create(options: FramePacerOptions | undefined): bigint;
   mln_frame_pacer_release(pacer: bigint, token: object | undefined): void;
+  mln_frame_pacer_set_options(pacer: bigint, options: FramePacerOptions): void;
+  mln_gpu_device_create(options: GpuDeviceOptions | undefined): bigint;
+  mln_gpu_device_get_capabilities(device: bigint): GpuDeviceCapabilities;
+  mln_gpu_device_get_vulkan_context(
+    device: bigint,
+  ): GpuDeviceVulkanContextResult;
+  mln_gpu_device_release(device: bigint, token: object | undefined): void;
+  mln_gpu_device_wrap_metal(descriptor: MetalDeviceDescriptor): bigint;
+  mln_gpu_device_wrap_open_gl(context: OpenGlContextDescriptor): bigint;
+  mln_gpu_device_wrap_vulkan(descriptor: VulkanDeviceDescriptor): bigint;
+  mln_gpu_device_wrap_web_gpu(context: WebGpuContextDescriptor): bigint;
   mln_lat_lng_for_projected_meters(meters: ProjectedMeters): LatLng;
   mln_log_clear_callback(): void;
   mln_log_set_async_severity_mask(mask: LogSeverityFlag): void;
@@ -150,6 +137,13 @@ export interface NativeOperations {
     map: bigint,
     sourceId: string,
     options: CustomGeometrySourceOptions,
+    completion: NativeCompletion | undefined,
+  ): void;
+  mln_map_add_custom_layer(
+    map: bigint,
+    layerId: string,
+    beforeLayerId: string | undefined,
+    host: CustomLayerHost | undefined,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_add_custom_vector_source(
@@ -189,112 +183,9 @@ export interface NativeOperations {
     delta: CameraDelta,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_attach_android_hardware_buffer_ring(
+  mln_map_attach(
     map: bigint,
-    descriptor: AndroidHardwareBufferRingDescriptor,
-    device: bigint | undefined,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_android_surface(
-    map: bigint,
-    descriptor: AndroidSurfaceDescriptor,
-    device: bigint | undefined,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_dma_buf_ring(
-    map: bigint,
-    descriptor: DmaBufRingDescriptor,
-    device: bigint | undefined,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_dxgi_shared_texture_ring(
-    map: bigint,
-    descriptor: DxgiSharedTextureRingDescriptor,
-    device: bigint | undefined,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_io_surface_ring(
-    map: bigint,
-    descriptor: IoSurfaceRingDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_metal_borrowed_texture(
-    map: bigint,
-    descriptor: MetalBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_metal_surface(
-    map: bigint,
-    descriptor: MetalSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_offscreen(
-    map: bigint,
-    descriptor: OffscreenDescriptor,
-    options: RenderSessionAttachOptions,
-    device: bigint | undefined,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_ohos_surface(
-    map: bigint,
-    descriptor: OhosSurfaceDescriptor,
-    device: bigint | undefined,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_open_gl_borrowed_texture(
-    map: bigint,
-    descriptor: OpenGlBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_open_gl_surface(
-    map: bigint,
-    descriptor: OpenGlSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_vulkan_borrowed_texture(
-    map: bigint,
-    descriptor: VulkanBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_vulkan_surface(
-    map: bigint,
-    descriptor: VulkanSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_wayland_surface(
-    map: bigint,
-    descriptor: WaylandSurfaceDescriptor,
-    device: bigint | undefined,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_web_gpu_borrowed_texture(
-    map: bigint,
-    descriptor: WebGpuBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_web_gpu_surface(
-    map: bigint,
-    descriptor: WebGpuSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-    completion: NativeCompletion,
-  ): bigint;
-  mln_map_attach_win32_window(
-    map: bigint,
-    descriptor: Win32WindowDescriptor,
+    target: RenderTarget,
     device: bigint | undefined,
     options: RenderSessionAttachOptions,
     completion: NativeCompletion,
@@ -526,7 +417,7 @@ export interface NativeOperations {
   mln_map_request_still_image(map: bigint, completion: NativeCompletion): void;
   mln_map_resize(
     map: bigint,
-    logicalSize: LogicalSize,
+    extent: LogicalExtent,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_bounds(
@@ -705,11 +596,6 @@ export interface NativeOperations {
   ): void;
   mln_network_get_status(): NetworkStatus;
   mln_network_set_status(status: NetworkStatus): void;
-  mln_offscreen_device_create(
-    options: OffscreenDeviceOptions | undefined,
-  ): bigint;
-  mln_offscreen_device_release(device: bigint, token: object | undefined): void;
-  mln_ohos_frame_pacer_create(options: FramePacerOptions | undefined): bigint;
   mln_open_gl_supported_context_provider_mask(): OpenGlContextProviderFlag;
   mln_projected_meters_for_lat_lng(coordinate: LatLng): ProjectedMeters;
   mln_render_session_abandon(session: bigint): RenderAbandonResult;
@@ -791,72 +677,17 @@ export interface NativeOperations {
   ): void;
   mln_render_session_resize(
     session: bigint,
-    logicalSize: LogicalSize,
+    extent: LogicalExtent,
     completion: NativeCompletion | undefined,
   ): void;
   mln_render_session_service_driver_work(session: bigint): void;
-  mln_render_session_set_android_surface_target(
-    session: bigint,
-    replacement: AndroidSurfaceReplacement,
-    completion: NativeCompletion,
-  ): void;
   mln_render_session_set_frame_pacer(
     session: bigint,
     pacer: bigint | undefined,
   ): void;
-  mln_render_session_set_metal_borrowed_texture_target(
+  mln_render_session_set_target(
     session: bigint,
-    replacement: MetalBorrowedTextureReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_metal_surface_target(
-    session: bigint,
-    replacement: MetalSurfaceReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_ohos_surface_target(
-    session: bigint,
-    replacement: OhosSurfaceReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_open_gl_borrowed_texture_target(
-    session: bigint,
-    replacement: OpenGlBorrowedTextureReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_open_gl_surface_target(
-    session: bigint,
-    replacement: OpenGlSurfaceReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_vulkan_borrowed_texture_target(
-    session: bigint,
-    replacement: VulkanBorrowedTextureReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_vulkan_surface_target(
-    session: bigint,
-    replacement: VulkanSurfaceReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_wayland_surface_target(
-    session: bigint,
-    replacement: WaylandSurfaceReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_web_gpu_borrowed_texture_target(
-    session: bigint,
-    replacement: WebGpuBorrowedTextureReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_web_gpu_surface_target(
-    session: bigint,
-    replacement: WebGpuSurfaceReplacement,
-    completion: NativeCompletion,
-  ): void;
-  mln_render_session_set_win32_window_target(
-    session: bigint,
-    replacement: Win32WindowReplacement,
+    target: RenderTarget,
     completion: NativeCompletion,
   ): void;
   mln_resource_request_complete(
@@ -1013,9 +844,6 @@ export interface NativeOperations {
     token: object | undefined,
   ): void;
   mln_supported_render_backend_mask(): RenderBackendFlag;
-  mln_vulkan_device_create(options: VulkanDeviceOptions | undefined): bigint;
-  mln_vulkan_device_get_context(device: bigint): VulkanDeviceContextResult;
-  mln_vulkan_device_release(device: bigint, token: object | undefined): void;
   mln_web_alloc(size: bigint, align: bigint): bigint;
   mln_web_free(pointer: bigint, size: bigint, align: bigint): void;
   mln_web_object_release(object: number): void;

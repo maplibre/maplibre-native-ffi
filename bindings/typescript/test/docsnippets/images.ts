@@ -27,8 +27,13 @@ export async function images(runtime: RuntimeHandle): Promise<void> {
   // #endregion style
 
   // #region attach
-  const session = map.attachOffscreen(
-    { logicalSize: { width: 800, height: 600 } },
+  // With no device, the session creates its own.
+  const session = map.attach(
+    {
+      kind: "offscreen",
+      value: { logicalSize: { width: 800, height: 600 } },
+    },
+    undefined,
     // The library renders on its own thread.
     { driver: RenderDriverKind.coreWorker },
   );

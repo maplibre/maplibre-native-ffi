@@ -24,10 +24,10 @@ with `onSurfaceAvailable` when the platform provides the surface, and with
 `onSurfaceLost` when the platform takes it away, such as when the app goes to
 the background.
 
-Pass the ID to `surfaces.acquire()` for the handles to attach a session with,
-with `MapHandle.attachMetalSurface()` or `MapHandle.attachAndroidSurface()`.
-Once the session no longer uses the surface, call `surfaces.release()`. The
-package keeps each surface until then, even after the view lets go of it. See
+Pass the ID to `surfaces.acquire()` for the handles to attach a session with, as
+the `metalLayer` or `androidWindow` target of `MapHandle.attach()`. Once the
+session no longer uses the surface, call `surfaces.release()`. The package keeps
+each surface until then, even after the view lets go of it. See
 `examples/react-native` for a full app.
 
 ## Lifecycle

@@ -1,10 +1,11 @@
 // Offscreen sessions on a core worker, a borrowed texture serviced on the
 // JavaScript thread, the scope of a frame view, a drain that finds nothing,
-// and the native registrations that a session's attach options take.
+// and the native registrations that attach options and GPU devices take.
 
 import assert from "node:assert/strict";
 
 import {
+  GpuDeviceHandle,
   GpuSyncKind,
   type MapHandle,
   MaplibreError,
@@ -281,7 +282,7 @@ test("a native registration reaches native unchanged, a call consumes it, and a 
   assert.deepEqual(unconverted.events, ["release"]);
 });
 
-test("a native queue lock reaches a session whose target takes one", async () => {
+test("a native queue lock reaches a session on a Vulkan device", async () => {
   const map = await openRenderMap();
   const probe = new NativeProbe();
   const queueLock = QueueLock.native({
@@ -291,17 +292,17 @@ test("a native queue lock reaches a session whose target takes one", async () =>
     releaseUserData: probe.release,
   });
   if (backend !== "vulkan") {
-    // Only a Vulkan texture or surface takes a queue lock, and the binding
-    // releases the context of the attach that native code refuses.
+    // Only a Vulkan device takes a queue lock, and the binding releases the
+    // context of the call that native code refuses.
     assert.throws(
-      () => attachSession(map, { queueLock }),
+      () => GpuDeviceHandle.create({ queueLock }),
       failsWith(Status.unsupported),
     );
     await probe.arrival("release");
     assert.deepEqual(probe.events, ["release"]);
     return;
   }
-  const session = attachVulkanSession(map, { queueLock });
+  const session = attachVulkanSession(map, queueLock);
   await bounded(session.ready, "the attachment");
   demandFrame(session, 1n);
   await probe.arrival("unlock");

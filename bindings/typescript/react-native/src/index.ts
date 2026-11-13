@@ -16,8 +16,8 @@ export {
 } from "./MaplibreSurfaceViewNativeComponent";
 
 /**
- * A surface's handles, for `MapHandle.attachAndroidSurface()` and
- * `MapHandle.attachMetalSurface()`.
+ * A surface's handles, for the `androidWindow` and `metalLayer` targets of
+ * `MapHandle.attach()`.
  */
 export type SurfaceHandles =
   | { readonly kind: "android"; readonly window: bigint }

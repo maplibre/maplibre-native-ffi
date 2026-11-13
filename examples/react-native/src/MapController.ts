@@ -13,6 +13,7 @@ import {
   RenderResult,
   type RenderSessionAttachOptions,
   type RenderSessionHandle,
+  type RenderTarget,
   RuntimeEventFlag,
   RuntimeEventType,
   RuntimeHandle,
@@ -88,7 +89,11 @@ export class MapController {
   setSize(size: LogicalSize): void {
     this.#size = size;
     if (this.#session !== undefined) {
-      this.#session.discarding.resize(size);
+      this.#session.discarding.resize({
+        width: size.width ?? 0,
+        height: size.height ?? 0,
+        scaleFactor: PixelRatio.get(),
+      });
     } else {
       this.#retarget();
     }
@@ -251,19 +256,7 @@ function attach(
   handles: SurfaceHandles,
   options: RenderSessionAttachOptions,
 ): RenderSessionHandle {
-  switch (handles.kind) {
-    case "metal":
-      return map.attachMetalSurface(
-        { logicalSize, layer: handles.layer },
-        options,
-      );
-    case "android":
-      return map.attachAndroidSurface(
-        { logicalSize, window: handles.window },
-        undefined,
-        options,
-      );
-  }
+  return map.attach(target(logicalSize, handles), undefined, options);
 }
 
 function setTarget(
@@ -271,16 +264,23 @@ function setTarget(
   logicalSize: LogicalSize,
   handles: SurfaceHandles,
 ): Promise<void> {
+  return session.setTarget(target(logicalSize, handles));
+}
+
+function target(
+  logicalSize: LogicalSize,
+  handles: SurfaceHandles,
+): RenderTarget {
   switch (handles.kind) {
     case "metal":
-      return session.setMetalSurfaceTarget({
-        logicalSize,
-        layer: handles.layer,
-      });
+      return {
+        kind: "metalLayer",
+        value: { logicalSize, layer: handles.layer },
+      };
     case "android":
-      return session.setAndroidSurfaceTarget({
-        logicalSize,
-        window: handles.window,
-      });
+      return {
+        kind: "androidWindow",
+        value: { logicalSize, window: handles.window },
+      };
   }
 }

@@ -173,6 +173,34 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_acquired_frame_get_opaque_fd(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_acquired_frame arg_frame = 0;
+  mln_opaque_fd_frame arg_out_frame;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "frame")) goto done;
+    arg_frame = (mln_acquired_frame)number;
+  }
+  memset(&arg_out_frame, 0, sizeof arg_out_frame);
+  arg_out_frame.size = sizeof arg_out_frame;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_acquired_frame_get_opaque_fd(arg_frame, &arg_out_frame, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result =
+    mln_ts_read_opaque_fd_frame(env, &(arg_out_frame), sizeof(arg_out_frame));
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_acquired_frame_get_open_gl_texture(
   napi_env env, napi_callback_info info
 ) {
@@ -355,38 +383,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_android_frame_pacer_create(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_frame_pacer_options arg_options;
-  const void* present_options = NULL;
-  mln_frame_pacer arg_out_pacer = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    memset(&arg_options, 0, sizeof arg_options);
-    arg_options.size = sizeof arg_options;
-    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
-    if (!mln_ts_write_frame_pacer_options(
-          call, call->argv[0], &arg_options, "options"
-        ))
-      goto done;
-    present_options = &arg_options;
-  }
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_android_frame_pacer_create(
-    present_options, &arg_out_pacer, &diagnostic
-  );
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_pacer);
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_android_init(
   napi_env env, napi_callback_info info
 ) {
@@ -411,37 +407,6 @@ static napi_value mln_ts_export_mln_android_init(
   diagnostic.message[0] = '\0';
   status = mln_android_init(arg_jni_env, arg_context, &diagnostic);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_apple_frame_pacer_create(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_frame_pacer_options arg_options;
-  const void* present_options = NULL;
-  mln_frame_pacer arg_out_pacer = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    memset(&arg_options, 0, sizeof arg_options);
-    arg_options.size = sizeof arg_options;
-    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
-    if (!mln_ts_write_frame_pacer_options(
-          call, call->argv[0], &arg_options, "options"
-        ))
-      goto done;
-    present_options = &arg_options;
-  }
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status =
-    mln_apple_frame_pacer_create(present_options, &arg_out_pacer, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_pacer);
 done:
   return mln_ts_end(call);
 }
@@ -493,6 +458,36 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_frame_pacer_create(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_frame_pacer_options arg_options;
+  const void* present_options = NULL;
+  mln_frame_pacer arg_out_pacer = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
+    if (!mln_ts_write_frame_pacer_options(
+          call, call->argv[0], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_frame_pacer_create(present_options, &arg_out_pacer, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_pacer);
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_frame_pacer_release(
   napi_env env, napi_callback_info info
 ) {
@@ -508,6 +503,252 @@ static napi_value mln_ts_export_mln_frame_pacer_release(
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   mln_frame_pacer_release(arg_pacer);
   mln_ts_consume(call);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_frame_pacer_set_options(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_frame_pacer arg_pacer = 0;
+  mln_frame_pacer_options arg_options;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "pacer")) goto done;
+    arg_pacer = (mln_frame_pacer)number;
+  }
+  memset(&arg_options, 0, sizeof arg_options);
+  arg_options.size = sizeof arg_options;
+  if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
+  if (!mln_ts_write_frame_pacer_options(
+        call, call->argv[1], &arg_options, "options"
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_frame_pacer_set_options(arg_pacer, &arg_options, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_create(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_gpu_device_options arg_options;
+  const void* present_options = NULL;
+  mln_gpu_device arg_out_device = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  if (!mln_ts_is_absent(call, call->argv[0])) {
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
+    if (!mln_ts_write_gpu_device_options(
+          call, call->argv[0], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
+  }
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_gpu_device_create(present_options, &arg_out_device, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_get_capabilities(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_gpu_device arg_device = 0;
+  mln_gpu_device_capabilities arg_out_capabilities;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
+    arg_device = (mln_gpu_device)number;
+  }
+  memset(&arg_out_capabilities, 0, sizeof arg_out_capabilities);
+  arg_out_capabilities.size = sizeof arg_out_capabilities;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_gpu_device_get_capabilities(
+    arg_device, &arg_out_capabilities, &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_read_gpu_device_capabilities(
+    env, &(arg_out_capabilities), sizeof(arg_out_capabilities)
+  );
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_get_vulkan_context(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_gpu_device arg_device = 0;
+  mln_gpu_device_vulkan_context_result arg_out_result;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
+    arg_device = (mln_gpu_device)number;
+  }
+  memset(&arg_out_result, 0, sizeof arg_out_result);
+  arg_out_result.size = sizeof arg_out_result;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_gpu_device_get_vulkan_context(arg_device, &arg_out_result, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_read_gpu_device_vulkan_context_result(
+    env, &(arg_out_result), sizeof(arg_out_result)
+  );
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_release(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_gpu_device arg_device = 0;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
+    arg_device = (mln_gpu_device)number;
+  }
+  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
+  mln_gpu_device_release(arg_device);
+  mln_ts_consume(call);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_wrap_metal(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_metal_device_descriptor arg_descriptor;
+  mln_gpu_device arg_out_device = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
+  if (!mln_ts_read_record(call, call->argv[0], "descriptor")) goto done;
+  if (!mln_ts_write_metal_device_descriptor(
+        call, call->argv[0], &arg_descriptor, "descriptor"
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_gpu_device_wrap_metal(&arg_descriptor, &arg_out_device, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_wrap_open_gl(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_open_gl_context_descriptor arg_context;
+  mln_gpu_device arg_out_device = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  memset(&arg_context, 0, sizeof arg_context);
+  if (!mln_ts_read_record(call, call->argv[0], "context")) goto done;
+  if (!mln_ts_write_open_gl_context_descriptor(
+        call, call->argv[0], &arg_context, "context"
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_gpu_device_wrap_open_gl(&arg_context, &arg_out_device, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_wrap_vulkan(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_vulkan_device_descriptor arg_descriptor;
+  mln_gpu_device arg_out_device = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
+  if (!mln_ts_read_record(call, call->argv[0], "descriptor")) goto done;
+  if (!mln_ts_write_vulkan_device_descriptor(
+        call, call->argv[0], &arg_descriptor, "descriptor"
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_gpu_device_wrap_vulkan(&arg_descriptor, &arg_out_device, &diagnostic);
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_wrap_web_gpu(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_web_gpu_context_descriptor arg_context;
+  mln_gpu_device arg_out_device = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  memset(&arg_context, 0, sizeof arg_context);
+  if (!mln_ts_read_record(call, call->argv[0], "context")) goto done;
+  if (!mln_ts_write_web_gpu_context_descriptor(
+        call, call->argv[0], &arg_context, "context"
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_gpu_device_wrap_web_gpu(&arg_context, &arg_out_device, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
 done:
   return mln_ts_end(call);
 }
@@ -678,6 +919,69 @@ static napi_value mln_ts_export_mln_map_add_custom_geometry_source(
   diagnostic.message[0] = '\0';
   status = mln_map_add_custom_geometry_source(
     arg_map, arg_source_id, &arg_options, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_add_custom_layer(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
+  mln_buffer_view arg_layer_id = {0};
+  mln_buffer_view arg_before_layer_id = {0};
+  mln_custom_layer_host arg_host;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 5)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_read_text_view(call, call->argv[1], &arg_layer_id, "layerId"))
+    goto done;
+  if (!mln_ts_is_absent(call, call->argv[2])) {
+    if (!mln_ts_read_text_view(
+          call, call->argv[2], &arg_before_layer_id, "beforeLayerId"
+        ))
+      goto done;
+  }
+  memset(&arg_host, 0, sizeof arg_host);
+  arg_host.size = sizeof arg_host;
+  if (!mln_ts_is_absent(call, call->argv[3])) {
+    {
+      uint64_t fields[6];
+      if (!mln_ts_read_native_registration(
+            call, call->argv[3], "CustomLayerHost", 4, fields, NULL, "host"
+          ))
+        goto done;
+      arg_host.prerender =
+        (mln_custom_layer_prerender_callback)(uintptr_t)fields[0];
+      arg_host.render = (mln_custom_layer_render_callback)(uintptr_t)fields[1];
+      arg_host.deinitialize =
+        (mln_custom_layer_session_end_callback)(uintptr_t)fields[2];
+      arg_host.context_lost =
+        (mln_custom_layer_session_end_callback)(uintptr_t)fields[3];
+      arg_host.user_data = (void*)(uintptr_t)fields[4];
+      arg_host.release_user_data = (mln_user_data_release)(uintptr_t)fields[5];
+    }
+  }
+  if (!mln_ts_read_completion(
+        call, call->argv[4], true, NULL, &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_add_custom_layer(
+    arg_map, arg_layer_id, arg_before_layer_id, &arg_host, present_completion,
+    &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -954,13 +1258,13 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_attach_android_hardware_buffer_ring(
+static napi_value mln_ts_export_mln_map_attach(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
-  mln_android_hardware_buffer_ring_descriptor arg_descriptor;
+  mln_render_target arg_target;
   uint64_t arg_device = 0;
   mln_render_session_attach_options arg_options;
   mln_render_session arg_out_session = MLN_HANDLE_NULL;
@@ -974,12 +1278,10 @@ static napi_value mln_ts_export_mln_map_attach_android_hardware_buffer_ring(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_android_hardware_buffer_ring_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
+  memset(&arg_target, 0, sizeof arg_target);
+  arg_target.size = sizeof arg_target;
+  if (!mln_ts_read_record(call, call->argv[1], "target")) goto done;
+  if (!mln_ts_write_render_target(call, call->argv[1], &arg_target, "target"))
     goto done;
   if (!mln_ts_is_absent(call, call->argv[2])) {
     if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
@@ -997,836 +1299,8 @@ static napi_value mln_ts_export_mln_map_attach_android_hardware_buffer_ring(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_map_attach_android_hardware_buffer_ring(
-    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_android_surface(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_android_surface_descriptor arg_descriptor;
-  uint64_t arg_device = 0;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_android_surface_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
-  }
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[3], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[4], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_android_surface(
-    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_dma_buf_ring(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_dma_buf_ring_descriptor arg_descriptor;
-  uint64_t arg_device = 0;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_dma_buf_ring_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
-  }
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[3], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[4], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_dma_buf_ring(
-    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_dxgi_shared_texture_ring(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_dxgi_shared_texture_ring_descriptor arg_descriptor;
-  uint64_t arg_device = 0;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_dxgi_shared_texture_ring_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
-  }
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[3], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[4], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_dxgi_shared_texture_ring(
-    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_io_surface_ring(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_io_surface_ring_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_io_surface_ring_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_io_surface_ring(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_metal_borrowed_texture(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_metal_borrowed_texture_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_metal_borrowed_texture_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_metal_borrowed_texture(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_metal_surface(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_metal_surface_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_metal_surface_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_metal_surface(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_offscreen(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_offscreen_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  uint64_t arg_device = 0;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_offscreen_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_is_absent(call, call->argv[3])) {
-    if (!mln_ts_read_u64(call, call->argv[3], &arg_device, "device")) goto done;
-  }
-  if (!mln_ts_read_completion(
-        call, call->argv[4], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_offscreen(
-    arg_map, &arg_descriptor, &arg_options, arg_device, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_ohos_surface(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_ohos_surface_descriptor arg_descriptor;
-  uint64_t arg_device = 0;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_ohos_surface_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
-  }
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[3], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[4], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_ohos_surface(
-    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_open_gl_borrowed_texture(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_open_gl_borrowed_texture_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_open_gl_borrowed_texture_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_open_gl_borrowed_texture(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_open_gl_surface(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_open_gl_surface_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_open_gl_surface_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_open_gl_surface(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_vulkan_borrowed_texture(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_vulkan_borrowed_texture_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_vulkan_borrowed_texture_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_vulkan_borrowed_texture(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_vulkan_surface(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_vulkan_surface_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_vulkan_surface_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_vulkan_surface(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_wayland_surface(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_wayland_surface_descriptor arg_descriptor;
-  uint64_t arg_device = 0;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_wayland_surface_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
-  }
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[3], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[4], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_wayland_surface(
-    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_web_gpu_borrowed_texture(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_web_gpu_borrowed_texture_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_web_gpu_borrowed_texture_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_web_gpu_borrowed_texture(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_web_gpu_surface(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_web_gpu_surface_descriptor arg_descriptor;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 4)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_web_gpu_surface_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[2], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[2], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[3], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_web_gpu_surface(
-    arg_map, &arg_descriptor, &arg_options, &arg_out_session,
-    present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_session);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_attach_win32_window(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_win32_window_descriptor arg_descriptor;
-  uint64_t arg_device = 0;
-  mln_render_session_attach_options arg_options;
-  mln_render_session arg_out_session = MLN_HANDLE_NULL;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 5)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_descriptor, 0, sizeof arg_descriptor);
-  arg_descriptor.size = sizeof arg_descriptor;
-  if (!mln_ts_read_record(call, call->argv[1], "descriptor")) goto done;
-  if (!mln_ts_write_win32_window_descriptor(
-        call, call->argv[1], &arg_descriptor, "descriptor"
-      ))
-    goto done;
-  if (!mln_ts_is_absent(call, call->argv[2])) {
-    if (!mln_ts_read_u64(call, call->argv[2], &arg_device, "device")) goto done;
-  }
-  memset(&arg_options, 0, sizeof arg_options);
-  arg_options.size = sizeof arg_options;
-  if (!mln_ts_read_record(call, call->argv[3], "options")) goto done;
-  if (!mln_ts_write_render_session_attach_options(
-        call, call->argv[3], &arg_options, "options"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[4], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_attach_win32_window(
-    arg_map, &arg_descriptor, arg_device, &arg_options, &arg_out_session,
+  status = mln_map_attach(
+    arg_map, &arg_target, arg_device, &arg_options, &arg_out_session,
     present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
@@ -3756,7 +3230,7 @@ static napi_value mln_ts_export_mln_map_resize(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_map arg_map = 0;
-  mln_logical_size arg_logical_size;
+  mln_logical_extent arg_extent;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -3767,11 +3241,9 @@ static napi_value mln_ts_export_mln_map_resize(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
     arg_map = (mln_map)number;
   }
-  memset(&arg_logical_size, 0, sizeof arg_logical_size);
-  if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
-  if (!mln_ts_write_logical_size(
-        call, call->argv[1], &arg_logical_size, "logicalSize"
-      ))
+  memset(&arg_extent, 0, sizeof arg_extent);
+  if (!mln_ts_read_record(call, call->argv[1], "extent")) goto done;
+  if (!mln_ts_write_logical_extent(call, call->argv[1], &arg_extent, "extent"))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, NULL, &arg_completion, &present_completion
@@ -3779,8 +3251,7 @@ static napi_value mln_ts_export_mln_map_resize(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status =
-    mln_map_resize(arg_map, arg_logical_size, present_completion, &diagnostic);
+  status = mln_map_resize(arg_map, arg_extent, present_completion, &diagnostic);
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
@@ -5044,87 +4515,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_offscreen_device_create(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_offscreen_device_options arg_options;
-  const void* present_options = NULL;
-  mln_offscreen_device arg_out_device = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    memset(&arg_options, 0, sizeof arg_options);
-    arg_options.size = sizeof arg_options;
-    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
-    if (!mln_ts_write_offscreen_device_options(
-          call, call->argv[0], &arg_options, "options"
-        ))
-      goto done;
-    present_options = &arg_options;
-  }
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status =
-    mln_offscreen_device_create(present_options, &arg_out_device, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_offscreen_device_release(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_offscreen_device arg_device = 0;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
-    arg_device = (mln_offscreen_device)number;
-  }
-  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  mln_offscreen_device_release(arg_device);
-  mln_ts_consume(call);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_ohos_frame_pacer_create(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_frame_pacer_options arg_options;
-  const void* present_options = NULL;
-  mln_frame_pacer arg_out_pacer = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    memset(&arg_options, 0, sizeof arg_options);
-    arg_options.size = sizeof arg_options;
-    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
-    if (!mln_ts_write_frame_pacer_options(
-          call, call->argv[0], &arg_options, "options"
-        ))
-      goto done;
-    present_options = &arg_options;
-  }
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status =
-    mln_ohos_frame_pacer_create(present_options, &arg_out_pacer, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_pacer);
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_open_gl_supported_context_provider_mask(
   napi_env env, napi_callback_info info
 ) {
@@ -5914,7 +5304,7 @@ static napi_value mln_ts_export_mln_render_session_resize(
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_render_session arg_session = 0;
-  mln_logical_size arg_logical_size;
+  mln_logical_extent arg_extent;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -5925,11 +5315,9 @@ static napi_value mln_ts_export_mln_render_session_resize(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  memset(&arg_logical_size, 0, sizeof arg_logical_size);
-  if (!mln_ts_read_record(call, call->argv[1], "logicalSize")) goto done;
-  if (!mln_ts_write_logical_size(
-        call, call->argv[1], &arg_logical_size, "logicalSize"
-      ))
+  memset(&arg_extent, 0, sizeof arg_extent);
+  if (!mln_ts_read_record(call, call->argv[1], "extent")) goto done;
+  if (!mln_ts_write_logical_extent(call, call->argv[1], &arg_extent, "extent"))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], true, NULL, &arg_completion, &present_completion
@@ -5938,7 +5326,7 @@ static napi_value mln_ts_export_mln_render_session_resize(
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_render_session_resize(
-    arg_session, arg_logical_size, present_completion, &diagnostic
+    arg_session, arg_extent, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -5963,45 +5351,6 @@ static napi_value mln_ts_export_mln_render_session_service_driver_work(
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_render_session_service_driver_work(arg_session, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_set_android_surface_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_android_surface_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_android_surface_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_android_surface_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -6034,14 +5383,13 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value
-mln_ts_export_mln_render_session_set_metal_borrowed_texture_target(
+static napi_value mln_ts_export_mln_render_session_set_target(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_render_session arg_session = 0;
-  mln_metal_borrowed_texture_replacement arg_replacement;
+  mln_render_target arg_target;
   mln_completion arg_completion;
   const mln_completion* present_completion = NULL;
   mln_diagnostic diagnostic;
@@ -6052,12 +5400,10 @@ mln_ts_export_mln_render_session_set_metal_borrowed_texture_target(
     if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
     arg_session = (mln_render_session)number;
   }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_metal_borrowed_texture_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
+  memset(&arg_target, 0, sizeof arg_target);
+  arg_target.size = sizeof arg_target;
+  if (!mln_ts_read_record(call, call->argv[1], "target")) goto done;
+  if (!mln_ts_write_render_target(call, call->argv[1], &arg_target, "target"))
     goto done;
   if (!mln_ts_read_completion(
         call, call->argv[2], false, NULL, &arg_completion, &present_completion
@@ -6065,401 +5411,8 @@ mln_ts_export_mln_render_session_set_metal_borrowed_texture_target(
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_render_session_set_metal_borrowed_texture_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_set_metal_surface_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_metal_surface_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_metal_surface_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_metal_surface_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_set_ohos_surface_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_ohos_surface_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_ohos_surface_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_ohos_surface_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value
-mln_ts_export_mln_render_session_set_open_gl_borrowed_texture_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_open_gl_borrowed_texture_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_open_gl_borrowed_texture_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_open_gl_borrowed_texture_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_set_open_gl_surface_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_open_gl_surface_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_open_gl_surface_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_open_gl_surface_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value
-mln_ts_export_mln_render_session_set_vulkan_borrowed_texture_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_vulkan_borrowed_texture_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_vulkan_borrowed_texture_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_vulkan_borrowed_texture_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_set_vulkan_surface_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_vulkan_surface_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_vulkan_surface_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_vulkan_surface_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_set_wayland_surface_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_wayland_surface_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_wayland_surface_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_wayland_surface_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value
-mln_ts_export_mln_render_session_set_web_gpu_borrowed_texture_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_web_gpu_borrowed_texture_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_web_gpu_borrowed_texture_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_web_gpu_borrowed_texture_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_set_web_gpu_surface_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_web_gpu_surface_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_web_gpu_surface_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_web_gpu_surface_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_render_session_set_win32_window_target(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_render_session arg_session = 0;
-  mln_win32_window_replacement arg_replacement;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "session")) goto done;
-    arg_session = (mln_render_session)number;
-  }
-  memset(&arg_replacement, 0, sizeof arg_replacement);
-  arg_replacement.size = sizeof arg_replacement;
-  if (!mln_ts_read_record(call, call->argv[1], "replacement")) goto done;
-  if (!mln_ts_write_win32_window_replacement(
-        call, call->argv[1], &arg_replacement, "replacement"
-      ))
-    goto done;
-  if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_render_session_set_win32_window_target(
-    arg_session, &arg_replacement, present_completion, &diagnostic
+  status = mln_render_session_set_target(
+    arg_session, &arg_target, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -7740,85 +6693,6 @@ static napi_value mln_ts_export_mln_supported_render_backend_mask(
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_vulkan_device_create(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_vulkan_device_options arg_options;
-  const void* present_options = NULL;
-  mln_vulkan_device arg_out_device = MLN_HANDLE_NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  if (!mln_ts_is_absent(call, call->argv[0])) {
-    memset(&arg_options, 0, sizeof arg_options);
-    arg_options.size = sizeof arg_options;
-    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
-    if (!mln_ts_write_vulkan_device_options(
-          call, call->argv[0], &arg_options, "options"
-        ))
-      goto done;
-    present_options = &arg_options;
-  }
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status =
-    mln_vulkan_device_create(present_options, &arg_out_device, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_vulkan_device_get_context(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_vulkan_device arg_device = 0;
-  mln_vulkan_device_context_result arg_out_result;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
-    arg_device = (mln_vulkan_device)number;
-  }
-  memset(&arg_out_result, 0, sizeof arg_out_result);
-  arg_out_result.size = sizeof arg_out_result;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status =
-    mln_vulkan_device_get_context(arg_device, &arg_out_result, &diagnostic);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_read_vulkan_device_context_result(
-    env, &(arg_out_result), sizeof(arg_out_result)
-  );
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_vulkan_device_release(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_vulkan_device arg_device = 0;
-  if (!mln_ts_begin(call, env, info, 2)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
-    arg_device = (mln_vulkan_device)number;
-  }
-  if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  mln_vulkan_device_release(arg_device);
-  mln_ts_consume(call);
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_web_alloc(
   napi_env env, napi_callback_info info
 ) {
@@ -7945,6 +6819,8 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_acquired_frame_get_io_surface},
   {"mln_acquired_frame_get_metal_texture",
    mln_ts_export_mln_acquired_frame_get_metal_texture},
+  {"mln_acquired_frame_get_opaque_fd",
+   mln_ts_export_mln_acquired_frame_get_opaque_fd},
   {"mln_acquired_frame_get_open_gl_texture",
    mln_ts_export_mln_acquired_frame_get_open_gl_texture},
   {"mln_acquired_frame_get_producer_sync",
@@ -7959,13 +6835,22 @@ static const mln_ts_export exports[] = {
   {"mln_acquired_frame_view_begin",
    mln_ts_export_mln_acquired_frame_view_begin},
   {"mln_acquired_frame_view_end", mln_ts_export_mln_acquired_frame_view_end},
-  {"mln_android_frame_pacer_create",
-   mln_ts_export_mln_android_frame_pacer_create},
   {"mln_android_init", mln_ts_export_mln_android_init},
-  {"mln_apple_frame_pacer_create", mln_ts_export_mln_apple_frame_pacer_create},
   {"mln_c_version", mln_ts_export_mln_c_version},
   {"mln_camera_for_tile", mln_ts_export_mln_camera_for_tile},
+  {"mln_frame_pacer_create", mln_ts_export_mln_frame_pacer_create},
   {"mln_frame_pacer_release", mln_ts_export_mln_frame_pacer_release},
+  {"mln_frame_pacer_set_options", mln_ts_export_mln_frame_pacer_set_options},
+  {"mln_gpu_device_create", mln_ts_export_mln_gpu_device_create},
+  {"mln_gpu_device_get_capabilities",
+   mln_ts_export_mln_gpu_device_get_capabilities},
+  {"mln_gpu_device_get_vulkan_context",
+   mln_ts_export_mln_gpu_device_get_vulkan_context},
+  {"mln_gpu_device_release", mln_ts_export_mln_gpu_device_release},
+  {"mln_gpu_device_wrap_metal", mln_ts_export_mln_gpu_device_wrap_metal},
+  {"mln_gpu_device_wrap_open_gl", mln_ts_export_mln_gpu_device_wrap_open_gl},
+  {"mln_gpu_device_wrap_vulkan", mln_ts_export_mln_gpu_device_wrap_vulkan},
+  {"mln_gpu_device_wrap_web_gpu", mln_ts_export_mln_gpu_device_wrap_web_gpu},
   {"mln_lat_lng_for_projected_meters",
    mln_ts_export_mln_lat_lng_for_projected_meters},
   {"mln_log_clear_callback", mln_ts_export_mln_log_clear_callback},
@@ -7976,6 +6861,7 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_logical_extent_physical_size},
   {"mln_map_add_custom_geometry_source",
    mln_ts_export_mln_map_add_custom_geometry_source},
+  {"mln_map_add_custom_layer", mln_ts_export_mln_map_add_custom_layer},
   {"mln_map_add_custom_vector_source",
    mln_ts_export_mln_map_add_custom_vector_source},
   {"mln_map_add_geo_json_source", mln_ts_export_mln_map_add_geo_json_source},
@@ -7985,35 +6871,7 @@ static const mln_ts_export exports[] = {
   {"mln_map_add_style_source_json",
    mln_ts_export_mln_map_add_style_source_json},
   {"mln_map_apply_camera_delta", mln_ts_export_mln_map_apply_camera_delta},
-  {"mln_map_attach_android_hardware_buffer_ring",
-   mln_ts_export_mln_map_attach_android_hardware_buffer_ring},
-  {"mln_map_attach_android_surface",
-   mln_ts_export_mln_map_attach_android_surface},
-  {"mln_map_attach_dma_buf_ring", mln_ts_export_mln_map_attach_dma_buf_ring},
-  {"mln_map_attach_dxgi_shared_texture_ring",
-   mln_ts_export_mln_map_attach_dxgi_shared_texture_ring},
-  {"mln_map_attach_io_surface_ring",
-   mln_ts_export_mln_map_attach_io_surface_ring},
-  {"mln_map_attach_metal_borrowed_texture",
-   mln_ts_export_mln_map_attach_metal_borrowed_texture},
-  {"mln_map_attach_metal_surface", mln_ts_export_mln_map_attach_metal_surface},
-  {"mln_map_attach_offscreen", mln_ts_export_mln_map_attach_offscreen},
-  {"mln_map_attach_ohos_surface", mln_ts_export_mln_map_attach_ohos_surface},
-  {"mln_map_attach_open_gl_borrowed_texture",
-   mln_ts_export_mln_map_attach_open_gl_borrowed_texture},
-  {"mln_map_attach_open_gl_surface",
-   mln_ts_export_mln_map_attach_open_gl_surface},
-  {"mln_map_attach_vulkan_borrowed_texture",
-   mln_ts_export_mln_map_attach_vulkan_borrowed_texture},
-  {"mln_map_attach_vulkan_surface",
-   mln_ts_export_mln_map_attach_vulkan_surface},
-  {"mln_map_attach_wayland_surface",
-   mln_ts_export_mln_map_attach_wayland_surface},
-  {"mln_map_attach_web_gpu_borrowed_texture",
-   mln_ts_export_mln_map_attach_web_gpu_borrowed_texture},
-  {"mln_map_attach_web_gpu_surface",
-   mln_ts_export_mln_map_attach_web_gpu_surface},
-  {"mln_map_attach_win32_window", mln_ts_export_mln_map_attach_win32_window},
+  {"mln_map_attach", mln_ts_export_mln_map_attach},
   {"mln_map_begin_command_group", mln_ts_export_mln_map_begin_command_group},
   {"mln_map_camera_for_geometry", mln_ts_export_mln_map_camera_for_geometry},
   {"mln_map_camera_for_lat_lng_bounds",
@@ -8146,9 +7004,6 @@ static const mln_ts_export exports[] = {
   {"mln_map_update_camera", mln_ts_export_mln_map_update_camera},
   {"mln_network_get_status", mln_ts_export_mln_network_get_status},
   {"mln_network_set_status", mln_ts_export_mln_network_set_status},
-  {"mln_offscreen_device_create", mln_ts_export_mln_offscreen_device_create},
-  {"mln_offscreen_device_release", mln_ts_export_mln_offscreen_device_release},
-  {"mln_ohos_frame_pacer_create", mln_ts_export_mln_ohos_frame_pacer_create},
   {"mln_open_gl_supported_context_provider_mask",
    mln_ts_export_mln_open_gl_supported_context_provider_mask},
   {"mln_projected_meters_for_lat_lng",
@@ -8193,32 +7048,10 @@ static const mln_ts_export exports[] = {
   {"mln_render_session_resize", mln_ts_export_mln_render_session_resize},
   {"mln_render_session_service_driver_work",
    mln_ts_export_mln_render_session_service_driver_work},
-  {"mln_render_session_set_android_surface_target",
-   mln_ts_export_mln_render_session_set_android_surface_target},
   {"mln_render_session_set_frame_pacer",
    mln_ts_export_mln_render_session_set_frame_pacer},
-  {"mln_render_session_set_metal_borrowed_texture_target",
-   mln_ts_export_mln_render_session_set_metal_borrowed_texture_target},
-  {"mln_render_session_set_metal_surface_target",
-   mln_ts_export_mln_render_session_set_metal_surface_target},
-  {"mln_render_session_set_ohos_surface_target",
-   mln_ts_export_mln_render_session_set_ohos_surface_target},
-  {"mln_render_session_set_open_gl_borrowed_texture_target",
-   mln_ts_export_mln_render_session_set_open_gl_borrowed_texture_target},
-  {"mln_render_session_set_open_gl_surface_target",
-   mln_ts_export_mln_render_session_set_open_gl_surface_target},
-  {"mln_render_session_set_vulkan_borrowed_texture_target",
-   mln_ts_export_mln_render_session_set_vulkan_borrowed_texture_target},
-  {"mln_render_session_set_vulkan_surface_target",
-   mln_ts_export_mln_render_session_set_vulkan_surface_target},
-  {"mln_render_session_set_wayland_surface_target",
-   mln_ts_export_mln_render_session_set_wayland_surface_target},
-  {"mln_render_session_set_web_gpu_borrowed_texture_target",
-   mln_ts_export_mln_render_session_set_web_gpu_borrowed_texture_target},
-  {"mln_render_session_set_web_gpu_surface_target",
-   mln_ts_export_mln_render_session_set_web_gpu_surface_target},
-  {"mln_render_session_set_win32_window_target",
-   mln_ts_export_mln_render_session_set_win32_window_target},
+  {"mln_render_session_set_target",
+   mln_ts_export_mln_render_session_set_target},
   {"mln_resource_request_complete",
    mln_ts_export_mln_resource_request_complete},
   {"mln_resource_request_is_cancelled",
@@ -8286,10 +7119,6 @@ static const mln_ts_export exports[] = {
   {"mln_style_expression_release", mln_ts_export_mln_style_expression_release},
   {"mln_supported_render_backend_mask",
    mln_ts_export_mln_supported_render_backend_mask},
-  {"mln_vulkan_device_create", mln_ts_export_mln_vulkan_device_create},
-  {"mln_vulkan_device_get_context",
-   mln_ts_export_mln_vulkan_device_get_context},
-  {"mln_vulkan_device_release", mln_ts_export_mln_vulkan_device_release},
   {"mln_web_alloc", mln_ts_export_mln_web_alloc},
   {"mln_web_free", mln_ts_export_mln_web_free},
   {"mln_web_object_release", mln_ts_export_mln_web_object_release},
