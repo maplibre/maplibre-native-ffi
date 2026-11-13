@@ -9,21 +9,13 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 
-/** The pool size the suite loads the module with, unlike the module's default of 20. */
-internal const val TEST_POOL_SIZE: Int = 24
-
-/** The Workers that the test module had as it loaded, before any test started a thread. */
-internal var workersAtLoad: Int = 0
-  private set
-
 // The body runs on Dispatchers.Default rather than the test scheduler, so its waits use real time
-// while native threads work. The module loads before the body, so a test that reaches native memory
-// runs in runSuspendTest whatever order Karma runs the tests in.
+// while the module's tasks and tile workers run. The module loads before the body, so a test that
+// reaches native memory runs in runSuspendTest whatever order Karma runs the tests in.
 internal actual fun runSuspendTest(block: suspend CoroutineScope.() -> Unit): TestResult =
   runTest(timeout = TEST_TIMEOUT) {
     withContext(Dispatchers.Default) {
-      loadWasmModule(TEST_POOL_SIZE)
-      if (workersAtLoad == 0) workersAtLoad = TestSupport.allWorkers()
+      loadWasmModule()
       block()
     }
   }

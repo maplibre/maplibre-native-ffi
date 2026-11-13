@@ -173,33 +173,6 @@ class KotlinLayoutTests(unittest.TestCase):
                     machine,
                 )
 
-    def test_the_wasm_glue_compiles_against_the_headers_for_wasm32(self):
-        # Each wrapper casts its wasm32 carriers to the C parameter types, and a
-        # thread-start wrapper asserts that its arguments fit the thread start,
-        # so compiling the glue against the real prototypes checks both.
-        clang = require_tool(self, "clang").executable
-        source = emitted(kotlin, real_api())[kotlin.WASM_GLUE]
-        with TemporaryDirectory() as directory:
-            check = Path(directory) / "glue.c"
-            check.write_text(source)
-            run(
-                self,
-                [
-                    clang,
-                    "--target=wasm32-unknown-unknown",
-                    "-ffreestanding",
-                    "-std=c2x",
-                    "-fsyntax-only",
-                    "-Wall",
-                    "-Werror",
-                    "-DMLN_STATIC",
-                    f"-I{ROOT / 'include'}",
-                    f"-I{ROOT / 'bindings/kotlin/wasm'}",
-                    str(check),
-                ],
-                ROOT,
-            )
-
     def test_a_frame_has_no_scoped_cleanup(self):
         owners = emitted(kotlin, real_api())
         # A frame's release needs the host's consumer sync and its discard
@@ -438,38 +411,35 @@ class KotlinLayoutTests(unittest.TestCase):
         ]
         self.assertIn("outResponse: HttpHeaderTransformResponse)\n", callbacks)
 
-    def test_each_queued_site_has_a_wasm_trampoline_that_runs_it(self):
+    def test_each_queued_site_runs_from_its_callback_types_trampoline(self):
         outputs = emitted(kotlin, real_api())
-        glue = outputs[kotlin.WASM_GLUE]
         base = "src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c"
         dispatched = outputs[f"{base}/DispatchedUpcalls.kt"]
         stubs = outputs[f"{base}/UpcallStubs.kt"]
-        table = glue[glue.index("functions[])(void) = {") :]
-        names = [
-            line.split("mln_kw_upcall_")[1].rstrip(",")
-            for line in table.splitlines()
-            if "(void (*)(void))mln_kw_upcall_" in line
-        ]
-        self.assertIn("completion", names)
-        self.assertIn("releaseRoot", names)
-        self.assertIn("wakeCallback", names)
-        self.assertIn("logHandlerCallback", names)
-        # A site that native calls on its own thread has no trampoline.
-        self.assertNotIn("queueLockLock", names)
-        # Each trampoline passes its number, which runs its own site and is the
-        # function pointer that its registration writes.
-        for number, site in enumerate(names):
+        # Each site writes the trampoline of its C callback type, which runs
+        # the site through the dispatch.
+        for site, name in (
+            ("completion", "mln_completion_callback"),
+            ("wakeCallback", "mln_wake_callback"),
+            ("logHandlerCallback", "mln_log_callback"),
+        ):
             with self.subTest(site=site):
-                trampoline = glue[glue.index(f" mln_kw_upcall_{site}(") :]
-                trampoline = trampoline[: trampoline.index("\n}")]
-                self.assertIn(f"mln_kw_js_upcall({number}, arguments);", trampoline)
-                branch = dispatched[dispatched.index(f"      {number} ->") :]
-                self.assertIn(f".{site}(", branch[: branch.index("\n      ", 8)])
                 self.assertIn(
-                    f"val {site}: Long\n    get() = upcallFunction({number})", stubs
+                    f'val {site}: Long\n    get() = upcallFunction("{name}")', stubs
                 )
-        # A record argument crosses as the address of the trampoline's copy.
-        self.assertIn("const mln_buffer_view* message_address = &message;", glue)
+                branch = dispatched[dispatched.index(f'      "{name}" ->') :]
+                self.assertIn(f".{site}(", branch[: branch.index('\n      "', 8)])
+        # The two kinds of user data share a release, which the root tells
+        # apart.
+        self.assertIn(
+            "if (isCallbackRoot(unsignedWord(argInt(arguments, 0)))) "
+            "Upcalls.releaseRoot(",
+            dispatched,
+        )
+        # A site that native calls on its own thread has no trampoline.
+        self.assertIn(
+            "val queueLockLock: Long\n    get() = throw MaplibreException(", stubs
+        )
 
     def test_native_registrations_mirror_their_c_records(self):
         _functions, _unsupported, _bodies, _split, values, _native = kotlin.lowered(

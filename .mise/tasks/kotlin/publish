@@ -38,22 +38,6 @@ prepare_native_inputs() {
   done <<< "$presets"
 }
 
-prepare_browser_runtimes() {
-  local backend preset directory
-  for backend in webgl webgpu; do
-    preset="emscripten-wasm32-${backend}"
-    directory="${build_root}/${preset}/install/share/maplibre-native-kotlin"
-    rm -rf "$directory"
-    cmake -S bindings/kotlin/wasm --preset "$preset" \
-      -B "${build_root}/${preset}/module" \
-      -DMLN_FFI_NATIVE_PREFIX="${build_root}/${preset}/install" \
-      -DCMAKE_INSTALL_PREFIX="$directory"
-    cmake --build "${build_root}/${preset}/module" \
-      --target maplibre_native_kotlin --config Release --parallel
-    cmake --install "${build_root}/${preset}/module" --component maplibre_native_kotlin --config Release
-  done
-}
-
 add_publications() {
   local project="$1"
   shift
@@ -103,7 +87,6 @@ case "$operation" in
     staging_root="${staging_base}/maven-staging"
     rm -rf "$staging_root"
     prepare_native_inputs
-    prepare_browser_runtimes
     release_version_args=()
     if [[ -n "$version" ]]; then
       release_version_args=("-Pmaplibre.maven.version=$version")

@@ -3,7 +3,6 @@
 package org.maplibre.nativeffi.browser
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -11,24 +10,20 @@ import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.RuntimeHandle
 import org.maplibre.nativeffi.RuntimeOptions
-import org.maplibre.nativeffi.TestSupport
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
 
-/** Kotlin on the browser page, which never blocks, drives runtimes and maps. */
+/**
+ * Kotlin on the browser page drives runtimes and maps. The module runs on the page too, never
+ * blocks it, and reports each completion in a task of its own after the call that started it.
+ */
 class PageThreadTest {
   @Test
   fun aRuntimeCreatedOnThePageCreatesAMap() = runSuspendTest {
-    assertTrue(crossOriginIsolated(), "the test page is not cross-origin isolated")
     assertTrue(onThePage(), "the test runs off the page thread")
-
-    // The page refuses mln_runtime_create, so a runtime that arrives came from a thread that the
-    // binding started, and the page yields while that thread starts.
-    val creation = RuntimeHandle.create(RuntimeOptions()).asDeferred()
-    assertFalse(creation.isCompleted, "runtime creation completed before its thread could start")
-    val runtime = creation.awaitWithin("the runtime")
+    val runtime = RuntimeHandle.create(RuntimeOptions())
 
     // Native queues the map's readiness for the page, which drains it only after it yields.
     val map = runtime.createMap(smallMapOptions())
@@ -44,29 +39,11 @@ class PageThreadTest {
   }
 
   @Test
-  fun runtimeCreationCompletesWhileThePoolIsEmpty() = runSuspendTest {
-    val runtime = TestSupport.withEmptyPool {
-      assertEquals(0, TestSupport.idleWorkers(), "the pool kept a Worker")
-      val workers = TestSupport.allWorkers()
-      // The creation's thread needs a Worker that the page creates, and that Worker starts only
-      // after the page yields, so a call that waited for the start would never return.
-      val creation = RuntimeHandle.create(RuntimeOptions()).asDeferred()
-      assertFalse(creation.isCompleted, "runtime creation completed before the page yielded")
-      val runtime = creation.awaitWithin("the runtime")
-      assertTrue(TestSupport.allWorkers() > workers, "the creation started no new Worker")
-      runtime
-    }
-    runtime.release().awaitWithin("the runtime release")
-  }
-
-  @Test
-  fun twoRuntimesCreatedOnThePageLoadStylesWithoutAPump() = runSuspendTest {
+  fun twoRuntimesOnThePageLoadStyles() = runSuspendTest {
     withMap {
       val first = this
       withMap {
         assertNotEquals(first.runtime.id, runtime.id)
-        // Each runtime runs its maps on an executor thread of its own, so the page only waits for
-        // the posted results, and nothing services either runtime from the page.
         val styles = listOf(first, this).map { it.map.setStyleJson(EMPTY_STYLE_JSON) }
         styles.forEach { it.awaitWithin("a style command") }
         first.awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
@@ -76,7 +53,4 @@ class PageThreadTest {
   }
 }
 
-private fun crossOriginIsolated(): Boolean = js("globalThis.crossOriginIsolated === true")
-
-// A dedicated or pthread worker has no document.
-private fun onThePage(): Boolean = js("typeof document === 'object'")
+private fun onThePage(): Boolean = js("typeof document !== 'undefined'")

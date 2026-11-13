@@ -7,19 +7,19 @@ import org.maplibre.nativeffi.MaplibreException
 import org.maplibre.nativeffi.Status
 
 /**
- * The browser module serves each site that the binding's delivery queue carries, with a trampoline
- * that the page's dispatch calls. A site that native calls on its own thread has no function
- * pointer.
+ * The module serves each site that the binding's delivery queue carries with the trampoline of the
+ * site's C callback type, which calls `DispatchedUpcalls`. A site that native calls on its own
+ * thread has no function pointer.
  */
 internal actual object UpcallStubs {
   actual val completion: Long
-    get() = upcallFunction(0)
+    get() = upcallFunction("mln_completion_callback")
 
   actual val completionRelease: Long
-    get() = upcallFunction(1)
+    get() = upcallFunction("mln_user_data_release")
 
   actual val releaseRoot: Long
-    get() = upcallFunction(2)
+    get() = upcallFunction("mln_user_data_release")
 
   actual val httpHeaderTransformCallback: Long
     get() =
@@ -29,34 +29,34 @@ internal actual object UpcallStubs {
       )
 
   actual val logHandlerCallback: Long
-    get() = upcallFunction(3)
+    get() = upcallFunction("mln_log_callback")
 
   actual val customGeometrySourceOptionsFetchTile: Long
-    get() = upcallFunction(4)
+    get() = upcallFunction("mln_custom_source_fetch_tile_callback")
 
   actual val customGeometrySourceOptionsCancelTile: Long
-    get() = upcallFunction(5)
+    get() = upcallFunction("mln_custom_source_cancel_tile_callback")
 
   actual val customVectorSourceOptionsFetchTile: Long
-    get() = upcallFunction(6)
+    get() = upcallFunction("mln_custom_source_fetch_tile_callback")
 
   actual val customVectorSourceOptionsCancelTile: Long
-    get() = upcallFunction(7)
+    get() = upcallFunction("mln_custom_source_cancel_tile_callback")
 
   actual val resourceRequestCancelHandlerCallback: Long
-    get() = upcallFunction(8)
+    get() = upcallFunction("mln_resource_request_cancel_callback")
 
   actual val runtimeEventHandlerCallback: Long
-    get() = upcallFunction(9)
+    get() = upcallFunction("mln_runtime_event_callback")
 
   actual val resourceProviderCallback: Long
-    get() = upcallFunction(10)
+    get() = upcallFunction("mln_resource_provider_callback")
 
   actual val resourceTransformCallback: Long
-    get() = upcallFunction(11)
+    get() = upcallFunction("mln_resource_transform_callback")
 
   actual val wakeCallback: Long
-    get() = upcallFunction(12)
+    get() = upcallFunction("mln_wake_callback")
 
   actual val queueLockLock: Long
     get() =
@@ -73,10 +73,16 @@ internal actual object UpcallStubs {
       )
 
   actual val cameraTransitionHandlerCallback: Long
-    get() = upcallFunction(13)
+    get() = upcallFunction("mln_camera_transition_end_callback")
 }
 
-private fun upcallFunction(site: Int): Long = unsignedWord(mln_kw_upcall_function(site))
+/** The trampoline of the C callback type [name]. */
+private fun upcallFunction(name: String): Long =
+  unsignedWord(mlnWebUpcallPointer(name)).also {
+    if (it == 0L) {
+      throw MaplibreException(Status.UNSUPPORTED, "the browser module has no trampoline for $name")
+    }
+  }
 
-private fun mln_kw_upcall_function(site: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_upcall_function(site)")
+private fun mlnWebUpcallPointer(name: String): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mlnWebUpcallPointer(name)")
