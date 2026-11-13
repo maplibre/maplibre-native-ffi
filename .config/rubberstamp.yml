@@ -4,11 +4,12 @@
 # already has a label keeps it.
 version: 1
 context: >-
-  A C API for MapLibre Native, the C++ map renderer, which is vendored as a git
-  submodule with carried patches. Bindings for Dart, Go, Kotlin, .NET, Python,
-  Rust, Swift, TypeScript, and Zig wrap the C API, as does a GObject library for
-  C, Vala, and GJS, and example apps use them. Mise defines tools and tasks,
-  CMake builds the native library, and Gradle builds the Kotlin packages.
+  A C API for MapLibre Native, implemented by mln-rs, the Rust port of the
+  MapLibre Native map renderer, which is vendored as a git submodule with
+  carried patches. Bindings for Dart, Go, Kotlin, .NET, Python, Rust, Swift,
+  TypeScript, and Zig wrap the C API, as does a GObject library for C, Vala, and
+  GJS, and example apps use them. Mise defines tools and tasks, CMake drives
+  Cargo to build the native library, and Gradle builds the Kotlin packages.
 
 labels:
   context: >-
@@ -35,8 +36,7 @@ labels:
           decision rather than shipped code.
     area:
       min: 1
-      guidance:
-        A patch to MapLibre Native takes the area of the behavior it changes.
+      guidance: A patch to mln-rs takes the area of the behavior it changes.
       labels:
         "area:*": ~
         area:api: >-
@@ -59,8 +59,8 @@ labels:
           and WebGPU backends, and layer plugins. How a binding or the generator
           exposes rendering types is api, not rendering.
         area:platform: >-
-          The OS services under `src/platform/` that MapLibre Native runs on:
-          the run loop, threads, HTTP and TLS, image decoding, locale and text,
+          The OS services that the library runs on, which mln-rs implements: the
+          run loop, threads, HTTP and TLS, image decoding, locale and text,
           assets, and log sinks.
         area:tooling: >-
           Building, checking, and shipping: CMake, mise, Gradle, CI and its
@@ -140,14 +140,13 @@ labels:
       labels:
         upstream:
           meaning: >-
-            The work changes MapLibre Native's own code: a patch under
-            `patches/maplibre-native/` or the `third_party/maplibre-native`
-            submodule.
+            The work changes mln-rs's own code: a patch under `patches/mln-rs/`
+            or the `third_party/mln-rs` submodule.
           rules:
             - if:
                 files:
-                  - patches/maplibre-native/**
-                  - third_party/maplibre-native
+                  - patches/mln-rs/**
+                  - third_party/mln-rs
               then: apply
           otherwise: skip
     dependencies:
@@ -238,7 +237,8 @@ ci:
         - if:
             files:
               - bindings/gobject/**
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-arm64:
       covers: >-
@@ -252,7 +252,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-musl:
       covers: >-
@@ -263,7 +264,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-musl-arm64:
       covers: >-
@@ -277,7 +279,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-riscv64:
       covers: >-
@@ -285,8 +288,8 @@ ci:
         Cross-compiles the native library on an x64 runner, checks its libc ABI,
         and runs the C tests and the Zig suite under QEMU's user-mode emulator.
         Catches architecture conditionals in the engine and its vendored code,
-        and problems in the Zig toolchain's cross builds, the Rust platform
-        crate, or the emulated test roots on RISC-V. Code that Linux x64 and
+        and problems in the Zig toolchain's cross builds, the Cargo build of
+        mln-rs, or the emulated test roots on RISC-V. Code that Linux x64 and
         ARM64 build alike doesn't need it.
       rules:
         - if:
@@ -294,7 +297,8 @@ ci:
               - scripts/run-qemu-test.sh
               - tools/deps/sync-linux-sysroot
               - tools/devices/linux-root
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-loongarch64:
       covers: >-
@@ -302,8 +306,8 @@ ci:
         Cross-compiles the native library on an x64 runner, checks its libc ABI,
         and runs the C tests and the Zig suite under QEMU's user-mode emulator.
         Catches architecture conditionals in the engine and its vendored code,
-        and problems in the Zig toolchain's cross builds, the Rust platform
-        crate, or the emulated test roots on LoongArch. Code that Linux x64 and
+        and problems in the Zig toolchain's cross builds, the Cargo build of
+        mln-rs, or the emulated test roots on LoongArch. Code that Linux x64 and
         ARM64 build alike doesn't need it.
       rules:
         - if:
@@ -311,14 +315,15 @@ ci:
               - scripts/run-qemu-test.sh
               - tools/deps/sync-linux-sysroot
               - tools/devices/linux-root
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     freebsd:
       covers: >-
         FreeBSD x64 with OpenGL (EGL) and Vulkan. Cross-compiles the native
         library and the binding tests on Linux and runs them in a FreeBSD
         virtual machine. Catches assumptions that only Linux holds, in platform
-        conditionals, the Zig toolchain, the Rust platform crate, and the
+        conditionals, the Zig toolchain, the Cargo build of mln-rs, and the
         bindings' cross-compilation. Platform-independent code that Linux x64
         tests doesn't need it.
       rules:
@@ -326,7 +331,8 @@ ci:
             files:
               - scripts/run-freebsd-test.sh
               - tools/devices/freebsd-host
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     macos:
       covers: >-
@@ -340,7 +346,8 @@ ci:
               # The GObject library's suite runs only on Linux and macOS.
               - bindings/gobject/**
               - bindings/kotlin/src/macosTest/**
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     macos-x64:
       covers: >-
@@ -354,7 +361,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     ios:
       covers: >-
@@ -368,7 +376,8 @@ ci:
         - if:
             files:
               - bindings/kotlin/src/iosTest/**
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     tvos:
       covers: >-
@@ -381,7 +390,8 @@ ci:
         - if:
             files:
               - bindings/kotlin/src/tvosTest/**
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     visionos:
       covers: >-
@@ -393,7 +403,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     windows-x64:
       covers: >-
@@ -404,9 +415,8 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/windows/**
-              - src/render/opengl/wgl_*
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     mingw:
       covers: >-
@@ -420,7 +430,8 @@ ci:
             files:
               - cmake/toolchains/msys2.cmake
               - .config/mise.msys2.*
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     mingw-arm64:
       covers: >-
@@ -435,7 +446,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     windows-arm64:
       covers: >-
@@ -448,7 +460,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android:
       covers: >-
@@ -459,14 +472,14 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/android/**
               - cmake/platform/android.cmake
               - .config/mise.android.*
               - bindings/kotlin/src/android*/**
               - .mise/tasks/kotlin/check-android-api-floor
               - tools/devices/android-serial
               - tools/env/swift-android-env.sh
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android-arm64:
       covers: >-
@@ -480,7 +493,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android-arm:
       covers: >-
@@ -495,7 +509,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android-x86:
       covers: >-
@@ -512,7 +527,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android-multi-abi:
       covers: >-
@@ -541,7 +557,6 @@ ci:
             files:
               - cmake/platform/ohos.cmake
               - .config/mise.ohos.*
-              - src/platform/ohos/**
               - tests/native/abi/platform/transport.c
               - bindings/typescript/scripts/build-hap.sh
               - bindings/typescript/scripts/test-arkts.sh
@@ -550,7 +565,8 @@ ci:
               - bindings/typescript/test/arkts/**
               - bindings/typescript/test/ohpm/**
               - tools/devices/ohos-key
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     ohos-arm64:
       covers: >-
@@ -564,7 +580,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     web:
       covers: >-
@@ -576,8 +593,6 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/emscripten/**
-              - src/render/webgpu/**
               - cmake/platform/emscripten.cmake
               - cmake/toolchains/emscripten.cmake
               - cmake/mln_ffi_emscripten.cmake
@@ -588,7 +603,8 @@ ci:
               - examples/browser/**
               - examples/styles.json
               - examples/fallback-font-faces.json
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     maven:
       covers: >-

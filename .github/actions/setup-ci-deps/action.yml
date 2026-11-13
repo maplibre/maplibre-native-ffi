@@ -149,31 +149,36 @@ runs:
           echo "MISE_DISABLE_TOOLS=http:oniro-emulator" >> "$GITHUB_ENV"
         fi
 
-    # The gitlink SHA is what decides the checkout, so key on it directly. A
-    # tag file can be left behind by a pin bump; the recorded commit cannot.
-    - name: Resolve the MapLibre Native pin
-      id: mln-pin
+    # The gitlink SHAs are what decide the checkouts, so key on them directly.
+    # A tag file can be left behind by a pin bump; the recorded commit cannot.
+    - name: Resolve the submodule pins
+      id: submodule-pins
       shell: bash
       run: >-
-        echo "sha=$(git ls-tree HEAD third_party/maplibre-native | awk '{print
-        $3}')" >> "$GITHUB_OUTPUT"
+        echo "sha=$(git ls-tree HEAD third_party/mln-rs
+        third_party/Vulkan-Headers | awk '{print $3}' | tr '\n' '-')" >>
+        "$GITHUB_OUTPUT"
 
-    - name: Cache MapLibre Native source
+    - name: Cache submodule sources
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
-          third_party/maplibre-native
-          .git/modules/third_party/maplibre-native
+          third_party/mln-rs
+          third_party/Vulkan-Headers
+          .git/modules/third_party/mln-rs
+          .git/modules/third_party/Vulkan-Headers
         key:
-          mln-src-v4-${{ hashFiles('.gitmodules', 'tools/deps/sync-submodules')
-          }}-${{ steps.mln-pin.outputs.sha }}
-        # Restore only caches created with the current selective-sync logic.
-        # A stale submodule worktree can otherwise report the recorded commit
-        # while retaining files from the previous checkout.
+          submodules-v1-${{ hashFiles('.gitmodules',
+          'tools/deps/sync-submodules') }}-${{ steps.submodule-pins.outputs.sha
+          }}
+        # Restore only caches created with the current sync logic. A stale
+        # submodule worktree can otherwise report the recorded commit while
+        # retaining files from the previous checkout.
         restore-keys: |
-          mln-src-v4-${{ hashFiles('.gitmodules', 'tools/deps/sync-submodules') }}-
+          submodules-v1-${{ hashFiles('.gitmodules', 'tools/deps/sync-submodules') }}-
 
-    - name: Sync MapLibre Native source
+    # Checks out mln-rs and applies patches/mln-rs.
+    - name: Sync submodule sources
       shell: bash
       run: tools/deps/sync-submodules
 
@@ -289,14 +294,14 @@ runs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        # The workspace lock file alone: a `**` glob also matches the
-        # submodule's, which an earlier step restores from another cache, so the
-        # key would depend on that cache's contents.
+        # The workspace's lock file, and mln-rs's, whose crates the native
+        # build compiles. The submodule's comes from the sync step above, and a
+        # `**` glob would also match lock files deeper in its tree.
         key:
-          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-${{
-          hashFiles('Cargo.lock') }}
+          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v3-${{
+          hashFiles('Cargo.lock', 'third_party/mln-rs/Cargo.lock') }}
         restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-
+          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v3-
 
     # uv, pnpm, and NuGet each default to a different per-OS cache location, and
     # some of those paths carry a tool-version suffix. Pinning them under one
