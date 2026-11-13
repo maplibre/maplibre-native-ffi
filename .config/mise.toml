@@ -183,6 +183,16 @@ postinstall = ["hk install --mise --quiet"]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 
+# A binding's tests for one of a preset's render backends. The task sources
+# tools/env/test-backend.sh, which exports the backend as MLN_FFI_TEST_BACKEND
+# for the suites to draw with.
+[task_templates."ffi:test"]
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}"
+arg "[backend]" default="" help="Render backend under test, such as vulkan or opengl; empty takes the preset's default backend"
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+
 [tasks.build]
 description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
