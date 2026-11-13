@@ -461,13 +461,6 @@ static const payload_row payload_rows[] = {
    sizeof(mln_runtime_event_offline_region_response_error),
    .message = MESSAGE_TEXT, .expected_message = denied_message,
    .check = check_offline_response_error},
-  {MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-   SCENARIO_UNREACHABLE, MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT,
-   sizeof(mln_runtime_event_offline_region_tile_count_limit),
-   .unreachable_reason =
-     "MapLibre limits only mapbox:// tile downloads, and no call sets the "
-     "limit"},
   {MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED, SCENARIO_SPRITES_AND_GLYPHS, MAP,
    MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS, sizeof(mln_runtime_event_glyphs),
    .check = check_glyphs},

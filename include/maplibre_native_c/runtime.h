@@ -135,19 +135,12 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
   /** A resource that the region needs failed to download. */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
-  /**
-   * The region's download became inactive because the cache file's offline
-   * regions hold as many tiles from MapLibre's demo tile server as the limit
-   * allows. Only tiles of sources with a `maplibre://` URL count toward the
-   * limit.
-   */
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
-  MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
-  MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
-  MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22,
-  MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23,
-  MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24,
-  MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 19,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 20,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 21,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 22,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 23,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 24,
 } mln_runtime_event_type;
 
 /** An event type, as a bit in a set. */
@@ -188,8 +181,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
     << MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
   MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 1ULL
     << MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
-  MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 1ULL
-    << MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
   MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED,
   MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 1ULL
@@ -226,8 +217,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
     MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR,
   MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS =
       MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED |
-    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR |
-    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR,
   MLN_RUNTIME_EVENT_FLAG_ALL = MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS |
     MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS,
 } mln_runtime_event_flag;
@@ -252,9 +242,8 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 7,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 8,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 9,
-  MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 10,
-  MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 11,
+  MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 9,
+  MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 10,
 } mln_runtime_event_payload_type;
 
 /** Whether a camera change jumps or animates. */
@@ -510,18 +499,6 @@ typedef struct mln_runtime_event_offline_region_response_error {
   mln_resource_error_reason reason;
 } mln_runtime_event_offline_region_response_error;
 
-/**
- * The details of MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED.
- */
-typedef struct mln_runtime_event_offline_region_tile_count_limit {
-  mln_offline_region_id region_id;
-  /**
-   * The number of demo server tiles that the cache file's offline regions may
-   * hold together.
-   */
-  uint64_t limit;
-} mln_runtime_event_offline_region_tile_count_limit;
-
 /** The details of an event, in the member that its `payload_type` names. */
 typedef union mln_runtime_event_payload {
   mln_runtime_event_camera_change camera_change
@@ -541,10 +518,6 @@ typedef union mln_runtime_event_payload {
   mln_runtime_event_offline_region_response_error offline_region_response_error
     MLN_BINDING(
       "variant=MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR"
-    );
-  mln_runtime_event_offline_region_tile_count_limit
-    offline_region_tile_count_limit MLN_BINDING(
-      "variant=MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT"
     );
   mln_runtime_event_glyphs glyphs
     MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS");
