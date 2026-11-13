@@ -784,8 +784,6 @@ internal expect object C {
 
   fun mln_open_gl_supported_context_provider_mask(): Int
 
-  fun mln_plugin_get_register_function_v1(): Long
-
   fun mln_projected_meters_for_lat_lng(coordinate: Long, outMeters: Long, outDiagnostic: Long): Int
 
   fun mln_render_frame_batch_release(batch: Long): Unit

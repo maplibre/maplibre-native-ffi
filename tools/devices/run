@@ -12,7 +12,7 @@
 # ends it and reports. --boot only gets the device ready, so that a caller can
 # boot it before any test's deadline starts. MLN_FFI_DEVICE_LIBRARIES lists, by
 # colons, further shared libraries that an emulator needs beside the
-# executable, such as a plugin it loads.
+# executable, such as the test graphics library.
 set -euo pipefail
 
 usage="usage: tools/devices/run <executable> [argument ...] | --boot"

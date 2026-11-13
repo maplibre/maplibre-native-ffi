@@ -758,8 +758,7 @@ class NativeShims:
             + "// The JNI half of each C function and upcall the Kotlin binding uses. Every\n"
             + "// argument is a primitive; mln_jni.h defines the casts and mln_jni.c the rest.\n"
             + '#include "mln_jni.h"\n\n'
-            + "#include <maplibre_native_c.h>\n"
-            + "#include <maplibre_native_c/plugin.h>\n\n"
+            + "#include <maplibre_native_c.h>\n\n"
             + "\n\n".join(functions)
             + "\n\nconst JNINativeMethod mln_jni_methods[] = {\n"
             + "\n".join(methods)
@@ -890,7 +889,6 @@ class NativeShims:
             + "// address.\n"
             + '#include "mln_kw_runtime.h"\n\n'
             + "#include <maplibre_native_c.h>\n"
-            + "#include <maplibre_native_c/plugin.h>\n"
             + "#include <stddef.h>\n\n"
             + "\n\n".join(wrappers)
             + "\n\n"

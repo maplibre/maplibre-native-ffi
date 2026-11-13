@@ -1,6 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #include <maplibre_native_c.h>
-#include <maplibre_native_c/plugin.h>
 #include <string.h>
 
 #include "maplibre-native-ffi-handles.h"
@@ -6813,12 +6812,6 @@ maplibre_native_ffi_open_gl_supported_context_provider_mask(void) {
   mln_open_gl_context_provider_flags result_ =
     mln_open_gl_supported_context_provider_mask();
   return (MaplibreNativeFfiOpenGlContextProviderFlag)(result_);
-}
-
-gpointer maplibre_native_ffi_get_plugin_register_function_v1(void) {
-  mln_plugin_register_function_v1 result_ =
-    mln_plugin_get_register_function_v1();
-  return (gpointer)(result_);
 }
 
 MaplibreNativeFfiProjectedMeters*

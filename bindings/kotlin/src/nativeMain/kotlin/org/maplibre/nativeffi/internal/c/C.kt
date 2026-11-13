@@ -1755,9 +1755,6 @@ internal actual object C {
   actual fun mln_open_gl_supported_context_provider_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_open_gl_supported_context_provider_mask().toInt()
 
-  actual fun mln_plugin_get_register_function_v1(): Long =
-    org.maplibre.nativeffi.internal.cinterop.mln_plugin_get_register_function_v1().toLong()
-
   actual fun mln_projected_meters_for_lat_lng(
     coordinate: Long,
     outMeters: Long,

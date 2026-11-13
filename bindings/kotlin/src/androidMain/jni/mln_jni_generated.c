@@ -2,7 +2,6 @@
 // The JNI half of each C function and upcall the Kotlin binding uses. Every
 // argument is a primitive; mln_jni.h defines the casts and mln_jni.c the rest.
 #include <maplibre_native_c.h>
-#include <maplibre_native_c/plugin.h>
 
 #include "mln_jni.h"
 
@@ -1571,10 +1570,6 @@ static jint mln_open_gl_supported_context_provider_mask_jni(
   return (jint)mln_open_gl_supported_context_provider_mask();
 }
 
-static jlong mln_plugin_get_register_function_v1_jni(JNIEnv* env, jclass type) {
-  return MLN_JNI_ADDRESS(mln_plugin_get_register_function_v1());
-}
-
 static jint mln_projected_meters_for_lat_lng_jni(
   JNIEnv* env, jclass type, jlong coordinate, jlong out_meters,
   jlong out_diagnostic
@@ -2670,8 +2665,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_offscreen_device_release_jni},
   {"mln_open_gl_supported_context_provider_mask", "()I",
    (void*)mln_open_gl_supported_context_provider_mask_jni},
-  {"mln_plugin_get_register_function_v1", "()J",
-   (void*)mln_plugin_get_register_function_v1_jni},
   {"mln_projected_meters_for_lat_lng", "(JJJ)I",
    (void*)mln_projected_meters_for_lat_lng_jni},
   {"mln_render_frame_batch_release", "(J)V",
@@ -3073,8 +3066,6 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_offscreen_device_release_jni},
   {"mln_open_gl_supported_context_provider_mask", "()I",
    (void*)mln_open_gl_supported_context_provider_mask_jni},
-  {"mln_plugin_get_register_function_v1", "()J",
-   (void*)mln_plugin_get_register_function_v1_jni},
   {"mln_projected_meters_for_lat_lng", "(JJJ)I",
    (void*)mln_projected_meters_for_lat_lng_jni},
   {"mln_render_frame_batch_release", "(J)V",

@@ -95,7 +95,6 @@
 /dotnet/src/Maplibre.NativeFfi/Offscreen/OffscreenDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Offscreen/OffscreenDeviceHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Offscreen/OffscreenDeviceOptions.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Plugin/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Projection/MapProjectionCameraResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Projection/MapProjectionHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Projection/MaplibreNative.Operations.g.cs linguist-generated=true
@@ -369,7 +368,6 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedMapRuntimeOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedOffscreenMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedOffscreenOffscreenDeviceOperations.swift linguist-generated=true
-/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedPluginGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionGlobalsOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionMapProjectionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedQueryRenderSessionOperations.swift linguist-generated=true

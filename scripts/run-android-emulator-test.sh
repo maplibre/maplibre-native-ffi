@@ -15,8 +15,8 @@ target=$2
 native_library=$3
 shift 3
 emulator_api=
-# Further shared libraries a test executable loads, such as a plugin, travel
-# beside the C API library.
+# Further shared libraries a test executable loads, such as the test graphics
+# library, travel beside the C API library.
 extra_libraries=()
 while (($#)); do
   case $1 in

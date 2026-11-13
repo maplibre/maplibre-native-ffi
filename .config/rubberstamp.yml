@@ -56,8 +56,8 @@ labels:
         area:rendering: >-
           Turning a map into pixels: render sessions and drivers, targets,
           surfaces, textures, readback, frame pacing, the OpenGL, Vulkan, Metal,
-          and WebGPU backends, and layer plugins. How a binding or the generator
-          exposes rendering types is api, not rendering.
+          and WebGPU backends. How a binding or the generator exposes rendering
+          types is api, not rendering.
         area:platform: >-
           The OS services that the library runs on, which mln-rs implements: the
           run loop, threads, HTTP and TLS, image decoding, locale and text,

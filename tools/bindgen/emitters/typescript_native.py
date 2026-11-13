@@ -84,7 +84,7 @@ def render_native(
         + "#ifndef MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H\n"
         + "#define MAPLIBRE_NATIVE_FFI_NODE_GENERATED_ADDON_H\n\n"
         + '#include "runtime.h"\n'
-        # The headers that the umbrella header leaves out, such as plugin.h.
+        # Each header that declares an exported function.
         + "".join(
             f'#include "{path}"\n'
             for path in sorted(

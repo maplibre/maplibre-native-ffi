@@ -13,8 +13,8 @@ timeout_seconds=$1
 native_library=$2
 cxx_library=$3
 shift 3
-# Further shared libraries a test executable loads, such as a plugin, travel
-# beside the C API library.
+# Further shared libraries a test executable loads, such as the test graphics
+# library, travel beside the C API library.
 extra_libraries=()
 while [[ ${1:-} == --library ]]; do
   extra_libraries+=("${2:?--library requires a shared library}")

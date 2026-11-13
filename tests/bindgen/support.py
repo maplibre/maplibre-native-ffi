@@ -22,8 +22,6 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PROTOCOLS = FIXTURES / "protocols.h"
 PROTOCOLS_STUB = FIXTURES / "protocols_stub.c"
-NATIVE_INCLUDE = ROOT / "include"
-REAL_CLANG_ARGS = (f"-I{NATIVE_INCLUDE}",)
 
 # CI sets this so that a probe whose toolchain is missing fails the job.
 REQUIRE_TOOLCHAINS = os.environ.get("MLN_BINDGEN_REQUIRE_TOOLCHAINS") == "1"
@@ -98,7 +96,7 @@ def emitted(emitter, api) -> dict[str, str]:
 
 
 def real_api() -> Api:
-    return parse_directory(ROOT / "include", REAL_CLANG_ARGS)
+    return parse_directory(ROOT / "include")
 
 
 _MODELS: dict[str, Api] = {}

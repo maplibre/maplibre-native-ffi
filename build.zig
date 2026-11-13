@@ -252,17 +252,6 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
     return translator.mod;
 }
 
-fn maplibreNativeCHeader(b: *std.Build) std.Build.LazyPath {
-    const header = b.addWriteFiles();
-    // Layer plugin registration stays outside the umbrella header; see
-    // include/maplibre_native_c/plugin.h.
-    return header.add("maplibre_native_c_import.h",
-        \\#include <maplibre_native_c.h>
-        \\#include <maplibre_native_c/plugin.h>
-        \\
-    );
-}
-
 fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const root = system_root orelse return;
@@ -311,7 +300,7 @@ fn addMaplibreNativeIncludes(
     }
     module.link_libc = true;
     module.addImport("maplibre_native_c", translateCModule(b, .{
-        .root_source_file = maplibreNativeCHeader(b),
+        .root_source_file = b.path("include/maplibre_native_c.h"),
         .target = target,
         .optimize = optimize,
         .include_dirs = include_dirs,

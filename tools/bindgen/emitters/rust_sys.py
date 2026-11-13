@@ -130,8 +130,7 @@ class Declarations:
                 if not field.name:
                     raise Unsupported(f"{name}: anonymous members need a name")
                 self.type(field.type)
-        # Any other name is a typedef that another header declares, such as the
-        # plugin registration function type, which the crate declares by hand.
+        # Any other name is a typedef that another header declares.
 
     def function_pointer(self, function: CType, names) -> str:
         names = names or [""] * len(function.parameters)

@@ -5137,18 +5137,6 @@ static napi_value mln_ts_export_mln_open_gl_supported_context_provider_mask(
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_plugin_get_register_function_v1(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_plugin_register_function_v1 result;
-  if (!mln_ts_begin(call, env, info, 0)) return NULL;
-  result = mln_plugin_get_register_function_v1();
-  call->result = mln_ts_u64(env, (uint64_t)(uintptr_t)(result));
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_projected_meters_for_lat_lng(
   napi_env env, napi_callback_info info
 ) {
@@ -8105,8 +8093,6 @@ static const mln_ts_export exports[] = {
   {"mln_ohos_frame_pacer_create", mln_ts_export_mln_ohos_frame_pacer_create},
   {"mln_open_gl_supported_context_provider_mask",
    mln_ts_export_mln_open_gl_supported_context_provider_mask},
-  {"mln_plugin_get_register_function_v1",
-   mln_ts_export_mln_plugin_get_register_function_v1},
   {"mln_projected_meters_for_lat_lng",
    mln_ts_export_mln_projected_meters_for_lat_lng},
   {"mln_render_session_abandon", mln_ts_export_mln_render_session_abandon},

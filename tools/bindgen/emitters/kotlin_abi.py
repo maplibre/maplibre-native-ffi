@@ -159,8 +159,8 @@ class Abi:
         canonical = ctype.canonical.removeprefix("const ").strip()
         if canonical in BUILTIN:
             return BUILTIN[canonical]
-        # A typedef declared outside the parsed headers, such as a plugin
-        # entry point, still has a canonical pointer type.
+        # A typedef declared outside the parsed headers still has a canonical
+        # pointer type.
         if canonical.endswith("*") or "(*)" in canonical:
             return POINTER
         raise LayoutError(f"{ctype.spelling}: no C layout rule")

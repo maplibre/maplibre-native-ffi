@@ -449,7 +449,7 @@ class RustSysTests(unittest.TestCase):
         """The crate declares exactly the functions the library exports, the
         delivery protocol and binding-support exports included."""
         exports = check_exports()
-        expected = exports.declared_functions() | exports.EXTRA_EXPORTS
+        expected = exports.declared_functions()
         declared = re.findall(
             r"\bpub fn (mln_\w+)\(",
             (SYS / "lib.rs").read_text() + (SYS / "generated.rs").read_text(),
@@ -503,7 +503,6 @@ class RustSysTests(unittest.TestCase):
             (root / "main.c").write_text(
                 "#include <stddef.h>\n#include <stdio.h>\n"
                 "#include <maplibre_native_c.h>\n"
-                "#include <maplibre_native_c/plugin.h>\n"
                 "int main(int argc, char** argv) {\n  (void)argc;\n"
                 '  FILE* out = fopen(argv[1], "w");\n  '
                 + "\n  ".join(c_lines)
@@ -533,7 +532,6 @@ class RustSysTests(unittest.TestCase):
             require_tool(self, "clang").run(
                 self,
                 "-std=c2x",
-                f"-I{ROOT / 'include'}",
                 f"-I{ROOT / 'include'}",
                 str(root / "main.c"),
                 "-o",

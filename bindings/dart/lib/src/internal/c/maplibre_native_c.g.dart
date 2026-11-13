@@ -4709,9 +4709,6 @@ external void mln_offscreen_device_release(int device);
 @Native<Uint32 Function()>()
 external int mln_open_gl_supported_context_provider_mask();
 
-@Native<Pointer<Void> Function()>()
-external Pointer<Void> mln_plugin_get_register_function_v1();
-
 @Native<
   Int32 Function(
     mln_lat_lng,

@@ -277,22 +277,6 @@ pub fn open_gl_supported_context_provider_mask() -> OpenGlContextProviderFlag {
     OpenGlContextProviderFlag::from_bits_retain(value)
 }
 
-/// Returns the function that registers a plugin's style layer types.
-///
-/// Pass the function to the plugin's registration entry point before
-/// loading a style that uses the plugin's layer types. Plugin callbacks run
-/// on library threads and can keep running while the process exits, so they
-/// must not use state that the process destroys at exit.
-///
-/// See `mln_plugin_get_register_function_v1` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
-pub fn get_plugin_register_function_v1() -> sys::mln_plugin_register_function_v1 {
-    let mut call = Call::global();
-    crate::abi::require_abi_version();
-    let value = call.run(|_| unsafe { sys::mln_plugin_get_register_function_v1() });
-    value
-}
-
 /// Converts a coordinate to meters in the Web Mercator projection.
 ///
 /// See `mln_projected_meters_for_lat_lng` in the

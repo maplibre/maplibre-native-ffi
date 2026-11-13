@@ -4,7 +4,7 @@
 # this worktree its own machine, booted on demand with anyvm from the image that
 # vmactions/freebsd-vm boots, which keeps running until `devices-cli release`.
 # The machine mounts the worktree over NFS at the path it has on the host, so a
-# test executable, the plugins it loads, and the fixtures keep their paths. It
+# test executable, the libraries it loads, and the fixtures keep their paths. It
 # needs QEMU, UEFI firmware, and KVM on a Linux host.
 set -euo pipefail
 

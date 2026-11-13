@@ -136,7 +136,7 @@ def main() -> int:
         api = parse_headers(
             args.include,
             clang=args.clang,
-            clang_args=(f"-I{args.include.resolve()}", *args.clang_arg),
+            clang_args=tuple(args.clang_arg),
         )
         validate(api)
         if args.command == "generate":
