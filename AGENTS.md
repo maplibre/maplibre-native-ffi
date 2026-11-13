@@ -44,10 +44,8 @@ the diff reverts the mln-rs pin.
 ## Tests
 
 Test native behavior once, in C, under `tests/native`. A patch to mln-rs is the
-exception: its tests go in mln-rs's own tests. A case that mln-rs doesn't pass
-yet goes in the backend's list under `tests/native/expected-failures/`, with why
-it fails. A binding's suite tests only what the binding adds: its runtime, its
-generated code, and its platform integration.
+exception: its tests go in mln-rs's own tests. A binding's suite tests only what
+the binding adds: its runtime, its generated code, and its platform integration.
 
 Test behavior that callers can observe, not implementation details. Add a test
 only when it would catch a regression in that behavior. Don't test what the

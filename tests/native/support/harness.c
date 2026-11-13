@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #if defined(__OHOS__)
 #include <unistd.h>
@@ -33,64 +32,6 @@ static const mln_test_group_entry groups[] = {
 #include "mln_native_test_registry.inc"
 #undef MLN_TEST_REGISTRY_ENTRY
 };
-
-// The cases that this build expects to fail, which CMake writes from the lists
-// in tests/native/expected-failures. A case that takes the process down is
-// skipped instead of run. The last entry only keeps the array from being
-// empty.
-typedef struct mln_test_expected_failure {
-  const char* file;
-  const char* name;
-  const char* reason;
-  bool skip;
-} mln_test_expected_failure;
-
-static const mln_test_expected_failure expected_failures[] = {
-#define MLN_TEST_EXPECTED_FAILURE(file, name, reason, skip) \
-  {file, name, reason, skip},
-#include "mln_native_expected_failures.inc"
-#undef MLN_TEST_EXPECTED_FAILURE
-  {NULL, NULL, NULL, false},
-};
-
-static const mln_test_expected_failure* expected_failure(
-  const char* file, const char* name
-) {
-  for (size_t index = 0; expected_failures[index].file != NULL; index += 1) {
-    if (
-      strcmp(expected_failures[index].file, file) == 0 &&
-      strcmp(expected_failures[index].name, name) == 0
-    ) {
-      return &expected_failures[index];
-    }
-  }
-  return NULL;
-}
-
-// A listed case that fails counts as ignored, and one that passes fails, so
-// the list shrinks as the library catches up.
-static void conclude_expected_failure(const char* reason) {
-  if (Unity.CurrentTestIgnored) {
-    return;
-  }
-  if (Unity.CurrentTestFailed) {
-    UnityPrint(" (expected failure");
-    if (reason[0] != '\0') {
-      UnityPrint(": ");
-      UnityPrint(reason);
-    }
-    UnityPrint(")");
-    Unity.CurrentTestFailed = 0;
-    Unity.CurrentTestIgnored = 1;
-    return;
-  }
-  if (TEST_PROTECT()) {
-    TEST_FAIL_MESSAGE(
-      "Passes, but tests/native/expected-failures lists it as failing. Remove "
-      "it from the list."
-    );
-  }
-}
 
 static bool listing;
 static size_t selected_cases;
@@ -143,15 +84,6 @@ void mln_test_run_case(UnityTestFunction func, const char* name, int line) {
 
   Unity.NumberOfTests++;
   UNITY_CLR_DETAILS();
-  const mln_test_expected_failure* expected =
-    expected_failure(Unity.TestFile, name);
-  if (expected != NULL && expected->skip) {
-    if (TEST_PROTECT()) {
-      TEST_IGNORE_MESSAGE(expected->reason);
-    }
-    UnityConcludeTest();
-    return;
-  }
   mln_test_watchdog_arm(Unity.TestFile, name);
   UNITY_EXEC_TIME_START();
   if (TEST_PROTECT()) {
@@ -160,9 +92,6 @@ void mln_test_run_case(UnityTestFunction func, const char* name, int line) {
   }
   if (TEST_PROTECT()) {
     tearDown();
-  }
-  if (expected != NULL) {
-    conclude_expected_failure(expected->reason);
   }
   UNITY_EXEC_TIME_STOP();
   mln_test_watchdog_disarm();

@@ -146,102 +146,6 @@ function(mln_native_write_registry registry_dir sources symbols)
     CONTENT "${registry}")
 endfunction()
 
-# The cases and programs that a preset expects to fail, because the library
-# doesn't do yet what they test. tests/native/expected-failures/ holds a list
-# for each backend, named by the backend or, for OpenGL, its context provider
-# (vulkan.txt, egl.txt, metal.txt), and optionally one for a system and backend
-# (android-vulkan.txt). A line names a suite case as <file>:<case>, or an exit
-# program as its file, relative to tests/native, followed by `  # ` and why it
-# fails. The harness reports a listed case that fails as ignored, and CTest
-# expects a listed program to fail. Either fails when what it lists passes, so
-# a list only ever shrinks where the review sees it. A case that takes the
-# process down with it, which would end the cases after it, starts its line
-# with `!`: the harness skips it instead of running it.
-#
-# Sets `out_cases` to the harness's entries, one MLN_TEST_EXPECTED_FAILURE()
-# line each, and `out_programs` to the listed exit programs' stems.
-function(mln_native_read_expected_failures out_cases out_programs)
-  string(TOLOWER "${CMAKE_SYSTEM_NAME}" system)
-  set(backend ${MLN_FFI_RENDER_BACKEND})
-  if(backend STREQUAL "opengl")
-    set(backend ${MLN_FFI_OPENGL_CONTEXT_PROVIDER})
-  endif()
-  set(cases "")
-  set(programs "")
-  foreach(name IN ITEMS "${backend}" "${system}-${backend}")
-    set(list_file "${MLN_NATIVE_TESTS_DIR}/expected-failures/${name}.txt")
-    set_property(
-      DIRECTORY
-      APPEND
-      PROPERTY CMAKE_CONFIGURE_DEPENDS "${list_file}")
-    if(NOT EXISTS "${list_file}")
-      continue()
-    endif()
-    file(STRINGS "${list_file}" lines)
-    foreach(line IN LISTS lines)
-      string(STRIP "${line}" line)
-      if(line STREQUAL "" OR line MATCHES "^#")
-        continue()
-      endif()
-      if(NOT line MATCHES "^(!?)([^:! ]+)(:([A-Za-z0-9_]+))?( +# *(.*))?$")
-        message(
-          FATAL_ERROR "${list_file}: not [!]<file>[:<case>]  # reason: ${line}"
-        )
-      endif()
-      set(skip 0)
-      if(CMAKE_MATCH_1)
-        set(skip 1)
-      endif()
-      set(file "${CMAKE_MATCH_2}")
-      set(case "${CMAKE_MATCH_4}")
-      set(reason "${CMAKE_MATCH_6}")
-      # A list that names what the suite no longer has would hide nothing, and
-      # would keep a stale entry around.
-      if(NOT EXISTS "${MLN_NATIVE_TESTS_DIR}/${file}")
-        message(FATAL_ERROR "${list_file} names ${file}, which doesn't exist")
-      endif()
-      if(NOT case)
-        if(skip)
-          message(FATAL_ERROR "${list_file}: only a case is skipped: ${line}")
-        endif()
-        if(NOT file MATCHES "^exit/([^/]+)\\.c$")
-          message(
-            FATAL_ERROR
-              "${list_file} names ${file} without a case; only exit programs fail as a whole"
-          )
-        endif()
-        list(APPEND programs "${CMAKE_MATCH_1}")
-        continue()
-      endif()
-      file(
-        STRINGS "${MLN_NATIVE_TESTS_DIR}/${file}" defined
-        REGEX "RUN_TEST[(]${case}[),]")
-      if(NOT defined)
-        message(
-          FATAL_ERROR "${list_file} names ${file}:${case}, which doesn't exist")
-      endif()
-      string(REPLACE "\\" "\\\\" reason "${reason}")
-      string(REPLACE "\"" "\\\"" reason "${reason}")
-      string(
-        APPEND cases
-        "MLN_TEST_EXPECTED_FAILURE(\"tests/native/${file}\", \"${case}\", \"${reason}\", ${skip})\n"
-      )
-    endforeach()
-  endforeach()
-  set(${out_cases} "${cases}" PARENT_SCOPE)
-  set(${out_programs} ${programs} PARENT_SCOPE)
-endfunction()
-
-# Writes the harness's list of the cases that this preset expects to fail.
-function(mln_native_write_expected_failures registry_dir)
-  mln_native_read_expected_failures(cases programs)
-  # Written as is: a reason may hold characters that file(CONFIGURE) expands.
-  set(output "${registry_dir}/mln_native_expected_failures.inc")
-  file(WRITE "${output}.tmp" "${cases}")
-  file(COPY_FILE "${output}.tmp" "${output}" ONLY_IF_DIFFERENT)
-  file(REMOVE "${output}.tmp")
-endfunction()
-
 function(mln_native_fetch_unity)
   include(FetchContent)
   fetchcontent_declare(
@@ -438,7 +342,6 @@ function(mln_native_add_abi_suite out_sources)
   mln_native_collect_abi_tests(sources symbols)
   set(registry_dir "${CMAKE_CURRENT_BINARY_DIR}/tests/native/abi")
   mln_native_write_registry("${registry_dir}" "${sources}" "${symbols}")
-  mln_native_write_expected_failures("${registry_dir}")
   list(TRANSFORM sources PREPEND "${MLN_NATIVE_TESTS_DIR}/" OUTPUT_VARIABLE
        test_sources)
   add_executable(mln_native_abi_tests ${test_sources})
@@ -506,7 +409,6 @@ endfunction()
 # only on matching presets, as a suite file does.
 function(mln_native_add_exit_tests out_tests)
   mln_native_active_file_tags(active_tags)
-  mln_native_read_expected_failures(expected_cases expected_programs)
   file(GLOB programs RELATIVE "${MLN_NATIVE_TESTS_DIR}/exit" CONFIGURE_DEPENDS
        "${MLN_NATIVE_TESTS_DIR}/exit/*.c")
   if(NOT WIN32)
@@ -533,9 +435,6 @@ function(mln_native_add_exit_tests out_tests)
     endif()
     add_test(NAME "native-exit/${stem}" COMMAND ${target})
     mln_native_bound_test("native-exit/${stem}" ${target} 60)
-    if(stem IN_LIST expected_programs)
-      set_tests_properties("native-exit/${stem}" PROPERTIES WILL_FAIL TRUE)
-    endif()
     list(APPEND tests "native-exit/${stem}")
   endforeach()
   set(${out_tests} ${tests} PARENT_SCOPE)

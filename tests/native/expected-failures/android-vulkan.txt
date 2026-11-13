@@ -1,4 +1,0 @@
-# The cases and exit programs that fail under the Android Vulkan presets on top
-# of vulkan.txt, on the x86_64 emulator's SwiftShader.
-exit/transition_release_at_exit.c  # a transition's release callback can still start after the library's exit handler ran
-!abi/backend/target_validation.c:set_target_rejects_malformed_targets  # crashes the process with a segmentation fault
