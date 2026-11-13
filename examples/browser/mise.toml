@@ -1,9 +1,9 @@
 # The browser example, which the docs site serves as its live demo at /demo/.
 # Its pages load the binding's browser modules, so build those first, with the
-# Emscripten SDK:
+# web toolchain:
 #
-#   mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgl
-#   mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgpu
+#   mise -E web run //bindings/typescript:build web-wasm32-webgl
+#   mise -E web run //bindings/typescript:build web-wasm32-webgpu
 #
 # Then run dev, or run build before //docs:build to put the demo in the site.
 
@@ -11,18 +11,20 @@
 hide = true
 run = '''
 for backend in webgl webgpu; do
-  install="$MISE_MONOREPO_ROOT/bindings/typescript/native/build/emscripten-wasm32-$backend/install"
-  if [[ ! -f "$install/maplibre_native_ffi.wasm" ]]; then
+  install="$MISE_MONOREPO_ROOT/bindings/typescript/native/build/web-wasm32-$backend/install"
+  if [[ ! -f "$install/maplibre_native_ffi_bg.wasm" ]]; then
     echo "error: the $backend browser module isn't built. Build it with:" >&2
-    echo "  mise -E emscripten run //bindings/typescript:build emscripten-wasm32-$backend" >&2
+    echo "  mise -E web run //bindings/typescript:build web-wasm32-$backend" >&2
     exit 1
   fi
   rm -rf "public/$backend"
   mkdir -p "public/$backend"
-  cp -R "$install/maplibre_native_ffi.mjs" "$install/maplibre_native_ffi.wasm" \
+  # The package's bindings, its tile worker script under snippets/, and the
+  # shaper module, which load by URLs relative to each other.
+  cp -R "$install/maplibre_native_ffi.js" "$install/maplibre_native_ffi_bg.wasm" \
+    "$install/snippets" "$install/mln_web_shaper.js" "$install/mln_web_shaper_bg.wasm" \
     "$install/licenses" "public/$backend/"
 done
-cp node_modules/coi-serviceworker/coi-serviceworker.min.js public/
 '''
 
 [tasks.dev]
