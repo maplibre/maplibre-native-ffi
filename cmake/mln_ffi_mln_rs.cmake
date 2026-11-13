@@ -6,9 +6,10 @@
 # always had, so the CMake package, pkg-config, the artifact descriptor, and the
 # bindings see no difference.
 #
-# The crate builds every render backend that its target supports, so the
-# presets of one platform share a Cargo build and differ in which backend their
-# tests drive and which one the descriptor names.
+# Each preset builds the crate with the Cargo feature of its render backend
+# alone, so the library draws with that backend and reports only it as
+# supported. A preset's Cargo build goes in a target directory of its feature,
+# so presets of one platform keep apart the libraries that they build.
 
 set(MLN_FFI_MLN_RS_DIR "${PROJECT_SOURCE_DIR}/third_party/mln-rs")
 set(MLN_FFI_LIBRARY_NAME maplibre-native-c)
@@ -170,6 +171,27 @@ esac
   set(${out_var} "${shim}" PARENT_SCOPE)
 endfunction()
 
+# The Cargo feature of mln-rs-c that builds the preset's backend, or nothing
+# for the crate's default features. The crate draws with Metal alone on Apple
+# platforms, so the Apple presets of another backend build every feature.
+function(mln_ffi_native_feature out_var)
+  set(feature "")
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    set(feature metal)
+  elseif(APPLE)
+    set(feature "")
+  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+    set(feature vulkan)
+  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+    set(feature gl)
+  else()
+    message(
+      FATAL_ERROR
+        "No mln-rs-c feature builds the ${MLN_FFI_RENDER_BACKEND} backend")
+  endif()
+  set(${out_var} "${feature}" PARENT_SCOPE)
+endfunction()
+
 # The environment and rustc arguments that build the crate for this preset.
 function(mln_ffi_cargo_environment out_environment out_rustc_arguments)
   set(rust_target "${MLN_FFI_RUST_TARGET}")
@@ -177,7 +199,7 @@ function(mln_ffi_cargo_environment out_environment out_rustc_arguments)
   string(REPLACE "-" "_" target_upper "${target_upper}")
   string(TOLOWER "${target_upper}" target_lower)
 
-  set(environment "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}")
+  set(environment "CARGO_TARGET_DIR=${MLN_FFI_CARGO_BUILD_DIR}")
   set(rustc_arguments)
   # Flags for every crate that Cargo builds for the target, but not for build
   # scripts, which run on the host.
@@ -283,7 +305,7 @@ endfunction()
 # The file names that Cargo gives the crate's outputs for the preset's target,
 # and the ones that this package installs them under.
 function(mln_ffi_library_files)
-  set(cargo_dir "${MLN_FFI_CARGO_TARGET_DIR}/${MLN_FFI_RUST_TARGET}/release")
+  set(cargo_dir "${MLN_FFI_CARGO_BUILD_DIR}/${MLN_FFI_RUST_TARGET}/release")
   set(native_dir "${CMAKE_BINARY_DIR}/native")
   # The libraries go beside the test executables, where Windows looks for the
   # DLLs that an executable imports.
@@ -393,6 +415,13 @@ function(mln_ffi_add_c_api_library target)
   endif()
   set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/build/cargo"
       CACHE PATH "Cargo target directory for mln-rs")
+  mln_ffi_native_feature(feature)
+  set(feature_arguments)
+  set(MLN_FFI_CARGO_BUILD_DIR "${MLN_FFI_CARGO_TARGET_DIR}/default")
+  if(feature)
+    set(feature_arguments --no-default-features --features "${feature}")
+    set(MLN_FFI_CARGO_BUILD_DIR "${MLN_FFI_CARGO_TARGET_DIR}/${feature}")
+  endif()
 
   get_target_property(shared_supported mln_ffi_platform_dependencies
                       MLN_FFI_SHARED_SUPPORTED)
@@ -432,6 +461,7 @@ function(mln_ffi_add_c_api_library target)
       "${MLN_FFI_MLN_RS_DIR}/Cargo.toml"
       --package
       mln-rs-c
+      ${feature_arguments}
       --lib
       --crate-type
       ${crate_types}
@@ -565,13 +595,13 @@ function(mln_ffi_add_c_api_library target)
       MLN_FFI_NATIVE_LIBRARIES_FILE
       "${native_libraries}")
 
-  mln_ffi_add_mln_rs_components(${target})
+  mln_ffi_add_mln_rs_components(${target} FEATURES ${feature})
 endfunction()
 
 # The components that the library carries: mln-rs, with its patches, the Rust
 # crates that Cargo builds into it, as cargo-about lists them, and the Rust
 # standard library. FEATURES names the crate's features for a build without its
-# default ones, as the browser package builds.
+# default ones, as each preset builds.
 function(mln_ffi_add_mln_rs_components target)
   cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "FEATURES")
   set(feature_arguments)
