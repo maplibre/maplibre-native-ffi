@@ -26,8 +26,8 @@ test("a failed call carries its status, an unknown status code, and its own diag
       error instanceof MaplibreError &&
       error.status === Status.invalidArgument &&
       error.statusName === "invalidArgument" &&
-      error.diagnostic === "mask must be valid" &&
-      error.message === "invalidArgument: mask must be valid",
+      error.diagnostic === "event mask contains unknown bits" &&
+      error.message === "invalidArgument: event mask contains unknown bits",
   );
   // An asynchronous failure carries the diagnostic of its own completion.
   await assert.rejects(

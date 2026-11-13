@@ -4,15 +4,10 @@
 
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/camera.h"
+#include "maplibre_native_c/gpu_device.h"
 #include "maplibre_native_c/logging.h"
 #include "maplibre_native_c/map.h"
-#include "maplibre_native_c/offscreen.h"
 #include "maplibre_native_c/platform/android.h"
-#include "maplibre_native_c/platform/apple.h"
-#include "maplibre_native_c/platform/linux.h"
-#include "maplibre_native_c/platform/ohos.h"
-#include "maplibre_native_c/platform/wayland.h"
-#include "maplibre_native_c/platform/win32.h"
 #include "maplibre_native_c/projection.h"
 #include "maplibre_native_c/query.h"
 #include "maplibre_native_c/render_session.h"
@@ -20,9 +15,7 @@
 #include "maplibre_native_c/runtime.h"
 #include "maplibre_native_c/style.h"
 #include "maplibre_native_c/style_expression.h"
-#include "maplibre_native_c/surface.h"
 #include "maplibre_native_c/texture.h"
-#include "maplibre_native_c/vulkan.h"
 #include "maplibre_native_c/web.h"
 #include "runtime.h"
 
@@ -178,11 +171,20 @@ napi_value mln_ts_read_event_batch_view(
 napi_value mln_ts_read_event_batch_view_events(
   napi_env env, const mln_event_batch_view* source
 );
+napi_value mln_ts_read_frame_projection(
+  napi_env env, const mln_frame_projection* source, size_t size
+);
 napi_value mln_ts_read_free_camera(
   napi_env env, const mln_free_camera* source, size_t size
 );
 napi_value mln_ts_read_geo_json_source_options(
   napi_env env, const mln_geo_json_source_options* source, size_t size
+);
+napi_value mln_ts_read_gpu_device_capabilities(
+  napi_env env, const mln_gpu_device_capabilities* source, size_t size
+);
+napi_value mln_ts_read_gpu_device_vulkan_context_result(
+  napi_env env, const mln_gpu_device_vulkan_context_result* source, size_t size
 );
 napi_value mln_ts_read_gpu_sync(
   napi_env env, const mln_gpu_sync* source, size_t size
@@ -226,6 +228,7 @@ napi_value mln_ts_read_map_view(
 napi_value mln_ts_read_map_viewport(
   napi_env env, const mln_map_viewport* source, size_t size
 );
+napi_value mln_ts_read_mat4(napi_env env, const mln_mat4* source, size_t size);
 napi_value mln_ts_read_metal_texture_frame(
   napi_env env, const mln_metal_texture_frame* source, size_t size
 );
@@ -248,6 +251,9 @@ napi_value mln_ts_read_offline_region_status(
 napi_value mln_ts_read_offline_tile_pyramid_region_definition(
   napi_env env, const mln_offline_tile_pyramid_region_definition* source,
   size_t size
+);
+napi_value mln_ts_read_opaque_fd_frame(
+  napi_env env, const mln_opaque_fd_frame* source, size_t size
 );
 napi_value mln_ts_read_open_gl_texture_frame(
   napi_env env, const mln_open_gl_texture_frame* source, size_t size
@@ -317,10 +323,6 @@ napi_value mln_ts_read_runtime_event_offline_region_status(
   napi_env env, const mln_runtime_event_offline_region_status* source,
   size_t size
 );
-napi_value mln_ts_read_runtime_event_offline_region_tile_count_limit(
-  napi_env env, const mln_runtime_event_offline_region_tile_count_limit* source,
-  size_t size
-);
 napi_value mln_ts_read_runtime_event_payload(
   napi_env env, const mln_runtime_event* source, size_t size
 );
@@ -382,11 +384,9 @@ napi_value mln_ts_read_tile_id(
   napi_env env, const mln_tile_id* source, size_t size
 );
 napi_value mln_ts_read_vec3(napi_env env, const mln_vec3* source, size_t size);
+napi_value mln_ts_read_vec4(napi_env env, const mln_vec4* source, size_t size);
 napi_value mln_ts_read_vulkan_context_descriptor(
   napi_env env, const mln_vulkan_context_descriptor* source, size_t size
-);
-napi_value mln_ts_read_vulkan_device_context_result(
-  napi_env env, const mln_vulkan_device_context_result* source, size_t size
 );
 napi_value mln_ts_read_vulkan_texture_frame(
   napi_env env, const mln_vulkan_texture_frame* source, size_t size
@@ -398,16 +398,8 @@ bool mln_ts_write_anchored_momentum(
   mln_ts_call* call, napi_value value, mln_anchored_momentum* out,
   const char* path
 );
-bool mln_ts_write_android_hardware_buffer_ring_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_android_hardware_buffer_ring_descriptor* out, const char* path
-);
-bool mln_ts_write_android_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_android_surface_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_android_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_android_surface_replacement* out,
+bool mln_ts_write_android_window_target(
+  mln_ts_call* call, napi_value value, mln_android_window_target* out,
   const char* path
 );
 bool mln_ts_write_animation_options(
@@ -456,19 +448,15 @@ bool mln_ts_write_custom_vector_source_options(
 bool mln_ts_write_dma_buf_format(
   mln_ts_call* call, napi_value value, mln_dma_buf_format* out, const char* path
 );
-bool mln_ts_write_dma_buf_ring_descriptor(
-  mln_ts_call* call, napi_value value, mln_dma_buf_ring_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_dxgi_shared_texture_ring_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_dxgi_shared_texture_ring_descriptor* out, const char* path
-);
 bool mln_ts_write_edge_insets(
   mln_ts_call* call, napi_value value, mln_edge_insets* out, const char* path
 );
 bool mln_ts_write_egl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_egl_context_descriptor* out,
+  const char* path
+);
+bool mln_ts_write_exported_ring_target(
+  mln_ts_call* call, napi_value value, mln_exported_ring_target* out,
   const char* path
 );
 bool mln_ts_write_feature_id(
@@ -497,6 +485,10 @@ bool mln_ts_write_gesture_momentum(
   mln_ts_call* call, napi_value value, mln_gesture_momentum* out,
   const char* path
 );
+bool mln_ts_write_gpu_device_options(
+  mln_ts_call* call, napi_value value, mln_gpu_device_options* out,
+  const char* path
+);
 bool mln_ts_write_gpu_sync(
   mln_ts_call* call, napi_value value, mln_gpu_sync* out, const char* path
 );
@@ -516,10 +508,6 @@ bool mln_ts_write_image_content(
 );
 bool mln_ts_write_image_stretch(
   mln_ts_call* call, napi_value value, mln_image_stretch* out, const char* path
-);
-bool mln_ts_write_io_surface_ring_descriptor(
-  mln_ts_call* call, napi_value value, mln_io_surface_ring_descriptor* out,
-  const char* path
 );
 bool mln_ts_write_lat_lng(
   mln_ts_call* call, napi_value value, mln_lat_lng* out, const char* path
@@ -613,24 +601,16 @@ bool mln_ts_write_metal_borrowed_texture(
   mln_ts_call* call, napi_value value, mln_metal_borrowed_texture* out,
   const char* path
 );
-bool mln_ts_write_metal_borrowed_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_metal_borrowed_texture_descriptor* out, const char* path
-);
-bool mln_ts_write_metal_borrowed_texture_replacement(
-  mln_ts_call* call, napi_value value,
-  mln_metal_borrowed_texture_replacement* out, const char* path
-);
-bool mln_ts_write_metal_context_descriptor(
-  mln_ts_call* call, napi_value value, mln_metal_context_descriptor* out,
+bool mln_ts_write_metal_borrowed_textures_target(
+  mln_ts_call* call, napi_value value, mln_metal_borrowed_textures_target* out,
   const char* path
 );
-bool mln_ts_write_metal_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_metal_surface_descriptor* out,
+bool mln_ts_write_metal_device_descriptor(
+  mln_ts_call* call, napi_value value, mln_metal_device_descriptor* out,
   const char* path
 );
-bool mln_ts_write_metal_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_metal_surface_replacement* out,
+bool mln_ts_write_metal_layer_target(
+  mln_ts_call* call, napi_value value, mln_metal_layer_target* out,
   const char* path
 );
 bool mln_ts_write_momentum_decay(
@@ -651,44 +631,28 @@ bool mln_ts_write_offline_tile_pyramid_region_definition(
   mln_ts_call* call, napi_value value,
   mln_offline_tile_pyramid_region_definition* out, const char* path
 );
-bool mln_ts_write_offscreen_descriptor(
-  mln_ts_call* call, napi_value value, mln_offscreen_descriptor* out,
+bool mln_ts_write_offscreen_target(
+  mln_ts_call* call, napi_value value, mln_offscreen_target* out,
   const char* path
 );
-bool mln_ts_write_offscreen_device_options(
-  mln_ts_call* call, napi_value value, mln_offscreen_device_options* out,
-  const char* path
-);
-bool mln_ts_write_ohos_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_ohos_surface_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_ohos_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_ohos_surface_replacement* out,
+bool mln_ts_write_ohos_window_target(
+  mln_ts_call* call, napi_value value, mln_ohos_window_target* out,
   const char* path
 );
 bool mln_ts_write_open_gl_borrowed_texture(
   mln_ts_call* call, napi_value value, mln_open_gl_borrowed_texture* out,
   const char* path
 );
-bool mln_ts_write_open_gl_borrowed_texture_descriptor(
+bool mln_ts_write_open_gl_borrowed_textures_target(
   mln_ts_call* call, napi_value value,
-  mln_open_gl_borrowed_texture_descriptor* out, const char* path
-);
-bool mln_ts_write_open_gl_borrowed_texture_replacement(
-  mln_ts_call* call, napi_value value,
-  mln_open_gl_borrowed_texture_replacement* out, const char* path
+  mln_open_gl_borrowed_textures_target* out, const char* path
 );
 bool mln_ts_write_open_gl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_open_gl_context_descriptor* out,
   const char* path
 );
-bool mln_ts_write_open_gl_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_open_gl_surface_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_open_gl_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_open_gl_surface_replacement* out,
+bool mln_ts_write_open_gl_surface_target(
+  mln_ts_call* call, napi_value value, mln_open_gl_surface_target* out,
   const char* path
 );
 bool mln_ts_write_pan_momentum(
@@ -720,6 +684,9 @@ bool mln_ts_write_quaternion(
 bool mln_ts_write_render_session_attach_options(
   mln_ts_call* call, napi_value value, mln_render_session_attach_options* out,
   const char* path
+);
+bool mln_ts_write_render_target(
+  mln_ts_call* call, napi_value value, mln_render_target* out, const char* path
 );
 bool mln_ts_write_rendered_feature_query_options(
   mln_ts_call* call, napi_value value, mln_rendered_feature_query_options* out,
@@ -812,39 +779,31 @@ bool mln_ts_write_vulkan_borrowed_texture(
   mln_ts_call* call, napi_value value, mln_vulkan_borrowed_texture* out,
   const char* path
 );
-bool mln_ts_write_vulkan_borrowed_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_vulkan_borrowed_texture_descriptor* out, const char* path
-);
-bool mln_ts_write_vulkan_borrowed_texture_replacement(
-  mln_ts_call* call, napi_value value,
-  mln_vulkan_borrowed_texture_replacement* out, const char* path
+bool mln_ts_write_vulkan_borrowed_textures_target(
+  mln_ts_call* call, napi_value value, mln_vulkan_borrowed_textures_target* out,
+  const char* path
 );
 bool mln_ts_write_vulkan_context_descriptor(
   mln_ts_call* call, napi_value value, mln_vulkan_context_descriptor* out,
   const char* path
 );
-bool mln_ts_write_vulkan_device_options(
-  mln_ts_call* call, napi_value value, mln_vulkan_device_options* out,
+bool mln_ts_write_vulkan_device_descriptor(
+  mln_ts_call* call, napi_value value, mln_vulkan_device_descriptor* out,
   const char* path
 );
-bool mln_ts_write_vulkan_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_vulkan_surface_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_vulkan_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_vulkan_surface_replacement* out,
+bool mln_ts_write_vulkan_surface_target(
+  mln_ts_call* call, napi_value value, mln_vulkan_surface_target* out,
   const char* path
 );
 bool mln_ts_write_wake(
   mln_ts_call* call, napi_value value, mln_wake* out, const char* path
 );
-bool mln_ts_write_wayland_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_wayland_surface_descriptor* out,
+bool mln_ts_write_wayland_surface_target(
+  mln_ts_call* call, napi_value value, mln_wayland_surface_target* out,
   const char* path
 );
-bool mln_ts_write_wayland_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_wayland_surface_replacement* out,
+bool mln_ts_write_web_canvas_target(
+  mln_ts_call* call, napi_value value, mln_web_canvas_target* out,
   const char* path
 );
 bool mln_ts_write_web_gl_context_descriptor(
@@ -855,36 +814,24 @@ bool mln_ts_write_web_gpu_borrowed_texture(
   mln_ts_call* call, napi_value value, mln_web_gpu_borrowed_texture* out,
   const char* path
 );
-bool mln_ts_write_web_gpu_borrowed_texture_descriptor(
+bool mln_ts_write_web_gpu_borrowed_textures_target(
   mln_ts_call* call, napi_value value,
-  mln_web_gpu_borrowed_texture_descriptor* out, const char* path
-);
-bool mln_ts_write_web_gpu_borrowed_texture_replacement(
-  mln_ts_call* call, napi_value value,
-  mln_web_gpu_borrowed_texture_replacement* out, const char* path
+  mln_web_gpu_borrowed_textures_target* out, const char* path
 );
 bool mln_ts_write_web_gpu_context_descriptor(
   mln_ts_call* call, napi_value value, mln_web_gpu_context_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_web_gpu_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_web_gpu_surface_descriptor* out,
-  const char* path
-);
-bool mln_ts_write_web_gpu_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_web_gpu_surface_replacement* out,
   const char* path
 );
 bool mln_ts_write_wgl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_wgl_context_descriptor* out,
   const char* path
 );
-bool mln_ts_write_win32_window_descriptor(
-  mln_ts_call* call, napi_value value, mln_win32_window_descriptor* out,
+bool mln_ts_write_win32_window_target(
+  mln_ts_call* call, napi_value value, mln_win32_window_target* out,
   const char* path
 );
-bool mln_ts_write_win32_window_replacement(
-  mln_ts_call* call, napi_value value, mln_win32_window_replacement* out,
+bool mln_ts_write_xlib_window_target(
+  mln_ts_call* call, napi_value value, mln_xlib_window_target* out,
   const char* path
 );
 

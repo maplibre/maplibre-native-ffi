@@ -1009,6 +1009,41 @@ napi_value mln_ts_read_event_batch_view_events(
   return result;
 }
 
+napi_value mln_ts_read_frame_projection(
+  napi_env env, const mln_frame_projection* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "matrix",
+        mln_ts_read_mat4(env, &(source->matrix), sizeof(source->matrix))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "clipDepthRange",
+        mln_ts_number(env, (double)(source->clip_depth_range))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "nearDistance",
+        mln_ts_number(env, (double)(source->near_distance))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "farDistance",
+        mln_ts_number(env, (double)(source->far_distance))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "farDepth", mln_ts_number(env, (double)(source->far_depth))
+      ))
+    return NULL;
+  if (!mln_ts_set(env, result, "globe", mln_ts_bool(env, source->globe)))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_free_camera(
   napi_env env, const mln_free_camera* source, size_t size
 ) {
@@ -1100,6 +1135,60 @@ napi_value mln_ts_read_geo_json_source_options(
     if (!mln_ts_set(env, result, "cluster", mln_ts_bool(env, source->cluster)))
       return NULL;
   }
+  return result;
+}
+
+napi_value mln_ts_read_gpu_device_capabilities(
+  napi_env env, const mln_gpu_device_capabilities* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "backend", mln_ts_number(env, (double)(source->backend))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "targetKinds",
+        mln_ts_number(env, (double)(source->target_kinds))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "exportKinds",
+        mln_ts_number(env, (double)(source->export_kinds))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "syncKinds",
+        mln_ts_number(env, (double)(source->sync_kinds))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthStencilFormats",
+        mln_ts_number(env, (double)(source->depth_stencil_formats))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthExportKinds",
+        mln_ts_number(env, (double)(source->depth_export_kinds))
+      ))
+    return NULL;
+  return result;
+}
+
+napi_value mln_ts_read_gpu_device_vulkan_context_result(
+  napi_env env, const mln_gpu_device_vulkan_context_result* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "context",
+        mln_ts_read_vulkan_context_descriptor(
+          env, &(source->context), sizeof(source->context)
+        )
+      ))
+    return NULL;
   return result;
 }
 
@@ -1493,6 +1582,29 @@ napi_value mln_ts_read_map_viewport(
   return result;
 }
 
+napi_value mln_ts_read_mat4(napi_env env, const mln_mat4* source, size_t size) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "x", mln_ts_read_vec4(env, &(source->x), sizeof(source->x))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "y", mln_ts_read_vec4(env, &(source->y), sizeof(source->y))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "z", mln_ts_read_vec4(env, &(source->z), sizeof(source->z))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "w", mln_ts_read_vec4(env, &(source->w), sizeof(source->w))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_metal_texture_frame(
   napi_env env, const mln_metal_texture_frame* source, size_t size
 ) {
@@ -1529,6 +1641,16 @@ napi_value mln_ts_read_metal_texture_frame(
   if (!mln_ts_set(
         env, result, "pixelFormat",
         mln_ts_u64(env, (uint64_t)(source->pixel_format))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthTexture",
+        mln_ts_u64(env, (uint64_t)(uintptr_t)(source->depth_texture))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthPixelFormat",
+        mln_ts_u64(env, (uint64_t)(source->depth_pixel_format))
       ))
     return NULL;
   return result;
@@ -1735,6 +1857,65 @@ napi_value mln_ts_read_offline_tile_pyramid_region_definition(
   return result;
 }
 
+napi_value mln_ts_read_opaque_fd_frame(
+  napi_env env, const mln_opaque_fd_frame* source, size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "width", mln_ts_number(env, (double)(source->width))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "height", mln_ts_number(env, (double)(source->height))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "scaleFactor",
+        mln_ts_number(env, (double)(source->scale_factor))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "slot", mln_ts_number(env, (double)(source->slot))
+      ))
+    return NULL;
+  if (!mln_ts_set(env, result, "fd", mln_ts_number(env, (double)(source->fd))))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "allocationSize",
+        mln_ts_u64(env, (uint64_t)(source->allocation_size))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "dedicated", mln_ts_bool(env, source->dedicated)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "format", mln_ts_number(env, (double)(source->format))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthFd", mln_ts_number(env, (double)(source->depth_fd))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthAllocationSize",
+        mln_ts_u64(env, (uint64_t)(source->depth_allocation_size))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthDedicated", mln_ts_bool(env, source->depth_dedicated)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthFormat",
+        mln_ts_number(env, (double)(source->depth_format))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_open_gl_texture_frame(
   napi_env env, const mln_open_gl_texture_frame* source, size_t size
 ) {
@@ -1764,6 +1945,16 @@ napi_value mln_ts_read_open_gl_texture_frame(
     return NULL;
   if (!mln_ts_set(
         env, result, "target", mln_ts_number(env, (double)(source->target))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthTexture",
+        mln_ts_number(env, (double)(source->depth_texture))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthInternalFormat",
+        mln_ts_number(env, (double)(source->depth_internal_format))
       ))
     return NULL;
   return result;
@@ -1932,6 +2123,13 @@ napi_value mln_ts_read_render_frame_result(
       ))
     return NULL;
   if (!mln_ts_set(
+        env, result, "frameProjection",
+        mln_ts_read_frame_projection(
+          env, &(source->frame_projection), sizeof(source->frame_projection)
+        )
+      ))
+    return NULL;
+  if (!mln_ts_set(
         env, result, "mode", mln_ts_number(env, (double)(source->mode))
       ))
     return NULL;
@@ -1965,6 +2163,11 @@ napi_value mln_ts_read_render_session_capabilities(
   if (!mln_ts_set(
         env, result, "consumerSyncKinds",
         mln_ts_number(env, (double)(source->consumer_sync_kinds))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "exportKind",
+        mln_ts_number(env, (double)(source->export_kind))
       ))
     return NULL;
   return result;
@@ -2329,24 +2532,6 @@ napi_value mln_ts_read_runtime_event_offline_region_status(
   return result;
 }
 
-napi_value mln_ts_read_runtime_event_offline_region_tile_count_limit(
-  napi_env env, const mln_runtime_event_offline_region_tile_count_limit* source,
-  size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "regionId", mln_ts_i64(env, (int64_t)(source->region_id))
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "limit", mln_ts_u64(env, (uint64_t)(source->limit))
-      ))
-    return NULL;
-  return result;
-}
-
 napi_value mln_ts_read_runtime_event_payload(
   napi_env env, const mln_runtime_event* source, size_t size
 ) {
@@ -2456,21 +2641,6 @@ napi_value mln_ts_read_runtime_event_payload(
             mln_ts_read_runtime_event_offline_region_response_error(
               env, &(source->payload.offline_region_response_error),
               sizeof(source->payload.offline_region_response_error)
-            )
-          ))
-        return NULL;
-      return result;
-    case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
-      if (!mln_ts_set(
-            env, result, "kind",
-            mln_ts_text(env, "offlineRegionTileCountLimit", 27)
-          ))
-        return NULL;
-      if (!mln_ts_set(
-            env, result, "value",
-            mln_ts_read_runtime_event_offline_region_tile_count_limit(
-              env, &(source->payload.offline_region_tile_count_limit),
-              sizeof(source->payload.offline_region_tile_count_limit)
             )
           ))
         return NULL;
@@ -3074,6 +3244,21 @@ napi_value mln_ts_read_vec3(napi_env env, const mln_vec3* source, size_t size) {
   return result;
 }
 
+napi_value mln_ts_read_vec4(napi_env env, const mln_vec4* source, size_t size) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(env, result, "x", mln_ts_number(env, (double)(source->x))))
+    return NULL;
+  if (!mln_ts_set(env, result, "y", mln_ts_number(env, (double)(source->y))))
+    return NULL;
+  if (!mln_ts_set(env, result, "z", mln_ts_number(env, (double)(source->z))))
+    return NULL;
+  if (!mln_ts_set(env, result, "w", mln_ts_number(env, (double)(source->w))))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_vulkan_context_descriptor(
   napi_env env, const mln_vulkan_context_descriptor* source, size_t size
 ) {
@@ -3113,22 +3298,6 @@ napi_value mln_ts_read_vulkan_context_descriptor(
   if (!mln_ts_set(
         env, result, "getDeviceProcAddr",
         mln_ts_u64(env, (uint64_t)(uintptr_t)(source->get_device_proc_addr))
-      ))
-    return NULL;
-  return result;
-}
-
-napi_value mln_ts_read_vulkan_device_context_result(
-  napi_env env, const mln_vulkan_device_context_result* source, size_t size
-) {
-  (void)size;
-  napi_value result = mln_ts_object(env);
-  if (result == NULL) return NULL;
-  if (!mln_ts_set(
-        env, result, "context",
-        mln_ts_read_vulkan_context_descriptor(
-          env, &(source->context), sizeof(source->context)
-        )
       ))
     return NULL;
   return result;
@@ -3179,6 +3348,26 @@ napi_value mln_ts_read_vulkan_texture_frame(
         env, result, "layout", mln_ts_number(env, (double)(source->layout))
       ))
     return NULL;
+  if (!mln_ts_set(
+        env, result, "depthImage",
+        mln_ts_u64(env, (uint64_t)(source->depth_image))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthImageView",
+        mln_ts_u64(env, (uint64_t)(source->depth_image_view))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthFormat",
+        mln_ts_number(env, (double)(source->depth_format))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthLayout",
+        mln_ts_number(env, (double)(source->depth_layout))
+      ))
+    return NULL;
   return result;
 }
 
@@ -3216,6 +3405,18 @@ napi_value mln_ts_read_web_gpu_texture_frame(
   if (!mln_ts_set(
         env, result, "format",
         mln_ts_text(env, (source->format).data, (source->format).size)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthTexture",
+        mln_ts_number(env, (double)(source->depth_texture))
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "depthFormat",
+        mln_ts_text(
+          env, (source->depth_format).data, (source->depth_format).size
+        )
       ))
     return NULL;
   return result;
@@ -3267,9 +3468,9 @@ bool mln_ts_write_anchored_momentum(
   return true;
 }
 
-bool mln_ts_write_android_hardware_buffer_ring_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_android_hardware_buffer_ring_descriptor* out, const char* path
+bool mln_ts_write_android_window_target(
+  mln_ts_call* call, napi_value value, mln_android_window_target* out,
+  const char* path
 ) {
   napi_value member;
   char child[256];
@@ -3280,108 +3481,12 @@ bool mln_ts_write_android_hardware_buffer_ring_descriptor(
   if (!mln_ts_read_record(call, member, child)) return false;
   if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
     return false;
-  if (!mln_ts_member(call, value, "bufferCount", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "bufferCount");
+  if (!mln_ts_member(call, value, "window", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "window");
   {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->buffer_count = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "usage", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "usage");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->usage = (uint64_t)number;
-    }
-  }
-  return true;
-}
-
-bool mln_ts_write_android_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_android_surface_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "window", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "window");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->window = (void*)(uintptr_t)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "jniEnv", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "jniEnv");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->jni_env = (void*)(uintptr_t)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "surface", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surface");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->surface = (void*)(uintptr_t)number;
-    }
-  }
-  return true;
-}
-
-bool mln_ts_write_android_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_android_surface_replacement* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "window", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "window");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->window = (void*)(uintptr_t)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "jniEnv", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "jniEnv");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->jni_env = (void*)(uintptr_t)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "surface", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surface");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->surface = (void*)(uintptr_t)number;
-    }
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->window = (void*)(uintptr_t)number;
   }
   return true;
 }
@@ -4118,66 +4223,6 @@ bool mln_ts_write_dma_buf_format(
   return true;
 }
 
-bool mln_ts_write_dma_buf_ring_descriptor(
-  mln_ts_call* call, napi_value value, mln_dma_buf_ring_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "bufferCount", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "bufferCount");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->buffer_count = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "formats", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "formats");
-  {
-    mln_dma_buf_format* items = NULL;
-    size_t count = 0;
-    if (!mln_ts_write_list_dma_buf_format(
-          call, member, UINT32_MAX, &items, &count, child
-        ))
-      return false;
-    out->formats = items;
-    out->format_count = (size_t)count;
-  }
-  return true;
-}
-
-bool mln_ts_write_dxgi_shared_texture_ring_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_dxgi_shared_texture_ring_descriptor* out, const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "textureCount", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "textureCount");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->texture_count = (uint32_t)number;
-  }
-  return true;
-}
-
 bool mln_ts_write_edge_insets(
   mln_ts_call* call, napi_value value, mln_edge_insets* out, const char* path
 ) {
@@ -4238,22 +4283,10 @@ bool mln_ts_write_egl_context_descriptor(
   }
   if (!mln_ts_member(call, value, "shareContext", &member)) return false;
   mln_ts_path(child, sizeof child, path, "shareContext");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->share_context = (void*)(uintptr_t)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "clientApi", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "clientApi");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->client_api = (mln_open_gl_client_api)number;
-    }
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->share_context = (void*)(uintptr_t)number;
   }
   if (!mln_ts_member(call, value, "getProcAddress", &member)) return false;
   mln_ts_path(child, sizeof child, path, "getProcAddress");
@@ -4262,6 +4295,62 @@ bool mln_ts_write_egl_context_descriptor(
       uint64_t number = 0;
       if (!mln_ts_read_u64(call, member, &number, child)) return false;
       out->get_proc_address = (void*)(uintptr_t)number;
+    }
+  }
+  return true;
+}
+
+bool mln_ts_write_exported_ring_target(
+  mln_ts_call* call, napi_value value, mln_exported_ring_target* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "logicalSize");
+  memset(&out->logical_size, 0, sizeof out->logical_size);
+  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
+    return false;
+  if (!mln_ts_member(call, value, "textureCount", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "textureCount");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->texture_count = (uint32_t)number;
+  }
+  if (!mln_ts_member(call, value, "exportKinds", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "exportKinds");
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->export_kinds = (mln_gpu_export_kind_flags)number;
+  }
+  if (!mln_ts_member(call, value, "dmaBufFormats", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "dmaBufFormats");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_dma_buf_format* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_dma_buf_format(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->dma_buf_formats = items;
+      out->dma_buf_format_count = (size_t)count;
+    }
+  }
+  if (!mln_ts_member(call, value, "androidHardwareBufferUsage", &member))
+    return false;
+  mln_ts_path(child, sizeof child, path, "androidHardwareBufferUsage");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->android_hardware_buffer_usage = (uint64_t)number;
     }
   }
   return true;
@@ -4407,6 +4496,14 @@ bool mln_ts_write_frame_pacer_options(
       out->maximum_frames_per_second = (uint32_t)number;
     }
     out->fields |= MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+  }
+  if (!mln_ts_member(call, value, "unlimitedFramesPerSecond", &member))
+    return false;
+  mln_ts_path(child, sizeof child, path, "unlimitedFramesPerSecond");
+  if (!mln_ts_is_absent(call, member)) {
+    bool flag = false;
+    if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+    if (flag) out->fields |= MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
   }
   return true;
 }
@@ -4582,6 +4679,89 @@ bool mln_ts_write_gesture_momentum(
     if (!mln_ts_read_record(call, member, child)) return false;
     if (!mln_ts_write_anchored_momentum(call, member, &out->pitch, child))
       return false;
+  }
+  return true;
+}
+
+bool mln_ts_write_gpu_device_options(
+  mln_ts_call* call, napi_value value, mln_gpu_device_options* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "backend", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "backend");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->backend = (mln_render_backend)number;
+    }
+    out->fields |= MLN_GPU_DEVICE_OPTION_BACKEND;
+  }
+  if (!mln_ts_member(call, value, "adapterIndex", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "adapterIndex");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->adapter_index = (uint32_t)number;
+    }
+    out->fields |= MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX;
+  }
+  if (!mln_ts_member(call, value, "adapterUuid", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "adapterUuid");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_bytes_view(call, member, &out->adapter_uuid, child))
+      return false;
+    out->fields |= MLN_GPU_DEVICE_OPTION_ADAPTER_UUID;
+  }
+  if (!mln_ts_member(call, value, "adapterLuid", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "adapterLuid");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_bytes_view(call, member, &out->adapter_luid, child))
+      return false;
+    out->fields |= MLN_GPU_DEVICE_OPTION_ADAPTER_LUID;
+  }
+  if (!mln_ts_member(call, value, "openGlClientApi", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "openGlClientApi");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->open_gl_client_api = (mln_open_gl_client_api)number;
+    }
+    out->fields |= MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API;
+  }
+  if (!mln_ts_member(call, value, "openGlSingleContext", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "openGlSingleContext");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->open_gl_single_context = flag;
+    }
+    out->fields |= MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT;
+  }
+  if (!mln_ts_member(call, value, "queueLock", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "queueLock");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t fields[4];
+      if (!mln_ts_read_native_registration(
+            call, member, "QueueLock", 2, fields, NULL, child
+          ))
+        return false;
+      out->queue_lock.lock = (mln_queue_lock_callback)(uintptr_t)fields[0];
+      out->queue_lock.unlock = (mln_queue_lock_callback)(uintptr_t)fields[1];
+      out->queue_lock.user_data = (void*)(uintptr_t)fields[2];
+      out->queue_lock.release_user_data =
+        (mln_user_data_release)(uintptr_t)fields[3];
+    }
   }
   return true;
 }
@@ -4763,40 +4943,6 @@ bool mln_ts_write_image_stretch(
     double number = 0;
     if (!mln_ts_read_double(call, member, &number, child)) return false;
     out->to = (float)number;
-  }
-  return true;
-}
-
-bool mln_ts_write_io_surface_ring_descriptor(
-  mln_ts_call* call, napi_value value, mln_io_surface_ring_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "bufferCount", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "bufferCount");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->buffer_count = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->context, 0, sizeof out->context);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_metal_context_descriptor(
-          call, member, &out->context, child
-        ))
-      return false;
   }
   return true;
 }
@@ -5547,9 +5693,9 @@ bool mln_ts_write_metal_borrowed_texture(
   return true;
 }
 
-bool mln_ts_write_metal_borrowed_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_metal_borrowed_texture_descriptor* out, const char* path
+bool mln_ts_write_metal_borrowed_textures_target(
+  mln_ts_call* call, napi_value value, mln_metal_borrowed_textures_target* out,
+  const char* path
 ) {
   napi_value member;
   char child[256];
@@ -5587,6 +5733,37 @@ bool mln_ts_write_metal_borrowed_texture_descriptor(
       return false;
     out->textures = items;
     out->texture_count = (size_t)count;
+  }
+  if (!mln_ts_member(call, value, "depthTextures", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "depthTextures");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_metal_borrowed_texture* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_metal_borrowed_texture(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->depth_textures = items;
+      out->depth_texture_count = (size_t)count;
+    }
+  }
+  return true;
+}
+
+bool mln_ts_write_metal_device_descriptor(
+  mln_ts_call* call, napi_value value, mln_metal_device_descriptor* out,
+  const char* path
+) {
+  napi_value member;
+  char child[256];
+  (void)child;
+  if (!mln_ts_member(call, value, "device", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "device");
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->device = (void*)(uintptr_t)number;
   }
   if (!mln_ts_member(call, value, "commandQueue", &member)) return false;
   mln_ts_path(child, sizeof child, path, "commandQueue");
@@ -5600,104 +5777,8 @@ bool mln_ts_write_metal_borrowed_texture_descriptor(
   return true;
 }
 
-bool mln_ts_write_metal_borrowed_texture_replacement(
-  mln_ts_call* call, napi_value value,
-  mln_metal_borrowed_texture_replacement* out, const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "physicalWidth", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "physicalWidth");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->physical_width = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "physicalHeight", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "physicalHeight");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->physical_height = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "textures", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "textures");
-  {
-    mln_metal_borrowed_texture* items = NULL;
-    size_t count = 0;
-    if (!mln_ts_write_list_metal_borrowed_texture(
-          call, member, UINT32_MAX, &items, &count, child
-        ))
-      return false;
-    out->textures = items;
-    out->texture_count = (size_t)count;
-  }
-  return true;
-}
-
-bool mln_ts_write_metal_context_descriptor(
-  mln_ts_call* call, napi_value value, mln_metal_context_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "device", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "device");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->device = (void*)(uintptr_t)number;
-    }
-  }
-  return true;
-}
-
-bool mln_ts_write_metal_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_metal_surface_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  if (!mln_ts_is_absent(call, member)) {
-    memset(&out->context, 0, sizeof out->context);
-    if (!mln_ts_read_record(call, member, child)) return false;
-    if (!mln_ts_write_metal_context_descriptor(
-          call, member, &out->context, child
-        ))
-      return false;
-  }
-  if (!mln_ts_member(call, value, "layer", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "layer");
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->layer = (void*)(uintptr_t)number;
-  }
-  return true;
-}
-
-bool mln_ts_write_metal_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_metal_surface_replacement* out,
+bool mln_ts_write_metal_layer_target(
+  mln_ts_call* call, napi_value value, mln_metal_layer_target* out,
   const char* path
 ) {
   napi_value member;
@@ -6001,8 +6082,8 @@ bool mln_ts_write_offline_tile_pyramid_region_definition(
   return true;
 }
 
-bool mln_ts_write_offscreen_descriptor(
-  mln_ts_call* call, napi_value value, mln_offscreen_descriptor* out,
+bool mln_ts_write_offscreen_target(
+  mln_ts_call* call, napi_value value, mln_offscreen_target* out,
   const char* path
 ) {
   napi_value member;
@@ -6017,50 +6098,8 @@ bool mln_ts_write_offscreen_descriptor(
   return true;
 }
 
-bool mln_ts_write_offscreen_device_options(
-  mln_ts_call* call, napi_value value, mln_offscreen_device_options* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "adapterIndex", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "adapterIndex");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->adapter_index = (uint32_t)number;
-    }
-    out->fields |= MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX;
-  }
-  if (!mln_ts_member(call, value, "singleContext", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "singleContext");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      bool flag = false;
-      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
-      out->single_context = flag;
-    }
-    out->fields |= MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
-  }
-  if (!mln_ts_member(call, value, "clientApi", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "clientApi");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->client_api = (mln_open_gl_client_api)number;
-    }
-    out->fields |= MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API;
-  }
-  return true;
-}
-
-bool mln_ts_write_ohos_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_ohos_surface_descriptor* out,
+bool mln_ts_write_ohos_window_target(
+  mln_ts_call* call, napi_value value, mln_ohos_window_target* out,
   const char* path
 ) {
   napi_value member;
@@ -6074,55 +6113,10 @@ bool mln_ts_write_ohos_surface_descriptor(
     return false;
   if (!mln_ts_member(call, value, "window", &member)) return false;
   mln_ts_path(child, sizeof child, path, "window");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->window = (void*)(uintptr_t)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "surfaceId", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surfaceId");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->surface_id = (uint64_t)number;
-    }
-  }
-  return true;
-}
-
-bool mln_ts_write_ohos_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_ohos_surface_replacement* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "window", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "window");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->window = (void*)(uintptr_t)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "surfaceId", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surfaceId");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->surface_id = (uint64_t)number;
-    }
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->window = (void*)(uintptr_t)number;
   }
   return true;
 }
@@ -6145,9 +6139,9 @@ bool mln_ts_write_open_gl_borrowed_texture(
   return true;
 }
 
-bool mln_ts_write_open_gl_borrowed_texture_descriptor(
+bool mln_ts_write_open_gl_borrowed_textures_target(
   mln_ts_call* call, napi_value value,
-  mln_open_gl_borrowed_texture_descriptor* out, const char* path
+  mln_open_gl_borrowed_textures_target* out, const char* path
 ) {
   napi_value member;
   char child[256];
@@ -6174,14 +6168,6 @@ bool mln_ts_write_open_gl_borrowed_texture_descriptor(
       return false;
     out->physical_height = (uint32_t)number;
   }
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  memset(&out->context, 0, sizeof out->context);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_open_gl_context_descriptor(
-        call, member, &out->context, child
-      ))
-    return false;
   if (!mln_ts_member(call, value, "textures", &member)) return false;
   mln_ts_path(child, sizeof child, path, "textures");
   {
@@ -6202,49 +6188,19 @@ bool mln_ts_write_open_gl_borrowed_texture_descriptor(
       return false;
     out->target = (uint32_t)number;
   }
-  return true;
-}
-
-bool mln_ts_write_open_gl_borrowed_texture_replacement(
-  mln_ts_call* call, napi_value value,
-  mln_open_gl_borrowed_texture_replacement* out, const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "physicalWidth", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "physicalWidth");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->physical_width = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "physicalHeight", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "physicalHeight");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->physical_height = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "textures", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "textures");
-  {
-    mln_open_gl_borrowed_texture* items = NULL;
-    size_t count = 0;
-    if (!mln_ts_write_list_open_gl_borrowed_texture(
-          call, member, UINT32_MAX, &items, &count, child
-        ))
-      return false;
-    out->textures = items;
-    out->texture_count = (size_t)count;
+  if (!mln_ts_member(call, value, "depthTextures", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "depthTextures");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_open_gl_borrowed_texture* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_open_gl_borrowed_texture(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->depth_textures = items;
+      out->depth_texture_count = (size_t)count;
+    }
   }
   return true;
 }
@@ -6253,33 +6209,18 @@ bool mln_ts_write_open_gl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_open_gl_context_descriptor* out,
   const char* path
 ) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "ownership", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "ownership");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      int64_t number = 0;
-      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-        return false;
-      out->ownership = (mln_open_gl_context_ownership)number;
-    }
-  }
-  if (!mln_ts_member(call, value, "data", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "data");
-  if (!mln_ts_read_record(call, member, child)) return false;
+  if (!mln_ts_read_record(call, value, path)) return false;
   {
     static const char* const kinds[] = {"wgl", "egl", "webGl"};
     napi_value arm;
     char arm_path[256];
     (void)arm;
     (void)arm_path;
-    switch (mln_ts_read_kind(call, member, kinds, 3, child)) {
+    switch (mln_ts_read_kind(call, value, kinds, 3, path)) {
       case 0:
         out->platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
-        if (!mln_ts_member(call, member, "value", &arm)) return false;
-        mln_ts_path(arm_path, sizeof arm_path, child, "value");
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
         memset(&out->data.wgl, 0, sizeof out->data.wgl);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
         if (!mln_ts_write_wgl_context_descriptor(
@@ -6289,8 +6230,8 @@ bool mln_ts_write_open_gl_context_descriptor(
         break;
       case 1:
         out->platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL;
-        if (!mln_ts_member(call, member, "value", &arm)) return false;
-        mln_ts_path(arm_path, sizeof arm_path, child, "value");
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
         memset(&out->data.egl, 0, sizeof out->data.egl);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
         if (!mln_ts_write_egl_context_descriptor(
@@ -6300,8 +6241,8 @@ bool mln_ts_write_open_gl_context_descriptor(
         break;
       case 2:
         out->platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL;
-        if (!mln_ts_member(call, member, "value", &arm)) return false;
-        mln_ts_path(arm_path, sizeof arm_path, child, "value");
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
         memset(&out->data.web_gl, 0, sizeof out->data.web_gl);
         if (!mln_ts_read_record(call, arm, arm_path)) return false;
         if (!mln_ts_write_web_gl_context_descriptor(
@@ -6316,41 +6257,8 @@ bool mln_ts_write_open_gl_context_descriptor(
   return true;
 }
 
-bool mln_ts_write_open_gl_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_open_gl_surface_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  memset(&out->context, 0, sizeof out->context);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_open_gl_context_descriptor(
-        call, member, &out->context, child
-      ))
-    return false;
-  if (!mln_ts_member(call, value, "surface", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surface");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->surface = (void*)(uintptr_t)number;
-    }
-  }
-  return true;
-}
-
-bool mln_ts_write_open_gl_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_open_gl_surface_replacement* out,
+bool mln_ts_write_open_gl_surface_target(
+  mln_ts_call* call, napi_value value, mln_open_gl_surface_target* out,
   const char* path
 ) {
   napi_value member;
@@ -6364,12 +6272,10 @@ bool mln_ts_write_open_gl_surface_replacement(
     return false;
   if (!mln_ts_member(call, value, "surface", &member)) return false;
   mln_ts_path(child, sizeof child, path, "surface");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->surface = (void*)(uintptr_t)number;
-    }
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->surface = (void*)(uintptr_t)number;
   }
   return true;
 }
@@ -6701,20 +6607,224 @@ bool mln_ts_write_render_session_attach_options(
       }
     }
   }
-  if (!mln_ts_member(call, value, "queueLock", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "queueLock");
+  if (!mln_ts_member(call, value, "keepDepth", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "keepDepth");
   if (!mln_ts_is_absent(call, member)) {
     {
-      uint64_t fields[4];
-      if (!mln_ts_read_native_registration(
-            call, member, "QueueLock", 2, fields, NULL, child
-          ))
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->keep_depth = flag;
+    }
+  }
+  return true;
+}
+
+bool mln_ts_write_render_target(
+  mln_ts_call* call, napi_value value, mln_render_target* out, const char* path
+) {
+  if (!mln_ts_read_record(call, value, path)) return false;
+  {
+    static const char* const kinds[] = {
+      "offscreen",
+      "metalLayer",
+      "win32Window",
+      "xlibWindow",
+      "waylandSurface",
+      "androidWindow",
+      "ohosWindow",
+      "vulkanSurface",
+      "openGlSurface",
+      "metalBorrowedTextures",
+      "vulkanBorrowedTextures",
+      "openGlBorrowedTextures",
+      "webGpuBorrowedTextures",
+      "exportedRing",
+      "webCanvas"
+    };
+    napi_value arm;
+    char arm_path[256];
+    (void)arm;
+    (void)arm_path;
+    switch (mln_ts_read_kind(call, value, kinds, 15, path)) {
+      case 0:
+        out->kind = MLN_RENDER_TARGET_KIND_OFFSCREEN;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.offscreen, 0, sizeof out->data.offscreen);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_offscreen_target(
+              call, arm, &out->data.offscreen, arm_path
+            ))
+          return false;
+        break;
+      case 1:
+        out->kind = MLN_RENDER_TARGET_KIND_METAL_LAYER;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.metal_layer, 0, sizeof out->data.metal_layer);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_metal_layer_target(
+              call, arm, &out->data.metal_layer, arm_path
+            ))
+          return false;
+        break;
+      case 2:
+        out->kind = MLN_RENDER_TARGET_KIND_WIN32_WINDOW;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.win32_window, 0, sizeof out->data.win32_window);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_win32_window_target(
+              call, arm, &out->data.win32_window, arm_path
+            ))
+          return false;
+        break;
+      case 3:
+        out->kind = MLN_RENDER_TARGET_KIND_XLIB_WINDOW;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.xlib_window, 0, sizeof out->data.xlib_window);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_xlib_window_target(
+              call, arm, &out->data.xlib_window, arm_path
+            ))
+          return false;
+        break;
+      case 4:
+        out->kind = MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.wayland_surface, 0, sizeof out->data.wayland_surface);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_wayland_surface_target(
+              call, arm, &out->data.wayland_surface, arm_path
+            ))
+          return false;
+        break;
+      case 5:
+        out->kind = MLN_RENDER_TARGET_KIND_ANDROID_WINDOW;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.android_window, 0, sizeof out->data.android_window);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_android_window_target(
+              call, arm, &out->data.android_window, arm_path
+            ))
+          return false;
+        break;
+      case 6:
+        out->kind = MLN_RENDER_TARGET_KIND_OHOS_WINDOW;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.ohos_window, 0, sizeof out->data.ohos_window);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_ohos_window_target(
+              call, arm, &out->data.ohos_window, arm_path
+            ))
+          return false;
+        break;
+      case 7:
+        out->kind = MLN_RENDER_TARGET_KIND_VULKAN_SURFACE;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.vulkan_surface, 0, sizeof out->data.vulkan_surface);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_vulkan_surface_target(
+              call, arm, &out->data.vulkan_surface, arm_path
+            ))
+          return false;
+        break;
+      case 8:
+        out->kind = MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.open_gl_surface, 0, sizeof out->data.open_gl_surface);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_open_gl_surface_target(
+              call, arm, &out->data.open_gl_surface, arm_path
+            ))
+          return false;
+        break;
+      case 9:
+        out->kind = MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(
+          &out->data.metal_borrowed_textures, 0,
+          sizeof out->data.metal_borrowed_textures
+        );
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_metal_borrowed_textures_target(
+              call, arm, &out->data.metal_borrowed_textures, arm_path
+            ))
+          return false;
+        break;
+      case 10:
+        out->kind = MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(
+          &out->data.vulkan_borrowed_textures, 0,
+          sizeof out->data.vulkan_borrowed_textures
+        );
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_vulkan_borrowed_textures_target(
+              call, arm, &out->data.vulkan_borrowed_textures, arm_path
+            ))
+          return false;
+        break;
+      case 11:
+        out->kind = MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(
+          &out->data.open_gl_borrowed_textures, 0,
+          sizeof out->data.open_gl_borrowed_textures
+        );
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_open_gl_borrowed_textures_target(
+              call, arm, &out->data.open_gl_borrowed_textures, arm_path
+            ))
+          return false;
+        break;
+      case 12:
+        out->kind = MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(
+          &out->data.web_gpu_borrowed_textures, 0,
+          sizeof out->data.web_gpu_borrowed_textures
+        );
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_web_gpu_borrowed_textures_target(
+              call, arm, &out->data.web_gpu_borrowed_textures, arm_path
+            ))
+          return false;
+        break;
+      case 13:
+        out->kind = MLN_RENDER_TARGET_KIND_EXPORTED_RING;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.exported_ring, 0, sizeof out->data.exported_ring);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_exported_ring_target(
+              call, arm, &out->data.exported_ring, arm_path
+            ))
+          return false;
+        break;
+      case 14:
+        out->kind = MLN_RENDER_TARGET_KIND_WEB_CANVAS;
+        if (!mln_ts_member(call, value, "value", &arm)) return false;
+        mln_ts_path(arm_path, sizeof arm_path, path, "value");
+        memset(&out->data.web_canvas, 0, sizeof out->data.web_canvas);
+        if (!mln_ts_read_record(call, arm, arm_path)) return false;
+        if (!mln_ts_write_web_canvas_target(
+              call, arm, &out->data.web_canvas, arm_path
+            ))
+          return false;
+        break;
+      default:
         return false;
-      out->queue_lock.lock = (mln_queue_lock_callback)(uintptr_t)fields[0];
-      out->queue_lock.unlock = (mln_queue_lock_callback)(uintptr_t)fields[1];
-      out->queue_lock.user_data = (void*)(uintptr_t)fields[2];
-      out->queue_lock.release_user_data =
-        (mln_user_data_release)(uintptr_t)fields[3];
     }
   }
   return true;
@@ -7621,9 +7731,9 @@ bool mln_ts_write_vulkan_borrowed_texture(
   return true;
 }
 
-bool mln_ts_write_vulkan_borrowed_texture_descriptor(
-  mln_ts_call* call, napi_value value,
-  mln_vulkan_borrowed_texture_descriptor* out, const char* path
+bool mln_ts_write_vulkan_borrowed_textures_target(
+  mln_ts_call* call, napi_value value, mln_vulkan_borrowed_textures_target* out,
+  const char* path
 ) {
   napi_value member;
   char child[256];
@@ -7650,14 +7760,6 @@ bool mln_ts_write_vulkan_borrowed_texture_descriptor(
       return false;
     out->physical_height = (uint32_t)number;
   }
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  memset(&out->context, 0, sizeof out->context);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_vulkan_context_descriptor(
-        call, member, &out->context, child
-      ))
-    return false;
   if (!mln_ts_member(call, value, "textures", &member)) return false;
   mln_ts_path(child, sizeof child, path, "textures");
   {
@@ -7696,49 +7798,39 @@ bool mln_ts_write_vulkan_borrowed_texture_descriptor(
       out->owner = (mln_vulkan_image_owner)number;
     }
   }
-  return true;
-}
-
-bool mln_ts_write_vulkan_borrowed_texture_replacement(
-  mln_ts_call* call, napi_value value,
-  mln_vulkan_borrowed_texture_replacement* out, const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "physicalWidth", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "physicalWidth");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->physical_width = (uint32_t)number;
+  if (!mln_ts_member(call, value, "depthTextures", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "depthTextures");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_vulkan_borrowed_texture* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_vulkan_borrowed_texture(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->depth_textures = items;
+      out->depth_texture_count = (size_t)count;
+    }
   }
-  if (!mln_ts_member(call, value, "physicalHeight", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "physicalHeight");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->physical_height = (uint32_t)number;
+  if (!mln_ts_member(call, value, "depthFormat", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "depthFormat");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->depth_format = (uint32_t)number;
+    }
   }
-  if (!mln_ts_member(call, value, "textures", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "textures");
-  {
-    mln_vulkan_borrowed_texture* items = NULL;
-    size_t count = 0;
-    if (!mln_ts_write_list_vulkan_borrowed_texture(
-          call, member, UINT32_MAX, &items, &count, child
-        ))
-      return false;
-    out->textures = items;
-    out->texture_count = (size_t)count;
+  if (!mln_ts_member(call, value, "depthFinalLayout", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "depthFinalLayout");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->depth_final_layout = (uint32_t)number;
+    }
   }
   return true;
 }
@@ -7804,53 +7896,13 @@ bool mln_ts_write_vulkan_context_descriptor(
   return true;
 }
 
-bool mln_ts_write_vulkan_device_options(
-  mln_ts_call* call, napi_value value, mln_vulkan_device_options* out,
+bool mln_ts_write_vulkan_device_descriptor(
+  mln_ts_call* call, napi_value value, mln_vulkan_device_descriptor* out,
   const char* path
 ) {
   napi_value member;
   char child[256];
   (void)child;
-  if (!mln_ts_member(call, value, "presentation", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "presentation");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      bool flag = false;
-      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
-      out->presentation = flag;
-    }
-    out->fields |= MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
-  }
-  if (!mln_ts_member(call, value, "deviceUuid", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "deviceUuid");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_bytes_view(call, member, &out->device_uuid, child))
-      return false;
-    out->fields |= MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
-  }
-  if (!mln_ts_member(call, value, "deviceLuid", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "deviceLuid");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_bytes_view(call, member, &out->device_luid, child))
-      return false;
-    out->fields |= MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID;
-  }
-  return true;
-}
-
-bool mln_ts_write_vulkan_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_vulkan_surface_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
   if (!mln_ts_member(call, value, "context", &member)) return false;
   mln_ts_path(child, sizeof child, path, "context");
   memset(&out->context, 0, sizeof out->context);
@@ -7859,18 +7911,41 @@ bool mln_ts_write_vulkan_surface_descriptor(
         call, member, &out->context, child
       ))
     return false;
-  if (!mln_ts_member(call, value, "surface", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surface");
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->surface = (uint64_t)number;
+  if (!mln_ts_member(call, value, "queueLock", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "queueLock");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t fields[4];
+      if (!mln_ts_read_native_registration(
+            call, member, "QueueLock", 2, fields, NULL, child
+          ))
+        return false;
+      out->queue_lock.lock = (mln_queue_lock_callback)(uintptr_t)fields[0];
+      out->queue_lock.unlock = (mln_queue_lock_callback)(uintptr_t)fields[1];
+      out->queue_lock.user_data = (void*)(uintptr_t)fields[2];
+      out->queue_lock.release_user_data =
+        (mln_user_data_release)(uintptr_t)fields[3];
+    }
+  }
+  if (!mln_ts_member(call, value, "enabledExtensions", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "enabledExtensions");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_buffer_view* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_buffer_view(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->enabled_extensions = items;
+      out->enabled_extension_count = (size_t)count;
+    }
   }
   return true;
 }
 
-bool mln_ts_write_vulkan_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_vulkan_surface_replacement* out,
+bool mln_ts_write_vulkan_surface_target(
+  mln_ts_call* call, napi_value value, mln_vulkan_surface_target* out,
   const char* path
 ) {
   napi_value member;
@@ -7913,8 +7988,8 @@ bool mln_ts_write_wake(
   return true;
 }
 
-bool mln_ts_write_wayland_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_wayland_surface_descriptor* out,
+bool mln_ts_write_wayland_surface_target(
+  mln_ts_call* call, napi_value value, mln_wayland_surface_target* out,
   const char* path
 ) {
   napi_value member;
@@ -7943,8 +8018,8 @@ bool mln_ts_write_wayland_surface_descriptor(
   return true;
 }
 
-bool mln_ts_write_wayland_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_wayland_surface_replacement* out,
+bool mln_ts_write_web_canvas_target(
+  mln_ts_call* call, napi_value value, mln_web_canvas_target* out,
   const char* path
 ) {
   napi_value member;
@@ -7956,12 +8031,18 @@ bool mln_ts_write_wayland_surface_replacement(
   if (!mln_ts_read_record(call, member, child)) return false;
   if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
     return false;
-  if (!mln_ts_member(call, value, "surface", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "surface");
+  if (!mln_ts_member(call, value, "canvas", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "canvas");
   {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->surface = (void*)(uintptr_t)number;
+    int64_t number = 0;
+    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+      return false;
+    out->canvas = (uint32_t)number;
+  }
+  if (!mln_ts_member(call, value, "format", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "format");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->format, child)) return false;
   }
   return true;
 }
@@ -8002,9 +8083,9 @@ bool mln_ts_write_web_gpu_borrowed_texture(
   return true;
 }
 
-bool mln_ts_write_web_gpu_borrowed_texture_descriptor(
+bool mln_ts_write_web_gpu_borrowed_textures_target(
   mln_ts_call* call, napi_value value,
-  mln_web_gpu_borrowed_texture_descriptor* out, const char* path
+  mln_web_gpu_borrowed_textures_target* out, const char* path
 ) {
   napi_value member;
   char child[256];
@@ -8031,14 +8112,6 @@ bool mln_ts_write_web_gpu_borrowed_texture_descriptor(
       return false;
     out->physical_height = (uint32_t)number;
   }
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  memset(&out->context, 0, sizeof out->context);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_web_gpu_context_descriptor(
-        call, member, &out->context, child
-      ))
-    return false;
   if (!mln_ts_member(call, value, "textures", &member)) return false;
   mln_ts_path(child, sizeof child, path, "textures");
   {
@@ -8054,49 +8127,25 @@ bool mln_ts_write_web_gpu_borrowed_texture_descriptor(
   if (!mln_ts_member(call, value, "format", &member)) return false;
   mln_ts_path(child, sizeof child, path, "format");
   if (!mln_ts_read_text_view(call, member, &out->format, child)) return false;
-  return true;
-}
-
-bool mln_ts_write_web_gpu_borrowed_texture_replacement(
-  mln_ts_call* call, napi_value value,
-  mln_web_gpu_borrowed_texture_replacement* out, const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "physicalWidth", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "physicalWidth");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->physical_width = (uint32_t)number;
+  if (!mln_ts_member(call, value, "depthTextures", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "depthTextures");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      mln_web_gpu_borrowed_texture* items = NULL;
+      size_t count = 0;
+      if (!mln_ts_write_list_web_gpu_borrowed_texture(
+            call, member, UINT32_MAX, &items, &count, child
+          ))
+        return false;
+      out->depth_textures = items;
+      out->depth_texture_count = (size_t)count;
+    }
   }
-  if (!mln_ts_member(call, value, "physicalHeight", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "physicalHeight");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+  if (!mln_ts_member(call, value, "depthFormat", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "depthFormat");
+  if (!mln_ts_is_absent(call, member)) {
+    if (!mln_ts_read_text_view(call, member, &out->depth_format, child))
       return false;
-    out->physical_height = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "textures", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "textures");
-  {
-    mln_web_gpu_borrowed_texture* items = NULL;
-    size_t count = 0;
-    if (!mln_ts_write_list_web_gpu_borrowed_texture(
-          call, member, UINT32_MAX, &items, &count, child
-        ))
-      return false;
-    out->textures = items;
-    out->texture_count = (size_t)count;
   }
   return true;
 }
@@ -8119,67 +8168,6 @@ bool mln_ts_write_web_gpu_context_descriptor(
   return true;
 }
 
-bool mln_ts_write_web_gpu_surface_descriptor(
-  mln_ts_call* call, napi_value value, mln_web_gpu_surface_descriptor* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "context", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "context");
-  memset(&out->context, 0, sizeof out->context);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_web_gpu_context_descriptor(
-        call, member, &out->context, child
-      ))
-    return false;
-  if (!mln_ts_member(call, value, "canvas", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "canvas");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->canvas = (uint32_t)number;
-  }
-  if (!mln_ts_member(call, value, "format", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "format");
-  if (!mln_ts_is_absent(call, member)) {
-    if (!mln_ts_read_text_view(call, member, &out->format, child)) return false;
-  }
-  return true;
-}
-
-bool mln_ts_write_web_gpu_surface_replacement(
-  mln_ts_call* call, napi_value value, mln_web_gpu_surface_replacement* out,
-  const char* path
-) {
-  napi_value member;
-  char child[256];
-  (void)child;
-  if (!mln_ts_member(call, value, "logicalSize", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "logicalSize");
-  memset(&out->logical_size, 0, sizeof out->logical_size);
-  if (!mln_ts_read_record(call, member, child)) return false;
-  if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
-    return false;
-  if (!mln_ts_member(call, value, "canvas", &member)) return false;
-  mln_ts_path(child, sizeof child, path, "canvas");
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
-      return false;
-    out->canvas = (uint32_t)number;
-  }
-  return true;
-}
-
 bool mln_ts_write_wgl_context_descriptor(
   mln_ts_call* call, napi_value value, mln_wgl_context_descriptor* out,
   const char* path
@@ -8196,12 +8184,10 @@ bool mln_ts_write_wgl_context_descriptor(
   }
   if (!mln_ts_member(call, value, "shareContext", &member)) return false;
   mln_ts_path(child, sizeof child, path, "shareContext");
-  if (!mln_ts_is_absent(call, member)) {
-    {
-      uint64_t number = 0;
-      if (!mln_ts_read_u64(call, member, &number, child)) return false;
-      out->share_context = (void*)(uintptr_t)number;
-    }
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->share_context = (void*)(uintptr_t)number;
   }
   if (!mln_ts_member(call, value, "getProcAddress", &member)) return false;
   mln_ts_path(child, sizeof child, path, "getProcAddress");
@@ -8215,8 +8201,8 @@ bool mln_ts_write_wgl_context_descriptor(
   return true;
 }
 
-bool mln_ts_write_win32_window_descriptor(
-  mln_ts_call* call, napi_value value, mln_win32_window_descriptor* out,
+bool mln_ts_write_win32_window_target(
+  mln_ts_call* call, napi_value value, mln_win32_window_target* out,
   const char* path
 ) {
   napi_value member;
@@ -8238,8 +8224,8 @@ bool mln_ts_write_win32_window_descriptor(
   return true;
 }
 
-bool mln_ts_write_win32_window_replacement(
-  mln_ts_call* call, napi_value value, mln_win32_window_replacement* out,
+bool mln_ts_write_xlib_window_target(
+  mln_ts_call* call, napi_value value, mln_xlib_window_target* out,
   const char* path
 ) {
   napi_value member;
@@ -8251,12 +8237,19 @@ bool mln_ts_write_win32_window_replacement(
   if (!mln_ts_read_record(call, member, child)) return false;
   if (!mln_ts_write_logical_size(call, member, &out->logical_size, child))
     return false;
+  if (!mln_ts_member(call, value, "display", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "display");
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, member, &number, child)) return false;
+    out->display = (void*)(uintptr_t)number;
+  }
   if (!mln_ts_member(call, value, "window", &member)) return false;
   mln_ts_path(child, sizeof child, path, "window");
   {
     uint64_t number = 0;
     if (!mln_ts_read_u64(call, member, &number, child)) return false;
-    out->window = (void*)(uintptr_t)number;
+    out->window = (uint64_t)number;
   }
   return true;
 }
