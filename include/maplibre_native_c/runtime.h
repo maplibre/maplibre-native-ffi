@@ -1128,12 +1128,12 @@ MLN_API void mln_resource_transform_request_release(
 /**
  * Adds headers to the runtime's HTTP requests.
  *
- * The transform replaces the one set before. In a browser or on OpenHarmony,
- * serve the requests with mln_runtime_set_resource_provider() instead.
+ * The transform replaces the one set before. A redirect to another origin
+ * drops its headers. In a browser, serve the requests with
+ * mln_runtime_set_resource_provider() instead.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when the library runs in a browser or on
- *   OpenHarmony.
+ * - MLN_STATUS_UNSUPPORTED when the library runs in a browser.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_http_header_transform(

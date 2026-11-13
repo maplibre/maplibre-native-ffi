@@ -52,7 +52,10 @@ typedef struct mln_gpu_device_options {
    */
   mln_render_backend backend
     MLN_BINDING("mask=fields;bit=MLN_GPU_DEVICE_OPTION_BACKEND");
-  /** The GPU to use, as an index into the backend's list of GPUs. */
+  /**
+   * The GPU to use, as an index into the backend's list of GPUs. OpenGL's
+   * list holds one GPU: the one that its display renders on.
+   */
   uint32_t adapter_index
     MLN_BINDING("mask=fields;bit=MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX");
   /**

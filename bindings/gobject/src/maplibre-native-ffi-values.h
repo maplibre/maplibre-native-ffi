@@ -8773,7 +8773,8 @@ void maplibre_native_ffi_gpu_device_options_set_backend(
 /**
  * MaplibreNativeFfiGpuDeviceOptions:adapter-index: (setter set_adapter_index) (getter get_adapter_index)
  *
- * The GPU to use, as an index into the backend's list of GPUs.
+ * The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
+ * holds one GPU: the one that its display renders on.
  */
 /**
  * maplibre_native_ffi_gpu_device_options_get_adapter_index: (get-property adapter-index)

@@ -2693,7 +2693,9 @@ class GpuDeviceOptions:
     """
 
     adapter_index: int | None = None
-    """The GPU to use, as an index into the backend's list of GPUs."""
+    """The GPU to use, as an index into the backend's list of GPUs. OpenGL's
+    list holds one GPU: the one that its display renders on.
+    """
 
     adapter_uuid: Buffer | None = None
     """The 16-byte UUID of the GPU to use: Vulkan's

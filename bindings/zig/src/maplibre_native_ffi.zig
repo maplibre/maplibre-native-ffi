@@ -2845,8 +2845,9 @@ pub const Runtime = struct {
 
     /// Adds headers to the runtime's HTTP requests.
     ///
-    /// The transform replaces the one set before. In a browser or on OpenHarmony,
-    /// serve the requests with `Runtime.setResourceProvider()` instead.
+    /// The transform replaces the one set before. A redirect to another origin
+    /// drops its headers. In a browser, serve the requests with
+    /// `Runtime.setResourceProvider()` instead.
     ///
     /// Runs on a library thread.
     ///
@@ -2855,7 +2856,7 @@ pub const Runtime = struct {
     ///
     /// Errors:
     ///
-    /// - `error.Unsupported` when the library runs in a browser or on OpenHarmony.
+    /// - `error.Unsupported` when the library runs in a browser.
     pub fn setHttpHeaderTransform(self: Runtime, allocator: std.mem.Allocator, transform: HttpHeaderTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_runtime_set_http_header_transform", .handle, self, call.command, allocator, diagnostic, .{transform});
     }
@@ -4902,7 +4903,8 @@ pub const GpuDeviceOptions = struct {
     /// system has no Vulkan driver, and in a browser the build's one backend:
     /// WebGPU or OpenGL (WebGL2).
     backend: ?RenderBackend = null,
-    /// The GPU to use, as an index into the backend's list of GPUs.
+    /// The GPU to use, as an index into the backend's list of GPUs. OpenGL's
+    /// list holds one GPU: the one that its display renders on.
     adapter_index: ?u32 = null,
     /// The 16-byte UUID of the GPU to use: Vulkan's
     /// `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes

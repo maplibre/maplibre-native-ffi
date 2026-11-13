@@ -130,8 +130,8 @@ public fun HttpHeaderTransformResponse.setHeader(name: String, value: String): U
 /**
  * Adds headers to the runtime's HTTP requests.
  *
- * The transform replaces the one set before. In a browser or on OpenHarmony, serve the requests
- * with `RuntimeHandle.setResourceProvider()` instead.
+ * The transform replaces the one set before. A redirect to another origin drops its headers. In a
+ * browser, serve the requests with `RuntimeHandle.setResourceProvider()` instead.
  *
  * Runs on a library thread.
  *
@@ -140,7 +140,7 @@ public fun HttpHeaderTransformResponse.setHeader(name: String, value: String): U
  *
  * Errors:
  *
- * - `Status.UNSUPPORTED` when the library runs in a browser or on OpenHarmony.
+ * - `Status.UNSUPPORTED` when the library runs in a browser.
  */
 public fun RuntimeHandle.setHttpHeaderTransform(
   transform: HttpHeaderTransform,

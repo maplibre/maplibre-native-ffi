@@ -5195,7 +5195,10 @@ public data class GpuDeviceOptions(
    * the build's one backend: WebGPU or OpenGL (WebGL2).
    */
   public val backend: RenderBackend? = null,
-  /** The GPU to use, as an index into the backend's list of GPUs. */
+  /**
+   * The GPU to use, as an index into the backend's list of GPUs. OpenGL's list holds one GPU: the
+   * one that its display renders on.
+   */
   @get:JvmSynthetic public val adapterIndex: UInt? = null,
   /**
    * The 16-byte UUID of the GPU to use: Vulkan's `VkPhysicalDeviceIDProperties.deviceUUID`. Only a

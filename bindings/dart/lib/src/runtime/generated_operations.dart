@@ -8710,16 +8710,16 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
 
   /// Adds headers to the runtime's HTTP requests.
   ///
-  /// The transform replaces the one set before. In a browser or on OpenHarmony,
-  /// serve the requests with `RuntimeHandle.setResourceProvider()` instead.
+  /// The transform replaces the one set before. A redirect to another origin
+  /// drops its headers. In a browser, serve the requests with
+  /// `RuntimeHandle.setResourceProvider()` instead.
   ///
   /// See `mln_runtime_set_http_header_transform` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` when the library runs in a browser or on
-  ///   OpenHarmony.
+  /// - `Status.unsupported` when the library runs in a browser.
   Future<CommandCompletion> setHttpHeaderTransform(
     HttpHeaderTransform transform,
   ) => _command((arena, completion) {
