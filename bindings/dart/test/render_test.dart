@@ -20,10 +20,6 @@ const _redStyle = {
   ],
 };
 
-final _descriptor = OffscreenDescriptor(
-  logicalSize: LogicalSize(width: renderSize, height: renderSize),
-);
-
 void _expectRed(TextureReadbackResult image) {
   expect(image.info.width, renderSize);
   expect(image.info.height, renderSize);
@@ -62,9 +58,9 @@ void main() {
     'a disposed attached session lets its map release before its device goes',
     () async {
       final map = await openRenderMap(emptyStyle);
-      final device = openOffscreenDevice();
-      final session = map.attachOffscreen(
-        _descriptor,
+      final device = openGpuDevice();
+      final session = attachOffscreenSession(
+        map,
         const RenderSessionAttachOptions(driver: RenderDriverKind.coreWorker),
         device: device,
       );

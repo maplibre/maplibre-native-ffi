@@ -29,9 +29,11 @@ Future<void> images(RuntimeHandle runtime) async {
   // #endregion style
 
   // #region attach
-  final session = map.attachOffscreen(
-    const OffscreenDescriptor(
-      logicalSize: LogicalSize(width: 800, height: 600),
+  final session = map.attach(
+    const RenderTarget.offscreen(
+      OffscreenTarget(
+        logicalSize: LogicalSize(width: 800, height: 600),
+      ),
     ),
     // The library renders on its own thread.
     const RenderSessionAttachOptions(

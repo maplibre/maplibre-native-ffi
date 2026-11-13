@@ -112,51 +112,48 @@ void main() {
     },
   );
 
-  test('host strings use views and native-lent strings decode', () async {
-    // Native rejects a NUL in a path view before a C-string consumer reads it.
-    expect(
-      () => RuntimeHandle.create(
-        options: RuntimeOptions(cachePath: 'cache\u0000tail'),
-      ),
-      throwsA(
-        isA<MaplibreException>().having(
-          (error) => error.status,
-          'status',
-          Status.invalidArgument,
+  test(
+    'host text with a NUL is rejected and native-lent text decodes',
+    () async {
+      // Text crosses as a view with an explicit length, and native code rejects
+      // an embedded NUL rather than reading the text up to it.
+      final rejectsNul = throwsA(
+        isA<MaplibreException>()
+            .having((error) => error.status, 'status', Status.invalidArgument)
+            .having(
+              (error) => error.diagnostic,
+              'diagnostic',
+              contains('embedded NUL'),
+            ),
+      );
+      expect(
+        () => RuntimeHandle.create(
+          options: RuntimeOptions(cachePath: 'cache\u0000tail'),
         ),
-      ),
-    );
+        rejectsNul,
+      );
 
-    // A layer ID crosses as a view with an explicit length, so an ID with an
-    // embedded NUL names that layer and not the prefix before the NUL.
-    const url = 'custom://native-lent.json';
-    final requested = Completer<String?>();
-    final fixture = await openRuntime(
-      provider: routedProvider([styleRoute(url)], (request, handle) {
-        requested.complete(request.requestedUrl);
-        handle.complete(
-          ResourceResponse(
-            status: ResourceResponseStatus.ok,
-            bytes: jsonBytes(emptyStyle),
-          ),
-        );
-      }),
-    );
-    final map = await fixture.openStyledMap({
-      'version': 8,
-      'sources': <String, Object?>{},
-      'layers': [
-        {'id': 'a\u0000b', 'type': 'background'},
-      ],
-    });
-    expect((await map.getStyleLayer('a\u0000b'))?.type, 'background');
-    expect(await map.getStyleLayer('a'), isNull);
-    expect((await map.listStyleLayers()).map((layer) => layer.id), [
-      'a\u0000b',
-    ]);
-    await expectCommitted(map.setStyleUrl(url));
-    expect(await within(requested.future, 'the native-lent URL'), url);
-  });
+      const url = 'custom://native-lent.json';
+      final requested = Completer<String?>();
+      final fixture = await openRuntime(
+        provider: routedProvider([styleRoute(url)], (request, handle) {
+          requested.complete(request.requestedUrl);
+          handle.complete(
+            ResourceResponse(
+              status: ResourceResponseStatus.ok,
+              bytes: jsonBytes(emptyStyle),
+            ),
+          );
+        }),
+      );
+      final map = await fixture.openStyledMap();
+      await expectLater(map.getStyleLayer('a\u0000b'), rejectsNul);
+
+      // The URL that native code lends the provider decodes to the one set.
+      await expectCommitted(map.setStyleUrl(url));
+      expect(await within(requested.future, 'the native-lent URL'), url);
+    },
+  );
 
   test(
     'presence fields keep a present zero apart from an absent one',

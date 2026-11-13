@@ -23,7 +23,9 @@ void main() {
       await within(map.requestRepaint(), 'a later command on the map');
       expect(map.getSnapshot().debugFlags, MapDebugFlag.tileBorders);
       expect(
-        () => map.discarding.resize(LogicalSize(width: 0, height: 8)),
+        () => map.discarding.resize(
+          LogicalExtent(width: 0, height: 8, scaleFactor: 1),
+        ),
         throwsA(
           isA<MaplibreException>().having(
             (error) => error.status,

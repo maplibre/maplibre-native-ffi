@@ -48,10 +48,16 @@ void onFrameWake() {
 // #endregion frame-wake
 
 // #region resize
-void onWindowResized(int width, int height) {
-  // The window's new size in logical pixels.
+// Runs when the window changes size, or moves to a display with
+// another scale factor.
+void onWindowResized(int width, int height, double scaleFactor) {
+  // The window's new size in logical pixels, and its scale factor.
   session.discarding.resize(
-    LogicalSize(width: width, height: height),
+    LogicalExtent(
+      width: width,
+      height: height,
+      scaleFactor: scaleFactor,
+    ),
   );
 }
 // #endregion resize
@@ -62,12 +68,18 @@ Future<void> surfaceLost() async {
   // #endregion lost-surface
 }
 
-Future<void> surfaceRestored(int newSurface) async {
+Future<void> surfaceRestored(
+  NativePointer display,
+  NativePointer newSurface,
+) async {
   // #region lost-surface
-  await session.setVulkanSurfaceTarget(
-    VulkanSurfaceReplacement(
-      logicalSize: const LogicalSize(width: 800, height: 600),
-      surface: newSurface,
+  await session.setTarget(
+    RenderTarget.waylandSurface(
+      WaylandSurfaceTarget(
+        logicalSize: const LogicalSize(width: 800, height: 600),
+        display: display,
+        surface: newSurface,
+      ),
     ),
   );
   // #endregion lost-surface
@@ -75,21 +87,23 @@ Future<void> surfaceRestored(int newSurface) async {
 
 Future<void> renderToWindow(
   MapHandle map,
-  VulkanContextDescriptor vulkan,
-  int windowSurface,
+  NativePointer display,
+  NativePointer windowSurface,
   NativePointer onDriverWorkWake,
 ) async {
   // #region attach
-  session = map.attachVulkanSurface(
-    VulkanSurfaceDescriptor(
-      // The window's size in logical pixels. The map's scale factor
-      // turns it into pixels.
-      logicalSize: const LogicalSize(width: 800, height: 600),
-      // Your VkInstance, VkPhysicalDevice,
-      // VkDevice, and graphics VkQueue.
-      context: vulkan,
-      // Your VkSurfaceKHR.
-      surface: windowSurface,
+  // With no device, the session creates one on the platform's own
+  // backend.
+  session = map.attach(
+    RenderTarget.waylandSurface(
+      WaylandSurfaceTarget(
+        // The window's size in logical pixels. The map's scale factor
+        // turns it into pixels.
+        logicalSize: const LogicalSize(width: 800, height: 600),
+        // Your wl_display and wl_surface.
+        display: display,
+        surface: windowSurface,
+      ),
     ),
     const RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
@@ -100,7 +114,7 @@ Future<void> renderToWindow(
   await session.ready;
   // #endregion attach
 
-  onWindowResized(1024, 768);
+  onWindowResized(1024, 768, 2);
 
   // #region service
   // An isolate can't service the session, because it can resume on

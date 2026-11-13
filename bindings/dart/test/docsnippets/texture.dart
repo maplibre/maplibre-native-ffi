@@ -41,52 +41,74 @@ Future<void> renderToTexture(
   final options = RenderSessionAttachOptions(
     driver: RenderDriverKind.coreWorker,
     frameWake: const Wake(callback: onFrameWake),
-    // Only if your renderer also submits to the graphics queue. The
-    // lock and unlock are native function pointers.
-    queueLock: QueueLock.native(lock: lockQueue, unlock: unlockQueue),
   );
   // #endregion attach-options
 
   // #region attach-borrowed
-  final ring = VulkanBorrowedTextureDescriptor(
-    // The map's size in logical pixels.
-    logicalSize: const LogicalSize(width: 800, height: 600),
-    // The size of your textures in device pixels.
-    physicalWidth: 1600,
-    physicalHeight: 1200,
-    context: vulkan,
-    // Your VkImage and VkImageView for each texture of the ring.
-    textures: [
-      VulkanBorrowedTexture(image: images[0], imageView: views[0]),
-      VulkanBorrowedTexture(image: images[1], imageView: views[1]),
-    ],
-    format: 37, // VK_FORMAT_R8G8B8A8_UNORM
-    finalLayout: 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+  // Your VkDevice and graphics queue.
+  final device = GpuDeviceHandle.wrapVulkan(
+    VulkanDeviceDescriptor(
+      context: vulkan,
+      // Only if your renderer also submits to the graphics queue. The
+      // lock and unlock are native function pointers.
+      queueLock: QueueLock.native(
+        lock: lockQueue,
+        unlock: unlockQueue,
+      ),
+      // The device extensions that you enabled on your VkDevice.
+      enabledExtensions: [
+        'VK_KHR_swapchain',
+        'VK_KHR_external_semaphore_fd',
+      ],
+    ),
   );
 
-  session = map.attachVulkanBorrowedTexture(ring, options);
+  final ring = RenderTarget.vulkanBorrowedTextures(
+    VulkanBorrowedTexturesTarget(
+      // The map's size in logical pixels.
+      logicalSize: const LogicalSize(width: 800, height: 600),
+      // The size of your textures in device pixels.
+      physicalWidth: 1600,
+      physicalHeight: 1200,
+      // Your VkImage and VkImageView for each texture of the ring.
+      textures: [
+        VulkanBorrowedTexture(image: images[0], imageView: views[0]),
+        VulkanBorrowedTexture(image: images[1], imageView: views[1]),
+      ],
+      format: 37, // VK_FORMAT_R8G8B8A8_UNORM
+      finalLayout: 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    ),
+  );
+
+  session = map.attach(ring, options, device: device);
+  // The session keeps the device until it detaches.
+  device.release();
   await session.ready;
   // #endregion attach-borrowed
 
   // #region resize-borrowed
-  final resized = VulkanBorrowedTextureReplacement(
-    logicalSize: const LogicalSize(width: 1024, height: 768),
-    physicalWidth: 2048,
-    physicalHeight: 1536,
-    // Your new textures, at the new size.
-    textures: [
-      VulkanBorrowedTexture(
-        image: newImages[0],
-        imageView: newViews[0],
-      ),
-      VulkanBorrowedTexture(
-        image: newImages[1],
-        imageView: newViews[1],
-      ),
-    ],
+  final resized = RenderTarget.vulkanBorrowedTextures(
+    VulkanBorrowedTexturesTarget(
+      logicalSize: const LogicalSize(width: 1024, height: 768),
+      physicalWidth: 2048,
+      physicalHeight: 1536,
+      // Your new textures, at the new size.
+      textures: [
+        VulkanBorrowedTexture(
+          image: newImages[0],
+          imageView: newViews[0],
+        ),
+        VulkanBorrowedTexture(
+          image: newImages[1],
+          imageView: newViews[1],
+        ),
+      ],
+      format: 37,
+      finalLayout: 5,
+    ),
   );
 
-  await session.setVulkanBorrowedTextureTarget(resized);
+  await session.setTarget(resized);
   // vkDestroyImageView and vkDestroyImage
   destroyTextures(images, views);
   // #endregion resize-borrowed

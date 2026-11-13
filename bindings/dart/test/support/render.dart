@@ -39,18 +39,25 @@ Future<MapHandle> openRenderMap(Object? style) async {
   return map;
 }
 
-/// Creates an offscreen device, which a teardown releases.
-OffscreenDeviceHandle openOffscreenDevice() {
-  final device = OffscreenDeviceHandle.create();
+/// An offscreen target of the render size.
+final offscreenTarget = RenderTarget.offscreen(
+  OffscreenTarget(logicalSize: _size),
+);
+
+/// Creates a GPU device that the library owns, which a teardown releases.
+GpuDeviceHandle openGpuDevice() {
+  final device = GpuDeviceHandle.create();
   addTearDown(device.release);
   return device;
 }
 
-/// Attaches an offscreen session of the render size, on a device of its own.
+/// Attaches an offscreen session of the render size, on [device] or else on a
+/// device of its own.
 RenderSessionHandle attachOffscreenSession(
   MapHandle map,
-  RenderSessionAttachOptions options,
-) => map.attachOffscreen(OffscreenDescriptor(logicalSize: _size), options);
+  RenderSessionAttachOptions options, {
+  GpuDeviceHandle? device,
+}) => map.attach(offscreenTarget, options, device: device);
 
 /// A session driven by its core worker, which a teardown releases before the
 /// map and any graphics context it uses.
