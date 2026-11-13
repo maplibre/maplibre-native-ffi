@@ -594,10 +594,14 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
     );
     mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
     MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
-    TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_SYNC_FD, producer.kind);
-    // -1 is a fence that has already signaled.
-    const int produced = (int)(int64_t)producer.handle;
-    TEST_ASSERT_GREATER_OR_EQUAL_INT(-1, produced);
+    // A sync file that has already signaled hands over as CPU complete.
+    int produced = -1;
+    if (producer.kind == MLN_GPU_SYNC_SYNC_FD) {
+      produced = (int)(int64_t)producer.handle;
+      TEST_ASSERT_GREATER_OR_EQUAL_INT(0, produced);
+    } else {
+      TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_CPU_COMPLETE, producer.kind);
+    }
     if (produced >= 0) {
       struct pollfd signaled = {.fd = produced, .events = POLLIN};
       TEST_ASSERT_EQUAL_INT(1, poll(&signaled, 1, 10000));
