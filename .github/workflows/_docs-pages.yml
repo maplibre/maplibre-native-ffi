@@ -66,21 +66,9 @@ jobs:
         run: >-
           mise run install-native-package linux-gnu-x64-vulkan
           build/packages/native/docs-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
-      # The live demo loads the browser modules that the CI run built and
-      # tested, from where the binding's build installs them.
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.run_id }}
-          name: typescript-addon-emscripten-wasm32-webgl-${{ env.RELEASE_SHA }}
-          path: bindings/typescript/native/build/emscripten-wasm32-webgl/install
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.run_id }}
-          name: typescript-addon-emscripten-wasm32-webgpu-${{ env.RELEASE_SHA }}
-          path: bindings/typescript/native/build/emscripten-wasm32-webgpu/install
-      - run: mise run //examples/browser:build
+      # TODO(part 2 of the move off Emscripten): the live demo loads the
+      # TypeScript binding's browser modules, which no run builds until that
+      # binding moves onto the web presets, so the site goes up without it.
       - run: mise run //docs:build
         env:
           MISE_TASK_SKIP: "//:build"

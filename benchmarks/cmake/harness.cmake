@@ -26,14 +26,6 @@ if(NOT EXISTS "${google_benchmark}/src/benchmark.cc")
       "'${google_benchmark}'. The bench tasks check it out.")
   return()
 endif()
-# The browser build embeds the fixtures, so it needs them at configure time.
-if(EMSCRIPTEN AND NOT IS_DIRECTORY "${MLN_BENCH_FIXTURE_DIR}")
-  message(
-    STATUS
-      "Skipping mln_ffi_bench: a browser build embeds its fixtures, and "
-      "MLN_BENCH_FIXTURE_DIR names no directory. The bench tasks prepare them.")
-  return()
-endif()
 
 if(NOT DEFINED MLN_BENCH_LIBRARY)
   set(MLN_BENCH_LIBRARY maplibre_native_c)
@@ -143,41 +135,8 @@ if(TARGET mln_ffi_platform_dependencies)
   endif()
 endif()
 
-# The browser runs the harness as a page, in the native suite's shell, with the
-# fixtures embedded at /fixtures. main() runs on a worker, where blocking is
-# legal.
-set(browser false)
-set(fixture_argument "")
-if(EMSCRIPTEN)
-  set(browser true)
-  # A change to an embedded file, such as the style, links the harness again.
-  file(GLOB_RECURSE embedded_fixtures "${MLN_BENCH_FIXTURE_DIR}/*")
-  set_property(
-    TARGET mln_ffi_bench
-    APPEND
-    PROPERTY LINK_DEPENDS ${embedded_fixtures})
-  set_target_properties(mln_ffi_bench PROPERTIES SUFFIX ".html")
-  target_link_options(
-    mln_ffi_bench
-    PRIVATE
-      "-sENVIRONMENT=web,worker"
-      "-sPROXY_TO_PTHREAD"
-      "-sOFFSCREENCANVAS_SUPPORT=1"
-      "-sEXPORTED_RUNTIME_METHODS=GL,ENV"
-      "-sALLOW_MEMORY_GROWTH=1"
-      "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/tests/native/support/browser_shell.html"
-      "-sEXIT_RUNTIME=1"
-      "SHELL:--embed-file ${MLN_BENCH_FIXTURE_DIR}@/fixtures")
-  # Like the native suites, the harness stands in for a WebGPU host that waits
-  # in place for its device and buffer maps, so it suspends through JSPI.
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
-    target_link_options(mln_ffi_bench PRIVATE "-sJSPI")
-  endif()
-  set(fixture_argument "/fixtures")
-endif()
-
 # How the bench task runs the harness: the environment that the native suites
-# get, and whether it runs in a browser.
+# get.
 set(environment)
 set(modifications)
 if(COMMAND mln_native_test_environment AND TARGET mln_ffi_render_dependencies)
@@ -199,9 +158,7 @@ file(
   CONTENT
     "{
   \"executable\": \"$<TARGET_FILE:mln_ffi_bench>\",
-  \"browser\": ${browser},
   \"render_backend\": \"${MLN_FFI_RENDER_BACKEND}\",
-  \"fixture_argument\": \"${fixture_argument}\",
   \"environment\": [${environment_json}]
 }
 ")

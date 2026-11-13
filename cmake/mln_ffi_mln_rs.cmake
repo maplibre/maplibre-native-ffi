@@ -174,8 +174,8 @@ function(mln_ffi_cargo_environment out_environment out_rustc_arguments)
       "CARGO_TARGET_${target_upper}_LINKER=${CMAKE_LINKER}")
     list(APPEND target_rustflags "-Clink-arg=/winsysroot:${MLN_FFI_WINSYSROOT}")
   else()
-    # Linux, FreeBSD, Android, OpenHarmony, and Emscripten: the compiler that
-    # CMake uses, wrapped with its target and flags.
+    # Linux, FreeBSD, Android, and OpenHarmony: the compiler that CMake uses,
+    # wrapped with its target and flags.
     mln_ffi_write_compiler_shim(cc cc "${CMAKE_C_COMPILER}" C)
     mln_ffi_write_compiler_shim(cxx c++ "${CMAKE_CXX_COMPILER}" CXX)
     list(
@@ -186,14 +186,11 @@ function(mln_ffi_cargo_environment out_environment out_rustc_arguments)
       "AR_${target_lower}=${CMAKE_AR}"
       "CARGO_TARGET_${target_upper}_AR=${CMAKE_AR}"
       "CARGO_TARGET_${target_upper}_LINKER=${cc}")
-    if(NOT EMSCRIPTEN)
-      # Cargo gives a shared library no soname, so the library gets the one
-      # that it installs under. The symbol table goes the way CPack strips the
-      # binaries it installs as targets.
-      list(
-        APPEND rustc_arguments -C
-        "link-arg=-Wl,-soname,lib${MLN_FFI_LIBRARY_NAME}.so" -C strip=symbols)
-    endif()
+    # Cargo gives a shared library no soname, so the library gets the one that
+    # it installs under. The symbol table goes the way CPack strips the
+    # binaries it installs as targets.
+    list(APPEND rustc_arguments -C
+         "link-arg=-Wl,-soname,lib${MLN_FFI_LIBRARY_NAME}.so" -C strip=symbols)
     if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
       # cc-rs and rustc's OpenHarmony target assume musl, which the SDK
       # selects through this macro.
@@ -222,18 +219,6 @@ function(mln_ffi_cargo_environment out_environment out_rustc_arguments)
       endforeach()
       list(APPEND target_rustflags "-Lnative=${stub_dir}")
     endif()
-  endif()
-
-  # Emscripten rejects mixing objects that carry atomics with objects that do
-  # not under shared memory, and rustup ships no wasm32-unknown-emscripten std
-  # built with atomics, so std is rebuilt from source. -Zbuild-std is
-  # nightly-only, and this is the one place the repository reaches for a nightly
-  # feature: RUSTC_BOOTSTRAP unlocks it on the pinned stable toolchain, which
-  # keeps every other build, and every artifact we ship, on stable.
-  if(EMSCRIPTEN)
-    list(APPEND environment "RUSTC_BOOTSTRAP=1")
-    list(APPEND target_rustflags -Ctarget-feature=+atomics,+bulk-memory
-         -Cpanic=abort)
   endif()
 
   if(target_rustflags)
@@ -275,7 +260,7 @@ function(mln_ffi_library_files)
     if(APPLE)
       set(cargo_shared "${cargo_dir}/libmaplibre_native_c.dylib")
       set(shared "${output_dir}/lib${MLN_FFI_LIBRARY_NAME}.dylib")
-    elseif(NOT EMSCRIPTEN)
+    else()
       set(cargo_shared "${cargo_dir}/libmaplibre_native_c.so")
       set(shared "${output_dir}/lib${MLN_FFI_LIBRARY_NAME}.so")
     endif()
@@ -357,16 +342,6 @@ function(mln_ffi_add_c_api_library target)
     message(
       FATAL_ERROR "The build needs MLN_FFI_RUST_TARGET, which the preset sets")
   endif()
-  # See the Emscripten entry in docs/support-gaps.toml.
-  if(EMSCRIPTEN)
-    message(
-      FATAL_ERROR
-        "The Emscripten presets are disabled: mln-rs doesn't build for "
-        "wasm32-unknown-emscripten. Its browser build targets "
-        "wasm32-unknown-unknown with wasm-bindgen, and its OpenGL and storage "
-        "crates take those paths for every wasm32 target, while the browser "
-        "builds here link Emscripten modules with pthreads.")
-  endif()
   set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/build/cargo"
       CACHE PATH "Cargo target directory for mln-rs")
 
@@ -378,10 +353,6 @@ function(mln_ffi_add_c_api_library target)
   set(crate_types staticlib)
   if(shared_supported)
     set(crate_types cdylib,staticlib)
-  endif()
-  set(cargo_extra_arguments)
-  if(EMSCRIPTEN)
-    list(APPEND cargo_extra_arguments -Z build-std=std,panic_abort)
   endif()
   set(native_libraries "${MLN_FFI_native_dir}/native-static-libs.txt")
 
@@ -418,7 +389,6 @@ function(mln_ffi_add_c_api_library target)
       --target
       "${MLN_FFI_RUST_TARGET}"
       --release
-      ${cargo_extra_arguments}
       --
       ${rustc_arguments}
       "--print=native-static-libs=${native_libraries}"
@@ -551,8 +521,15 @@ endfunction()
 
 # The components that the library carries: mln-rs, with its patches, the Rust
 # crates that Cargo builds into it, as cargo-about lists them, and the Rust
-# standard library.
+# standard library. FEATURES names the crate's features for a build without its
+# default ones, as the browser package builds.
 function(mln_ffi_add_mln_rs_components target)
+  cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "FEATURES")
+  set(feature_arguments)
+  if(arg_FEATURES)
+    list(JOIN arg_FEATURES "," features)
+    set(feature_arguments --no-default-features --features "${features}")
+  endif()
   find_program(CARGO_ABOUT_EXECUTABLE cargo-about REQUIRED)
   find_program(RUSTC_EXECUTABLE rustc REQUIRED)
   mln_ffi_add_component(
@@ -585,6 +562,7 @@ function(mln_ffi_add_mln_rs_components target)
       "${license_config}"
       --target
       "${MLN_FFI_RUST_TARGET}"
+      ${feature_arguments}
       --locked
       --fail
       --format

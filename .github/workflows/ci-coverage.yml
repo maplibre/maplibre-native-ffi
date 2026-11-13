@@ -194,7 +194,10 @@ jobs:
             github.event.number) || 'main' }}
         run: mise run --no-deps //docs:deploy-cloudflare "$CLOUDFLARE_BRANCH"
   # The live demo loads the browser modules that the web unit's targets build,
-  # so the preview gains the demo only when both ran. It waits for the targets
+  # so the preview gains the demo only when both ran. TODO(part 2 of the move
+  # off Emscripten): the demo's TypeScript browser modules still name the
+  # Emscripten presets, which no longer exist, so this job doesn't run until
+  # the TypeScript binding moves onto the web presets. It waits for the targets
   # instead of holding up a pull request's preview above.
   docs-demo-preview:
     name: docs demo preview

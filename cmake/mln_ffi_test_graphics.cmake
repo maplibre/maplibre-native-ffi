@@ -51,11 +51,6 @@ function(mln_ffi_test_graphics_loader_definitions out_var)
 endfunction()
 
 function(mln_ffi_add_test_graphics)
-  # Browser GPU contexts come from JavaScript, so the browser suite keeps its
-  # own fixtures in tests/native/support.
-  if(EMSCRIPTEN)
-    return()
-  endif()
   mln_ffi_test_graphics_loader_definitions(loader_definitions)
 
   add_library(

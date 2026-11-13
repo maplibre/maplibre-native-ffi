@@ -8,8 +8,6 @@
 #include "support/style.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
-
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 #include <objc/message.h>
 #include <objc/runtime.h>
@@ -1054,10 +1052,8 @@ static void releases_that_a_ring_refuses(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   tear_down_map(&map);
 }
-#endif
 
 MLN_TEST_GROUP {
-#if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_borrowed_texture_retarget_renders_into_the_new_texture);
   RUN_TEST(a_borrowed_retarget_is_refused_while_a_frame_is_acquired);
   RUN_TEST(a_borrowed_retarget_returns_quarantined_slots_to_service);
@@ -1073,5 +1069,4 @@ MLN_TEST_GROUP {
   RUN_TEST(a_release_finishes_a_waiting_demand);
   RUN_TEST(an_offscreen_session_refuses_targets);
   RUN_TEST(releases_that_a_ring_refuses);
-#endif
 }

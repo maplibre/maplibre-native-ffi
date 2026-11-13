@@ -1035,12 +1035,7 @@ static void attach_picks_a_producer_sync_kind(void) {
   );
   // The fixture's Metal target names no command queue, so it lacks queue
   // order.
-#if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  const mln_gpu_sync_kind expected[] = {
-    MLN_GPU_SYNC_QUEUE_ORDER, MLN_GPU_SYNC_QUEUE_ORDER
-  };
-  options.producer_sync_kinds = MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE;
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   const mln_gpu_sync_kind expected[] = {
     MLN_GPU_SYNC_CPU_COMPLETE, MLN_GPU_SYNC_QUEUE_ORDER
   };
@@ -1336,7 +1331,7 @@ static void a_released_caller_driven_session_is_abandoned_when_its_map_releases(
     MLN_TEST_INVALID_STATE(
       mln_render_session_service_driver_work(fixture.session, NULL)
     );
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL) || defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
     // Only the driver thread may destroy these backends' objects.
     TEST_ASSERT_TRUE_MESSAGE(
       mln_test_wait_for_flag(&render_warning_logged),

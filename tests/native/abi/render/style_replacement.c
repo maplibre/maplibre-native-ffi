@@ -6,8 +6,6 @@
 #include "support/resources.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
-
 typedef struct replacement_wait {
   mln_runtime runtime;
   mln_map map;
@@ -310,11 +308,7 @@ static void a_reloaded_style_renders_a_layer_added_again(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#endif
-
 MLN_TEST_GROUP {
-#if !defined(__EMSCRIPTEN__)
   RUN_TEST(waiting_demands_settle_replaced_styles_with_revalidated_tiles);
   RUN_TEST(a_reloaded_style_renders_a_layer_added_again);
-#endif
 }

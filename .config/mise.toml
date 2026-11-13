@@ -16,7 +16,6 @@ lockfile_mode = "merge"
 # machine that cannot install one of them cannot run any task at all.
 auto_install_disable_tools = [
   "android-sdk",
-  "emsdk",
   "github:Jake-Shadle/xwin",
   "ohos-sdk",
   "http:oniro-emulator",
@@ -118,12 +117,10 @@ sccache = "0.19.0"
 
 # The native build compiles mln-rs, which implements the C library, with Cargo
 # for each preset's Rust target, so Rust is part of the repository-wide native
-# toolchain. `rust-src` is for the Emscripten target alone: rustup ships no
-# `std` for `wasm32-unknown-emscripten` built with atomics, so that target
-# rebuilds `std` from source. See cmake/mln_ffi_mln_rs.cmake.
+# toolchain. See cmake/mln_ffi_mln_rs.cmake.
 # `llvm-tools` and the toolchain's lld package the Linux and FreeBSD archives for
 # any architecture. See cmake/toolchains/zig.cmake.
-"core:rust" = { version = "1.99.1", profile = "minimal", components = "rustfmt,clippy,rust-src,llvm-tools", targets = "x86_64-apple-darwin,aarch64-apple-tvos,aarch64-apple-tvos-sim,aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,i686-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,riscv64gc-unknown-linux-gnu,riscv64gc-unknown-linux-musl,loongarch64-unknown-linux-gnu,loongarch64-unknown-linux-musl,x86_64-unknown-freebsd,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,x86_64-pc-windows-gnu,aarch64-pc-windows-msvc,aarch64-pc-windows-gnullvm,wasm32-unknown-emscripten" }
+"core:rust" = { version = "1.99.1", profile = "minimal", components = "rustfmt,clippy,llvm-tools", targets = "x86_64-apple-darwin,aarch64-apple-tvos,aarch64-apple-tvos-sim,aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,i686-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,riscv64gc-unknown-linux-gnu,riscv64gc-unknown-linux-musl,loongarch64-unknown-linux-gnu,loongarch64-unknown-linux-musl,x86_64-unknown-freebsd,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,x86_64-pc-windows-gnu,aarch64-pc-windows-msvc,aarch64-pc-windows-gnullvm,wasm32-unknown-unknown" }
 
 # The native CMake build compiles the Linux and FreeBSD targets with `zig cc`,
 # so Zig joins the native toolchain there. See cmake/toolchains/zig.cmake. The
@@ -135,7 +132,9 @@ sccache = "0.19.0"
 
 # The cross-compilation SDKs are multi-gigabyte downloads, and a build reads one out
 # of the environment, so each is opt-in through a configuration environment of its
-# own under .config/: mise.android.toml, mise.emscripten.toml, and mise.ohos.toml.
+# own under .config/: mise.android.toml and mise.ohos.toml. The web presets' tools
+# are small, but only those presets and their bindings' browser suites use them, so
+# they come with `MISE_ENV=web` from mise.web.toml.
 
 [env]
 # The Android SDK packages the CMake presets and the Gradle builds resolve. They are
@@ -223,6 +222,8 @@ run = [
 hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = '''
+# A web preset compiles no C.
+case "$usage_preset" in web-*) exit 0 ;; esac
 compile_commands_dir="$MISE_MONOREPO_ROOT/build/clangd"
 compile_commands="$compile_commands_dir/compile_commands.json"
 cmake -E make_directory "$compile_commands_dir"
@@ -241,7 +242,6 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = '''
 case "$usage_preset" in
   android-*) variable=ANDROID_HOME environment=android ;;
-  emscripten-*) variable=EMSDK environment=emscripten ;;
   ohos-*) variable=OHOS_SDK_NATIVE environment=ohos ;;
   windows-*)
     # A Windows host builds against Visual Studio instead.
@@ -299,11 +299,19 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # ctest runs the suites: on the host, one entry per test file and one per
 # program in tests/native/exit; off the host, one entry per suite and exit
-# program through tools/devices/run. The Emscripten suites run as pages in
-# headless Chromium; see scripts/run-browser-test.mjs for how a browser is
-# located.
+# program through tools/devices/run. A web preset builds no C, so mln-rs's
+# browser check drives the package's raw C ABI from a Web Worker in headless
+# Chromium instead; scripts/find-chromium.mjs says how a browser is located.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
+case "$usage_preset" in
+web-*)
+  share="$build_dir/install/share/maplibre-native-c"
+  feature="$(jq -r '{webgpu: "webgpu", opengl: "gl"}[.backend]' "$share/artifact.json")"
+  exec node "$MISE_MONOREPO_ROOT/third_party/mln-rs/crates/mln_c/web-check/check.mjs" \
+    "$share/web" "$feature" --chromium "$(node "$MISE_MONOREPO_ROOT/scripts/find-chromium.mjs")"
+  ;;
+esac
 # A device build that no emulator or simulator runs registers no tests, so it
 # fails before a device boots for nothing.
 if ctest --test-dir "$build_dir" -C Release --show-only | grep -q '^Total Tests: 0[[:space:]]*$'; then

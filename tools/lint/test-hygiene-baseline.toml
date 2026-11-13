@@ -2,5 +2,5 @@
 # Counts only fall. Run the script with --update after removing some.
 
 [sleep]
-"tests/native/support/render_webgpu.c" = 2
 
+[network-host]

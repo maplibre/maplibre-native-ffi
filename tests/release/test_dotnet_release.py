@@ -40,7 +40,7 @@ class RuntimeTargetTests(unittest.TestCase):
             {
                 preset
                 for preset in presets
-                if preset.startswith(("emscripten-", "visionos-", "ohos-"))
+                if preset.startswith(("web-", "visionos-", "ohos-"))
             },
         )
 

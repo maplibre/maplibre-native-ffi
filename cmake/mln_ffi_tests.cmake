@@ -22,24 +22,14 @@ set(MLN_NATIVE_ABI_DOMAINS
     binding
     platform)
 
-# The browser runs the ABI suite as four pages rather than one per file, which
-# would launch Chromium once per file. Each shard names its domains.
-set(MLN_NATIVE_BROWSER_SHARDS
-    "base,completion,runtime" "resources,map,projection,style" "render,backend"
-    "delivery,binding,platform")
-
 # Tags a test file can end its name with to build only on matching targets,
-# such as backend/single_context_device_egl.c or
-# platform/browser_http_emscripten.c.
+# such as backend/single_context_device_egl.c.
 set(MLN_NATIVE_FILE_TAGS
     metal
     opengl
     vulkan
-    webgpu
     egl
     wgl
-    webgl
-    emscripten
     android
     ohos
     apple
@@ -52,9 +42,6 @@ function(mln_native_active_file_tags out_var)
   set(tags ${MLN_FFI_RENDER_BACKEND})
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
     list(APPEND tags ${MLN_FFI_OPENGL_CONTEXT_PROVIDER})
-  endif()
-  if(EMSCRIPTEN)
-    list(APPEND tags emscripten)
   endif()
   if(ANDROID)
     list(APPEND tags android)
@@ -278,86 +265,6 @@ function(mln_native_fetch_unity)
   endif()
 endfunction()
 
-# Links a suite into a page the browser runner loads. It needs three things a
-# native run gets for free:
-#
-#   * A canvas, because the OpenGL fixture creates a real WebGL2 context.
-#   * Its fixtures, which it opens through stdio. They are embedded in the
-#     module rather than served, so the suite reads them the same way it does
-#     everywhere else.
-#   * Cross-origin isolation. The build uses pthreads, so SharedArrayBuffer has
-#     to be available, which means COOP/COEP response headers and therefore a
-#     real HTTP origin rather than file://. The runner serves the directory.
-function(mln_native_configure_browser_page target)
-  set_target_properties(${target} PROPERTIES SUFFIX ".html")
-  target_link_options(
-    ${target}
-    PRIVATE
-      "-sENVIRONMENT=web,worker"
-      # main() runs on a worker, where blocking is legal. MapLibre blocks in
-      # waitForEmpty() and during teardown, which the browser main thread
-      # forbids, so this is what lets the suite run as written.
-      "-sPROXY_TO_PTHREAD"
-      # Fixtures create a private OffscreenCanvas per session, on whichever
-      # worker attaches it, and register it in GL.offscreenCanvases -- which is
-      # what resolves the selector, so that table has to be reachable from JS.
-      "-sOFFSCREENCANVAS_SUPPORT=1"
-      # GL for the canvas registry the fixtures resolve their selector through,
-      # ENV for the fixture origin and timeout scale the page shell hands the
-      # suite.
-      "-sEXPORTED_RUNTIME_METHODS=GL,ENV"
-      "SHELL:--shell-file ${MLN_NATIVE_TESTS_DIR}/support/browser_shell.html"
-      # Unity reports through stdout and the process exit status, so the runner
-      # needs the module to exit rather than keep its runtime alive.
-      "-sEXIT_RUNTIME=1"
-      "SHELL:--embed-file ${MLN_NATIVE_TESTS_DIR}/fixtures@/fixtures")
-  # The suite stands in for a WebGPU host, and as written it waits in place:
-  # for its own device, for buffer maps, and for sessions whose results arrive
-  # on its event loop. So it suspends through JSPI. The library never does,
-  # and links without it.
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
-    target_link_options(${target} PRIVATE "-sJSPI")
-  endif()
-endfunction()
-
-# Registers one browser page run. The runner's timeout sits below the entry's,
-# so a run that hangs ends at the runner, which reports how far it got and
-# removes the browser profile, rather than at CTest.
-function(mln_native_add_browser_test test_name target)
-  find_program(MLN_FFI_NODE_EXECUTABLE node REQUIRED)
-  set(module_arguments)
-  foreach(argument IN LISTS ARGN)
-    list(APPEND module_arguments --module-arg "${argument}")
-  endforeach()
-  add_test(
-    NAME ${test_name}
-    COMMAND
-      "${MLN_FFI_NODE_EXECUTABLE}"
-      "${PROJECT_SOURCE_DIR}/scripts/run-browser-test.mjs"
-      "$<TARGET_FILE:${target}>"
-      --timeout-seconds
-      170
-      --render-backend
-      ${MLN_FFI_RENDER_BACKEND}
-      ${module_arguments})
-  set_tests_properties(${test_name} PROPERTIES TIMEOUT 180)
-endfunction()
-
-function(mln_native_add_browser_abi_shards)
-  set(shard_index 0)
-  foreach(shard IN LISTS MLN_NATIVE_BROWSER_SHARDS)
-    math(EXPR shard_index "${shard_index} + 1")
-    string(REPLACE "," ";" shard_domains "${shard}")
-    set(filter)
-    foreach(domain IN LISTS shard_domains)
-      list(APPEND filter "/abi/${domain}/")
-    endforeach()
-    list(JOIN filter "," filter)
-    mln_native_add_browser_test("native-abi/browser-shard-${shard_index}"
-                                mln_native_abi_tests -f "${filter}")
-  endforeach()
-endfunction()
-
 function(mln_native_test_environment out_environment out_modifications)
   get_target_property(dependency_runtime_dirs mln_ffi_render_dependencies
                       MLN_FFI_RUNTIME_DIRS)
@@ -403,16 +310,6 @@ function(mln_native_configure_suite target registry_dir)
   endif()
 
   set(support_dir "${MLN_NATIVE_TESTS_DIR}/support")
-  # The render fixture's context comes from tests/graphics on native targets,
-  # and from the browser file for this preset's backend in the browser.
-  if(EMSCRIPTEN AND MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
-    set(render_backend_files "render_webgl.c")
-  elseif(EMSCRIPTEN)
-    set(render_backend_files "render_${MLN_FFI_RENDER_BACKEND}.c")
-  else()
-    set(render_backend_files "render_graphics.c")
-  endif()
-  list(TRANSFORM render_backend_files PREPEND "${support_dir}/")
   target_sources(
     ${target}
     PRIVATE
@@ -426,12 +323,8 @@ function(mln_native_configure_suite target registry_dir)
       "${support_dir}/map.c"
       "${support_dir}/style.c"
       "${support_dir}/resources.c"
-      ${render_backend_files})
-  # The browser has no sockets, so its transport runs against the runner's
-  # routes instead of the loopback server.
-  if(NOT EMSCRIPTEN)
-    target_sources(${target} PRIVATE "${support_dir}/http_server.c")
-  endif()
+      "${support_dir}/render_graphics.c")
+  target_sources(${target} PRIVATE "${support_dir}/http_server.c")
   if(WIN32)
     target_link_libraries(${target} PRIVATE ws2_32)
   endif()
@@ -499,15 +392,11 @@ function(mln_native_configure_suite target registry_dir)
     target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_BACKEND_OPENGL=1)
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
       target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_OPENGL_WGL=1)
-    elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
-      target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_OPENGL_WEBGL=1)
     else()
       target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_OPENGL_EGL=1)
     endif()
   elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
     target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_BACKEND_VULKAN=1)
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
-    target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_BACKEND_WEBGPU=1)
   endif()
 
   if(NOT WIN32)
@@ -539,9 +428,6 @@ function(mln_native_configure_suite target registry_dir)
                       MLN_FFI_TEST_LINK_OPTIONS)
   if(test_link_options)
     target_link_options(${target} PRIVATE ${test_link_options})
-  endif()
-  if(EMSCRIPTEN)
-    mln_native_configure_browser_page(${target})
   endif()
 endfunction()
 
@@ -677,11 +563,6 @@ function(mln_ffi_add_native_tests)
   mln_native_fetch_unity()
   mln_native_add_abi_suite(abi_sources)
   mln_native_add_doc_snippets()
-
-  if(EMSCRIPTEN)
-    mln_native_add_browser_abi_shards()
-    return()
-  endif()
 
   # Each registered test gets the same environment, so a new entry cannot miss
   # the fixture directory or the loader path.

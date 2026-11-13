@@ -414,17 +414,11 @@ void mln_test_destroy_map(mln_map map) {
 bool mln_test_fixture_path(
   const char* relative_path, char* out_path, size_t out_path_capacity
 ) {
-#if defined(__EMSCRIPTEN__)
-  // The browser suite embeds its fixtures in the module at a fixed virtual
-  // path.
-  const char* fixture_dir = "/fixtures";
-#else
   const char* fixture_dir = getenv("MLN_FFI_TEST_FIXTURE_DIR");
   TEST_ASSERT_TRUE_MESSAGE(
     fixture_dir != NULL && fixture_dir[0] != '\0',
     "MLN_FFI_TEST_FIXTURE_DIR is unset; run the suite through ctest"
   );
-#endif
 
   const int written =
     snprintf(out_path, out_path_capacity, "%s/%s", fixture_dir, relative_path);

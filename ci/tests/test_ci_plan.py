@@ -201,9 +201,7 @@ class PresetTest(unittest.TestCase):
         }
         expected = {}
         for name, target in self.targets.items():
-            mise_env = (
-                target.platform if target.platform in ("emscripten", "ohos") else ""
-            )
+            mise_env = target.platform if target.platform in ("web", "ohos") else ""
             if target.platform == "windows-mingw":
                 mise_env = "msys2"
             # Only the Linux and Windows runners lack a GPU. The RISC-V and
@@ -339,11 +337,11 @@ class PresetTest(unittest.TestCase):
         browser_presets = {
             row["preset"]
             for row in result["matrix"]
-            if row["preset"].startswith("emscripten-")
+            if row["preset"].startswith("web-")
         }
         self.assertEqual(
             browser_presets,
-            {"emscripten-wasm32-webgl", "emscripten-wasm32-webgpu"},
+            {"web-wasm32-webgl", "web-wasm32-webgpu"},
         )
 
     def test_an_unknown_unit_fails(self):

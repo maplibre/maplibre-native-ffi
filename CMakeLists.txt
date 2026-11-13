@@ -4,8 +4,17 @@ include("${CMAKE_CURRENT_LIST_DIR}/cmake/platform/apple.cmake")
 mln_ffi_configure_apple_toolchain_defaults()
 
 # Cargo builds the library from mln-rs (cmake/mln_ffi_mln_rs.cmake). C and C++
-# are the languages of the test suites and the test graphics fixtures.
-project(maplibre_native_c VERSION 0.1.0 LANGUAGES C CXX)
+# are the languages of the test suites and the test graphics fixtures. A web
+# preset builds the browser package (cmake/mln_ffi_web.cmake), which has
+# neither.
+if(MLN_FFI_TARGET_PLATFORM MATCHES "^web-")
+  set(MLN_FFI_WEB TRUE)
+  set(languages NONE)
+else()
+  set(MLN_FFI_WEB FALSE)
+  set(languages C CXX)
+endif()
+project(maplibre_native_c VERSION 0.1.0 LANGUAGES ${languages})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
   # The OHOS SDK toolchain injects --gcc-toolchain, which clang reports as
@@ -32,34 +41,39 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 include(GNUInstallDirs)
 include(mln_ffi_options)
-include(mln_ffi_platform)
-include(mln_ffi_render_backend)
-include(mln_ffi_components)
-include(mln_ffi_apple_framework)
-include(mln_ffi_install)
-include(mln_ffi_mln_rs)
-
-include(mln_ffi_emscripten)
 mln_ffi_configure_options()
-mln_ffi_validate_platform()
-mln_ffi_select_platform()
-# Before the render backend, which only looks for a graphics loader when the
-# test harness that links it is being built.
-include(CTest)
 
-mln_ffi_select_render_backend()
-mln_ffi_add_c_api_library(maplibre_native_c)
-mln_ffi_install_c_api_library(maplibre_native_c)
+if(MLN_FFI_WEB)
+  include(mln_ffi_web)
+  mln_ffi_add_web_package(maplibre_native_c)
+else()
+  include(mln_ffi_platform)
+  include(mln_ffi_render_backend)
+  include(mln_ffi_components)
+  include(mln_ffi_apple_framework)
+  include(mln_ffi_install)
+  include(mln_ffi_mln_rs)
 
-# The namespace is the repository, not the target: `maplibre_native_c` is the C
-# component of `maplibre-native-ffi`, the same split the other bindings publish
-# under. Consumers that add this repository as a subdirectory link the alias so
-# they never depend on the bare target name.
-add_library(maplibre_native_ffi::c ALIAS maplibre_native_c)
+  mln_ffi_validate_platform()
+  mln_ffi_select_platform()
+  # Before the render backend, which only looks for a graphics loader when the
+  # test harness that links it is being built.
+  include(CTest)
 
-if(BUILD_TESTING AND MLN_FFI_ARTIFACT_NAME)
-  include(cmake/mln_ffi_tests.cmake)
-  mln_ffi_add_native_tests()
+  mln_ffi_select_render_backend()
+  mln_ffi_add_c_api_library(maplibre_native_c)
+  mln_ffi_install_c_api_library(maplibre_native_c)
+
+  # The namespace is the repository, not the target: `maplibre_native_c` is the
+  # C component of `maplibre-native-ffi`, the same split the other bindings
+  # publish under. Consumers that add this repository as a subdirectory link the
+  # alias so they never depend on the bare target name.
+  add_library(maplibre_native_ffi::c ALIAS maplibre_native_c)
+
+  if(BUILD_TESTING AND MLN_FFI_ARTIFACT_NAME)
+    include(cmake/mln_ffi_tests.cmake)
+    mln_ffi_add_native_tests()
+  endif()
 endif()
 
 if(MLN_FFI_ARTIFACT_NAME)

@@ -23,7 +23,6 @@
 #include "support/host_graphics.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
 static uint32_t render_frame(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
@@ -1005,10 +1004,7 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#endif
-
 MLN_TEST_GROUP {
-#if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_borrowed_ring_hands_each_frame_to_the_host);
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
   RUN_TEST(queue_ordered_frames_share_the_hosts_queue);
@@ -1032,5 +1028,4 @@ MLN_TEST_GROUP {
   RUN_TEST(borrowed_opengl_frames_support_gpu_fences);
 #endif
   RUN_TEST(a_surface_presents_frames_and_takes_a_resize);
-#endif
 }

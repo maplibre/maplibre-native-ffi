@@ -12,17 +12,13 @@
 #include <stdint.h>
 
 #include "maplibre_native_c.h"
-#include "render.h"
-
-#if !defined(__EMSCRIPTEN__)
 #include "mln_test_graphics.h"
-#endif
+#include "render.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#if !defined(__EMSCRIPTEN__)
 // The size of every fixture target, in pixels, at a scale factor of 1.
 #define MLN_TEST_HOST_TARGET_SIZE 64U
 
@@ -199,7 +195,6 @@ mln_status mln_test_render_fixture_set_surface(
   const mln_test_render_fixture* fixture,
   const mln_test_render_surface* surface, const mln_completion* completion
 );
-#endif
 
 #ifdef __cplusplus
 }

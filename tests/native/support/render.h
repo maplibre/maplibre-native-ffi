@@ -4,10 +4,8 @@
 // The backend-neutral render fixtures. An offscreen fixture renders on a
 // device that its session creates, and reads back only. A borrowed fixture
 // renders into a ring of textures that the fixture creates on a host device
-// for the preset's backend, and hands each frame to the case. On native
-// targets the host device comes from tests/graphics through render_graphics.c;
-// in the browser it comes from render_webgl.c or render_webgpu.c, which CMake
-// selects by preset.
+// for the preset's backend, and hands each frame to the case. The host device
+// comes from tests/graphics through render_graphics.c.
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -146,42 +144,13 @@ mln_status mln_test_render_fixture_finish_disposal(
 mln_status mln_test_render_session_release(mln_render_session session);
 
 // Releases the graphics device this thread cached. Every thread must call this
-// before its entry function returns: on browser WebGPU a live GPUDevice pins an
-// Emscripten keepalive and pthread_join on that thread blocks forever. A no-op
-// where the backend caches nothing per thread.
+// before its entry function returns. A no-op where the backend caches nothing
+// per thread.
 void mln_test_release_thread_gpu_resources(void);
 
 // Destroys the render sessions this thread still has tracked and reports
 // whether there were any. Part of mln_test_reclaim_thread_resources().
 bool mln_test_render_reclaim_thread_sessions(void);
-
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
-// Transfers an OffscreenCanvas into a core-worker WebGL surface session.
-bool mln_test_transferred_webgl_surface_create(
-  mln_map map, mln_test_render_fixture* fixture
-);
-// Transfers the page's <canvas> with the ID `canvas_id`, sized 64 by 64, into
-// a core-worker WebGL surface session, which presents to the page.
-bool mln_test_page_webgl_surface_create(
-  mln_map map, const char* canvas_id, mln_test_render_fixture* fixture
-);
-#endif
-
-#if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-// The WGPUTexture at `index` of a borrowed ring fixture, or null past its end.
-void* mln_test_webgpu_ring_texture(
-  const mln_test_render_fixture* fixture, size_t index
-);
-
-// Copies the ring texture at `index` into a buffer on the device's queue, maps
-// that buffer, and writes its tightly packed RGBA8 pixels to `pixels`, which
-// holds at least `size` bytes. Returns false when the texture, the copy, or
-// the map is unavailable.
-bool mln_test_webgpu_read_ring_texture(
-  const mln_test_render_fixture* fixture, size_t index, uint8_t* pixels,
-  size_t size
-);
-#endif
 
 #ifdef __cplusplus
 }
