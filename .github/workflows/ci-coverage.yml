@@ -160,8 +160,8 @@ jobs:
       && github.event.pull_request.head.repo.full_name == github.repository)
       || ((github.event_name == 'push'
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
-      && !(contains(needs.plan.outputs.matrix, '"emscripten-wasm32-webgl"')
-      && contains(needs.plan.outputs.matrix, '"emscripten-wasm32-webgpu"')))
+      && !(contains(needs.plan.outputs.matrix, '"web-wasm32-webgl"')
+      && contains(needs.plan.outputs.matrix, '"web-wasm32-webgpu"')))
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     environment:
@@ -194,10 +194,7 @@ jobs:
             github.event.number) || 'main' }}
         run: mise run --no-deps //docs:deploy-cloudflare "$CLOUDFLARE_BRANCH"
   # The live demo loads the browser modules that the web unit's targets build,
-  # so the preview gains the demo only when both ran. TODO(part 2 of the move
-  # off Emscripten): the demo's TypeScript browser modules still name the
-  # Emscripten presets, which no longer exist, so this job doesn't run until
-  # the TypeScript binding moves onto the web presets. It waits for the targets
+  # so the preview gains the demo only when both ran. It waits for the targets
   # instead of holding up a pull request's preview above.
   docs-demo-preview:
     name: docs demo preview
@@ -210,8 +207,8 @@ jobs:
       && (github.event_name == 'push'
       || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))))
       && needs.target.result == 'success'
-      && contains(needs.plan.outputs.matrix, '"emscripten-wasm32-webgl"')
-      && contains(needs.plan.outputs.matrix, '"emscripten-wasm32-webgpu"')
+      && contains(needs.plan.outputs.matrix, '"web-wasm32-webgl"')
+      && contains(needs.plan.outputs.matrix, '"web-wasm32-webgpu"')
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 15
     environment:
@@ -233,12 +230,12 @@ jobs:
           path: build
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: typescript-addon-emscripten-wasm32-webgl-${{ github.sha }}
-          path: bindings/typescript/native/build/emscripten-wasm32-webgl/install
+          name: typescript-addon-web-wasm32-webgl-${{ github.sha }}
+          path: bindings/typescript/native/build/web-wasm32-webgl/install
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: typescript-addon-emscripten-wasm32-webgpu-${{ github.sha }}
-          path: bindings/typescript/native/build/emscripten-wasm32-webgpu/install
+          name: typescript-addon-web-wasm32-webgpu-${{ github.sha }}
+          path: bindings/typescript/native/build/web-wasm32-webgpu/install
       - name: Add the demo to the site
         run: |
           mise deps pnpm
