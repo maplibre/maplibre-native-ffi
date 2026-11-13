@@ -4,11 +4,6 @@ package("maplibre-native-c")
     set_license("BSD-2-Clause")
     set_kind("library")
 
-    add_configs("backend", {
-        description = "Render backend (defaults to the platform's backend)",
-        default = "default", type = "string",
-        values = {"default", "egl", "vulkan", "wgl", "metal", "webgl", "webgpu"}
-    })
     add_configs("libc", {
         description = "Linux C library", default = "gnu", type = "string",
         values = {"gnu", "musl"}
@@ -45,19 +40,8 @@ package("maplibre-native-c")
         }
         local arch = architectures[package:arch()]
         assert(arch, "unsupported architecture: " .. package:arch())
-        local backend = package:config("backend")
-        if backend == "default" then
-            if package:is_plat("macosx", "iphoneos", "appletvos", "applexros") then
-                backend = "metal"
-            elseif package:is_plat("windows") then
-                backend = "wgl"
-            elseif package:is_plat("wasm") then
-                backend = "webgl"
-            else
-                backend = "egl"
-            end
-        end
-        local preset = platform .. "-" .. arch .. "-" .. backend
+        -- An archive carries every render backend of its platform.
+        local preset = platform .. "-" .. arch
         local selected
         for _, url in ipairs(package:urls()) do
             if package:url_alias(url) == preset then

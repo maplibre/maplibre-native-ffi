@@ -28,7 +28,7 @@ from zig_package import write_package as write_zig_package
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from tools.ci import gaps
+from tools.ci import gaps, plan
 from tools.ci.suites import GOBJECT_ARCHIVE_PREFIX, gobject_archive
 
 ARCHIVE_PREFIX = "maplibre-native-c-"
@@ -64,14 +64,11 @@ def sha256(path: pathlib.Path) -> str:
 
 def package_presets(repository: pathlib.Path) -> list[str]:
     """Visible native targets without a declared package gap."""
-    presets = json.loads(
-        (repository / "CMakePresets.json").read_text(encoding="utf-8")
-    ).get("configurePresets", [])
+    presets = json.loads((repository / "CMakePresets.json").read_text(encoding="utf-8"))
     names = sorted(
-        preset["name"]
-        for preset in presets
-        if not preset.get("hidden", False)
-        and gaps.gap("c", gaps.target_from_name(preset["name"]), "package") is None
+        target.preset
+        for target in plan.targets(presets)
+        if gaps.supported("c", target, "package")
     )
     if not names:
         raise SystemExit("CMakePresets.json defines no native configure presets")
@@ -106,7 +103,11 @@ def gobject_archives(
     release_dir: pathlib.Path, presets: Iterable[str]
 ) -> list[pathlib.Path]:
     """The GObject archives that the jobs of `presets` publish."""
-    expected = {name for preset in presets if (name := gobject_archive(preset))}
+    expected = {
+        name
+        for preset in presets
+        if (name := gobject_archive(plan.target_named(preset)))
+    }
     return archive_set(release_dir, expected, GOBJECT_ARCHIVE_PREFIX)
 
 
@@ -337,12 +338,16 @@ def artifact_index(tag: str, archives: list[pathlib.Path]) -> dict:
     """The artifact index of release `tag`, which holds `archives`.
 
     A published package pins the index to choose an archive for its target
-    and backend before it has downloaded any. Each descriptor's release fields
+    and backend before it has downloaded any: the archive of the target's
+    platform whose `backends` include the backend, by default the platform's
+    `defaultBackend`. A native platform has one archive with all of its
+    backends, and the browser one for each. Each descriptor's release fields
     and platform appear once.
     """
     index = None
     platforms: dict[str, dict] = {}
-    artifacts: dict[tuple[str, str], dict] = {}
+    carriers: dict[tuple[str, str], str] = {}
+    artifacts = []
     for archive in archives:
         descriptor = archive_descriptor(archive)
         release = {
@@ -360,27 +365,32 @@ def artifact_index(tag: str, archives: list[pathlib.Path]) -> dict:
             raise SystemExit(
                 f"{archive.name} describes {platform['id']} unlike another archive"
             )
-        key = (platform["id"], descriptor["backend"])
-        if key in artifacts:
-            raise SystemExit(f"{archive.name} duplicates {' '.join(key)}")
-        artifacts[key] = {
-            "platform": key[0],
-            "backend": key[1],
-            "archive": archive.name,
-            "sha256": sha256(archive),
-            "sbom": sbom_reference(archive, tag),
-        }
+        for backend in descriptor["backends"]:
+            other = carriers.setdefault((platform["id"], backend), archive.name)
+            if other != archive.name:
+                raise SystemExit(
+                    f"{archive.name} and {other} both carry {platform['id']} {backend}"
+                )
+        artifacts.append(
+            {
+                "platform": platform["id"],
+                "backends": descriptor["backends"],
+                "archive": archive.name,
+                "sha256": sha256(archive),
+                "sbom": sbom_reference(archive, tag),
+            }
+        )
     if index is None:
         raise SystemExit("an artifact index needs at least one archive")
     for platform in platforms.values():
-        if (platform["id"], platform["defaultBackend"]) not in artifacts:
+        if (platform["id"], platform["defaultBackend"]) not in carriers:
             raise SystemExit(
                 f"no archive has {platform['id']}'s default backend, "
                 f"{platform['defaultBackend']}"
             )
     return index | {
         "platforms": [platforms[name] for name in sorted(platforms)],
-        "artifacts": list(artifacts.values()),
+        "artifacts": sorted(artifacts, key=lambda artifact: artifact["archive"]),
     }
 
 

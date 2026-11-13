@@ -1,9 +1,9 @@
 """Consume the release's complete static C archive through CMakeDeps.
 
-`backend=default` selects the platform's default renderer. Linux defaults to
+The archive carries every render backend of its platform. Linux defaults to
 `libc=gnu`; musl consumers must select `libc=musl`. Only OS/architecture and
-these options select the prebuilt binary; the consumer's compiler and build
-mode do not rebuild it.
+this option select the prebuilt binary; the consumer's compiler and build mode
+do not rebuild it.
 """
 
 import json
@@ -22,11 +22,8 @@ class MaplibreNativeC(ConanFile):
     homepage = "https://github.com/maplibre/maplibre-native-ffi"
     description = "The C API for MapLibre Native, as a prebuilt static library"
     settings = "os", "arch", "compiler"
-    options: ClassVar[dict[str, list[str]]] = {
-        "backend": ["default", "metal", "opengl", "vulkan", "webgpu"],
-        "libc": ["gnu", "musl"],
-    }
-    default_options: ClassVar[dict[str, str]] = {"backend": "default", "libc": "gnu"}
+    options: ClassVar[dict[str, list[str]]] = {"libc": ["gnu", "musl"]}
+    default_options: ClassVar[dict[str, str]] = {"libc": "gnu"}
 
     def config_options(self):
         if self.settings.os != "Linux":
@@ -63,16 +60,7 @@ class MaplibreNativeC(ConanFile):
         return f"{platform}-{arch}"
 
     def _source(self):
-        backend = str(self.options.backend)
-        if backend == "default":
-            if self.settings.os in ("Macos", "iOS", "tvOS", "visionOS"):
-                backend = "metal"
-            elif self.settings.os in ("Linux", "Windows", "FreeBSD"):
-                backend = "vulkan"
-            else:
-                backend = "opengl"
-        suffix = {"Windows": "wgl"}.get(str(self.settings.os), "egl")
-        key = f"{self._platform}-{suffix if backend == 'opengl' else backend}"
+        key = self._platform
         try:
             return self.conan_data["sources"][str(self.version)][key]
         except KeyError:

@@ -19,7 +19,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive", type=pathlib.Path)
-    parser.add_argument("--backend", default="default")
     args = parser.parse_args()
     archive = args.archive.resolve(strict=True)
     with tempfile.TemporaryDirectory() as temporary:
@@ -34,8 +33,7 @@ def main() -> int:
         shutil.copyfile(ROOT / "tests/package/main.c", consumer / "main.c")
         (consumer / "xmake.lua").write_text(
             f'add_repositories("maplibre {tree.as_posix()}")\n'
-            'add_requires("maplibre-native-c 0.0.0", '
-            f'{{system = false, configs = {{backend = "{args.backend}"}}}})\n'
+            'add_requires("maplibre-native-c 0.0.0", {system = false})\n'
             'target("consumer")\n'
             '    set_kind("binary")\n'
             '    add_files("main.c")\n'
