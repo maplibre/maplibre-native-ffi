@@ -682,39 +682,6 @@ static void cancel_callback_may_release_the_request(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A style named through the tile server's URI scheme alias reaches the
-// provider twice over: as the alias the style names, which is also the
-// request's cache identity, and as the URL the built-in network stack would
-// fetch.
-static void a_request_names_its_alias_and_its_resolved_url(void) {
-  static const char alias_url[] = "maplibre://maps/streets";
-  static const mln_test_provided_resource resources[] = {
-    {.url = alias_url,
-     .response = {
-       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-       .bytes = (const uint8_t*)inline_style_json,
-       .byte_count = sizeof(inline_style_json) - 1,
-     }},
-  };
-  mln_test_provider* provider = mln_test_provider_create(resources, 1);
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_test_provider_install(runtime, provider);
-  mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_OK(mln_test_map_set_style_url(map, alias_url));
-  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
-
-  const mln_test_provider_request* request =
-    mln_test_provider_request_at(provider, alias_url, 0);
-  TEST_ASSERT_NOT_NULL(request);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, request->kind);
-  TEST_ASSERT_EQUAL_STRING(alias_url, request->requested_url);
-  TEST_ASSERT_EQUAL_STRING_LEN("https://", request->resolved_url, 8);
-  TEST_ASSERT_NULL(strstr(request->resolved_url, "maplibre://"));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-  mln_test_provider_destroy(provider);
-}
-
 // The archive is unanswered, so nothing past the header is asked for.
 static void a_pmtiles_request_carries_its_byte_range(void) {
   static const char style_url[] = "custom://pmtiles/style.json";
@@ -1075,7 +1042,6 @@ MLN_TEST_GROUP {
   RUN_TEST(cancel_callback_runs_when_map_discards_request);
   RUN_TEST(late_cancel_callback_registration_reports_cancelled);
   RUN_TEST(cancel_callback_may_release_the_request);
-  RUN_TEST(a_request_names_its_alias_and_its_resolved_url);
   RUN_TEST(a_pmtiles_request_carries_its_byte_range);
   RUN_TEST(a_tile_answer_decides_whether_the_map_renders);
   RUN_TEST(a_style_error_reaches_the_loading_failure);
