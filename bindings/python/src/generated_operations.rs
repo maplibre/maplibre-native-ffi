@@ -344,6 +344,23 @@ fn generated_copy_mln_edge_insets(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_frame_projection(
+    py: Python<'_>,
+    value: &sys::mln_frame_projection,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("matrix", generated_copy_mln_mat4(py, &value.matrix)?)?;
+    dict.set_item(
+        "clip_depth_range",
+        generated_value(py, value.clip_depth_range)?,
+    )?;
+    dict.set_item("near_distance", generated_value(py, value.near_distance)?)?;
+    dict.set_item("far_distance", generated_value(py, value.far_distance)?)?;
+    dict.set_item("far_depth", generated_value(py, value.far_depth)?)?;
+    dict.set_item("globe", generated_value(py, value.globe)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_free_camera(
     py: Python<'_>,
     value: &sys::mln_free_camera,
@@ -437,6 +454,38 @@ fn generated_copy_mln_geo_json_source_options(
             value.fields & sys::MLN_GEO_JSON_SOURCE_OPTION_CLUSTER != 0,
             || generated_value(py, value.cluster),
         )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_gpu_device_capabilities(
+    py: Python<'_>,
+    value: &sys::mln_gpu_device_capabilities,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("backend", generated_value(py, value.backend)?)?;
+    dict.set_item("target_kinds", generated_value(py, value.target_kinds)?)?;
+    dict.set_item("export_kinds", generated_value(py, value.export_kinds)?)?;
+    dict.set_item("sync_kinds", generated_value(py, value.sync_kinds)?)?;
+    dict.set_item(
+        "depth_stencil_formats",
+        generated_value(py, value.depth_stencil_formats)?,
+    )?;
+    dict.set_item(
+        "depth_export_kinds",
+        generated_value(py, value.depth_export_kinds)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_gpu_device_vulkan_context_result(
+    py: Python<'_>,
+    value: &sys::mln_gpu_device_vulkan_context_result,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "context",
+        generated_copy_mln_vulkan_context_descriptor(py, &value.context)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -661,6 +710,15 @@ fn generated_copy_mln_map_viewport(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_mat4(py: Python<'_>, value: &sys::mln_mat4) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("x", generated_copy_mln_vec4(py, &value.x)?)?;
+    dict.set_item("y", generated_copy_mln_vec4(py, &value.y)?)?;
+    dict.set_item("z", generated_copy_mln_vec4(py, &value.z)?)?;
+    dict.set_item("w", generated_copy_mln_vec4(py, &value.w)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_metal_texture_frame(
     py: Python<'_>,
     value: &sys::mln_metal_texture_frame,
@@ -673,6 +731,14 @@ fn generated_copy_mln_metal_texture_frame(
     dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
     dict.set_item("device", generated_value(py, value.device as usize)?)?;
     dict.set_item("pixel_format", generated_value(py, value.pixel_format)?)?;
+    dict.set_item(
+        "depth_texture",
+        generated_value(py, value.depth_texture as usize)?,
+    )?;
+    dict.set_item(
+        "depth_pixel_format",
+        generated_value(py, value.depth_pixel_format)?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -792,6 +858,35 @@ fn generated_copy_mln_offline_tile_pyramid_region_definition(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_opaque_fd_frame(
+    py: Python<'_>,
+    value: &sys::mln_opaque_fd_frame,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("width", generated_value(py, value.width)?)?;
+    dict.set_item("height", generated_value(py, value.height)?)?;
+    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
+    dict.set_item("slot", generated_value(py, value.slot)?)?;
+    dict.set_item("fd", generated_value(py, value.fd)?)?;
+    dict.set_item(
+        "allocation_size",
+        generated_value(py, value.allocation_size)?,
+    )?;
+    dict.set_item("dedicated", generated_value(py, value.dedicated)?)?;
+    dict.set_item("format", generated_value(py, value.format)?)?;
+    dict.set_item("depth_fd", generated_value(py, value.depth_fd)?)?;
+    dict.set_item(
+        "depth_allocation_size",
+        generated_value(py, value.depth_allocation_size)?,
+    )?;
+    dict.set_item(
+        "depth_dedicated",
+        generated_value(py, value.depth_dedicated)?,
+    )?;
+    dict.set_item("depth_format", generated_value(py, value.depth_format)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_open_gl_texture_frame(
     py: Python<'_>,
     value: &sys::mln_open_gl_texture_frame,
@@ -803,6 +898,11 @@ fn generated_copy_mln_open_gl_texture_frame(
     dict.set_item("slot", generated_value(py, value.slot)?)?;
     dict.set_item("texture", generated_value(py, value.texture)?)?;
     dict.set_item("target", generated_value(py, value.target)?)?;
+    dict.set_item("depth_texture", generated_value(py, value.depth_texture)?)?;
+    dict.set_item(
+        "depth_internal_format",
+        generated_value(py, value.depth_internal_format)?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -881,6 +981,10 @@ fn generated_copy_mln_render_frame_result(
     )?;
     dict.set_item("needs_repaint", generated_value(py, value.needs_repaint)?)?;
     dict.set_item("view", generated_copy_mln_map_view(py, &value.view)?)?;
+    dict.set_item(
+        "frame_projection",
+        generated_copy_mln_frame_projection(py, &value.frame_projection)?,
+    )?;
     dict.set_item("mode", generated_value(py, value.mode)?)?;
     Ok(dict.into_any().unbind())
 }
@@ -904,6 +1008,7 @@ fn generated_copy_mln_render_session_capabilities(
         "consumer_sync_kinds",
         generated_value(py, value.consumer_sync_kinds)?,
     )?;
+    dict.set_item("export_kind", generated_value(py, value.export_kind)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1188,14 +1293,6 @@ fn generated_copy_mln_runtime_event(
                     &(unsafe { value.payload.offline_region_response_error }),
                 )?,
             )?,
-            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => generated_variant(
-                py,
-                "offline_region_tile_count_limit",
-                generated_copy_mln_runtime_event_offline_region_tile_count_limit(
-                    py,
-                    &(unsafe { value.payload.offline_region_tile_count_limit }),
-                )?,
-            )?,
             sys::MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS => generated_variant(
                 py,
                 "glyphs",
@@ -1305,16 +1402,6 @@ fn generated_copy_mln_runtime_event_offline_region_status(
         "status",
         generated_copy_mln_offline_region_status(py, &value.status)?,
     )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_runtime_event_offline_region_tile_count_limit(
-    py: Python<'_>,
-    value: &sys::mln_runtime_event_offline_region_tile_count_limit,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("region_id", generated_value(py, value.region_id)?)?;
-    dict.set_item("limit", generated_value(py, value.limit)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1638,6 +1725,15 @@ fn generated_copy_mln_vec3(py: Python<'_>, value: &sys::mln_vec3) -> PyResult<Py
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_vec4(py: Python<'_>, value: &sys::mln_vec4) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("x", generated_value(py, value.x)?)?;
+    dict.set_item("y", generated_value(py, value.y)?)?;
+    dict.set_item("z", generated_value(py, value.z)?)?;
+    dict.set_item("w", generated_value(py, value.w)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_vulkan_context_descriptor(
     py: Python<'_>,
     value: &sys::mln_vulkan_context_descriptor,
@@ -1668,18 +1764,6 @@ fn generated_copy_mln_vulkan_context_descriptor(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_vulkan_device_context_result(
-    py: Python<'_>,
-    value: &sys::mln_vulkan_device_context_result,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "context",
-        generated_copy_mln_vulkan_context_descriptor(py, &value.context)?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_vulkan_texture_frame(
     py: Python<'_>,
     value: &sys::mln_vulkan_texture_frame,
@@ -1694,6 +1778,13 @@ fn generated_copy_mln_vulkan_texture_frame(
     dict.set_item("device", generated_value(py, value.device as usize)?)?;
     dict.set_item("format", generated_value(py, value.format)?)?;
     dict.set_item("layout", generated_value(py, value.layout)?)?;
+    dict.set_item("depth_image", generated_value(py, value.depth_image)?)?;
+    dict.set_item(
+        "depth_image_view",
+        generated_value(py, value.depth_image_view)?,
+    )?;
+    dict.set_item("depth_format", generated_value(py, value.depth_format)?)?;
+    dict.set_item("depth_layout", generated_value(py, value.depth_layout)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1733,41 +1824,13 @@ fn generated_input_mln_anchored_momentum<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_android_hardware_buffer_ring_descriptor<'py>(
+fn generated_input_mln_android_window_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_android_hardware_buffer_ring_descriptor> {
-    let mut raw: sys::mln_android_hardware_buffer_ring_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_android_hardware_buffer_ring_descriptor>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.buffer_count = value.getattr("buffer_count")?.extract::<u32>()?;
-    raw.usage = value.getattr("usage")?.extract::<u64>()?;
-    Ok(raw)
-}
-
-fn generated_input_mln_android_surface_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_android_surface_descriptor> {
-    let mut raw: sys::mln_android_surface_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_android_surface_descriptor>() as _;
+) -> PyResult<sys::mln_android_window_target> {
+    let mut raw: sys::mln_android_window_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.window = value.getattr("window")?.extract::<usize>()? as _;
-    raw.jni_env = value.getattr("jni_env")?.extract::<usize>()? as _;
-    raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
-fn generated_input_mln_android_surface_replacement<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_android_surface_replacement> {
-    let mut raw: sys::mln_android_surface_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_android_surface_replacement>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.window = value.getattr("window")?.extract::<usize>()? as _;
-    raw.jni_env = value.getattr("jni_env")?.extract::<usize>()? as _;
-    raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
     Ok(raw)
 }
 
@@ -2085,6 +2148,24 @@ fn generated_input_mln_custom_geometry_source_options<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_custom_layer_host<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_custom_layer_host> {
+    let mut raw: sys::mln_custom_layer_host = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_custom_layer_host>() as _;
+    if let Some(native) = storage.native_registration(value, "mln_custom_layer_host")? {
+        raw.user_data = native.user_data as _;
+        raw.release_user_data = unsafe { std::mem::transmute::<usize, _>(native.release) };
+        raw.prerender = unsafe { std::mem::transmute::<usize, _>(native.callbacks[0]) };
+        raw.render = unsafe { std::mem::transmute::<usize, _>(native.callbacks[1]) };
+        raw.deinitialize = unsafe { std::mem::transmute::<usize, _>(native.callbacks[2]) };
+        raw.context_lost = unsafe { std::mem::transmute::<usize, _>(native.callbacks[3]) };
+        return Ok(raw);
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_custom_vector_source_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2134,35 +2215,6 @@ fn generated_input_mln_dma_buf_format<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_dma_buf_ring_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_dma_buf_ring_descriptor> {
-    let mut raw: sys::mln_dma_buf_ring_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_dma_buf_ring_descriptor>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.buffer_count = value.getattr("buffer_count")?.extract::<u32>()?;
-    raw.formats = {
-        let items = generated_items(&value.getattr("formats")?, |item| {
-            generated_input_mln_dma_buf_format(&item, storage)
-        })?;
-        raw.format_count = generated_length(items.len())?;
-        storage.keep_array(items)
-    };
-    Ok(raw)
-}
-
-fn generated_input_mln_dxgi_shared_texture_ring_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_dxgi_shared_texture_ring_descriptor> {
-    let mut raw: sys::mln_dxgi_shared_texture_ring_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_dxgi_shared_texture_ring_descriptor>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.texture_count = value.getattr("texture_count")?.extract::<u32>()?;
-    Ok(raw)
-}
-
 fn generated_input_mln_edge_insets<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2185,10 +2237,30 @@ fn generated_input_mln_egl_context_descriptor<'py>(
     raw.display = value.getattr("display")?.extract::<usize>()? as _;
     raw.config = value.getattr("config")?.extract::<usize>()? as _;
     raw.share_context = value.getattr("share_context")?.extract::<usize>()? as _;
-    raw.client_api = value
-        .getattr("client_api")?
-        .extract::<sys::mln_open_gl_client_api>()?;
     raw.get_proc_address = value.getattr("get_proc_address")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_exported_ring_target<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_exported_ring_target> {
+    let mut raw: sys::mln_exported_ring_target = unsafe { std::mem::zeroed() };
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.texture_count = value.getattr("texture_count")?.extract::<u32>()?;
+    raw.export_kinds = value
+        .getattr("export_kinds")?
+        .extract::<sys::mln_gpu_export_kind_flags>()?;
+    raw.dma_buf_formats = {
+        let items = generated_items(&value.getattr("dma_buf_formats")?, |item| {
+            generated_input_mln_dma_buf_format(&item, storage)
+        })?;
+        raw.dma_buf_format_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
+    raw.android_hardware_buffer_usage = value
+        .getattr("android_hardware_buffer_usage")?
+        .extract::<u64>()?;
     Ok(raw)
 }
 
@@ -2260,6 +2332,10 @@ fn generated_input_mln_frame_pacer_options<'py>(
     if let Some(field) = generated_present(value, "maximum_frames_per_second")? {
         raw.maximum_frames_per_second = field.extract::<u32>()?;
         raw.fields |= sys::MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+    }
+    let field = value.getattr("unlimited_frames_per_second")?;
+    if field.extract::<bool>()? {
+        raw.fields |= sys::MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
     }
     Ok(raw)
 }
@@ -2338,6 +2414,41 @@ fn generated_input_mln_gesture_momentum<'py>(
     raw.zoom = generated_input_mln_anchored_momentum(&value.getattr("zoom")?, storage)?;
     raw.bearing = generated_input_mln_anchored_momentum(&value.getattr("bearing")?, storage)?;
     raw.pitch = generated_input_mln_anchored_momentum(&value.getattr("pitch")?, storage)?;
+    Ok(raw)
+}
+
+fn generated_input_mln_gpu_device_options<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gpu_device_options> {
+    let mut raw: sys::mln_gpu_device_options = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_gpu_device_options>() as _;
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "backend")? {
+        raw.backend = field.extract::<sys::mln_render_backend>()?;
+        raw.fields |= sys::MLN_GPU_DEVICE_OPTION_BACKEND;
+    }
+    if let Some(field) = generated_present(value, "adapter_index")? {
+        raw.adapter_index = field.extract::<u32>()?;
+        raw.fields |= sys::MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX;
+    }
+    if let Some(field) = generated_present(value, "adapter_uuid")? {
+        raw.adapter_uuid = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_GPU_DEVICE_OPTION_ADAPTER_UUID;
+    }
+    if let Some(field) = generated_present(value, "adapter_luid")? {
+        raw.adapter_luid = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_GPU_DEVICE_OPTION_ADAPTER_LUID;
+    }
+    if let Some(field) = generated_present(value, "open_gl_client_api")? {
+        raw.open_gl_client_api = field.extract::<sys::mln_open_gl_client_api>()?;
+        raw.fields |= sys::MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API;
+    }
+    if let Some(field) = generated_present(value, "open_gl_single_context")? {
+        raw.open_gl_single_context = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT;
+    }
+    raw.queue_lock = generated_input_mln_queue_lock(&value.getattr("queue_lock")?, storage)?;
     Ok(raw)
 }
 
@@ -2424,19 +2535,6 @@ fn generated_input_mln_image_stretch<'py>(
     let mut raw: sys::mln_image_stretch = unsafe { std::mem::zeroed() };
     raw.from = value.getattr("from_")?.extract::<f32>()?;
     raw.to = value.getattr("to")?.extract::<f32>()?;
-    Ok(raw)
-}
-
-fn generated_input_mln_io_surface_ring_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_io_surface_ring_descriptor> {
-    let mut raw: sys::mln_io_surface_ring_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_io_surface_ring_descriptor>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.buffer_count = value.getattr("buffer_count")?.extract::<u32>()?;
-    raw.context =
-        generated_input_mln_metal_context_descriptor(&value.getattr("context")?, storage)?;
     Ok(raw)
 }
 
@@ -2637,12 +2735,11 @@ fn generated_input_mln_metal_borrowed_texture<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
+fn generated_input_mln_metal_borrowed_textures_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_metal_borrowed_texture_descriptor> {
-    let mut raw: sys::mln_metal_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_metal_borrowed_texture_descriptor>() as _;
+) -> PyResult<sys::mln_metal_borrowed_textures_target> {
+    let mut raw: sys::mln_metal_borrowed_textures_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
@@ -2653,58 +2750,33 @@ fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
         raw.texture_count = generated_length(items.len())?;
         storage.keep_array(items)
     };
+    raw.depth_textures = {
+        let items = generated_items(&value.getattr("depth_textures")?, |item| {
+            generated_input_mln_metal_borrowed_texture(&item, storage)
+        })?;
+        raw.depth_texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
+    Ok(raw)
+}
+
+fn generated_input_mln_metal_device_descriptor<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_metal_device_descriptor> {
+    let _ = storage;
+    let mut raw: sys::mln_metal_device_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_metal_device_descriptor>() as _;
+    raw.device = value.getattr("device")?.extract::<usize>()? as _;
     raw.command_queue = value.getattr("command_queue")?.extract::<usize>()? as _;
     Ok(raw)
 }
 
-fn generated_input_mln_metal_borrowed_texture_replacement<'py>(
+fn generated_input_mln_metal_layer_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_metal_borrowed_texture_replacement> {
-    let mut raw: sys::mln_metal_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_metal_borrowed_texture_replacement>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
-    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
-    raw.textures = {
-        let items = generated_items(&value.getattr("textures")?, |item| {
-            generated_input_mln_metal_borrowed_texture(&item, storage)
-        })?;
-        raw.texture_count = generated_length(items.len())?;
-        storage.keep_array(items)
-    };
-    Ok(raw)
-}
-
-fn generated_input_mln_metal_context_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_metal_context_descriptor> {
-    let _ = storage;
-    let mut raw: sys::mln_metal_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.device = value.getattr("device")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
-fn generated_input_mln_metal_surface_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_metal_surface_descriptor> {
-    let mut raw: sys::mln_metal_surface_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_metal_surface_descriptor>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.context =
-        generated_input_mln_metal_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.layer = value.getattr("layer")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
-fn generated_input_mln_metal_surface_replacement<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_metal_surface_replacement> {
-    let mut raw: sys::mln_metal_surface_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_metal_surface_replacement>() as _;
+) -> PyResult<sys::mln_metal_layer_target> {
+    let mut raw: sys::mln_metal_layer_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.layer = value.getattr("layer")?.extract::<usize>()? as _;
     Ok(raw)
@@ -2836,36 +2908,22 @@ fn generated_input_mln_offline_tile_pyramid_region_definition<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_offscreen_descriptor<'py>(
+fn generated_input_mln_offscreen_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_offscreen_descriptor> {
-    let mut raw: sys::mln_offscreen_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_offscreen_descriptor>() as _;
+) -> PyResult<sys::mln_offscreen_target> {
+    let mut raw: sys::mln_offscreen_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     Ok(raw)
 }
 
-fn generated_input_mln_offscreen_device_options<'py>(
+fn generated_input_mln_ohos_window_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_offscreen_device_options> {
-    let _ = storage;
-    let mut raw: sys::mln_offscreen_device_options = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_offscreen_device_options>() as _;
-    raw.fields = 0;
-    if let Some(field) = generated_present(value, "adapter_index")? {
-        raw.adapter_index = field.extract::<u32>()?;
-        raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX;
-    }
-    if let Some(field) = generated_present(value, "single_context")? {
-        raw.single_context = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT;
-    }
-    if let Some(field) = generated_present(value, "client_api")? {
-        raw.client_api = field.extract::<sys::mln_open_gl_client_api>()?;
-        raw.fields |= sys::MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API;
-    }
+) -> PyResult<sys::mln_ohos_window_target> {
+    let mut raw: sys::mln_ohos_window_target = unsafe { std::mem::zeroed() };
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.window = value.getattr("window")?.extract::<usize>()? as _;
     Ok(raw)
 }
 
@@ -2879,17 +2937,14 @@ fn generated_input_mln_open_gl_borrowed_texture<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_open_gl_borrowed_texture_descriptor<'py>(
+fn generated_input_mln_open_gl_borrowed_textures_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_open_gl_borrowed_texture_descriptor> {
-    let mut raw: sys::mln_open_gl_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_open_gl_borrowed_texture_descriptor>() as _;
+) -> PyResult<sys::mln_open_gl_borrowed_textures_target> {
+    let mut raw: sys::mln_open_gl_borrowed_textures_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
-    raw.context =
-        generated_input_mln_open_gl_context_descriptor(&value.getattr("context")?, storage)?;
     raw.textures = {
         let items = generated_items(&value.getattr("textures")?, |item| {
             generated_input_mln_open_gl_borrowed_texture(&item, storage)
@@ -2898,23 +2953,11 @@ fn generated_input_mln_open_gl_borrowed_texture_descriptor<'py>(
         storage.keep_array(items)
     };
     raw.target = value.getattr("target")?.extract::<u32>()?;
-    Ok(raw)
-}
-
-fn generated_input_mln_open_gl_borrowed_texture_replacement<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_open_gl_borrowed_texture_replacement> {
-    let mut raw: sys::mln_open_gl_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_open_gl_borrowed_texture_replacement>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
-    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
-    raw.textures = {
-        let items = generated_items(&value.getattr("textures")?, |item| {
+    raw.depth_textures = {
+        let items = generated_items(&value.getattr("depth_textures")?, |item| {
             generated_input_mln_open_gl_borrowed_texture(&item, storage)
         })?;
-        raw.texture_count = generated_length(items.len())?;
+        raw.depth_texture_count = generated_length(items.len())?;
         storage.keep_array(items)
     };
     Ok(raw)
@@ -2925,10 +2968,7 @@ fn generated_input_mln_open_gl_context_descriptor<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_open_gl_context_descriptor> {
     let mut raw: sys::mln_open_gl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.ownership = value
-        .getattr("ownership")?
-        .extract::<sys::mln_open_gl_context_ownership>()?;
-    let field = value.getattr("data")?;
+    let field = value;
     let tag = field.getattr("_tag")?.extract::<u32>()?;
     match tag {
         sys::MLN_OPEN_GL_CONTEXT_PLATFORM_WGL => {
@@ -2949,25 +2989,11 @@ fn generated_input_mln_open_gl_context_descriptor<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_open_gl_surface_descriptor<'py>(
+fn generated_input_mln_open_gl_surface_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_open_gl_surface_descriptor> {
-    let mut raw: sys::mln_open_gl_surface_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_open_gl_surface_descriptor>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.context =
-        generated_input_mln_open_gl_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
-fn generated_input_mln_open_gl_surface_replacement<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_open_gl_surface_replacement> {
-    let mut raw: sys::mln_open_gl_surface_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_open_gl_surface_replacement>() as _;
+) -> PyResult<sys::mln_open_gl_surface_target> {
+    let mut raw: sys::mln_open_gl_surface_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
     Ok(raw)
@@ -3107,7 +3133,93 @@ fn generated_input_mln_render_session_attach_options<'py>(
     raw.frame_wake = generated_input_mln_wake(&value.getattr("frame_wake")?, storage)?;
     raw.redraw_wake = generated_input_mln_wake(&value.getattr("redraw_wake")?, storage)?;
     raw.driver_work_wake = generated_input_mln_wake(&value.getattr("driver_work_wake")?, storage)?;
-    raw.queue_lock = generated_input_mln_queue_lock(&value.getattr("queue_lock")?, storage)?;
+    raw.keep_depth = value.getattr("keep_depth")?.extract::<bool>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_render_target<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_render_target> {
+    let mut raw: sys::mln_render_target = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_render_target>() as _;
+    let field = value;
+    let tag = field.getattr("_tag")?.extract::<u32>()?;
+    match tag {
+        sys::MLN_RENDER_TARGET_KIND_OFFSCREEN => {
+            raw.data.offscreen =
+                generated_input_mln_offscreen_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_METAL_LAYER => {
+            raw.data.metal_layer =
+                generated_input_mln_metal_layer_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_WIN32_WINDOW => {
+            raw.data.win32_window =
+                generated_input_mln_win32_window_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_XLIB_WINDOW => {
+            raw.data.xlib_window =
+                generated_input_mln_xlib_window_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE => {
+            raw.data.wayland_surface =
+                generated_input_mln_wayland_surface_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_ANDROID_WINDOW => {
+            raw.data.android_window =
+                generated_input_mln_android_window_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_OHOS_WINDOW => {
+            raw.data.ohos_window =
+                generated_input_mln_ohos_window_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_VULKAN_SURFACE => {
+            raw.data.vulkan_surface =
+                generated_input_mln_vulkan_surface_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE => {
+            raw.data.open_gl_surface =
+                generated_input_mln_open_gl_surface_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES => {
+            raw.data.metal_borrowed_textures = generated_input_mln_metal_borrowed_textures_target(
+                &field.getattr("value")?,
+                storage,
+            )?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES => {
+            raw.data.vulkan_borrowed_textures =
+                generated_input_mln_vulkan_borrowed_textures_target(
+                    &field.getattr("value")?,
+                    storage,
+                )?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES => {
+            raw.data.open_gl_borrowed_textures =
+                generated_input_mln_open_gl_borrowed_textures_target(
+                    &field.getattr("value")?,
+                    storage,
+                )?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES => {
+            raw.data.web_gpu_borrowed_textures =
+                generated_input_mln_web_gpu_borrowed_textures_target(
+                    &field.getattr("value")?,
+                    storage,
+                )?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_EXPORTED_RING => {
+            raw.data.exported_ring =
+                generated_input_mln_exported_ring_target(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_WEB_CANVAS => {
+            raw.data.web_canvas =
+                generated_input_mln_web_canvas_target(&field.getattr("value")?, storage)?;
+        }
+        _ => {}
+    }
+    raw.kind = tag;
     Ok(raw)
 }
 
@@ -3597,17 +3709,14 @@ fn generated_input_mln_vulkan_borrowed_texture<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
+fn generated_input_mln_vulkan_borrowed_textures_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_vulkan_borrowed_texture_descriptor> {
-    let mut raw: sys::mln_vulkan_borrowed_texture_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_vulkan_borrowed_texture_descriptor>() as _;
+) -> PyResult<sys::mln_vulkan_borrowed_textures_target> {
+    let mut raw: sys::mln_vulkan_borrowed_textures_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
-    raw.context =
-        generated_input_mln_vulkan_context_descriptor(&value.getattr("context")?, storage)?;
     raw.textures = {
         let items = generated_items(&value.getattr("textures")?, |item| {
             generated_input_mln_vulkan_borrowed_texture(&item, storage)
@@ -3620,25 +3729,15 @@ fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
     raw.owner = value
         .getattr("owner")?
         .extract::<sys::mln_vulkan_image_owner>()?;
-    Ok(raw)
-}
-
-fn generated_input_mln_vulkan_borrowed_texture_replacement<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_vulkan_borrowed_texture_replacement> {
-    let mut raw: sys::mln_vulkan_borrowed_texture_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_vulkan_borrowed_texture_replacement>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
-    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
-    raw.textures = {
-        let items = generated_items(&value.getattr("textures")?, |item| {
+    raw.depth_textures = {
+        let items = generated_items(&value.getattr("depth_textures")?, |item| {
             generated_input_mln_vulkan_borrowed_texture(&item, storage)
         })?;
-        raw.texture_count = generated_length(items.len())?;
+        raw.depth_texture_count = generated_length(items.len())?;
         storage.keep_array(items)
     };
+    raw.depth_format = value.getattr("depth_format")?.extract::<u32>()?;
+    raw.depth_final_layout = value.getattr("depth_final_layout")?.extract::<u32>()?;
     Ok(raw)
 }
 
@@ -3662,47 +3761,30 @@ fn generated_input_mln_vulkan_context_descriptor<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_vulkan_device_options<'py>(
+fn generated_input_mln_vulkan_device_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_vulkan_device_options> {
-    let mut raw: sys::mln_vulkan_device_options = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_vulkan_device_options>() as _;
-    raw.fields = 0;
-    if let Some(field) = generated_present(value, "presentation")? {
-        raw.presentation = field.extract::<bool>()?;
-        raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
-    }
-    if let Some(field) = generated_present(value, "device_uuid")? {
-        raw.device_uuid = storage.buffer(field, false)?;
-        raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
-    }
-    if let Some(field) = generated_present(value, "device_luid")? {
-        raw.device_luid = storage.buffer(field, false)?;
-        raw.fields |= sys::MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID;
-    }
-    Ok(raw)
-}
-
-fn generated_input_mln_vulkan_surface_descriptor<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_vulkan_surface_descriptor> {
-    let mut raw: sys::mln_vulkan_surface_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_vulkan_surface_descriptor>() as _;
-    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+) -> PyResult<sys::mln_vulkan_device_descriptor> {
+    let mut raw: sys::mln_vulkan_device_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_vulkan_device_descriptor>() as _;
     raw.context =
         generated_input_mln_vulkan_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.surface = value.getattr("surface")?.extract::<u64>()?;
+    raw.queue_lock = generated_input_mln_queue_lock(&value.getattr("queue_lock")?, storage)?;
+    raw.enabled_extensions = {
+        let items = generated_items(&value.getattr("enabled_extensions")?, |item| {
+            storage.buffer(item, true)
+        })?;
+        raw.enabled_extension_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     Ok(raw)
 }
 
-fn generated_input_mln_vulkan_surface_replacement<'py>(
+fn generated_input_mln_vulkan_surface_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_vulkan_surface_replacement> {
-    let mut raw: sys::mln_vulkan_surface_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_vulkan_surface_replacement>() as _;
+) -> PyResult<sys::mln_vulkan_surface_target> {
+    let mut raw: sys::mln_vulkan_surface_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<u64>()?;
     Ok(raw)
@@ -3734,26 +3816,25 @@ fn generated_input_mln_wake<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_wayland_surface_descriptor<'py>(
+fn generated_input_mln_wayland_surface_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_wayland_surface_descriptor> {
-    let mut raw: sys::mln_wayland_surface_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_wayland_surface_descriptor>() as _;
+) -> PyResult<sys::mln_wayland_surface_target> {
+    let mut raw: sys::mln_wayland_surface_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.display = value.getattr("display")?.extract::<usize>()? as _;
     raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
     Ok(raw)
 }
 
-fn generated_input_mln_wayland_surface_replacement<'py>(
+fn generated_input_mln_web_canvas_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_wayland_surface_replacement> {
-    let mut raw: sys::mln_wayland_surface_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_wayland_surface_replacement>() as _;
+) -> PyResult<sys::mln_web_canvas_target> {
+    let mut raw: sys::mln_web_canvas_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
+    raw.canvas = value.getattr("canvas")?.extract::<u32>()?;
+    raw.format = storage.buffer(value.getattr("format")?, true)?;
     Ok(raw)
 }
 
@@ -3764,6 +3845,43 @@ fn generated_input_mln_web_gl_context_descriptor<'py>(
     let _ = storage;
     let mut raw: sys::mln_web_gl_context_descriptor = unsafe { std::mem::zeroed() };
     raw.context = value.getattr("context")?.extract::<u32>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_web_gpu_borrowed_texture<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_web_gpu_borrowed_texture> {
+    let _ = storage;
+    let mut raw: sys::mln_web_gpu_borrowed_texture = unsafe { std::mem::zeroed() };
+    raw.texture = value.getattr("texture")?.extract::<u32>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_web_gpu_borrowed_textures_target<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_web_gpu_borrowed_textures_target> {
+    let mut raw: sys::mln_web_gpu_borrowed_textures_target = unsafe { std::mem::zeroed() };
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
+    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_web_gpu_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
+    raw.format = storage.buffer(value.getattr("format")?, true)?;
+    raw.depth_textures = {
+        let items = generated_items(&value.getattr("depth_textures")?, |item| {
+            generated_input_mln_web_gpu_borrowed_texture(&item, storage)
+        })?;
+        raw.depth_texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
+    raw.depth_format = storage.buffer(value.getattr("depth_format")?, true)?;
     Ok(raw)
 }
 
@@ -3779,25 +3897,24 @@ fn generated_input_mln_wgl_context_descriptor<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_win32_window_descriptor<'py>(
+fn generated_input_mln_win32_window_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_win32_window_descriptor> {
-    let mut raw: sys::mln_win32_window_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_win32_window_descriptor>() as _;
+) -> PyResult<sys::mln_win32_window_target> {
+    let mut raw: sys::mln_win32_window_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.window = value.getattr("window")?.extract::<usize>()? as _;
     Ok(raw)
 }
 
-fn generated_input_mln_win32_window_replacement<'py>(
+fn generated_input_mln_xlib_window_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_win32_window_replacement> {
-    let mut raw: sys::mln_win32_window_replacement = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_win32_window_replacement>() as _;
+) -> PyResult<sys::mln_xlib_window_target> {
+    let mut raw: sys::mln_xlib_window_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
-    raw.window = value.getattr("window")?.extract::<usize>()? as _;
+    raw.display = value.getattr("display")?.extract::<usize>()? as _;
+    raw.window = value.getattr("window")?.extract::<u64>()?;
     Ok(raw)
 }
 
@@ -3814,6 +3931,13 @@ unsafe extern "C" fn generated_dispose_mln_frame_pacer(
     sys::MLN_STATUS_OK
 }
 
+unsafe extern "C" fn generated_dispose_mln_gpu_device(
+    handle: sys::mln_gpu_device,
+) -> sys::mln_status {
+    unsafe { sys::mln_gpu_device_release(handle) };
+    sys::MLN_STATUS_OK
+}
+
 unsafe extern "C" fn generated_dispose_mln_map(handle: sys::mln_map) -> sys::mln_status {
     unsafe { sys::mln_map_dispose(handle, std::ptr::null_mut()) }
 }
@@ -3822,13 +3946,6 @@ unsafe extern "C" fn generated_dispose_mln_map_projection(
     handle: sys::mln_map_projection,
 ) -> sys::mln_status {
     unsafe { sys::mln_map_projection_release(handle) };
-    sys::MLN_STATUS_OK
-}
-
-unsafe extern "C" fn generated_dispose_mln_offscreen_device(
-    handle: sys::mln_offscreen_device,
-) -> sys::mln_status {
-    unsafe { sys::mln_offscreen_device_release(handle) };
     sys::MLN_STATUS_OK
 }
 
@@ -3867,13 +3984,6 @@ unsafe extern "C" fn generated_dispose_mln_style_expression(
     handle: sys::mln_style_expression,
 ) -> sys::mln_status {
     unsafe { sys::mln_style_expression_release(handle) };
-    sys::MLN_STATUS_OK
-}
-
-unsafe extern "C" fn generated_dispose_mln_vulkan_device(
-    handle: sys::mln_vulkan_device,
-) -> sys::mln_status {
-    unsafe { sys::mln_vulkan_device_release(handle) };
     sys::MLN_STATUS_OK
 }
 
@@ -3960,6 +4070,19 @@ impl AcquiredFrameHandle {
         generated_copy_mln_metal_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
+    fn opaque_fd(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_frame: sys::mln_opaque_fd_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_opaque_fd_frame>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_acquired_frame_get_opaque_fd(handle, &mut out_frame, diagnostic)
+            })
+        }?;
+        generated_copy_mln_opaque_fd_frame(py, &out_frame)
+    }
+    #[pyo3(signature = ())]
     fn open_gl_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -4037,6 +4160,27 @@ impl AcquiredFrameHandle {
 
 #[pymethods]
 impl FramePacerHandle {
+    #[staticmethod]
+    #[pyo3(signature = (options=None))]
+    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_frame_pacer_options(&options, storage)
+        })?;
+        let mut out_pacer: sys::mln_frame_pacer = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_frame_pacer_create(
+                    generated_pointer(&options_value),
+                    &mut out_pacer,
+                    diagnostic,
+                )
+            })
+        }?;
+        unsafe { FramePacerHandle::adopt(py, out_pacer, Vec::new()) }
+    }
     #[pyo3(signature = ())]
     fn _dispose(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -4058,6 +4202,140 @@ impl FramePacerHandle {
         unsafe { call.run(|| sys::mln_frame_pacer_release(handle)) };
         reservation.commit();
         Ok(py.None())
+    }
+    #[pyo3(signature = (options))]
+    fn set_options(&self, py: Python<'_>, options: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let options_value = generated_input_mln_frame_pacer_options(&options.clone(), storage)?;
+        let handle = self.input();
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_frame_pacer_set_options(handle, &options_value, diagnostic)
+            })
+        }?;
+        Ok(py.None())
+    }
+}
+
+#[pymethods]
+impl GpuDeviceHandle {
+    #[staticmethod]
+    #[pyo3(signature = (options=None))]
+    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_gpu_device_options(&options, storage)
+        })?;
+        let mut out_device: sys::mln_gpu_device = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gpu_device_create(
+                    generated_pointer(&options_value),
+                    &mut out_device,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        unsafe { GpuDeviceHandle::adopt(py, out_device, callback_roots.clone()) }
+    }
+    #[pyo3(signature = ())]
+    fn get_capabilities(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_capabilities: sys::mln_gpu_device_capabilities = unsafe { std::mem::zeroed() };
+        out_capabilities.size = std::mem::size_of::<sys::mln_gpu_device_capabilities>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gpu_device_get_capabilities(handle, &mut out_capabilities, diagnostic)
+            })
+        }?;
+        generated_copy_mln_gpu_device_capabilities(py, &out_capabilities)
+    }
+    #[pyo3(signature = ())]
+    fn get_vulkan_context(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_result: sys::mln_gpu_device_vulkan_context_result =
+            unsafe { std::mem::zeroed() };
+        out_result.size = std::mem::size_of::<sys::mln_gpu_device_vulkan_context_result>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gpu_device_get_vulkan_context(handle, &mut out_result, diagnostic)
+            })
+        }?;
+        generated_copy_mln_gpu_device_vulkan_context_result(py, &out_result)
+    }
+    #[pyo3(signature = ())]
+    fn _dispose(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_gpu_device_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[pyo3(signature = ())]
+    fn release(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let Some(mut reservation) = self.reserve(true)? else {
+            return Ok(py.None());
+        };
+        let handle = reservation.handle();
+        unsafe { call.run(|| sys::mln_gpu_device_release(handle)) };
+        reservation.commit();
+        Ok(py.None())
+    }
+    #[staticmethod]
+    #[pyo3(signature = (descriptor))]
+    fn wrap_metal(py: Python<'_>, descriptor: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let descriptor_value =
+            generated_input_mln_metal_device_descriptor(&descriptor.clone(), storage)?;
+        let mut out_device: sys::mln_gpu_device = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gpu_device_wrap_metal(&descriptor_value, &mut out_device, diagnostic)
+            })
+        }?;
+        unsafe { GpuDeviceHandle::adopt(py, out_device, Vec::new()) }
+    }
+    #[staticmethod]
+    #[pyo3(signature = (context))]
+    fn wrap_open_gl(py: Python<'_>, context: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let context_value =
+            generated_input_mln_open_gl_context_descriptor(&context.clone(), storage)?;
+        let mut out_device: sys::mln_gpu_device = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gpu_device_wrap_open_gl(&context_value, &mut out_device, diagnostic)
+            })
+        }?;
+        unsafe { GpuDeviceHandle::adopt(py, out_device, Vec::new()) }
+    }
+    #[staticmethod]
+    #[pyo3(signature = (descriptor))]
+    fn wrap_vulkan(py: Python<'_>, descriptor: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let descriptor_value =
+            generated_input_mln_vulkan_device_descriptor(&descriptor.clone(), storage)?;
+        let mut out_device: sys::mln_gpu_device = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gpu_device_wrap_vulkan(&descriptor_value, &mut out_device, diagnostic)
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        unsafe { GpuDeviceHandle::adopt(py, out_device, callback_roots.clone()) }
     }
 }
 
@@ -4110,6 +4388,68 @@ impl MapHandle {
                     handle,
                     source_id_value,
                     &options_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (layer_id, before_layer_id, host))]
+    fn add_custom_layer(
+        &self,
+        py: Python<'_>,
+        layer_id: &Bound<'_, PyAny>,
+        before_layer_id: Option<Bound<'_, PyAny>>,
+        host: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
+        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
+        let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
+        let host_value = generated_input_mln_custom_layer_host(&host.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_add_custom_layer(
+                    handle,
+                    layer_id_value,
+                    before_layer_id_value,
+                    &host_value,
+                    completion,
+                    diagnostic,
+                )
+            })
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
+    }
+    #[pyo3(signature = (layer_id, before_layer_id, host))]
+    fn _discard_add_custom_layer(
+        &self,
+        py: Python<'_>,
+        layer_id: &Bound<'_, PyAny>,
+        before_layer_id: Option<Bound<'_, PyAny>>,
+        host: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
+        let before_layer_id = before_layer_id.unwrap_or_else(|| py.None().into_bound(py));
+        let before_layer_id_value = storage.buffer(before_layer_id.clone(), true)?;
+        let host_value = generated_input_mln_custom_layer_host(&host.clone(), storage)?;
+        let handle = self.input();
+        let future = unsafe {
+            call.discard(|completion, diagnostic| {
+                sys::mln_map_add_custom_layer(
+                    handle,
+                    layer_id_value,
+                    before_layer_id_value,
+                    &host_value,
                     completion,
                     diagnostic,
                 )
@@ -4429,21 +4769,18 @@ impl MapHandle {
         self.state().retain_callback_roots(callback_roots);
         Ok(future)
     }
-    #[pyo3(signature = (descriptor, device, options))]
-    fn attach_android_hardware_buffer_ring(
+    #[pyo3(signature = (target, device, options))]
+    fn attach(
         &self,
         py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        device: Option<&VulkanDeviceHandle>,
+        target: &Bound<'_, PyAny>,
+        device: Option<&GpuDeviceHandle>,
         options: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let descriptor_value = generated_input_mln_android_hardware_buffer_ring_descriptor(
-            &descriptor.clone(),
-            storage,
-        )?;
-        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
+        let target_value = generated_input_mln_render_target(&target.clone(), storage)?;
+        let device_handle = device.map_or(sys::mln_gpu_device(0), |handle| handle.input());
         let options_value =
             generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
         let handle = self.input();
@@ -4452,573 +4789,9 @@ impl MapHandle {
         let future = unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_map_attach_android_hardware_buffer_ring(
+                    sys::mln_map_attach(
                         handle,
-                        &descriptor_value,
-                        device_handle,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, device, options))]
-    fn attach_android_surface(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        device: Option<&VulkanDeviceHandle>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_android_surface_descriptor(&descriptor.clone(), storage)?;
-        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_android_surface(
-                        handle,
-                        &descriptor_value,
-                        device_handle,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, device, options))]
-    fn attach_dma_buf_ring(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        device: Option<&VulkanDeviceHandle>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_dma_buf_ring_descriptor(&descriptor.clone(), storage)?;
-        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_dma_buf_ring(
-                        handle,
-                        &descriptor_value,
-                        device_handle,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, device, options))]
-    fn attach_dxgi_shared_texture_ring(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        device: Option<&VulkanDeviceHandle>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_dxgi_shared_texture_ring_descriptor(&descriptor.clone(), storage)?;
-        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_dxgi_shared_texture_ring(
-                        handle,
-                        &descriptor_value,
-                        device_handle,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
-    fn attach_io_surface_ring(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_io_surface_ring_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_io_surface_ring(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
-    fn attach_metal_borrowed_texture(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_metal_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_metal_borrowed_texture(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
-    fn attach_metal_surface(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_metal_surface_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_metal_surface(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options, device=None))]
-    fn attach_offscreen(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-        device: Option<&OffscreenDeviceHandle>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_offscreen_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let device_handle = device.map_or(sys::mln_offscreen_device(0), |handle| handle.input());
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_offscreen(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        device_handle,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
-    fn attach_open_gl_borrowed_texture(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_open_gl_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_open_gl_borrowed_texture(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
-    fn attach_open_gl_surface(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_open_gl_surface_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_open_gl_surface(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
-    fn attach_vulkan_borrowed_texture(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_vulkan_borrowed_texture_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_vulkan_borrowed_texture(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, options))]
-    fn attach_vulkan_surface(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_vulkan_surface_descriptor(&descriptor.clone(), storage)?;
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_vulkan_surface(
-                        handle,
-                        &descriptor_value,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, device, options))]
-    fn attach_wayland_surface(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        device: Option<&VulkanDeviceHandle>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_wayland_surface_descriptor(&descriptor.clone(), storage)?;
-        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_wayland_surface(
-                        handle,
-                        &descriptor_value,
-                        device_handle,
-                        &options_value,
-                        &mut out_session,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }?;
-        let callback_roots = call.accept_callbacks();
-        let mut out_session_owner =
-            GeneratedOwnedOutput::new(out_session, generated_dispose_mln_render_session);
-        let out_session_python = unsafe {
-            RenderSessionHandle::adopt(py, out_session_owner.take(), callback_roots.clone())
-        }?;
-        let result = PyDict::new(py);
-        result.set_item("session", out_session_python)?;
-        result.set_item("ready", future)?;
-        Ok(result.into_any().unbind())
-    }
-    #[pyo3(signature = (descriptor, device, options))]
-    fn attach_win32_window(
-        &self,
-        py: Python<'_>,
-        descriptor: &Bound<'_, PyAny>,
-        device: Option<&VulkanDeviceHandle>,
-        options: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let descriptor_value =
-            generated_input_mln_win32_window_descriptor(&descriptor.clone(), storage)?;
-        let device_handle = device.map_or(sys::mln_vulkan_device(0), |handle| handle.input());
-        let options_value =
-            generated_input_mln_render_session_attach_options(&options.clone(), storage)?;
-        let handle = self.input();
-        let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
-        let convert = py_none;
-        let future = unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_attach_win32_window(
-                        handle,
-                        &descriptor_value,
+                        &target_value,
                         device_handle,
                         &options_value,
                         &mut out_session,
@@ -6279,31 +6052,27 @@ impl MapHandle {
             )
         }
     }
-    #[pyo3(signature = (logical_size))]
-    fn resize(&self, py: Python<'_>, logical_size: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent))]
+    fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
+        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_map_resize(handle, logical_size_value, completion, diagnostic)
+                sys::mln_map_resize(handle, extent_value, completion, diagnostic)
             })
         }
     }
-    #[pyo3(signature = (logical_size))]
-    fn _discard_resize(
-        &self,
-        py: Python<'_>,
-        logical_size: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent))]
+    fn _discard_resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
+        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_map_resize(handle, logical_size_value, completion, diagnostic)
+                sys::mln_map_resize(handle, extent_value, completion, diagnostic)
             })
         }
     }
@@ -7835,53 +7604,6 @@ impl MapProjectionHandle {
 }
 
 #[pymethods]
-impl OffscreenDeviceHandle {
-    #[staticmethod]
-    #[pyo3(signature = (options=None))]
-    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_offscreen_device_options(&options, storage)
-        })?;
-        let mut out_device: sys::mln_offscreen_device = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_offscreen_device_create(
-                    generated_pointer(&options_value),
-                    &mut out_device,
-                    diagnostic,
-                )
-            })
-        }?;
-        unsafe { OffscreenDeviceHandle::adopt(py, out_device, Vec::new()) }
-    }
-    #[pyo3(signature = ())]
-    fn _dispose(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_offscreen_device_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-    #[pyo3(signature = ())]
-    fn release(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_offscreen_device_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-}
-
-#[pymethods]
 impl RenderSessionHandle {
     #[pyo3(signature = ())]
     fn abandon(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -8317,31 +8039,27 @@ impl RenderSessionHandle {
             )
         }
     }
-    #[pyo3(signature = (logical_size))]
-    fn resize(&self, py: Python<'_>, logical_size: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent))]
+    fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
+        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_render_session_resize(handle, logical_size_value, completion, diagnostic)
+                sys::mln_render_session_resize(handle, extent_value, completion, diagnostic)
             })
         }
     }
-    #[pyo3(signature = (logical_size))]
-    fn _discard_resize(
-        &self,
-        py: Python<'_>,
-        logical_size: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (extent))]
+    fn _discard_resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let logical_size_value = generated_input_mln_logical_size(&logical_size.clone(), storage)?;
+        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.discard(|completion, diagnostic| {
-                sys::mln_render_session_resize(handle, logical_size_value, completion, diagnostic)
+                sys::mln_render_session_resize(handle, extent_value, completion, diagnostic)
             })
         }
     }
@@ -8355,32 +8073,6 @@ impl RenderSessionHandle {
             })
         }?;
         Ok(py.None())
-    }
-    #[pyo3(signature = (replacement))]
-    fn set_android_surface_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let replacement_value =
-            generated_input_mln_android_surface_replacement(&replacement.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_android_surface_target(
-                        handle,
-                        &replacement_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
     }
     #[pyo3(signature = (pacer=None))]
     fn set_frame_pacer(
@@ -8398,208 +8090,19 @@ impl RenderSessionHandle {
         }?;
         Ok(py.None())
     }
-    #[pyo3(signature = (replacement))]
-    fn set_metal_borrowed_texture_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (target))]
+    fn set_target(&self, py: Python<'_>, target: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let replacement_value =
-            generated_input_mln_metal_borrowed_texture_replacement(&replacement.clone(), storage)?;
+        let target_value = generated_input_mln_render_target(&target.clone(), storage)?;
         let handle = self.input();
         let convert = py_none;
         unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_render_session_set_metal_borrowed_texture_target(
+                    sys::mln_render_session_set_target(
                         handle,
-                        &replacement_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (replacement))]
-    fn set_metal_surface_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let replacement_value =
-            generated_input_mln_metal_surface_replacement(&replacement.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_metal_surface_target(
-                        handle,
-                        &replacement_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (replacement))]
-    fn set_open_gl_borrowed_texture_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let replacement_value = generated_input_mln_open_gl_borrowed_texture_replacement(
-            &replacement.clone(),
-            storage,
-        )?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_open_gl_borrowed_texture_target(
-                        handle,
-                        &replacement_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (replacement))]
-    fn set_open_gl_surface_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let replacement_value =
-            generated_input_mln_open_gl_surface_replacement(&replacement.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_open_gl_surface_target(
-                        handle,
-                        &replacement_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (replacement))]
-    fn set_vulkan_borrowed_texture_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let replacement_value =
-            generated_input_mln_vulkan_borrowed_texture_replacement(&replacement.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_vulkan_borrowed_texture_target(
-                        handle,
-                        &replacement_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (replacement))]
-    fn set_vulkan_surface_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let replacement_value =
-            generated_input_mln_vulkan_surface_replacement(&replacement.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_vulkan_surface_target(
-                        handle,
-                        &replacement_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (replacement))]
-    fn set_wayland_surface_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let replacement_value =
-            generated_input_mln_wayland_surface_replacement(&replacement.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_wayland_surface_target(
-                        handle,
-                        &replacement_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (replacement))]
-    fn set_win32_window_target(
-        &self,
-        py: Python<'_>,
-        replacement: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let replacement_value =
-            generated_input_mln_win32_window_replacement(&replacement.clone(), storage)?;
-        let handle = self.input();
-        let convert = py_none;
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_render_session_set_win32_window_target(
-                        handle,
-                        &replacement_value,
+                        &target_value,
                         completion,
                         diagnostic,
                     )
@@ -9482,66 +8985,6 @@ impl StyleExpressionHandle {
         Ok(py.None())
     }
 }
-
-#[pymethods]
-impl VulkanDeviceHandle {
-    #[staticmethod]
-    #[pyo3(signature = (options=None))]
-    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_vulkan_device_options(&options, storage)
-        })?;
-        let mut out_device: sys::mln_vulkan_device = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_vulkan_device_create(
-                    generated_pointer(&options_value),
-                    &mut out_device,
-                    diagnostic,
-                )
-            })
-        }?;
-        unsafe { VulkanDeviceHandle::adopt(py, out_device, Vec::new()) }
-    }
-    #[pyo3(signature = ())]
-    fn get_context(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        let mut out_result: sys::mln_vulkan_device_context_result = unsafe { std::mem::zeroed() };
-        out_result.size = std::mem::size_of::<sys::mln_vulkan_device_context_result>() as _;
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_vulkan_device_get_context(handle, &mut out_result, diagnostic)
-            })
-        }?;
-        generated_copy_mln_vulkan_device_context_result(py, &out_result)
-    }
-    #[pyo3(signature = ())]
-    fn _dispose(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_vulkan_device_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-    #[pyo3(signature = ())]
-    fn release(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let Some(mut reservation) = self.reserve(true)? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_vulkan_device_release(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-}
 generated_owner!(
     AcquiredFrameHandle,
     "_AcquiredFrameHandle",
@@ -9561,6 +9004,12 @@ generated_owner!(
     Some(generated_dispose_mln_frame_pacer)
 );
 generated_owner!(
+    GpuDeviceHandle,
+    "_GpuDeviceHandle",
+    mln_gpu_device,
+    Some(generated_dispose_mln_gpu_device)
+);
+generated_owner!(
     MapHandle,
     "_MapHandle",
     mln_map,
@@ -9571,12 +9020,6 @@ generated_owner!(
     "_MapProjectionHandle",
     mln_map_projection,
     Some(generated_dispose_mln_map_projection)
-);
-generated_owner!(
-    OffscreenDeviceHandle,
-    "_OffscreenDeviceHandle",
-    mln_offscreen_device,
-    Some(generated_dispose_mln_offscreen_device)
 );
 generated_owner!(
     RenderSessionHandle,
@@ -9608,37 +9051,6 @@ generated_owner!(
     mln_style_expression,
     Some(generated_dispose_mln_style_expression)
 );
-generated_owner!(
-    VulkanDeviceHandle,
-    "_VulkanDeviceHandle",
-    mln_vulkan_device,
-    Some(generated_dispose_mln_vulkan_device)
-);
-#[pyfunction]
-#[pyo3(signature = (options=None))]
-fn android_frame_pacer_create(
-    py: Python<'_>,
-    options: Option<Bound<'_, PyAny>>,
-) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py);
-    let storage = &mut call.storage;
-    let options = options.unwrap_or_else(|| py.None().into_bound(py));
-    let options_value = generated_maybe(&options, |options| {
-        generated_input_mln_frame_pacer_options(&options, storage)
-    })?;
-    let mut out_pacer: sys::mln_frame_pacer = unsafe { std::mem::zeroed() };
-    unsafe {
-        call.status(|diagnostic| {
-            sys::mln_android_frame_pacer_create(
-                generated_pointer(&options_value),
-                &mut out_pacer,
-                diagnostic,
-            )
-        })
-    }?;
-    unsafe { FramePacerHandle::adopt(py, out_pacer, Vec::new()) }
-}
-
 #[pyfunction]
 #[pyo3(signature = (jni_env, context))]
 fn init_android(
@@ -9653,31 +9065,6 @@ fn init_android(
         call.status(|diagnostic| sys::mln_android_init(jni_env_value, context_value, diagnostic))
     }?;
     Ok(py.None())
-}
-
-#[pyfunction]
-#[pyo3(signature = (options=None))]
-fn apple_frame_pacer_create(
-    py: Python<'_>,
-    options: Option<Bound<'_, PyAny>>,
-) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py);
-    let storage = &mut call.storage;
-    let options = options.unwrap_or_else(|| py.None().into_bound(py));
-    let options_value = generated_maybe(&options, |options| {
-        generated_input_mln_frame_pacer_options(&options, storage)
-    })?;
-    let mut out_pacer: sys::mln_frame_pacer = unsafe { std::mem::zeroed() };
-    unsafe {
-        call.status(|diagnostic| {
-            sys::mln_apple_frame_pacer_create(
-                generated_pointer(&options_value),
-                &mut out_pacer,
-                diagnostic,
-            )
-        })
-    }?;
-    unsafe { FramePacerHandle::adopt(py, out_pacer, Vec::new()) }
 }
 
 #[pyfunction]
@@ -9836,18 +9223,15 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
     module.add_class::<FramePacerHandle>()?;
+    module.add_class::<GpuDeviceHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
-    module.add_class::<OffscreenDeviceHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
     module.add_class::<ResourceTransformRequestHandle>()?;
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<StyleExpressionHandle>()?;
-    module.add_class::<VulkanDeviceHandle>()?;
-    module.add_function(wrap_pyfunction!(android_frame_pacer_create, module)?)?;
     module.add_function(wrap_pyfunction!(init_android, module)?)?;
-    module.add_function(wrap_pyfunction!(apple_frame_pacer_create, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(camera_for_tile, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;

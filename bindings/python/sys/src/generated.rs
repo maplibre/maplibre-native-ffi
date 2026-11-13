@@ -67,6 +67,9 @@ pub type mln_camera_update_mode = u32;
 pub const MLN_CAMERA_UPDATE_MODE_JUMP: mln_camera_update_mode = 0;
 pub const MLN_CAMERA_UPDATE_MODE_EASE: mln_camera_update_mode = 1;
 pub const MLN_CAMERA_UPDATE_MODE_FLY: mln_camera_update_mode = 2;
+pub type mln_clip_depth_range = u32;
+pub const MLN_CLIP_DEPTH_RANGE_ZERO_TO_ONE: mln_clip_depth_range = 1;
+pub const MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE: mln_clip_depth_range = 2;
 pub type mln_constrain_mode = u32;
 pub const MLN_CONSTRAIN_MODE_NONE: mln_constrain_mode = 0;
 pub const MLN_CONSTRAIN_MODE_HEIGHT_ONLY: mln_constrain_mode = 1;
@@ -83,6 +86,9 @@ pub const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP: mln_custom_geometry_source_opt
 pub type mln_custom_vector_source_option_field = u32;
 pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM: mln_custom_vector_source_option_field = 1;
 pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM: mln_custom_vector_source_option_field = 2;
+pub type mln_depth_stencil_format_flag = u32;
+pub const MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8: mln_depth_stencil_format_flag = 1;
+pub const MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8: mln_depth_stencil_format_flag = 2;
 pub type mln_feature_id_type = u32;
 pub const MLN_FEATURE_ID_TYPE_STRING: mln_feature_id_type = 1;
 pub const MLN_FEATURE_ID_TYPE_UINT: mln_feature_id_type = 2;
@@ -95,6 +101,7 @@ pub const MLN_FRAME_DEMAND_FORCE: mln_frame_demand_flag = 1;
 pub const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE: mln_frame_demand_flag = 4;
 pub type mln_frame_pacer_option_field = u32;
 pub const MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND: mln_frame_pacer_option_field = 1;
+pub const MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND: mln_frame_pacer_option_field = 2;
 pub type mln_free_camera_option_field = u32;
 pub const MLN_FREE_CAMERA_OPTION_POSITION: mln_free_camera_option_field = 1;
 pub const MLN_FREE_CAMERA_OPTION_ORIENTATION: mln_free_camera_option_field = 2;
@@ -114,6 +121,26 @@ pub const MLN_GESTURE_PHASE_BEGIN: mln_gesture_phase = 1;
 pub const MLN_GESTURE_PHASE_UPDATE: mln_gesture_phase = 2;
 pub const MLN_GESTURE_PHASE_END: mln_gesture_phase = 3;
 pub const MLN_GESTURE_PHASE_CANCEL: mln_gesture_phase = 4;
+pub type mln_gpu_device_option_field = u32;
+pub const MLN_GPU_DEVICE_OPTION_BACKEND: mln_gpu_device_option_field = 1;
+pub const MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX: mln_gpu_device_option_field = 2;
+pub const MLN_GPU_DEVICE_OPTION_ADAPTER_UUID: mln_gpu_device_option_field = 4;
+pub const MLN_GPU_DEVICE_OPTION_ADAPTER_LUID: mln_gpu_device_option_field = 8;
+pub const MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API: mln_gpu_device_option_field = 16;
+pub const MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT: mln_gpu_device_option_field = 32;
+pub type mln_gpu_export_kind = u32;
+pub const MLN_GPU_EXPORT_KIND_NONE: mln_gpu_export_kind = 0;
+pub const MLN_GPU_EXPORT_KIND_IO_SURFACE: mln_gpu_export_kind = 1;
+pub const MLN_GPU_EXPORT_KIND_DMA_BUF: mln_gpu_export_kind = 2;
+pub const MLN_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER: mln_gpu_export_kind = 3;
+pub const MLN_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE: mln_gpu_export_kind = 4;
+pub const MLN_GPU_EXPORT_KIND_OPAQUE_FD: mln_gpu_export_kind = 5;
+pub type mln_gpu_export_kind_flag = u32;
+pub const MLN_GPU_EXPORT_KIND_FLAG_IO_SURFACE: mln_gpu_export_kind_flag = 1;
+pub const MLN_GPU_EXPORT_KIND_FLAG_DMA_BUF: mln_gpu_export_kind_flag = 2;
+pub const MLN_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER: mln_gpu_export_kind_flag = 4;
+pub const MLN_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE: mln_gpu_export_kind_flag = 8;
+pub const MLN_GPU_EXPORT_KIND_FLAG_OPAQUE_FD: mln_gpu_export_kind_flag = 16;
 pub type mln_gpu_sync_kind = u32;
 pub const MLN_GPU_SYNC_CPU_COMPLETE: mln_gpu_sync_kind = 0;
 pub const MLN_GPU_SYNC_OPEN_GL_FENCE: mln_gpu_sync_kind = 1;
@@ -221,17 +248,10 @@ pub const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY: mln_offline_region_definition_
 pub type mln_offline_region_download_state = u32;
 pub const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE: mln_offline_region_download_state = 0;
 pub const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE: mln_offline_region_download_state = 1;
-pub type mln_offscreen_device_option_field = u32;
-pub const MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX: mln_offscreen_device_option_field = 1;
-pub const MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT: mln_offscreen_device_option_field = 2;
-pub const MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API: mln_offscreen_device_option_field = 4;
 pub type mln_open_gl_client_api = u32;
 pub const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED: mln_open_gl_client_api = 0;
 pub const MLN_OPEN_GL_CLIENT_API_GL: mln_open_gl_client_api = 1;
 pub const MLN_OPEN_GL_CLIENT_API_GLES: mln_open_gl_client_api = 2;
-pub type mln_open_gl_context_ownership = u32;
-pub const MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED: mln_open_gl_context_ownership = 0;
-pub const MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED: mln_open_gl_context_ownership = 1;
 pub type mln_open_gl_context_platform = u32;
 pub const MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED: mln_open_gl_context_platform = 0;
 pub const MLN_OPEN_GL_CONTEXT_PLATFORM_WGL: mln_open_gl_context_platform = 1;
@@ -254,6 +274,11 @@ pub const MLN_PROJECTION_TYPE_GLOBE: mln_projection_type = 2;
 pub type mln_render_abandon_disposition = u32;
 pub const MLN_RENDER_ABANDON_DISPOSITION_CLEAN: mln_render_abandon_disposition = 0;
 pub const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED: mln_render_abandon_disposition = 1;
+pub type mln_render_backend = u32;
+pub const MLN_RENDER_BACKEND_METAL: mln_render_backend = 1;
+pub const MLN_RENDER_BACKEND_VULKAN: mln_render_backend = 2;
+pub const MLN_RENDER_BACKEND_OPEN_GL: mln_render_backend = 3;
+pub const MLN_RENDER_BACKEND_WEB_GPU: mln_render_backend = 4;
 pub type mln_render_backend_flag = u32;
 pub const MLN_RENDER_BACKEND_FLAG_METAL: mln_render_backend_flag = 1;
 pub const MLN_RENDER_BACKEND_FLAG_VULKAN: mln_render_backend_flag = 2;
@@ -282,6 +307,39 @@ pub const MLN_RENDER_SESSION_STATE_DETACHING: mln_render_session_state = 3;
 pub const MLN_RENDER_SESSION_STATE_DETACHED: mln_render_session_state = 4;
 pub const MLN_RENDER_SESSION_STATE_FAILED: mln_render_session_state = 5;
 pub const MLN_RENDER_SESSION_STATE_ABANDONED: mln_render_session_state = 6;
+pub type mln_render_target_kind = u32;
+pub const MLN_RENDER_TARGET_KIND_OFFSCREEN: mln_render_target_kind = 1;
+pub const MLN_RENDER_TARGET_KIND_METAL_LAYER: mln_render_target_kind = 2;
+pub const MLN_RENDER_TARGET_KIND_WIN32_WINDOW: mln_render_target_kind = 3;
+pub const MLN_RENDER_TARGET_KIND_XLIB_WINDOW: mln_render_target_kind = 4;
+pub const MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE: mln_render_target_kind = 5;
+pub const MLN_RENDER_TARGET_KIND_ANDROID_WINDOW: mln_render_target_kind = 6;
+pub const MLN_RENDER_TARGET_KIND_OHOS_WINDOW: mln_render_target_kind = 7;
+pub const MLN_RENDER_TARGET_KIND_VULKAN_SURFACE: mln_render_target_kind = 10;
+pub const MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE: mln_render_target_kind = 11;
+pub const MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES: mln_render_target_kind = 12;
+pub const MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES: mln_render_target_kind = 13;
+pub const MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES: mln_render_target_kind = 14;
+pub const MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES: mln_render_target_kind = 15;
+pub const MLN_RENDER_TARGET_KIND_EXPORTED_RING: mln_render_target_kind = 16;
+pub const MLN_RENDER_TARGET_KIND_WEB_CANVAS: mln_render_target_kind = 17;
+pub type mln_render_target_kind_flag = u32;
+pub const MLN_RENDER_TARGET_KIND_FLAG_OFFSCREEN: mln_render_target_kind_flag = 1;
+pub const MLN_RENDER_TARGET_KIND_FLAG_METAL_LAYER: mln_render_target_kind_flag = 2;
+pub const MLN_RENDER_TARGET_KIND_FLAG_WIN32_WINDOW: mln_render_target_kind_flag = 4;
+pub const MLN_RENDER_TARGET_KIND_FLAG_XLIB_WINDOW: mln_render_target_kind_flag = 8;
+pub const MLN_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE: mln_render_target_kind_flag = 16;
+pub const MLN_RENDER_TARGET_KIND_FLAG_ANDROID_WINDOW: mln_render_target_kind_flag = 32;
+pub const MLN_RENDER_TARGET_KIND_FLAG_OHOS_WINDOW: mln_render_target_kind_flag = 64;
+pub const MLN_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE: mln_render_target_kind_flag = 512;
+pub const MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_SURFACE: mln_render_target_kind_flag = 1024;
+pub const MLN_RENDER_TARGET_KIND_FLAG_METAL_BORROWED_TEXTURES: mln_render_target_kind_flag = 2048;
+pub const MLN_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES: mln_render_target_kind_flag = 4096;
+pub const MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES: mln_render_target_kind_flag = 8192;
+pub const MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES: mln_render_target_kind_flag =
+    16384;
+pub const MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING: mln_render_target_kind_flag = 32768;
+pub const MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS: mln_render_target_kind_flag = 65536;
 pub type mln_rendered_feature_query_option_field = u32;
 pub const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: mln_rendered_feature_query_option_field = 1;
 pub type mln_rendered_query_geometry_type = u32;
@@ -361,17 +419,15 @@ pub const MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION: mln_runtime_event_flag = 32768
 pub const MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED: mln_runtime_event_flag = 65536;
 pub const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_event_flag = 131072;
 pub const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_flag = 262144;
-pub const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_flag =
-    524288;
-pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED: mln_runtime_event_flag = 1048576;
-pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED: mln_runtime_event_flag = 2097152;
-pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR: mln_runtime_event_flag = 4194304;
-pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED: mln_runtime_event_flag = 8388608;
-pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED: mln_runtime_event_flag = 16777216;
-pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR: mln_runtime_event_flag = 33554432;
-pub const MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS: mln_runtime_event_flag = 66191358;
-pub const MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS: mln_runtime_event_flag = 917504;
-pub const MLN_RUNTIME_EVENT_FLAG_ALL: mln_runtime_event_flag = 67108862;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED: mln_runtime_event_flag = 524288;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED: mln_runtime_event_flag = 1048576;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR: mln_runtime_event_flag = 2097152;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED: mln_runtime_event_flag = 4194304;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED: mln_runtime_event_flag = 8388608;
+pub const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR: mln_runtime_event_flag = 16777216;
+pub const MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS: mln_runtime_event_flag = 33161214;
+pub const MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS: mln_runtime_event_flag = 393216;
+pub const MLN_RUNTIME_EVENT_FLAG_ALL: mln_runtime_event_flag = 33554430;
 pub type mln_runtime_event_payload_type = u32;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_NONE: mln_runtime_event_payload_type = 0;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_CHANGE: mln_runtime_event_payload_type = 1;
@@ -383,10 +439,8 @@ pub const MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED: mln_runtime_event_payload_ty
 pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS: mln_runtime_event_payload_type = 7;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_payload_type =
     8;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
-    mln_runtime_event_payload_type = 9;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS: mln_runtime_event_payload_type = 10;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE: mln_runtime_event_payload_type = 11;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS: mln_runtime_event_payload_type = 9;
+pub const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE: mln_runtime_event_payload_type = 10;
 pub type mln_runtime_event_source_type = u32;
 pub const MLN_RUNTIME_EVENT_SOURCE_RUNTIME: mln_runtime_event_source_type = 0;
 pub const MLN_RUNTIME_EVENT_SOURCE_MAP: mln_runtime_event_source_type = 1;
@@ -409,13 +463,12 @@ pub const MLN_RUNTIME_EVENT_MAP_TILE_ACTION: mln_runtime_event_type = 15;
 pub const MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED: mln_runtime_event_type = 16;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_event_type = 17;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_type = 18;
-pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_type = 19;
-pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED: mln_runtime_event_type = 20;
-pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED: mln_runtime_event_type = 21;
-pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR: mln_runtime_event_type = 22;
-pub const MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED: mln_runtime_event_type = 23;
-pub const MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED: mln_runtime_event_type = 24;
-pub const MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR: mln_runtime_event_type = 25;
+pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED: mln_runtime_event_type = 19;
+pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED: mln_runtime_event_type = 20;
+pub const MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR: mln_runtime_event_type = 21;
+pub const MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED: mln_runtime_event_type = 22;
+pub const MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED: mln_runtime_event_type = 23;
+pub const MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR: mln_runtime_event_type = 24;
 pub type mln_source_feature_query_option_field = u32;
 pub const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: mln_source_feature_query_option_field =
     1;
@@ -519,10 +572,6 @@ pub const MLN_URL_MATCH_GLOB: mln_url_match_flag = 1;
 pub type mln_viewport_mode = u32;
 pub const MLN_VIEWPORT_MODE_DEFAULT: mln_viewport_mode = 0;
 pub const MLN_VIEWPORT_MODE_FLIPPED_Y: mln_viewport_mode = 1;
-pub type mln_vulkan_device_option_field = u32;
-pub const MLN_VULKAN_DEVICE_OPTION_PRESENTATION: mln_vulkan_device_option_field = 1;
-pub const MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID: mln_vulkan_device_option_field = 2;
-pub const MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID: mln_vulkan_device_option_field = 4;
 pub type mln_vulkan_image_owner = u32;
 pub const MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE: mln_vulkan_image_owner = 0;
 pub const MLN_VULKAN_IMAGE_OWNER_EXTERNAL: mln_vulkan_image_owner = 1;
@@ -548,29 +597,9 @@ pub struct mln_android_hardware_buffer_frame {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_android_hardware_buffer_ring_descriptor {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub buffer_count: u32,
-    pub usage: u64,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_android_surface_descriptor {
-    pub size: u32,
+pub struct mln_android_window_target {
     pub logical_size: mln_logical_size,
     pub window: *mut std::ffi::c_void,
-    pub jni_env: *mut std::ffi::c_void,
-    pub surface: *mut std::ffi::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_android_surface_replacement {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub window: *mut std::ffi::c_void,
-    pub jni_env: *mut std::ffi::c_void,
-    pub surface: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -757,6 +786,57 @@ pub struct mln_custom_geometry_source_options {
     pub queue: mln_delivery_queue,
 }
 #[repr(C)]
+#[derive(Clone, Copy)]
+pub union mln_custom_layer_encoder_data {
+    pub metal: mln_metal_custom_layer_encoder,
+    pub vulkan: mln_vulkan_custom_layer_encoder,
+    pub web_gpu: mln_web_gpu_custom_layer_encoder,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_custom_layer_frame {
+    pub view: mln_map_view,
+    pub frame_projection: mln_frame_projection,
+    pub width: u32,
+    pub height: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_custom_layer_host {
+    pub size: u32,
+    pub prerender: mln_custom_layer_prerender_callback,
+    pub render: mln_custom_layer_render_callback,
+    pub deinitialize: mln_custom_layer_session_end_callback,
+    pub context_lost: mln_custom_layer_session_end_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_user_data_release,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union mln_custom_layer_pass_data {
+    pub metal: mln_metal_custom_layer_pass,
+    pub vulkan: mln_vulkan_custom_layer_pass,
+    pub open_gl: mln_open_gl_custom_layer_pass,
+    pub web_gpu: mln_web_gpu_custom_layer_pass,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct mln_custom_layer_prerender_parameters {
+    pub size: u32,
+    pub backend: mln_render_backend,
+    pub encoder: mln_custom_layer_encoder_data,
+    pub frame: mln_custom_layer_frame,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct mln_custom_layer_render_parameters {
+    pub size: u32,
+    pub backend: mln_render_backend,
+    pub pass: mln_custom_layer_pass_data,
+    pub frame: mln_custom_layer_frame,
+    pub layer_depth: f64,
+}
+#[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_custom_vector_source_options {
     pub size: u32,
@@ -810,15 +890,6 @@ pub struct mln_dma_buf_plane {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_dma_buf_ring_descriptor {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub buffer_count: u32,
-    pub formats: *const mln_dma_buf_format,
-    pub format_count: usize,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_dxgi_shared_texture_frame {
     pub size: u32,
     pub width: u32,
@@ -827,13 +898,6 @@ pub struct mln_dxgi_shared_texture_frame {
     pub slot: u32,
     pub format: u32,
     pub handle: *mut std::ffi::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_dxgi_shared_texture_ring_descriptor {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub texture_count: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -849,7 +913,6 @@ pub struct mln_egl_context_descriptor {
     pub display: *mut std::ffi::c_void,
     pub config: *mut std::ffi::c_void,
     pub share_context: *mut std::ffi::c_void,
-    pub client_api: mln_open_gl_client_api,
     pub get_proc_address: *mut std::ffi::c_void,
 }
 #[repr(C)]
@@ -859,6 +922,16 @@ pub struct mln_event_batch_view {
     pub event_size: u32,
     pub events: *const mln_runtime_event,
     pub event_count: usize,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_exported_ring_target {
+    pub logical_size: mln_logical_size,
+    pub texture_count: u32,
+    pub export_kinds: mln_gpu_export_kind_flags,
+    pub dma_buf_formats: *const mln_dma_buf_format,
+    pub dma_buf_format_count: usize,
+    pub android_hardware_buffer_usage: u64,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -900,6 +973,16 @@ pub struct mln_frame_pacer_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_frame_projection {
+    pub matrix: mln_mat4,
+    pub clip_depth_range: mln_clip_depth_range,
+    pub near_distance: f64,
+    pub far_distance: f64,
+    pub far_depth: f64,
+    pub globe: bool,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_free_camera {
     pub position: mln_vec3,
     pub orientation: mln_quaternion,
@@ -935,6 +1018,36 @@ pub struct mln_gesture_momentum {
     pub zoom: mln_anchored_momentum,
     pub bearing: mln_anchored_momentum,
     pub pitch: mln_anchored_momentum,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gpu_device_capabilities {
+    pub size: u32,
+    pub backend: mln_render_backend,
+    pub target_kinds: mln_render_target_kind_flags,
+    pub export_kinds: mln_gpu_export_kind_flags,
+    pub sync_kinds: mln_gpu_sync_kind_flags,
+    pub depth_stencil_formats: mln_depth_stencil_format_flags,
+    pub depth_export_kinds: mln_gpu_export_kind_flags,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gpu_device_options {
+    pub size: u32,
+    pub fields: mln_gpu_device_option_fields,
+    pub backend: mln_render_backend,
+    pub adapter_index: u32,
+    pub adapter_uuid: mln_buffer_view,
+    pub adapter_luid: mln_buffer_view,
+    pub open_gl_client_api: mln_open_gl_client_api,
+    pub open_gl_single_context: bool,
+    pub queue_lock: mln_queue_lock,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gpu_device_vulkan_context_result {
+    pub size: u32,
+    pub context: mln_vulkan_context_descriptor,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -999,14 +1112,6 @@ pub struct mln_io_surface_frame {
     pub scale_factor: f64,
     pub slot: u32,
     pub surface: *mut std::ffi::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_io_surface_ring_descriptor {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub buffer_count: u32,
-    pub context: mln_metal_context_descriptor,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1132,29 +1237,27 @@ pub struct mln_map_viewport_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_mat4 {
+    pub x: mln_vec4,
+    pub y: mln_vec4,
+    pub z: mln_vec4,
+    pub w: mln_vec4,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_metal_borrowed_texture {
     pub texture: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_metal_borrowed_texture_descriptor {
-    pub size: u32,
+pub struct mln_metal_borrowed_textures_target {
     pub logical_size: mln_logical_size,
     pub physical_width: u32,
     pub physical_height: u32,
     pub textures: *const mln_metal_borrowed_texture,
     pub texture_count: usize,
-    pub command_queue: *mut std::ffi::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_metal_borrowed_texture_replacement {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub physical_width: u32,
-    pub physical_height: u32,
-    pub textures: *const mln_metal_borrowed_texture,
-    pub texture_count: usize,
+    pub depth_textures: *const mln_metal_borrowed_texture,
+    pub depth_texture_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1163,16 +1266,29 @@ pub struct mln_metal_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_metal_surface_descriptor {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub context: mln_metal_context_descriptor,
-    pub layer: *mut std::ffi::c_void,
+pub struct mln_metal_custom_layer_encoder {
+    pub command_buffer: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_metal_surface_replacement {
+pub struct mln_metal_custom_layer_pass {
+    pub encoder: *mut std::ffi::c_void,
+    pub command_buffer: *mut std::ffi::c_void,
+    pub color_format: u64,
+    pub depth_format: u64,
+    pub stencil_format: u64,
+    pub sample_count: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_metal_device_descriptor {
     pub size: u32,
+    pub device: *mut std::ffi::c_void,
+    pub command_queue: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_metal_layer_target {
     pub logical_size: mln_logical_size,
     pub layer: *mut std::ffi::c_void,
 }
@@ -1187,6 +1303,8 @@ pub struct mln_metal_texture_frame {
     pub texture: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
     pub pixel_format: u64,
+    pub depth_texture: *mut std::ffi::c_void,
+    pub depth_pixel_format: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1267,34 +1385,31 @@ pub struct mln_offline_tile_pyramid_region_definition {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_offscreen_descriptor {
-    pub size: u32,
+pub struct mln_offscreen_target {
     pub logical_size: mln_logical_size,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_offscreen_device_options {
-    pub size: u32,
-    pub fields: mln_offscreen_device_option_fields,
-    pub adapter_index: u32,
-    pub single_context: bool,
-    pub client_api: mln_open_gl_client_api,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_ohos_surface_descriptor {
-    pub size: u32,
+pub struct mln_ohos_window_target {
     pub logical_size: mln_logical_size,
     pub window: *mut std::ffi::c_void,
-    pub surface_id: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_ohos_surface_replacement {
+pub struct mln_opaque_fd_frame {
     pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub window: *mut std::ffi::c_void,
-    pub surface_id: u64,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub slot: u32,
+    pub fd: i32,
+    pub allocation_size: u64,
+    pub dedicated: bool,
+    pub format: u32,
+    pub depth_fd: i32,
+    pub depth_allocation_size: u64,
+    pub depth_dedicated: bool,
+    pub depth_format: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1302,32 +1417,21 @@ pub struct mln_open_gl_borrowed_texture {
     pub texture: u32,
 }
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct mln_open_gl_borrowed_texture_descriptor {
-    pub size: u32,
+#[derive(Debug, Clone, Copy)]
+pub struct mln_open_gl_borrowed_textures_target {
     pub logical_size: mln_logical_size,
     pub physical_width: u32,
     pub physical_height: u32,
-    pub context: mln_open_gl_context_descriptor,
     pub textures: *const mln_open_gl_borrowed_texture,
     pub texture_count: usize,
     pub target: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_open_gl_borrowed_texture_replacement {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub physical_width: u32,
-    pub physical_height: u32,
-    pub textures: *const mln_open_gl_borrowed_texture,
-    pub texture_count: usize,
+    pub depth_textures: *const mln_open_gl_borrowed_texture,
+    pub depth_texture_count: usize,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_open_gl_context_descriptor {
     pub platform: mln_open_gl_context_platform,
-    pub ownership: mln_open_gl_context_ownership,
     pub data: mln_open_gl_context_descriptor_data,
 }
 #[repr(C)]
@@ -1338,17 +1442,13 @@ pub union mln_open_gl_context_descriptor_data {
     pub web_gl: mln_web_gl_context_descriptor,
 }
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct mln_open_gl_surface_descriptor {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub context: mln_open_gl_context_descriptor,
-    pub surface: *mut std::ffi::c_void,
+#[derive(Debug, Clone, Copy)]
+pub struct mln_open_gl_custom_layer_pass {
+    pub framebuffer: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_open_gl_surface_replacement {
-    pub size: u32,
+pub struct mln_open_gl_surface_target {
     pub logical_size: mln_logical_size,
     pub surface: *mut std::ffi::c_void,
 }
@@ -1362,6 +1462,8 @@ pub struct mln_open_gl_texture_frame {
     pub slot: u32,
     pub texture: u32,
     pub target: u32,
+    pub depth_texture: u32,
+    pub depth_internal_format: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1452,6 +1554,7 @@ pub struct mln_render_frame_result {
     pub frame_generation: u64,
     pub needs_repaint: bool,
     pub view: mln_map_view,
+    pub frame_projection: mln_frame_projection,
     pub mode: mln_render_mode,
 }
 #[repr(C)]
@@ -1463,7 +1566,7 @@ pub struct mln_render_session_attach_options {
     pub frame_wake: mln_wake,
     pub redraw_wake: mln_wake,
     pub driver_work_wake: mln_wake,
-    pub queue_lock: mln_queue_lock,
+    pub keep_depth: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1474,6 +1577,7 @@ pub struct mln_render_session_capabilities {
     pub flags: mln_render_session_capability_flags,
     pub producer_sync_kind: mln_gpu_sync_kind,
     pub consumer_sync_kinds: mln_gpu_sync_kind_flags,
+    pub export_kind: mln_gpu_export_kind,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1486,6 +1590,32 @@ pub struct mln_render_session_snapshot {
     pub acquired_frame_count: u32,
     pub failure_status: mln_status,
     pub has_target: bool,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct mln_render_target {
+    pub size: u32,
+    pub kind: mln_render_target_kind,
+    pub data: mln_render_target_data,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union mln_render_target_data {
+    pub offscreen: mln_offscreen_target,
+    pub metal_layer: mln_metal_layer_target,
+    pub win32_window: mln_win32_window_target,
+    pub xlib_window: mln_xlib_window_target,
+    pub wayland_surface: mln_wayland_surface_target,
+    pub android_window: mln_android_window_target,
+    pub ohos_window: mln_ohos_window_target,
+    pub vulkan_surface: mln_vulkan_surface_target,
+    pub open_gl_surface: mln_open_gl_surface_target,
+    pub metal_borrowed_textures: mln_metal_borrowed_textures_target,
+    pub vulkan_borrowed_textures: mln_vulkan_borrowed_textures_target,
+    pub open_gl_borrowed_textures: mln_open_gl_borrowed_textures_target,
+    pub web_gpu_borrowed_textures: mln_web_gpu_borrowed_textures_target,
+    pub exported_ring: mln_exported_ring_target,
+    pub web_canvas: mln_web_canvas_target,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1680,12 +1810,6 @@ pub struct mln_runtime_event_offline_region_status {
     pub status: mln_offline_region_status,
 }
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_runtime_event_offline_region_tile_count_limit {
-    pub region_id: mln_offline_region_id,
-    pub limit: u64,
-}
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub union mln_runtime_event_payload {
     pub camera_change: mln_runtime_event_camera_change,
@@ -1696,7 +1820,6 @@ pub union mln_runtime_event_payload {
     pub source_changed: mln_runtime_event_source_changed,
     pub offline_region_status: mln_runtime_event_offline_region_status,
     pub offline_region_response_error: mln_runtime_event_offline_region_response_error,
-    pub offline_region_tile_count_limit: mln_runtime_event_offline_region_tile_count_limit,
     pub glyphs: mln_runtime_event_glyphs,
     pub sprite: mln_runtime_event_sprite,
 }
@@ -1931,33 +2054,33 @@ pub struct mln_vec3 {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_vec4 {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub w: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_borrowed_texture {
     pub image: mln_vulkan_non_dispatchable_handle,
     pub image_view: mln_vulkan_non_dispatchable_handle,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_borrowed_texture_descriptor {
-    pub size: u32,
+pub struct mln_vulkan_borrowed_textures_target {
     pub logical_size: mln_logical_size,
     pub physical_width: u32,
     pub physical_height: u32,
-    pub context: mln_vulkan_context_descriptor,
     pub textures: *const mln_vulkan_borrowed_texture,
     pub texture_count: usize,
     pub format: u32,
     pub final_layout: u32,
     pub owner: mln_vulkan_image_owner,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_borrowed_texture_replacement {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub physical_width: u32,
-    pub physical_height: u32,
-    pub textures: *const mln_vulkan_borrowed_texture,
-    pub texture_count: usize,
+    pub depth_textures: *const mln_vulkan_borrowed_texture,
+    pub depth_texture_count: usize,
+    pub depth_format: u32,
+    pub depth_final_layout: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1972,31 +2095,33 @@ pub struct mln_vulkan_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_device_context_result {
+pub struct mln_vulkan_custom_layer_encoder {
+    pub context: mln_vulkan_context_descriptor,
+    pub command_buffer: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_vulkan_custom_layer_pass {
+    pub context: mln_vulkan_context_descriptor,
+    pub command_buffer: *mut std::ffi::c_void,
+    pub render_pass: mln_vulkan_non_dispatchable_handle,
+    pub subpass: u32,
+    pub sample_count: u32,
+    pub color_format: u32,
+    pub depth_stencil_format: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_vulkan_device_descriptor {
     pub size: u32,
     pub context: mln_vulkan_context_descriptor,
+    pub queue_lock: mln_queue_lock,
+    pub enabled_extensions: *const mln_buffer_view,
+    pub enabled_extension_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_device_options {
-    pub size: u32,
-    pub fields: mln_vulkan_device_option_fields,
-    pub presentation: bool,
-    pub device_uuid: mln_buffer_view,
-    pub device_luid: mln_buffer_view,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_surface_descriptor {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub context: mln_vulkan_context_descriptor,
-    pub surface: mln_vulkan_non_dispatchable_handle,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_surface_replacement {
-    pub size: u32,
+pub struct mln_vulkan_surface_target {
     pub logical_size: mln_logical_size,
     pub surface: mln_vulkan_non_dispatchable_handle,
 }
@@ -2013,6 +2138,10 @@ pub struct mln_vulkan_texture_frame {
     pub device: *mut std::ffi::c_void,
     pub format: u32,
     pub layout: u32,
+    pub depth_image: mln_vulkan_non_dispatchable_handle,
+    pub depth_image_view: mln_vulkan_non_dispatchable_handle,
+    pub depth_format: u32,
+    pub depth_layout: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2024,18 +2153,17 @@ pub struct mln_wake {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_wayland_surface_descriptor {
-    pub size: u32,
+pub struct mln_wayland_surface_target {
     pub logical_size: mln_logical_size,
     pub display: *mut std::ffi::c_void,
     pub surface: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_wayland_surface_replacement {
-    pub size: u32,
+pub struct mln_web_canvas_target {
     pub logical_size: mln_logical_size,
-    pub surface: *mut std::ffi::c_void,
+    pub canvas: mln_web_object,
+    pub format: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2049,25 +2177,16 @@ pub struct mln_web_gpu_borrowed_texture {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_web_gpu_borrowed_texture_descriptor {
-    pub size: u32,
+pub struct mln_web_gpu_borrowed_textures_target {
     pub logical_size: mln_logical_size,
     pub physical_width: u32,
     pub physical_height: u32,
-    pub context: mln_web_gpu_context_descriptor,
     pub textures: *const mln_web_gpu_borrowed_texture,
     pub texture_count: usize,
     pub format: mln_buffer_view,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_web_gpu_borrowed_texture_replacement {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub physical_width: u32,
-    pub physical_height: u32,
-    pub textures: *const mln_web_gpu_borrowed_texture,
-    pub texture_count: usize,
+    pub depth_textures: *const mln_web_gpu_borrowed_texture,
+    pub depth_texture_count: usize,
+    pub depth_format: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2076,19 +2195,18 @@ pub struct mln_web_gpu_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_web_gpu_surface_descriptor {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub context: mln_web_gpu_context_descriptor,
-    pub canvas: mln_web_object,
-    pub format: mln_buffer_view,
+pub struct mln_web_gpu_custom_layer_encoder {
+    pub device: mln_web_object,
+    pub encoder: mln_web_object,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_web_gpu_surface_replacement {
-    pub size: u32,
-    pub logical_size: mln_logical_size,
-    pub canvas: mln_web_object,
+pub struct mln_web_gpu_custom_layer_pass {
+    pub device: mln_web_object,
+    pub encoder: mln_web_object,
+    pub color_format: mln_buffer_view,
+    pub depth_stencil_format: mln_buffer_view,
+    pub sample_count: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2101,6 +2219,8 @@ pub struct mln_web_gpu_texture_frame {
     pub texture: mln_web_object,
     pub device: mln_web_object,
     pub format: mln_buffer_view,
+    pub depth_texture: mln_web_object,
+    pub depth_format: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2111,17 +2231,16 @@ pub struct mln_wgl_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_win32_window_descriptor {
-    pub size: u32,
+pub struct mln_win32_window_target {
     pub logical_size: mln_logical_size,
     pub window: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_win32_window_replacement {
-    pub size: u32,
+pub struct mln_xlib_window_target {
     pub logical_size: mln_logical_size,
-    pub window: *mut std::ffi::c_void,
+    pub display: *mut std::ffi::c_void,
+    pub window: u64,
 }
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2139,6 +2258,20 @@ pub type mln_completion_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, result: *const mln_completion_result),
 >;
 pub type mln_custom_geometry_source_option_fields = u32;
+pub type mln_custom_layer_prerender_callback = Option<
+    unsafe extern "C" fn(
+        user_data: *mut std::ffi::c_void,
+        parameters: *const mln_custom_layer_prerender_parameters,
+    ),
+>;
+pub type mln_custom_layer_render_callback = Option<
+    unsafe extern "C" fn(
+        user_data: *mut std::ffi::c_void,
+        parameters: *const mln_custom_layer_render_parameters,
+    ),
+>;
+pub type mln_custom_layer_session_end_callback =
+    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_custom_source_cancel_tile_callback = Option<
     unsafe extern "C" fn(
         user_data: *mut std::ffi::c_void,
@@ -2159,6 +2292,7 @@ pub type mln_custom_vector_source_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_delivery_queue(pub u64);
+pub type mln_depth_stencil_format_flags = u32;
 pub type mln_feature_state_selector_fields = u32;
 pub type mln_frame_demand_flags = u32;
 #[repr(transparent)]
@@ -2167,6 +2301,11 @@ pub struct mln_frame_pacer(pub u64);
 pub type mln_frame_pacer_option_fields = u32;
 pub type mln_free_camera_option_fields = u32;
 pub type mln_geo_json_source_option_fields = u32;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct mln_gpu_device(pub u64);
+pub type mln_gpu_device_option_fields = u32;
+pub type mln_gpu_export_kind_flags = u32;
 pub type mln_gpu_sync_kind_flags = u32;
 pub type mln_http_header_transform_callback = Option<
     unsafe extern "C" fn(
@@ -2199,10 +2338,6 @@ pub type mln_map_viewport_option_fields = u32;
 pub type mln_momentum_decay_fields = u32;
 pub type mln_momentum_snap_fields = u32;
 pub type mln_offline_region_id = i64;
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_offscreen_device(pub u64);
-pub type mln_offscreen_device_option_fields = u32;
 pub type mln_open_gl_context_provider_flags = u32;
 pub type mln_pan_momentum_fields = u32;
 pub type mln_projection_mode_option_fields = u32;
@@ -2215,6 +2350,7 @@ pub struct mln_render_frame_batch(pub u64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_render_session(pub u64);
 pub type mln_render_session_capability_flags = u32;
+pub type mln_render_target_kind_flags = u32;
 pub type mln_rendered_feature_query_option_fields = u32;
 pub type mln_resource_kind_flags = u32;
 pub type mln_resource_provider_callback = Option<
@@ -2262,10 +2398,6 @@ pub type mln_style_source_info_fields = u32;
 pub type mln_style_transition_option_fields = u32;
 pub type mln_url_match_flags = u32;
 pub type mln_user_data_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_vulkan_device(pub u64);
-pub type mln_vulkan_device_option_fields = u32;
 pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_web_object = u32;
@@ -2273,16 +2405,15 @@ native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
     mln_frame_pacer,
+    mln_gpu_device,
     mln_map,
     mln_map_projection,
-    mln_offscreen_device,
     mln_render_frame_batch,
     mln_render_session,
     mln_resource_request,
     mln_resource_transform_request,
     mln_runtime,
-    mln_style_expression,
-    mln_vulkan_device
+    mln_style_expression
 );
 
 unsafe extern "C" {
@@ -2313,6 +2444,11 @@ unsafe extern "C" {
     pub fn mln_acquired_frame_get_metal_texture(
         frame: mln_acquired_frame,
         out_frame: *mut mln_metal_texture_frame,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_acquired_frame_get_opaque_fd(
+        frame: mln_acquired_frame,
+        out_frame: *mut mln_opaque_fd_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_get_open_gl_texture(
@@ -2351,19 +2487,9 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_view_end(scope: *mut std::ffi::c_void);
-    pub fn mln_android_frame_pacer_create(
-        options: *const mln_frame_pacer_options,
-        out_pacer: *mut mln_frame_pacer,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_android_init(
         jni_env: *mut std::ffi::c_void,
         context: *mut std::ffi::c_void,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_apple_frame_pacer_create(
-        options: *const mln_frame_pacer_options,
-        out_pacer: *mut mln_frame_pacer,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_binding_dart_wake_create(
@@ -2397,7 +2523,53 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_delivery_queue_release(queue: mln_delivery_queue);
+    pub fn mln_frame_pacer_create(
+        options: *const mln_frame_pacer_options,
+        out_pacer: *mut mln_frame_pacer,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_frame_pacer_release(pacer: mln_frame_pacer);
+    pub fn mln_frame_pacer_set_options(
+        pacer: mln_frame_pacer,
+        options: *const mln_frame_pacer_options,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gpu_device_create(
+        options: *const mln_gpu_device_options,
+        out_device: *mut mln_gpu_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gpu_device_get_capabilities(
+        device: mln_gpu_device,
+        out_capabilities: *mut mln_gpu_device_capabilities,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gpu_device_get_vulkan_context(
+        device: mln_gpu_device,
+        out_result: *mut mln_gpu_device_vulkan_context_result,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gpu_device_release(device: mln_gpu_device);
+    pub fn mln_gpu_device_wrap_metal(
+        descriptor: *const mln_metal_device_descriptor,
+        out_device: *mut mln_gpu_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gpu_device_wrap_open_gl(
+        context: *const mln_open_gl_context_descriptor,
+        out_device: *mut mln_gpu_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gpu_device_wrap_vulkan(
+        descriptor: *const mln_vulkan_device_descriptor,
+        out_device: *mut mln_gpu_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gpu_device_wrap_web_gpu(
+        context: *const mln_web_gpu_context_descriptor,
+        out_device: *mut mln_gpu_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_http_header_transform_response_set_header(
         response: *mut mln_http_header_transform_response,
         name: mln_buffer_view,
@@ -2428,6 +2600,14 @@ unsafe extern "C" {
         map: mln_map,
         source_id: mln_buffer_view,
         options: *const mln_custom_geometry_source_options,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_add_custom_layer(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        before_layer_id: mln_buffer_view,
+        host: *const mln_custom_layer_host,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2475,145 +2655,10 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_attach_android_hardware_buffer_ring(
+    pub fn mln_map_attach(
         map: mln_map,
-        descriptor: *const mln_android_hardware_buffer_ring_descriptor,
-        device: mln_vulkan_device,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_android_surface(
-        map: mln_map,
-        descriptor: *const mln_android_surface_descriptor,
-        device: mln_vulkan_device,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_dma_buf_ring(
-        map: mln_map,
-        descriptor: *const mln_dma_buf_ring_descriptor,
-        device: mln_vulkan_device,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_dxgi_shared_texture_ring(
-        map: mln_map,
-        descriptor: *const mln_dxgi_shared_texture_ring_descriptor,
-        device: mln_vulkan_device,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_io_surface_ring(
-        map: mln_map,
-        descriptor: *const mln_io_surface_ring_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_metal_borrowed_texture(
-        map: mln_map,
-        descriptor: *const mln_metal_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_metal_surface(
-        map: mln_map,
-        descriptor: *const mln_metal_surface_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_offscreen(
-        map: mln_map,
-        descriptor: *const mln_offscreen_descriptor,
-        options: *const mln_render_session_attach_options,
-        device: mln_offscreen_device,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_ohos_surface(
-        map: mln_map,
-        descriptor: *const mln_ohos_surface_descriptor,
-        device: mln_vulkan_device,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_open_gl_borrowed_texture(
-        map: mln_map,
-        descriptor: *const mln_open_gl_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_open_gl_surface(
-        map: mln_map,
-        descriptor: *const mln_open_gl_surface_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_vulkan_borrowed_texture(
-        map: mln_map,
-        descriptor: *const mln_vulkan_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_vulkan_surface(
-        map: mln_map,
-        descriptor: *const mln_vulkan_surface_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_wayland_surface(
-        map: mln_map,
-        descriptor: *const mln_wayland_surface_descriptor,
-        device: mln_vulkan_device,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_web_gpu_borrowed_texture(
-        map: mln_map,
-        descriptor: *const mln_web_gpu_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_web_gpu_surface(
-        map: mln_map,
-        descriptor: *const mln_web_gpu_surface_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_attach_win32_window(
-        map: mln_map,
-        descriptor: *const mln_win32_window_descriptor,
-        device: mln_vulkan_device,
+        target: *const mln_render_target,
+        device: mln_gpu_device,
         options: *const mln_render_session_attach_options,
         out_session: *mut mln_render_session,
         completion: *const mln_completion,
@@ -2934,7 +2979,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_resize(
         map: mln_map,
-        logical_size: mln_logical_size,
+        extent: mln_logical_extent,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -3151,17 +3196,6 @@ unsafe extern "C" {
         status: mln_network_status,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_offscreen_device_create(
-        options: *const mln_offscreen_device_options,
-        out_device: *mut mln_offscreen_device,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_offscreen_device_release(device: mln_offscreen_device);
-    pub fn mln_ohos_frame_pacer_create(
-        options: *const mln_frame_pacer_options,
-        out_pacer: *mut mln_frame_pacer,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_open_gl_supported_context_provider_mask() -> mln_open_gl_context_provider_flags;
     pub fn mln_projected_meters_for_lat_lng(
         coordinate: mln_lat_lng,
@@ -3290,7 +3324,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_resize(
         session: mln_render_session,
-        logical_size: mln_logical_size,
+        extent: mln_logical_extent,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -3298,80 +3332,14 @@ unsafe extern "C" {
         session: mln_render_session,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_set_android_surface_target(
-        session: mln_render_session,
-        replacement: *const mln_android_surface_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_render_session_set_frame_pacer(
         session: mln_render_session,
         pacer: mln_frame_pacer,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_set_metal_borrowed_texture_target(
+    pub fn mln_render_session_set_target(
         session: mln_render_session,
-        replacement: *const mln_metal_borrowed_texture_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_metal_surface_target(
-        session: mln_render_session,
-        replacement: *const mln_metal_surface_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_ohos_surface_target(
-        session: mln_render_session,
-        replacement: *const mln_ohos_surface_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_open_gl_borrowed_texture_target(
-        session: mln_render_session,
-        replacement: *const mln_open_gl_borrowed_texture_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_open_gl_surface_target(
-        session: mln_render_session,
-        replacement: *const mln_open_gl_surface_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_vulkan_borrowed_texture_target(
-        session: mln_render_session,
-        replacement: *const mln_vulkan_borrowed_texture_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_vulkan_surface_target(
-        session: mln_render_session,
-        replacement: *const mln_vulkan_surface_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_wayland_surface_target(
-        session: mln_render_session,
-        replacement: *const mln_wayland_surface_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_web_gpu_borrowed_texture_target(
-        session: mln_render_session,
-        replacement: *const mln_web_gpu_borrowed_texture_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_web_gpu_surface_target(
-        session: mln_render_session,
-        replacement: *const mln_web_gpu_surface_replacement,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_session_set_win32_window_target(
-        session: mln_render_session,
-        replacement: *const mln_win32_window_replacement,
+        target: *const mln_render_target,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -3570,17 +3538,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_style_expression_release(expression: mln_style_expression);
     pub fn mln_supported_render_backend_mask() -> mln_render_backend_flags;
-    pub fn mln_vulkan_device_create(
-        options: *const mln_vulkan_device_options,
-        out_device: *mut mln_vulkan_device,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_vulkan_device_get_context(
-        device: mln_vulkan_device,
-        out_result: *mut mln_vulkan_device_context_result,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_vulkan_device_release(device: mln_vulkan_device);
     pub fn mln_web_alloc(size: usize, align: usize) -> *mut std::ffi::c_void;
     pub fn mln_web_free(pointer: *mut std::ffi::c_void, size: usize, align: usize);
     pub fn mln_web_object_release(object: mln_web_object);

@@ -11,7 +11,8 @@ package maplibre
 import "C"
 import "unsafe"
 
-// WithDxgiSharedTexture gets the DXGI shared texture of an acquired frame.
+// WithDxgiSharedTexture gets the DXGI shared texture of an exported ring's
+// acquired frame.
 //
 // Wait for AcquiredFrameHandle.WithProducerSync() before you read the texture.
 // Once you release or discard the frame, the session may render into the
@@ -23,9 +24,11 @@ import "unsafe"
 // release the frame, duplicate it with DuplicateHandle.
 //
 // See mln_acquired_frame_get_dxgi_shared_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 //
 // Errors:
+//   - StatusUnsupported when the session's ring shares its textures in another
+//     way.
 //   - StatusTargetLost when the session failed, or you detached, abandoned, or
 //     disposed it.
 func (receiver *AcquiredFrameHandle) WithDxgiSharedTexture(callback func(DxgiSharedTextureFrameView) error) error {
@@ -38,122 +41,4 @@ func (receiver *AcquiredFrameHandle) WithDxgiSharedTexture(callback func(DxgiSha
 	}, func(scope *bindingScope) DxgiSharedTextureFrameView {
 		return DxgiSharedTextureFrameView{value: copyDxgiSharedTextureFrame(outFrame), scope: scope}
 	})
-}
-
-// AttachDxgiSharedTextureRing creates a session that renders the map into a
-// ring of DXGI shared textures that the library allocates.
-//
-// Acquire each frame with RenderSessionHandle.AcquireFrame(), and get its
-// texture with AcquiredFrameHandle.WithDxgiSharedTexture().
-// RenderSessionHandle.Resize() gives the ring new textures of the new size.
-//
-// The session renders with the Vulkan device device, or, when device is null,
-// with one that the library creates. The textures belong to the device's GPU,
-// so open them on a D3D11 or D3D12 device of the same adapter. To pick the GPU,
-// create device with VulkanDeviceOptions.DeviceLuid set to your adapter's LUID.
-// Attach with RenderDriverKindCoreWorker.
-//
-// For a reader that waits on no fence, such as Flutter's texture registrar,
-// attach without GPUSyncKindFlagD3d12Fence in
-// RenderSessionAttachOptions.ProducerSyncKinds, so that each frame finishes
-// before you acquire it. Release a frame with GPUSyncKindCPUComplete only once
-// the reader has finished with its texture.
-//
-// See mln_map_attach_dxgi_shared_texture_ring in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
-//
-// Errors:
-//   - StatusUnsupported in an OpenGL build, or when the GPU can't share the
-//     textures: D3D11 has no adapter with the Vulkan device's LUID or can't
-//     share textures through NT handles, or the device lacks
-//     VK_KHR_external_memory_win32 or can't import D3D11 textures.
-//   - StatusNativeError when the library can't create its Vulkan device or a
-//     D3D11 device on the adapter.
-func (receiver *MapHandle) AttachDxgiSharedTextureRing(descriptor DxgiSharedTextureRingDescriptor, device *VulkanDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_dxgi_shared_texture_ring(C.mln_map(raw), bindingStore(nativeDxgiSharedTextureRingDescriptor(descriptor, arena), arena), C.mln_vulkan_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachWin32Window creates a session that presents the map to a Win32 window,
-// with a graphics context that the library creates.
-//
-// A Vulkan build presents with device, or, when device is null, with a device
-// that the library creates. An OpenGL build uses a WGL context, and device must
-// be null. Attach with RenderDriverKindCoreWorker.
-//
-// An OpenGL build sets the window's pixel format, so don't set one yourself.
-//
-// The session presents without waiting for the display, so demand at most one
-// frame per display refresh. While the window is minimized, frame demands
-// finish with RenderResultTargetNotReady.
-//
-// Keep the window until a release or replacement of the target, or a detach of
-// the session, completes.
-//
-// See mln_map_attach_win32_window in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
-//
-// Errors:
-//   - StatusInvalidArgument when window isn't a window, or, in an OpenGL build,
-//     already has another pixel format.
-//   - StatusInvalidState when window is minimized or has no client area.
-//   - StatusUnsupported when you created device without
-//     VulkanDeviceOptions.Presentation.
-//   - StatusInvalidState when window was minimized before the attach ran.
-//   - StatusUnsupported when the GPU or the Vulkan loader can't present.
-//   - StatusNativeError when the library can't create the graphics context or
-//     present to the window.
-func (receiver *MapHandle) AttachWin32Window(descriptor Win32WindowDescriptor, device *VulkanDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_win32_window(C.mln_map(raw), bindingStore(nativeWin32WindowDescriptor(descriptor, arena), arena), C.mln_vulkan_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// SetWin32WindowTarget replaces the Win32 window that the session presents to.
-//
-// Use it to give the session a window again after
-// RenderSessionHandle.ReleaseTarget(), to move it to another window, or to
-// resize it. Once the replacement completes, the session no longer uses the old
-// window.
-//
-// See mln_render_session_set_win32_window_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
-//
-// Errors:
-//   - StatusInvalidArgument when window isn't a window, or, in an OpenGL build,
-//     already has another pixel format.
-//   - StatusInvalidState when window is minimized or has no client area.
-//   - StatusInvalidState when window was minimized before the replacement ran.
-//   - StatusUnsupported when, in a Vulkan build, the new window needs a
-//     different color format than the old one. Attach a new session instead.
-//   - StatusNativeError when the library can't present to the new window.
-func (receiver *RenderSessionHandle) SetWin32WindowTarget(replacement Win32WindowReplacement) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_win32_window_target(C.mln_render_session(raw), bindingStore(nativeWin32WindowReplacement(replacement, arena), arena), completion, diagnostic))
-	}, completionUnit)
 }

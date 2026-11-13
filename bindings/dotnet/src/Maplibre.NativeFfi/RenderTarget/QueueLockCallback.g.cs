@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Locks or unlocks the Vulkan queue that you share with a render session.
+/// Locks or unlocks the Vulkan queue that you share with the render sessions of
+/// a GPU device.
 /// </summary>
 /// <remarks>
 /// <para>It can run on a library thread, and it can't call the library.</para>

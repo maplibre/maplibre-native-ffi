@@ -4,19 +4,20 @@
 
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import kotlin.jvm.JvmField
 import kotlin.jvm.JvmName
 import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.callback.NativeRegistration
-import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.values.flagLabel
 
 /**
  * A maintenance action on a runtime's cache database.
  *
- * The cache database is the file that `RuntimeOptions.cachePath` names. It holds the ambient cache,
- * meaning the resources that maps loaded, and the offline regions.
+ * The cache database is the file that `RuntimeOptions.cachePath` names. It
+ * holds the ambient cache, meaning the resources that maps loaded, and the
+ * offline regions.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -24,59 +25,45 @@ import org.maplibre.nativeffi.internal.values.flagLabel
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class CacheDatabaseOperation(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      1u -> "CLEAR"
-      2u -> "INVALIDATE"
-      3u -> "PACK"
-      4u -> "RESET"
-      else -> "CacheDatabaseOperation($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is CacheDatabaseOperation && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 1u -> "CLEAR"; 2u -> "INVALIDATE"; 3u -> "PACK"; 4u -> "RESET"; else -> "CacheDatabaseOperation($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is CacheDatabaseOperation && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /**
-     * Deletes the ambient cache's resources and frees the space they used. Offline regions keep
-     * their resources.
+     * Deletes the ambient cache's resources and frees the space they used.
+     * Offline regions keep their resources.
      */
     @JvmField public val CLEAR: CacheDatabaseOperation = CacheDatabaseOperation(CLEAR_VALUE)
     /** The `rawValue` of [CLEAR]. */
     public const val CLEAR_VALUE: UInt = 1u
     /**
-     * Keeps the ambient cache's resources, but makes maps check each one with the server before
-     * they use it again. Offline regions keep their resources as they are.
+     * Keeps the ambient cache's resources, but makes maps check each one with
+     * the server before they use it again. Offline regions keep their resources
+     * as they are.
      */
-    @JvmField
-    public val INVALIDATE: CacheDatabaseOperation = CacheDatabaseOperation(INVALIDATE_VALUE)
+    @JvmField public val INVALIDATE: CacheDatabaseOperation = CacheDatabaseOperation(INVALIDATE_VALUE)
     /** The `rawValue` of [INVALIDATE]. */
     public const val INVALIDATE_VALUE: UInt = 2u
-    /** Compacts the whole database file to free the disk space that it no longer uses. */
+    /**
+     * Compacts the whole database file to free the disk space that it no longer
+     * uses.
+     */
     @JvmField public val PACK: CacheDatabaseOperation = CacheDatabaseOperation(PACK_VALUE)
     /** The `rawValue` of [PACK]. */
     public const val PACK_VALUE: UInt = 3u
-    /** Deletes the whole database, offline regions included, and starts an empty one. */
+    /**
+     * Deletes the whole database, offline regions included, and starts an empty
+     * one.
+     */
     @JvmField public val RESET: CacheDatabaseOperation = CacheDatabaseOperation(RESET_VALUE)
     /** The `rawValue` of [RESET]. */
     public const val RESET_VALUE: UInt = 4u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): CacheDatabaseOperation =
-      when (rawValue) {
-        CLEAR_VALUE -> CLEAR
-        INVALIDATE_VALUE -> INVALIDATE
-        PACK_VALUE -> PACK
-        RESET_VALUE -> RESET
-        else -> CacheDatabaseOperation(rawValue)
-      }
+    public fun of(rawValue: UInt): CacheDatabaseOperation = when (rawValue) { CLEAR_VALUE -> CLEAR; INVALIDATE_VALUE -> INVALIDATE; PACK_VALUE -> PACK; RESET_VALUE -> RESET; else -> CacheDatabaseOperation(rawValue) }
   }
 }
-
 /**
  * Whether a camera change jumps or animates.
  *
@@ -86,18 +73,9 @@ public class CacheDatabaseOperation(@get:JvmName("getRawValue") public val rawVa
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class CameraChangeMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "IMMEDIATE"
-      1u -> "ANIMATED"
-      else -> "CameraChangeMode($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is CameraChangeMode && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "IMMEDIATE"; 1u -> "ANIMATED"; else -> "CameraChangeMode($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is CameraChangeMode && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val IMMEDIATE: CameraChangeMode = CameraChangeMode(IMMEDIATE_VALUE)
     /** The `rawValue` of [IMMEDIATE]. */
@@ -105,19 +83,12 @@ public class CameraChangeMode(@get:JvmName("getRawValue") public val rawValue: U
     @JvmField public val ANIMATED: CameraChangeMode = CameraChangeMode(ANIMATED_VALUE)
     /** The `rawValue` of [ANIMATED]. */
     public const val ANIMATED_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): CameraChangeMode =
-      when (rawValue) {
-        IMMEDIATE_VALUE -> IMMEDIATE
-        ANIMATED_VALUE -> ANIMATED
-        else -> CameraChangeMode(rawValue)
-      }
+    public fun of(rawValue: UInt): CameraChangeMode = when (rawValue) { IMMEDIATE_VALUE -> IMMEDIATE; ANIMATED_VALUE -> ANIMATED; else -> CameraChangeMode(rawValue) }
   }
 }
-
 /**
  * What moved the camera.
  *
@@ -127,54 +98,41 @@ public class CameraChangeMode(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class CameraChangeSource(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "COMMAND"
-      1u -> "GESTURE"
-      2u -> "MOMENTUM"
-      else -> "CameraChangeSource($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is CameraChangeSource && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "COMMAND"; 1u -> "GESTURE"; 2u -> "MOMENTUM"; else -> "CameraChangeSource($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is CameraChangeSource && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /**
-     * A camera command outside a gesture, or the map itself, as when a resize keeps the camera
-     * within its bounds.
+     * A camera command outside a gesture, or the map itself, as when a resize
+     * keeps the camera within its bounds.
      */
     @JvmField public val COMMAND: CameraChangeSource = CameraChangeSource(COMMAND_VALUE)
     /** The `rawValue` of [COMMAND]. */
     public const val COMMAND_VALUE: UInt = 0u
-    /** A camera command with a gesture phase. */
+    /**
+     * A camera command with a gesture phase.
+     */
     @JvmField public val GESTURE: CameraChangeSource = CameraChangeSource(GESTURE_VALUE)
     /** The `rawValue` of [GESTURE]. */
     public const val GESTURE_VALUE: UInt = 1u
-    /** The momentum and bearing snap that a gesture's end started. */
+    /**
+     * The momentum and bearing snap that a gesture's end started.
+     */
     @JvmField public val MOMENTUM: CameraChangeSource = CameraChangeSource(MOMENTUM_VALUE)
     /** The `rawValue` of [MOMENTUM]. */
     public const val MOMENTUM_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): CameraChangeSource =
-      when (rawValue) {
-        COMMAND_VALUE -> COMMAND
-        GESTURE_VALUE -> GESTURE
-        MOMENTUM_VALUE -> MOMENTUM
-        else -> CameraChangeSource(rawValue)
-      }
+    public fun of(rawValue: UInt): CameraChangeSource = when (rawValue) { COMMAND_VALUE -> COMMAND; GESTURE_VALUE -> GESTURE; MOMENTUM_VALUE -> MOMENTUM; else -> CameraChangeSource(rawValue) }
   }
 }
-
 /**
  * How a camera change ended.
  *
- * A change that ends in more than one way reports `CameraTransitionOutcome.CANCELLED` if any of it
- * was cancelled, and otherwise `CameraTransitionOutcome.REPLACED` if any of it was replaced.
+ * A change that ends in more than one way reports
+ * `CameraTransitionOutcome.CANCELLED` if any of it was cancelled, and otherwise
+ * `CameraTransitionOutcome.REPLACED` if any of it was replaced.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -182,67 +140,52 @@ public class CameraChangeSource(@get:JvmName("getRawValue") public val rawValue:
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class CameraTransitionOutcome(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "COMPLETED"
-      1u -> "CANCELLED"
-      2u -> "CLOSED"
-      3u -> "REPLACED"
-      else -> "CameraTransitionOutcome($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is CameraTransitionOutcome && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "COMPLETED"; 1u -> "CANCELLED"; 2u -> "CLOSED"; 3u -> "REPLACED"; else -> "CameraTransitionOutcome($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is CameraTransitionOutcome && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** The camera finished the change. */
-    @JvmField
-    public val COMPLETED: CameraTransitionOutcome = CameraTransitionOutcome(COMPLETED_VALUE)
+    /**
+     * The camera finished the change.
+     */
+    @JvmField public val COMPLETED: CameraTransitionOutcome = CameraTransitionOutcome(COMPLETED_VALUE)
     /** The `rawValue` of [COMPLETED]. */
     public const val COMPLETED_VALUE: UInt = 0u
     /**
-     * `MapHandle.cancelCameraTransitions()`, `MapHandle.cancelCameraTransitionsWithId()`, a
-     * gesture's `GesturePhase.BEGIN` or `GesturePhase.CANCEL`, `MapHandle.setFreeCameraOptions()`,
-     * or a resize that moved the camera back inside its bounds stopped the change. A command that
-     * fails before it moves the camera also reports this.
+     * `MapHandle.cancelCameraTransitions()`,
+     * `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
+     * `GesturePhase.BEGIN` or `GesturePhase.CANCEL`,
+     * `MapHandle.setFreeCameraOptions()`, or a resize that moved the camera
+     * back inside its bounds stopped the change. A command that fails before it
+     * moves the camera also reports this.
      */
-    @JvmField
-    public val CANCELLED: CameraTransitionOutcome = CameraTransitionOutcome(CANCELLED_VALUE)
+    @JvmField public val CANCELLED: CameraTransitionOutcome = CameraTransitionOutcome(CANCELLED_VALUE)
     /** The `rawValue` of [CANCELLED]. */
     public const val CANCELLED_VALUE: UInt = 1u
-    /** The map closed before the change ended. */
+    /**
+     * The map closed before the change ended.
+     */
     @JvmField public val CLOSED: CameraTransitionOutcome = CameraTransitionOutcome(CLOSED_VALUE)
     /** The `rawValue` of [CLOSED]. */
     public const val CLOSED_VALUE: UInt = 2u
     /**
-     * A later camera change set every field that a part of the change was still animating, so that
-     * part stopped. Its other parts keep animating, and the change reports this outcome when they
-     * end, unless one was cancelled.
+     * A later camera change set every field that a part of the change was still
+     * animating, so that part stopped. Its other parts keep animating, and the
+     * change reports this outcome when they end, unless one was cancelled.
      *
-     * A later change that sets only some of those fields leaves the change animating the rest. A
-     * fly's center and zoom count as one field, and so do an anchored change's center and the
-     * fields that the anchor holds in place.
+     * A later change that sets only some of those fields leaves the change
+     * animating the rest. A fly's center and zoom count as one field, and so do
+     * an anchored change's center and the fields that the anchor holds in
+     * place.
      */
     @JvmField public val REPLACED: CameraTransitionOutcome = CameraTransitionOutcome(REPLACED_VALUE)
     /** The `rawValue` of [REPLACED]. */
     public const val REPLACED_VALUE: UInt = 3u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): CameraTransitionOutcome =
-      when (rawValue) {
-        COMPLETED_VALUE -> COMPLETED
-        CANCELLED_VALUE -> CANCELLED
-        CLOSED_VALUE -> CLOSED
-        REPLACED_VALUE -> REPLACED
-        else -> CameraTransitionOutcome(rawValue)
-      }
+    public fun of(rawValue: UInt): CameraTransitionOutcome = when (rawValue) { COMPLETED_VALUE -> COMPLETED; CANCELLED_VALUE -> CANCELLED; CLOSED_VALUE -> CLOSED; REPLACED_VALUE -> REPLACED; else -> CameraTransitionOutcome(rawValue) }
   }
 }
-
 /**
  * How a camera command moves the camera.
  *
@@ -252,46 +195,66 @@ public class CameraTransitionOutcome(@get:JvmName("getRawValue") public val rawV
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class CameraUpdateMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "JUMP"
-      1u -> "EASE"
-      2u -> "FLY"
-      else -> "CameraUpdateMode($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is CameraUpdateMode && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "JUMP"; 1u -> "EASE"; 2u -> "FLY"; else -> "CameraUpdateMode($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is CameraUpdateMode && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** Moves the camera at once. */
+    /**
+     * Moves the camera at once.
+     */
     @JvmField public val JUMP: CameraUpdateMode = CameraUpdateMode(JUMP_VALUE)
     /** The `rawValue` of [JUMP]. */
     public const val JUMP_VALUE: UInt = 0u
-    /** Animates the camera straight to the target. */
+    /**
+     * Animates the camera straight to the target.
+     */
     @JvmField public val EASE: CameraUpdateMode = CameraUpdateMode(EASE_VALUE)
     /** The `rawValue` of [EASE]. */
     public const val EASE_VALUE: UInt = 1u
-    /** Zooms out, travels to the target, and zooms back in. */
+    /**
+     * Zooms out, travels to the target, and zooms back in.
+     */
     @JvmField public val FLY: CameraUpdateMode = CameraUpdateMode(FLY_VALUE)
     /** The `rawValue` of [FLY]. */
     public const val FLY_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): CameraUpdateMode =
-      when (rawValue) {
-        JUMP_VALUE -> JUMP
-        EASE_VALUE -> EASE
-        FLY_VALUE -> FLY
-        else -> CameraUpdateMode(rawValue)
-      }
+    public fun of(rawValue: UInt): CameraUpdateMode = when (rawValue) { JUMP_VALUE -> JUMP; EASE_VALUE -> EASE; FLY_VALUE -> FLY; else -> CameraUpdateMode(rawValue) }
   }
 }
-
+/**
+ * How a graphics API's clip space holds depth.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_clip_depth_range` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public class ClipDepthRange(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String = when (rawValue) { 1u -> "ZERO_TO_ONE"; 2u -> "NEGATIVE_ONE_TO_ONE"; else -> "ClipDepthRange($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is ClipDepthRange && other.rawValue == rawValue
+  override fun hashCode(): Int = rawValue.hashCode()
+  public companion object {
+    /**
+     * Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and
+     * OpenGL with `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+     */
+    @JvmField public val ZERO_TO_ONE: ClipDepthRange = ClipDepthRange(ZERO_TO_ONE_VALUE)
+    /** The `rawValue` of [ZERO_TO_ONE]. */
+    public const val ZERO_TO_ONE_VALUE: UInt = 1u
+    /**
+     * Clip z runs from -w to w, as in OpenGL by default.
+     */
+    @JvmField public val NEGATIVE_ONE_TO_ONE: ClipDepthRange = ClipDepthRange(NEGATIVE_ONE_TO_ONE_VALUE)
+    /** The `rawValue` of [NEGATIVE_ONE_TO_ONE]. */
+    public const val NEGATIVE_ONE_TO_ONE_VALUE: UInt = 2u
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): ClipDepthRange = when (rawValue) { ZERO_TO_ONE_VALUE -> ZERO_TO_ONE; NEGATIVE_ONE_TO_ONE_VALUE -> NEGATIVE_ONE_TO_ONE; else -> ClipDepthRange(rawValue) }
+  }
+}
 /**
  * How the map keeps the camera within the world or within its bounds.
  *
@@ -301,56 +264,85 @@ public class CameraUpdateMode(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class ConstrainMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "NONE"
-      1u -> "HEIGHT_ONLY"
-      2u -> "WIDTH_AND_HEIGHT"
-      3u -> "SCREEN"
-      else -> "ConstrainMode($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "NONE"; 1u -> "HEIGHT_ONLY"; 2u -> "WIDTH_AND_HEIGHT"; 3u -> "SCREEN"; else -> "ConstrainMode($rawValue)" }
   override fun equals(other: Any?): Boolean = other is ConstrainMode && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val NONE: ConstrainMode = ConstrainMode(NONE_VALUE)
     /** The `rawValue` of [NONE]. */
     public const val NONE_VALUE: UInt = 0u
-    /** Keeps the world filling the view from top to bottom. */
+    /**
+     * Keeps the world filling the view from top to bottom.
+     */
     @JvmField public val HEIGHT_ONLY: ConstrainMode = ConstrainMode(HEIGHT_ONLY_VALUE)
     /** The `rawValue` of [HEIGHT_ONLY]. */
     public const val HEIGHT_ONLY_VALUE: UInt = 1u
-    /** Keeps the world filling the view in both directions. */
+    /**
+     * Keeps the world filling the view in both directions.
+     */
     @JvmField public val WIDTH_AND_HEIGHT: ConstrainMode = ConstrainMode(WIDTH_AND_HEIGHT_VALUE)
     /** The `rawValue` of [WIDTH_AND_HEIGHT]. */
     public const val WIDTH_AND_HEIGHT_VALUE: UInt = 2u
-    /** Keeps the whole view inside the bounds from `MapHandle.setBounds()`. */
+    /**
+     * Keeps the whole view inside the bounds from `MapHandle.setBounds()`.
+     */
     @JvmField public val SCREEN: ConstrainMode = ConstrainMode(SCREEN_VALUE)
     /** The `rawValue` of [SCREEN]. */
     public const val SCREEN_VALUE: UInt = 3u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ConstrainMode =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        HEIGHT_ONLY_VALUE -> HEIGHT_ONLY
-        WIDTH_AND_HEIGHT_VALUE -> WIDTH_AND_HEIGHT
-        SCREEN_VALUE -> SCREEN
-        else -> ConstrainMode(rawValue)
-      }
+    public fun of(rawValue: UInt): ConstrainMode = when (rawValue) { NONE_VALUE -> NONE; HEIGHT_ONLY_VALUE -> HEIGHT_ONLY; WIDTH_AND_HEIGHT_VALUE -> WIDTH_AND_HEIGHT; SCREEN_VALUE -> SCREEN; else -> ConstrainMode(rawValue) }
   }
 }
-
+/**
+ * A format of depth and stencil textures, as a bit in a set.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
+ * See `mln_depth_stencil_format_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class DepthStencilFormatFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  public infix fun or(other: DepthStencilFormatFlag): DepthStencilFormatFlag = of(rawValue or other.rawValue)
+  public infix fun and(other: DepthStencilFormatFlag): DepthStencilFormatFlag = of(rawValue and other.rawValue)
+  public operator fun contains(other: DepthStencilFormatFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "DEPTH24_STENCIL8", 2uL to "DEPTH32_FLOAT_STENCIL8"))
+  override fun equals(other: Any?): Boolean = other is DepthStencilFormatFlag && other.rawValue == rawValue
+  override fun hashCode(): Int = rawValue.hashCode()
+  public companion object {
+    /** No flags. */
+    @JvmField public val NONE: DepthStencilFormatFlag = DepthStencilFormatFlag(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    /**
+     * 24-bit normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
+     * MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
+     * WGPUTextureFormat_Depth24PlusStencil8 (`depth24plus-stencil8`).
+     */
+    @JvmField public val DEPTH24_STENCIL8: DepthStencilFormatFlag = DepthStencilFormatFlag(DEPTH24_STENCIL8_VALUE)
+    /** The `rawValue` of [DEPTH24_STENCIL8]. */
+    public const val DEPTH24_STENCIL8_VALUE: UInt = 1u
+    /**
+     * 32-bit float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
+     * MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
+     * WGPUTextureFormat_Depth32FloatStencil8 (`depth32float-stencil8`).
+     */
+    @JvmField public val DEPTH32_FLOAT_STENCIL8: DepthStencilFormatFlag = DepthStencilFormatFlag(DEPTH32_FLOAT_STENCIL8_VALUE)
+    /** The `rawValue` of [DEPTH32_FLOAT_STENCIL8]. */
+    public const val DEPTH32_FLOAT_STENCIL8_VALUE: UInt = 2u
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): DepthStencilFormatFlag = when (rawValue) { NONE_VALUE -> NONE; DEPTH24_STENCIL8_VALUE -> DEPTH24_STENCIL8; DEPTH32_FLOAT_STENCIL8_VALUE -> DEPTH32_FLOAT_STENCIL8; else -> DepthStencilFormatFlag(rawValue) }
+  }
+}
 /**
  * How a frame demand behaves.
  *
- * Without flags, a demand draws a frame when the map changed since the last one, and otherwise
- * finishes with `RenderResult.NO_UPDATE`. A session with a surface target shows each frame that it
- * draws.
+ * Without flags, a demand draws a frame when the map changed since the last
+ * one, and otherwise finishes with `RenderResult.NO_UPDATE`. A session with a
+ * surface target shows each frame that it draws.
  *
  * Later versions may add flags; unknown bits keep their place in `rawValue`.
  *
@@ -359,59 +351,41 @@ public class ConstrainMode(@get:JvmName("getRawValue") public val rawValue: UInt
  */
 public class FrameDemandFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
   public infix fun or(other: FrameDemandFlag): FrameDemandFlag = of(rawValue or other.rawValue)
-
   public infix fun and(other: FrameDemandFlag): FrameDemandFlag = of(rawValue and other.rawValue)
-
-  public operator fun contains(other: FrameDemandFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "FORCE", 4uL to "WAIT_FOR_UPDATE"))
-
+  public operator fun contains(other: FrameDemandFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "FORCE", 4uL to "WAIT_FOR_UPDATE"))
   override fun equals(other: Any?): Boolean = other is FrameDemandFlag && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: FrameDemandFlag = FrameDemandFlag(NONE_VALUE)
     /** The `rawValue` of [NONE]. */
     public const val NONE_VALUE: UInt = 0u
     /**
-     * Draws a frame even when nothing changed since the last one. It can't be combined with
-     * `FrameDemandFlag.WAIT_FOR_UPDATE`.
+     * Draws a frame even when nothing changed since the last one. It can't be
+     * combined with `FrameDemandFlag.WAIT_FOR_UPDATE`.
      */
     @JvmField public val FORCE: FrameDemandFlag = FrameDemandFlag(FORCE_VALUE)
     /** The `rawValue` of [FORCE]. */
     public const val FORCE_VALUE: UInt = 1u
     /**
-     * When the map has nothing new to draw, waits for its next update instead of finishing with
-     * `RenderResult.NO_UPDATE`.
+     * When the map has nothing new to draw, waits for its next update instead
+     * of finishing with `RenderResult.NO_UPDATE`.
      */
     @JvmField public val WAIT_FOR_UPDATE: FrameDemandFlag = FrameDemandFlag(WAIT_FOR_UPDATE_VALUE)
     /** The `rawValue` of [WAIT_FOR_UPDATE]. */
     public const val WAIT_FOR_UPDATE_VALUE: UInt = 4u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): FrameDemandFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        FORCE_VALUE -> FORCE
-        WAIT_FOR_UPDATE_VALUE -> WAIT_FOR_UPDATE
-        else -> FrameDemandFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): FrameDemandFlag = when (rawValue) { NONE_VALUE -> NONE; FORCE_VALUE -> FORCE; WAIT_FOR_UPDATE_VALUE -> WAIT_FOR_UPDATE; else -> FrameDemandFlag(rawValue) }
   }
 }
-
 /**
  * Where a camera change falls in a gesture that the user makes.
  *
- * `GesturePhase.BEGIN` and `GesturePhase.UPDATE` mark a gesture in progress, and `GesturePhase.END`
- * and `GesturePhase.CANCEL` end it.
+ * `GesturePhase.BEGIN` and `GesturePhase.UPDATE` mark a gesture in progress,
+ * and `GesturePhase.END` and `GesturePhase.CANCEL` end it.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -419,34 +393,26 @@ public class FrameDemandFlag(@get:JvmName("getRawValue") public val rawValue: UI
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class GesturePhase(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "NONE"
-      1u -> "BEGIN"
-      2u -> "UPDATE"
-      3u -> "END"
-      4u -> "CANCEL"
-      else -> "GesturePhase($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "NONE"; 1u -> "BEGIN"; 2u -> "UPDATE"; 3u -> "END"; 4u -> "CANCEL"; else -> "GesturePhase($rawValue)" }
   override fun equals(other: Any?): Boolean = other is GesturePhase && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** The change isn't part of a gesture. */
+    /**
+     * The change isn't part of a gesture.
+     */
     @JvmField public val NONE: GesturePhase = GesturePhase(NONE_VALUE)
     /** The `rawValue` of [NONE]. */
     public const val NONE_VALUE: UInt = 0u
     /**
-     * The gesture starts. This cancels every running camera animation before the change applies.
+     * The gesture starts. This cancels every running camera animation before
+     * the change applies.
      */
     @JvmField public val BEGIN: GesturePhase = GesturePhase(BEGIN_VALUE)
     /** The `rawValue` of [BEGIN]. */
     public const val BEGIN_VALUE: UInt = 1u
     /**
-     * The gesture continues. To start a gesture that keeps the running camera animations, start it
-     * with this phase instead of `GesturePhase.BEGIN`.
+     * The gesture continues. To start a gesture that keeps the running camera
+     * animations, start it with this phase instead of `GesturePhase.BEGIN`.
      */
     @JvmField public val UPDATE: GesturePhase = GesturePhase(UPDATE_VALUE)
     /** The `rawValue` of [UPDATE]. */
@@ -455,34 +421,121 @@ public class GesturePhase(@get:JvmName("getRawValue") public val rawValue: UInt)
     /** The `rawValue` of [END]. */
     public const val END_VALUE: UInt = 3u
     /**
-     * The platform cancelled the gesture. This also cancels every running camera animation after
-     * the change applies.
+     * The platform cancelled the gesture. This also cancels every running
+     * camera animation after the change applies.
      */
     @JvmField public val CANCEL: GesturePhase = GesturePhase(CANCEL_VALUE)
     /** The `rawValue` of [CANCEL]. */
     public const val CANCEL_VALUE: UInt = 4u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): GesturePhase =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        BEGIN_VALUE -> BEGIN
-        UPDATE_VALUE -> UPDATE
-        END_VALUE -> END
-        CANCEL_VALUE -> CANCEL
-        else -> GesturePhase(rawValue)
-      }
+    public fun of(rawValue: UInt): GesturePhase = when (rawValue) { NONE_VALUE -> NONE; BEGIN_VALUE -> BEGIN; UPDATE_VALUE -> UPDATE; END_VALUE -> END; CANCEL_VALUE -> CANCEL; else -> GesturePhase(rawValue) }
   }
 }
-
+/**
+ * A way to share a texture's memory with another API or process.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_gpu_export_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class GpuExportKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String = when (rawValue) { 0u -> "NONE"; 1u -> "IO_SURFACE"; 2u -> "DMA_BUF"; 3u -> "ANDROID_HARDWARE_BUFFER"; 4u -> "DXGI_SHARED_HANDLE"; 5u -> "OPAQUE_FD"; else -> "GpuExportKind($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is GpuExportKind && other.rawValue == rawValue
+  override fun hashCode(): Int = rawValue.hashCode()
+  public companion object {
+    /**
+     * The texture isn't shared.
+     */
+    @JvmField public val NONE: GpuExportKind = GpuExportKind(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    /**
+     * An `IOSurfaceRef`.
+     */
+    @JvmField public val IO_SURFACE: GpuExportKind = GpuExportKind(IO_SURFACE_VALUE)
+    /** The `rawValue` of [IO_SURFACE]. */
+    public const val IO_SURFACE_VALUE: UInt = 1u
+    /**
+     * A Linux dmabuf, as file descriptors with a DRM format and modifier.
+     */
+    @JvmField public val DMA_BUF: GpuExportKind = GpuExportKind(DMA_BUF_VALUE)
+    /** The `rawValue` of [DMA_BUF]. */
+    public const val DMA_BUF_VALUE: UInt = 2u
+    /**
+     * An `AHardwareBuffer*`.
+     */
+    @JvmField public val ANDROID_HARDWARE_BUFFER: GpuExportKind = GpuExportKind(ANDROID_HARDWARE_BUFFER_VALUE)
+    /** The `rawValue` of [ANDROID_HARDWARE_BUFFER]. */
+    public const val ANDROID_HARDWARE_BUFFER_VALUE: UInt = 3u
+    /**
+     * A DXGI shared texture's NT handle.
+     */
+    @JvmField public val DXGI_SHARED_HANDLE: GpuExportKind = GpuExportKind(DXGI_SHARED_HANDLE_VALUE)
+    /** The `rawValue` of [DXGI_SHARED_HANDLE]. */
+    public const val DXGI_SHARED_HANDLE_VALUE: UInt = 4u
+    /**
+     * A Vulkan or OpenGL opaque memory file descriptor.
+     */
+    @JvmField public val OPAQUE_FD: GpuExportKind = GpuExportKind(OPAQUE_FD_VALUE)
+    /** The `rawValue` of [OPAQUE_FD]. */
+    public const val OPAQUE_FD_VALUE: UInt = 5u
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): GpuExportKind = when (rawValue) { NONE_VALUE -> NONE; IO_SURFACE_VALUE -> IO_SURFACE; DMA_BUF_VALUE -> DMA_BUF; ANDROID_HARDWARE_BUFFER_VALUE -> ANDROID_HARDWARE_BUFFER; DXGI_SHARED_HANDLE_VALUE -> DXGI_SHARED_HANDLE; OPAQUE_FD_VALUE -> OPAQUE_FD; else -> GpuExportKind(rawValue) }
+  }
+}
+/**
+ * A way to share a texture's memory, as a bit in a set.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
+ * See `mln_gpu_export_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class GpuExportKindFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  public infix fun or(other: GpuExportKindFlag): GpuExportKindFlag = of(rawValue or other.rawValue)
+  public infix fun and(other: GpuExportKindFlag): GpuExportKindFlag = of(rawValue and other.rawValue)
+  public operator fun contains(other: GpuExportKindFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "IO_SURFACE", 2uL to "DMA_BUF", 4uL to "ANDROID_HARDWARE_BUFFER", 8uL to "DXGI_SHARED_HANDLE", 16uL to "OPAQUE_FD"))
+  override fun equals(other: Any?): Boolean = other is GpuExportKindFlag && other.rawValue == rawValue
+  override fun hashCode(): Int = rawValue.hashCode()
+  public companion object {
+    /** No flags. */
+    @JvmField public val NONE: GpuExportKindFlag = GpuExportKindFlag(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    @JvmField public val IO_SURFACE: GpuExportKindFlag = GpuExportKindFlag(IO_SURFACE_VALUE)
+    /** The `rawValue` of [IO_SURFACE]. */
+    public const val IO_SURFACE_VALUE: UInt = 1u
+    @JvmField public val DMA_BUF: GpuExportKindFlag = GpuExportKindFlag(DMA_BUF_VALUE)
+    /** The `rawValue` of [DMA_BUF]. */
+    public const val DMA_BUF_VALUE: UInt = 2u
+    @JvmField public val ANDROID_HARDWARE_BUFFER: GpuExportKindFlag = GpuExportKindFlag(ANDROID_HARDWARE_BUFFER_VALUE)
+    /** The `rawValue` of [ANDROID_HARDWARE_BUFFER]. */
+    public const val ANDROID_HARDWARE_BUFFER_VALUE: UInt = 4u
+    @JvmField public val DXGI_SHARED_HANDLE: GpuExportKindFlag = GpuExportKindFlag(DXGI_SHARED_HANDLE_VALUE)
+    /** The `rawValue` of [DXGI_SHARED_HANDLE]. */
+    public const val DXGI_SHARED_HANDLE_VALUE: UInt = 8u
+    @JvmField public val OPAQUE_FD: GpuExportKindFlag = GpuExportKindFlag(OPAQUE_FD_VALUE)
+    /** The `rawValue` of [OPAQUE_FD]. */
+    public const val OPAQUE_FD_VALUE: UInt = 16u
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): GpuExportKindFlag = when (rawValue) { NONE_VALUE -> NONE; IO_SURFACE_VALUE -> IO_SURFACE; DMA_BUF_VALUE -> DMA_BUF; ANDROID_HARDWARE_BUFFER_VALUE -> ANDROID_HARDWARE_BUFFER; DXGI_SHARED_HANDLE_VALUE -> DXGI_SHARED_HANDLE; OPAQUE_FD_VALUE -> OPAQUE_FD; else -> GpuExportKindFlag(rawValue) }
+  }
+}
 /**
  * How one side waits for the other's GPU work on a shared texture.
  *
- * A sync file descriptor or an OpenGL fence signals once, so when `AcquiredFrameHandle.release()`
- * succeeds, the session takes the one you pass. A Vulkan timeline semaphore, Metal shared event, or
- * D3D12 fence counts up with each frame, so the one you pass stays yours. Keep it valid until a
+ * A sync file descriptor or an OpenGL fence signals once, so when
+ * `AcquiredFrameHandle.release()` succeeds, the session takes the one you pass.
+ * A Vulkan timeline semaphore, Metal shared event, or D3D12 fence counts up
+ * with each frame, so the one you pass stays yours. Keep it valid until a
  * detach or release of the session completes.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
@@ -491,73 +544,62 @@ public class GesturePhase(@get:JvmName("getRawValue") public val rawValue: UInt)
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public class GpuSyncKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "CPU_COMPLETE"
-      1u -> "OPEN_GL_FENCE"
-      2u -> "QUEUE_ORDER"
-      3u -> "VULKAN_TIMELINE_SEMAPHORE"
-      4u -> "SYNC_FD"
-      5u -> "METAL_SHARED_EVENT"
-      6u -> "D3D12_FENCE"
-      else -> "GpuSyncKind($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "CPU_COMPLETE"; 1u -> "OPEN_GL_FENCE"; 2u -> "QUEUE_ORDER"; 3u -> "VULKAN_TIMELINE_SEMAPHORE"; 4u -> "SYNC_FD"; 5u -> "METAL_SHARED_EVENT"; 6u -> "D3D12_FENCE"; else -> "GpuSyncKind($rawValue)" }
   override fun equals(other: Any?): Boolean = other is GpuSyncKind && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** The work has already finished, so there is nothing to wait for. */
+    /**
+     * The work has already finished, so there is nothing to wait for.
+     */
     @JvmField public val CPU_COMPLETE: GpuSyncKind = GpuSyncKind(CPU_COMPLETE_VALUE)
     /** The `rawValue` of [CPU_COMPLETE]. */
     public const val CPU_COMPLETE_VALUE: UInt = 0u
-    /** `handle` is a `GLsync` in the session's share group. */
+    /**
+     * `handle` is a `GLsync` in the session's share group.
+     */
     @JvmField public val OPEN_GL_FENCE: GpuSyncKind = GpuSyncKind(OPEN_GL_FENCE_VALUE)
     /** The `rawValue` of [OPEN_GL_FENCE]. */
     public const val OPEN_GL_FENCE_VALUE: UInt = 1u
     /**
-     * The work was submitted to the queue that both sides share, so work submitted to that queue
-     * later runs after it.
+     * The work was submitted to the queue that both sides share, so work
+     * submitted to that queue later runs after it.
      */
     @JvmField public val QUEUE_ORDER: GpuSyncKind = GpuSyncKind(QUEUE_ORDER_VALUE)
     /** The `rawValue` of [QUEUE_ORDER]. */
     public const val QUEUE_ORDER_VALUE: UInt = 2u
-    /** `handle` is a `VkSemaphore`. Wait until it reaches `value`. */
-    @JvmField
-    public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(VULKAN_TIMELINE_SEMAPHORE_VALUE)
+    /**
+     * `handle` is a `VkSemaphore`. Wait until it reaches `value`.
+     */
+    @JvmField public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(VULKAN_TIMELINE_SEMAPHORE_VALUE)
     /** The `rawValue` of [VULKAN_TIMELINE_SEMAPHORE]. */
     public const val VULKAN_TIMELINE_SEMAPHORE_VALUE: UInt = 3u
-    /** `handle` is a sync file descriptor. */
+    /**
+     * `handle` is a sync file descriptor. A descriptor of -1, as Vulkan exports
+     * for a semaphore that has already signaled, counts as
+     * `GpuSyncKind.CPU_COMPLETE`.
+     */
     @JvmField public val SYNC_FD: GpuSyncKind = GpuSyncKind(SYNC_FD_VALUE)
     /** The `rawValue` of [SYNC_FD]. */
     public const val SYNC_FD_VALUE: UInt = 4u
-    /** `handle` is an `MTLSharedEvent`. Wait until it reaches `value`. */
+    /**
+     * `handle` is an `MTLSharedEvent`. Wait until it reaches `value`.
+     */
     @JvmField public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(METAL_SHARED_EVENT_VALUE)
     /** The `rawValue` of [METAL_SHARED_EVENT]. */
     public const val METAL_SHARED_EVENT_VALUE: UInt = 5u
-    /** `handle` is a shared Windows handle to an `ID3D12Fence`. Wait until it reaches `value`. */
+    /**
+     * `handle` is a shared Windows handle to an `ID3D12Fence`. Wait until it
+     * reaches `value`.
+     */
     @JvmField public val D3D12_FENCE: GpuSyncKind = GpuSyncKind(D3D12_FENCE_VALUE)
     /** The `rawValue` of [D3D12_FENCE]. */
     public const val D3D12_FENCE_VALUE: UInt = 6u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): GpuSyncKind =
-      when (rawValue) {
-        CPU_COMPLETE_VALUE -> CPU_COMPLETE
-        OPEN_GL_FENCE_VALUE -> OPEN_GL_FENCE
-        QUEUE_ORDER_VALUE -> QUEUE_ORDER
-        VULKAN_TIMELINE_SEMAPHORE_VALUE -> VULKAN_TIMELINE_SEMAPHORE
-        SYNC_FD_VALUE -> SYNC_FD
-        METAL_SHARED_EVENT_VALUE -> METAL_SHARED_EVENT
-        D3D12_FENCE_VALUE -> D3D12_FENCE
-        else -> GpuSyncKind(rawValue)
-      }
+    public fun of(rawValue: UInt): GpuSyncKind = when (rawValue) { CPU_COMPLETE_VALUE -> CPU_COMPLETE; OPEN_GL_FENCE_VALUE -> OPEN_GL_FENCE; QUEUE_ORDER_VALUE -> QUEUE_ORDER; VULKAN_TIMELINE_SEMAPHORE_VALUE -> VULKAN_TIMELINE_SEMAPHORE; SYNC_FD_VALUE -> SYNC_FD; METAL_SHARED_EVENT_VALUE -> METAL_SHARED_EVENT; D3D12_FENCE_VALUE -> D3D12_FENCE; else -> GpuSyncKind(rawValue) }
   }
 }
-
 /**
  * A GPU sync kind, as a bit in a set.
  *
@@ -568,31 +610,11 @@ public class GpuSyncKind(@get:JvmName("getRawValue") public val rawValue: UInt) 
  */
 public class GpuSyncKindFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
   public infix fun or(other: GpuSyncKindFlag): GpuSyncKindFlag = of(rawValue or other.rawValue)
-
   public infix fun and(other: GpuSyncKindFlag): GpuSyncKindFlag = of(rawValue and other.rawValue)
-
-  public operator fun contains(other: GpuSyncKindFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(
-      rawValue.toULong(),
-      "NONE",
-      listOf(
-        1uL to "CPU_COMPLETE",
-        2uL to "OPEN_GL_FENCE",
-        4uL to "QUEUE_ORDER",
-        8uL to "VULKAN_TIMELINE_SEMAPHORE",
-        16uL to "SYNC_FD",
-        32uL to "METAL_SHARED_EVENT",
-        64uL to "D3D12_FENCE",
-      ),
-    )
-
+  public operator fun contains(other: GpuSyncKindFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "CPU_COMPLETE", 2uL to "OPEN_GL_FENCE", 4uL to "QUEUE_ORDER", 8uL to "VULKAN_TIMELINE_SEMAPHORE", 16uL to "SYNC_FD", 32uL to "METAL_SHARED_EVENT", 64uL to "D3D12_FENCE"))
   override fun equals(other: Any?): Boolean = other is GpuSyncKindFlag && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: GpuSyncKindFlag = GpuSyncKindFlag(NONE_VALUE)
@@ -607,42 +629,24 @@ public class GpuSyncKindFlag(@get:JvmName("getRawValue") public val rawValue: UI
     @JvmField public val QUEUE_ORDER: GpuSyncKindFlag = GpuSyncKindFlag(QUEUE_ORDER_VALUE)
     /** The `rawValue` of [QUEUE_ORDER]. */
     public const val QUEUE_ORDER_VALUE: UInt = 4u
-    @JvmField
-    public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKindFlag =
-      GpuSyncKindFlag(VULKAN_TIMELINE_SEMAPHORE_VALUE)
+    @JvmField public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKindFlag = GpuSyncKindFlag(VULKAN_TIMELINE_SEMAPHORE_VALUE)
     /** The `rawValue` of [VULKAN_TIMELINE_SEMAPHORE]. */
     public const val VULKAN_TIMELINE_SEMAPHORE_VALUE: UInt = 8u
     @JvmField public val SYNC_FD: GpuSyncKindFlag = GpuSyncKindFlag(SYNC_FD_VALUE)
     /** The `rawValue` of [SYNC_FD]. */
     public const val SYNC_FD_VALUE: UInt = 16u
-    @JvmField
-    public val METAL_SHARED_EVENT: GpuSyncKindFlag = GpuSyncKindFlag(METAL_SHARED_EVENT_VALUE)
+    @JvmField public val METAL_SHARED_EVENT: GpuSyncKindFlag = GpuSyncKindFlag(METAL_SHARED_EVENT_VALUE)
     /** The `rawValue` of [METAL_SHARED_EVENT]. */
     public const val METAL_SHARED_EVENT_VALUE: UInt = 32u
     @JvmField public val D3D12_FENCE: GpuSyncKindFlag = GpuSyncKindFlag(D3D12_FENCE_VALUE)
     /** The `rawValue` of [D3D12_FENCE]. */
     public const val D3D12_FENCE_VALUE: UInt = 64u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): GpuSyncKindFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        CPU_COMPLETE_VALUE -> CPU_COMPLETE
-        OPEN_GL_FENCE_VALUE -> OPEN_GL_FENCE
-        QUEUE_ORDER_VALUE -> QUEUE_ORDER
-        VULKAN_TIMELINE_SEMAPHORE_VALUE -> VULKAN_TIMELINE_SEMAPHORE
-        SYNC_FD_VALUE -> SYNC_FD
-        METAL_SHARED_EVENT_VALUE -> METAL_SHARED_EVENT
-        D3D12_FENCE_VALUE -> D3D12_FENCE
-        else -> GpuSyncKindFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): GpuSyncKindFlag = when (rawValue) { NONE_VALUE -> NONE; CPU_COMPLETE_VALUE -> CPU_COMPLETE; OPEN_GL_FENCE_VALUE -> OPEN_GL_FENCE; QUEUE_ORDER_VALUE -> QUEUE_ORDER; VULKAN_TIMELINE_SEMAPHORE_VALUE -> VULKAN_TIMELINE_SEMAPHORE; SYNC_FD_VALUE -> SYNC_FD; METAL_SHARED_EVENT_VALUE -> METAL_SHARED_EVENT; D3D12_FENCE_VALUE -> D3D12_FENCE; else -> GpuSyncKindFlag(rawValue) }
   }
 }
-
 /**
  * The part of the library that logged a message.
  *
@@ -652,32 +656,9 @@ public class GpuSyncKindFlag(@get:JvmName("getRawValue") public val rawValue: UI
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public class LogEvent(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "GENERAL"
-      1u -> "SETUP"
-      2u -> "SHADER"
-      3u -> "PARSE_STYLE"
-      4u -> "PARSE_TILE"
-      5u -> "RENDER"
-      6u -> "STYLE"
-      7u -> "DATABASE"
-      8u -> "HTTP_REQUEST"
-      9u -> "SPRITE"
-      10u -> "IMAGE"
-      11u -> "GRAPHICS_BACKEND"
-      12u -> "JNI"
-      13u -> "ANDROID"
-      14u -> "CRASH"
-      15u -> "GLYPH"
-      16u -> "TIMING"
-      else -> "LogEvent($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "GENERAL"; 1u -> "SETUP"; 2u -> "SHADER"; 3u -> "PARSE_STYLE"; 4u -> "PARSE_TILE"; 5u -> "RENDER"; 6u -> "STYLE"; 7u -> "DATABASE"; 8u -> "HTTP_REQUEST"; 9u -> "SPRITE"; 10u -> "IMAGE"; 11u -> "GRAPHICS_BACKEND"; 12u -> "JNI"; 13u -> "ANDROID"; 14u -> "CRASH"; 15u -> "GLYPH"; 16u -> "TIMING"; else -> "LogEvent($rawValue)" }
   override fun equals(other: Any?): Boolean = other is LogEvent && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val GENERAL: LogEvent = LogEvent(GENERAL_VALUE)
     /** The `rawValue` of [GENERAL]. */
@@ -730,34 +711,12 @@ public class LogEvent(@get:JvmName("getRawValue") public val rawValue: UInt) {
     @JvmField public val TIMING: LogEvent = LogEvent(TIMING_VALUE)
     /** The `rawValue` of [TIMING]. */
     public const val TIMING_VALUE: UInt = 16u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): LogEvent =
-      when (rawValue) {
-        GENERAL_VALUE -> GENERAL
-        SETUP_VALUE -> SETUP
-        SHADER_VALUE -> SHADER
-        PARSE_STYLE_VALUE -> PARSE_STYLE
-        PARSE_TILE_VALUE -> PARSE_TILE
-        RENDER_VALUE -> RENDER
-        STYLE_VALUE -> STYLE
-        DATABASE_VALUE -> DATABASE
-        HTTP_REQUEST_VALUE -> HTTP_REQUEST
-        SPRITE_VALUE -> SPRITE
-        IMAGE_VALUE -> IMAGE
-        GRAPHICS_BACKEND_VALUE -> GRAPHICS_BACKEND
-        JNI_VALUE -> JNI
-        ANDROID_VALUE -> ANDROID
-        CRASH_VALUE -> CRASH
-        GLYPH_VALUE -> GLYPH
-        TIMING_VALUE -> TIMING
-        else -> LogEvent(rawValue)
-      }
+    public fun of(rawValue: UInt): LogEvent = when (rawValue) { GENERAL_VALUE -> GENERAL; SETUP_VALUE -> SETUP; SHADER_VALUE -> SHADER; PARSE_STYLE_VALUE -> PARSE_STYLE; PARSE_TILE_VALUE -> PARSE_TILE; RENDER_VALUE -> RENDER; STYLE_VALUE -> STYLE; DATABASE_VALUE -> DATABASE; HTTP_REQUEST_VALUE -> HTTP_REQUEST; SPRITE_VALUE -> SPRITE; IMAGE_VALUE -> IMAGE; GRAPHICS_BACKEND_VALUE -> GRAPHICS_BACKEND; JNI_VALUE -> JNI; ANDROID_VALUE -> ANDROID; CRASH_VALUE -> CRASH; GLYPH_VALUE -> GLYPH; TIMING_VALUE -> TIMING; else -> LogEvent(rawValue) }
   }
 }
-
 /**
  * The severity of a log message.
  *
@@ -767,18 +726,9 @@ public class LogEvent(@get:JvmName("getRawValue") public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public class LogSeverity(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      1u -> "INFO"
-      2u -> "WARNING"
-      3u -> "ERROR"
-      else -> "LogSeverity($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 1u -> "INFO"; 2u -> "WARNING"; 3u -> "ERROR"; else -> "LogSeverity($rawValue)" }
   override fun equals(other: Any?): Boolean = other is LogSeverity && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val INFO: LogSeverity = LogSeverity(INFO_VALUE)
     /** The `rawValue` of [INFO]. */
@@ -789,20 +739,12 @@ public class LogSeverity(@get:JvmName("getRawValue") public val rawValue: UInt) 
     @JvmField public val ERROR: LogSeverity = LogSeverity(ERROR_VALUE)
     /** The `rawValue` of [ERROR]. */
     public const val ERROR_VALUE: UInt = 3u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): LogSeverity =
-      when (rawValue) {
-        INFO_VALUE -> INFO
-        WARNING_VALUE -> WARNING
-        ERROR_VALUE -> ERROR
-        else -> LogSeverity(rawValue)
-      }
+    public fun of(rawValue: UInt): LogSeverity = when (rawValue) { INFO_VALUE -> INFO; WARNING_VALUE -> WARNING; ERROR_VALUE -> ERROR; else -> LogSeverity(rawValue) }
   }
 }
-
 /**
  * A log severity, as a bit in a set.
  *
@@ -813,19 +755,11 @@ public class LogSeverity(@get:JvmName("getRawValue") public val rawValue: UInt) 
  */
 public class LogSeverityFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
   public infix fun or(other: LogSeverityFlag): LogSeverityFlag = of(rawValue or other.rawValue)
-
   public infix fun and(other: LogSeverityFlag): LogSeverityFlag = of(rawValue and other.rawValue)
-
-  public operator fun contains(other: LogSeverityFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(rawValue.toULong(), "NONE", listOf(2uL to "INFO", 4uL to "WARNING", 8uL to "ERROR"))
-
+  public operator fun contains(other: LogSeverityFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(2uL to "INFO", 4uL to "WARNING", 8uL to "ERROR"))
   override fun equals(other: Any?): Boolean = other is LogSeverityFlag && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: LogSeverityFlag = LogSeverityFlag(NONE_VALUE)
@@ -841,7 +775,8 @@ public class LogSeverityFlag(@get:JvmName("getRawValue") public val rawValue: UI
     /** The `rawValue` of [ERROR]. */
     public const val ERROR_VALUE: UInt = 8u
     /**
-     * The severities logged on a background thread until `setLogAsyncSeverityMask()` changes them.
+     * The severities logged on a background thread until
+     * `setLogAsyncSeverityMask()` changes them.
      */
     @JvmField public val DEFAULT: LogSeverityFlag = LogSeverityFlag(DEFAULT_VALUE)
     /** The `rawValue` of [DEFAULT]. */
@@ -849,25 +784,12 @@ public class LogSeverityFlag(@get:JvmName("getRawValue") public val rawValue: UI
     @JvmField public val ALL: LogSeverityFlag = LogSeverityFlag(ALL_VALUE)
     /** The `rawValue` of [ALL]. */
     public const val ALL_VALUE: UInt = 14u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): LogSeverityFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        INFO_VALUE -> INFO
-        WARNING_VALUE -> WARNING
-        ERROR_VALUE -> ERROR
-        DEFAULT_VALUE -> DEFAULT
-        ALL_VALUE -> ALL
-        else -> LogSeverityFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): LogSeverityFlag = when (rawValue) { NONE_VALUE -> NONE; INFO_VALUE -> INFO; WARNING_VALUE -> WARNING; ERROR_VALUE -> ERROR; DEFAULT_VALUE -> DEFAULT; ALL_VALUE -> ALL; else -> LogSeverityFlag(rawValue) }
   }
 }
-
 /**
  * A debug overlay that the map draws.
  *
@@ -878,31 +800,11 @@ public class LogSeverityFlag(@get:JvmName("getRawValue") public val rawValue: UI
  */
 public class MapDebugFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
   public infix fun or(other: MapDebugFlag): MapDebugFlag = of(rawValue or other.rawValue)
-
   public infix fun and(other: MapDebugFlag): MapDebugFlag = of(rawValue and other.rawValue)
-
-  public operator fun contains(other: MapDebugFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(
-      rawValue.toULong(),
-      "NONE",
-      listOf(
-        2uL to "TILE_BORDERS",
-        4uL to "PARSE_STATUS",
-        8uL to "TIMESTAMPS",
-        16uL to "COLLISION",
-        32uL to "OVERDRAW",
-        64uL to "STENCIL_CLIP",
-        128uL to "DEPTH_BUFFER",
-      ),
-    )
-
+  public operator fun contains(other: MapDebugFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(2uL to "TILE_BORDERS", 4uL to "PARSE_STATUS", 8uL to "TIMESTAMPS", 16uL to "COLLISION", 32uL to "OVERDRAW", 64uL to "STENCIL_CLIP", 128uL to "DEPTH_BUFFER"))
   override fun equals(other: Any?): Boolean = other is MapDebugFlag && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: MapDebugFlag = MapDebugFlag(NONE_VALUE)
@@ -929,27 +831,12 @@ public class MapDebugFlag(@get:JvmName("getRawValue") public val rawValue: UInt)
     @JvmField public val DEPTH_BUFFER: MapDebugFlag = MapDebugFlag(DEPTH_BUFFER_VALUE)
     /** The `rawValue` of [DEPTH_BUFFER]. */
     public const val DEPTH_BUFFER_VALUE: UInt = 128u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): MapDebugFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        TILE_BORDERS_VALUE -> TILE_BORDERS
-        PARSE_STATUS_VALUE -> PARSE_STATUS
-        TIMESTAMPS_VALUE -> TIMESTAMPS
-        COLLISION_VALUE -> COLLISION
-        OVERDRAW_VALUE -> OVERDRAW
-        STENCIL_CLIP_VALUE -> STENCIL_CLIP
-        DEPTH_BUFFER_VALUE -> DEPTH_BUFFER
-        else -> MapDebugFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): MapDebugFlag = when (rawValue) { NONE_VALUE -> NONE; TILE_BORDERS_VALUE -> TILE_BORDERS; PARSE_STATUS_VALUE -> PARSE_STATUS; TIMESTAMPS_VALUE -> TIMESTAMPS; COLLISION_VALUE -> COLLISION; OVERDRAW_VALUE -> OVERDRAW; STENCIL_CLIP_VALUE -> STENCIL_CLIP; DEPTH_BUFFER_VALUE -> DEPTH_BUFFER; else -> MapDebugFlag(rawValue) }
   }
 }
-
 /**
  * Why a map failed to load a style.
  *
@@ -959,44 +846,31 @@ public class MapDebugFlag(@get:JvmName("getRawValue") public val rawValue: UInt)
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class MapLoadError(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "UNKNOWN"
-      1u -> "STYLE_PARSE"
-      2u -> "STYLE_LOAD"
-      else -> "MapLoadError($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "UNKNOWN"; 1u -> "STYLE_PARSE"; 2u -> "STYLE_LOAD"; else -> "MapLoadError($rawValue)" }
   override fun equals(other: Any?): Boolean = other is MapLoadError && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val UNKNOWN: MapLoadError = MapLoadError(UNKNOWN_VALUE)
     /** The `rawValue` of [UNKNOWN]. */
     public const val UNKNOWN_VALUE: UInt = 0u
-    /** The style document isn't a valid style. */
+    /**
+     * The style document isn't a valid style.
+     */
     @JvmField public val STYLE_PARSE: MapLoadError = MapLoadError(STYLE_PARSE_VALUE)
     /** The `rawValue` of [STYLE_PARSE]. */
     public const val STYLE_PARSE_VALUE: UInt = 1u
-    /** The style's request failed, such as with a 404 or a missing file. */
+    /**
+     * The style's request failed, such as with a 404 or a missing file.
+     */
     @JvmField public val STYLE_LOAD: MapLoadError = MapLoadError(STYLE_LOAD_VALUE)
     /** The `rawValue` of [STYLE_LOAD]. */
     public const val STYLE_LOAD_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): MapLoadError =
-      when (rawValue) {
-        UNKNOWN_VALUE -> UNKNOWN
-        STYLE_PARSE_VALUE -> STYLE_PARSE
-        STYLE_LOAD_VALUE -> STYLE_LOAD
-        else -> MapLoadError(rawValue)
-      }
+    public fun of(rawValue: UInt): MapLoadError = when (rawValue) { UNKNOWN_VALUE -> UNKNOWN; STYLE_PARSE_VALUE -> STYLE_PARSE; STYLE_LOAD_VALUE -> STYLE_LOAD; else -> MapLoadError(rawValue) }
   }
 }
-
 /**
  * When a map renders.
  *
@@ -1006,45 +880,34 @@ public class MapLoadError(@get:JvmName("getRawValue") public val rawValue: UInt)
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class MapMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "CONTINUOUS"
-      1u -> "STATIC"
-      2u -> "TILE"
-      else -> "MapMode($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "CONTINUOUS"; 1u -> "STATIC"; 2u -> "TILE"; else -> "MapMode($rawValue)" }
   override fun equals(other: Any?): Boolean = other is MapMode && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** Renders whenever the map changes. */
+    /**
+     * Renders whenever the map changes.
+     */
     @JvmField public val CONTINUOUS: MapMode = MapMode(CONTINUOUS_VALUE)
     /** The `rawValue` of [CONTINUOUS]. */
     public const val CONTINUOUS_VALUE: UInt = 0u
-    /** Renders only when `MapHandle.requestStillImage()` asks for an image. */
+    /**
+     * Renders only when `MapHandle.requestStillImage()` asks for an image.
+     */
     @JvmField public val STATIC: MapMode = MapMode(STATIC_VALUE)
     /** The `rawValue` of [STATIC]. */
     public const val STATIC_VALUE: UInt = 1u
-    /** Renders still images of single tiles, as `MapMode.STATIC` does. */
+    /**
+     * Renders still images of single tiles, as `MapMode.STATIC` does.
+     */
     @JvmField public val TILE: MapMode = MapMode(TILE_VALUE)
     /** The `rawValue` of [TILE]. */
     public const val TILE_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): MapMode =
-      when (rawValue) {
-        CONTINUOUS_VALUE -> CONTINUOUS
-        STATIC_VALUE -> STATIC
-        TILE_VALUE -> TILE
-        else -> MapMode(rawValue)
-      }
+    public fun of(rawValue: UInt): MapMode = when (rawValue) { CONTINUOUS_VALUE -> CONTINUOUS; STATIC_VALUE -> STATIC; TILE_VALUE -> TILE; else -> MapMode(rawValue) }
   }
 }
-
 /**
  * How a part of a gesture's momentum slows from its release speed.
  *
@@ -1054,47 +917,32 @@ public class MapMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "FRICTION"
-      1u -> "EASE"
-      else -> "MomentumDecayModel($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is MomentumDecayModel && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "FRICTION"; 1u -> "EASE"; else -> "MomentumDecayModel($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is MomentumDecayModel && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /**
-     * The speed halves every `half_life_ms`, until it drops to `stop_speed`. UIScrollView's normal
-     * deceleration is a half-life of 346 ms, and its fast deceleration 69 ms.
+     * The speed halves every `half_life_ms`, until it drops to `stop_speed`.
+     * UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
+     * deceleration 69 ms.
      */
     @JvmField public val FRICTION: MomentumDecayModel = MomentumDecayModel(FRICTION_VALUE)
     /** The `rawValue` of [FRICTION]. */
     public const val FRICTION_VALUE: UInt = 0u
     /**
-     * The part eases `distance` over `duration_ms`, along `easing`, as a camera animation does. The
-     * caller plans the glide, for example from the platform's own fling physics, such as Android's
-     * OverScroller.
+     * The part eases `distance` over `duration_ms`, along `easing`, as a camera
+     * animation does. The caller plans the glide, for example from the
+     * platform's own fling physics, such as Android's OverScroller.
      */
     @JvmField public val EASE: MomentumDecayModel = MomentumDecayModel(EASE_VALUE)
     /** The `rawValue` of [EASE]. */
     public const val EASE_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): MomentumDecayModel =
-      when (rawValue) {
-        FRICTION_VALUE -> FRICTION
-        EASE_VALUE -> EASE
-        else -> MomentumDecayModel(rawValue)
-      }
+    public fun of(rawValue: UInt): MomentumDecayModel = when (rawValue) { FRICTION_VALUE -> FRICTION; EASE_VALUE -> EASE; else -> MomentumDecayModel(rawValue) }
   }
 }
-
 /**
  * Whether the library may use the network.
  *
@@ -1104,17 +952,9 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class NetworkStatus(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      1u -> "ONLINE"
-      2u -> "OFFLINE"
-      else -> "NetworkStatus($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 1u -> "ONLINE"; 2u -> "OFFLINE"; else -> "NetworkStatus($rawValue)" }
   override fun equals(other: Any?): Boolean = other is NetworkStatus && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val ONLINE: NetworkStatus = NetworkStatus(ONLINE_VALUE)
     /** The `rawValue` of [ONLINE]. */
@@ -1122,19 +962,12 @@ public class NetworkStatus(@get:JvmName("getRawValue") public val rawValue: UInt
     @JvmField public val OFFLINE: NetworkStatus = NetworkStatus(OFFLINE_VALUE)
     /** The `rawValue` of [OFFLINE]. */
     public const val OFFLINE_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): NetworkStatus =
-      when (rawValue) {
-        ONLINE_VALUE -> ONLINE
-        OFFLINE_VALUE -> OFFLINE
-        else -> NetworkStatus(rawValue)
-      }
+    public fun of(rawValue: UInt): NetworkStatus = when (rawValue) { ONLINE_VALUE -> ONLINE; OFFLINE_VALUE -> OFFLINE; else -> NetworkStatus(rawValue) }
   }
 }
-
 /**
  * The screen direction that north points to when the bearing is 0.
  *
@@ -1144,20 +977,9 @@ public class NetworkStatus(@get:JvmName("getRawValue") public val rawValue: UInt
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class NorthOrientation(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "UP"
-      1u -> "RIGHT"
-      2u -> "DOWN"
-      3u -> "LEFT"
-      else -> "NorthOrientation($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is NorthOrientation && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "UP"; 1u -> "RIGHT"; 2u -> "DOWN"; 3u -> "LEFT"; else -> "NorthOrientation($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is NorthOrientation && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val UP: NorthOrientation = NorthOrientation(UP_VALUE)
     /** The `rawValue` of [UP]. */
@@ -1171,21 +993,12 @@ public class NorthOrientation(@get:JvmName("getRawValue") public val rawValue: U
     @JvmField public val LEFT: NorthOrientation = NorthOrientation(LEFT_VALUE)
     /** The `rawValue` of [LEFT]. */
     public const val LEFT_VALUE: UInt = 3u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): NorthOrientation =
-      when (rawValue) {
-        UP_VALUE -> UP
-        RIGHT_VALUE -> RIGHT
-        DOWN_VALUE -> DOWN
-        LEFT_VALUE -> LEFT
-        else -> NorthOrientation(rawValue)
-      }
+    public fun of(rawValue: UInt): NorthOrientation = when (rawValue) { UP_VALUE -> UP; RIGHT_VALUE -> RIGHT; DOWN_VALUE -> DOWN; LEFT_VALUE -> LEFT; else -> NorthOrientation(rawValue) }
   }
 }
-
 /**
  * Whether an offline region is downloading.
  *
@@ -1195,40 +1008,22 @@ public class NorthOrientation(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class OfflineRegionDownloadState(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "INACTIVE"
-      1u -> "ACTIVE"
-      else -> "OfflineRegionDownloadState($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is OfflineRegionDownloadState && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "INACTIVE"; 1u -> "ACTIVE"; else -> "OfflineRegionDownloadState($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is OfflineRegionDownloadState && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    @JvmField
-    public val INACTIVE: OfflineRegionDownloadState = OfflineRegionDownloadState(INACTIVE_VALUE)
+    @JvmField public val INACTIVE: OfflineRegionDownloadState = OfflineRegionDownloadState(INACTIVE_VALUE)
     /** The `rawValue` of [INACTIVE]. */
     public const val INACTIVE_VALUE: UInt = 0u
-    @JvmField
-    public val ACTIVE: OfflineRegionDownloadState = OfflineRegionDownloadState(ACTIVE_VALUE)
+    @JvmField public val ACTIVE: OfflineRegionDownloadState = OfflineRegionDownloadState(ACTIVE_VALUE)
     /** The `rawValue` of [ACTIVE]. */
     public const val ACTIVE_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): OfflineRegionDownloadState =
-      when (rawValue) {
-        INACTIVE_VALUE -> INACTIVE
-        ACTIVE_VALUE -> ACTIVE
-        else -> OfflineRegionDownloadState(rawValue)
-      }
+    public fun of(rawValue: UInt): OfflineRegionDownloadState = when (rawValue) { INACTIVE_VALUE -> INACTIVE; ACTIVE_VALUE -> ACTIVE; else -> OfflineRegionDownloadState(rawValue) }
   }
 }
-
 /**
  * The OpenGL API that a context renders with.
  *
@@ -1238,18 +1033,9 @@ public class OfflineRegionDownloadState(@get:JvmName("getRawValue") public val r
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public class OpenGlClientApi(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "UNSPECIFIED"
-      1u -> "GL"
-      2u -> "GLES"
-      else -> "OpenGlClientApi($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "UNSPECIFIED"; 1u -> "GL"; 2u -> "GLES"; else -> "OpenGlClientApi($rawValue)" }
   override fun equals(other: Any?): Boolean = other is OpenGlClientApi && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val UNSPECIFIED: OpenGlClientApi = OpenGlClientApi(UNSPECIFIED_VALUE)
     /** The `rawValue` of [UNSPECIFIED]. */
@@ -1260,63 +1046,12 @@ public class OpenGlClientApi(@get:JvmName("getRawValue") public val rawValue: UI
     @JvmField public val GLES: OpenGlClientApi = OpenGlClientApi(GLES_VALUE)
     /** The `rawValue` of [GLES]. */
     public const val GLES_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): OpenGlClientApi =
-      when (rawValue) {
-        UNSPECIFIED_VALUE -> UNSPECIFIED
-        GL_VALUE -> GL
-        GLES_VALUE -> GLES
-        else -> OpenGlClientApi(rawValue)
-      }
+    public fun of(rawValue: UInt): OpenGlClientApi = when (rawValue) { UNSPECIFIED_VALUE -> UNSPECIFIED; GL_VALUE -> GL; GLES_VALUE -> GLES; else -> OpenGlClientApi(rawValue) }
   }
 }
-
-/**
- * Whether a render session's OpenGL context shares objects with yours.
- *
- * Later versions may add values; an unknown one keeps its `rawValue`.
- *
- * See `mln_open_gl_context_ownership` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public class OpenGlContextOwnership(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "SHARED"
-      1u -> "DEDICATED"
-      else -> "OpenGlContextOwnership($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is OpenGlContextOwnership && other.rawValue == rawValue
-
-  override fun hashCode(): Int = rawValue.hashCode()
-
-  public companion object {
-    /** The session's context shares objects with your `share_context`. */
-    @JvmField public val SHARED: OpenGlContextOwnership = OpenGlContextOwnership(SHARED_VALUE)
-    /** The `rawValue` of [SHARED]. */
-    public const val SHARED_VALUE: UInt = 0u
-    /** The session's context shares objects with no other context. */
-    @JvmField public val DEDICATED: OpenGlContextOwnership = OpenGlContextOwnership(DEDICATED_VALUE)
-    /** The `rawValue` of [DEDICATED]. */
-    public const val DEDICATED_VALUE: UInt = 1u
-
-    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
-    @JvmStatic
-    @JvmName("of")
-    public fun of(rawValue: UInt): OpenGlContextOwnership =
-      when (rawValue) {
-        SHARED_VALUE -> SHARED
-        DEDICATED_VALUE -> DEDICATED
-        else -> OpenGlContextOwnership(rawValue)
-      }
-  }
-}
-
 /**
  * An OpenGL context platform, as a bit in a set.
  *
@@ -1326,23 +1061,12 @@ public class OpenGlContextOwnership(@get:JvmName("getRawValue") public val rawVa
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public class OpenGlContextProviderFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  public infix fun or(other: OpenGlContextProviderFlag): OpenGlContextProviderFlag =
-    of(rawValue or other.rawValue)
-
-  public infix fun and(other: OpenGlContextProviderFlag): OpenGlContextProviderFlag =
-    of(rawValue and other.rawValue)
-
-  public operator fun contains(other: OpenGlContextProviderFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "WGL", 2uL to "EGL", 4uL to "WEB_GL"))
-
-  override fun equals(other: Any?): Boolean =
-    other is OpenGlContextProviderFlag && other.rawValue == rawValue
-
+  public infix fun or(other: OpenGlContextProviderFlag): OpenGlContextProviderFlag = of(rawValue or other.rawValue)
+  public infix fun and(other: OpenGlContextProviderFlag): OpenGlContextProviderFlag = of(rawValue and other.rawValue)
+  public operator fun contains(other: OpenGlContextProviderFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "WGL", 2uL to "EGL", 4uL to "WEB_GL"))
+  override fun equals(other: Any?): Boolean = other is OpenGlContextProviderFlag && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: OpenGlContextProviderFlag = OpenGlContextProviderFlag(NONE_VALUE)
@@ -1357,26 +1081,16 @@ public class OpenGlContextProviderFlag(@get:JvmName("getRawValue") public val ra
     @JvmField public val WEB_GL: OpenGlContextProviderFlag = OpenGlContextProviderFlag(WEB_GL_VALUE)
     /** The `rawValue` of [WEB_GL]. */
     public const val WEB_GL_VALUE: UInt = 4u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): OpenGlContextProviderFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        WGL_VALUE -> WGL
-        EGL_VALUE -> EGL
-        WEB_GL_VALUE -> WEB_GL
-        else -> OpenGlContextProviderFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): OpenGlContextProviderFlag = when (rawValue) { NONE_VALUE -> NONE; WGL_VALUE -> WGL; EGL_VALUE -> EGL; WEB_GL_VALUE -> WEB_GL; else -> OpenGlContextProviderFlag(rawValue) }
   }
 }
-
 /**
  * A projection that a style's
- * &#91;projection&#93;(https://maplibre.org/maplibre-style-spec/projection/) names.
+ * &#91;projection&#93;(https://maplibre.org/maplibre-style-spec/projection/)
+ * names.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -1384,45 +1098,32 @@ public class OpenGlContextProviderFlag(@get:JvmName("getRawValue") public val ra
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class ProjectionType(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "MERCATOR"
-      1u -> "VERTICAL_PERSPECTIVE"
-      2u -> "GLOBE"
-      else -> "ProjectionType($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "MERCATOR"; 1u -> "VERTICAL_PERSPECTIVE"; 2u -> "GLOBE"; else -> "ProjectionType($rawValue)" }
   override fun equals(other: Any?): Boolean = other is ProjectionType && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val MERCATOR: ProjectionType = ProjectionType(MERCATOR_VALUE)
     /** The `rawValue` of [MERCATOR]. */
     public const val MERCATOR_VALUE: UInt = 0u
-    /** Draws the map as a globe. */
-    @JvmField
-    public val VERTICAL_PERSPECTIVE: ProjectionType = ProjectionType(VERTICAL_PERSPECTIVE_VALUE)
+    /**
+     * Draws the map as a globe.
+     */
+    @JvmField public val VERTICAL_PERSPECTIVE: ProjectionType = ProjectionType(VERTICAL_PERSPECTIVE_VALUE)
     /** The `rawValue` of [VERTICAL_PERSPECTIVE]. */
     public const val VERTICAL_PERSPECTIVE_VALUE: UInt = 1u
-    /** Draws the map as a globe at low zooms, and hands over to Mercator between zoom 11 and 12. */
+    /**
+     * Draws the map as a globe at low zooms, and hands over to Mercator between
+     * zoom 11 and 12.
+     */
     @JvmField public val GLOBE: ProjectionType = ProjectionType(GLOBE_VALUE)
     /** The `rawValue` of [GLOBE]. */
     public const val GLOBE_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ProjectionType =
-      when (rawValue) {
-        MERCATOR_VALUE -> MERCATOR
-        VERTICAL_PERSPECTIVE_VALUE -> VERTICAL_PERSPECTIVE
-        GLOBE_VALUE -> GLOBE
-        else -> ProjectionType(rawValue)
-      }
+    public fun of(rawValue: UInt): ProjectionType = when (rawValue) { MERCATOR_VALUE -> MERCATOR; VERTICAL_PERSPECTIVE_VALUE -> VERTICAL_PERSPECTIVE; GLOBE_VALUE -> GLOBE; else -> ProjectionType(rawValue) }
   }
 }
-
 /**
  * What `RenderSessionHandle.abandon()` did with a session's graphics objects.
  *
@@ -1432,43 +1133,57 @@ public class ProjectionType(@get:JvmName("getRawValue") public val rawValue: UIn
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public class RenderAbandonDisposition(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "CLEAN"
-      1u -> "QUARANTINED"
-      else -> "RenderAbandonDisposition($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is RenderAbandonDisposition && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "CLEAN"; 1u -> "QUARANTINED"; else -> "RenderAbandonDisposition($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is RenderAbandonDisposition && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val CLEAN: RenderAbandonDisposition = RenderAbandonDisposition(CLEAN_VALUE)
     /** The `rawValue` of [CLEAN]. */
     public const val CLEAN_VALUE: UInt = 0u
     /**
-     * It kept some objects that it couldn't destroy safely. They stay allocated until the process
-     * exits.
+     * It kept some objects that it couldn't destroy safely. They stay allocated
+     * until the process exits.
      */
-    @JvmField
-    public val QUARANTINED: RenderAbandonDisposition = RenderAbandonDisposition(QUARANTINED_VALUE)
+    @JvmField public val QUARANTINED: RenderAbandonDisposition = RenderAbandonDisposition(QUARANTINED_VALUE)
     /** The `rawValue` of [QUARANTINED]. */
     public const val QUARANTINED_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RenderAbandonDisposition =
-      when (rawValue) {
-        CLEAN_VALUE -> CLEAN
-        QUARANTINED_VALUE -> QUARANTINED
-        else -> RenderAbandonDisposition(rawValue)
-      }
+    public fun of(rawValue: UInt): RenderAbandonDisposition = when (rawValue) { CLEAN_VALUE -> CLEAN; QUARANTINED_VALUE -> QUARANTINED; else -> RenderAbandonDisposition(rawValue) }
   }
 }
-
+/**
+ * A render backend.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_render_backend` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+public class RenderBackend(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String = when (rawValue) { 1u -> "METAL"; 2u -> "VULKAN"; 3u -> "OPEN_GL"; 4u -> "WEB_GPU"; else -> "RenderBackend($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is RenderBackend && other.rawValue == rawValue
+  override fun hashCode(): Int = rawValue.hashCode()
+  public companion object {
+    @JvmField public val METAL: RenderBackend = RenderBackend(METAL_VALUE)
+    /** The `rawValue` of [METAL]. */
+    public const val METAL_VALUE: UInt = 1u
+    @JvmField public val VULKAN: RenderBackend = RenderBackend(VULKAN_VALUE)
+    /** The `rawValue` of [VULKAN]. */
+    public const val VULKAN_VALUE: UInt = 2u
+    @JvmField public val OPEN_GL: RenderBackend = RenderBackend(OPEN_GL_VALUE)
+    /** The `rawValue` of [OPEN_GL]. */
+    public const val OPEN_GL_VALUE: UInt = 3u
+    @JvmField public val WEB_GPU: RenderBackend = RenderBackend(WEB_GPU_VALUE)
+    /** The `rawValue` of [WEB_GPU]. */
+    public const val WEB_GPU_VALUE: UInt = 4u
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): RenderBackend = when (rawValue) { METAL_VALUE -> METAL; VULKAN_VALUE -> VULKAN; OPEN_GL_VALUE -> OPEN_GL; WEB_GPU_VALUE -> WEB_GPU; else -> RenderBackend(rawValue) }
+  }
+}
 /**
  * A render backend, as a bit in a set.
  *
@@ -1479,25 +1194,11 @@ public class RenderAbandonDisposition(@get:JvmName("getRawValue") public val raw
  */
 public class RenderBackendFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
   public infix fun or(other: RenderBackendFlag): RenderBackendFlag = of(rawValue or other.rawValue)
-
-  public infix fun and(other: RenderBackendFlag): RenderBackendFlag =
-    of(rawValue and other.rawValue)
-
-  public operator fun contains(other: RenderBackendFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(
-      rawValue.toULong(),
-      "NONE",
-      listOf(1uL to "METAL", 2uL to "VULKAN", 4uL to "OPEN_GL", 8uL to "WEB_GPU"),
-    )
-
-  override fun equals(other: Any?): Boolean =
-    other is RenderBackendFlag && other.rawValue == rawValue
-
+  public infix fun and(other: RenderBackendFlag): RenderBackendFlag = of(rawValue and other.rawValue)
+  public operator fun contains(other: RenderBackendFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "METAL", 2uL to "VULKAN", 4uL to "OPEN_GL", 8uL to "WEB_GPU"))
+  override fun equals(other: Any?): Boolean = other is RenderBackendFlag && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: RenderBackendFlag = RenderBackendFlag(NONE_VALUE)
@@ -1515,24 +1216,12 @@ public class RenderBackendFlag(@get:JvmName("getRawValue") public val rawValue: 
     @JvmField public val WEB_GPU: RenderBackendFlag = RenderBackendFlag(WEB_GPU_VALUE)
     /** The `rawValue` of [WEB_GPU]. */
     public const val WEB_GPU_VALUE: UInt = 8u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RenderBackendFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        METAL_VALUE -> METAL
-        VULKAN_VALUE -> VULKAN
-        OPEN_GL_VALUE -> OPEN_GL
-        WEB_GPU_VALUE -> WEB_GPU
-        else -> RenderBackendFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): RenderBackendFlag = when (rawValue) { NONE_VALUE -> NONE; METAL_VALUE -> METAL; VULKAN_VALUE -> VULKAN; OPEN_GL_VALUE -> OPEN_GL; WEB_GPU_VALUE -> WEB_GPU; else -> RenderBackendFlag(rawValue) }
   }
 }
-
 /**
  * The thread that runs a render session's graphics work.
  *
@@ -1542,44 +1231,31 @@ public class RenderBackendFlag(@get:JvmName("getRawValue") public val rawValue: 
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public class RenderDriverKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      1u -> "CORE_WORKER"
-      2u -> "CALLER_GRAPHICS_THREAD"
-      else -> "RenderDriverKind($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is RenderDriverKind && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 1u -> "CORE_WORKER"; 2u -> "CALLER_GRAPHICS_THREAD"; else -> "RenderDriverKind($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is RenderDriverKind && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** A library thread. */
+    /**
+     * A library thread.
+     */
     @JvmField public val CORE_WORKER: RenderDriverKind = RenderDriverKind(CORE_WORKER_VALUE)
     /** The `rawValue` of [CORE_WORKER]. */
     public const val CORE_WORKER_VALUE: UInt = 1u
-    /** Your thread, when it calls `RenderSessionHandle.serviceDriverWork()`. */
-    @JvmField
-    public val CALLER_GRAPHICS_THREAD: RenderDriverKind =
-      RenderDriverKind(CALLER_GRAPHICS_THREAD_VALUE)
+    /**
+     * Your thread, when it calls `RenderSessionHandle.serviceDriverWork()`.
+     */
+    @JvmField public val CALLER_GRAPHICS_THREAD: RenderDriverKind = RenderDriverKind(CALLER_GRAPHICS_THREAD_VALUE)
     /** The `rawValue` of [CALLER_GRAPHICS_THREAD]. */
     public const val CALLER_GRAPHICS_THREAD_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RenderDriverKind =
-      when (rawValue) {
-        CORE_WORKER_VALUE -> CORE_WORKER
-        CALLER_GRAPHICS_THREAD_VALUE -> CALLER_GRAPHICS_THREAD
-        else -> RenderDriverKind(rawValue)
-      }
+    public fun of(rawValue: UInt): RenderDriverKind = when (rawValue) { CORE_WORKER_VALUE -> CORE_WORKER; CALLER_GRAPHICS_THREAD_VALUE -> CALLER_GRAPHICS_THREAD; else -> RenderDriverKind(rawValue) }
   }
 }
-
 /**
- * Whether a frame drew the map complete, or lacked resources that are still loading.
+ * Whether a frame drew the map complete, or lacked resources that are still
+ * loading.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -1587,17 +1263,9 @@ public class RenderDriverKind(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class RenderMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "PARTIAL"
-      1u -> "FULL"
-      else -> "RenderMode($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "PARTIAL"; 1u -> "FULL"; else -> "RenderMode($rawValue)" }
   override fun equals(other: Any?): Boolean = other is RenderMode && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val PARTIAL: RenderMode = RenderMode(PARTIAL_VALUE)
     /** The `rawValue` of [PARTIAL]. */
@@ -1605,19 +1273,12 @@ public class RenderMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
     @JvmField public val FULL: RenderMode = RenderMode(FULL_VALUE)
     /** The `rawValue` of [FULL]. */
     public const val FULL_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RenderMode =
-      when (rawValue) {
-        PARTIAL_VALUE -> PARTIAL
-        FULL_VALUE -> FULL
-        else -> RenderMode(rawValue)
-      }
+    public fun of(rawValue: UInt): RenderMode = when (rawValue) { PARTIAL_VALUE -> PARTIAL; FULL_VALUE -> FULL; else -> RenderMode(rawValue) }
   }
 }
-
 /**
  * How a frame demand finished.
  *
@@ -1627,62 +1288,47 @@ public class RenderMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public class RenderResult(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "RENDERED"
-      1u -> "NO_UPDATE"
-      2u -> "TARGET_NOT_READY"
-      3u -> "SUPERSEDED"
-      4u -> "FAILED"
-      else -> "RenderResult($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "RENDERED"; 1u -> "NO_UPDATE"; 2u -> "TARGET_NOT_READY"; 3u -> "SUPERSEDED"; 4u -> "FAILED"; else -> "RenderResult($rawValue)" }
   override fun equals(other: Any?): Boolean = other is RenderResult && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val RENDERED: RenderResult = RenderResult(RENDERED_VALUE)
     /** The `rawValue` of [RENDERED]. */
     public const val RENDERED_VALUE: UInt = 0u
-    /** The map had nothing new to draw. */
+    /**
+     * The map had nothing new to draw.
+     */
     @JvmField public val NO_UPDATE: RenderResult = RenderResult(NO_UPDATE_VALUE)
     /** The `rawValue` of [NO_UPDATE]. */
     public const val NO_UPDATE_VALUE: UInt = 1u
     /**
-     * The target couldn't take a frame, such as while a window is hidden or destroyed, or after
-     * `RenderSessionHandle.releaseTarget()`. Demand a frame again later.
+     * The target couldn't take a frame, such as while a window is hidden or
+     * destroyed, or after `RenderSessionHandle.releaseTarget()`. Demand a frame
+     * again later.
      */
     @JvmField public val TARGET_NOT_READY: RenderResult = RenderResult(TARGET_NOT_READY_VALUE)
     /** The `rawValue` of [TARGET_NOT_READY]. */
     public const val TARGET_NOT_READY_VALUE: UInt = 2u
-    /** A later demand with the same flags replaced this one. */
+    /**
+     * A later demand with the same flags replaced this one.
+     */
     @JvmField public val SUPERSEDED: RenderResult = RenderResult(SUPERSEDED_VALUE)
     /** The `rawValue` of [SUPERSEDED]. */
     public const val SUPERSEDED_VALUE: UInt = 3u
     /**
-     * The session failed, and `RenderSessionHandle.getFailure()` reports why. Once
-     * `RenderSessionHandle.release()` completes, you can attach a new session.
+     * The session failed, and `RenderSessionHandle.getFailure()` reports why.
+     * Once `RenderSessionHandle.release()` completes, you can attach a new
+     * session.
      */
     @JvmField public val FAILED: RenderResult = RenderResult(FAILED_VALUE)
     /** The `rawValue` of [FAILED]. */
     public const val FAILED_VALUE: UInt = 4u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RenderResult =
-      when (rawValue) {
-        RENDERED_VALUE -> RENDERED
-        NO_UPDATE_VALUE -> NO_UPDATE
-        TARGET_NOT_READY_VALUE -> TARGET_NOT_READY
-        SUPERSEDED_VALUE -> SUPERSEDED
-        FAILED_VALUE -> FAILED
-        else -> RenderResult(rawValue)
-      }
+    public fun of(rawValue: UInt): RenderResult = when (rawValue) { RENDERED_VALUE -> RENDERED; NO_UPDATE_VALUE -> NO_UPDATE; TARGET_NOT_READY_VALUE -> TARGET_NOT_READY; SUPERSEDED_VALUE -> SUPERSEDED; FAILED_VALUE -> FAILED; else -> RenderResult(rawValue) }
   }
 }
-
 /**
  * Something that a render session can do.
  *
@@ -1692,66 +1338,41 @@ public class RenderResult(@get:JvmName("getRawValue") public val rawValue: UInt)
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public class RenderSessionCapabilityFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  public infix fun or(other: RenderSessionCapabilityFlag): RenderSessionCapabilityFlag =
-    of(rawValue or other.rawValue)
-
-  public infix fun and(other: RenderSessionCapabilityFlag): RenderSessionCapabilityFlag =
-    of(rawValue and other.rawValue)
-
-  public operator fun contains(other: RenderSessionCapabilityFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(
-      rawValue.toULong(),
-      "NONE",
-      listOf(1uL to "FRAME_ACQUISITION", 2uL to "READBACK", 4uL to "PRESENTATION"),
-    )
-
-  override fun equals(other: Any?): Boolean =
-    other is RenderSessionCapabilityFlag && other.rawValue == rawValue
-
+  public infix fun or(other: RenderSessionCapabilityFlag): RenderSessionCapabilityFlag = of(rawValue or other.rawValue)
+  public infix fun and(other: RenderSessionCapabilityFlag): RenderSessionCapabilityFlag = of(rawValue and other.rawValue)
+  public operator fun contains(other: RenderSessionCapabilityFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "FRAME_ACQUISITION", 2uL to "READBACK", 4uL to "PRESENTATION"))
+  override fun equals(other: Any?): Boolean = other is RenderSessionCapabilityFlag && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(NONE_VALUE)
     /** The `rawValue` of [NONE]. */
     public const val NONE_VALUE: UInt = 0u
-    /** `RenderSessionHandle.acquireFrame()` can take the frames it renders. */
-    @JvmField
-    public val FRAME_ACQUISITION: RenderSessionCapabilityFlag =
-      RenderSessionCapabilityFlag(FRAME_ACQUISITION_VALUE)
+    /**
+     * `RenderSessionHandle.acquireFrame()` can take the frames it renders.
+     */
+    @JvmField public val FRAME_ACQUISITION: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(FRAME_ACQUISITION_VALUE)
     /** The `rawValue` of [FRAME_ACQUISITION]. */
     public const val FRAME_ACQUISITION_VALUE: UInt = 1u
-    /** `RenderSessionHandle.readTexture()` can copy its texture to memory. */
-    @JvmField
-    public val READBACK: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(READBACK_VALUE)
+    /**
+     * `RenderSessionHandle.readTexture()` can copy its texture to memory.
+     */
+    @JvmField public val READBACK: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(READBACK_VALUE)
     /** The `rawValue` of [READBACK]. */
     public const val READBACK_VALUE: UInt = 2u
-    /** It shows frames on a surface. */
-    @JvmField
-    public val PRESENTATION: RenderSessionCapabilityFlag =
-      RenderSessionCapabilityFlag(PRESENTATION_VALUE)
+    /**
+     * It shows frames on a surface.
+     */
+    @JvmField public val PRESENTATION: RenderSessionCapabilityFlag = RenderSessionCapabilityFlag(PRESENTATION_VALUE)
     /** The `rawValue` of [PRESENTATION]. */
     public const val PRESENTATION_VALUE: UInt = 4u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RenderSessionCapabilityFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        FRAME_ACQUISITION_VALUE -> FRAME_ACQUISITION
-        READBACK_VALUE -> READBACK
-        PRESENTATION_VALUE -> PRESENTATION
-        else -> RenderSessionCapabilityFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): RenderSessionCapabilityFlag = when (rawValue) { NONE_VALUE -> NONE; FRAME_ACQUISITION_VALUE -> FRAME_ACQUISITION; READBACK_VALUE -> READBACK; PRESENTATION_VALUE -> PRESENTATION; else -> RenderSessionCapabilityFlag(rawValue) }
   }
 }
-
 /**
  * Where a render session is in its life.
  *
@@ -1761,22 +1382,9 @@ public class RenderSessionCapabilityFlag(@get:JvmName("getRawValue") public val 
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public class RenderSessionState(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      1u -> "ATTACHING"
-      2u -> "ATTACHED"
-      3u -> "DETACHING"
-      4u -> "DETACHED"
-      5u -> "FAILED"
-      6u -> "ABANDONED"
-      else -> "RenderSessionState($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is RenderSessionState && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 1u -> "ATTACHING"; 2u -> "ATTACHED"; 3u -> "DETACHING"; 4u -> "DETACHED"; 5u -> "FAILED"; 6u -> "ABANDONED"; else -> "RenderSessionState($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is RenderSessionState && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val ATTACHING: RenderSessionState = RenderSessionState(ATTACHING_VALUE)
     /** The `rawValue` of [ATTACHING]. */
@@ -1796,23 +1404,83 @@ public class RenderSessionState(@get:JvmName("getRawValue") public val rawValue:
     @JvmField public val ABANDONED: RenderSessionState = RenderSessionState(ABANDONED_VALUE)
     /** The `rawValue` of [ABANDONED]. */
     public const val ABANDONED_VALUE: UInt = 6u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RenderSessionState =
-      when (rawValue) {
-        ATTACHING_VALUE -> ATTACHING
-        ATTACHED_VALUE -> ATTACHED
-        DETACHING_VALUE -> DETACHING
-        DETACHED_VALUE -> DETACHED
-        FAILED_VALUE -> FAILED
-        ABANDONED_VALUE -> ABANDONED
-        else -> RenderSessionState(rawValue)
-      }
+    public fun of(rawValue: UInt): RenderSessionState = when (rawValue) { ATTACHING_VALUE -> ATTACHING; ATTACHED_VALUE -> ATTACHED; DETACHING_VALUE -> DETACHING; DETACHED_VALUE -> DETACHED; FAILED_VALUE -> FAILED; ABANDONED_VALUE -> ABANDONED; else -> RenderSessionState(rawValue) }
   }
 }
-
+/**
+ * A render target kind, as a bit in a set.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
+ * See `mln_render_target_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class RenderTargetKindFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  public infix fun or(other: RenderTargetKindFlag): RenderTargetKindFlag = of(rawValue or other.rawValue)
+  public infix fun and(other: RenderTargetKindFlag): RenderTargetKindFlag = of(rawValue and other.rawValue)
+  public operator fun contains(other: RenderTargetKindFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "OFFSCREEN", 2uL to "METAL_LAYER", 4uL to "WIN32_WINDOW", 8uL to "XLIB_WINDOW", 16uL to "WAYLAND_SURFACE", 32uL to "ANDROID_WINDOW", 64uL to "OHOS_WINDOW", 512uL to "VULKAN_SURFACE", 1024uL to "OPEN_GL_SURFACE", 2048uL to "METAL_BORROWED_TEXTURES", 4096uL to "VULKAN_BORROWED_TEXTURES", 8192uL to "OPEN_GL_BORROWED_TEXTURES", 16384uL to "WEB_GPU_BORROWED_TEXTURES", 32768uL to "EXPORTED_RING", 65536uL to "WEB_CANVAS"))
+  override fun equals(other: Any?): Boolean = other is RenderTargetKindFlag && other.rawValue == rawValue
+  override fun hashCode(): Int = rawValue.hashCode()
+  public companion object {
+    /** No flags. */
+    @JvmField public val NONE: RenderTargetKindFlag = RenderTargetKindFlag(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    @JvmField public val OFFSCREEN: RenderTargetKindFlag = RenderTargetKindFlag(OFFSCREEN_VALUE)
+    /** The `rawValue` of [OFFSCREEN]. */
+    public const val OFFSCREEN_VALUE: UInt = 1u
+    @JvmField public val METAL_LAYER: RenderTargetKindFlag = RenderTargetKindFlag(METAL_LAYER_VALUE)
+    /** The `rawValue` of [METAL_LAYER]. */
+    public const val METAL_LAYER_VALUE: UInt = 2u
+    @JvmField public val WIN32_WINDOW: RenderTargetKindFlag = RenderTargetKindFlag(WIN32_WINDOW_VALUE)
+    /** The `rawValue` of [WIN32_WINDOW]. */
+    public const val WIN32_WINDOW_VALUE: UInt = 4u
+    @JvmField public val XLIB_WINDOW: RenderTargetKindFlag = RenderTargetKindFlag(XLIB_WINDOW_VALUE)
+    /** The `rawValue` of [XLIB_WINDOW]. */
+    public const val XLIB_WINDOW_VALUE: UInt = 8u
+    @JvmField public val WAYLAND_SURFACE: RenderTargetKindFlag = RenderTargetKindFlag(WAYLAND_SURFACE_VALUE)
+    /** The `rawValue` of [WAYLAND_SURFACE]. */
+    public const val WAYLAND_SURFACE_VALUE: UInt = 16u
+    @JvmField public val ANDROID_WINDOW: RenderTargetKindFlag = RenderTargetKindFlag(ANDROID_WINDOW_VALUE)
+    /** The `rawValue` of [ANDROID_WINDOW]. */
+    public const val ANDROID_WINDOW_VALUE: UInt = 32u
+    @JvmField public val OHOS_WINDOW: RenderTargetKindFlag = RenderTargetKindFlag(OHOS_WINDOW_VALUE)
+    /** The `rawValue` of [OHOS_WINDOW]. */
+    public const val OHOS_WINDOW_VALUE: UInt = 64u
+    @JvmField public val VULKAN_SURFACE: RenderTargetKindFlag = RenderTargetKindFlag(VULKAN_SURFACE_VALUE)
+    /** The `rawValue` of [VULKAN_SURFACE]. */
+    public const val VULKAN_SURFACE_VALUE: UInt = 512u
+    @JvmField public val OPEN_GL_SURFACE: RenderTargetKindFlag = RenderTargetKindFlag(OPEN_GL_SURFACE_VALUE)
+    /** The `rawValue` of [OPEN_GL_SURFACE]. */
+    public const val OPEN_GL_SURFACE_VALUE: UInt = 1024u
+    @JvmField public val METAL_BORROWED_TEXTURES: RenderTargetKindFlag = RenderTargetKindFlag(METAL_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [METAL_BORROWED_TEXTURES]. */
+    public const val METAL_BORROWED_TEXTURES_VALUE: UInt = 2048u
+    @JvmField public val VULKAN_BORROWED_TEXTURES: RenderTargetKindFlag = RenderTargetKindFlag(VULKAN_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [VULKAN_BORROWED_TEXTURES]. */
+    public const val VULKAN_BORROWED_TEXTURES_VALUE: UInt = 4096u
+    @JvmField public val OPEN_GL_BORROWED_TEXTURES: RenderTargetKindFlag = RenderTargetKindFlag(OPEN_GL_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [OPEN_GL_BORROWED_TEXTURES]. */
+    public const val OPEN_GL_BORROWED_TEXTURES_VALUE: UInt = 8192u
+    @JvmField public val WEB_GPU_BORROWED_TEXTURES: RenderTargetKindFlag = RenderTargetKindFlag(WEB_GPU_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [WEB_GPU_BORROWED_TEXTURES]. */
+    public const val WEB_GPU_BORROWED_TEXTURES_VALUE: UInt = 16384u
+    @JvmField public val EXPORTED_RING: RenderTargetKindFlag = RenderTargetKindFlag(EXPORTED_RING_VALUE)
+    /** The `rawValue` of [EXPORTED_RING]. */
+    public const val EXPORTED_RING_VALUE: UInt = 32768u
+    @JvmField public val WEB_CANVAS: RenderTargetKindFlag = RenderTargetKindFlag(WEB_CANVAS_VALUE)
+    /** The `rawValue` of [WEB_CANVAS]. */
+    public const val WEB_CANVAS_VALUE: UInt = 65536u
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): RenderTargetKindFlag = when (rawValue) { NONE_VALUE -> NONE; OFFSCREEN_VALUE -> OFFSCREEN; METAL_LAYER_VALUE -> METAL_LAYER; WIN32_WINDOW_VALUE -> WIN32_WINDOW; XLIB_WINDOW_VALUE -> XLIB_WINDOW; WAYLAND_SURFACE_VALUE -> WAYLAND_SURFACE; ANDROID_WINDOW_VALUE -> ANDROID_WINDOW; OHOS_WINDOW_VALUE -> OHOS_WINDOW; VULKAN_SURFACE_VALUE -> VULKAN_SURFACE; OPEN_GL_SURFACE_VALUE -> OPEN_GL_SURFACE; METAL_BORROWED_TEXTURES_VALUE -> METAL_BORROWED_TEXTURES; VULKAN_BORROWED_TEXTURES_VALUE -> VULKAN_BORROWED_TEXTURES; OPEN_GL_BORROWED_TEXTURES_VALUE -> OPEN_GL_BORROWED_TEXTURES; WEB_GPU_BORROWED_TEXTURES_VALUE -> WEB_GPU_BORROWED_TEXTURES; EXPORTED_RING_VALUE -> EXPORTED_RING; WEB_CANVAS_VALUE -> WEB_CANVAS; else -> RenderTargetKindFlag(rawValue) }
+  }
+}
 /**
  * Why a resource request failed.
  *
@@ -1822,56 +1490,40 @@ public class RenderSessionState(@get:JvmName("getRawValue") public val rawValue:
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class ResourceErrorReason(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "OTHER"
-      1u -> "NOT_FOUND"
-      2u -> "SERVER"
-      3u -> "CONNECTION"
-      4u -> "RATE_LIMIT"
-      else -> "ResourceErrorReason($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is ResourceErrorReason && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "OTHER"; 1u -> "NOT_FOUND"; 2u -> "SERVER"; 3u -> "CONNECTION"; 4u -> "RATE_LIMIT"; else -> "ResourceErrorReason($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is ResourceErrorReason && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** A reason that no other value names. */
+    /**
+     * A reason that no other value names.
+     */
     @JvmField public val OTHER: ResourceErrorReason = ResourceErrorReason(OTHER_VALUE)
     /** The `rawValue` of [OTHER]. */
     public const val OTHER_VALUE: UInt = 0u
     @JvmField public val NOT_FOUND: ResourceErrorReason = ResourceErrorReason(NOT_FOUND_VALUE)
     /** The `rawValue` of [NOT_FOUND]. */
     public const val NOT_FOUND_VALUE: UInt = 1u
-    /** The server reported an error. */
+    /**
+     * The server reported an error.
+     */
     @JvmField public val SERVER: ResourceErrorReason = ResourceErrorReason(SERVER_VALUE)
     /** The `rawValue` of [SERVER]. */
     public const val SERVER_VALUE: UInt = 2u
-    /** The server couldn't be reached. */
+    /**
+     * The server couldn't be reached.
+     */
     @JvmField public val CONNECTION: ResourceErrorReason = ResourceErrorReason(CONNECTION_VALUE)
     /** The `rawValue` of [CONNECTION]. */
     public const val CONNECTION_VALUE: UInt = 3u
     @JvmField public val RATE_LIMIT: ResourceErrorReason = ResourceErrorReason(RATE_LIMIT_VALUE)
     /** The `rawValue` of [RATE_LIMIT]. */
     public const val RATE_LIMIT_VALUE: UInt = 4u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ResourceErrorReason =
-      when (rawValue) {
-        OTHER_VALUE -> OTHER
-        NOT_FOUND_VALUE -> NOT_FOUND
-        SERVER_VALUE -> SERVER
-        CONNECTION_VALUE -> CONNECTION
-        RATE_LIMIT_VALUE -> RATE_LIMIT
-        else -> ResourceErrorReason(rawValue)
-      }
+    public fun of(rawValue: UInt): ResourceErrorReason = when (rawValue) { OTHER_VALUE -> OTHER; NOT_FOUND_VALUE -> NOT_FOUND; SERVER_VALUE -> SERVER; CONNECTION_VALUE -> CONNECTION; RATE_LIMIT_VALUE -> RATE_LIMIT; else -> ResourceErrorReason(rawValue) }
   }
 }
-
 /**
  * The kind of a resource that the library loads.
  *
@@ -1881,23 +1533,9 @@ public class ResourceErrorReason(@get:JvmName("getRawValue") public val rawValue
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class ResourceKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "UNKNOWN"
-      1u -> "STYLE"
-      2u -> "SOURCE"
-      3u -> "TILE"
-      4u -> "GLYPHS"
-      5u -> "SPRITE_IMAGE"
-      6u -> "SPRITE_JSON"
-      7u -> "IMAGE"
-      else -> "ResourceKind($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "UNKNOWN"; 1u -> "STYLE"; 2u -> "SOURCE"; 3u -> "TILE"; 4u -> "GLYPHS"; 5u -> "SPRITE_IMAGE"; 6u -> "SPRITE_JSON"; 7u -> "IMAGE"; else -> "ResourceKind($rawValue)" }
   override fun equals(other: Any?): Boolean = other is ResourceKind && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val UNKNOWN: ResourceKind = ResourceKind(UNKNOWN_VALUE)
     /** The `rawValue` of [UNKNOWN]. */
@@ -1923,25 +1561,12 @@ public class ResourceKind(@get:JvmName("getRawValue") public val rawValue: UInt)
     @JvmField public val IMAGE: ResourceKind = ResourceKind(IMAGE_VALUE)
     /** The `rawValue` of [IMAGE]. */
     public const val IMAGE_VALUE: UInt = 7u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ResourceKind =
-      when (rawValue) {
-        UNKNOWN_VALUE -> UNKNOWN
-        STYLE_VALUE -> STYLE
-        SOURCE_VALUE -> SOURCE
-        TILE_VALUE -> TILE
-        GLYPHS_VALUE -> GLYPHS
-        SPRITE_IMAGE_VALUE -> SPRITE_IMAGE
-        SPRITE_JSON_VALUE -> SPRITE_JSON
-        IMAGE_VALUE -> IMAGE
-        else -> ResourceKind(rawValue)
-      }
+    public fun of(rawValue: UInt): ResourceKind = when (rawValue) { UNKNOWN_VALUE -> UNKNOWN; STYLE_VALUE -> STYLE; SOURCE_VALUE -> SOURCE; TILE_VALUE -> TILE; GLYPHS_VALUE -> GLYPHS; SPRITE_IMAGE_VALUE -> SPRITE_IMAGE; SPRITE_JSON_VALUE -> SPRITE_JSON; IMAGE_VALUE -> IMAGE; else -> ResourceKind(rawValue) }
   }
 }
-
 /**
  * A resource kind, as a bit in a set.
  *
@@ -1952,33 +1577,11 @@ public class ResourceKind(@get:JvmName("getRawValue") public val rawValue: UInt)
  */
 public class ResourceKindFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
   public infix fun or(other: ResourceKindFlag): ResourceKindFlag = of(rawValue or other.rawValue)
-
   public infix fun and(other: ResourceKindFlag): ResourceKindFlag = of(rawValue and other.rawValue)
-
-  public operator fun contains(other: ResourceKindFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(
-      rawValue.toULong(),
-      "NONE",
-      listOf(
-        1uL to "UNKNOWN",
-        2uL to "STYLE",
-        4uL to "SOURCE",
-        8uL to "TILE",
-        16uL to "GLYPHS",
-        32uL to "SPRITE_IMAGE",
-        64uL to "SPRITE_JSON",
-        128uL to "IMAGE",
-      ),
-    )
-
-  override fun equals(other: Any?): Boolean =
-    other is ResourceKindFlag && other.rawValue == rawValue
-
+  public operator fun contains(other: ResourceKindFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "UNKNOWN", 2uL to "STYLE", 4uL to "SOURCE", 8uL to "TILE", 16uL to "GLYPHS", 32uL to "SPRITE_IMAGE", 64uL to "SPRITE_JSON", 128uL to "IMAGE"))
+  override fun equals(other: Any?): Boolean = other is ResourceKindFlag && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: ResourceKindFlag = ResourceKindFlag(NONE_VALUE)
@@ -2011,29 +1614,12 @@ public class ResourceKindFlag(@get:JvmName("getRawValue") public val rawValue: U
     @JvmField public val ALL: ResourceKindFlag = ResourceKindFlag(ALL_VALUE)
     /** The `rawValue` of [ALL]. */
     public const val ALL_VALUE: UInt = 255u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ResourceKindFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        UNKNOWN_VALUE -> UNKNOWN
-        STYLE_VALUE -> STYLE
-        SOURCE_VALUE -> SOURCE
-        TILE_VALUE -> TILE
-        GLYPHS_VALUE -> GLYPHS
-        SPRITE_IMAGE_VALUE -> SPRITE_IMAGE
-        SPRITE_JSON_VALUE -> SPRITE_JSON
-        IMAGE_VALUE -> IMAGE
-        ALL_VALUE -> ALL
-        else -> ResourceKindFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): ResourceKindFlag = when (rawValue) { NONE_VALUE -> NONE; UNKNOWN_VALUE -> UNKNOWN; STYLE_VALUE -> STYLE; SOURCE_VALUE -> SOURCE; TILE_VALUE -> TILE; GLYPHS_VALUE -> GLYPHS; SPRITE_IMAGE_VALUE -> SPRITE_IMAGE; SPRITE_JSON_VALUE -> SPRITE_JSON; IMAGE_VALUE -> IMAGE; ALL_VALUE -> ALL; else -> ResourceKindFlag(rawValue) }
   }
 }
-
 /**
  * Where a request may load its resource from.
  *
@@ -2043,45 +1629,28 @@ public class ResourceKindFlag(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class ResourceLoadingMethod(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "ALL"
-      1u -> "CACHE_ONLY"
-      2u -> "NETWORK_ONLY"
-      else -> "ResourceLoadingMethod($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is ResourceLoadingMethod && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "ALL"; 1u -> "CACHE_ONLY"; 2u -> "NETWORK_ONLY"; else -> "ResourceLoadingMethod($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is ResourceLoadingMethod && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** The cache or the network. */
+    /**
+     * The cache or the network.
+     */
     @JvmField public val ALL: ResourceLoadingMethod = ResourceLoadingMethod(ALL_VALUE)
     /** The `rawValue` of [ALL]. */
     public const val ALL_VALUE: UInt = 0u
     @JvmField public val CACHE_ONLY: ResourceLoadingMethod = ResourceLoadingMethod(CACHE_ONLY_VALUE)
     /** The `rawValue` of [CACHE_ONLY]. */
     public const val CACHE_ONLY_VALUE: UInt = 1u
-    @JvmField
-    public val NETWORK_ONLY: ResourceLoadingMethod = ResourceLoadingMethod(NETWORK_ONLY_VALUE)
+    @JvmField public val NETWORK_ONLY: ResourceLoadingMethod = ResourceLoadingMethod(NETWORK_ONLY_VALUE)
     /** The `rawValue` of [NETWORK_ONLY]. */
     public const val NETWORK_ONLY_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ResourceLoadingMethod =
-      when (rawValue) {
-        ALL_VALUE -> ALL
-        CACHE_ONLY_VALUE -> CACHE_ONLY
-        NETWORK_ONLY_VALUE -> NETWORK_ONLY
-        else -> ResourceLoadingMethod(rawValue)
-      }
+    public fun of(rawValue: UInt): ResourceLoadingMethod = when (rawValue) { ALL_VALUE -> ALL; CACHE_ONLY_VALUE -> CACHE_ONLY; NETWORK_ONLY_VALUE -> NETWORK_ONLY; else -> ResourceLoadingMethod(rawValue) }
   }
 }
-
 /**
  * The priority of a resource request.
  *
@@ -2091,18 +1660,9 @@ public class ResourceLoadingMethod(@get:JvmName("getRawValue") public val rawVal
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class ResourcePriority(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "REGULAR"
-      1u -> "LOW"
-      else -> "ResourcePriority($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is ResourcePriority && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "REGULAR"; 1u -> "LOW"; else -> "ResourcePriority($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is ResourcePriority && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val REGULAR: ResourcePriority = ResourcePriority(REGULAR_VALUE)
     /** The `rawValue` of [REGULAR]. */
@@ -2110,19 +1670,12 @@ public class ResourcePriority(@get:JvmName("getRawValue") public val rawValue: U
     @JvmField public val LOW: ResourcePriority = ResourcePriority(LOW_VALUE)
     /** The `rawValue` of [LOW]. */
     public const val LOW_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ResourcePriority =
-      when (rawValue) {
-        REGULAR_VALUE -> REGULAR
-        LOW_VALUE -> LOW
-        else -> ResourcePriority(rawValue)
-      }
+    public fun of(rawValue: UInt): ResourcePriority = when (rawValue) { REGULAR_VALUE -> REGULAR; LOW_VALUE -> LOW; else -> ResourcePriority(rawValue) }
   }
 }
-
 /**
  * The outcome of a resource request.
  *
@@ -2132,20 +1685,9 @@ public class ResourcePriority(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class ResourceResponseStatus(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "OK"
-      1u -> "ERROR"
-      2u -> "NO_CONTENT"
-      3u -> "NOT_MODIFIED"
-      else -> "ResourceResponseStatus($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is ResourceResponseStatus && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "OK"; 1u -> "ERROR"; 2u -> "NO_CONTENT"; 3u -> "NOT_MODIFIED"; else -> "ResourceResponseStatus($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is ResourceResponseStatus && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val OK: ResourceResponseStatus = ResourceResponseStatus(OK_VALUE)
     /** The `rawValue` of [OK]. */
@@ -2153,31 +1695,24 @@ public class ResourceResponseStatus(@get:JvmName("getRawValue") public val rawVa
     @JvmField public val ERROR: ResourceResponseStatus = ResourceResponseStatus(ERROR_VALUE)
     /** The `rawValue` of [ERROR]. */
     public const val ERROR_VALUE: UInt = 1u
-    /** The resource exists and is empty. */
-    @JvmField
-    public val NO_CONTENT: ResourceResponseStatus = ResourceResponseStatus(NO_CONTENT_VALUE)
+    /**
+     * The resource exists and is empty.
+     */
+    @JvmField public val NO_CONTENT: ResourceResponseStatus = ResourceResponseStatus(NO_CONTENT_VALUE)
     /** The `rawValue` of [NO_CONTENT]. */
     public const val NO_CONTENT_VALUE: UInt = 2u
-    /** The earlier copy that the request's `prior_` fields describe is current. */
-    @JvmField
-    public val NOT_MODIFIED: ResourceResponseStatus = ResourceResponseStatus(NOT_MODIFIED_VALUE)
+    /**
+     * The earlier copy that the request's `prior_` fields describe is current.
+     */
+    @JvmField public val NOT_MODIFIED: ResourceResponseStatus = ResourceResponseStatus(NOT_MODIFIED_VALUE)
     /** The `rawValue` of [NOT_MODIFIED]. */
     public const val NOT_MODIFIED_VALUE: UInt = 3u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ResourceResponseStatus =
-      when (rawValue) {
-        OK_VALUE -> OK
-        ERROR_VALUE -> ERROR
-        NO_CONTENT_VALUE -> NO_CONTENT
-        NOT_MODIFIED_VALUE -> NOT_MODIFIED
-        else -> ResourceResponseStatus(rawValue)
-      }
+    public fun of(rawValue: UInt): ResourceResponseStatus = when (rawValue) { OK_VALUE -> OK; ERROR_VALUE -> ERROR; NO_CONTENT_VALUE -> NO_CONTENT; NOT_MODIFIED_VALUE -> NOT_MODIFIED; else -> ResourceResponseStatus(rawValue) }
   }
 }
-
 /**
  * Whether the library keeps a loaded resource in its cache.
  *
@@ -2187,18 +1722,9 @@ public class ResourceResponseStatus(@get:JvmName("getRawValue") public val rawVa
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class ResourceStoragePolicy(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "PERMANENT"
-      1u -> "VOLATILE"
-      else -> "ResourceStoragePolicy($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is ResourceStoragePolicy && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "PERMANENT"; 1u -> "VOLATILE"; else -> "ResourceStoragePolicy($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is ResourceStoragePolicy && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val PERMANENT: ResourceStoragePolicy = ResourceStoragePolicy(PERMANENT_VALUE)
     /** The `rawValue` of [PERMANENT]. */
@@ -2206,19 +1732,12 @@ public class ResourceStoragePolicy(@get:JvmName("getRawValue") public val rawVal
     @JvmField public val VOLATILE: ResourceStoragePolicy = ResourceStoragePolicy(VOLATILE_VALUE)
     /** The `rawValue` of [VOLATILE]. */
     public const val VOLATILE_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ResourceStoragePolicy =
-      when (rawValue) {
-        PERMANENT_VALUE -> PERMANENT
-        VOLATILE_VALUE -> VOLATILE
-        else -> ResourceStoragePolicy(rawValue)
-      }
+    public fun of(rawValue: UInt): ResourceStoragePolicy = when (rawValue) { PERMANENT_VALUE -> PERMANENT; VOLATILE_VALUE -> VOLATILE; else -> ResourceStoragePolicy(rawValue) }
   }
 }
-
 /**
  * Whether a request loads a resource for a map or an offline region.
  *
@@ -2228,17 +1747,9 @@ public class ResourceStoragePolicy(@get:JvmName("getRawValue") public val rawVal
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class ResourceUsage(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "ONLINE"
-      1u -> "OFFLINE"
-      else -> "ResourceUsage($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "ONLINE"; 1u -> "OFFLINE"; else -> "ResourceUsage($rawValue)" }
   override fun equals(other: Any?): Boolean = other is ResourceUsage && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val ONLINE: ResourceUsage = ResourceUsage(ONLINE_VALUE)
     /** The `rawValue` of [ONLINE]. */
@@ -2246,19 +1757,12 @@ public class ResourceUsage(@get:JvmName("getRawValue") public val rawValue: UInt
     @JvmField public val OFFLINE: ResourceUsage = ResourceUsage(OFFLINE_VALUE)
     /** The `rawValue` of [OFFLINE]. */
     public const val OFFLINE_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ResourceUsage =
-      when (rawValue) {
-        ONLINE_VALUE -> ONLINE
-        OFFLINE_VALUE -> OFFLINE
-        else -> ResourceUsage(rawValue)
-      }
+    public fun of(rawValue: UInt): ResourceUsage = when (rawValue) { ONLINE_VALUE -> ONLINE; OFFLINE_VALUE -> OFFLINE; else -> ResourceUsage(rawValue) }
   }
 }
-
 /**
  * An event type, as a bit in a set.
  *
@@ -2269,215 +1773,102 @@ public class ResourceUsage(@get:JvmName("getRawValue") public val rawValue: UInt
  */
 public class RuntimeEventFlag(@get:JvmName("getRawValue") public val rawValue: ULong) {
   public infix fun or(other: RuntimeEventFlag): RuntimeEventFlag = of(rawValue or other.rawValue)
-
   public infix fun and(other: RuntimeEventFlag): RuntimeEventFlag = of(rawValue and other.rawValue)
-
-  public operator fun contains(other: RuntimeEventFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(
-      rawValue,
-      "NONE",
-      listOf(
-        2uL to "MAP_CAMERA_WILL_CHANGE",
-        4uL to "MAP_CAMERA_IS_CHANGING",
-        8uL to "MAP_CAMERA_DID_CHANGE",
-        16uL to "MAP_STYLE_LOADED",
-        32uL to "MAP_LOADING_STARTED",
-        64uL to "MAP_LOADING_FINISHED",
-        128uL to "MAP_LOADING_FAILED",
-        256uL to "MAP_IDLE",
-        512uL to "MAP_RENDER_ERROR",
-        1024uL to "MAP_RENDER_FRAME_STARTED",
-        2048uL to "MAP_RENDER_FRAME_FINISHED",
-        4096uL to "MAP_RENDER_MAP_STARTED",
-        8192uL to "MAP_RENDER_MAP_FINISHED",
-        16384uL to "MAP_STYLE_IMAGE_MISSING",
-        32768uL to "MAP_TILE_ACTION",
-        65536uL to "MAP_SOURCE_CHANGED",
-        131072uL to "OFFLINE_REGION_STATUS_CHANGED",
-        262144uL to "OFFLINE_REGION_RESPONSE_ERROR",
-        524288uL to "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED",
-        1048576uL to "MAP_GLYPHS_REQUESTED",
-        2097152uL to "MAP_GLYPHS_LOADED",
-        4194304uL to "MAP_GLYPHS_ERROR",
-        8388608uL to "MAP_SPRITE_REQUESTED",
-        16777216uL to "MAP_SPRITE_LOADED",
-        33554432uL to "MAP_SPRITE_ERROR",
-      ),
-    )
-
-  override fun equals(other: Any?): Boolean =
-    other is RuntimeEventFlag && other.rawValue == rawValue
-
+  public operator fun contains(other: RuntimeEventFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
+  override fun toString(): String = flagLabel(rawValue, "NONE", listOf(2uL to "MAP_CAMERA_WILL_CHANGE", 4uL to "MAP_CAMERA_IS_CHANGING", 8uL to "MAP_CAMERA_DID_CHANGE", 16uL to "MAP_STYLE_LOADED", 32uL to "MAP_LOADING_STARTED", 64uL to "MAP_LOADING_FINISHED", 128uL to "MAP_LOADING_FAILED", 256uL to "MAP_IDLE", 512uL to "MAP_RENDER_ERROR", 1024uL to "MAP_RENDER_FRAME_STARTED", 2048uL to "MAP_RENDER_FRAME_FINISHED", 4096uL to "MAP_RENDER_MAP_STARTED", 8192uL to "MAP_RENDER_MAP_FINISHED", 16384uL to "MAP_STYLE_IMAGE_MISSING", 32768uL to "MAP_TILE_ACTION", 65536uL to "MAP_SOURCE_CHANGED", 131072uL to "OFFLINE_REGION_STATUS_CHANGED", 262144uL to "OFFLINE_REGION_RESPONSE_ERROR", 524288uL to "MAP_GLYPHS_REQUESTED", 1048576uL to "MAP_GLYPHS_LOADED", 2097152uL to "MAP_GLYPHS_ERROR", 4194304uL to "MAP_SPRITE_REQUESTED", 8388608uL to "MAP_SPRITE_LOADED", 16777216uL to "MAP_SPRITE_ERROR"))
+  override fun equals(other: Any?): Boolean = other is RuntimeEventFlag && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val NONE: RuntimeEventFlag = RuntimeEventFlag(NONE_VALUE)
     /** The `rawValue` of [NONE]. */
     public const val NONE_VALUE: ULong = 0uL
-    @JvmField
-    public val MAP_CAMERA_WILL_CHANGE: RuntimeEventFlag =
-      RuntimeEventFlag(MAP_CAMERA_WILL_CHANGE_VALUE)
+    @JvmField public val MAP_CAMERA_WILL_CHANGE: RuntimeEventFlag = RuntimeEventFlag(MAP_CAMERA_WILL_CHANGE_VALUE)
     /** The `rawValue` of [MAP_CAMERA_WILL_CHANGE]. */
     public const val MAP_CAMERA_WILL_CHANGE_VALUE: ULong = 2uL
-    @JvmField
-    public val MAP_CAMERA_IS_CHANGING: RuntimeEventFlag =
-      RuntimeEventFlag(MAP_CAMERA_IS_CHANGING_VALUE)
+    @JvmField public val MAP_CAMERA_IS_CHANGING: RuntimeEventFlag = RuntimeEventFlag(MAP_CAMERA_IS_CHANGING_VALUE)
     /** The `rawValue` of [MAP_CAMERA_IS_CHANGING]. */
     public const val MAP_CAMERA_IS_CHANGING_VALUE: ULong = 4uL
-    @JvmField
-    public val MAP_CAMERA_DID_CHANGE: RuntimeEventFlag =
-      RuntimeEventFlag(MAP_CAMERA_DID_CHANGE_VALUE)
+    @JvmField public val MAP_CAMERA_DID_CHANGE: RuntimeEventFlag = RuntimeEventFlag(MAP_CAMERA_DID_CHANGE_VALUE)
     /** The `rawValue` of [MAP_CAMERA_DID_CHANGE]. */
     public const val MAP_CAMERA_DID_CHANGE_VALUE: ULong = 8uL
-    @JvmField
-    public val MAP_STYLE_LOADED: RuntimeEventFlag = RuntimeEventFlag(MAP_STYLE_LOADED_VALUE)
+    @JvmField public val MAP_STYLE_LOADED: RuntimeEventFlag = RuntimeEventFlag(MAP_STYLE_LOADED_VALUE)
     /** The `rawValue` of [MAP_STYLE_LOADED]. */
     public const val MAP_STYLE_LOADED_VALUE: ULong = 16uL
-    @JvmField
-    public val MAP_LOADING_STARTED: RuntimeEventFlag = RuntimeEventFlag(MAP_LOADING_STARTED_VALUE)
+    @JvmField public val MAP_LOADING_STARTED: RuntimeEventFlag = RuntimeEventFlag(MAP_LOADING_STARTED_VALUE)
     /** The `rawValue` of [MAP_LOADING_STARTED]. */
     public const val MAP_LOADING_STARTED_VALUE: ULong = 32uL
-    @JvmField
-    public val MAP_LOADING_FINISHED: RuntimeEventFlag = RuntimeEventFlag(MAP_LOADING_FINISHED_VALUE)
+    @JvmField public val MAP_LOADING_FINISHED: RuntimeEventFlag = RuntimeEventFlag(MAP_LOADING_FINISHED_VALUE)
     /** The `rawValue` of [MAP_LOADING_FINISHED]. */
     public const val MAP_LOADING_FINISHED_VALUE: ULong = 64uL
-    @JvmField
-    public val MAP_LOADING_FAILED: RuntimeEventFlag = RuntimeEventFlag(MAP_LOADING_FAILED_VALUE)
+    @JvmField public val MAP_LOADING_FAILED: RuntimeEventFlag = RuntimeEventFlag(MAP_LOADING_FAILED_VALUE)
     /** The `rawValue` of [MAP_LOADING_FAILED]. */
     public const val MAP_LOADING_FAILED_VALUE: ULong = 128uL
     @JvmField public val MAP_IDLE: RuntimeEventFlag = RuntimeEventFlag(MAP_IDLE_VALUE)
     /** The `rawValue` of [MAP_IDLE]. */
     public const val MAP_IDLE_VALUE: ULong = 256uL
-    @JvmField
-    public val MAP_RENDER_ERROR: RuntimeEventFlag = RuntimeEventFlag(MAP_RENDER_ERROR_VALUE)
+    @JvmField public val MAP_RENDER_ERROR: RuntimeEventFlag = RuntimeEventFlag(MAP_RENDER_ERROR_VALUE)
     /** The `rawValue` of [MAP_RENDER_ERROR]. */
     public const val MAP_RENDER_ERROR_VALUE: ULong = 512uL
-    @JvmField
-    public val MAP_RENDER_FRAME_STARTED: RuntimeEventFlag =
-      RuntimeEventFlag(MAP_RENDER_FRAME_STARTED_VALUE)
+    @JvmField public val MAP_RENDER_FRAME_STARTED: RuntimeEventFlag = RuntimeEventFlag(MAP_RENDER_FRAME_STARTED_VALUE)
     /** The `rawValue` of [MAP_RENDER_FRAME_STARTED]. */
     public const val MAP_RENDER_FRAME_STARTED_VALUE: ULong = 1024uL
-    @JvmField
-    public val MAP_RENDER_FRAME_FINISHED: RuntimeEventFlag =
-      RuntimeEventFlag(MAP_RENDER_FRAME_FINISHED_VALUE)
+    @JvmField public val MAP_RENDER_FRAME_FINISHED: RuntimeEventFlag = RuntimeEventFlag(MAP_RENDER_FRAME_FINISHED_VALUE)
     /** The `rawValue` of [MAP_RENDER_FRAME_FINISHED]. */
     public const val MAP_RENDER_FRAME_FINISHED_VALUE: ULong = 2048uL
-    @JvmField
-    public val MAP_RENDER_MAP_STARTED: RuntimeEventFlag =
-      RuntimeEventFlag(MAP_RENDER_MAP_STARTED_VALUE)
+    @JvmField public val MAP_RENDER_MAP_STARTED: RuntimeEventFlag = RuntimeEventFlag(MAP_RENDER_MAP_STARTED_VALUE)
     /** The `rawValue` of [MAP_RENDER_MAP_STARTED]. */
     public const val MAP_RENDER_MAP_STARTED_VALUE: ULong = 4096uL
-    @JvmField
-    public val MAP_RENDER_MAP_FINISHED: RuntimeEventFlag =
-      RuntimeEventFlag(MAP_RENDER_MAP_FINISHED_VALUE)
+    @JvmField public val MAP_RENDER_MAP_FINISHED: RuntimeEventFlag = RuntimeEventFlag(MAP_RENDER_MAP_FINISHED_VALUE)
     /** The `rawValue` of [MAP_RENDER_MAP_FINISHED]. */
     public const val MAP_RENDER_MAP_FINISHED_VALUE: ULong = 8192uL
-    @JvmField
-    public val MAP_STYLE_IMAGE_MISSING: RuntimeEventFlag =
-      RuntimeEventFlag(MAP_STYLE_IMAGE_MISSING_VALUE)
+    @JvmField public val MAP_STYLE_IMAGE_MISSING: RuntimeEventFlag = RuntimeEventFlag(MAP_STYLE_IMAGE_MISSING_VALUE)
     /** The `rawValue` of [MAP_STYLE_IMAGE_MISSING]. */
     public const val MAP_STYLE_IMAGE_MISSING_VALUE: ULong = 16384uL
     @JvmField public val MAP_TILE_ACTION: RuntimeEventFlag = RuntimeEventFlag(MAP_TILE_ACTION_VALUE)
     /** The `rawValue` of [MAP_TILE_ACTION]. */
     public const val MAP_TILE_ACTION_VALUE: ULong = 32768uL
-    @JvmField
-    public val MAP_SOURCE_CHANGED: RuntimeEventFlag = RuntimeEventFlag(MAP_SOURCE_CHANGED_VALUE)
+    @JvmField public val MAP_SOURCE_CHANGED: RuntimeEventFlag = RuntimeEventFlag(MAP_SOURCE_CHANGED_VALUE)
     /** The `rawValue` of [MAP_SOURCE_CHANGED]. */
     public const val MAP_SOURCE_CHANGED_VALUE: ULong = 65536uL
-    @JvmField
-    public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventFlag =
-      RuntimeEventFlag(OFFLINE_REGION_STATUS_CHANGED_VALUE)
+    @JvmField public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventFlag = RuntimeEventFlag(OFFLINE_REGION_STATUS_CHANGED_VALUE)
     /** The `rawValue` of [OFFLINE_REGION_STATUS_CHANGED]. */
     public const val OFFLINE_REGION_STATUS_CHANGED_VALUE: ULong = 131072uL
-    @JvmField
-    public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventFlag =
-      RuntimeEventFlag(OFFLINE_REGION_RESPONSE_ERROR_VALUE)
+    @JvmField public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventFlag = RuntimeEventFlag(OFFLINE_REGION_RESPONSE_ERROR_VALUE)
     /** The `rawValue` of [OFFLINE_REGION_RESPONSE_ERROR]. */
     public const val OFFLINE_REGION_RESPONSE_ERROR_VALUE: ULong = 262144uL
-    @JvmField
-    public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventFlag =
-      RuntimeEventFlag(OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE)
-    /** The `rawValue` of [OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED]. */
-    public const val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE: ULong = 524288uL
-    @JvmField
-    public val MAP_GLYPHS_REQUESTED: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_REQUESTED_VALUE)
+    @JvmField public val MAP_GLYPHS_REQUESTED: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_REQUESTED_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_REQUESTED]. */
-    public const val MAP_GLYPHS_REQUESTED_VALUE: ULong = 1048576uL
-    @JvmField
-    public val MAP_GLYPHS_LOADED: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_LOADED_VALUE)
+    public const val MAP_GLYPHS_REQUESTED_VALUE: ULong = 524288uL
+    @JvmField public val MAP_GLYPHS_LOADED: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_LOADED_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_LOADED]. */
-    public const val MAP_GLYPHS_LOADED_VALUE: ULong = 2097152uL
-    @JvmField
-    public val MAP_GLYPHS_ERROR: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_ERROR_VALUE)
+    public const val MAP_GLYPHS_LOADED_VALUE: ULong = 1048576uL
+    @JvmField public val MAP_GLYPHS_ERROR: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_ERROR_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_ERROR]. */
-    public const val MAP_GLYPHS_ERROR_VALUE: ULong = 4194304uL
-    @JvmField
-    public val MAP_SPRITE_REQUESTED: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_REQUESTED_VALUE)
+    public const val MAP_GLYPHS_ERROR_VALUE: ULong = 2097152uL
+    @JvmField public val MAP_SPRITE_REQUESTED: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_REQUESTED_VALUE)
     /** The `rawValue` of [MAP_SPRITE_REQUESTED]. */
-    public const val MAP_SPRITE_REQUESTED_VALUE: ULong = 8388608uL
-    @JvmField
-    public val MAP_SPRITE_LOADED: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_LOADED_VALUE)
+    public const val MAP_SPRITE_REQUESTED_VALUE: ULong = 4194304uL
+    @JvmField public val MAP_SPRITE_LOADED: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_LOADED_VALUE)
     /** The `rawValue` of [MAP_SPRITE_LOADED]. */
-    public const val MAP_SPRITE_LOADED_VALUE: ULong = 16777216uL
-    @JvmField
-    public val MAP_SPRITE_ERROR: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_ERROR_VALUE)
+    public const val MAP_SPRITE_LOADED_VALUE: ULong = 8388608uL
+    @JvmField public val MAP_SPRITE_ERROR: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_ERROR_VALUE)
     /** The `rawValue` of [MAP_SPRITE_ERROR]. */
-    public const val MAP_SPRITE_ERROR_VALUE: ULong = 33554432uL
+    public const val MAP_SPRITE_ERROR_VALUE: ULong = 16777216uL
     @JvmField public val ALL_MAP_EVENTS: RuntimeEventFlag = RuntimeEventFlag(ALL_MAP_EVENTS_VALUE)
     /** The `rawValue` of [ALL_MAP_EVENTS]. */
-    public const val ALL_MAP_EVENTS_VALUE: ULong = 66191358uL
-    @JvmField
-    public val ALL_RUNTIME_EVENTS: RuntimeEventFlag = RuntimeEventFlag(ALL_RUNTIME_EVENTS_VALUE)
+    public const val ALL_MAP_EVENTS_VALUE: ULong = 33161214uL
+    @JvmField public val ALL_RUNTIME_EVENTS: RuntimeEventFlag = RuntimeEventFlag(ALL_RUNTIME_EVENTS_VALUE)
     /** The `rawValue` of [ALL_RUNTIME_EVENTS]. */
-    public const val ALL_RUNTIME_EVENTS_VALUE: ULong = 917504uL
+    public const val ALL_RUNTIME_EVENTS_VALUE: ULong = 393216uL
     @JvmField public val ALL: RuntimeEventFlag = RuntimeEventFlag(ALL_VALUE)
     /** The `rawValue` of [ALL]. */
-    public const val ALL_VALUE: ULong = 67108862uL
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    public const val ALL_VALUE: ULong = 33554430uL
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: ULong): RuntimeEventFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        MAP_CAMERA_WILL_CHANGE_VALUE -> MAP_CAMERA_WILL_CHANGE
-        MAP_CAMERA_IS_CHANGING_VALUE -> MAP_CAMERA_IS_CHANGING
-        MAP_CAMERA_DID_CHANGE_VALUE -> MAP_CAMERA_DID_CHANGE
-        MAP_STYLE_LOADED_VALUE -> MAP_STYLE_LOADED
-        MAP_LOADING_STARTED_VALUE -> MAP_LOADING_STARTED
-        MAP_LOADING_FINISHED_VALUE -> MAP_LOADING_FINISHED
-        MAP_LOADING_FAILED_VALUE -> MAP_LOADING_FAILED
-        MAP_IDLE_VALUE -> MAP_IDLE
-        MAP_RENDER_ERROR_VALUE -> MAP_RENDER_ERROR
-        MAP_RENDER_FRAME_STARTED_VALUE -> MAP_RENDER_FRAME_STARTED
-        MAP_RENDER_FRAME_FINISHED_VALUE -> MAP_RENDER_FRAME_FINISHED
-        MAP_RENDER_MAP_STARTED_VALUE -> MAP_RENDER_MAP_STARTED
-        MAP_RENDER_MAP_FINISHED_VALUE -> MAP_RENDER_MAP_FINISHED
-        MAP_STYLE_IMAGE_MISSING_VALUE -> MAP_STYLE_IMAGE_MISSING
-        MAP_TILE_ACTION_VALUE -> MAP_TILE_ACTION
-        MAP_SOURCE_CHANGED_VALUE -> MAP_SOURCE_CHANGED
-        OFFLINE_REGION_STATUS_CHANGED_VALUE -> OFFLINE_REGION_STATUS_CHANGED
-        OFFLINE_REGION_RESPONSE_ERROR_VALUE -> OFFLINE_REGION_RESPONSE_ERROR
-        OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE -> OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
-        MAP_GLYPHS_REQUESTED_VALUE -> MAP_GLYPHS_REQUESTED
-        MAP_GLYPHS_LOADED_VALUE -> MAP_GLYPHS_LOADED
-        MAP_GLYPHS_ERROR_VALUE -> MAP_GLYPHS_ERROR
-        MAP_SPRITE_REQUESTED_VALUE -> MAP_SPRITE_REQUESTED
-        MAP_SPRITE_LOADED_VALUE -> MAP_SPRITE_LOADED
-        MAP_SPRITE_ERROR_VALUE -> MAP_SPRITE_ERROR
-        ALL_MAP_EVENTS_VALUE -> ALL_MAP_EVENTS
-        ALL_RUNTIME_EVENTS_VALUE -> ALL_RUNTIME_EVENTS
-        ALL_VALUE -> ALL
-        else -> RuntimeEventFlag(rawValue)
-      }
+    public fun of(rawValue: ULong): RuntimeEventFlag = when (rawValue) { NONE_VALUE -> NONE; MAP_CAMERA_WILL_CHANGE_VALUE -> MAP_CAMERA_WILL_CHANGE; MAP_CAMERA_IS_CHANGING_VALUE -> MAP_CAMERA_IS_CHANGING; MAP_CAMERA_DID_CHANGE_VALUE -> MAP_CAMERA_DID_CHANGE; MAP_STYLE_LOADED_VALUE -> MAP_STYLE_LOADED; MAP_LOADING_STARTED_VALUE -> MAP_LOADING_STARTED; MAP_LOADING_FINISHED_VALUE -> MAP_LOADING_FINISHED; MAP_LOADING_FAILED_VALUE -> MAP_LOADING_FAILED; MAP_IDLE_VALUE -> MAP_IDLE; MAP_RENDER_ERROR_VALUE -> MAP_RENDER_ERROR; MAP_RENDER_FRAME_STARTED_VALUE -> MAP_RENDER_FRAME_STARTED; MAP_RENDER_FRAME_FINISHED_VALUE -> MAP_RENDER_FRAME_FINISHED; MAP_RENDER_MAP_STARTED_VALUE -> MAP_RENDER_MAP_STARTED; MAP_RENDER_MAP_FINISHED_VALUE -> MAP_RENDER_MAP_FINISHED; MAP_STYLE_IMAGE_MISSING_VALUE -> MAP_STYLE_IMAGE_MISSING; MAP_TILE_ACTION_VALUE -> MAP_TILE_ACTION; MAP_SOURCE_CHANGED_VALUE -> MAP_SOURCE_CHANGED; OFFLINE_REGION_STATUS_CHANGED_VALUE -> OFFLINE_REGION_STATUS_CHANGED; OFFLINE_REGION_RESPONSE_ERROR_VALUE -> OFFLINE_REGION_RESPONSE_ERROR; MAP_GLYPHS_REQUESTED_VALUE -> MAP_GLYPHS_REQUESTED; MAP_GLYPHS_LOADED_VALUE -> MAP_GLYPHS_LOADED; MAP_GLYPHS_ERROR_VALUE -> MAP_GLYPHS_ERROR; MAP_SPRITE_REQUESTED_VALUE -> MAP_SPRITE_REQUESTED; MAP_SPRITE_LOADED_VALUE -> MAP_SPRITE_LOADED; MAP_SPRITE_ERROR_VALUE -> MAP_SPRITE_ERROR; ALL_MAP_EVENTS_VALUE -> ALL_MAP_EVENTS; ALL_RUNTIME_EVENTS_VALUE -> ALL_RUNTIME_EVENTS; ALL_VALUE -> ALL; else -> RuntimeEventFlag(rawValue) }
   }
 }
-
 /**
  * The kind of handle that raised an event.
  *
@@ -2487,18 +1878,9 @@ public class RuntimeEventFlag(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class RuntimeEventSourceType(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "RUNTIME"
-      1u -> "MAP"
-      else -> "RuntimeEventSourceType($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is RuntimeEventSourceType && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "RUNTIME"; 1u -> "MAP"; else -> "RuntimeEventSourceType($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is RuntimeEventSourceType && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val RUNTIME: RuntimeEventSourceType = RuntimeEventSourceType(RUNTIME_VALUE)
     /** The `rawValue` of [RUNTIME]. */
@@ -2506,25 +1888,19 @@ public class RuntimeEventSourceType(@get:JvmName("getRawValue") public val rawVa
     @JvmField public val MAP: RuntimeEventSourceType = RuntimeEventSourceType(MAP_VALUE)
     /** The `rawValue` of [MAP]. */
     public const val MAP_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RuntimeEventSourceType =
-      when (rawValue) {
-        RUNTIME_VALUE -> RUNTIME
-        MAP_VALUE -> MAP
-        else -> RuntimeEventSourceType(rawValue)
-      }
+    public fun of(rawValue: UInt): RuntimeEventSourceType = when (rawValue) { RUNTIME_VALUE -> RUNTIME; MAP_VALUE -> MAP; else -> RuntimeEventSourceType(rawValue) }
   }
 }
-
 /**
  * The kind of an event.
  *
- * Only maps in `MapMode.CONTINUOUS` raise `RuntimeEventType.MAP_LOADING_FINISHED`,
- * `RuntimeEventType.MAP_IDLE`, and the render frame and render map events. Offline region events
- * come only for the regions and types that `RuntimeHandle.setOfflineRegionObserved()` selects.
+ * Only maps in `MapMode.CONTINUOUS` raise
+ * `RuntimeEventType.MAP_LOADING_FINISHED`, `RuntimeEventType.MAP_IDLE`, and the
+ * render frame and render map events. Offline region events come only for the
+ * regions and types that `RuntimeHandle.setOfflineRegionObserved()` selects.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
@@ -2532,202 +1908,114 @@ public class RuntimeEventSourceType(@get:JvmName("getRawValue") public val rawVa
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class RuntimeEventType(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      1u -> "MAP_CAMERA_WILL_CHANGE"
-      2u -> "MAP_CAMERA_IS_CHANGING"
-      3u -> "MAP_CAMERA_DID_CHANGE"
-      4u -> "MAP_STYLE_LOADED"
-      5u -> "MAP_LOADING_STARTED"
-      6u -> "MAP_LOADING_FINISHED"
-      7u -> "MAP_LOADING_FAILED"
-      8u -> "MAP_IDLE"
-      9u -> "MAP_RENDER_ERROR"
-      10u -> "MAP_RENDER_FRAME_STARTED"
-      11u -> "MAP_RENDER_FRAME_FINISHED"
-      12u -> "MAP_RENDER_MAP_STARTED"
-      13u -> "MAP_RENDER_MAP_FINISHED"
-      14u -> "MAP_STYLE_IMAGE_MISSING"
-      15u -> "MAP_TILE_ACTION"
-      16u -> "MAP_SOURCE_CHANGED"
-      17u -> "OFFLINE_REGION_STATUS_CHANGED"
-      18u -> "OFFLINE_REGION_RESPONSE_ERROR"
-      19u -> "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED"
-      20u -> "MAP_GLYPHS_REQUESTED"
-      21u -> "MAP_GLYPHS_LOADED"
-      22u -> "MAP_GLYPHS_ERROR"
-      23u -> "MAP_SPRITE_REQUESTED"
-      24u -> "MAP_SPRITE_LOADED"
-      25u -> "MAP_SPRITE_ERROR"
-      else -> "RuntimeEventType($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is RuntimeEventType && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 1u -> "MAP_CAMERA_WILL_CHANGE"; 2u -> "MAP_CAMERA_IS_CHANGING"; 3u -> "MAP_CAMERA_DID_CHANGE"; 4u -> "MAP_STYLE_LOADED"; 5u -> "MAP_LOADING_STARTED"; 6u -> "MAP_LOADING_FINISHED"; 7u -> "MAP_LOADING_FAILED"; 8u -> "MAP_IDLE"; 9u -> "MAP_RENDER_ERROR"; 10u -> "MAP_RENDER_FRAME_STARTED"; 11u -> "MAP_RENDER_FRAME_FINISHED"; 12u -> "MAP_RENDER_MAP_STARTED"; 13u -> "MAP_RENDER_MAP_FINISHED"; 14u -> "MAP_STYLE_IMAGE_MISSING"; 15u -> "MAP_TILE_ACTION"; 16u -> "MAP_SOURCE_CHANGED"; 17u -> "OFFLINE_REGION_STATUS_CHANGED"; 18u -> "OFFLINE_REGION_RESPONSE_ERROR"; 19u -> "MAP_GLYPHS_REQUESTED"; 20u -> "MAP_GLYPHS_LOADED"; 21u -> "MAP_GLYPHS_ERROR"; 22u -> "MAP_SPRITE_REQUESTED"; 23u -> "MAP_SPRITE_LOADED"; 24u -> "MAP_SPRITE_ERROR"; else -> "RuntimeEventType($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is RuntimeEventType && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    @JvmField
-    public val MAP_CAMERA_WILL_CHANGE: RuntimeEventType =
-      RuntimeEventType(MAP_CAMERA_WILL_CHANGE_VALUE)
+    @JvmField public val MAP_CAMERA_WILL_CHANGE: RuntimeEventType = RuntimeEventType(MAP_CAMERA_WILL_CHANGE_VALUE)
     /** The `rawValue` of [MAP_CAMERA_WILL_CHANGE]. */
     public const val MAP_CAMERA_WILL_CHANGE_VALUE: UInt = 1u
-    @JvmField
-    public val MAP_CAMERA_IS_CHANGING: RuntimeEventType =
-      RuntimeEventType(MAP_CAMERA_IS_CHANGING_VALUE)
+    @JvmField public val MAP_CAMERA_IS_CHANGING: RuntimeEventType = RuntimeEventType(MAP_CAMERA_IS_CHANGING_VALUE)
     /** The `rawValue` of [MAP_CAMERA_IS_CHANGING]. */
     public const val MAP_CAMERA_IS_CHANGING_VALUE: UInt = 2u
-    @JvmField
-    public val MAP_CAMERA_DID_CHANGE: RuntimeEventType =
-      RuntimeEventType(MAP_CAMERA_DID_CHANGE_VALUE)
+    @JvmField public val MAP_CAMERA_DID_CHANGE: RuntimeEventType = RuntimeEventType(MAP_CAMERA_DID_CHANGE_VALUE)
     /** The `rawValue` of [MAP_CAMERA_DID_CHANGE]. */
     public const val MAP_CAMERA_DID_CHANGE_VALUE: UInt = 3u
-    @JvmField
-    public val MAP_STYLE_LOADED: RuntimeEventType = RuntimeEventType(MAP_STYLE_LOADED_VALUE)
+    @JvmField public val MAP_STYLE_LOADED: RuntimeEventType = RuntimeEventType(MAP_STYLE_LOADED_VALUE)
     /** The `rawValue` of [MAP_STYLE_LOADED]. */
     public const val MAP_STYLE_LOADED_VALUE: UInt = 4u
-    /** The map started to load a style. */
-    @JvmField
-    public val MAP_LOADING_STARTED: RuntimeEventType = RuntimeEventType(MAP_LOADING_STARTED_VALUE)
+    /**
+     * The map started to load a style.
+     */
+    @JvmField public val MAP_LOADING_STARTED: RuntimeEventType = RuntimeEventType(MAP_LOADING_STARTED_VALUE)
     /** The `rawValue` of [MAP_LOADING_STARTED]. */
     public const val MAP_LOADING_STARTED_VALUE: UInt = 5u
     /**
-     * The map loaded its style and everything that the current view needs, and rendered the result.
+     * The map loaded its style and everything that the current view needs, and
+     * rendered the result.
      */
-    @JvmField
-    public val MAP_LOADING_FINISHED: RuntimeEventType = RuntimeEventType(MAP_LOADING_FINISHED_VALUE)
+    @JvmField public val MAP_LOADING_FINISHED: RuntimeEventType = RuntimeEventType(MAP_LOADING_FINISHED_VALUE)
     /** The `rawValue` of [MAP_LOADING_FINISHED]. */
     public const val MAP_LOADING_FINISHED_VALUE: UInt = 6u
-    /** The map failed to load a style. */
-    @JvmField
-    public val MAP_LOADING_FAILED: RuntimeEventType = RuntimeEventType(MAP_LOADING_FAILED_VALUE)
+    /**
+     * The map failed to load a style.
+     */
+    @JvmField public val MAP_LOADING_FAILED: RuntimeEventType = RuntimeEventType(MAP_LOADING_FAILED_VALUE)
     /** The `rawValue` of [MAP_LOADING_FAILED]. */
     public const val MAP_LOADING_FAILED_VALUE: UInt = 7u
-    /** The map rendered a complete frame and has nothing left to load, animate, or redraw. */
+    /**
+     * The map rendered a complete frame and has nothing left to load, animate,
+     * or redraw.
+     */
     @JvmField public val MAP_IDLE: RuntimeEventType = RuntimeEventType(MAP_IDLE_VALUE)
     /** The `rawValue` of [MAP_IDLE]. */
     public const val MAP_IDLE_VALUE: UInt = 8u
-    @JvmField
-    public val MAP_RENDER_ERROR: RuntimeEventType = RuntimeEventType(MAP_RENDER_ERROR_VALUE)
+    @JvmField public val MAP_RENDER_ERROR: RuntimeEventType = RuntimeEventType(MAP_RENDER_ERROR_VALUE)
     /** The `rawValue` of [MAP_RENDER_ERROR]. */
     public const val MAP_RENDER_ERROR_VALUE: UInt = 9u
-    @JvmField
-    public val MAP_RENDER_FRAME_STARTED: RuntimeEventType =
-      RuntimeEventType(MAP_RENDER_FRAME_STARTED_VALUE)
+    @JvmField public val MAP_RENDER_FRAME_STARTED: RuntimeEventType = RuntimeEventType(MAP_RENDER_FRAME_STARTED_VALUE)
     /** The `rawValue` of [MAP_RENDER_FRAME_STARTED]. */
     public const val MAP_RENDER_FRAME_STARTED_VALUE: UInt = 10u
-    @JvmField
-    public val MAP_RENDER_FRAME_FINISHED: RuntimeEventType =
-      RuntimeEventType(MAP_RENDER_FRAME_FINISHED_VALUE)
+    @JvmField public val MAP_RENDER_FRAME_FINISHED: RuntimeEventType = RuntimeEventType(MAP_RENDER_FRAME_FINISHED_VALUE)
     /** The `rawValue` of [MAP_RENDER_FRAME_FINISHED]. */
     public const val MAP_RENDER_FRAME_FINISHED_VALUE: UInt = 11u
-    @JvmField
-    public val MAP_RENDER_MAP_STARTED: RuntimeEventType =
-      RuntimeEventType(MAP_RENDER_MAP_STARTED_VALUE)
+    @JvmField public val MAP_RENDER_MAP_STARTED: RuntimeEventType = RuntimeEventType(MAP_RENDER_MAP_STARTED_VALUE)
     /** The `rawValue` of [MAP_RENDER_MAP_STARTED]. */
     public const val MAP_RENDER_MAP_STARTED_VALUE: UInt = 12u
-    @JvmField
-    public val MAP_RENDER_MAP_FINISHED: RuntimeEventType =
-      RuntimeEventType(MAP_RENDER_MAP_FINISHED_VALUE)
+    @JvmField public val MAP_RENDER_MAP_FINISHED: RuntimeEventType = RuntimeEventType(MAP_RENDER_MAP_FINISHED_VALUE)
     /** The `rawValue` of [MAP_RENDER_MAP_FINISHED]. */
     public const val MAP_RENDER_MAP_FINISHED_VALUE: UInt = 13u
-    /** The style uses an image that it doesn't have. */
-    @JvmField
-    public val MAP_STYLE_IMAGE_MISSING: RuntimeEventType =
-      RuntimeEventType(MAP_STYLE_IMAGE_MISSING_VALUE)
+    /**
+     * The style uses an image that it doesn't have.
+     */
+    @JvmField public val MAP_STYLE_IMAGE_MISSING: RuntimeEventType = RuntimeEventType(MAP_STYLE_IMAGE_MISSING_VALUE)
     /** The `rawValue` of [MAP_STYLE_IMAGE_MISSING]. */
     public const val MAP_STYLE_IMAGE_MISSING_VALUE: UInt = 14u
-    /** A tile moved to another step of loading. */
+    /**
+     * A tile moved to another step of loading.
+     */
     @JvmField public val MAP_TILE_ACTION: RuntimeEventType = RuntimeEventType(MAP_TILE_ACTION_VALUE)
     /** The `rawValue` of [MAP_TILE_ACTION]. */
     public const val MAP_TILE_ACTION_VALUE: UInt = 15u
-    /** A source in the style changed, such as when its TileJSON loads. */
-    @JvmField
-    public val MAP_SOURCE_CHANGED: RuntimeEventType = RuntimeEventType(MAP_SOURCE_CHANGED_VALUE)
+    /**
+     * A source in the style changed, such as when its TileJSON loads.
+     */
+    @JvmField public val MAP_SOURCE_CHANGED: RuntimeEventType = RuntimeEventType(MAP_SOURCE_CHANGED_VALUE)
     /** The `rawValue` of [MAP_SOURCE_CHANGED]. */
     public const val MAP_SOURCE_CHANGED_VALUE: UInt = 16u
-    @JvmField
-    public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventType =
-      RuntimeEventType(OFFLINE_REGION_STATUS_CHANGED_VALUE)
+    @JvmField public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventType = RuntimeEventType(OFFLINE_REGION_STATUS_CHANGED_VALUE)
     /** The `rawValue` of [OFFLINE_REGION_STATUS_CHANGED]. */
     public const val OFFLINE_REGION_STATUS_CHANGED_VALUE: UInt = 17u
-    /** A resource that the region needs failed to download. */
-    @JvmField
-    public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType =
-      RuntimeEventType(OFFLINE_REGION_RESPONSE_ERROR_VALUE)
+    /**
+     * A resource that the region needs failed to download.
+     */
+    @JvmField public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(OFFLINE_REGION_RESPONSE_ERROR_VALUE)
     /** The `rawValue` of [OFFLINE_REGION_RESPONSE_ERROR]. */
     public const val OFFLINE_REGION_RESPONSE_ERROR_VALUE: UInt = 18u
-    /**
-     * The region's download became inactive because the cache file's offline regions hold as many
-     * tiles from MapLibre's demo tile server as the limit allows. Only tiles of sources with a
-     * `maplibre://` URL count toward the limit.
-     */
-    @JvmField
-    public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType =
-      RuntimeEventType(OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE)
-    /** The `rawValue` of [OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED]. */
-    public const val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE: UInt = 19u
-    @JvmField
-    public val MAP_GLYPHS_REQUESTED: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_REQUESTED_VALUE)
+    @JvmField public val MAP_GLYPHS_REQUESTED: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_REQUESTED_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_REQUESTED]. */
-    public const val MAP_GLYPHS_REQUESTED_VALUE: UInt = 20u
-    @JvmField
-    public val MAP_GLYPHS_LOADED: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_LOADED_VALUE)
+    public const val MAP_GLYPHS_REQUESTED_VALUE: UInt = 19u
+    @JvmField public val MAP_GLYPHS_LOADED: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_LOADED_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_LOADED]. */
-    public const val MAP_GLYPHS_LOADED_VALUE: UInt = 21u
-    @JvmField
-    public val MAP_GLYPHS_ERROR: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_ERROR_VALUE)
+    public const val MAP_GLYPHS_LOADED_VALUE: UInt = 20u
+    @JvmField public val MAP_GLYPHS_ERROR: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_ERROR_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_ERROR]. */
-    public const val MAP_GLYPHS_ERROR_VALUE: UInt = 22u
-    @JvmField
-    public val MAP_SPRITE_REQUESTED: RuntimeEventType = RuntimeEventType(MAP_SPRITE_REQUESTED_VALUE)
+    public const val MAP_GLYPHS_ERROR_VALUE: UInt = 21u
+    @JvmField public val MAP_SPRITE_REQUESTED: RuntimeEventType = RuntimeEventType(MAP_SPRITE_REQUESTED_VALUE)
     /** The `rawValue` of [MAP_SPRITE_REQUESTED]. */
-    public const val MAP_SPRITE_REQUESTED_VALUE: UInt = 23u
-    @JvmField
-    public val MAP_SPRITE_LOADED: RuntimeEventType = RuntimeEventType(MAP_SPRITE_LOADED_VALUE)
+    public const val MAP_SPRITE_REQUESTED_VALUE: UInt = 22u
+    @JvmField public val MAP_SPRITE_LOADED: RuntimeEventType = RuntimeEventType(MAP_SPRITE_LOADED_VALUE)
     /** The `rawValue` of [MAP_SPRITE_LOADED]. */
-    public const val MAP_SPRITE_LOADED_VALUE: UInt = 24u
-    @JvmField
-    public val MAP_SPRITE_ERROR: RuntimeEventType = RuntimeEventType(MAP_SPRITE_ERROR_VALUE)
+    public const val MAP_SPRITE_LOADED_VALUE: UInt = 23u
+    @JvmField public val MAP_SPRITE_ERROR: RuntimeEventType = RuntimeEventType(MAP_SPRITE_ERROR_VALUE)
     /** The `rawValue` of [MAP_SPRITE_ERROR]. */
-    public const val MAP_SPRITE_ERROR_VALUE: UInt = 25u
-
+    public const val MAP_SPRITE_ERROR_VALUE: UInt = 24u
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): RuntimeEventType =
-      when (rawValue) {
-        MAP_CAMERA_WILL_CHANGE_VALUE -> MAP_CAMERA_WILL_CHANGE
-        MAP_CAMERA_IS_CHANGING_VALUE -> MAP_CAMERA_IS_CHANGING
-        MAP_CAMERA_DID_CHANGE_VALUE -> MAP_CAMERA_DID_CHANGE
-        MAP_STYLE_LOADED_VALUE -> MAP_STYLE_LOADED
-        MAP_LOADING_STARTED_VALUE -> MAP_LOADING_STARTED
-        MAP_LOADING_FINISHED_VALUE -> MAP_LOADING_FINISHED
-        MAP_LOADING_FAILED_VALUE -> MAP_LOADING_FAILED
-        MAP_IDLE_VALUE -> MAP_IDLE
-        MAP_RENDER_ERROR_VALUE -> MAP_RENDER_ERROR
-        MAP_RENDER_FRAME_STARTED_VALUE -> MAP_RENDER_FRAME_STARTED
-        MAP_RENDER_FRAME_FINISHED_VALUE -> MAP_RENDER_FRAME_FINISHED
-        MAP_RENDER_MAP_STARTED_VALUE -> MAP_RENDER_MAP_STARTED
-        MAP_RENDER_MAP_FINISHED_VALUE -> MAP_RENDER_MAP_FINISHED
-        MAP_STYLE_IMAGE_MISSING_VALUE -> MAP_STYLE_IMAGE_MISSING
-        MAP_TILE_ACTION_VALUE -> MAP_TILE_ACTION
-        MAP_SOURCE_CHANGED_VALUE -> MAP_SOURCE_CHANGED
-        OFFLINE_REGION_STATUS_CHANGED_VALUE -> OFFLINE_REGION_STATUS_CHANGED
-        OFFLINE_REGION_RESPONSE_ERROR_VALUE -> OFFLINE_REGION_RESPONSE_ERROR
-        OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE -> OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
-        MAP_GLYPHS_REQUESTED_VALUE -> MAP_GLYPHS_REQUESTED
-        MAP_GLYPHS_LOADED_VALUE -> MAP_GLYPHS_LOADED
-        MAP_GLYPHS_ERROR_VALUE -> MAP_GLYPHS_ERROR
-        MAP_SPRITE_REQUESTED_VALUE -> MAP_SPRITE_REQUESTED
-        MAP_SPRITE_LOADED_VALUE -> MAP_SPRITE_LOADED
-        MAP_SPRITE_ERROR_VALUE -> MAP_SPRITE_ERROR
-        else -> RuntimeEventType(rawValue)
-      }
+    public fun of(rawValue: UInt): RuntimeEventType = when (rawValue) { MAP_CAMERA_WILL_CHANGE_VALUE -> MAP_CAMERA_WILL_CHANGE; MAP_CAMERA_IS_CHANGING_VALUE -> MAP_CAMERA_IS_CHANGING; MAP_CAMERA_DID_CHANGE_VALUE -> MAP_CAMERA_DID_CHANGE; MAP_STYLE_LOADED_VALUE -> MAP_STYLE_LOADED; MAP_LOADING_STARTED_VALUE -> MAP_LOADING_STARTED; MAP_LOADING_FINISHED_VALUE -> MAP_LOADING_FINISHED; MAP_LOADING_FAILED_VALUE -> MAP_LOADING_FAILED; MAP_IDLE_VALUE -> MAP_IDLE; MAP_RENDER_ERROR_VALUE -> MAP_RENDER_ERROR; MAP_RENDER_FRAME_STARTED_VALUE -> MAP_RENDER_FRAME_STARTED; MAP_RENDER_FRAME_FINISHED_VALUE -> MAP_RENDER_FRAME_FINISHED; MAP_RENDER_MAP_STARTED_VALUE -> MAP_RENDER_MAP_STARTED; MAP_RENDER_MAP_FINISHED_VALUE -> MAP_RENDER_MAP_FINISHED; MAP_STYLE_IMAGE_MISSING_VALUE -> MAP_STYLE_IMAGE_MISSING; MAP_TILE_ACTION_VALUE -> MAP_TILE_ACTION; MAP_SOURCE_CHANGED_VALUE -> MAP_SOURCE_CHANGED; OFFLINE_REGION_STATUS_CHANGED_VALUE -> OFFLINE_REGION_STATUS_CHANGED; OFFLINE_REGION_RESPONSE_ERROR_VALUE -> OFFLINE_REGION_RESPONSE_ERROR; MAP_GLYPHS_REQUESTED_VALUE -> MAP_GLYPHS_REQUESTED; MAP_GLYPHS_LOADED_VALUE -> MAP_GLYPHS_LOADED; MAP_GLYPHS_ERROR_VALUE -> MAP_GLYPHS_ERROR; MAP_SPRITE_REQUESTED_VALUE -> MAP_SPRITE_REQUESTED; MAP_SPRITE_LOADED_VALUE -> MAP_SPRITE_LOADED; MAP_SPRITE_ERROR_VALUE -> MAP_SPRITE_ERROR; else -> RuntimeEventType(rawValue) }
   }
 }
-
 /**
  * The result of a call or of asynchronous work.
  *
@@ -2737,93 +2025,81 @@ public class RuntimeEventType(@get:JvmName("getRawValue") public val rawValue: U
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
 public class Status(public val rawValue: Int) {
-  override fun toString(): String =
-    when (rawValue) {
-      0 -> "OK"
-      -1 -> "INVALID_ARGUMENT"
-      -2 -> "INVALID_STATE"
-      -3 -> "WRONG_THREAD"
-      -4 -> "UNSUPPORTED"
-      -5 -> "NATIVE_ERROR"
-      -6 -> "CANCELLED"
-      -7 -> "BUSY"
-      -8 -> "TARGET_LOST"
-      -10 -> "NOT_FOUND"
-      -11 -> "ALREADY_EXISTS"
-      else -> "Status($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0 -> "OK"; -1 -> "INVALID_ARGUMENT"; -2 -> "INVALID_STATE"; -3 -> "WRONG_THREAD"; -4 -> "UNSUPPORTED"; -5 -> "NATIVE_ERROR"; -6 -> "CANCELLED"; -7 -> "BUSY"; -8 -> "TARGET_LOST"; -10 -> "NOT_FOUND"; -11 -> "ALREADY_EXISTS"; else -> "Status($rawValue)" }
   override fun equals(other: Any?): Boolean = other is Status && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val OK: Status = Status(OK_VALUE)
     /** The `rawValue` of [OK]. */
     public const val OK_VALUE: Int = 0
-    /** An argument is invalid, such as malformed JSON or a value out of range. */
+    /**
+     * An argument is invalid, such as malformed JSON or a value out of range.
+     */
     @JvmField public val INVALID_ARGUMENT: Status = Status(INVALID_ARGUMENT_VALUE)
     /** The `rawValue` of [INVALID_ARGUMENT]. */
     public const val INVALID_ARGUMENT_VALUE: Int = -1
     /**
-     * The call doesn't fit the current state, such as removing a source that a layer still uses.
+     * The call doesn't fit the current state, such as removing a source that a
+     * layer still uses.
      */
     @JvmField public val INVALID_STATE: Status = Status(INVALID_STATE_VALUE)
     /** The `rawValue` of [INVALID_STATE]. */
     public const val INVALID_STATE_VALUE: Int = -2
-    /** The call came from a thread that can't make it. */
+    /**
+     * The call came from a thread that can't make it.
+     */
     @JvmField public val WRONG_THREAD: Status = Status(WRONG_THREAD_VALUE)
     /** The `rawValue` of [WRONG_THREAD]. */
     public const val WRONG_THREAD_VALUE: Int = -3
-    /** The platform, the build, or the render target lacks the feature. */
+    /**
+     * The platform, the build, or the render target lacks the feature.
+     */
     @JvmField public val UNSUPPORTED: Status = Status(UNSUPPORTED_VALUE)
     /** The `rawValue` of [UNSUPPORTED]. */
     public const val UNSUPPORTED_VALUE: Int = -4
-    /** The library or the platform hit an error, such as a failed graphics driver call. */
+    /**
+     * The library or the platform hit an error, such as a failed graphics
+     * driver call.
+     */
     @JvmField public val NATIVE_ERROR: Status = Status(NATIVE_ERROR_VALUE)
     /** The `rawValue` of [NATIVE_ERROR]. */
     public const val NATIVE_ERROR_VALUE: Int = -5
-    /** The work stopped before it finished, such as when its handle was released. */
+    /**
+     * The work stopped before it finished, such as when its handle was
+     * released.
+     */
     @JvmField public val CANCELLED: Status = Status(CANCELLED_VALUE)
     /** The `rawValue` of [CANCELLED]. */
     public const val CANCELLED_VALUE: Int = -6
-    /** Another call is still using the same object. */
+    /**
+     * Another call is still using the same object.
+     */
     @JvmField public val BUSY: Status = Status(BUSY_VALUE)
     /** The `rawValue` of [BUSY]. */
     public const val BUSY_VALUE: Int = -7
-    /** The render target can't be drawn to anymore. */
+    /**
+     * The render target can't be drawn to anymore.
+     */
     @JvmField public val TARGET_LOST: Status = Status(TARGET_LOST_VALUE)
     /** The `rawValue` of [TARGET_LOST]. */
     public const val TARGET_LOST_VALUE: Int = -8
-    /** Nothing has the given ID. */
+    /**
+     * Nothing has the given ID.
+     */
     @JvmField public val NOT_FOUND: Status = Status(NOT_FOUND_VALUE)
     /** The `rawValue` of [NOT_FOUND]. */
     public const val NOT_FOUND_VALUE: Int = -10
-    /** Something already has the given ID. */
+    /**
+     * Something already has the given ID.
+     */
     @JvmField public val ALREADY_EXISTS: Status = Status(ALREADY_EXISTS_VALUE)
     /** The `rawValue` of [ALREADY_EXISTS]. */
     public const val ALREADY_EXISTS_VALUE: Int = -11
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
-    public fun of(rawValue: Int): Status =
-      when (rawValue) {
-        OK_VALUE -> OK
-        INVALID_ARGUMENT_VALUE -> INVALID_ARGUMENT
-        INVALID_STATE_VALUE -> INVALID_STATE
-        WRONG_THREAD_VALUE -> WRONG_THREAD
-        UNSUPPORTED_VALUE -> UNSUPPORTED
-        NATIVE_ERROR_VALUE -> NATIVE_ERROR
-        CANCELLED_VALUE -> CANCELLED
-        BUSY_VALUE -> BUSY
-        TARGET_LOST_VALUE -> TARGET_LOST
-        NOT_FOUND_VALUE -> NOT_FOUND
-        ALREADY_EXISTS_VALUE -> ALREADY_EXISTS
-        else -> Status(rawValue)
-      }
+    public fun of(rawValue: Int): Status = when (rawValue) { OK_VALUE -> OK; INVALID_ARGUMENT_VALUE -> INVALID_ARGUMENT; INVALID_STATE_VALUE -> INVALID_STATE; WRONG_THREAD_VALUE -> WRONG_THREAD; UNSUPPORTED_VALUE -> UNSUPPORTED; NATIVE_ERROR_VALUE -> NATIVE_ERROR; CANCELLED_VALUE -> CANCELLED; BUSY_VALUE -> BUSY; TARGET_LOST_VALUE -> TARGET_LOST; NOT_FOUND_VALUE -> NOT_FOUND; ALREADY_EXISTS_VALUE -> ALREADY_EXISTS; else -> Status(rawValue) }
   }
 }
-
 /**
  * The type of a style expression's result, or of the items of an array result.
  *
@@ -2833,29 +2109,13 @@ public class Status(public val rawValue: Int) {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 public class StyleExpressionTypeKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "VALUE"
-      1u -> "NUMBER"
-      2u -> "STRING"
-      3u -> "BOOLEAN"
-      4u -> "COLOR"
-      5u -> "OBJECT"
-      6u -> "FORMATTED"
-      7u -> "IMAGE"
-      8u -> "PADDING"
-      9u -> "VARIABLE_ANCHOR_OFFSET_COLLECTION"
-      10u -> "ARRAY"
-      else -> "StyleExpressionTypeKind($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is StyleExpressionTypeKind && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "VALUE"; 1u -> "NUMBER"; 2u -> "STRING"; 3u -> "BOOLEAN"; 4u -> "COLOR"; 5u -> "OBJECT"; 6u -> "FORMATTED"; 7u -> "IMAGE"; 8u -> "PADDING"; 9u -> "VARIABLE_ANCHOR_OFFSET_COLLECTION"; 10u -> "ARRAY"; else -> "StyleExpressionTypeKind($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is StyleExpressionTypeKind && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** Any type. */
+    /**
+     * Any type.
+     */
     @JvmField public val VALUE: StyleExpressionTypeKind = StyleExpressionTypeKind(VALUE_VALUE)
     /** The `rawValue` of [VALUE]. */
     public const val VALUE_VALUE: UInt = 0u
@@ -2874,8 +2134,7 @@ public class StyleExpressionTypeKind(@get:JvmName("getRawValue") public val rawV
     @JvmField public val OBJECT: StyleExpressionTypeKind = StyleExpressionTypeKind(OBJECT_VALUE)
     /** The `rawValue` of [OBJECT]. */
     public const val OBJECT_VALUE: UInt = 5u
-    @JvmField
-    public val FORMATTED: StyleExpressionTypeKind = StyleExpressionTypeKind(FORMATTED_VALUE)
+    @JvmField public val FORMATTED: StyleExpressionTypeKind = StyleExpressionTypeKind(FORMATTED_VALUE)
     /** The `rawValue` of [FORMATTED]. */
     public const val FORMATTED_VALUE: UInt = 6u
     @JvmField public val IMAGE: StyleExpressionTypeKind = StyleExpressionTypeKind(IMAGE_VALUE)
@@ -2884,36 +2143,18 @@ public class StyleExpressionTypeKind(@get:JvmName("getRawValue") public val rawV
     @JvmField public val PADDING: StyleExpressionTypeKind = StyleExpressionTypeKind(PADDING_VALUE)
     /** The `rawValue` of [PADDING]. */
     public const val PADDING_VALUE: UInt = 8u
-    @JvmField
-    public val VARIABLE_ANCHOR_OFFSET_COLLECTION: StyleExpressionTypeKind =
-      StyleExpressionTypeKind(VARIABLE_ANCHOR_OFFSET_COLLECTION_VALUE)
+    @JvmField public val VARIABLE_ANCHOR_OFFSET_COLLECTION: StyleExpressionTypeKind = StyleExpressionTypeKind(VARIABLE_ANCHOR_OFFSET_COLLECTION_VALUE)
     /** The `rawValue` of [VARIABLE_ANCHOR_OFFSET_COLLECTION]. */
     public const val VARIABLE_ANCHOR_OFFSET_COLLECTION_VALUE: UInt = 9u
     @JvmField public val ARRAY: StyleExpressionTypeKind = StyleExpressionTypeKind(ARRAY_VALUE)
     /** The `rawValue` of [ARRAY]. */
     public const val ARRAY_VALUE: UInt = 10u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): StyleExpressionTypeKind =
-      when (rawValue) {
-        VALUE_VALUE -> VALUE
-        NUMBER_VALUE -> NUMBER
-        STRING_VALUE -> STRING
-        BOOLEAN_VALUE -> BOOLEAN
-        COLOR_VALUE -> COLOR
-        OBJECT_VALUE -> OBJECT
-        FORMATTED_VALUE -> FORMATTED
-        IMAGE_VALUE -> IMAGE
-        PADDING_VALUE -> PADDING
-        VARIABLE_ANCHOR_OFFSET_COLLECTION_VALUE -> VARIABLE_ANCHOR_OFFSET_COLLECTION
-        ARRAY_VALUE -> ARRAY
-        else -> StyleExpressionTypeKind(rawValue)
-      }
+    public fun of(rawValue: UInt): StyleExpressionTypeKind = when (rawValue) { VALUE_VALUE -> VALUE; NUMBER_VALUE -> NUMBER; STRING_VALUE -> STRING; BOOLEAN_VALUE -> BOOLEAN; COLOR_VALUE -> COLOR; OBJECT_VALUE -> OBJECT; FORMATTED_VALUE -> FORMATTED; IMAGE_VALUE -> IMAGE; PADDING_VALUE -> PADDING; VARIABLE_ANCHOR_OFFSET_COLLECTION_VALUE -> VARIABLE_ANCHOR_OFFSET_COLLECTION; ARRAY_VALUE -> ARRAY; else -> StyleExpressionTypeKind(rawValue) }
   }
 }
-
 /**
  * How an image stretches to fit text along one axis.
  *
@@ -2923,22 +2164,11 @@ public class StyleExpressionTypeKind(@get:JvmName("getRawValue") public val rawV
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public class StyleImageTextFit(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "STRETCH_OR_SHRINK"
-      1u -> "STRETCH_ONLY"
-      2u -> "PROPORTIONAL"
-      else -> "StyleImageTextFit($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is StyleImageTextFit && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "STRETCH_OR_SHRINK"; 1u -> "STRETCH_ONLY"; 2u -> "PROPORTIONAL"; else -> "StyleImageTextFit($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is StyleImageTextFit && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    @JvmField
-    public val STRETCH_OR_SHRINK: StyleImageTextFit = StyleImageTextFit(STRETCH_OR_SHRINK_VALUE)
+    @JvmField public val STRETCH_OR_SHRINK: StyleImageTextFit = StyleImageTextFit(STRETCH_OR_SHRINK_VALUE)
     /** The `rawValue` of [STRETCH_OR_SHRINK]. */
     public const val STRETCH_OR_SHRINK_VALUE: UInt = 0u
     @JvmField public val STRETCH_ONLY: StyleImageTextFit = StyleImageTextFit(STRETCH_ONLY_VALUE)
@@ -2947,20 +2177,12 @@ public class StyleImageTextFit(@get:JvmName("getRawValue") public val rawValue: 
     @JvmField public val PROPORTIONAL: StyleImageTextFit = StyleImageTextFit(PROPORTIONAL_VALUE)
     /** The `rawValue` of [PROPORTIONAL]. */
     public const val PROPORTIONAL_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): StyleImageTextFit =
-      when (rawValue) {
-        STRETCH_OR_SHRINK_VALUE -> STRETCH_OR_SHRINK
-        STRETCH_ONLY_VALUE -> STRETCH_ONLY
-        PROPORTIONAL_VALUE -> PROPORTIONAL
-        else -> StyleImageTextFit(rawValue)
-      }
+    public fun of(rawValue: UInt): StyleImageTextFit = when (rawValue) { STRETCH_OR_SHRINK_VALUE -> STRETCH_OR_SHRINK; STRETCH_ONLY_VALUE -> STRETCH_ONLY; PROPORTIONAL_VALUE -> PROPORTIONAL; else -> StyleImageTextFit(rawValue) }
   }
 }
-
 /**
  * Whether a layer shows.
  *
@@ -2970,18 +2192,9 @@ public class StyleImageTextFit(@get:JvmName("getRawValue") public val rawValue: 
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public class StyleLayerVisibility(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "VISIBLE"
-      1u -> "NONE"
-      else -> "StyleLayerVisibility($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is StyleLayerVisibility && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "VISIBLE"; 1u -> "NONE"; else -> "StyleLayerVisibility($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is StyleLayerVisibility && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val VISIBLE: StyleLayerVisibility = StyleLayerVisibility(VISIBLE_VALUE)
     /** The `rawValue` of [VISIBLE]. */
@@ -2989,19 +2202,12 @@ public class StyleLayerVisibility(@get:JvmName("getRawValue") public val rawValu
     @JvmField public val NONE: StyleLayerVisibility = StyleLayerVisibility(NONE_VALUE)
     /** The `rawValue` of [NONE]. */
     public const val NONE_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): StyleLayerVisibility =
-      when (rawValue) {
-        VISIBLE_VALUE -> VISIBLE
-        NONE_VALUE -> NONE
-        else -> StyleLayerVisibility(rawValue)
-      }
+    public fun of(rawValue: UInt): StyleLayerVisibility = when (rawValue) { VISIBLE_VALUE -> VISIBLE; NONE_VALUE -> NONE; else -> StyleLayerVisibility(rawValue) }
   }
 }
-
 /**
  * How a raster DEM tile encodes elevation in its colors.
  *
@@ -3011,18 +2217,9 @@ public class StyleLayerVisibility(@get:JvmName("getRawValue") public val rawValu
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public class StyleRasterDemEncoding(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "MAPBOX"
-      1u -> "TERRARIUM"
-      else -> "StyleRasterDemEncoding($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is StyleRasterDemEncoding && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "MAPBOX"; 1u -> "TERRARIUM"; else -> "StyleRasterDemEncoding($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is StyleRasterDemEncoding && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val MAPBOX: StyleRasterDemEncoding = StyleRasterDemEncoding(MAPBOX_VALUE)
     /** The `rawValue` of [MAPBOX]. */
@@ -3030,19 +2227,12 @@ public class StyleRasterDemEncoding(@get:JvmName("getRawValue") public val rawVa
     @JvmField public val TERRARIUM: StyleRasterDemEncoding = StyleRasterDemEncoding(TERRARIUM_VALUE)
     /** The `rawValue` of [TERRARIUM]. */
     public const val TERRARIUM_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): StyleRasterDemEncoding =
-      when (rawValue) {
-        MAPBOX_VALUE -> MAPBOX
-        TERRARIUM_VALUE -> TERRARIUM
-        else -> StyleRasterDemEncoding(rawValue)
-      }
+    public fun of(rawValue: UInt): StyleRasterDemEncoding = when (rawValue) { MAPBOX_VALUE -> MAPBOX; TERRARIUM_VALUE -> TERRARIUM; else -> StyleRasterDemEncoding(rawValue) }
   }
 }
-
 /**
  * The type of a style source.
  *
@@ -3052,24 +2242,9 @@ public class StyleRasterDemEncoding(@get:JvmName("getRawValue") public val rawVa
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public class StyleSourceType(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "UNKNOWN"
-      1u -> "VECTOR"
-      2u -> "RASTER"
-      3u -> "RASTER_DEM"
-      4u -> "GEO_JSON"
-      5u -> "IMAGE"
-      6u -> "VIDEO"
-      7u -> "CUSTOM_GEOMETRY"
-      8u -> "CUSTOM_VECTOR"
-      else -> "StyleSourceType($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "UNKNOWN"; 1u -> "VECTOR"; 2u -> "RASTER"; 3u -> "RASTER_DEM"; 4u -> "GEO_JSON"; 5u -> "IMAGE"; 6u -> "VIDEO"; 7u -> "CUSTOM_GEOMETRY"; 8u -> "CUSTOM_VECTOR"; else -> "StyleSourceType($rawValue)" }
   override fun equals(other: Any?): Boolean = other is StyleSourceType && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val UNKNOWN: StyleSourceType = StyleSourceType(UNKNOWN_VALUE)
     /** The `rawValue` of [UNKNOWN]. */
@@ -3098,26 +2273,12 @@ public class StyleSourceType(@get:JvmName("getRawValue") public val rawValue: UI
     @JvmField public val CUSTOM_VECTOR: StyleSourceType = StyleSourceType(CUSTOM_VECTOR_VALUE)
     /** The `rawValue` of [CUSTOM_VECTOR]. */
     public const val CUSTOM_VECTOR_VALUE: UInt = 8u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): StyleSourceType =
-      when (rawValue) {
-        UNKNOWN_VALUE -> UNKNOWN
-        VECTOR_VALUE -> VECTOR
-        RASTER_VALUE -> RASTER
-        RASTER_DEM_VALUE -> RASTER_DEM
-        GEO_JSON_VALUE -> GEO_JSON
-        IMAGE_VALUE -> IMAGE
-        VIDEO_VALUE -> VIDEO
-        CUSTOM_GEOMETRY_VALUE -> CUSTOM_GEOMETRY
-        CUSTOM_VECTOR_VALUE -> CUSTOM_VECTOR
-        else -> StyleSourceType(rawValue)
-      }
+    public fun of(rawValue: UInt): StyleSourceType = when (rawValue) { UNKNOWN_VALUE -> UNKNOWN; VECTOR_VALUE -> VECTOR; RASTER_VALUE -> RASTER; RASTER_DEM_VALUE -> RASTER_DEM; GEO_JSON_VALUE -> GEO_JSON; IMAGE_VALUE -> IMAGE; VIDEO_VALUE -> VIDEO; CUSTOM_GEOMETRY_VALUE -> CUSTOM_GEOMETRY; CUSTOM_VECTOR_VALUE -> CUSTOM_VECTOR; else -> StyleSourceType(rawValue) }
   }
 }
-
 /**
  * Whether a tileset counts tile rows from the north (XYZ) or the south (TMS).
  *
@@ -3127,17 +2288,9 @@ public class StyleSourceType(@get:JvmName("getRawValue") public val rawValue: UI
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public class StyleTileScheme(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "XYZ"
-      1u -> "TMS"
-      else -> "StyleTileScheme($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "XYZ"; 1u -> "TMS"; else -> "StyleTileScheme($rawValue)" }
   override fun equals(other: Any?): Boolean = other is StyleTileScheme && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val XYZ: StyleTileScheme = StyleTileScheme(XYZ_VALUE)
     /** The `rawValue` of [XYZ]. */
@@ -3145,19 +2298,12 @@ public class StyleTileScheme(@get:JvmName("getRawValue") public val rawValue: UI
     @JvmField public val TMS: StyleTileScheme = StyleTileScheme(TMS_VALUE)
     /** The `rawValue` of [TMS]. */
     public const val TMS_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): StyleTileScheme =
-      when (rawValue) {
-        XYZ_VALUE -> XYZ
-        TMS_VALUE -> TMS
-        else -> StyleTileScheme(rawValue)
-      }
+    public fun of(rawValue: UInt): StyleTileScheme = when (rawValue) { XYZ_VALUE -> XYZ; TMS_VALUE -> TMS; else -> StyleTileScheme(rawValue) }
   }
 }
-
 /**
  * The format of vector tiles.
  *
@@ -3167,18 +2313,9 @@ public class StyleTileScheme(@get:JvmName("getRawValue") public val rawValue: UI
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public class StyleVectorTileEncoding(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "MVT"
-      1u -> "MLT"
-      else -> "StyleVectorTileEncoding($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is StyleVectorTileEncoding && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "MVT"; 1u -> "MLT"; else -> "StyleVectorTileEncoding($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is StyleVectorTileEncoding && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val MVT: StyleVectorTileEncoding = StyleVectorTileEncoding(MVT_VALUE)
     /** The `rawValue` of [MVT]. */
@@ -3186,19 +2323,12 @@ public class StyleVectorTileEncoding(@get:JvmName("getRawValue") public val rawV
     @JvmField public val MLT: StyleVectorTileEncoding = StyleVectorTileEncoding(MLT_VALUE)
     /** The `rawValue` of [MLT]. */
     public const val MLT_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): StyleVectorTileEncoding =
-      when (rawValue) {
-        MVT_VALUE -> MVT
-        MLT_VALUE -> MLT
-        else -> StyleVectorTileEncoding(rawValue)
-      }
+    public fun of(rawValue: UInt): StyleVectorTileEncoding = when (rawValue) { MVT_VALUE -> MVT; MLT_VALUE -> MLT; else -> StyleVectorTileEncoding(rawValue) }
   }
 }
-
 /**
  * How the map picks the level of detail of its tiles.
  *
@@ -3208,39 +2338,28 @@ public class StyleVectorTileEncoding(@get:JvmName("getRawValue") public val rawV
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class TileLodMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "DEFAULT"
-      1u -> "DISTANCE"
-      else -> "TileLodMode($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "DEFAULT"; 1u -> "DISTANCE"; else -> "TileLodMode($rawValue)" }
   override fun equals(other: Any?): Boolean = other is TileLodMode && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** Uses the most detail at the center of the screen. */
+    /**
+     * Uses the most detail at the center of the screen.
+     */
     @JvmField public val DEFAULT: TileLodMode = TileLodMode(DEFAULT_VALUE)
     /** The `rawValue` of [DEFAULT]. */
     public const val DEFAULT_VALUE: UInt = 0u
-    /** Uses the most detail closest to the camera. */
+    /**
+     * Uses the most detail closest to the camera.
+     */
     @JvmField public val DISTANCE: TileLodMode = TileLodMode(DISTANCE_VALUE)
     /** The `rawValue` of [DISTANCE]. */
     public const val DISTANCE_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): TileLodMode =
-      when (rawValue) {
-        DEFAULT_VALUE -> DEFAULT
-        DISTANCE_VALUE -> DISTANCE
-        else -> TileLodMode(rawValue)
-      }
+    public fun of(rawValue: UInt): TileLodMode = when (rawValue) { DEFAULT_VALUE -> DEFAULT; DISTANCE_VALUE -> DISTANCE; else -> TileLodMode(rawValue) }
   }
 }
-
 /**
  * A step in loading a tile.
  *
@@ -3250,31 +2369,14 @@ public class TileLodMode(@get:JvmName("getRawValue") public val rawValue: UInt) 
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public class TileOperation(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "REQUESTED_FROM_CACHE"
-      1u -> "REQUESTED_FROM_NETWORK"
-      2u -> "LOAD_FROM_NETWORK"
-      3u -> "LOAD_FROM_CACHE"
-      4u -> "START_PARSE"
-      5u -> "END_PARSE"
-      6u -> "ERROR"
-      7u -> "CANCELLED"
-      8u -> "NULL"
-      else -> "TileOperation($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "REQUESTED_FROM_CACHE"; 1u -> "REQUESTED_FROM_NETWORK"; 2u -> "LOAD_FROM_NETWORK"; 3u -> "LOAD_FROM_CACHE"; 4u -> "START_PARSE"; 5u -> "END_PARSE"; 6u -> "ERROR"; 7u -> "CANCELLED"; 8u -> "NULL"; else -> "TileOperation($rawValue)" }
   override fun equals(other: Any?): Boolean = other is TileOperation && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    @JvmField
-    public val REQUESTED_FROM_CACHE: TileOperation = TileOperation(REQUESTED_FROM_CACHE_VALUE)
+    @JvmField public val REQUESTED_FROM_CACHE: TileOperation = TileOperation(REQUESTED_FROM_CACHE_VALUE)
     /** The `rawValue` of [REQUESTED_FROM_CACHE]. */
     public const val REQUESTED_FROM_CACHE_VALUE: UInt = 0u
-    @JvmField
-    public val REQUESTED_FROM_NETWORK: TileOperation = TileOperation(REQUESTED_FROM_NETWORK_VALUE)
+    @JvmField public val REQUESTED_FROM_NETWORK: TileOperation = TileOperation(REQUESTED_FROM_NETWORK_VALUE)
     /** The `rawValue` of [REQUESTED_FROM_NETWORK]. */
     public const val REQUESTED_FROM_NETWORK_VALUE: UInt = 1u
     @JvmField public val LOAD_FROM_NETWORK: TileOperation = TileOperation(LOAD_FROM_NETWORK_VALUE)
@@ -3298,31 +2400,17 @@ public class TileOperation(@get:JvmName("getRawValue") public val rawValue: UInt
     @JvmField public val NULL: TileOperation = TileOperation(NULL_VALUE)
     /** The `rawValue` of [NULL]. */
     public const val NULL_VALUE: UInt = 8u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): TileOperation =
-      when (rawValue) {
-        REQUESTED_FROM_CACHE_VALUE -> REQUESTED_FROM_CACHE
-        REQUESTED_FROM_NETWORK_VALUE -> REQUESTED_FROM_NETWORK
-        LOAD_FROM_NETWORK_VALUE -> LOAD_FROM_NETWORK
-        LOAD_FROM_CACHE_VALUE -> LOAD_FROM_CACHE
-        START_PARSE_VALUE -> START_PARSE
-        END_PARSE_VALUE -> END_PARSE
-        ERROR_VALUE -> ERROR
-        CANCELLED_VALUE -> CANCELLED
-        NULL_VALUE -> NULL
-        else -> TileOperation(rawValue)
-      }
+    public fun of(rawValue: UInt): TileOperation = when (rawValue) { REQUESTED_FROM_CACHE_VALUE -> REQUESTED_FROM_CACHE; REQUESTED_FROM_NETWORK_VALUE -> REQUESTED_FROM_NETWORK; LOAD_FROM_NETWORK_VALUE -> LOAD_FROM_NETWORK; LOAD_FROM_CACHE_VALUE -> LOAD_FROM_CACHE; START_PARSE_VALUE -> START_PARSE; END_PARSE_VALUE -> END_PARSE; ERROR_VALUE -> ERROR; CANCELLED_VALUE -> CANCELLED; NULL_VALUE -> NULL; else -> TileOperation(rawValue) }
   }
 }
-
 /**
  * How a URL pattern matches a request's URL.
  *
- * A pattern matches the whole URL, query included. Without flags, it matches only the URL that
- * equals it exactly.
+ * A pattern matches the whole URL, query included. Without flags, it matches
+ * only the URL that equals it exactly.
  *
  * Later versions may add flags; unknown bits keep their place in `rawValue`.
  *
@@ -3331,47 +2419,32 @@ public class TileOperation(@get:JvmName("getRawValue") public val rawValue: UInt
  */
 public class UrlMatchFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
   public infix fun or(other: UrlMatchFlag): UrlMatchFlag = of(rawValue or other.rawValue)
-
   public infix fun and(other: UrlMatchFlag): UrlMatchFlag = of(rawValue and other.rawValue)
-
-  public operator fun contains(other: UrlMatchFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
+  public operator fun contains(other: UrlMatchFlag): Boolean = (rawValue and other.rawValue) == other.rawValue
   override fun toString(): String = flagLabel(rawValue.toULong(), "NONE", listOf(1uL to "GLOB"))
-
   override fun equals(other: Any?): Boolean = other is UrlMatchFlag && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     /** No flags. */
     @JvmField public val NONE: UrlMatchFlag = UrlMatchFlag(NONE_VALUE)
     /** The `rawValue` of [NONE]. */
     public const val NONE_VALUE: UInt = 0u
     /**
-     * The URL matches the pattern as a glob. `*` matches any characters except `/`, `**` matches
-     * any characters, and `?` matches one character except `/`. `\` makes the next character match
-     * only itself. For example, `https:// *.example.com/tiles/ **` matches every URL under
-     * `/tiles/` on each subdomain of `example.com`.
+     * The URL matches the pattern as a glob. `*` matches any characters except
+     * `/`, `**` matches any characters, and `?` matches one character except
+     * `/`. `\` makes the next character match only itself. For example,
+     * `https:// *.example.com/tiles/ **` matches every URL under `/tiles/` on
+     * each subdomain of `example.com`.
      */
     @JvmField public val GLOB: UrlMatchFlag = UrlMatchFlag(GLOB_VALUE)
     /** The `rawValue` of [GLOB]. */
     public const val GLOB_VALUE: UInt = 1u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
+    /** Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): UrlMatchFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        GLOB_VALUE -> GLOB
-        else -> UrlMatchFlag(rawValue)
-      }
+    public fun of(rawValue: UInt): UrlMatchFlag = when (rawValue) { NONE_VALUE -> NONE; GLOB_VALUE -> GLOB; else -> UrlMatchFlag(rawValue) }
   }
 }
-
 /**
  * The vertical direction of the image that the map renders.
  *
@@ -3381,307 +2454,213 @@ public class UrlMatchFlag(@get:JvmName("getRawValue") public val rawValue: UInt)
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public class ViewportMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "DEFAULT"
-      1u -> "FLIPPED_Y"
-      else -> "ViewportMode($rawValue)"
-    }
-
+  override fun toString(): String = when (rawValue) { 0u -> "DEFAULT"; 1u -> "FLIPPED_Y"; else -> "ViewportMode($rawValue)" }
   override fun equals(other: Any?): Boolean = other is ViewportMode && other.rawValue == rawValue
-
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
     @JvmField public val DEFAULT: ViewportMode = ViewportMode(DEFAULT_VALUE)
     /** The `rawValue` of [DEFAULT]. */
     public const val DEFAULT_VALUE: UInt = 0u
-    /** Renders the image upside down. */
+    /**
+     * Renders the image upside down.
+     */
     @JvmField public val FLIPPED_Y: ViewportMode = ViewportMode(FLIPPED_Y_VALUE)
     /** The `rawValue` of [FLIPPED_Y]. */
     public const val FLIPPED_Y_VALUE: UInt = 1u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): ViewportMode =
-      when (rawValue) {
-        DEFAULT_VALUE -> DEFAULT
-        FLIPPED_Y_VALUE -> FLIPPED_Y
-        else -> ViewportMode(rawValue)
-      }
+    public fun of(rawValue: UInt): ViewportMode = when (rawValue) { DEFAULT_VALUE -> DEFAULT; FLIPPED_Y_VALUE -> FLIPPED_Y; else -> ViewportMode(rawValue) }
   }
 }
-
 /**
  * The queue family that a borrowed image goes to after each frame.
  *
- * With `VulkanImageOwner.EXTERNAL` or `VulkanImageOwner.FOREIGN`, acquire the image on your side
- * before you read it. You don't need to release it back.
+ * With `VulkanImageOwner.EXTERNAL` or `VulkanImageOwner.FOREIGN`, acquire the
+ * image on your side before you read it. You don't need to release it back.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_vulkan_image_owner` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public class VulkanImageOwner(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "GRAPHICS_QUEUE"
-      1u -> "EXTERNAL"
-      2u -> "FOREIGN"
-      else -> "VulkanImageOwner($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is VulkanImageOwner && other.rawValue == rawValue
-
+  override fun toString(): String = when (rawValue) { 0u -> "GRAPHICS_QUEUE"; 1u -> "EXTERNAL"; 2u -> "FOREIGN"; else -> "VulkanImageOwner($rawValue)" }
+  override fun equals(other: Any?): Boolean = other is VulkanImageOwner && other.rawValue == rawValue
   override fun hashCode(): Int = rawValue.hashCode()
-
   public companion object {
-    /** The image stays with the queue family of `graphics_queue_family_index`. */
+    /**
+     * The image stays with the queue family of the device's queue.
+     */
     @JvmField public val GRAPHICS_QUEUE: VulkanImageOwner = VulkanImageOwner(GRAPHICS_QUEUE_VALUE)
     /** The `rawValue` of [GRAPHICS_QUEUE]. */
     public const val GRAPHICS_QUEUE_VALUE: UInt = 0u
-    /** Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL. */
+    /**
+     * Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL.
+     */
     @JvmField public val EXTERNAL: VulkanImageOwner = VulkanImageOwner(EXTERNAL_VALUE)
     /** The `rawValue` of [EXTERNAL]. */
     public const val EXTERNAL_VALUE: UInt = 1u
-    /** Each frame releases the image to VK_QUEUE_FAMILY_FOREIGN_EXT. */
+    /**
+     * Each frame releases the image to VK_QUEUE_FAMILY_FOREIGN_EXT.
+     */
     @JvmField public val FOREIGN: VulkanImageOwner = VulkanImageOwner(FOREIGN_VALUE)
     /** The `rawValue` of [FOREIGN]. */
     public const val FOREIGN_VALUE: UInt = 2u
-
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): VulkanImageOwner =
-      when (rawValue) {
-        GRAPHICS_QUEUE_VALUE -> GRAPHICS_QUEUE
-        EXTERNAL_VALUE -> EXTERNAL
-        FOREIGN_VALUE -> FOREIGN
-        else -> VulkanImageOwner(rawValue)
-      }
+    public fun of(rawValue: UInt): VulkanImageOwner = when (rawValue) { GRAPHICS_QUEUE_VALUE -> GRAPHICS_QUEUE; EXTERNAL_VALUE -> EXTERNAL; FOREIGN_VALUE -> FOREIGN; else -> VulkanImageOwner(rawValue) }
   }
 }
-
 /**
- * The Android hardware buffer of an acquired frame.
+ * The Android hardware buffer of an exported ring's acquired frame.
  *
  * See `mln_android_hardware_buffer_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class AndroidHardwareBufferFrame(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
-  /** The buffer's index in the ring. */
+  /**
+   * The buffer's index in the ring.
+   */
   @get:JvmName("getSlot") public val slot: UInt,
-  /** The `AHardwareBuffer*`. */
-  buffer: NativePointer,
+  /**
+   * The `AHardwareBuffer*`.
+   */
+  buffer: NativePointer
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedBuffer: NativePointer = buffer
-  public val buffer: NativePointer
-    get() {
-      bindingScope?.ensureActive()
-      return storedBuffer
-    }
-
+  public val buffer: NativePointer get() { bindingScope?.ensureActive(); return storedBuffer }
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      scaleFactor: Double,
-      slot: Int,
-      buffer: NativePointer,
-    ): AndroidHardwareBufferFrame =
-      AndroidHardwareBufferFrame(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        scaleFactor = scaleFactor,
-        slot = slot.toUInt(),
-        buffer = buffer,
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, buffer: NativePointer): AndroidHardwareBufferFrame = AndroidHardwareBufferFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), buffer = buffer)
   }
 }
-
 /**
  * Where one plane of a dmabuf keeps its data.
  *
  * See `mln_dma_buf_plane` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class DmaBufPlane(
   /**
-   * The file descriptor of the dmabuf that holds the plane. The planes of a buffer often share one.
+   * The file descriptor of the dmabuf that holds the plane. The planes of a
+   * buffer often share one.
    */
   public val fd: Int,
-  /** The bytes from the start of the dmabuf to the plane's first byte. */
+  /**
+   * The bytes from the start of the dmabuf to the plane's first byte.
+   */
   @get:JvmName("getOffset") public val offset: UInt,
-  /** The bytes from the start of one row to the start of the next. */
-  @get:JvmName("getStride") public val stride: UInt,
+  /**
+   * The bytes from the start of one row to the start of the next.
+   */
+  @get:JvmName("getStride") public val stride: UInt
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(fd: Int, offset: Int, stride: Int): DmaBufPlane =
-      DmaBufPlane(fd = fd, offset = offset.toUInt(), stride = stride.toUInt())
+    @JvmStatic @PublishedApi internal fun of(fd: Int, offset: Int, stride: Int): DmaBufPlane = DmaBufPlane(fd = fd, offset = offset.toUInt(), stride = stride.toUInt())
   }
 }
-
 /**
- * The dmabuf of an acquired frame.
+ * The dmabuf of an exported ring's acquired frame.
  *
  * See `mln_dma_buf_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class DmaBufFrame(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
-  /** The buffer's index in the ring. */
+  /**
+   * The buffer's index in the ring.
+   */
   @get:JvmName("getSlot") public val slot: UInt,
   @get:JvmName("getFourcc") public val fourcc: UInt,
   @get:JvmName("getModifier") public val modifier: ULong,
   /**
-   * The buffer's planes, in the order that its fourcc and modifier define. Import all of them, as
-   * EGL_EXT_image_dma_buf_import_modifiers planes 0 and up, or with one
-   * `zwp_linux_buffer_params_v1.add` call each.
+   * The buffer's planes, in the order that its fourcc and modifier define.
+   * Import all of them, as EGL_EXT_image_dma_buf_import_modifiers planes 0 and
+   * up, or with one `zwp_linux_buffer_params_v1.add` call each.
    */
-  planes: List<DmaBufPlane>,
+  planes: List<DmaBufPlane>
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedPlanes: List<DmaBufPlane> = planes
-  public val planes: List<DmaBufPlane>
-    get() {
-      bindingScope?.ensureActive()
-      return storedPlanes
-    }
-
+  public val planes: List<DmaBufPlane> get() { bindingScope?.ensureActive(); return storedPlanes }
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      scaleFactor: Double,
-      slot: Int,
-      fourcc: Int,
-      modifier: Long,
-      planes: List<DmaBufPlane>,
-    ): DmaBufFrame =
-      DmaBufFrame(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        scaleFactor = scaleFactor,
-        slot = slot.toUInt(),
-        fourcc = fourcc.toUInt(),
-        modifier = modifier.toULong(),
-        planes = planes,
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, fourcc: Int, modifier: Long, planes: List<DmaBufPlane>): DmaBufFrame = DmaBufFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), fourcc = fourcc.toUInt(), modifier = modifier.toULong(), planes = planes)
   }
 }
-
 /**
- * The DXGI shared texture of an acquired frame.
+ * The DXGI shared texture of an exported ring's acquired frame.
  *
  * See `mln_dxgi_shared_texture_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class DxgiSharedTextureFrame(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
-  /** The texture's index in the ring. */
+  /**
+   * The texture's index in the ring.
+   */
   @get:JvmName("getSlot") public val slot: UInt,
-  /** The texture's `DXGI_FORMAT`. */
+  /**
+   * The texture's `DXGI_FORMAT`.
+   */
   @get:JvmName("getFormat") public val format: UInt,
-  /** The texture's shared NT `HANDLE`. */
-  handle: NativePointer,
+  /**
+   * The texture's shared NT `HANDLE`.
+   */
+  handle: NativePointer
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedHandle: NativePointer = handle
-  public val handle: NativePointer
-    get() {
-      bindingScope?.ensureActive()
-      return storedHandle
-    }
-
+  public val handle: NativePointer get() { bindingScope?.ensureActive(); return storedHandle }
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      scaleFactor: Double,
-      slot: Int,
-      format: Int,
-      handle: NativePointer,
-    ): DxgiSharedTextureFrame =
-      DxgiSharedTextureFrame(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        scaleFactor = scaleFactor,
-        slot = slot.toUInt(),
-        format = format.toUInt(),
-        handle = handle,
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, format: Int, handle: NativePointer): DxgiSharedTextureFrame = DxgiSharedTextureFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), format = format.toUInt(), handle = handle)
   }
 }
-
 /**
- * The IOSurface of an acquired frame.
+ * The IOSurface of an exported ring's acquired frame.
  *
  * See `mln_io_surface_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class IoSurfaceFrame(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
-  /** The surface's index in the ring. */
+  /**
+   * The surface's index in the ring.
+   */
   @get:JvmName("getSlot") public val slot: UInt,
-  /** The `IOSurfaceRef`. */
-  surface: NativePointer,
+  /**
+   * The `IOSurfaceRef`.
+   */
+  surface: NativePointer
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedSurface: NativePointer = surface
-  public val surface: NativePointer
-    get() {
-      bindingScope?.ensureActive()
-      return storedSurface
-    }
-
+  public val surface: NativePointer get() { bindingScope?.ensureActive(); return storedSurface }
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      scaleFactor: Double,
-      slot: Int,
-      surface: NativePointer,
-    ): IoSurfaceFrame =
-      IoSurfaceFrame(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        scaleFactor = scaleFactor,
-        slot = slot.toUInt(),
-        surface = surface,
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, surface: NativePointer): IoSurfaceFrame = IoSurfaceFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), surface = surface)
   }
 }
-
 /**
  * The Metal texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture: one of a
+ * borrowed ring's `depth_textures`, or an exported ring's with
+ * `RenderSessionAttachOptions.keepDepth`. Otherwise they are zero.
  *
  * See `mln_metal_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -3690,57 +2669,127 @@ public class MetalTextureFrame(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
-  /** The texture's index in the descriptor's `textures`. */
+  /**
+   * The texture's index in the descriptor's `textures`.
+   */
   @get:JvmName("getSlot") public val slot: UInt,
-  /** The MTLTexture. */
+  /**
+   * The MTLTexture.
+   */
   texture: NativePointer,
-  /** The texture's MTLDevice. */
+  /**
+   * The texture's MTLDevice.
+   */
   device: NativePointer,
-  /** The texture's MTLPixelFormat. */
+  /**
+   * The texture's MTLPixelFormat.
+   */
   @get:JvmName("getPixelFormat") public val pixelFormat: ULong,
+  /**
+   * The MTLTexture that holds the frame's depth and stencil.
+   */
+  depthTexture: NativePointer,
+  /**
+   * The depth texture's MTLPixelFormat.
+   */
+  @get:JvmName("getDepthPixelFormat") public val depthPixelFormat: ULong
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: NativePointer = texture
-  public val texture: NativePointer
-    get() {
-      bindingScope?.ensureActive()
-      return storedTexture
-    }
-
+  public val texture: NativePointer get() { bindingScope?.ensureActive(); return storedTexture }
   private val storedDevice: NativePointer = device
-  public val device: NativePointer
-    get() {
-      bindingScope?.ensureActive()
-      return storedDevice
-    }
-
+  public val device: NativePointer get() { bindingScope?.ensureActive(); return storedDevice }
+  private val storedDepthTexture: NativePointer = depthTexture
+  public val depthTexture: NativePointer get() { bindingScope?.ensureActive(); return storedDepthTexture }
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      scaleFactor: Double,
-      slot: Int,
-      texture: NativePointer,
-      device: NativePointer,
-      pixelFormat: Long,
-    ): MetalTextureFrame =
-      MetalTextureFrame(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        scaleFactor = scaleFactor,
-        slot = slot.toUInt(),
-        texture = texture,
-        device = device,
-        pixelFormat = pixelFormat.toULong(),
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, texture: NativePointer, device: NativePointer, pixelFormat: Long, depthTexture: NativePointer, depthPixelFormat: Long): MetalTextureFrame = MetalTextureFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), texture = texture, device = device, pixelFormat = pixelFormat.toULong(), depthTexture = depthTexture, depthPixelFormat = depthPixelFormat.toULong())
   }
 }
-
+/**
+ * The memory of an exported ring's acquired frame, as an opaque file
+ * descriptor.
+ *
+ * The memory holds a 2D Vulkan image of `format`, with one mip level, one
+ * layer, optimal tiling, and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+ * VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a
+ * Vulkan image that imports it has too. In OpenGL, import it with
+ * glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the texture
+ * with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
+ * glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
+ * VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+ *
+ * With `RenderSessionAttachOptions.keepDepth`, on a device whose
+ * `GpuDeviceCapabilities.depthExportKinds` has `GpuExportKind.OPAQUE_FD`, the
+ * depth members share the memory of the frame's depth image in the same way.
+ * Otherwise `depth_fd` is -1 and the others are zero. The depth image is 2D, of
+ * `depth_format`, with one mip level, one layer, optimal tiling, and the usage
+ * VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_USAGE_SAMPLED_BIT, and
+ * VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame leaves it in
+ * VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL. In OpenGL,
+ * make its texture with the internal format that `DepthStencilFormatFlag` names
+ * for `depth_format`.
+ *
+ * See `mln_opaque_fd_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public class OpaqueFdFrame(
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
+  public val scaleFactor: Double,
+  /**
+   * The texture's index in the ring.
+   */
+  @get:JvmName("getSlot") public val slot: UInt,
+  /**
+   * The file descriptor of the image's memory.
+   */
+  fd: Int,
+  /**
+   * The size of the memory in bytes.
+   */
+  @get:JvmName("getAllocationSize") public val allocationSize: ULong,
+  /**
+   * Whether the memory is the image's own, which an import says, such as with
+   * GL_DEDICATED_MEMORY_OBJECT_EXT.
+   */
+  public val dedicated: Boolean,
+  /**
+   * The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8.
+   */
+  @get:JvmName("getFormat") public val format: UInt,
+  /**
+   * The file descriptor of the depth image's memory.
+   */
+  depthFd: Int,
+  /**
+   * The size of the depth image's memory in bytes.
+   */
+  @get:JvmName("getDepthAllocationSize") public val depthAllocationSize: ULong,
+  /**
+   * Whether the memory is the depth image's own.
+   */
+  public val depthDedicated: Boolean,
+  /**
+   * The depth image's `VkFormat`.
+   */
+  @get:JvmName("getDepthFormat") public val depthFormat: UInt
+) {
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
+  private val storedFd: Int = fd
+  public val fd: Int get() { bindingScope?.ensureActive(); return storedFd }
+  private val storedDepthFd: Int = depthFd
+  public val depthFd: Int get() { bindingScope?.ensureActive(); return storedDepthFd }
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, fd: Int, allocationSize: Long, dedicated: Boolean, format: Int, depthFd: Int, depthAllocationSize: Long, depthDedicated: Boolean, depthFormat: Int): OpaqueFdFrame = OpaqueFdFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), fd = fd, allocationSize = allocationSize.toULong(), dedicated = dedicated, format = format.toUInt(), depthFd = depthFd, depthAllocationSize = depthAllocationSize.toULong(), depthDedicated = depthDedicated, depthFormat = depthFormat.toUInt())
+  }
+}
 /**
  * The OpenGL texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * `MetalTextureFrame`. Otherwise they are zero.
  *
  * See `mln_open_gl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -3749,43 +2798,32 @@ public class OpenGlTextureFrame(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
-  /** The texture's index in the descriptor's `textures`. */
+  /**
+   * The texture's index in the descriptor's `textures`.
+   */
   @get:JvmName("getSlot") public val slot: UInt,
   texture: UInt,
   @get:JvmName("getTarget") public val target: UInt,
+  /**
+   * The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil.
+   */
+  depthTexture: UInt,
+  /**
+   * The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero
+   * for a borrowed ring's.
+   */
+  @get:JvmName("getDepthInternalFormat") public val depthInternalFormat: UInt
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: UInt = texture
-  @get:JvmName("getTexture")
-  public val texture: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedTexture
-    }
-
+  @get:JvmName("getTexture") public val texture: UInt get() { bindingScope?.ensureActive(); return storedTexture }
+  private val storedDepthTexture: UInt = depthTexture
+  @get:JvmName("getDepthTexture") public val depthTexture: UInt get() { bindingScope?.ensureActive(); return storedDepthTexture }
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      scaleFactor: Double,
-      slot: Int,
-      texture: Int,
-      target: Int,
-    ): OpenGlTextureFrame =
-      OpenGlTextureFrame(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        scaleFactor = scaleFactor,
-        slot = slot.toUInt(),
-        texture = texture.toUInt(),
-        target = target.toUInt(),
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, texture: Int, target: Int, depthTexture: Int, depthInternalFormat: Int): OpenGlTextureFrame = OpenGlTextureFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), texture = texture.toUInt(), target = target.toUInt(), depthTexture = depthTexture.toUInt(), depthInternalFormat = depthInternalFormat.toUInt())
   }
 }
-
 /**
  * A point in GPU work that the other side waits for before using a texture.
  *
@@ -3794,50 +2832,25 @@ public class OpenGlTextureFrame(
  */
 public class GpuSync(
   public val kind: GpuSyncKind = GpuSyncKind.CPU_COMPLETE,
-  /** The object to wait on, for the kinds that name one. */
+  /**
+   * The object to wait on, for the kinds that name one.
+   */
   handle: ULong = 0uL,
-  @get:JvmName("getValue") public val value: ULong = 0uL,
+  @get:JvmName("getValue") public val value: ULong = 0uL
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedHandle: ULong = handle
-  @get:JvmName("getHandle")
-  public val handle: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedHandle
-    }
-
-  @PublishedApi
-  internal fun withKind(kind: GpuSyncKind): GpuSync =
-    GpuSync(kind = kind, handle = handle, value = value).also { it.bindingScope = bindingScope }
-
-  @PublishedApi
-  internal fun withHandle(handle: Long): GpuSync =
-    GpuSync(kind = kind, handle = handle.toULong(), value = value).also {
-      it.bindingScope = bindingScope
-    }
-
-  @PublishedApi
-  internal fun withValue(value: Long): GpuSync =
-    GpuSync(kind = kind, handle = handle, value = value.toULong()).also {
-      it.bindingScope = bindingScope
-    }
-
+  @get:JvmName("getHandle") public val handle: ULong get() { bindingScope?.ensureActive(); return storedHandle }
+  @PublishedApi internal fun withKind(kind: GpuSyncKind): GpuSync = GpuSync(kind = kind, handle = handle, value = value).also { it.bindingScope = bindingScope }
+  @PublishedApi internal fun withHandle(handle: Long): GpuSync = GpuSync(kind = kind, handle = handle.toULong(), value = value).also { it.bindingScope = bindingScope }
+  @PublishedApi internal fun withValue(value: Long): GpuSync = GpuSync(kind = kind, handle = handle, value = value.toULong()).also { it.bindingScope = bindingScope }
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): GpuSync = GpuSync()
-
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(kind: GpuSyncKind, handle: Long, value: Long): GpuSync =
-      GpuSync(kind = kind, handle = handle.toULong(), value = value.toULong())
+    @JvmStatic @PublishedApi internal fun of(kind: GpuSyncKind, handle: Long, value: Long): GpuSync = GpuSync(kind = kind, handle = handle.toULong(), value = value.toULong())
   }
 }
-
 /**
  * A geographic coordinate, in degrees.
  *
@@ -3846,21 +2859,15 @@ public class GpuSync(
  */
 public data class LatLng(
   public val latitude: Double = 0.0,
-  public val longitude: Double = 0.0,
+  public val longitude: Double = 0.0
 ) {
   @PublishedApi internal fun withLatitude(latitude: Double): LatLng = copy(latitude = latitude)
-
   @PublishedApi internal fun withLongitude(longitude: Double): LatLng = copy(longitude = longitude)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): LatLng = LatLng()
   }
 }
-
 /**
  * Distances in logical pixels from each edge of the map.
  *
@@ -3871,25 +2878,17 @@ public data class EdgeInsets(
   public val top: Double = 0.0,
   public val left: Double = 0.0,
   public val bottom: Double = 0.0,
-  public val right: Double = 0.0,
+  public val right: Double = 0.0
 ) {
   @PublishedApi internal fun withTop(top: Double): EdgeInsets = copy(top = top)
-
   @PublishedApi internal fun withLeft(left: Double): EdgeInsets = copy(left = left)
-
   @PublishedApi internal fun withBottom(bottom: Double): EdgeInsets = copy(bottom = bottom)
-
   @PublishedApi internal fun withRight(right: Double): EdgeInsets = copy(right = right)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): EdgeInsets = EdgeInsets()
   }
 }
-
 /**
  * A map's whole camera.
  *
@@ -3898,61 +2897,49 @@ public data class EdgeInsets(
  */
 public data class Camera(
   public val center: LatLng = LatLng(),
-  /** The altitude of the center, in meters above sea level. */
+  /**
+   * The altitude of the center, in meters above sea level.
+   */
   public val centerAltitude: Double = 0.0,
-  /** Insets from the map's edges. The camera centers within the rest. */
+  /**
+   * Insets from the map's edges. The camera centers within the rest.
+   */
   public val padding: EdgeInsets = EdgeInsets(),
   public val zoom: Double = 0.0,
-  /** The rotation from north, in degrees. */
+  /**
+   * The rotation from north, in degrees.
+   */
   public val bearing: Double = 0.0,
-  /** The tilt toward the horizon, in degrees. 0 looks straight down. */
+  /**
+   * The tilt toward the horizon, in degrees. 0 looks straight down.
+   */
   public val pitch: Double = 0.0,
-  /** The roll, in degrees. */
+  /**
+   * The roll, in degrees.
+   */
   public val roll: Double = 0.0,
-  /** The vertical field of view, in degrees. */
-  public val fieldOfView: Double = 0.0,
+  /**
+   * The vertical field of view, in degrees.
+   */
+  public val fieldOfView: Double = 0.0
 ) {
-  /** Converts this `Camera` to `CameraOptions` that set each of its members. */
-  public fun toOptions(): CameraOptions =
-    CameraOptions(
-      center = center,
-      centerAltitude = centerAltitude,
-      padding = padding,
-      zoom = zoom,
-      bearing = bearing,
-      pitch = pitch,
-      roll = roll,
-      fieldOfView = fieldOfView,
-    )
-
+  /**
+   * Converts this `Camera` to `CameraOptions` that set each of its members.
+   */
+  public fun toOptions(): CameraOptions = CameraOptions(center = center, centerAltitude = centerAltitude, padding = padding, zoom = zoom, bearing = bearing, pitch = pitch, roll = roll, fieldOfView = fieldOfView)
   @PublishedApi internal fun withCenter(center: LatLng): Camera = copy(center = center)
-
-  @PublishedApi
-  internal fun withCenterAltitude(centerAltitude: Double): Camera =
-    copy(centerAltitude = centerAltitude)
-
+  @PublishedApi internal fun withCenterAltitude(centerAltitude: Double): Camera = copy(centerAltitude = centerAltitude)
   @PublishedApi internal fun withPadding(padding: EdgeInsets): Camera = copy(padding = padding)
-
   @PublishedApi internal fun withZoom(zoom: Double): Camera = copy(zoom = zoom)
-
   @PublishedApi internal fun withBearing(bearing: Double): Camera = copy(bearing = bearing)
-
   @PublishedApi internal fun withPitch(pitch: Double): Camera = copy(pitch = pitch)
-
   @PublishedApi internal fun withRoll(roll: Double): Camera = copy(roll = roll)
-
-  @PublishedApi
-  internal fun withFieldOfView(fieldOfView: Double): Camera = copy(fieldOfView = fieldOfView)
-
+  @PublishedApi internal fun withFieldOfView(fieldOfView: Double): Camera = copy(fieldOfView = fieldOfView)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): Camera = Camera()
   }
 }
-
 /**
  * A point on the screen, in logical pixels from the map's top-left corner.
  *
@@ -3961,21 +2948,15 @@ public data class Camera(
  */
 public data class ScreenPoint(
   public val x: Double = 0.0,
-  public val y: Double = 0.0,
+  public val y: Double = 0.0
 ) {
   @PublishedApi internal fun withX(x: Double): ScreenPoint = copy(x = x)
-
   @PublishedApi internal fun withY(y: Double): ScreenPoint = copy(y = y)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ScreenPoint = ScreenPoint()
   }
 }
-
 /**
  * A camera, with only the members that `fields` selects.
  *
@@ -3984,56 +2965,51 @@ public data class ScreenPoint(
  */
 public data class CameraOptions(
   public val center: LatLng? = null,
-  /** The altitude of the center, in meters above sea level. */
+  /**
+   * The altitude of the center, in meters above sea level.
+   */
   public val centerAltitude: Double? = null,
-  /** Insets from the map's edges. The camera centers within the rest. */
+  /**
+   * Insets from the map's edges. The camera centers within the rest.
+   */
   public val padding: EdgeInsets? = null,
   /**
-   * The screen point that a change to the zoom, bearing, or pitch keeps in place. A `center`
-   * overrides it.
+   * The screen point that a change to the zoom, bearing, or pitch keeps in
+   * place. A `center` overrides it.
    */
   public val anchor: ScreenPoint? = null,
   public val zoom: Double? = null,
-  /** The rotation from north, in degrees. */
+  /**
+   * The rotation from north, in degrees.
+   */
   public val bearing: Double? = null,
-  /** The tilt toward the horizon, in degrees. 0 looks straight down. */
+  /**
+   * The tilt toward the horizon, in degrees. 0 looks straight down.
+   */
   public val pitch: Double? = null,
-  /** The roll, in degrees. */
+  /**
+   * The roll, in degrees.
+   */
   public val roll: Double? = null,
-  /** The vertical field of view, in degrees. */
-  public val fieldOfView: Double? = null,
+  /**
+   * The vertical field of view, in degrees.
+   */
+  public val fieldOfView: Double? = null
 ) {
   @PublishedApi internal fun withCenter(center: LatLng): CameraOptions = copy(center = center)
-
-  @PublishedApi
-  internal fun withCenterAltitude(centerAltitude: Double): CameraOptions =
-    copy(centerAltitude = centerAltitude)
-
-  @PublishedApi
-  internal fun withPadding(padding: EdgeInsets): CameraOptions = copy(padding = padding)
-
+  @PublishedApi internal fun withCenterAltitude(centerAltitude: Double): CameraOptions = copy(centerAltitude = centerAltitude)
+  @PublishedApi internal fun withPadding(padding: EdgeInsets): CameraOptions = copy(padding = padding)
   @PublishedApi internal fun withAnchor(anchor: ScreenPoint): CameraOptions = copy(anchor = anchor)
-
   @PublishedApi internal fun withZoom(zoom: Double): CameraOptions = copy(zoom = zoom)
-
   @PublishedApi internal fun withBearing(bearing: Double): CameraOptions = copy(bearing = bearing)
-
   @PublishedApi internal fun withPitch(pitch: Double): CameraOptions = copy(pitch = pitch)
-
   @PublishedApi internal fun withRoll(roll: Double): CameraOptions = copy(roll = roll)
-
-  @PublishedApi
-  internal fun withFieldOfView(fieldOfView: Double): CameraOptions = copy(fieldOfView = fieldOfView)
-
+  @PublishedApi internal fun withFieldOfView(fieldOfView: Double): CameraOptions = copy(fieldOfView = fieldOfView)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): CameraOptions = CameraOptions()
   }
 }
-
 /**
  * A size in logical pixels, and the physical pixels in each logical pixel.
  *
@@ -4043,30 +3019,18 @@ public data class CameraOptions(
 public data class LogicalExtent(
   @get:JvmName("getWidth") public val width: UInt = 0u,
   @get:JvmName("getHeight") public val height: UInt = 0u,
-  public val scaleFactor: Double = 0.0,
+  public val scaleFactor: Double = 0.0
 ) {
   @PublishedApi internal fun withWidth(width: Int): LogicalExtent = copy(width = width.toUInt())
-
   @PublishedApi internal fun withHeight(height: Int): LogicalExtent = copy(height = height.toUInt())
-
-  @PublishedApi
-  internal fun withScaleFactor(scaleFactor: Double): LogicalExtent = copy(scaleFactor = scaleFactor)
-
+  @PublishedApi internal fun withScaleFactor(scaleFactor: Double): LogicalExtent = copy(scaleFactor = scaleFactor)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): LogicalExtent = LogicalExtent()
-
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(width: Int, height: Int, scaleFactor: Double): LogicalExtent =
-      LogicalExtent(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor)
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double): LogicalExtent = LogicalExtent(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor)
   }
 }
-
 /**
  * A map's whole projection mode.
  *
@@ -4078,25 +3042,16 @@ public data class LogicalExtent(
 public data class ProjectionMode(
   public val axonometric: Boolean = false,
   public val xSkew: Double = 0.0,
-  public val ySkew: Double = 0.0,
+  public val ySkew: Double = 0.0
 ) {
-  @PublishedApi
-  internal fun withAxonometric(axonometric: Boolean): ProjectionMode =
-    copy(axonometric = axonometric)
-
+  @PublishedApi internal fun withAxonometric(axonometric: Boolean): ProjectionMode = copy(axonometric = axonometric)
   @PublishedApi internal fun withXSkew(xSkew: Double): ProjectionMode = copy(xSkew = xSkew)
-
   @PublishedApi internal fun withYSkew(ySkew: Double): ProjectionMode = copy(ySkew = ySkew)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ProjectionMode = ProjectionMode()
   }
 }
-
 /**
  * A map's whole viewport.
  *
@@ -4109,33 +3064,17 @@ public data class MapViewport(
   public val northOrientation: NorthOrientation = NorthOrientation.UP,
   public val constrainMode: ConstrainMode = ConstrainMode.NONE,
   public val viewportMode: ViewportMode = ViewportMode.DEFAULT,
-  public val frustumOffset: EdgeInsets = EdgeInsets(),
+  public val frustumOffset: EdgeInsets = EdgeInsets()
 ) {
-  @PublishedApi
-  internal fun withNorthOrientation(northOrientation: NorthOrientation): MapViewport =
-    copy(northOrientation = northOrientation)
-
-  @PublishedApi
-  internal fun withConstrainMode(constrainMode: ConstrainMode): MapViewport =
-    copy(constrainMode = constrainMode)
-
-  @PublishedApi
-  internal fun withViewportMode(viewportMode: ViewportMode): MapViewport =
-    copy(viewportMode = viewportMode)
-
-  @PublishedApi
-  internal fun withFrustumOffset(frustumOffset: EdgeInsets): MapViewport =
-    copy(frustumOffset = frustumOffset)
-
+  @PublishedApi internal fun withNorthOrientation(northOrientation: NorthOrientation): MapViewport = copy(northOrientation = northOrientation)
+  @PublishedApi internal fun withConstrainMode(constrainMode: ConstrainMode): MapViewport = copy(constrainMode = constrainMode)
+  @PublishedApi internal fun withViewportMode(viewportMode: ViewportMode): MapViewport = copy(viewportMode = viewportMode)
+  @PublishedApi internal fun withFrustumOffset(frustumOffset: EdgeInsets): MapViewport = copy(frustumOffset = frustumOffset)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): MapViewport = MapViewport()
   }
 }
-
 /**
  * A style's projection at one zoom: `from` turning into `to`.
  *
@@ -4148,29 +3087,19 @@ public data class ProjectionDefinition(
   public val from: ProjectionType = ProjectionType.MERCATOR,
   public val to: ProjectionType = ProjectionType.MERCATOR,
   /**
-   * How far `from` has turned into `to`, from 0 to 1. Ignored when `from` equals `to`. A value
-   * outside that range holds at the nearer end.
+   * How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
+   * equals `to`. A value outside that range holds at the nearer end.
    */
-  public val transition: Double = 0.0,
+  public val transition: Double = 0.0
 ) {
-  @PublishedApi
-  internal fun withFrom(from: ProjectionType): ProjectionDefinition = copy(from = from)
-
+  @PublishedApi internal fun withFrom(from: ProjectionType): ProjectionDefinition = copy(from = from)
   @PublishedApi internal fun withTo(to: ProjectionType): ProjectionDefinition = copy(to = to)
-
-  @PublishedApi
-  internal fun withTransition(transition: Double): ProjectionDefinition =
-    copy(transition = transition)
-
+  @PublishedApi internal fun withTransition(transition: Double): ProjectionDefinition = copy(transition = transition)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ProjectionDefinition = ProjectionDefinition()
   }
 }
-
 /**
  * One view of a map: its camera, size, and projection.
  *
@@ -4182,33 +3111,111 @@ public data class MapView(
   public val extent: LogicalExtent = LogicalExtent(),
   public val projectionMode: ProjectionMode = ProjectionMode(),
   public val viewport: MapViewport = MapViewport(),
-  /** The style's projection at the camera's zoom. */
-  public val projection: ProjectionDefinition = ProjectionDefinition(),
+  /**
+   * The style's projection at the camera's zoom.
+   */
+  public val projection: ProjectionDefinition = ProjectionDefinition()
 ) {
   @PublishedApi internal fun withCamera(camera: Camera): MapView = copy(camera = camera)
-
   @PublishedApi internal fun withExtent(extent: LogicalExtent): MapView = copy(extent = extent)
-
-  @PublishedApi
-  internal fun withProjectionMode(projectionMode: ProjectionMode): MapView =
-    copy(projectionMode = projectionMode)
-
-  @PublishedApi
-  internal fun withViewport(viewport: MapViewport): MapView = copy(viewport = viewport)
-
-  @PublishedApi
-  internal fun withProjection(projection: ProjectionDefinition): MapView =
-    copy(projection = projection)
-
+  @PublishedApi internal fun withProjectionMode(projectionMode: ProjectionMode): MapView = copy(projectionMode = projectionMode)
+  @PublishedApi internal fun withViewport(viewport: MapViewport): MapView = copy(viewport = viewport)
+  @PublishedApi internal fun withProjection(projection: ProjectionDefinition): MapView = copy(projection = projection)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): MapView = MapView()
   }
 }
-
+/**
+ * A vector in four dimensions, such as a point in homogeneous coordinates.
+ *
+ * See `mln_vec4` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class Vec4(
+  public val x: Double,
+  public val y: Double,
+  public val z: Double,
+  public val w: Double
+)
+/**
+ * A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x,
+ * plus `y` times its y, `z` times its z, and `w` times its w. In memory it is
+ * 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and WebGPU
+ * shaders take a matrix.
+ *
+ * See `mln_mat4` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class Mat4(
+  public val x: Vec4,
+  public val y: Vec4,
+  public val z: Vec4,
+  public val w: Vec4
+)
+/**
+ * Where a frame drew the map, and the depth that it wrote there.
+ *
+ * World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at 180°
+ * east, and on past both into the copies of the world beside the first. y runs
+ * from 0 at the north edge of the Mercator world, about 85.05° north, to 1 at
+ * its south edge. z is the altitude in meters above sea level, at the scale of
+ * the heights of the map's 3D layers, and the map draws its ground at 0.
+ *
+ * `matrix` takes a world point to the clip coordinates where the frame drew it,
+ * with the camera's padding, roll, field of view, and center altitude, and the
+ * map's viewport and projection mode. Clip y points up, as the map draws with
+ * OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so negate it
+ * there too. At high zooms, single precision can't tell nearby world points
+ * apart: subtract an origin near your geometry from its coordinates in double
+ * precision, and fold the origin into the matrix, before you convert to float.
+ *
+ * Clip z follows `clip_depth_range`, the convention of the device's graphics
+ * API. With the API's default depth range of 0 to 1, a fragment that you draw
+ * through `matrix` gets the depth that the map's 3D layers, such as fill
+ * extrusions, wrote at the same place: 0 at `near_distance` from the camera, up
+ * to `far_depth` at `far_distance`. Depth-tested against the frame's depth,
+ * your fragments hide behind the map's 3D layers where those stand in front of
+ * them.
+ *
+ * The frame's depth starts at 1. The map's 3D layers write the depth of each of
+ * their fragments. A 2D layer below every 3D layer of the style that draws
+ * opaque fragments, such as an opaque fill, writes one depth over all of them,
+ * wherever they are: the higher the layer, the lower its depth, and every one
+ * between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D
+ * layers above a 3D layer, such as labels, write no depth. So what you draw
+ * through `matrix`, even on the ground, lies in front of every 2D layer.
+ *
+ * While `globe` is true, the frame drew the map onto a globe, and its 2D layers
+ * wrote no depth. `matrix` then is the map's Mercator one, which doesn't place
+ * points on the globe.
+ *
+ * See `mln_frame_projection` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class FrameProjection(
+  public val matrix: Mat4,
+  public val clipDepthRange: ClipDepthRange,
+  /**
+   * The distance from the camera to the plane where the depth that you get
+   * through `matrix` is 0, along the camera's view. Like `far_distance`, it is
+   * in pixels of the map at the camera's zoom, where the world is 512 × 2^zoom
+   * pixels wide.
+   */
+  public val nearDistance: Double,
+  /**
+   * The distance to the plane where the depth is `far_depth`.
+   */
+  public val farDistance: Double,
+  /**
+   * The depth at `far_distance`, below 1.
+   */
+  public val farDepth: Double,
+  /**
+   * Whether the frame drew the map as a globe, alone or blending into Mercator.
+   */
+  public val globe: Boolean
+)
 /**
  * How one frame demand finished.
  *
@@ -4219,46 +3226,35 @@ public data class RenderFrameResult(
   public val disposition: RenderResult,
   @get:JvmName("getToken") public val token: ULong,
   /**
-   * The map update that a rendered frame shows. The frame includes a command's change when this is
-   * at least the command's `CommandCompletion.renderUpdateGeneration`.
+   * The map update that a rendered frame shows. The frame includes a command's
+   * change when this is at least the command's
+   * `CommandCompletion.renderUpdateGeneration`.
    */
   @get:JvmName("getMapUpdateGeneration") public val mapUpdateGeneration: ULong,
   @get:JvmName("getGeneration") public val generation: ULong,
   @get:JvmName("getFrameGeneration") public val frameGeneration: ULong,
   public val needsRepaint: Boolean,
-  /** The camera and extent that a rendered frame shows. */
+  /**
+   * The camera and extent that a rendered frame shows.
+   */
   public val view: MapView,
-  public val mode: RenderMode,
+  /**
+   * Where a rendered frame drew the map, for drawing into its frame with depth.
+   * All zero for a demand that rendered nothing.
+   */
+  public val frameProjection: FrameProjection,
+  public val mode: RenderMode
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      disposition: RenderResult,
-      token: Long,
-      mapUpdateGeneration: Long,
-      generation: Long,
-      frameGeneration: Long,
-      needsRepaint: Boolean,
-      view: MapView,
-      mode: RenderMode,
-    ): RenderFrameResult =
-      RenderFrameResult(
-        disposition = disposition,
-        token = token.toULong(),
-        mapUpdateGeneration = mapUpdateGeneration.toULong(),
-        generation = generation.toULong(),
-        frameGeneration = frameGeneration.toULong(),
-        needsRepaint = needsRepaint,
-        view = view,
-        mode = mode,
-      )
+    @JvmStatic @PublishedApi internal fun of(disposition: RenderResult, token: Long, mapUpdateGeneration: Long, generation: Long, frameGeneration: Long, needsRepaint: Boolean, view: MapView, frameProjection: FrameProjection, mode: RenderMode): RenderFrameResult = RenderFrameResult(disposition = disposition, token = token.toULong(), mapUpdateGeneration = mapUpdateGeneration.toULong(), generation = generation.toULong(), frameGeneration = frameGeneration.toULong(), needsRepaint = needsRepaint, view = view, frameProjection = frameProjection, mode = mode)
   }
 }
-
 /**
  * The Vulkan image of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth image, as for
+ * `MetalTextureFrame`. Otherwise they are zero.
  *
  * See `mln_vulkan_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4267,74 +3263,68 @@ public class VulkanTextureFrame(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
-  /** The image's index in the descriptor's `textures`. */
+  /**
+   * The image's index in the descriptor's `textures`.
+   */
   @get:JvmName("getSlot") public val slot: UInt,
-  /** The VkImage. */
+  /**
+   * The VkImage.
+   */
   image: ULong,
-  /** The VkImageView. */
+  /**
+   * The VkImageView.
+   */
   imageView: ULong,
-  /** The image's VkDevice. */
+  /**
+   * The image's VkDevice.
+   */
   device: NativePointer,
-  /** The image's VkFormat. */
+  /**
+   * The image's VkFormat.
+   */
   @get:JvmName("getFormat") public val format: UInt,
-  /** The VkImageLayout that the frame left the image in. */
+  /**
+   * The VkImageLayout that the frame left the image in.
+   */
   @get:JvmName("getLayout") public val layout: UInt,
+  /**
+   * The VkImage that holds the frame's depth and stencil.
+   */
+  depthImage: ULong,
+  /**
+   * A VkImageView of the depth image's depth and stencil aspects.
+   */
+  depthImageView: ULong,
+  /**
+   * The depth image's VkFormat.
+   */
+  @get:JvmName("getDepthFormat") public val depthFormat: UInt,
+  /**
+   * The VkImageLayout that the frame left the depth image in.
+   */
+  @get:JvmName("getDepthLayout") public val depthLayout: UInt
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedImage: ULong = image
-  @get:JvmName("getImage")
-  public val image: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedImage
-    }
-
+  @get:JvmName("getImage") public val image: ULong get() { bindingScope?.ensureActive(); return storedImage }
   private val storedImageView: ULong = imageView
-  @get:JvmName("getImageView")
-  public val imageView: ULong
-    get() {
-      bindingScope?.ensureActive()
-      return storedImageView
-    }
-
+  @get:JvmName("getImageView") public val imageView: ULong get() { bindingScope?.ensureActive(); return storedImageView }
   private val storedDevice: NativePointer = device
-  public val device: NativePointer
-    get() {
-      bindingScope?.ensureActive()
-      return storedDevice
-    }
-
+  public val device: NativePointer get() { bindingScope?.ensureActive(); return storedDevice }
+  private val storedDepthImage: ULong = depthImage
+  @get:JvmName("getDepthImage") public val depthImage: ULong get() { bindingScope?.ensureActive(); return storedDepthImage }
+  private val storedDepthImageView: ULong = depthImageView
+  @get:JvmName("getDepthImageView") public val depthImageView: ULong get() { bindingScope?.ensureActive(); return storedDepthImageView }
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      scaleFactor: Double,
-      slot: Int,
-      image: Long,
-      imageView: Long,
-      device: NativePointer,
-      format: Int,
-      layout: Int,
-    ): VulkanTextureFrame =
-      VulkanTextureFrame(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        scaleFactor = scaleFactor,
-        slot = slot.toUInt(),
-        image = image.toULong(),
-        imageView = imageView.toULong(),
-        device = device,
-        format = format.toUInt(),
-        layout = layout.toUInt(),
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, image: Long, imageView: Long, device: NativePointer, format: Int, layout: Int, depthImage: Long, depthImageView: Long, depthFormat: Int, depthLayout: Int): VulkanTextureFrame = VulkanTextureFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), image = image.toULong(), imageView = imageView.toULong(), device = device, format = format.toUInt(), layout = layout.toUInt(), depthImage = depthImage.toULong(), depthImageView = depthImageView.toULong(), depthFormat = depthFormat.toUInt(), depthLayout = depthLayout.toUInt())
   }
 }
-
 /**
  * The WebGPU texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * `MetalTextureFrame`. Otherwise they are zero.
  *
  * See `mln_web_gpu_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4343,94 +3333,47 @@ public class WebGpuTextureFrame(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   public val scaleFactor: Double,
-  /** The texture's index in the descriptor's `textures`. */
+  /**
+   * The texture's index in the descriptor's `textures`.
+   */
   @get:JvmName("getSlot") public val slot: UInt,
-  /** The `GPUTexture`. */
+  /**
+   * The `GPUTexture`.
+   */
   texture: UInt,
-  /** The texture's `GPUDevice`. */
+  /**
+   * The texture's `GPUDevice`.
+   */
   device: UInt,
-  /** The texture's `GPUTextureFormat`. */
+  /**
+   * The texture's `GPUTextureFormat`.
+   */
   format: String,
+  /**
+   * The `GPUTexture` that holds the frame's depth and stencil.
+   */
+  depthTexture: UInt,
+  /**
+   * The depth texture's `GPUTextureFormat`.
+   */
+  depthFormat: String
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: UInt = texture
-  @get:JvmName("getTexture")
-  public val texture: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedTexture
-    }
-
+  @get:JvmName("getTexture") public val texture: UInt get() { bindingScope?.ensureActive(); return storedTexture }
   private val storedDevice: UInt = device
-  @get:JvmName("getDevice")
-  public val device: UInt
-    get() {
-      bindingScope?.ensureActive()
-      return storedDevice
-    }
-
+  @get:JvmName("getDevice") public val device: UInt get() { bindingScope?.ensureActive(); return storedDevice }
   private val storedFormat: String = format
-  public val format: String
-    get() {
-      bindingScope?.ensureActive()
-      return storedFormat
-    }
-
+  public val format: String get() { bindingScope?.ensureActive(); return storedFormat }
+  private val storedDepthTexture: UInt = depthTexture
+  @get:JvmName("getDepthTexture") public val depthTexture: UInt get() { bindingScope?.ensureActive(); return storedDepthTexture }
+  private val storedDepthFormat: String = depthFormat
+  public val depthFormat: String get() { bindingScope?.ensureActive(); return storedDepthFormat }
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      scaleFactor: Double,
-      slot: Int,
-      texture: Int,
-      device: Int,
-      format: String,
-    ): WebGpuTextureFrame =
-      WebGpuTextureFrame(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        scaleFactor = scaleFactor,
-        slot = slot.toUInt(),
-        texture = texture.toUInt(),
-        device = device.toUInt(),
-        format = format,
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, scaleFactor: Double, slot: Int, texture: Int, device: Int, format: String, depthTexture: Int, depthFormat: String): WebGpuTextureFrame = WebGpuTextureFrame(width = width.toUInt(), height = height.toUInt(), scaleFactor = scaleFactor, slot = slot.toUInt(), texture = texture.toUInt(), device = device.toUInt(), format = format, depthTexture = depthTexture.toUInt(), depthFormat = depthFormat)
   }
 }
-
-/**
- * Options for creating a frame pacer.
- *
- * See `mln_frame_pacer_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-public data class FramePacerOptions(
-  /**
-   * The most frames per second that the pacer demands, greater than zero. The pacer skips display
-   * refreshes to stay within it. By default, it can demand frames at every refresh.
-   */
-  @get:JvmSynthetic public val maximumFramesPerSecond: UInt? = null,
-) {
-  @PublishedApi
-  @JvmName("getMaximumFramesPerSecond")
-  internal fun maximumFramesPerSecondForJava(): Int? = maximumFramesPerSecond?.toInt()
-
-  @PublishedApi
-  internal fun withMaximumFramesPerSecond(maximumFramesPerSecond: Int): FramePacerOptions =
-    copy(maximumFramesPerSecond = maximumFramesPerSecond.toUInt())
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): FramePacerOptions = FramePacerOptions()
-  }
-}
-
 /**
  * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
  *
@@ -4440,29 +3383,18 @@ public data class FramePacerOptions(
 public data class CanonicalTileId(
   @get:JvmName("getZ") public val z: UInt = 0u,
   @get:JvmName("getX") public val x: UInt = 0u,
-  @get:JvmName("getY") public val y: UInt = 0u,
+  @get:JvmName("getY") public val y: UInt = 0u
 ) {
   @PublishedApi internal fun withZ(z: Int): CanonicalTileId = copy(z = z.toUInt())
-
   @PublishedApi internal fun withX(x: Int): CanonicalTileId = copy(x = x.toUInt())
-
   @PublishedApi internal fun withY(y: Int): CanonicalTileId = copy(y = y.toUInt())
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): CanonicalTileId = CanonicalTileId()
-
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(z: Int, x: Int, y: Int): CanonicalTileId =
-      CanonicalTileId(z = z.toUInt(), x = x.toUInt(), y = y.toUInt())
+    @JvmStatic @PublishedApi internal fun of(z: Int, x: Int, y: Int): CanonicalTileId = CanonicalTileId(z = z.toUInt(), x = x.toUInt(), y = y.toUInt())
   }
 }
-
 /**
  * A size in logical pixels, which the map's scale factor turns into pixels.
  *
@@ -4471,27 +3403,296 @@ public data class CanonicalTileId(
  */
 public data class LogicalSize(
   @get:JvmName("getWidth") public val width: UInt = 0u,
-  @get:JvmName("getHeight") public val height: UInt = 0u,
+  @get:JvmName("getHeight") public val height: UInt = 0u
 ) {
   @PublishedApi internal fun withWidth(width: Int): LogicalSize = copy(width = width.toUInt())
-
   @PublishedApi internal fun withHeight(height: Int): LogicalSize = copy(height = height.toUInt())
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): LogicalSize = LogicalSize()
-
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(width: Int, height: Int): LogicalSize =
-      LogicalSize(width = width.toUInt(), height = height.toUInt())
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int): LogicalSize = LogicalSize(width = width.toUInt(), height = height.toUInt())
   }
 }
-
+/**
+ * Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
+ *
+ * See `mln_frame_pacer_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public data class FramePacerOptions(
+  /**
+   * The most frames per second that the pacer demands, greater than zero. The
+   * pacer skips display refreshes to stay within it. By default, it can demand
+   * frames at every refresh.
+   */
+  @get:JvmSynthetic public val maximumFramesPerSecond: UInt? = null,
+  /**
+   * Removes the frame rate limit, so the pacer can demand frames at every
+   * display refresh, as it does by default.
+   */
+  public val unlimitedFramesPerSecond: Boolean = false
+) {
+  @PublishedApi @JvmName("getMaximumFramesPerSecond") internal fun maximumFramesPerSecondForJava(): Int? = maximumFramesPerSecond?.toInt()
+  @PublishedApi internal fun withMaximumFramesPerSecond(maximumFramesPerSecond: Int): FramePacerOptions = copy(maximumFramesPerSecond = maximumFramesPerSecond.toUInt())
+  @PublishedApi internal fun withUnlimitedFramesPerSecond(unlimitedFramesPerSecond: Boolean): FramePacerOptions = copy(unlimitedFramesPerSecond = unlimitedFramesPerSecond)
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(): FramePacerOptions = FramePacerOptions()
+  }
+}
+/**
+ * Options for `GpuDeviceHandle.create()`.
+ *
+ * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
+ * `adapter_luid`. Without one, the device prefers a discrete GPU.
+ *
+ * See `mln_gpu_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class GpuDeviceOptions(
+  /**
+   * The backend that the device renders with. By default, the platform's own:
+   * Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has
+   * no Vulkan driver, and in a browser the build's one backend: WebGPU or
+   * OpenGL (WebGL2).
+   */
+  public val backend: RenderBackend? = null,
+  /**
+   * The GPU to use, as an index into the backend's list of GPUs.
+   */
+  @get:JvmSynthetic public val adapterIndex: UInt? = null,
+  /**
+   * The 16-byte UUID of the GPU to use: Vulkan's
+   * `VkPhysicalDeviceIDProperties.deviceUUID`, or OpenGL's
+   * `GL_DEVICE_UUID_EXT`.
+   */
+  public val adapterUuid: ByteArray? = null,
+  /**
+   * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
+   * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`, and on Apple
+   * platforms, its `MTLDevice.registryID`, in the platform's byte order.
+   */
+  public val adapterLuid: ByteArray? = null,
+  /**
+   * The OpenGL API that an OpenGL device renders with. An EGL device defaults
+   * to `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on Linux and
+   * FreeBSD. A WGL device takes only `OpenGlClientApi.GL`, its default, and a
+   * WebGL device only `OpenGlClientApi.GLES`, its default.
+   */
+  public val openGlClientApi: OpenGlClientApi? = null,
+  /**
+   * Whether the sessions of an EGL device take turns in one OpenGL context
+   * instead of having one each.
+   */
+  public val openGlSingleContext: Boolean? = null,
+  /**
+   * Your lock on a Vulkan device's queue, when you submit to the queue that
+   * `GpuDeviceHandle.getVulkanContext()` reports. Only a Vulkan device takes
+   * one.
+   */
+  public val queueLock: QueueLock = QueueLock()
+) {
+  private fun contentFields(): Array<Any?> = arrayOf(backend, adapterIndex, adapterUuid, adapterLuid, openGlClientApi, openGlSingleContext, queueLock)
+  override fun equals(other: Any?): Boolean = this === other || other is GpuDeviceOptions && contentFields().contentDeepEquals(other.contentFields())
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  @PublishedApi @JvmName("getAdapterIndex") internal fun adapterIndexForJava(): Int? = adapterIndex?.toInt()
+  @PublishedApi internal fun withBackend(backend: RenderBackend): GpuDeviceOptions = copy(backend = backend)
+  @PublishedApi internal fun withAdapterIndex(adapterIndex: Int): GpuDeviceOptions = copy(adapterIndex = adapterIndex.toUInt())
+  @PublishedApi internal fun withAdapterUuid(adapterUuid: ByteArray): GpuDeviceOptions = copy(adapterUuid = adapterUuid)
+  @PublishedApi internal fun withAdapterLuid(adapterLuid: ByteArray): GpuDeviceOptions = copy(adapterLuid = adapterLuid)
+  @PublishedApi internal fun withOpenGlClientApi(openGlClientApi: OpenGlClientApi): GpuDeviceOptions = copy(openGlClientApi = openGlClientApi)
+  @PublishedApi internal fun withOpenGlSingleContext(openGlSingleContext: Boolean): GpuDeviceOptions = copy(openGlSingleContext = openGlSingleContext)
+  @PublishedApi internal fun withQueueLock(queueLock: QueueLock): GpuDeviceOptions = copy(queueLock = queueLock)
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(): GpuDeviceOptions = GpuDeviceOptions()
+  }
+}
+/**
+ * Your Metal device and command queue, for `GpuDeviceHandle.wrapMetal()`.
+ *
+ * See `mln_metal_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class MetalDeviceDescriptor(
+  /**
+   * Your `MTLDevice`.
+   */
+  public val device: NativePointer,
+  /**
+   * Your `MTLCommandQueue` on `device`, or null for a queue of the library's.
+   * With your queue, borrowed rings can use `GpuSyncKind.QUEUE_ORDER`.
+   */
+  public val commandQueue: NativePointer
+)
+/**
+ * Your WGL context, which each session's context shares objects with.
+ *
+ * See `mln_wgl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WglContextDescriptor(
+  /**
+   * An `HDC` with the pixel format of `share_context`.
+   */
+  public val deviceContext: NativePointer,
+  /**
+   * Your `HGLRC`.
+   */
+  public val shareContext: NativePointer,
+  /**
+   * Your `wglGetProcAddress`, or null to use the system's.
+   */
+  public val getProcAddress: NativePointer
+)
+/**
+ * Your EGL context, which each session's context shares objects with.
+ *
+ * Each session makes its context on `display` with `config` and the client API
+ * and version of `share_context`.
+ *
+ * See `mln_egl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class EglContextDescriptor(
+  /**
+   * An `EGLDisplay`, which you initialized.
+   */
+  public val display: NativePointer,
+  /**
+   * The `EGLConfig` of `share_context`.
+   */
+  public val config: NativePointer,
+  /**
+   * Your `EGLContext`.
+   */
+  public val shareContext: NativePointer,
+  /**
+   * Your `eglGetProcAddress`, or null to use the system's.
+   */
+  public val getProcAddress: NativePointer
+)
+/**
+ * The WebGL2 context that an OpenGL device wraps.
+ *
+ * See `mln_web_gl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebGlContextDescriptor(
+  /**
+   * Your `WebGL2RenderingContext`.
+   */
+  @get:JvmName("getContext") public val context: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(context: Int): WebGlContextDescriptor = WebGlContextDescriptor(context = context.toUInt())
+  }
+}
+/**
+ * Your OpenGL context, for `GpuDeviceHandle.wrapOpenGl()`: the root of the
+ * share group that the device's sessions join.
+ *
+ * See `mln_open_gl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public sealed interface OpenGlContextDescriptor {
+  public data class Wgl(public val value: WglContextDescriptor): OpenGlContextDescriptor
+  public data class Egl(public val value: EglContextDescriptor): OpenGlContextDescriptor
+  public data class WebGl(public val value: WebGlContextDescriptor): OpenGlContextDescriptor
+}
+/**
+ * The Vulkan device and queue that a render session uses.
+ *
+ * Keep these objects alive until a detach or release of the session completes,
+ * or an abandon of it returns.
+ *
+ * See `mln_vulkan_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class VulkanContextDescriptor(
+  /**
+   * A `VkInstance`.
+   */
+  public val instance: NativePointer,
+  /**
+   * A `VkPhysicalDevice`.
+   */
+  public val physicalDevice: NativePointer,
+  /**
+   * A `VkDevice`.
+   */
+  public val device: NativePointer,
+  /**
+   * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If
+   * you submit to it too, give the device your `QueueLock`.
+   */
+  public val graphicsQueue: NativePointer,
+  @get:JvmName("getGraphicsQueueFamilyIndex") public val graphicsQueueFamilyIndex: UInt = 0u,
+  /**
+   * Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
+   */
+  public val getInstanceProcAddr: NativePointer,
+  /**
+   * Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
+   */
+  public val getDeviceProcAddr: NativePointer
+) {
+  @PublishedApi internal fun withGraphicsQueueFamilyIndex(graphicsQueueFamilyIndex: Int): VulkanContextDescriptor = copy(graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt())
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(instance: NativePointer, physicalDevice: NativePointer, device: NativePointer, graphicsQueue: NativePointer, getInstanceProcAddr: NativePointer, getDeviceProcAddr: NativePointer): VulkanContextDescriptor = VulkanContextDescriptor(instance = instance, physicalDevice = physicalDevice, device = device, graphicsQueue = graphicsQueue, getInstanceProcAddr = getInstanceProcAddr, getDeviceProcAddr = getDeviceProcAddr)
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(instance: NativePointer, physicalDevice: NativePointer, device: NativePointer, graphicsQueue: NativePointer, graphicsQueueFamilyIndex: Int, getInstanceProcAddr: NativePointer, getDeviceProcAddr: NativePointer): VulkanContextDescriptor = VulkanContextDescriptor(instance = instance, physicalDevice = physicalDevice, device = device, graphicsQueue = graphicsQueue, graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt(), getInstanceProcAddr = getInstanceProcAddr, getDeviceProcAddr = getDeviceProcAddr)
+  }
+}
+/**
+ * Your Vulkan device and queue, for `GpuDeviceHandle.wrapVulkan()`.
+ *
+ * See `mln_vulkan_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class VulkanDeviceDescriptor(
+  public val context: VulkanContextDescriptor,
+  /**
+   * Your lock on `context.graphics_queue`, when you submit to it yourself. Give
+   * every device that wraps the queue the same lock.
+   */
+  public val queueLock: QueueLock = QueueLock(),
+  /**
+   * The names of the device extensions that you enabled on `context.device`,
+   * such as "VK_KHR_external_semaphore_fd". Vulkan offers no way to ask a
+   * device which extensions it has, so the device offers the export kinds and
+   * `GpuSyncKind.SYNC_FD` only when the extensions that they need are listed
+   * here, and none of them when the list is empty.
+   */
+  public val enabledExtensions: List<String> = emptyList()
+) {
+  @PublishedApi internal fun withQueueLock(queueLock: QueueLock): VulkanDeviceDescriptor = copy(queueLock = queueLock)
+  @PublishedApi internal fun withEnabledExtensions(enabledExtensions: List<String>): VulkanDeviceDescriptor = copy(enabledExtensions = enabledExtensions)
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(context: VulkanContextDescriptor): VulkanDeviceDescriptor = VulkanDeviceDescriptor(context = context)
+  }
+}
+/**
+ * The WebGPU device that a render session uses.
+ *
+ * See `mln_web_gpu_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebGpuContextDescriptor(
+  /**
+   * Your `GPUDevice`. Sessions submit to its `queue`.
+   */
+  @get:JvmName("getDevice") public val device: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(device: Int): WebGpuContextDescriptor = WebGpuContextDescriptor(device = device.toUInt())
+  }
+}
 /**
  * A point in the Web Mercator projection, in meters.
  *
@@ -4500,69 +3701,15 @@ public data class LogicalSize(
  */
 public data class ProjectedMeters(
   public val northing: Double = 0.0,
-  public val easting: Double = 0.0,
+  public val easting: Double = 0.0
 ) {
-  @PublishedApi
-  internal fun withNorthing(northing: Double): ProjectedMeters = copy(northing = northing)
-
+  @PublishedApi internal fun withNorthing(northing: Double): ProjectedMeters = copy(northing = northing)
   @PublishedApi internal fun withEasting(easting: Double): ProjectedMeters = copy(easting = easting)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ProjectedMeters = ProjectedMeters()
   }
 }
-
-/**
- * Options for `OffscreenDeviceHandle.create()`.
- *
- * See `mln_offscreen_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
- */
-public data class OffscreenDeviceOptions(
-  /** The GPU to use, as an index into the platform's list of GPUs. */
-  @get:JvmSynthetic public val adapterIndex: UInt? = null,
-  /**
-   * Whether the device's sessions take turns in one OpenGL context instead of having one each. Only
-   * an EGL device reads it.
-   */
-  public val singleContext: Boolean? = null,
-  /**
-   * The OpenGL API that the device's sessions render with. An EGL device defaults to
-   * `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on Linux and FreeBSD. A WGL device
-   * takes only `OpenGlClientApi.GL`, its default, and a WebGL device only `OpenGlClientApi.GLES`,
-   * its default. Other devices take neither.
-   */
-  public val clientApi: OpenGlClientApi? = null,
-) {
-  @PublishedApi
-  @JvmName("getAdapterIndex")
-  internal fun adapterIndexForJava(): Int? = adapterIndex?.toInt()
-
-  @PublishedApi
-  internal fun withAdapterIndex(adapterIndex: Int): OffscreenDeviceOptions =
-    copy(adapterIndex = adapterIndex.toUInt())
-
-  @PublishedApi
-  internal fun withSingleContext(singleContext: Boolean): OffscreenDeviceOptions =
-    copy(singleContext = singleContext)
-
-  @PublishedApi
-  internal fun withClientApi(clientApi: OpenGlClientApi): OffscreenDeviceOptions =
-    copy(clientApi = clientApi)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): OffscreenDeviceOptions = OffscreenDeviceOptions()
-  }
-}
-
 /**
  * Options for `RuntimeHandle.create()`.
  *
@@ -4571,31 +3718,24 @@ public data class OffscreenDeviceOptions(
  */
 public data class RuntimeOptions(
   /**
-   * The directory that `asset://` URLs load from. Empty uses the working directory, or the app's
-   * assets on Android.
+   * The directory that `asset://` URLs load from. Empty uses the working
+   * directory, or the app's assets on Android.
    */
   public val assetPath: String = "",
   /**
-   * The path of the cache database file, which holds the ambient cache and offline regions. Its
-   * directory must be writable. Empty keeps the cache in memory.
+   * The path of the cache database file, which holds the ambient cache and
+   * offline regions. Its directory must be writable. Empty keeps the cache in
+   * memory.
    */
-  public val cachePath: String = "",
+  public val cachePath: String = ""
 ) {
-  @PublishedApi
-  internal fun withAssetPath(assetPath: String): RuntimeOptions = copy(assetPath = assetPath)
-
-  @PublishedApi
-  internal fun withCachePath(cachePath: String): RuntimeOptions = copy(cachePath = cachePath)
-
+  @PublishedApi internal fun withAssetPath(assetPath: String): RuntimeOptions = copy(assetPath = assetPath)
+  @PublishedApi internal fun withCachePath(cachePath: String): RuntimeOptions = copy(cachePath = cachePath)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): RuntimeOptions = RuntimeOptions()
   }
 }
-
 /**
  * The type of a style expression's result.
  *
@@ -4605,43 +3745,25 @@ public data class RuntimeOptions(
 public data class StyleExpressionType(
   public val kind: StyleExpressionTypeKind = StyleExpressionTypeKind.VALUE,
   /**
-   * The type of each item when `kind` is `StyleExpressionTypeKind.ARRAY`. It can't be an array
-   * itself.
+   * The type of each item when `kind` is `StyleExpressionTypeKind.ARRAY`. It
+   * can't be an array itself.
    */
   public val itemKind: StyleExpressionTypeKind = StyleExpressionTypeKind.VALUE,
-  /** The length of an array, or 0 for any length. */
-  @get:JvmName("getItemCount") public val itemCount: UInt = 0u,
+  /**
+   * The length of an array, or 0 for any length.
+   */
+  @get:JvmName("getItemCount") public val itemCount: UInt = 0u
 ) {
-  @PublishedApi
-  internal fun withKind(kind: StyleExpressionTypeKind): StyleExpressionType = copy(kind = kind)
-
-  @PublishedApi
-  internal fun withItemKind(itemKind: StyleExpressionTypeKind): StyleExpressionType =
-    copy(itemKind = itemKind)
-
-  @PublishedApi
-  internal fun withItemCount(itemCount: Int): StyleExpressionType =
-    copy(itemCount = itemCount.toUInt())
-
+  @PublishedApi internal fun withKind(kind: StyleExpressionTypeKind): StyleExpressionType = copy(kind = kind)
+  @PublishedApi internal fun withItemKind(itemKind: StyleExpressionTypeKind): StyleExpressionType = copy(itemKind = itemKind)
+  @PublishedApi internal fun withItemCount(itemCount: Int): StyleExpressionType = copy(itemCount = itemCount.toUInt())
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): StyleExpressionType = StyleExpressionType()
-
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      kind: StyleExpressionTypeKind,
-      itemKind: StyleExpressionTypeKind,
-      itemCount: Int,
-    ): StyleExpressionType =
-      StyleExpressionType(kind = kind, itemKind = itemKind, itemCount = itemCount.toUInt())
+    @JvmStatic @PublishedApi internal fun of(kind: StyleExpressionTypeKind, itemKind: StyleExpressionTypeKind, itemCount: Int): StyleExpressionType = StyleExpressionType(kind = kind, itemKind = itemKind, itemCount = itemCount.toUInt())
   }
 }
-
 /**
  * Options for parsing a style expression.
  *
@@ -4649,71 +3771,397 @@ public data class StyleExpressionType(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 public data class StyleExpressionOptions(
-  /** The type that the result must have. */
-  public val expectedType: StyleExpressionType? = null,
+  /**
+   * The type that the result must have.
+   */
+  public val expectedType: StyleExpressionType? = null
 ) {
-  @PublishedApi
-  internal fun withExpectedType(expectedType: StyleExpressionType): StyleExpressionOptions =
-    copy(expectedType = expectedType)
-
+  @PublishedApi internal fun withExpectedType(expectedType: StyleExpressionType): StyleExpressionOptions = copy(expectedType = expectedType)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): StyleExpressionOptions = StyleExpressionOptions()
   }
 }
-
 /**
- * Options for `VulkanDeviceHandle.create()`.
+ * What a GPU device can do.
  *
- * See `mln_vulkan_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ * See `mln_gpu_device_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
  */
-public data class VulkanDeviceOptions(
+public data class GpuDeviceCapabilities(
+  public val backend: RenderBackend,
   /**
-   * Whether the device can present to a window. The instance then enables VK_KHR_surface and the
-   * platform's surface extensions, and the device enables VK_KHR_swapchain. Defaults to false.
+   * The kinds of `RenderTarget` that sessions on the device render to.
    */
-  public val presentation: Boolean? = null,
-  /** The 16-byte `deviceUUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. */
-  public val deviceUuid: ByteArray? = null,
+  public val targetKinds: RenderTargetKindFlag,
   /**
-   * The 8-byte `deviceLUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. On
-   * Windows, this is the GPU's DXGI adapter LUID.
+   * The ways that the device can share the textures of an exported ring. A kind
+   * is here only once the device has exported a texture of it, so a driver that
+   * offers an extension but can't allocate the memory reports no kind of it.
    */
-  public val deviceLuid: ByteArray? = null,
+  public val exportKinds: GpuExportKindFlag,
+  /**
+   * The kinds of `GpuSync` that the device can signal and wait on.
+   */
+  public val syncKinds: GpuSyncKindFlag,
+  /**
+   * The formats of the depth textures that a borrowed ring takes.
+   */
+  public val depthStencilFormats: DepthStencilFormatFlag,
+  /**
+   * The kinds of `export_kinds` whose rings also share each frame's depth
+   * texture, with `RenderSessionAttachOptions.keepDepth`. An IOSurface or a
+   * dmabuf holds no depth format, so only `GpuExportKind.OPAQUE_FD` can be
+   * here.
+   */
+  public val depthExportKinds: GpuExportKindFlag
+)
+/**
+ * The Vulkan objects of a device, as `GpuDeviceHandle.getVulkanContext()`
+ * reports them.
+ *
+ * See `mln_gpu_device_vulkan_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class GpuDeviceVulkanContextResult(
+  public val context: VulkanContextDescriptor
+)
+/**
+ * The frame's Metal command buffer, outside the map's render pass.
+ *
+ * End each encoder that you make on `command_buffer` before the callback
+ * returns, and don't commit the buffer.
+ *
+ * See `mln_metal_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class MetalCustomLayerEncoder(
+  /**
+   * The frame's `MTLCommandBuffer`, with no encoder open.
+   */
+  public val commandBuffer: NativePointer
+)
+/**
+ * The frame's Vulkan command buffer, outside the map's render pass.
+ *
+ * Record work such as copies, compute dispatches, and render passes of your
+ * own, with the barriers that it needs. The map's render pass loads its
+ * attachments after a barrier of its own, but it doesn't wait for writes to
+ * your images: give those the barriers that your later reads need. Don't end or
+ * submit `command_buffer`.
+ *
+ * See `mln_vulkan_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class VulkanCustomLayerEncoder(
+  /**
+   * The device that the session renders on. Make the objects that your commands
+   * use on `context.device`. Don't submit to `context.graphics_queue` from a
+   * callback.
+   */
+  public val context: VulkanContextDescriptor,
+  /**
+   * The frame's `VkCommandBuffer`, recording outside a render pass.
+   */
+  public val commandBuffer: NativePointer
+)
+/**
+ * The frame's WebGPU command encoder, outside the map's render pass.
+ *
+ * End each pass that you begin on `encoder` before the callback returns, and
+ * don't finish the encoder.
+ *
+ * See `mln_web_gpu_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class WebGpuCustomLayerEncoder(
+  /**
+   * The `GPUDevice` that the session renders on.
+   */
+  @get:JvmName("getDevice") public val device: UInt,
+  /**
+   * The frame's `GPUCommandEncoder`, with no pass open.
+   */
+  @get:JvmName("getEncoder") public val encoder: UInt
 ) {
-  private fun contentFields(): Array<Any?> = arrayOf(presentation, deviceUuid, deviceLuid)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is VulkanDeviceOptions && contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
-  @PublishedApi
-  internal fun withPresentation(presentation: Boolean): VulkanDeviceOptions =
-    copy(presentation = presentation)
-
-  @PublishedApi
-  internal fun withDeviceUuid(deviceUuid: ByteArray): VulkanDeviceOptions =
-    copy(deviceUuid = deviceUuid)
-
-  @PublishedApi
-  internal fun withDeviceLuid(deviceLuid: ByteArray): VulkanDeviceOptions =
-    copy(deviceLuid = deviceLuid)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): VulkanDeviceOptions = VulkanDeviceOptions()
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(device: Int, encoder: Int): WebGpuCustomLayerEncoder = WebGpuCustomLayerEncoder(device = device.toUInt(), encoder = encoder.toUInt())
   }
 }
-
+/**
+ * The frame that a custom layer draws into, as its callbacks get it.
+ *
+ * The view and the frame projection are the ones that the frame draws the map
+ * with, so they are never newer than the frame, unlike the map's camera.
+ *
+ * See `mln_custom_layer_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class CustomLayerFrame(
+  /**
+   * The camera, extent, and scale factor that the frame shows.
+   */
+  public val view: MapView,
+  /**
+   * Where the frame draws the map, and the depth that it writes there.
+   */
+  public val frameProjection: FrameProjection,
+  /**
+   * The width of the frame's attachments, in physical pixels.
+   */
+  @get:JvmName("getWidth") public val width: UInt,
+  /**
+   * The height of the frame's attachments, in physical pixels.
+   */
+  @get:JvmName("getHeight") public val height: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(view: MapView, frameProjection: FrameProjection, width: Int, height: Int): CustomLayerFrame = CustomLayerFrame(view = view, frameProjection = frameProjection, width = width.toUInt(), height = height.toUInt())
+  }
+}
+/**
+ * The GPU commands of a frame outside the map's render pass, by the backend
+ * that the session renders with.
+ *
+ * An OpenGL session has no variant: its context is current, and it draws
+ * through no object that the callback needs.
+ *
+ * See `mln_custom_layer_encoder_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public sealed interface CustomLayerPrerenderParametersEncoder {
+  public data class Metal(public val value: MetalCustomLayerEncoder): CustomLayerPrerenderParametersEncoder
+  public data class Vulkan(public val value: VulkanCustomLayerEncoder): CustomLayerPrerenderParametersEncoder
+  public data class WebGpu(public val value: WebGpuCustomLayerEncoder): CustomLayerPrerenderParametersEncoder
+  public data object None: CustomLayerPrerenderParametersEncoder
+  public data class Unknown(@get:JvmName("getTag") public val tag: UInt, public val bytes: ByteArray): CustomLayerPrerenderParametersEncoder {
+  private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+  override fun equals(other: Any?): Boolean = this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(tag: Int, bytes: ByteArray): Unknown = Unknown(tag = tag.toUInt(), bytes = bytes)
+  }
+}
+}
+/**
+ * What a custom layer's prerender callback gets.
+ *
+ * See `mln_custom_layer_prerender_parameters` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class CustomLayerPrerenderParameters(
+  public val encoder: CustomLayerPrerenderParametersEncoder,
+  public val frame: CustomLayerFrame
+)
+/**
+ * The map's Metal render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline state, depth-stencil state, buffers, textures, and
+ * samplers on `encoder`, and any other state that your draws need. After the
+ * callback returns, the map sets the state that its own draws need again. Don't
+ * end `encoder`.
+ *
+ * See `mln_metal_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class MetalCustomLayerPass(
+  /**
+   * The pass's `MTLRenderCommandEncoder`.
+   */
+  public val encoder: NativePointer,
+  /**
+   * The `MTLCommandBuffer` that `encoder` encodes into. Don't commit it.
+   */
+  public val commandBuffer: NativePointer,
+  /**
+   * The `MTLPixelFormat` of the pass's color attachment.
+   */
+  @get:JvmName("getColorFormat") public val colorFormat: ULong,
+  /**
+   * The `MTLPixelFormat` of the pass's depth attachment, or
+   * `MTLPixelFormatInvalid` when it has none.
+   */
+  @get:JvmName("getDepthFormat") public val depthFormat: ULong,
+  /**
+   * The `MTLPixelFormat` of the pass's stencil attachment, or
+   * `MTLPixelFormatInvalid` when it has none.
+   */
+  @get:JvmName("getStencilFormat") public val stencilFormat: ULong,
+  /**
+   * The sample count of the pass's attachments.
+   */
+  @get:JvmName("getSampleCount") public val sampleCount: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(encoder: NativePointer, commandBuffer: NativePointer, colorFormat: Long, depthFormat: Long, stencilFormat: Long, sampleCount: Int): MetalCustomLayerPass = MetalCustomLayerPass(encoder = encoder, commandBuffer = commandBuffer, colorFormat = colorFormat.toULong(), depthFormat = depthFormat.toULong(), stencilFormat = stencilFormat.toULong(), sampleCount = sampleCount.toUInt())
+  }
+}
+/**
+ * The map's Vulkan render pass, at a custom layer's place in the style.
+ *
+ * Record draws into `command_buffer`, with pipelines that you make for
+ * `render_pass`, `subpass`, and `sample_count`. Bind your own pipeline,
+ * descriptor sets, vertex and index buffers, and push constants, and set the
+ * dynamic state that your pipelines have, such as the viewport and scissor.
+ * After the callback returns, the map binds and sets again what its own draws
+ * need. Your pipeline layouts can differ from the map's. Record nothing that a
+ * render pass can't hold, and don't end the render pass.
+ *
+ * See `mln_vulkan_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class VulkanCustomLayerPass(
+  /**
+   * The device that the session renders on. Make the objects that your commands
+   * use on `context.device`. Don't submit to `context.graphics_queue` from a
+   * callback.
+   */
+  public val context: VulkanContextDescriptor,
+  /**
+   * The frame's `VkCommandBuffer`, recording inside `render_pass`.
+   */
+  public val commandBuffer: NativePointer,
+  /**
+   * The `VkRenderPass` that `command_buffer` records in.
+   */
+  @get:JvmName("getRenderPass") public val renderPass: ULong,
+  /**
+   * The index of the subpass that `command_buffer` records in.
+   */
+  @get:JvmName("getSubpass") public val subpass: UInt,
+  /**
+   * The `VkSampleCountFlagBits` of the render pass's attachments.
+   */
+  @get:JvmName("getSampleCount") public val sampleCount: UInt,
+  /**
+   * The `VkFormat` of the render pass's color attachment.
+   */
+  @get:JvmName("getColorFormat") public val colorFormat: UInt,
+  /**
+   * The `VkFormat` of the render pass's depth-stencil attachment, or
+   * `VK_FORMAT_UNDEFINED` when it has none.
+   */
+  @get:JvmName("getDepthStencilFormat") public val depthStencilFormat: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(context: VulkanContextDescriptor, commandBuffer: NativePointer, renderPass: Long, subpass: Int, sampleCount: Int, colorFormat: Int, depthStencilFormat: Int): VulkanCustomLayerPass = VulkanCustomLayerPass(context = context, commandBuffer = commandBuffer, renderPass = renderPass.toULong(), subpass = subpass.toUInt(), sampleCount = sampleCount.toUInt(), colorFormat = colorFormat.toUInt(), depthStencilFormat = depthStencilFormat.toUInt())
+  }
+}
+/**
+ * The map's OpenGL framebuffer, at a custom layer's place in the style.
+ *
+ * The session's context is current, with `framebuffer` bound and the viewport
+ * covering it. You can change the program, the vertex array, the buffers bound
+ * to each target, the framebuffer, the viewport, the active texture unit and
+ * the textures bound to each unit, the uniform buffer bindings, and the
+ * scissor, depth, stencil, blend, color mask, cull face, and line width state.
+ * After the callback returns, the map sets again what its own draws need of
+ * these. The vertex array bound when the callback starts is 0, so bind your own
+ * before you set vertex attributes. Leave any other state as you found it, such
+ * as the sampler objects bound to texture units, the pixel pack and unpack
+ * buffers and parameters, polygon offset, and rasterizer discard. Don't clear
+ * or invalidate the framebuffer's attachments.
+ *
+ * See `mln_open_gl_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class OpenGlCustomLayerPass(
+  /**
+   * The framebuffer that the map draws into, or 0 for the default one.
+   */
+  @get:JvmName("getFramebuffer") public val framebuffer: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(framebuffer: Int): OpenGlCustomLayerPass = OpenGlCustomLayerPass(framebuffer = framebuffer.toUInt())
+  }
+}
+/**
+ * The map's WebGPU render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline, bind groups, vertex and index buffers, viewport,
+ * scissor rectangle, and stencil reference on `encoder`. After the callback
+ * returns, the map sets again what its own draws need. Don't end `encoder`.
+ *
+ * See `mln_web_gpu_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class WebGpuCustomLayerPass(
+  /**
+   * The `GPUDevice` that the session renders on.
+   */
+  @get:JvmName("getDevice") public val device: UInt,
+  /**
+   * The pass's `GPURenderPassEncoder`.
+   */
+  @get:JvmName("getEncoder") public val encoder: UInt,
+  /**
+   * The `GPUTextureFormat` of the pass's color attachment.
+   */
+  public val colorFormat: String,
+  /**
+   * The `GPUTextureFormat` of the pass's depth-stencil attachment, or empty
+   * when it has none.
+   */
+  public val depthStencilFormat: String,
+  /**
+   * The sample count of the pass's attachments.
+   */
+  @get:JvmName("getSampleCount") public val sampleCount: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(device: Int, encoder: Int, colorFormat: String, depthStencilFormat: String, sampleCount: Int): WebGpuCustomLayerPass = WebGpuCustomLayerPass(device = device.toUInt(), encoder = encoder.toUInt(), colorFormat = colorFormat, depthStencilFormat = depthStencilFormat, sampleCount = sampleCount.toUInt())
+  }
+}
+/**
+ * The map's render pass at a custom layer's place in the style, by the backend
+ * that the session renders with.
+ *
+ * See `mln_custom_layer_pass_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public sealed interface CustomLayerRenderParametersPass {
+  public data class Metal(public val value: MetalCustomLayerPass): CustomLayerRenderParametersPass
+  public data class Vulkan(public val value: VulkanCustomLayerPass): CustomLayerRenderParametersPass
+  public data class OpenGl(public val value: OpenGlCustomLayerPass): CustomLayerRenderParametersPass
+  public data class WebGpu(public val value: WebGpuCustomLayerPass): CustomLayerRenderParametersPass
+  public data class Unknown(@get:JvmName("getTag") public val tag: UInt, public val bytes: ByteArray): CustomLayerRenderParametersPass {
+  private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+  override fun equals(other: Any?): Boolean = this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(tag: Int, bytes: ByteArray): Unknown = Unknown(tag = tag.toUInt(), bytes = bytes)
+  }
+}
+}
+/**
+ * What a custom layer's render callback gets.
+ *
+ * See `mln_custom_layer_render_parameters` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class CustomLayerRenderParameters(
+  public val pass: CustomLayerRenderParametersPass,
+  public val frame: CustomLayerFrame,
+  /**
+   * The depth that a 2D layer at the layer's place in the style writes, as
+   * `FrameProjection` describes, between `frame.frame_projection.far_depth` and
+   * 1.
+   *
+   * The map draws the opaque fragments of its 2D layers before the render
+   * callback runs, those above the custom layer too. A fragment that you draw
+   * at this depth, tested with less-or-equal, stays under those above that
+   * wrote depth.
+   */
+  public val layerDepth: Double
+)
 /**
  * Options for a GeoJSON
  * &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/#geojson).
@@ -4727,71 +4175,41 @@ public data class GeoJsonSourceOptions(
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   public val tolerance: Double? = null,
-  /** The last zoom level that has clusters, at most 30. */
+  /**
+   * The last zoom level that has clusters, at most 30.
+   */
   public val clusterMaxZoom: Double? = null,
-  /** The `clusterProperties` object, or empty for none. */
+  /**
+   * The `clusterProperties` object, or empty for none.
+   */
   public val clusterProperties: String = "",
   @get:JvmSynthetic public val buffer: UInt? = null,
   @get:JvmSynthetic public val clusterRadius: UInt? = null,
-  /** At most 4294967295 on a 32-bit target. */
+  /**
+   * At most 4294967295 on a 32-bit target.
+   */
   @get:JvmSynthetic public val clusterMinPoints: ULong? = null,
   public val lineMetrics: Boolean? = null,
-  public val cluster: Boolean? = null,
+  public val cluster: Boolean? = null
 ) {
   @PublishedApi @JvmName("getBuffer") internal fun bufferForJava(): Int? = buffer?.toInt()
-
-  @PublishedApi
-  @JvmName("getClusterRadius")
-  internal fun clusterRadiusForJava(): Int? = clusterRadius?.toInt()
-
-  @PublishedApi
-  @JvmName("getClusterMinPoints")
-  internal fun clusterMinPointsForJava(): Long? = clusterMinPoints?.toLong()
-
-  @PublishedApi
-  internal fun withMinZoom(minZoom: Double): GeoJsonSourceOptions = copy(minZoom = minZoom)
-
-  @PublishedApi
-  internal fun withMaxZoom(maxZoom: Double): GeoJsonSourceOptions = copy(maxZoom = maxZoom)
-
-  @PublishedApi
-  internal fun withTolerance(tolerance: Double): GeoJsonSourceOptions = copy(tolerance = tolerance)
-
-  @PublishedApi
-  internal fun withClusterMaxZoom(clusterMaxZoom: Double): GeoJsonSourceOptions =
-    copy(clusterMaxZoom = clusterMaxZoom)
-
-  @PublishedApi
-  internal fun withClusterProperties(clusterProperties: String): GeoJsonSourceOptions =
-    copy(clusterProperties = clusterProperties)
-
-  @PublishedApi
-  internal fun withBuffer(buffer: Int): GeoJsonSourceOptions = copy(buffer = buffer.toUInt())
-
-  @PublishedApi
-  internal fun withClusterRadius(clusterRadius: Int): GeoJsonSourceOptions =
-    copy(clusterRadius = clusterRadius.toUInt())
-
-  @PublishedApi
-  internal fun withClusterMinPoints(clusterMinPoints: Long): GeoJsonSourceOptions =
-    copy(clusterMinPoints = clusterMinPoints.toULong())
-
-  @PublishedApi
-  internal fun withLineMetrics(lineMetrics: Boolean): GeoJsonSourceOptions =
-    copy(lineMetrics = lineMetrics)
-
-  @PublishedApi
-  internal fun withCluster(cluster: Boolean): GeoJsonSourceOptions = copy(cluster = cluster)
-
+  @PublishedApi @JvmName("getClusterRadius") internal fun clusterRadiusForJava(): Int? = clusterRadius?.toInt()
+  @PublishedApi @JvmName("getClusterMinPoints") internal fun clusterMinPointsForJava(): Long? = clusterMinPoints?.toLong()
+  @PublishedApi internal fun withMinZoom(minZoom: Double): GeoJsonSourceOptions = copy(minZoom = minZoom)
+  @PublishedApi internal fun withMaxZoom(maxZoom: Double): GeoJsonSourceOptions = copy(maxZoom = maxZoom)
+  @PublishedApi internal fun withTolerance(tolerance: Double): GeoJsonSourceOptions = copy(tolerance = tolerance)
+  @PublishedApi internal fun withClusterMaxZoom(clusterMaxZoom: Double): GeoJsonSourceOptions = copy(clusterMaxZoom = clusterMaxZoom)
+  @PublishedApi internal fun withClusterProperties(clusterProperties: String): GeoJsonSourceOptions = copy(clusterProperties = clusterProperties)
+  @PublishedApi internal fun withBuffer(buffer: Int): GeoJsonSourceOptions = copy(buffer = buffer.toUInt())
+  @PublishedApi internal fun withClusterRadius(clusterRadius: Int): GeoJsonSourceOptions = copy(clusterRadius = clusterRadius.toUInt())
+  @PublishedApi internal fun withClusterMinPoints(clusterMinPoints: Long): GeoJsonSourceOptions = copy(clusterMinPoints = clusterMinPoints.toULong())
+  @PublishedApi internal fun withLineMetrics(lineMetrics: Boolean): GeoJsonSourceOptions = copy(lineMetrics = lineMetrics)
+  @PublishedApi internal fun withCluster(cluster: Boolean): GeoJsonSourceOptions = copy(cluster = cluster)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): GeoJsonSourceOptions = GeoJsonSourceOptions()
   }
 }
-
 /**
  * An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
  *
@@ -4802,42 +4220,26 @@ public data class PremultipliedRgba8Image(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
   /**
-   * The number of bytes from the start of one row to the start of the next, at least `width`
-   * &#42; 4.
+   * The number of bytes from the start of one row to the start of the next, at
+   * least `width` &#42; 4.
    */
   @get:JvmName("getStride") public val stride: UInt,
-  /** The rows of pixels, `stride` bytes apart, from the top row down. */
-  public val pixels: ByteArray,
+  /**
+   * The rows of pixels, `stride` bytes apart, from the top row down.
+   */
+  public val pixels: ByteArray
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(width, height, stride, pixels)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is PremultipliedRgba8Image && contentFields().contentDeepEquals(other.contentFields())
-
+  override fun equals(other: Any?): Boolean = this === other || other is PremultipliedRgba8Image && contentFields().contentDeepEquals(other.contentFields())
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      stride: Int,
-      pixels: ByteArray,
-    ): PremultipliedRgba8Image =
-      PremultipliedRgba8Image(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        stride = stride.toUInt(),
-        pixels = pixels,
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, stride: Int, pixels: ByteArray): PremultipliedRgba8Image = PremultipliedRgba8Image(width = width.toUInt(), height = height.toUInt(), stride = stride.toUInt(), pixels = pixels)
   }
 }
-
 /**
- * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`) and (`x2`, `y2`).
+ * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
+ * and (`x2`, `y2`).
  *
  * `x1` and `x2` are between 0 and 1.
  *
@@ -4848,100 +4250,86 @@ public data class UnitBezier(
   public val x1: Double = 0.0,
   public val y1: Double = 0.0,
   public val x2: Double = 0.0,
-  public val y2: Double = 0.0,
+  public val y2: Double = 0.0
 ) {
   @PublishedApi internal fun withX1(x1: Double): UnitBezier = copy(x1 = x1)
-
   @PublishedApi internal fun withY1(y1: Double): UnitBezier = copy(y1 = y1)
-
   @PublishedApi internal fun withX2(x2: Double): UnitBezier = copy(x2 = x2)
-
   @PublishedApi internal fun withY2(y2: Double): UnitBezier = copy(y2 = y2)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): UnitBezier = UnitBezier()
   }
 }
-
 /**
  * How one part of a gesture's momentum slows from its release speed.
  *
- * Speeds and distances are in the part's unit: logical pixels for pan, zoom levels for zoom, and
- * degrees for bearing and pitch. A setting whose bit isn't set takes the part's default, which
- * `GestureMomentum` lists. `min_speed` is finite and not negative, and every other number is finite
- * and positive. A friction decay can serve every release, as a preset that matches a platform's
- * scrolling. An eased glide takes its direction from the part's velocity, and its distance and
- * duration from the caller's plan.
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom
+ * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
+ * set takes the part's default, which `GestureMomentum` lists. `min_speed` is
+ * finite and not negative, and every other number is finite and positive. A
+ * friction decay can serve every release, as a preset that matches a platform's
+ * scrolling. An eased glide takes its direction from the part's velocity, and
+ * its distance and duration from the caller's plan.
  *
  * See `mln_momentum_decay` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MomentumDecay(
   public val model: MomentumDecayModel? = null,
-  /** For `MomentumDecayModel.FRICTION`, how long the speed takes to halve. */
+  /**
+   * For `MomentumDecayModel.FRICTION`, how long the speed takes to halve.
+   */
   public val halfLifeMs: Double? = null,
-  /** For `MomentumDecayModel.FRICTION`, the speed at which it ends. */
+  /**
+   * For `MomentumDecayModel.FRICTION`, the speed at which it ends.
+   */
   public val stopSpeed: Double? = null,
-  /** Required for `MomentumDecayModel.EASE`. */
+  /**
+   * Required for `MomentumDecayModel.EASE`.
+   */
   public val distance: Double? = null,
-  /** Required for `MomentumDecayModel.EASE`. */
+  /**
+   * Required for `MomentumDecayModel.EASE`.
+   */
   public val durationMs: Double? = null,
   /**
-   * For `MomentumDecayModel.EASE`, the share of `distance` covered over the share of `duration_ms`.
-   * Its control points are between 0 and 1, so the glide never passes its distance. Defaults to (0,
-   * 0, 0.25, 1), the curve that camera animations ease along by default. Android's scroll fling
+   * For `MomentumDecayModel.EASE`, the share of `distance` covered over the
+   * share of `duration_ms`. Its control points are between 0 and 1, so the
+   * glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
+   * that camera animations ease along by default. Android's scroll fling
    * follows (0.175, 0.5, 0.35, 1).
    */
   public val easing: UnitBezier? = null,
-  /** A slower release starts no momentum. */
+  /**
+   * A slower release starts no momentum.
+   */
   public val minSpeed: Double? = null,
-  /** For `MomentumDecayModel.FRICTION`, a faster release counts as this. */
+  /**
+   * For `MomentumDecayModel.FRICTION`, a faster release counts as this.
+   */
   public val maxSpeed: Double? = null,
   /**
-   * The farthest the part moves. A friction release that would move farther starts slower, so it
-   * ends sooner, and a planned glide moves at most this far over its duration.
+   * The farthest the part moves. A friction release that would move farther
+   * starts slower, so it ends sooner, and a planned glide moves at most this
+   * far over its duration.
    */
-  public val maxDistance: Double? = null,
+  public val maxDistance: Double? = null
 ) {
-  @PublishedApi
-  internal fun withModel(model: MomentumDecayModel): MomentumDecay = copy(model = model)
-
-  @PublishedApi
-  internal fun withHalfLifeMs(halfLifeMs: Double): MomentumDecay = copy(halfLifeMs = halfLifeMs)
-
-  @PublishedApi
-  internal fun withStopSpeed(stopSpeed: Double): MomentumDecay = copy(stopSpeed = stopSpeed)
-
-  @PublishedApi
-  internal fun withDistance(distance: Double): MomentumDecay = copy(distance = distance)
-
-  @PublishedApi
-  internal fun withDurationMs(durationMs: Double): MomentumDecay = copy(durationMs = durationMs)
-
+  @PublishedApi internal fun withModel(model: MomentumDecayModel): MomentumDecay = copy(model = model)
+  @PublishedApi internal fun withHalfLifeMs(halfLifeMs: Double): MomentumDecay = copy(halfLifeMs = halfLifeMs)
+  @PublishedApi internal fun withStopSpeed(stopSpeed: Double): MomentumDecay = copy(stopSpeed = stopSpeed)
+  @PublishedApi internal fun withDistance(distance: Double): MomentumDecay = copy(distance = distance)
+  @PublishedApi internal fun withDurationMs(durationMs: Double): MomentumDecay = copy(durationMs = durationMs)
   @PublishedApi internal fun withEasing(easing: UnitBezier): MomentumDecay = copy(easing = easing)
-
-  @PublishedApi
-  internal fun withMinSpeed(minSpeed: Double): MomentumDecay = copy(minSpeed = minSpeed)
-
-  @PublishedApi
-  internal fun withMaxSpeed(maxSpeed: Double): MomentumDecay = copy(maxSpeed = maxSpeed)
-
-  @PublishedApi
-  internal fun withMaxDistance(maxDistance: Double): MomentumDecay = copy(maxDistance = maxDistance)
-
+  @PublishedApi internal fun withMinSpeed(minSpeed: Double): MomentumDecay = copy(minSpeed = minSpeed)
+  @PublishedApi internal fun withMaxSpeed(maxSpeed: Double): MomentumDecay = copy(maxSpeed = maxSpeed)
+  @PublishedApi internal fun withMaxDistance(maxDistance: Double): MomentumDecay = copy(maxDistance = maxDistance)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): MomentumDecay = MomentumDecay()
   }
 }
-
 /**
  * How a gesture's pan keeps moving the map's content after release.
  *
@@ -4950,66 +4338,58 @@ public data class MomentumDecay(
  */
 public data class PanMomentum(
   /**
-   * How fast the map's content moved on the screen at release, in logical pixels per second. The
-   * pan moves only when this is set.
+   * How fast the map's content moved on the screen at release, in logical
+   * pixels per second. The pan moves only when this is set.
    */
   public val velocity: ScreenPoint? = null,
-  public val decay: MomentumDecay = MomentumDecay(),
+  public val decay: MomentumDecay = MomentumDecay()
 ) {
-  @PublishedApi
-  internal fun withVelocity(velocity: ScreenPoint): PanMomentum = copy(velocity = velocity)
-
+  @PublishedApi internal fun withVelocity(velocity: ScreenPoint): PanMomentum = copy(velocity = velocity)
   @PublishedApi internal fun withDecay(decay: MomentumDecay): PanMomentum = copy(decay = decay)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): PanMomentum = PanMomentum()
   }
 }
-
 /**
  * Where a part settles after a gesture that changed it.
  *
- * The targets are every `spacing` from `offset`, in the part's unit. Bearing targets wrap around
- * the circle. Once the part's glide ends, or right away when it doesn't move, the part eases to the
- * nearest target if it is within `tolerance` of it, and otherwise stays where it is. A setting
- * whose bit isn't set takes the part's default, which `GestureMomentum` lists.
+ * The targets are every `spacing` from `offset`, in the part's unit. Bearing
+ * targets wrap around the circle. Once the part's glide ends, or right away
+ * when it doesn't move, the part eases to the nearest target if it is within
+ * `tolerance` of it, and otherwise stays where it is. A setting whose bit isn't
+ * set takes the part's default, which `GestureMomentum` lists.
  *
  * See `mln_momentum_snap` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MomentumSnap(
-  /** Positive. */
+  /**
+   * Positive.
+   */
   public val spacing: Double? = null,
-  /** Defaults to 0. */
+  /**
+   * Defaults to 0.
+   */
   public val offset: Double? = null,
-  /** Not negative. */
+  /**
+   * Not negative.
+   */
   public val tolerance: Double? = null,
-  /** Zero settles without easing. Defaults to 300. */
-  public val durationMs: Double? = null,
+  /**
+   * Zero settles without easing. Defaults to 300.
+   */
+  public val durationMs: Double? = null
 ) {
   @PublishedApi internal fun withSpacing(spacing: Double): MomentumSnap = copy(spacing = spacing)
-
   @PublishedApi internal fun withOffset(offset: Double): MomentumSnap = copy(offset = offset)
-
-  @PublishedApi
-  internal fun withTolerance(tolerance: Double): MomentumSnap = copy(tolerance = tolerance)
-
-  @PublishedApi
-  internal fun withDurationMs(durationMs: Double): MomentumSnap = copy(durationMs = durationMs)
-
+  @PublishedApi internal fun withTolerance(tolerance: Double): MomentumSnap = copy(tolerance = tolerance)
+  @PublishedApi internal fun withDurationMs(durationMs: Double): MomentumSnap = copy(durationMs = durationMs)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): MomentumSnap = MomentumSnap()
   }
 }
-
 /**
  * How a gesture's zoom, bearing, or pitch keeps changing after release.
  *
@@ -5018,52 +4398,47 @@ public data class MomentumSnap(
  */
 public data class AnchoredMomentum(
   /**
-   * How fast the value changed at release: zoom levels per second for zoom, and degrees per second
-   * for bearing and pitch. The part moves only when this is set.
+   * How fast the value changed at release: zoom levels per second for zoom, and
+   * degrees per second for bearing and pitch. The part moves only when this is
+   * set.
    */
   public val velocity: Double? = null,
   /**
-   * The screen point that the change keeps in place. Without one, the change keeps the center of
-   * the view in place.
+   * The screen point that the change keeps in place. Without one, the change
+   * keeps the center of the view in place.
    */
   public val anchor: ScreenPoint? = null,
   public val decay: MomentumDecay = MomentumDecay(),
-  /** Where the part settles. Without this, it stays where the gesture and its glide leave it. */
-  public val snap: MomentumSnap? = null,
+  /**
+   * Where the part settles. Without this, it stays where the gesture and its
+   * glide leave it.
+   */
+  public val snap: MomentumSnap? = null
 ) {
-  @PublishedApi
-  internal fun withVelocity(velocity: Double): AnchoredMomentum = copy(velocity = velocity)
-
-  @PublishedApi
-  internal fun withAnchor(anchor: ScreenPoint): AnchoredMomentum = copy(anchor = anchor)
-
+  @PublishedApi internal fun withVelocity(velocity: Double): AnchoredMomentum = copy(velocity = velocity)
+  @PublishedApi internal fun withAnchor(anchor: ScreenPoint): AnchoredMomentum = copy(anchor = anchor)
   @PublishedApi internal fun withDecay(decay: MomentumDecay): AnchoredMomentum = copy(decay = decay)
-
   @PublishedApi internal fun withSnap(snap: MomentumSnap): AnchoredMomentum = copy(snap = snap)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): AnchoredMomentum = AnchoredMomentum()
   }
 }
-
 /**
  * How a gesture keeps moving the camera after the user lets go.
  *
- * A part moves only when its velocity is set, and each part slows on its own. Every part defaults
- * to `MomentumDecayModel.FRICTION` with a half-life of 140 ms, and these other defaults:
+ * A part moves only when its velocity is set, and each part slows on its own.
+ * Every part defaults to `MomentumDecayModel.FRICTION` with a half-life of 140
+ * ms, and these other defaults:
  *
- * - Pan stops at 10 logical pixels per second, needs a release of at least 200, and counts a
- *   release faster than 10000 as 10000.
- * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap settles on the
- *   nearest whole level.
- * - Bearing stops at 1 degree per second and needs a release of at least 60. Its snap settles on
- *   north within 7 degrees.
- * - Pitch stops at 1 degree per second and needs a release of at least 5. Its snap settles flat
- *   within 7 degrees.
+ * - Pan stops at 10 logical pixels per second, needs a release of at least 200,
+ *   and counts a release faster than 10000 as 10000.
+ * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap
+ *   settles on the nearest whole level.
+ * - Bearing stops at 1 degree per second and needs a release of at least 60.
+ *   Its snap settles on north within 7 degrees.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+ *   snap settles flat within 7 degrees.
  *
  * See `mln_gesture_momentum` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5072,27 +4447,17 @@ public data class GestureMomentum(
   public val pan: PanMomentum = PanMomentum(),
   public val zoom: AnchoredMomentum = AnchoredMomentum(),
   public val bearing: AnchoredMomentum = AnchoredMomentum(),
-  public val pitch: AnchoredMomentum = AnchoredMomentum(),
+  public val pitch: AnchoredMomentum = AnchoredMomentum()
 ) {
   @PublishedApi internal fun withPan(pan: PanMomentum): GestureMomentum = copy(pan = pan)
-
   @PublishedApi internal fun withZoom(zoom: AnchoredMomentum): GestureMomentum = copy(zoom = zoom)
-
-  @PublishedApi
-  internal fun withBearing(bearing: AnchoredMomentum): GestureMomentum = copy(bearing = bearing)
-
-  @PublishedApi
-  internal fun withPitch(pitch: AnchoredMomentum): GestureMomentum = copy(pitch = pitch)
-
+  @PublishedApi internal fun withBearing(bearing: AnchoredMomentum): GestureMomentum = copy(bearing = bearing)
+  @PublishedApi internal fun withPitch(pitch: AnchoredMomentum): GestureMomentum = copy(pitch = pitch)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): GestureMomentum = GestureMomentum()
   }
 }
-
 /**
  * How fast each part of a camera change moves.
  *
@@ -5100,16 +4465,24 @@ public data class GestureMomentum(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraVelocity(
-  /** How fast the map's content moves on the screen, in logical pixels per second. */
+  /**
+   * How fast the map's content moves on the screen, in logical pixels per
+   * second.
+   */
   public val pan: ScreenPoint,
-  /** In zoom levels per second. */
+  /**
+   * In zoom levels per second.
+   */
   public val zoom: Double,
-  /** In degrees per second. */
+  /**
+   * In degrees per second.
+   */
   public val bearing: Double,
-  /** In degrees per second. */
-  public val pitch: Double,
+  /**
+   * In degrees per second.
+   */
+  public val pitch: Double
 )
-
 /**
  * The end of a camera change.
  *
@@ -5119,29 +4492,22 @@ public data class CameraVelocity(
 public data class CameraTransitionEnd(
   public val outcome: CameraTransitionOutcome,
   /**
-   * The generation of the first map snapshot that shows where the change left the camera, or 0 when
-   * the map closed first.
+   * The generation of the first map snapshot that shows where the change left
+   * the camera, or 0 when the map closed first.
    */
   @get:JvmName("getGeneration") public val generation: ULong,
   /**
-   * How fast a gesture's momentum still moved when it was cancelled, which the next gesture can add
-   * to its own release velocities. Zero for every other end.
+   * How fast a gesture's momentum still moved when it was cancelled, which the
+   * next gesture can add to its own release velocities. Zero for every other
+   * end.
    */
-  public val velocity: CameraVelocity,
+  public val velocity: CameraVelocity
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      outcome: CameraTransitionOutcome,
-      generation: Long,
-      velocity: CameraVelocity,
-    ): CameraTransitionEnd =
-      CameraTransitionEnd(outcome = outcome, generation = generation.toULong(), velocity = velocity)
+    @JvmStatic @PublishedApi internal fun of(outcome: CameraTransitionOutcome, generation: Long, velocity: CameraVelocity): CameraTransitionEnd = CameraTransitionEnd(outcome = outcome, generation = generation.toULong(), velocity = velocity)
   }
 }
-
 /**
  * How a camera change animates.
  *
@@ -5150,61 +4516,43 @@ public data class CameraTransitionEnd(
  */
 public data class AnimationOptions(
   public val durationMs: Double? = null,
-  /** The average speed of a fly animation, in screens per second. `duration_ms` overrides it. */
+  /**
+   * The average speed of a fly animation, in screens per second. `duration_ms`
+   * overrides it.
+   */
   public val velocity: Double? = null,
-  /** The zoom level at the peak of a fly animation. */
+  /**
+   * The zoom level at the peak of a fly animation.
+   */
   public val minZoom: Double? = null,
   /**
-   * The longest a fly animation may take. A fly animation whose duration, set or derived from
-   * `velocity`, is longer moves the camera at once instead, and so does one too slow for the
-   * library to time, without this field. Other animations ignore it.
+   * The longest a fly animation may take. A fly animation whose duration, set
+   * or derived from `velocity`, is longer moves the camera at once instead, and
+   * so does one too slow for the library to time, without this field. Other
+   * animations ignore it.
    */
   public val maxDurationMs: Double? = null,
   public val easing: UnitBezier? = null,
   /**
-   * An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change by. Several changes
-   * can share one.
+   * An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change
+   * by. Several changes can share one.
    */
   @get:JvmSynthetic public val transitionId: ULong? = null,
-  public val endHandler: CameraTransitionHandler = CameraTransitionHandler(),
+  public val endHandler: CameraTransitionHandler = CameraTransitionHandler()
 ) {
-  @PublishedApi
-  @JvmName("getTransitionId")
-  internal fun transitionIdForJava(): Long? = transitionId?.toLong()
-
-  @PublishedApi
-  internal fun withDurationMs(durationMs: Double): AnimationOptions = copy(durationMs = durationMs)
-
-  @PublishedApi
-  internal fun withVelocity(velocity: Double): AnimationOptions = copy(velocity = velocity)
-
-  @PublishedApi
-  internal fun withMinZoom(minZoom: Double): AnimationOptions = copy(minZoom = minZoom)
-
-  @PublishedApi
-  internal fun withMaxDurationMs(maxDurationMs: Double): AnimationOptions =
-    copy(maxDurationMs = maxDurationMs)
-
-  @PublishedApi
-  internal fun withEasing(easing: UnitBezier): AnimationOptions = copy(easing = easing)
-
-  @PublishedApi
-  internal fun withTransitionId(transitionId: Long): AnimationOptions =
-    copy(transitionId = transitionId.toULong())
-
-  @PublishedApi
-  internal fun withEndHandler(endHandler: CameraTransitionHandler): AnimationOptions =
-    copy(endHandler = endHandler)
-
+  @PublishedApi @JvmName("getTransitionId") internal fun transitionIdForJava(): Long? = transitionId?.toLong()
+  @PublishedApi internal fun withDurationMs(durationMs: Double): AnimationOptions = copy(durationMs = durationMs)
+  @PublishedApi internal fun withVelocity(velocity: Double): AnimationOptions = copy(velocity = velocity)
+  @PublishedApi internal fun withMinZoom(minZoom: Double): AnimationOptions = copy(minZoom = minZoom)
+  @PublishedApi internal fun withMaxDurationMs(maxDurationMs: Double): AnimationOptions = copy(maxDurationMs = maxDurationMs)
+  @PublishedApi internal fun withEasing(easing: UnitBezier): AnimationOptions = copy(easing = easing)
+  @PublishedApi internal fun withTransitionId(transitionId: Long): AnimationOptions = copy(transitionId = transitionId.toULong())
+  @PublishedApi internal fun withEndHandler(endHandler: CameraTransitionHandler): AnimationOptions = copy(endHandler = endHandler)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): AnimationOptions = AnimationOptions()
   }
 }
-
 /**
  * A change to the camera from where it is now, for gestures.
  *
@@ -5212,114 +4560,648 @@ public data class AnimationOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraDelta(
-  /** Moves the map's content this far on the screen, as a drag does. */
+  /**
+   * Moves the map's content this far on the screen, as a drag does.
+   */
   public val offset: ScreenPoint? = null,
-  /** Multiplies the map's scale. 2 zooms in by one level. */
+  /**
+   * Multiplies the map's scale. 2 zooms in by one level.
+   */
   public val scale: Double? = null,
-  /** Degrees to add to the bearing. */
+  /**
+   * Degrees to add to the bearing.
+   */
   public val bearing: Double? = null,
-  /** Degrees to add to the pitch. */
+  /**
+   * Degrees to add to the pitch.
+   */
   public val pitch: Double? = null,
   /**
-   * The screen point that `scale`, `bearing`, and `pitch` keep in place. It needs one of them, and
-   * it combines with `offset` only in a delta without a duration.
+   * The screen point that `scale`, `bearing`, and `pitch` keep in place. It
+   * needs one of them, and it combines with `offset` only in a delta without a
+   * duration.
    */
   public val anchor: ScreenPoint? = null,
   /**
-   * How the gesture keeps moving after this delta. Only a delta in the `GesturePhase.END` phase
-   * carries it.
+   * How the gesture keeps moving after this delta. Only a delta in the
+   * `GesturePhase.END` phase carries it.
    */
   public val momentum: GestureMomentum? = null,
   public val animation: AnimationOptions = AnimationOptions(),
-  public val gesturePhase: GesturePhase = GesturePhase.NONE,
+  public val gesturePhase: GesturePhase = GesturePhase.NONE
 ) {
   @PublishedApi internal fun withOffset(offset: ScreenPoint): CameraDelta = copy(offset = offset)
-
   @PublishedApi internal fun withScale(scale: Double): CameraDelta = copy(scale = scale)
-
   @PublishedApi internal fun withBearing(bearing: Double): CameraDelta = copy(bearing = bearing)
-
   @PublishedApi internal fun withPitch(pitch: Double): CameraDelta = copy(pitch = pitch)
-
   @PublishedApi internal fun withAnchor(anchor: ScreenPoint): CameraDelta = copy(anchor = anchor)
-
-  @PublishedApi
-  internal fun withMomentum(momentum: GestureMomentum): CameraDelta = copy(momentum = momentum)
-
-  @PublishedApi
-  internal fun withAnimation(animation: AnimationOptions): CameraDelta = copy(animation = animation)
-
-  @PublishedApi
-  internal fun withGesturePhase(gesturePhase: GesturePhase): CameraDelta =
-    copy(gesturePhase = gesturePhase)
-
+  @PublishedApi internal fun withMomentum(momentum: GestureMomentum): CameraDelta = copy(momentum = momentum)
+  @PublishedApi internal fun withAnimation(animation: AnimationOptions): CameraDelta = copy(animation = animation)
+  @PublishedApi internal fun withGesturePhase(gesturePhase: GesturePhase): CameraDelta = copy(gesturePhase = gesturePhase)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): CameraDelta = CameraDelta()
   }
 }
-
 /**
- * A ring of Android hardware buffers that the library allocates, for
- * `MapHandle.attachAndroidHardwareBufferRing()`.
+ * An image that the session allocates, renders at the map's scale factor, and
+ * reads back with `RenderSessionHandle.readTexture()`.
  *
- * Each buffer has the map's size in pixels, `logical_size` times the map's scale factor, and the
- * format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its usage is
- * AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
- * `usage`.
- *
- * See `mln_android_hardware_buffer_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ * See `mln_offscreen_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class AndroidHardwareBufferRingDescriptor(
+public data class OffscreenTarget(
+  public val logicalSize: LogicalSize
+)
+/**
+ * A `CAMetalLayer` to present to.
+ *
+ * The session sets the layer's device, pixel format, and drawable size.
+ *
+ * See `mln_metal_layer_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class MetalLayerTarget(
   public val logicalSize: LogicalSize,
-  /** How many buffers the ring has, from 1 to 8. */
-  @get:JvmName("getBufferCount") public val bufferCount: UInt,
   /**
-   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
-   * AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+   * Your `CAMetalLayer*`.
    */
-  @get:JvmName("getUsage") public val usage: ULong = 0uL,
+  public val layer: NativePointer
+)
+/**
+ * A Win32 window to present to.
+ *
+ * On an OpenGL device, the session sets the window's pixel format, so don't set
+ * one yourself. While the window is minimized, frame demands finish with
+ * `RenderResult.TARGET_NOT_READY`.
+ *
+ * See `mln_win32_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class Win32WindowTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * Your `HWND`.
+   */
+  public val window: NativePointer
+)
+/**
+ * An X11 window to present to, through Xlib.
+ *
+ * Keep the display connected until the session's detach completes.
+ *
+ * See `mln_xlib_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class XlibWindowTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * Your `Display*`.
+   */
+  public val display: NativePointer,
+  /**
+   * Your `Window`, on `display`.
+   */
+  @get:JvmName("getWindow") public val window: ULong
 ) {
-  @PublishedApi
-  internal fun withUsage(usage: Long): AndroidHardwareBufferRingDescriptor =
-    copy(usage = usage.toULong())
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      bufferCount: Int,
-    ): AndroidHardwareBufferRingDescriptor =
-      AndroidHardwareBufferRingDescriptor(
-        logicalSize = logicalSize,
-        bufferCount = bufferCount.toUInt(),
-      )
-
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      bufferCount: Int,
-      usage: Long,
-    ): AndroidHardwareBufferRingDescriptor =
-      AndroidHardwareBufferRingDescriptor(
-        logicalSize = logicalSize,
-        bufferCount = bufferCount.toUInt(),
-        usage = usage.toULong(),
-      )
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, display: NativePointer, window: Long): XlibWindowTarget = XlibWindowTarget(logicalSize = logicalSize, display = display, window = window.toULong())
   }
 }
-
+/**
+ * A Wayland surface to present to.
+ *
+ * Keep the display connected until the session's detach completes. On an OpenGL
+ * device, if you also use EGL on the display, initialize it before you attach.
+ *
+ * See `mln_wayland_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WaylandSurfaceTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * Your `wl_display*`.
+   */
+  public val display: NativePointer,
+  /**
+   * Your `wl_surface*`, on `display`.
+   */
+  public val surface: NativePointer
+)
+/**
+ * An Android window to present to.
+ *
+ * The session takes its own reference to the window, so you can release yours
+ * once the call returns. When the platform destroys the window, such as in
+ * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+ * `RenderSessionHandle.releaseTarget()`, or give the session another window
+ * with `RenderSessionHandle.setTarget()`, without waiting for that to complete.
+ * A frame to the destroyed window finishes with
+ * `RenderResult.TARGET_NOT_READY`, or with `RenderResult.RENDERED` if the
+ * window went away while the frame was presenting.
+ *
+ * See `mln_android_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class AndroidWindowTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * Your `ANativeWindow*`.
+   */
+  public val window: NativePointer
+)
+/**
+ * An OpenHarmony window to present to.
+ *
+ * The session takes its own reference to the window, so you can release yours
+ * once the call returns. When the platform destroys the window, such as in an
+ * `XComponent`'s `onSurfaceDestroyed` callback, release the target or give the
+ * session another window without waiting, as for an Android window.
+ *
+ * See `mln_ohos_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class OhosWindowTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * Your `OHNativeWindow*`.
+   */
+  public val window: NativePointer
+)
+/**
+ * Your Vulkan surface to present to.
+ *
+ * Make it with the instance of the Vulkan device that you attach on. The
+ * device's queue family must support presenting to the surface. The session
+ * creates the swapchain, and destroys it but not the surface.
+ *
+ * See `mln_vulkan_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class VulkanSurfaceTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * Your `VkSurfaceKHR`.
+   */
+  @get:JvmName("getSurface") public val surface: ULong
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, surface: Long): VulkanSurfaceTarget = VulkanSurfaceTarget(logicalSize = logicalSize, surface = surface.toULong())
+  }
+}
+/**
+ * Your OpenGL surface to present to, with the context that
+ * `GpuDeviceHandle.wrapOpenGl()` wrapped.
+ *
+ * The session makes its context current on the surface for each frame, and
+ * swaps the surface's buffers to present.
+ *
+ * See `mln_open_gl_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class OpenGlSurfaceTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * Your `EGLSurface` on the context's display, with its config, or your `HDC`
+   * with the context's pixel format.
+   */
+  public val surface: NativePointer
+)
+/**
+ * A Metal texture of a borrowed ring.
+ *
+ * See `mln_metal_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class MetalBorrowedTexture(
+  /**
+   * Your `MTLTexture`.
+   */
+  public val texture: NativePointer
+)
+/**
+ * A ring of your Metal textures to render into, on the Metal device that you
+ * attach on.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. The textures
+ * must all have that size, the device's `MTLDevice`, one pixel format, one
+ * sample, and `MTLTextureUsageRenderTarget`. The ring holds up to
+ * `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, renders the map's
+ * depth and stencil into it, and stores them. They must have the size of
+ * `textures`, one pixel format of `GpuDeviceCapabilities.depthStencilFormats`,
+ * one sample, `MTLTextureUsageRenderTarget`, and a storage mode other than
+ * `MTLStorageModeMemoryless`.
+ *
+ * See `mln_metal_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class MetalBorrowedTexturesTarget(
+  public val logicalSize: LogicalSize,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<MetalBorrowedTexture>,
+  public val depthTextures: List<MetalBorrowedTexture> = emptyList()
+) {
+  @PublishedApi internal fun withDepthTextures(depthTextures: List<MetalBorrowedTexture>): MetalBorrowedTexturesTarget = copy(depthTextures = depthTextures)
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, physicalWidth: Int, physicalHeight: Int, textures: List<MetalBorrowedTexture>): MetalBorrowedTexturesTarget = MetalBorrowedTexturesTarget(logicalSize = logicalSize, physicalWidth = physicalWidth.toUInt(), physicalHeight = physicalHeight.toUInt(), textures = textures)
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, physicalWidth: Int, physicalHeight: Int, textures: List<MetalBorrowedTexture>, depthTextures: List<MetalBorrowedTexture>): MetalBorrowedTexturesTarget = MetalBorrowedTexturesTarget(logicalSize = logicalSize, physicalWidth = physicalWidth.toUInt(), physicalHeight = physicalHeight.toUInt(), textures = textures, depthTextures = depthTextures)
+  }
+}
+/**
+ * A Vulkan image of a borrowed ring.
+ *
+ * See `mln_vulkan_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class VulkanBorrowedTexture(
+  /**
+   * Your `VkImage`.
+   */
+  @get:JvmName("getImage") public val image: ULong,
+  /**
+   * A 2D `VkImageView` of `image` with one mip level and one layer.
+   */
+  @get:JvmName("getImageView") public val imageView: ULong
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(image: Long, imageView: Long): VulkanBorrowedTexture = VulkanBorrowedTexture(image = image.toULong(), imageView = imageView.toULong())
+  }
+}
+/**
+ * A ring of your Vulkan images to render into, on the Vulkan device that you
+ * attach on.
+ *
+ * `physical_width` and `physical_height` give the images' size in pixels, which
+ * is usually `logical_size` times the map's scale factor. Each image must have
+ * that size, `format`, and `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT`, and belong to
+ * the device's `VkDevice`. The ring holds up to `TEXTURE_RING_MAX_DEPTH`
+ * distinct images.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, renders the map's
+ * depth and stencil into it, stores them, and leaves it in
+ * `depth_final_layout`, with `owner` as for the color image. They must have the
+ * size of `textures`, `depth_format`, one sample, and
+ * `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and their views both the depth
+ * and the stencil aspect.
+ *
+ * See `mln_vulkan_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class VulkanBorrowedTexturesTarget(
+  public val logicalSize: LogicalSize,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<VulkanBorrowedTexture>,
+  /**
+   * The images' `VkFormat`.
+   */
+  @get:JvmName("getFormat") public val format: UInt,
+  /**
+   * The `VkImageLayout` that each frame leaves its image in.
+   */
+  @get:JvmName("getFinalLayout") public val finalLayout: UInt,
+  public val owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE,
+  public val depthTextures: List<VulkanBorrowedTexture> = emptyList(),
+  /**
+   * The depth images' `VkFormat`, of
+   * `GpuDeviceCapabilities.depthStencilFormats`.
+   */
+  @get:JvmName("getDepthFormat") public val depthFormat: UInt = 0u,
+  /**
+   * The `VkImageLayout` that each frame leaves its depth image in.
+   */
+  @get:JvmName("getDepthFinalLayout") public val depthFinalLayout: UInt = 0u
+) {
+  @PublishedApi internal fun withOwner(owner: VulkanImageOwner): VulkanBorrowedTexturesTarget = copy(owner = owner)
+  @PublishedApi internal fun withDepthTextures(depthTextures: List<VulkanBorrowedTexture>): VulkanBorrowedTexturesTarget = copy(depthTextures = depthTextures)
+  @PublishedApi internal fun withDepthFormat(depthFormat: Int): VulkanBorrowedTexturesTarget = copy(depthFormat = depthFormat.toUInt())
+  @PublishedApi internal fun withDepthFinalLayout(depthFinalLayout: Int): VulkanBorrowedTexturesTarget = copy(depthFinalLayout = depthFinalLayout.toUInt())
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, physicalWidth: Int, physicalHeight: Int, textures: List<VulkanBorrowedTexture>, format: Int, finalLayout: Int): VulkanBorrowedTexturesTarget = VulkanBorrowedTexturesTarget(logicalSize = logicalSize, physicalWidth = physicalWidth.toUInt(), physicalHeight = physicalHeight.toUInt(), textures = textures, format = format.toUInt(), finalLayout = finalLayout.toUInt())
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, physicalWidth: Int, physicalHeight: Int, textures: List<VulkanBorrowedTexture>, format: Int, finalLayout: Int, owner: VulkanImageOwner, depthTextures: List<VulkanBorrowedTexture>, depthFormat: Int, depthFinalLayout: Int): VulkanBorrowedTexturesTarget = VulkanBorrowedTexturesTarget(logicalSize = logicalSize, physicalWidth = physicalWidth.toUInt(), physicalHeight = physicalHeight.toUInt(), textures = textures, format = format.toUInt(), finalLayout = finalLayout.toUInt(), owner = owner, depthTextures = depthTextures, depthFormat = depthFormat.toUInt(), depthFinalLayout = depthFinalLayout.toUInt())
+  }
+}
+/**
+ * An OpenGL texture of a borrowed ring.
+ *
+ * See `mln_open_gl_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class OpenGlBorrowedTexture(
+  /**
+   * Your texture name.
+   */
+  @get:JvmName("getTexture") public val texture: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(texture: Int): OpenGlBorrowedTexture = OpenGlBorrowedTexture(texture = texture.toUInt())
+  }
+}
+/**
+ * A ring of your OpenGL textures to render into, on an OpenGL device that
+ * `GpuDeviceHandle.wrapOpenGl()` made from your context.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. Each texture
+ * must be in your context's share group, with RGBA8 storage of that size. The
+ * ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, and renders the map's
+ * depth and stencil into it. They must be `GL_TEXTURE_2D` textures in the share
+ * group, with storage of the size of `textures` in a format of
+ * `GpuDeviceCapabilities.depthStencilFormats`.
+ *
+ * See `mln_open_gl_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class OpenGlBorrowedTexturesTarget(
+  public val logicalSize: LogicalSize,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<OpenGlBorrowedTexture>,
+  /**
+   * The textures' target. It must be `GL_TEXTURE_2D`.
+   */
+  @get:JvmName("getTarget") public val target: UInt,
+  public val depthTextures: List<OpenGlBorrowedTexture> = emptyList()
+) {
+  @PublishedApi internal fun withDepthTextures(depthTextures: List<OpenGlBorrowedTexture>): OpenGlBorrowedTexturesTarget = copy(depthTextures = depthTextures)
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, physicalWidth: Int, physicalHeight: Int, textures: List<OpenGlBorrowedTexture>, target: Int): OpenGlBorrowedTexturesTarget = OpenGlBorrowedTexturesTarget(logicalSize = logicalSize, physicalWidth = physicalWidth.toUInt(), physicalHeight = physicalHeight.toUInt(), textures = textures, target = target.toUInt())
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, physicalWidth: Int, physicalHeight: Int, textures: List<OpenGlBorrowedTexture>, target: Int, depthTextures: List<OpenGlBorrowedTexture>): OpenGlBorrowedTexturesTarget = OpenGlBorrowedTexturesTarget(logicalSize = logicalSize, physicalWidth = physicalWidth.toUInt(), physicalHeight = physicalHeight.toUInt(), textures = textures, target = target.toUInt(), depthTextures = depthTextures)
+  }
+}
+/**
+ * A WebGPU texture of a borrowed ring.
+ *
+ * See `mln_web_gpu_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebGpuBorrowedTexture(
+  /**
+   * Your `GPUTexture`.
+   */
+  @get:JvmName("getTexture") public val texture: UInt
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(texture: Int): WebGpuBorrowedTexture = WebGpuBorrowedTexture(texture = texture.toUInt())
+  }
+}
+/**
+ * A ring of your WebGPU textures to render into, on a WebGPU device that wraps
+ * yours.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. Each texture
+ * must be 2D with that size, `format`, one layer, one mip level, one sample,
+ * and `GPUTextureUsage.RENDER_ATTACHMENT`. The ring holds up to
+ * `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, renders the map's
+ * depth and stencil into it, and stores them. They must be 2D with the size of
+ * `textures`, `depth_format`, one layer, one mip level, one sample, and
+ * `GPUTextureUsage.RENDER_ATTACHMENT`.
+ *
+ * The ring renders on a device from `GpuDeviceHandle.wrapWebGpu()`, which no
+ * build has yet: an attach with it fails with `Status.UNSUPPORTED`.
+ *
+ * See `mln_web_gpu_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebGpuBorrowedTexturesTarget(
+  public val logicalSize: LogicalSize,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<WebGpuBorrowedTexture>,
+  /**
+   * The textures' `GPUTextureFormat`, such as `rgba8unorm`.
+   */
+  public val format: String,
+  public val depthTextures: List<WebGpuBorrowedTexture> = emptyList(),
+  /**
+   * The depth textures' `GPUTextureFormat`, of
+   * `GpuDeviceCapabilities.depthStencilFormats`.
+   */
+  public val depthFormat: String = ""
+) {
+  @PublishedApi internal fun withDepthTextures(depthTextures: List<WebGpuBorrowedTexture>): WebGpuBorrowedTexturesTarget = copy(depthTextures = depthTextures)
+  @PublishedApi internal fun withDepthFormat(depthFormat: String): WebGpuBorrowedTexturesTarget = copy(depthFormat = depthFormat)
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, physicalWidth: Int, physicalHeight: Int, textures: List<WebGpuBorrowedTexture>, format: String): WebGpuBorrowedTexturesTarget = WebGpuBorrowedTexturesTarget(logicalSize = logicalSize, physicalWidth = physicalWidth.toUInt(), physicalHeight = physicalHeight.toUInt(), textures = textures, format = format)
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, physicalWidth: Int, physicalHeight: Int, textures: List<WebGpuBorrowedTexture>, format: String, depthTextures: List<WebGpuBorrowedTexture>, depthFormat: String): WebGpuBorrowedTexturesTarget = WebGpuBorrowedTexturesTarget(logicalSize = logicalSize, physicalWidth = physicalWidth.toUInt(), physicalHeight = physicalHeight.toUInt(), textures = textures, format = format, depthTextures = depthTextures, depthFormat = depthFormat)
+  }
+}
+/**
+ * A DRM format and modifier that you can import.
+ *
+ * See `mln_dma_buf_format` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class DmaBufFormat(
+  /**
+   * A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
+   */
+  @get:JvmName("getFourcc") public val fourcc: UInt = 0u,
+  /**
+   * A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+   */
+  @get:JvmName("getModifier") public val modifier: ULong = 0uL
+) {
+  @PublishedApi internal fun withFourcc(fourcc: Int): DmaBufFormat = copy(fourcc = fourcc.toUInt())
+  @PublishedApi internal fun withModifier(modifier: Long): DmaBufFormat = copy(modifier = modifier.toULong())
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(): DmaBufFormat = DmaBufFormat()
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(fourcc: Int, modifier: Long): DmaBufFormat = DmaBufFormat(fourcc = fourcc.toUInt(), modifier = modifier.toULong())
+  }
+}
+/**
+ * A ring of textures that the session allocates on its device and shares with
+ * you, in one of the ways that you can import.
+ *
+ * Each texture has the size in pixels of `logical_size` at the map's scale
+ * factor. `RenderSessionHandle.resize()` gives the ring textures of the new
+ * size, and a frame that you hold keeps its texture of the old size until you
+ * release or discard it.
+ *
+ * The ring shares its textures in the first kind of `export_kinds` that the
+ * device exports, in this order, and `RenderSessionCapabilities.exportKind`
+ * reports it:
+ *
+ * - `GpuExportKind.IO_SURFACE`: IOSurfaces of the pixel format
+ *   kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm. Get
+ *   each frame's surface with `AcquiredFrameHandle.withIoSurface()`.
+ * - `GpuExportKind.ANDROID_HARDWARE_BUFFER`: hardware buffers of the format
+ *   AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage
+ *   AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+ *   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+ *   `android_hardware_buffer_usage`. Get each frame's buffer with
+ *   `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
+ * - `GpuExportKind.DXGI_SHARED_HANDLE`: D3D11 textures of the format
+ *   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
+ *   resources and render targets. Open them on a D3D11 or D3D12 device of the
+ *   same adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each
+ *   frame's texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+ * - `GpuExportKind.DMA_BUF`: dmabufs of a format and modifier from
+ *   `dma_buf_formats`. Get each frame's buffer with
+ *   `AcquiredFrameHandle.withDmaBuf()`.
+ * - `GpuExportKind.OPAQUE_FD`: the memory of Vulkan images, which only a Vulkan
+ *   device or an OpenGL context with GL_EXT_memory_object_fd on the same GPU
+ *   and driver imports. To pick the GPU, create the device with
+ *   `GpuDeviceOptions.adapterUuid` set to your context's GL_DEVICE_UUID_EXT.
+ *   Get each frame's memory with `AcquiredFrameHandle.withOpaqueFd()`.
+ *
+ * `GpuDeviceCapabilities.exportKinds` reports the kinds that a device exports.
+ * Attach with `RenderDriverKind.CORE_WORKER`. Without a device, the session
+ * renders on the first of the platform's backends whose device exports one of
+ * `export_kinds`.
+ *
+ * Each frame hands over with `GpuSyncKind.CPU_COMPLETE` or with the sync kind
+ * that crosses APIs on its platform: `GpuSyncKind.METAL_SHARED_EVENT` for an
+ * IOSurface, and `GpuSyncKind.SYNC_FD` for the others, where the device has
+ * them. For a reader that waits on neither, such as a Wayland compositor
+ * without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
+ * out of `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+ * finishes before you acquire it, and release each frame only once the reader
+ * is done with its texture. Give the ring 3 textures, so the session can render
+ * while you hold two frames.
+ *
+ * See `mln_exported_ring_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class ExportedRingTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * How many textures the ring has, from 1 to `TEXTURE_RING_MAX_DEPTH`.
+   */
+  @get:JvmName("getTextureCount") public val textureCount: UInt,
+  /**
+   * The ways of sharing a texture that you can import.
+   */
+  public val exportKinds: GpuExportKindFlag,
+  /**
+   * The dmabuf formats and modifiers that you import, most preferred first,
+   * such as those that eglQueryDmaBufModifiersEXT() reports. A ring exports
+   * dmabufs only of one of them. The library renders only DRM_FORMAT_ABGR8888
+   * and DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+   * format has, such as a plane of compression metadata, and the library takes
+   * any such modifier that its GPU can render into and share. The library takes
+   * no implicit modifier: it skips DRM_FORMAT_MOD_INVALID, so a list of only
+   * that one gets no dmabuf.
+   */
+  public val dmaBufFormats: List<DmaBufFormat> = emptyList(),
+  /**
+   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads of a hardware buffer
+   * need, such as AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+   */
+  @get:JvmName("getAndroidHardwareBufferUsage") public val androidHardwareBufferUsage: ULong = 0uL
+) {
+  @PublishedApi internal fun withDmaBufFormats(dmaBufFormats: List<DmaBufFormat>): ExportedRingTarget = copy(dmaBufFormats = dmaBufFormats)
+  @PublishedApi internal fun withAndroidHardwareBufferUsage(androidHardwareBufferUsage: Long): ExportedRingTarget = copy(androidHardwareBufferUsage = androidHardwareBufferUsage.toULong())
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, textureCount: Int, exportKinds: GpuExportKindFlag): ExportedRingTarget = ExportedRingTarget(logicalSize = logicalSize, textureCount = textureCount.toUInt(), exportKinds = exportKinds)
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, textureCount: Int, exportKinds: GpuExportKindFlag, dmaBufFormats: List<DmaBufFormat>, androidHardwareBufferUsage: Long): ExportedRingTarget = ExportedRingTarget(logicalSize = logicalSize, textureCount = textureCount.toUInt(), exportKinds = exportKinds, dmaBufFormats = dmaBufFormats, androidHardwareBufferUsage = androidHardwareBufferUsage.toULong())
+  }
+}
+/**
+ * A canvas to present to.
+ *
+ * The session makes the canvas's "webgpu" or "webgl2" context with the device's
+ * backend, and sets the canvas's size to `logical_size` at the map's scale
+ * factor. Attached without a device, it renders with the build's backend: a
+ * WebGPU build asks the browser for a device, and attaches once it has one. For
+ * an OpenGL device that wraps your WebGL2 context, the canvas must be the
+ * context's own.
+ *
+ * See `mln_web_canvas_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebCanvasTarget(
+  public val logicalSize: LogicalSize,
+  /**
+   * An `OffscreenCanvas`, such as one from
+   * `HTMLCanvasElement.transferControlToOffscreen()` that you posted to the
+   * library's Web Worker, or an `HTMLCanvasElement` when the library runs on
+   * the page's thread.
+   */
+  @get:JvmName("getCanvas") public val canvas: UInt,
+  /**
+   * For a WebGPU device, the `GPUTextureFormat` to configure the canvas with,
+   * such as `bgra8unorm`. Empty for a format that the device's adapter prefers.
+   */
+  public val format: String = ""
+) {
+  @PublishedApi internal fun withFormat(format: String): WebCanvasTarget = copy(format = format)
+  public companion object {
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, canvas: Int): WebCanvasTarget = WebCanvasTarget(logicalSize = logicalSize, canvas = canvas.toUInt())
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(logicalSize: LogicalSize, canvas: Int, format: String): WebCanvasTarget = WebCanvasTarget(logicalSize = logicalSize, canvas = canvas.toUInt(), format = format)
+  }
+}
+/**
+ * What a render session renders into: one kind of target, and its descriptor.
+ *
+ * Every target has a size in logical pixels, which sets the map's size. The
+ * session renders it at the map's scale factor. A borrowed or exported ring
+ * hands each frame to you: acquire it with
+ * `RenderSessionHandle.acquireFrame()`, and release it with your GPU's
+ * synchronization once you have read it.
+ *
+ * The session uses the objects that the descriptor names until a replacement or
+ * release of the target completes, a detach or release of the session
+ * completes, or an abandon of it returns, except as a kind's descriptor says. A
+ * window target presents without waiting for the display, so demand at most one
+ * frame per display refresh.
+ *
+ * See `mln_render_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public sealed interface RenderTarget {
+  public data class Offscreen(public val value: OffscreenTarget): RenderTarget
+  public data class MetalLayer(public val value: MetalLayerTarget): RenderTarget
+  public data class Win32Window(public val value: Win32WindowTarget): RenderTarget
+  public data class XlibWindow(public val value: XlibWindowTarget): RenderTarget
+  public data class WaylandSurface(public val value: WaylandSurfaceTarget): RenderTarget
+  public data class AndroidWindow(public val value: AndroidWindowTarget): RenderTarget
+  public data class OhosWindow(public val value: OhosWindowTarget): RenderTarget
+  public data class VulkanSurface(public val value: VulkanSurfaceTarget): RenderTarget
+  public data class OpenGlSurface(public val value: OpenGlSurfaceTarget): RenderTarget
+  public data class MetalBorrowedTextures(public val value: MetalBorrowedTexturesTarget): RenderTarget
+  public data class VulkanBorrowedTextures(public val value: VulkanBorrowedTexturesTarget): RenderTarget
+  public data class OpenGlBorrowedTextures(public val value: OpenGlBorrowedTexturesTarget): RenderTarget
+  public data class WebGpuBorrowedTextures(public val value: WebGpuBorrowedTexturesTarget): RenderTarget
+  public data class ExportedRing(public val value: ExportedRingTarget): RenderTarget
+  public data class WebCanvas(public val value: WebCanvasTarget): RenderTarget
+}
 /**
  * Options for attaching a render session to a map.
  *
@@ -5328,911 +5210,73 @@ public data class AndroidHardwareBufferRingDescriptor(
  */
 public data class RenderSessionAttachOptions(
   /**
-   * The thread that runs the session's graphics work, which depends on the target:
+   * The thread that runs the session's graphics work, which depends on the
+   * target:
    *
-   * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a shared or dedicated EGL or WGL context, an
-   *   existing WebGL context, or a browser's WebGPU device.
-   * - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an Android, OpenHarmony, or
-   *   Win32 window, a Wayland surface, a ring of Android hardware buffers, dmabufs, DXGI shared
-   *   textures, or IOSurfaces, or an offscreen session.
-   * - Either one for another Metal or Vulkan target.
+   * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a borrowed ring of WebGPU
+   *   textures.
+   * - `RenderDriverKind.CORE_WORKER` for an offscreen target, a window, or an
+   *   exported ring.
+   * - Either one for a web canvas. In a browser both run on the thread that
+   *   loaded the library: `RenderDriverKind.CORE_WORKER` in the library's own
+   *   tasks, and `RenderDriverKind.CALLER_GRAPHICS_THREAD` when you service the
+   *   session.
+   * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
+   *   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
+   *   these on `RenderDriverKind.CORE_WORKER` only, and fails an attach with
+   *   `RenderDriverKind.CALLER_GRAPHICS_THREAD` then.
    *
    * An attach with another driver fails with `Status.UNSUPPORTED`.
    */
   public val driver: RenderDriverKind,
   /**
-   * The kinds of `GpuSync` that you can wait on before you read an acquired frame. The session uses
-   * one of them that its target supports. Zero lets the session pick a kind that names no object to
-   * wait on.
+   * The kinds of `GpuSync` that you can wait on before you read an acquired
+   * frame. The session uses one of them that its target supports. Zero lets the
+   * session pick a kind that names no object to wait on.
    */
   public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
   /**
-   * Called when frame results are waiting for `RenderSessionHandle.drainFrameResults()`. It isn't
-   * called again until a drain takes them.
+   * Called when frame results are waiting for
+   * `RenderSessionHandle.drainFrameResults()`. It isn't called again until a
+   * drain takes them.
    */
   public val frameWake: Wake = Wake(),
   /**
-   * Called when the session has something new to draw. Demand a frame at your next display refresh.
-   * It isn't called again until you demand a frame, or while the session has no target.
+   * Called when the session has something new to draw. Demand a frame at your
+   * next display refresh. It isn't called again until you demand a frame, or
+   * while the session has no target.
    */
   public val redrawWake: Wake = Wake(),
   /**
-   * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
-   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs.
+   * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD`
+   * has work for `RenderSessionHandle.serviceDriverWork()`. It isn't called
+   * again until a service runs.
    */
   public val driverWorkWake: Wake = Wake(),
-  /** Your lock on the Vulkan queue, when you submit to it yourself. */
-  public val queueLock: QueueLock = QueueLock(),
-) {
-  @PublishedApi
-  internal fun withProducerSyncKinds(
-    producerSyncKinds: GpuSyncKindFlag,
-  ): RenderSessionAttachOptions = copy(producerSyncKinds = producerSyncKinds)
-
-  @PublishedApi
-  internal fun withFrameWake(frameWake: Wake): RenderSessionAttachOptions =
-    copy(frameWake = frameWake)
-
-  @PublishedApi
-  internal fun withRedrawWake(redrawWake: Wake): RenderSessionAttachOptions =
-    copy(redrawWake = redrawWake)
-
-  @PublishedApi
-  internal fun withDriverWorkWake(driverWorkWake: Wake): RenderSessionAttachOptions =
-    copy(driverWorkWake = driverWorkWake)
-
-  @PublishedApi
-  internal fun withQueueLock(queueLock: QueueLock): RenderSessionAttachOptions =
-    copy(queueLock = queueLock)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(driver: RenderDriverKind): RenderSessionAttachOptions =
-      RenderSessionAttachOptions(driver = driver)
-  }
-}
-
-/**
- * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
- *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
- * to the window, so you can release yours once the call returns.
- *
- * See `mln_android_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
- */
-public data class AndroidSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
-  public val window: NativePointer,
-  /** The calling thread's `JNIEnv*`, with `surface`. */
-  public val jniEnv: NativePointer,
-  /** An `android.view.Surface`, with `jni_env`. */
-  public val surface: NativePointer,
-)
-
-/**
- * A DRM format and modifier that you can import.
- *
- * See `mln_dma_buf_format` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
- */
-public data class DmaBufFormat(
-  /** A DRM fourcc code, such as DRM_FORMAT_ABGR8888. */
-  @get:JvmName("getFourcc") public val fourcc: UInt = 0u,
-  /** A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR. */
-  @get:JvmName("getModifier") public val modifier: ULong = 0uL,
-) {
-  @PublishedApi internal fun withFourcc(fourcc: Int): DmaBufFormat = copy(fourcc = fourcc.toUInt())
-
-  @PublishedApi
-  internal fun withModifier(modifier: Long): DmaBufFormat = copy(modifier = modifier.toULong())
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): DmaBufFormat = DmaBufFormat()
-
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(fourcc: Int, modifier: Long): DmaBufFormat =
-      DmaBufFormat(fourcc = fourcc.toUInt(), modifier = modifier.toULong())
-  }
-}
-
-/**
- * A ring of dmabufs that the library allocates, for `MapHandle.attachDmaBufRing()`.
- *
- * Each buffer has the map's size in pixels and a format and modifier from `formats`. The library
- * renders only DRM_FORMAT_ABGR8888 and DRM_FORMAT_ARGB8888. A modifier can give a buffer more
- * planes than its format has, such as a plane of compression metadata, and the library takes any
- * such modifier that its GPU can render into and share.
- *
- * See `mln_dma_buf_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
- */
-public data class DmaBufRingDescriptor(
-  public val logicalSize: LogicalSize,
-  /** How many buffers the ring has, from 1 to 8. */
-  @get:JvmName("getBufferCount") public val bufferCount: UInt,
   /**
-   * The formats and modifiers that your reader imports, most preferred first, such as those that
-   * eglQueryDmaBufModifiersEXT() reports.
+   * Whether an exported ring keeps the depth and stencil of each frame for you,
+   * so that you can draw into the frame depth-tested against the map, as
+   * `FrameProjection` says. The getter of the device's API, such as
+   * `AcquiredFrameHandle.withVulkanTexture()`, gets a frame's depth texture on
+   * the device, and `AcquiredFrameHandle.withOpaqueFd()` shares it across APIs
+   * when `GpuDeviceCapabilities.depthExportKinds` has the ring's kind. Keeping
+   * depth costs memory bandwidth, most on tile-based GPUs. A borrowed ring
+   * keeps depth in the textures that you give it instead, and the other targets
+   * keep none, so an attach to them with `keep_depth` fails with
+   * `Status.UNSUPPORTED`.
    */
-  public val formats: List<DmaBufFormat>,
+  public val keepDepth: Boolean = false
 ) {
+  @PublishedApi internal fun withProducerSyncKinds(producerSyncKinds: GpuSyncKindFlag): RenderSessionAttachOptions = copy(producerSyncKinds = producerSyncKinds)
+  @PublishedApi internal fun withFrameWake(frameWake: Wake): RenderSessionAttachOptions = copy(frameWake = frameWake)
+  @PublishedApi internal fun withRedrawWake(redrawWake: Wake): RenderSessionAttachOptions = copy(redrawWake = redrawWake)
+  @PublishedApi internal fun withDriverWorkWake(driverWorkWake: Wake): RenderSessionAttachOptions = copy(driverWorkWake = driverWorkWake)
+  @PublishedApi internal fun withKeepDepth(keepDepth: Boolean): RenderSessionAttachOptions = copy(keepDepth = keepDepth)
   public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      bufferCount: Int,
-      formats: List<DmaBufFormat>,
-    ): DmaBufRingDescriptor =
-      DmaBufRingDescriptor(
-        logicalSize = logicalSize,
-        bufferCount = bufferCount.toUInt(),
-        formats = formats,
-      )
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(driver: RenderDriverKind): RenderSessionAttachOptions = RenderSessionAttachOptions(driver = driver)
   }
 }
-
-/**
- * A ring of DXGI shared textures that the library allocates, for
- * `MapHandle.attachDxgiSharedTextureRing()`.
- *
- * Each texture is a D3D11 2D texture with the map's size in pixels and the format
- * DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a render target, and is shared
- * through an NT handle.
- *
- * See `mln_dxgi_shared_texture_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
- */
-public data class DxgiSharedTextureRingDescriptor(
-  public val logicalSize: LogicalSize,
-  /** How many textures the ring has, from 1 to 8. */
-  @get:JvmName("getTextureCount") public val textureCount: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(logicalSize: LogicalSize, textureCount: Int): DxgiSharedTextureRingDescriptor =
-      DxgiSharedTextureRingDescriptor(
-        logicalSize = logicalSize,
-        textureCount = textureCount.toUInt(),
-      )
-  }
-}
-
-/**
- * The Metal device that a render session uses.
- *
- * See `mln_metal_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class MetalContextDescriptor(
-  /** An `MTLDevice`. */
-  public val device: NativePointer,
-)
-
-/**
- * A ring of IOSurfaces that the library allocates, for `MapHandle.attachIoSurfaceRing()`.
- *
- * Each surface has the map's size in pixels, `logical_size` times the map's scale factor, and the
- * pixel format kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm.
- *
- * See `mln_io_surface_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
- */
-public data class IoSurfaceRingDescriptor(
-  public val logicalSize: LogicalSize,
-  /** How many surfaces the ring has, from 1 to 8. */
-  @get:JvmName("getBufferCount") public val bufferCount: UInt,
-  /** The MTLDevice to render with. A null device picks the system's default. */
-  public val context: MetalContextDescriptor,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      bufferCount: Int,
-      context: MetalContextDescriptor,
-    ): IoSurfaceRingDescriptor =
-      IoSurfaceRingDescriptor(
-        logicalSize = logicalSize,
-        bufferCount = bufferCount.toUInt(),
-        context = context,
-      )
-  }
-}
-
-/**
- * A Metal texture of a borrowed ring.
- *
- * See `mln_metal_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class MetalBorrowedTexture(
-  /** Your MTLTexture. */
-  public val texture: NativePointer,
-)
-
-/**
- * A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
- * size in pixels, which is usually `logical_size` times the map's scale factor. The textures must
- * all have that size, one device, one pixel format, one sample, and MTLTextureUsageRenderTarget.
- * The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
- *
- * The session uses the textures until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_metal_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class MetalBorrowedTextureDescriptor(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<MetalBorrowedTexture>,
-  /**
-   * Your MTLCommandQueue on the textures' device, or null for a queue of the session's own. With
-   * your queue, frames can use `GpuSyncKind.QUEUE_ORDER`.
-   */
-  public val commandQueue: NativePointer,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<MetalBorrowedTexture>,
-      commandQueue: NativePointer,
-    ): MetalBorrowedTextureDescriptor =
-      MetalBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-        commandQueue = commandQueue,
-      )
-  }
-}
-
-/**
- * A Metal layer to render to, for `MapHandle.attachMetalSurface()`.
- *
- * The session sets the layer's device, pixel format, and drawable size. It uses the layer until a
- * replacement or release of the target completes, a detach or release of the session completes, or
- * an abandon of it returns.
- *
- * See `mln_metal_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class MetalSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  /** The MTLDevice to render with. A null device picks the system's default. */
-  public val context: MetalContextDescriptor,
-  /** Your CAMetalLayer. */
-  public val layer: NativePointer,
-)
-
-/**
- * The image that `MapHandle.attachOffscreen()` renders. The session renders it at the map's scale
- * factor.
- *
- * See `mln_offscreen_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
- */
-public data class OffscreenDescriptor(
-  public val logicalSize: LogicalSize,
-)
-
-/**
- * The WGL objects that a render session makes its OpenGL context from.
- *
- * See `mln_wgl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class WglContextDescriptor(
-  /** An `HDC`. */
-  public val deviceContext: NativePointer,
-  /** Your `HGLRC`, for a shared context. */
-  public val shareContext: NativePointer,
-  /** Your `wglGetProcAddress`, or null to use the system's. */
-  public val getProcAddress: NativePointer,
-)
-
-/**
- * The EGL objects that a render session makes its OpenGL context from.
- *
- * See `mln_egl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class EglContextDescriptor(
-  /** An `EGLDisplay`. */
-  public val display: NativePointer,
-  /** An `EGLConfig`. */
-  public val config: NativePointer,
-  /** Your `EGLContext`, for a shared context. */
-  public val shareContext: NativePointer,
-  /** The API of a dedicated context. A shared context uses the API of yours. */
-  public val clientApi: OpenGlClientApi = OpenGlClientApi.UNSPECIFIED,
-  /** Your `eglGetProcAddress`, or null to use the system's. */
-  public val getProcAddress: NativePointer,
-) {
-  @PublishedApi
-  internal fun withClientApi(clientApi: OpenGlClientApi): EglContextDescriptor =
-    copy(clientApi = clientApi)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      display: NativePointer,
-      config: NativePointer,
-      shareContext: NativePointer,
-      getProcAddress: NativePointer,
-    ): EglContextDescriptor =
-      EglContextDescriptor(
-        display = display,
-        config = config,
-        shareContext = shareContext,
-        getProcAddress = getProcAddress,
-      )
-  }
-}
-
-/**
- * The WebGL2 context that an OpenGL device wraps.
- *
- * See `mln_web_gl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class WebGlContextDescriptor(
-  /** Your `WebGL2RenderingContext`. */
-  @get:JvmName("getContext") public val context: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(context: Int): WebGlContextDescriptor =
-      WebGlContextDescriptor(context = context.toUInt())
-  }
-}
-
-/**
- * The WGL, EGL, or WebGL part of an OpenGL context descriptor.
- *
- * See `mln_open_gl_context_descriptor_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public sealed interface OpenGlContextDescriptorData {
-  public data class Wgl(public val value: WglContextDescriptor) : OpenGlContextDescriptorData
-
-  public data class Egl(public val value: EglContextDescriptor) : OpenGlContextDescriptorData
-
-  public data class WebGl(public val value: WebGlContextDescriptor) : OpenGlContextDescriptorData
-}
-
-/**
- * How a render session gets the OpenGL context that it renders with.
- *
- * Keep the objects that it names alive until a detach or release of the session completes, or an
- * abandon of it returns.
- *
- * See `mln_open_gl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class OpenGlContextDescriptor(
-  public val ownership: OpenGlContextOwnership = OpenGlContextOwnership.SHARED,
-  public val data: OpenGlContextDescriptorData,
-) {
-  @PublishedApi
-  internal fun withOwnership(ownership: OpenGlContextOwnership): OpenGlContextDescriptor =
-    copy(ownership = ownership)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(data: OpenGlContextDescriptorData): OpenGlContextDescriptor =
-      OpenGlContextDescriptor(data = data)
-  }
-}
-
-/**
- * An OpenGL texture of a borrowed ring.
- *
- * See `mln_open_gl_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class OpenGlBorrowedTexture(
-  /** Your texture name. */
-  @get:JvmName("getTexture") public val texture: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(texture: Int): OpenGlBorrowedTexture =
-      OpenGlBorrowedTexture(texture = texture.toUInt())
-  }
-}
-
-/**
- * A ring of your OpenGL textures, for `MapHandle.attachOpenGlBorrowedTexture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
- * size in pixels, which is usually `logical_size` times the map's scale factor. The context must
- * use `OpenGlContextOwnership.SHARED`. Each texture must be in your context's share group, with
- * storage of that size. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
- *
- * The session uses the textures until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_open_gl_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class OpenGlBorrowedTextureDescriptor(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val context: OpenGlContextDescriptor,
-  public val textures: List<OpenGlBorrowedTexture>,
-  /** The textures' target. It must be GL_TEXTURE_2D. */
-  @get:JvmName("getTarget") public val target: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      context: OpenGlContextDescriptor,
-      textures: List<OpenGlBorrowedTexture>,
-      target: Int,
-    ): OpenGlBorrowedTextureDescriptor =
-      OpenGlBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        context = context,
-        textures = textures,
-        target = target.toUInt(),
-      )
-  }
-}
-
-/**
- * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
- *
- * The session uses the surface until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_open_gl_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class OpenGlSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  public val context: OpenGlContextDescriptor,
-  /** Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it. */
-  public val surface: NativePointer,
-)
-
-/**
- * The Vulkan device and queue that a render session uses.
- *
- * Keep these objects alive until a detach or release of the session completes, or an abandon of it
- * returns.
- *
- * See `mln_vulkan_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class VulkanContextDescriptor(
-  /** A `VkInstance`. */
-  public val instance: NativePointer,
-  /** A `VkPhysicalDevice`. */
-  public val physicalDevice: NativePointer,
-  /** A `VkDevice`. */
-  public val device: NativePointer,
-  /**
-   * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If you submit to it too,
-   * set `RenderSessionAttachOptions.queueLock`.
-   */
-  public val graphicsQueue: NativePointer,
-  @get:JvmName("getGraphicsQueueFamilyIndex") public val graphicsQueueFamilyIndex: UInt = 0u,
-  /** Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's. */
-  public val getInstanceProcAddr: NativePointer,
-  /** Your `vkGetDeviceProcAddr`, or null to look it up from the instance. */
-  public val getDeviceProcAddr: NativePointer,
-) {
-  @PublishedApi
-  internal fun withGraphicsQueueFamilyIndex(
-    graphicsQueueFamilyIndex: Int,
-  ): VulkanContextDescriptor = copy(graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt())
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      instance: NativePointer,
-      physicalDevice: NativePointer,
-      device: NativePointer,
-      graphicsQueue: NativePointer,
-      getInstanceProcAddr: NativePointer,
-      getDeviceProcAddr: NativePointer,
-    ): VulkanContextDescriptor =
-      VulkanContextDescriptor(
-        instance = instance,
-        physicalDevice = physicalDevice,
-        device = device,
-        graphicsQueue = graphicsQueue,
-        getInstanceProcAddr = getInstanceProcAddr,
-        getDeviceProcAddr = getDeviceProcAddr,
-      )
-
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      instance: NativePointer,
-      physicalDevice: NativePointer,
-      device: NativePointer,
-      graphicsQueue: NativePointer,
-      graphicsQueueFamilyIndex: Int,
-      getInstanceProcAddr: NativePointer,
-      getDeviceProcAddr: NativePointer,
-    ): VulkanContextDescriptor =
-      VulkanContextDescriptor(
-        instance = instance,
-        physicalDevice = physicalDevice,
-        device = device,
-        graphicsQueue = graphicsQueue,
-        graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt(),
-        getInstanceProcAddr = getInstanceProcAddr,
-        getDeviceProcAddr = getDeviceProcAddr,
-      )
-  }
-}
-
-/**
- * A Vulkan image of a borrowed ring.
- *
- * See `mln_vulkan_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class VulkanBorrowedTexture(
-  /** Your VkImage. */
-  @get:JvmName("getImage") public val image: ULong,
-  /** A 2D VkImageView of `image` with one mip level and one layer. */
-  @get:JvmName("getImageView") public val imageView: ULong,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(image: Long, imageView: Long): VulkanBorrowedTexture =
-      VulkanBorrowedTexture(image = image.toULong(), imageView = imageView.toULong())
-  }
-}
-
-/**
- * A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height` give the images' size
- * in pixels, which is usually `logical_size` times the map's scale factor. Each image must have
- * that size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
- * The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct images.
- *
- * The session uses the images until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_vulkan_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class VulkanBorrowedTextureDescriptor(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val context: VulkanContextDescriptor,
-  public val textures: List<VulkanBorrowedTexture>,
-  /** The images' VkFormat. */
-  @get:JvmName("getFormat") public val format: UInt,
-  /** The VkImageLayout that each frame leaves its image in. */
-  @get:JvmName("getFinalLayout") public val finalLayout: UInt,
-  public val owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE,
-) {
-  @PublishedApi
-  internal fun withOwner(owner: VulkanImageOwner): VulkanBorrowedTextureDescriptor =
-    copy(owner = owner)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      context: VulkanContextDescriptor,
-      textures: List<VulkanBorrowedTexture>,
-      format: Int,
-      finalLayout: Int,
-    ): VulkanBorrowedTextureDescriptor =
-      VulkanBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        context = context,
-        textures = textures,
-        format = format.toUInt(),
-        finalLayout = finalLayout.toUInt(),
-      )
-
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      context: VulkanContextDescriptor,
-      textures: List<VulkanBorrowedTexture>,
-      format: Int,
-      finalLayout: Int,
-      owner: VulkanImageOwner,
-    ): VulkanBorrowedTextureDescriptor =
-      VulkanBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        context = context,
-        textures = textures,
-        format = format.toUInt(),
-        finalLayout = finalLayout.toUInt(),
-        owner = owner,
-      )
-  }
-}
-
-/**
- * A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()`.
- *
- * The device must have VK_KHR_swapchain enabled, and the queue family of
- * `graphics_queue_family_index` must support presenting to the surface. The session creates the
- * swapchain. It uses the surface until a replacement or release of the target completes, a detach
- * or release of the session completes, or an abandon of it returns.
- *
- * See `mln_vulkan_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class VulkanSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  public val context: VulkanContextDescriptor,
-  /** Your VkSurfaceKHR. */
-  @get:JvmName("getSurface") public val surface: ULong,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      context: VulkanContextDescriptor,
-      surface: Long,
-    ): VulkanSurfaceDescriptor =
-      VulkanSurfaceDescriptor(
-        logicalSize = logicalSize,
-        context = context,
-        surface = surface.toULong(),
-      )
-  }
-}
-
-/**
- * A Wayland surface to present to, for `MapHandle.attachWaylandSurface()`.
- *
- * See `mln_wayland_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
- */
-public data class WaylandSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  /** Your `wl_display*`. */
-  public val display: NativePointer,
-  /** Your `wl_surface*`, on `display`. */
-  public val surface: NativePointer,
-)
-
-/**
- * The WebGPU device that a render session uses.
- *
- * See `mln_web_gpu_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class WebGpuContextDescriptor(
-  /** Your `GPUDevice`. Sessions submit to its `queue`. */
-  @get:JvmName("getDevice") public val device: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(device: Int): WebGpuContextDescriptor =
-      WebGpuContextDescriptor(device = device.toUInt())
-  }
-}
-
-/**
- * A WebGPU texture of a borrowed ring.
- *
- * See `mln_web_gpu_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class WebGpuBorrowedTexture(
-  /** Your `GPUTexture`. */
-  @get:JvmName("getTexture") public val texture: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(texture: Int): WebGpuBorrowedTexture =
-      WebGpuBorrowedTexture(texture = texture.toUInt())
-  }
-}
-
-/**
- * A ring of your WebGPU textures, for `MapHandle.attachWebGpuBorrowedTexture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
- * size in pixels, which is usually `logical_size` times the map's scale factor. Each texture must
- * be 2D with that size, `format`, one layer, one mip level, one sample, and
- * WGPUTextureUsage_RenderAttachment. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct
- * textures.
- *
- * The session uses the textures until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_web_gpu_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class WebGpuBorrowedTextureDescriptor(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val context: WebGpuContextDescriptor,
-  public val textures: List<WebGpuBorrowedTexture>,
-  /** The textures' `GPUTextureFormat`, such as `rgba8unorm`. */
-  public val format: String,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      context: WebGpuContextDescriptor,
-      textures: List<WebGpuBorrowedTexture>,
-      format: String,
-    ): WebGpuBorrowedTextureDescriptor =
-      WebGpuBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        context = context,
-        textures = textures,
-        format = format,
-      )
-  }
-}
-
-/**
- * A WebGPU surface to present to, for `MapHandle.attachWebGpuSurface()`.
- *
- * The session configures the surface. It uses the surface until a replacement or release of the
- * target completes, a detach or release of the session completes, or an abandon of it returns.
- *
- * See `mln_web_gpu_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class WebGpuSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  public val context: WebGpuContextDescriptor,
-  /** Your `OffscreenCanvas` or `HTMLCanvasElement`. */
-  @get:JvmName("getCanvas") public val canvas: UInt,
-  /**
-   * The `GPUTextureFormat` to configure the canvas with, such as `bgra8unorm`. Empty for a format
-   * that the device's adapter prefers.
-   */
-  public val format: String = "",
-) {
-  @PublishedApi
-  internal fun withFormat(format: String): WebGpuSurfaceDescriptor = copy(format = format)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      context: WebGpuContextDescriptor,
-      canvas: Int,
-    ): WebGpuSurfaceDescriptor =
-      WebGpuSurfaceDescriptor(
-        logicalSize = logicalSize,
-        context = context,
-        canvas = canvas.toUInt(),
-      )
-
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      context: WebGpuContextDescriptor,
-      canvas: Int,
-      format: String,
-    ): WebGpuSurfaceDescriptor =
-      WebGpuSurfaceDescriptor(
-        logicalSize = logicalSize,
-        context = context,
-        canvas = canvas.toUInt(),
-        format = format,
-      )
-  }
-}
-
-/**
- * A Win32 window to present to, for `MapHandle.attachWin32Window()`.
- *
- * See `mln_win32_window_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
- */
-public data class Win32WindowDescriptor(
-  public val logicalSize: LogicalSize,
-  /** Your `HWND`. */
-  public val window: NativePointer,
-)
-
 /**
  * Options for finding the camera that fits an area.
  *
@@ -6241,32 +5285,28 @@ public data class Win32WindowDescriptor(
  */
 public data class CameraFitOptions(
   /**
-   * Space to leave between the area and each edge of the map. The left and right insets must add up
-   * to less than the map's width, and the top and bottom to less than its height.
+   * Space to leave between the area and each edge of the map. The left and
+   * right insets must add up to less than the map's width, and the top and
+   * bottom to less than its height.
    */
   public val padding: EdgeInsets? = null,
-  /** The rotation from north, in degrees. */
+  /**
+   * The rotation from north, in degrees.
+   */
   public val bearing: Double? = null,
-  /** The tilt toward the horizon, in degrees. */
-  public val pitch: Double? = null,
+  /**
+   * The tilt toward the horizon, in degrees.
+   */
+  public val pitch: Double? = null
 ) {
-  @PublishedApi
-  internal fun withPadding(padding: EdgeInsets): CameraFitOptions = copy(padding = padding)
-
-  @PublishedApi
-  internal fun withBearing(bearing: Double): CameraFitOptions = copy(bearing = bearing)
-
+  @PublishedApi internal fun withPadding(padding: EdgeInsets): CameraFitOptions = copy(padding = padding)
+  @PublishedApi internal fun withBearing(bearing: Double): CameraFitOptions = copy(bearing = bearing)
   @PublishedApi internal fun withPitch(pitch: Double): CameraFitOptions = copy(pitch = pitch)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): CameraFitOptions = CameraFitOptions()
   }
 }
-
 /**
  * A rectangle of coordinates, from its southwest to its northeast corner.
  *
@@ -6275,26 +5315,18 @@ public data class CameraFitOptions(
  */
 public data class LatLngBounds(
   public val southwest: LatLng = LatLng(),
-  public val northeast: LatLng = LatLng(),
+  public val northeast: LatLng = LatLng()
 ) {
-  @PublishedApi
-  internal fun withSouthwest(southwest: LatLng): LatLngBounds = copy(southwest = southwest)
-
-  @PublishedApi
-  internal fun withNortheast(northeast: LatLng): LatLngBounds = copy(northeast = northeast)
-
+  @PublishedApi internal fun withSouthwest(southwest: LatLng): LatLngBounds = copy(southwest = southwest)
+  @PublishedApi internal fun withNortheast(northeast: LatLng): LatLngBounds = copy(northeast = northeast)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): LatLngBounds = LatLngBounds()
   }
 }
-
 /**
- * A camera change that fits an area, for `MapHandle.fitCameraToLatLngBounds()` and the other fit
- * commands.
+ * A camera change that fits an area, for `MapHandle.fitCameraToLatLngBounds()`
+ * and the other fit commands.
  *
  * A jump uses only the end handler of `animation`, as in `CameraUpdate`.
  *
@@ -6304,25 +5336,16 @@ public data class LatLngBounds(
 public data class CameraFitUpdate(
   public val mode: CameraUpdateMode = CameraUpdateMode.JUMP,
   public val fit: CameraFitOptions = CameraFitOptions(),
-  public val animation: AnimationOptions = AnimationOptions(),
+  public val animation: AnimationOptions = AnimationOptions()
 ) {
   @PublishedApi internal fun withMode(mode: CameraUpdateMode): CameraFitUpdate = copy(mode = mode)
-
   @PublishedApi internal fun withFit(fit: CameraFitOptions): CameraFitUpdate = copy(fit = fit)
-
-  @PublishedApi
-  internal fun withAnimation(animation: AnimationOptions): CameraFitUpdate =
-    copy(animation = animation)
-
+  @PublishedApi internal fun withAnimation(animation: AnimationOptions): CameraFitUpdate = copy(animation = animation)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): CameraFitUpdate = CameraFitUpdate()
   }
 }
-
 /**
  * A map's camera, with the snapshot generation that it matches.
  *
@@ -6331,44 +5354,36 @@ public data class CameraFitUpdate(
  */
 public data class CameraQueryResult(
   @get:JvmName("getGeneration") public val generation: ULong,
-  public val camera: Camera,
+  public val camera: Camera
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(generation: Long, camera: Camera): CameraQueryResult =
-      CameraQueryResult(generation = generation.toULong(), camera = camera)
+    @JvmStatic @PublishedApi internal fun of(generation: Long, camera: Camera): CameraQueryResult = CameraQueryResult(generation = generation.toULong(), camera = camera)
   }
 }
-
 /**
  * The ID of a feature in a source, as the source's data gives it.
  *
- * The map compares feature IDs as text. A number names the same feature as the string of its
- * shortest decimal form, so 7, 7.0, and "7" name one feature.
+ * The map compares feature IDs as text. A number names the same feature as the
+ * string of its shortest decimal form, so 7, 7.0, and "7" name one feature.
  *
  * See `mln_feature_id` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public sealed interface FeatureId {
-  public data class StringValue(public val value: String) : FeatureId
-
-  public data class UintValue(@get:JvmName("getValue") public val value: ULong) : FeatureId {
-    public companion object {
-      /** Creates a value, for Java, which can't call the constructor. */
-      @JvmStatic
-      @PublishedApi
-      internal fun of(value: Long): UintValue = UintValue(value = value.toULong())
-    }
+  public data class StringValue(public val value: String): FeatureId
+  public data class UintValue(@get:JvmName("getValue") public val value: ULong): FeatureId {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(value: Long): UintValue = UintValue(value = value.toULong())
   }
-
-  public data class IntValue(public val value: Long) : FeatureId
-
-  /** A finite number. */
-  public data class DoubleValue(public val value: Double) : FeatureId
 }
-
+  public data class IntValue(public val value: Long): FeatureId
+  /**
+   * A finite number.
+   */
+  public data class DoubleValue(public val value: Double): FeatureId
+}
 /**
  * The features whose state to set, read, or remove.
  *
@@ -6377,42 +5392,30 @@ public sealed interface FeatureId {
  */
 public data class FeatureStateSelector(
   public val sourceId: String,
-  /** The source layer, for a vector source. Empty for other sources. */
+  /**
+   * The source layer, for a vector source. Empty for other sources.
+   */
   public val sourceLayerId: String = "",
   /**
    * The feature's ID. Setting or reading state needs it. Without it,
-   * `MapHandle.removeFeatureState()` removes the state of every feature in the source layer.
+   * `MapHandle.removeFeatureState()` removes the state of every feature in the
+   * source layer.
    */
   public val featureId: FeatureId? = null,
   /**
-   * The one key that `MapHandle.removeFeatureState()` removes. It needs `feature_id`. Empty removes
-   * every key.
+   * The one key that `MapHandle.removeFeatureState()` removes. It needs
+   * `feature_id`. Empty removes every key.
    */
-  public val stateKey: String = "",
+  public val stateKey: String = ""
 ) {
-  @PublishedApi
-  internal fun withSourceLayerId(sourceLayerId: String): FeatureStateSelector =
-    copy(sourceLayerId = sourceLayerId)
-
-  @PublishedApi
-  internal fun withFeatureId(featureId: FeatureId): FeatureStateSelector =
-    copy(featureId = featureId)
-
-  @PublishedApi
-  internal fun withStateKey(stateKey: String): FeatureStateSelector = copy(stateKey = stateKey)
-
+  @PublishedApi internal fun withSourceLayerId(sourceLayerId: String): FeatureStateSelector = copy(sourceLayerId = sourceLayerId)
+  @PublishedApi internal fun withFeatureId(featureId: FeatureId): FeatureStateSelector = copy(featureId = featureId)
+  @PublishedApi internal fun withStateKey(stateKey: String): FeatureStateSelector = copy(stateKey = stateKey)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(sourceId: String): FeatureStateSelector =
-      FeatureStateSelector(sourceId = sourceId)
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(sourceId: String): FeatureStateSelector = FeatureStateSelector(sourceId = sourceId)
   }
 }
-
 /**
  * All the settings for how a map picks the tiles to load.
  *
@@ -6425,34 +5428,18 @@ public data class MapTileSettings(
   @get:JvmName("getPrefetchZoomDelta") public val prefetchZoomDelta: UInt,
   public val lodMinRadius: Double,
   public val lodScale: Double,
-  /** The pitch, in degrees, above which the map lowers the detail. */
+  /**
+   * The pitch, in degrees, above which the map lowers the detail.
+   */
   public val lodPitchThreshold: Double,
   public val lodZoomShift: Double,
-  public val lodMode: TileLodMode,
+  public val lodMode: TileLodMode
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      prefetchZoomDelta: Int,
-      lodMinRadius: Double,
-      lodScale: Double,
-      lodPitchThreshold: Double,
-      lodZoomShift: Double,
-      lodMode: TileLodMode,
-    ): MapTileSettings =
-      MapTileSettings(
-        prefetchZoomDelta = prefetchZoomDelta.toUInt(),
-        lodMinRadius = lodMinRadius,
-        lodScale = lodScale,
-        lodPitchThreshold = lodPitchThreshold,
-        lodZoomShift = lodZoomShift,
-        lodMode = lodMode,
-      )
+    @JvmStatic @PublishedApi internal fun of(prefetchZoomDelta: Int, lodMinRadius: Double, lodScale: Double, lodPitchThreshold: Double, lodZoomShift: Double, lodMode: TileLodMode): MapTileSettings = MapTileSettings(prefetchZoomDelta = prefetchZoomDelta.toUInt(), lodMinRadius = lodMinRadius, lodScale = lodScale, lodPitchThreshold = lodPitchThreshold, lodZoomShift = lodZoomShift, lodMode = lodMode)
   }
 }
-
 /**
  * All the limits on a map's camera.
  *
@@ -6463,20 +5450,25 @@ public data class MapTileSettings(
  */
 public data class CameraBounds(
   /**
-   * The area that the camera's center stays within. When `unbounded` is true, it covers the whole
-   * world.
+   * The area that the camera's center stays within. When `unbounded` is true,
+   * it covers the whole world.
    */
   public val bounds: LatLngBounds,
-  /** Whether no area limits the camera's center. */
+  /**
+   * Whether no area limits the camera's center.
+   */
   public val unbounded: Boolean,
   public val minZoom: Double,
   public val maxZoom: Double,
-  /** The lowest pitch, in degrees. */
+  /**
+   * The lowest pitch, in degrees.
+   */
   public val minPitch: Double,
-  /** The highest pitch, in degrees. */
-  public val maxPitch: Double,
+  /**
+   * The highest pitch, in degrees.
+   */
+  public val maxPitch: Double
 )
-
 /**
  * A vector in three dimensions.
  *
@@ -6486,23 +5478,16 @@ public data class CameraBounds(
 public data class Vec3(
   public val x: Double = 0.0,
   public val y: Double = 0.0,
-  public val z: Double = 0.0,
+  public val z: Double = 0.0
 ) {
   @PublishedApi internal fun withX(x: Double): Vec3 = copy(x = x)
-
   @PublishedApi internal fun withY(y: Double): Vec3 = copy(y = y)
-
   @PublishedApi internal fun withZ(z: Double): Vec3 = copy(z = z)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): Vec3 = Vec3()
   }
 }
-
 /**
  * A rotation, as a quaternion.
  *
@@ -6513,25 +5498,17 @@ public data class Quaternion(
   public val x: Double = 0.0,
   public val y: Double = 0.0,
   public val z: Double = 0.0,
-  public val w: Double = 0.0,
+  public val w: Double = 0.0
 ) {
   @PublishedApi internal fun withX(x: Double): Quaternion = copy(x = x)
-
   @PublishedApi internal fun withY(y: Double): Quaternion = copy(y = y)
-
   @PublishedApi internal fun withZ(z: Double): Quaternion = copy(z = z)
-
   @PublishedApi internal fun withW(w: Double): Quaternion = copy(w = w)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): Quaternion = Quaternion()
   }
 }
-
 /**
  * A map camera's whole position and orientation in three dimensions.
  *
@@ -6542,9 +5519,8 @@ public data class Quaternion(
  */
 public data class FreeCamera(
   public val position: Vec3,
-  public val orientation: Quaternion,
+  public val orientation: Quaternion
 )
-
 /**
  * A map's state, as `MapHandle.getSnapshot()` reads it.
  *
@@ -6553,64 +5529,40 @@ public data class FreeCamera(
  */
 public data class MapSnapshot(
   public val debugFlags: MapDebugFlag,
-  /** Grows with each change to the map's state. */
+  /**
+   * Grows with each change to the map's state.
+   */
   @get:JvmName("getGeneration") public val generation: ULong,
-  /** Whether the style and every resource that the view needs have loaded. */
+  /**
+   * Whether the style and every resource that the view needs have loaded.
+   */
   public val fullyLoaded: Boolean,
   public val renderingStatsViewEnabled: Boolean,
   public val gestureInProgress: Boolean,
   public val transitionInProgress: Boolean,
   public val eventMask: RuntimeEventFlag,
-  /** Counts the render updates that the map has made for its render session. */
+  /**
+   * Counts the render updates that the map has made for its render session.
+   */
   @get:JvmName("getLatestRenderUpdateGeneration") public val latestRenderUpdateGeneration: ULong,
   public val tile: MapTileSettings,
   public val bounds: CameraBounds,
   public val freeCamera: FreeCamera,
   public val view: MapView,
-  /** Whether the map draws as a globe, alone or blending into Mercator. */
+  /**
+   * Whether the map draws as a globe, alone or blending into Mercator.
+   */
   public val globeRendering: Boolean,
-  /** The setting from `MapHandle.setGlobeFreeBearingEnabled()`. */
-  public val globeFreeBearingEnabled: Boolean,
+  /**
+   * The setting from `MapHandle.setGlobeFreeBearingEnabled()`.
+   */
+  public val globeFreeBearingEnabled: Boolean
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      debugFlags: MapDebugFlag,
-      generation: Long,
-      fullyLoaded: Boolean,
-      renderingStatsViewEnabled: Boolean,
-      gestureInProgress: Boolean,
-      transitionInProgress: Boolean,
-      eventMask: RuntimeEventFlag,
-      latestRenderUpdateGeneration: Long,
-      tile: MapTileSettings,
-      bounds: CameraBounds,
-      freeCamera: FreeCamera,
-      view: MapView,
-      globeRendering: Boolean,
-      globeFreeBearingEnabled: Boolean,
-    ): MapSnapshot =
-      MapSnapshot(
-        debugFlags = debugFlags,
-        generation = generation.toULong(),
-        fullyLoaded = fullyLoaded,
-        renderingStatsViewEnabled = renderingStatsViewEnabled,
-        gestureInProgress = gestureInProgress,
-        transitionInProgress = transitionInProgress,
-        eventMask = eventMask,
-        latestRenderUpdateGeneration = latestRenderUpdateGeneration.toULong(),
-        tile = tile,
-        bounds = bounds,
-        freeCamera = freeCamera,
-        view = view,
-        globeRendering = globeRendering,
-        globeFreeBearingEnabled = globeFreeBearingEnabled,
-      )
+    @JvmStatic @PublishedApi internal fun of(debugFlags: MapDebugFlag, generation: Long, fullyLoaded: Boolean, renderingStatsViewEnabled: Boolean, gestureInProgress: Boolean, transitionInProgress: Boolean, eventMask: RuntimeEventFlag, latestRenderUpdateGeneration: Long, tile: MapTileSettings, bounds: CameraBounds, freeCamera: FreeCamera, view: MapView, globeRendering: Boolean, globeFreeBearingEnabled: Boolean): MapSnapshot = MapSnapshot(debugFlags = debugFlags, generation = generation.toULong(), fullyLoaded = fullyLoaded, renderingStatsViewEnabled = renderingStatsViewEnabled, gestureInProgress = gestureInProgress, transitionInProgress = transitionInProgress, eventMask = eventMask, latestRenderUpdateGeneration = latestRenderUpdateGeneration.toULong(), tile = tile, bounds = bounds, freeCamera = freeCamera, view = view, globeRendering = globeRendering, globeFreeBearingEnabled = globeFreeBearingEnabled)
   }
 }
-
 /**
  * A range of image pixels, from `from` to `to`, that stretches to fit text.
  *
@@ -6619,21 +5571,15 @@ public data class MapSnapshot(
  */
 public data class ImageStretch(
   public val from: Float = 0f,
-  public val to: Float = 0f,
+  public val to: Float = 0f
 ) {
   @PublishedApi internal fun withFrom(from: Float): ImageStretch = copy(from = from)
-
   @PublishedApi internal fun withTo(to: Float): ImageStretch = copy(to = to)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ImageStretch = ImageStretch()
   }
 }
-
 /**
  * The area of an image, in image pixels, that text fits inside.
  *
@@ -6644,25 +5590,17 @@ public data class ImageContent(
   public val left: Float = 0f,
   public val top: Float = 0f,
   public val right: Float = 0f,
-  public val bottom: Float = 0f,
+  public val bottom: Float = 0f
 ) {
   @PublishedApi internal fun withLeft(left: Float): ImageContent = copy(left = left)
-
   @PublishedApi internal fun withTop(top: Float): ImageContent = copy(top = top)
-
   @PublishedApi internal fun withRight(right: Float): ImageContent = copy(right = right)
-
   @PublishedApi internal fun withBottom(bottom: Float): ImageContent = copy(bottom = bottom)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ImageContent = ImageContent()
   }
 }
-
 /**
  * An image in the map's style.
  *
@@ -6672,7 +5610,10 @@ public data class ImageContent(
 public data class StyleImageInfo(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
-  /** The premultiplied RGBA pixels, in rows of `width` &#42; 4 bytes, from the top row down. */
+  /**
+   * The premultiplied RGBA pixels, in rows of `width` &#42; 4 bytes, from the
+   * top row down.
+   */
   public val pixels: ByteArray,
   public val stretchX: List<ImageStretch>,
   public val stretchY: List<ImageStretch>,
@@ -6681,62 +5622,16 @@ public data class StyleImageInfo(
   public val textFitHeight: StyleImageTextFit?,
   public val pixelRatio: Float,
   public val sdf: Boolean,
-  public val keepUnused: Boolean,
+  public val keepUnused: Boolean
 ) {
-  private fun contentFields(): Array<Any?> =
-    arrayOf(
-      width,
-      height,
-      pixels,
-      stretchX,
-      stretchY,
-      content,
-      textFitWidth,
-      textFitHeight,
-      pixelRatio,
-      sdf,
-      keepUnused,
-    )
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is StyleImageInfo && contentFields().contentDeepEquals(other.contentFields())
-
+  private fun contentFields(): Array<Any?> = arrayOf(width, height, pixels, stretchX, stretchY, content, textFitWidth, textFitHeight, pixelRatio, sdf, keepUnused)
+  override fun equals(other: Any?): Boolean = this === other || other is StyleImageInfo && contentFields().contentDeepEquals(other.contentFields())
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      width: Int,
-      height: Int,
-      pixels: ByteArray,
-      stretchX: List<ImageStretch>,
-      stretchY: List<ImageStretch>,
-      content: ImageContent?,
-      textFitWidth: StyleImageTextFit?,
-      textFitHeight: StyleImageTextFit?,
-      pixelRatio: Float,
-      sdf: Boolean,
-      keepUnused: Boolean,
-    ): StyleImageInfo =
-      StyleImageInfo(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        pixels = pixels,
-        stretchX = stretchX,
-        stretchY = stretchY,
-        content = content,
-        textFitWidth = textFitWidth,
-        textFitHeight = textFitHeight,
-        pixelRatio = pixelRatio,
-        sdf = sdf,
-        keepUnused = keepUnused,
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, pixels: ByteArray, stretchX: List<ImageStretch>, stretchY: List<ImageStretch>, content: ImageContent?, textFitWidth: StyleImageTextFit?, textFitHeight: StyleImageTextFit?, pixelRatio: Float, sdf: Boolean, keepUnused: Boolean): StyleImageInfo = StyleImageInfo(width = width.toUInt(), height = height.toUInt(), pixels = pixels, stretchX = stretchX, stretchY = stretchY, content = content, textFitWidth = textFitWidth, textFitHeight = textFitHeight, pixelRatio = pixelRatio, sdf = sdf, keepUnused = keepUnused)
   }
 }
-
 /**
  * A layer in the map's style.
  *
@@ -6746,22 +5641,25 @@ public data class StyleImageInfo(
 public data class StyleLayerInfo(
   public val id: String,
   /**
-   * The layer's &#91;type&#93;(https://maplibre.org/maplibre-style-spec/layers/#type), such as
-   * `fill`.
+   * The layer's
+   * &#91;type&#93;(https://maplibre.org/maplibre-style-spec/layers/#type), such
+   * as `fill`.
    */
   public val type: String,
   public val sourceId: String,
   public val sourceLayer: String,
   /**
-   * The zoom level where the layer starts to show, or negative infinity when the layer doesn't set
-   * one.
+   * The zoom level where the layer starts to show, or negative infinity when
+   * the layer doesn't set one.
    */
   public val minZoom: Double,
-  /** The zoom level where the layer stops showing, or infinity when the layer doesn't set one. */
+  /**
+   * The zoom level where the layer stops showing, or infinity when the layer
+   * doesn't set one.
+   */
   public val maxZoom: Double,
-  public val visibility: StyleLayerVisibility,
+  public val visibility: StyleLayerVisibility
 )
-
 /**
  * The tiles of a source, as the style lists them.
  *
@@ -6772,9 +5670,8 @@ public data class StyleSourceTileInfo(
   public val tileUrls: List<String>,
   public val minZoom: Double,
   public val maxZoom: Double,
-  public val scheme: StyleTileScheme,
+  public val scheme: StyleTileScheme
 )
-
 /**
  * A source in the map's style.
  *
@@ -6787,53 +5684,29 @@ public data class StyleSourceInfo(
   public val isVolatile: Boolean,
   public val attribution: String,
   public val url: String,
-  /** The tiles that the style lists in the source itself, instead of at a URL. */
+  /**
+   * The tiles that the style lists in the source itself, instead of at a URL.
+   */
   public val tileJson: StyleSourceTileInfo?,
   public val bounds: LatLngBounds?,
   @get:JvmSynthetic public val tileSize: UInt?,
   public val vectorEncoding: StyleVectorTileEncoding?,
   public val rasterEncoding: StyleRasterDemEncoding?,
-  /** A GeoJSON source's options, with every field set. */
-  public val geoJson: GeoJsonSourceOptions?,
+  /**
+   * A GeoJSON source's options, with every field set.
+   */
+  public val geoJson: GeoJsonSourceOptions?
 ) {
   @PublishedApi @JvmName("getTileSize") internal fun tileSizeForJava(): Int? = tileSize?.toInt()
-
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      id: String,
-      type: StyleSourceType,
-      isVolatile: Boolean,
-      attribution: String,
-      url: String,
-      tileJson: StyleSourceTileInfo?,
-      bounds: LatLngBounds?,
-      tileSize: Int?,
-      vectorEncoding: StyleVectorTileEncoding?,
-      rasterEncoding: StyleRasterDemEncoding?,
-      geoJson: GeoJsonSourceOptions?,
-    ): StyleSourceInfo =
-      StyleSourceInfo(
-        id = id,
-        type = type,
-        isVolatile = isVolatile,
-        attribution = attribution,
-        url = url,
-        tileJson = tileJson,
-        bounds = bounds,
-        tileSize = tileSize?.toUInt(),
-        vectorEncoding = vectorEncoding,
-        rasterEncoding = rasterEncoding,
-        geoJson = geoJson,
-      )
+    @JvmStatic @PublishedApi internal fun of(id: String, type: StyleSourceType, isVolatile: Boolean, attribution: String, url: String, tileJson: StyleSourceTileInfo?, bounds: LatLngBounds?, tileSize: Int?, vectorEncoding: StyleVectorTileEncoding?, rasterEncoding: StyleRasterDemEncoding?, geoJson: GeoJsonSourceOptions?): StyleSourceInfo = StyleSourceInfo(id = id, type = type, isVolatile = isVolatile, attribution = attribution, url = url, tileJson = tileJson, bounds = bounds, tileSize = tileSize?.toUInt(), vectorEncoding = vectorEncoding, rasterEncoding = rasterEncoding, geoJson = geoJson)
   }
 }
-
 /**
- * The default &#91;transition&#93;(https://maplibre.org/maplibre-style-spec/transition/) for
- * changes to a style's paint properties.
+ * The default
+ * &#91;transition&#93;(https://maplibre.org/maplibre-style-spec/transition/)
+ * for changes to a style's paint properties.
  *
  * See `mln_style_transition_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -6841,30 +5714,19 @@ public data class StyleSourceInfo(
 public data class StyleTransitionOptions(
   public val durationMs: Double? = null,
   public val delayMs: Double? = null,
-  /** Whether symbols fade in and out as the map places them. */
-  public val enablePlacementTransitions: Boolean? = null,
+  /**
+   * Whether symbols fade in and out as the map places them.
+   */
+  public val enablePlacementTransitions: Boolean? = null
 ) {
-  @PublishedApi
-  internal fun withDurationMs(durationMs: Double): StyleTransitionOptions =
-    copy(durationMs = durationMs)
-
-  @PublishedApi
-  internal fun withDelayMs(delayMs: Double): StyleTransitionOptions = copy(delayMs = delayMs)
-
-  @PublishedApi
-  internal fun withEnablePlacementTransitions(
-    enablePlacementTransitions: Boolean,
-  ): StyleTransitionOptions = copy(enablePlacementTransitions = enablePlacementTransitions)
-
+  @PublishedApi internal fun withDurationMs(durationMs: Double): StyleTransitionOptions = copy(durationMs = durationMs)
+  @PublishedApi internal fun withDelayMs(delayMs: Double): StyleTransitionOptions = copy(delayMs = delayMs)
+  @PublishedApi internal fun withEnablePlacementTransitions(enablePlacementTransitions: Boolean): StyleTransitionOptions = copy(enablePlacementTransitions = enablePlacementTransitions)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): StyleTransitionOptions = StyleTransitionOptions()
   }
 }
-
 /**
  * Limits on the camera, for `MapHandle.setBounds()`.
  *
@@ -6872,41 +5734,36 @@ public data class StyleTransitionOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class BoundOptions(
-  /** The area that the camera's center stays within. */
+  /**
+   * The area that the camera's center stays within.
+   */
   public val bounds: LatLngBounds? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
-  /** The lowest pitch, in degrees. */
+  /**
+   * The lowest pitch, in degrees.
+   */
   public val minPitch: Double? = null,
-  /** The highest pitch, in degrees. */
+  /**
+   * The highest pitch, in degrees.
+   */
   public val maxPitch: Double? = null,
-  /** Removes the area that limits the camera's center. */
-  public val unbounded: Boolean = false,
+  /**
+   * Removes the area that limits the camera's center.
+   */
+  public val unbounded: Boolean = false
 ) {
   @PublishedApi internal fun withBounds(bounds: LatLngBounds): BoundOptions = copy(bounds = bounds)
-
   @PublishedApi internal fun withMinZoom(minZoom: Double): BoundOptions = copy(minZoom = minZoom)
-
   @PublishedApi internal fun withMaxZoom(maxZoom: Double): BoundOptions = copy(maxZoom = maxZoom)
-
-  @PublishedApi
-  internal fun withMinPitch(minPitch: Double): BoundOptions = copy(minPitch = minPitch)
-
-  @PublishedApi
-  internal fun withMaxPitch(maxPitch: Double): BoundOptions = copy(maxPitch = maxPitch)
-
-  @PublishedApi
-  internal fun withUnbounded(unbounded: Boolean): BoundOptions = copy(unbounded = unbounded)
-
+  @PublishedApi internal fun withMinPitch(minPitch: Double): BoundOptions = copy(minPitch = minPitch)
+  @PublishedApi internal fun withMaxPitch(maxPitch: Double): BoundOptions = copy(maxPitch = maxPitch)
+  @PublishedApi internal fun withUnbounded(unbounded: Boolean): BoundOptions = copy(unbounded = unbounded)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): BoundOptions = BoundOptions()
   }
 }
-
 /**
  * The camera's position and orientation in three dimensions.
  *
@@ -6916,29 +5773,23 @@ public data class BoundOptions(
 public data class FreeCameraOptions(
   /**
    * The camera's position in Web Mercator units, where the world is 1 wide, (0,
-   * 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is the altitude in the same
-   *    units.
+   * 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is the
+   * altitude in the same units.
    */
   public val position: Vec3? = null,
-  /** The camera's rotation from looking straight down with north at the top of the screen. */
-  public val orientation: Quaternion? = null,
+  /**
+   * The camera's rotation from looking straight down with north at the top of
+   * the screen.
+   */
+  public val orientation: Quaternion? = null
 ) {
-  @PublishedApi
-  internal fun withPosition(position: Vec3): FreeCameraOptions = copy(position = position)
-
-  @PublishedApi
-  internal fun withOrientation(orientation: Quaternion): FreeCameraOptions =
-    copy(orientation = orientation)
-
+  @PublishedApi internal fun withPosition(position: Vec3): FreeCameraOptions = copy(position = position)
+  @PublishedApi internal fun withOrientation(orientation: Quaternion): FreeCameraOptions = copy(orientation = orientation)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): FreeCameraOptions = FreeCameraOptions()
   }
 }
-
 /**
  * Settings that skew the map or draw it without perspective.
  *
@@ -6946,39 +5797,37 @@ public data class FreeCameraOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class ProjectionModeOptions(
-  /** Whether the map draws without perspective. */
+  /**
+   * Whether the map draws without perspective.
+   */
   public val axonometric: Boolean? = null,
   public val xSkew: Double? = null,
-  public val ySkew: Double? = null,
+  public val ySkew: Double? = null
 ) {
-  @PublishedApi
-  internal fun withAxonometric(axonometric: Boolean): ProjectionModeOptions =
-    copy(axonometric = axonometric)
-
+  @PublishedApi internal fun withAxonometric(axonometric: Boolean): ProjectionModeOptions = copy(axonometric = axonometric)
   @PublishedApi internal fun withXSkew(xSkew: Double): ProjectionModeOptions = copy(xSkew = xSkew)
-
   @PublishedApi internal fun withYSkew(ySkew: Double): ProjectionModeOptions = copy(ySkew = ySkew)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ProjectionModeOptions = ProjectionModeOptions()
   }
 }
-
 /**
  * Options for a style image, as the
- * &#91;sprite&#93;(https://maplibre.org/maplibre-style-spec/sprite/) spec describes them.
+ * &#91;sprite&#93;(https://maplibre.org/maplibre-style-spec/sprite/) spec
+ * describes them.
  *
  * See `mln_style_image_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleImageOptions(
-  /** The ranges of columns that stretch, in increasing order without overlap. */
+  /**
+   * The ranges of columns that stretch, in increasing order without overlap.
+   */
   public val stretchX: List<ImageStretch>? = null,
-  /** The ranges of rows that stretch, in increasing order without overlap. */
+  /**
+   * The ranges of rows that stretch, in increasing order without overlap.
+   */
   public val stretchY: List<ImageStretch>? = null,
   public val content: ImageContent? = null,
   public val textFitWidth: StyleImageTextFit? = null,
@@ -6986,109 +5835,72 @@ public data class StyleImageOptions(
   public val pixelRatio: Float? = null,
   public val sdf: Boolean? = null,
   /**
-   * Keeps the image after no layer uses it. Without this, the map can remove an image that it asked
-   * for through `RuntimeEventType.MAP_STYLE_IMAGE_MISSING`.
+   * Keeps the image after no layer uses it. Without this, the map can remove an
+   * image that it asked for through `RuntimeEventType.MAP_STYLE_IMAGE_MISSING`.
    */
-  public val keepUnused: Boolean? = null,
+  public val keepUnused: Boolean? = null
 ) {
-  @PublishedApi
-  internal fun withStretchX(stretchX: List<ImageStretch>): StyleImageOptions =
-    copy(stretchX = stretchX)
-
-  @PublishedApi
-  internal fun withStretchY(stretchY: List<ImageStretch>): StyleImageOptions =
-    copy(stretchY = stretchY)
-
-  @PublishedApi
-  internal fun withContent(content: ImageContent): StyleImageOptions = copy(content = content)
-
-  @PublishedApi
-  internal fun withTextFitWidth(textFitWidth: StyleImageTextFit): StyleImageOptions =
-    copy(textFitWidth = textFitWidth)
-
-  @PublishedApi
-  internal fun withTextFitHeight(textFitHeight: StyleImageTextFit): StyleImageOptions =
-    copy(textFitHeight = textFitHeight)
-
-  @PublishedApi
-  internal fun withPixelRatio(pixelRatio: Float): StyleImageOptions = copy(pixelRatio = pixelRatio)
-
+  @PublishedApi internal fun withStretchX(stretchX: List<ImageStretch>): StyleImageOptions = copy(stretchX = stretchX)
+  @PublishedApi internal fun withStretchY(stretchY: List<ImageStretch>): StyleImageOptions = copy(stretchY = stretchY)
+  @PublishedApi internal fun withContent(content: ImageContent): StyleImageOptions = copy(content = content)
+  @PublishedApi internal fun withTextFitWidth(textFitWidth: StyleImageTextFit): StyleImageOptions = copy(textFitWidth = textFitWidth)
+  @PublishedApi internal fun withTextFitHeight(textFitHeight: StyleImageTextFit): StyleImageOptions = copy(textFitHeight = textFitHeight)
+  @PublishedApi internal fun withPixelRatio(pixelRatio: Float): StyleImageOptions = copy(pixelRatio = pixelRatio)
   @PublishedApi internal fun withSdf(sdf: Boolean): StyleImageOptions = copy(sdf = sdf)
-
-  @PublishedApi
-  internal fun withKeepUnused(keepUnused: Boolean): StyleImageOptions =
-    copy(keepUnused = keepUnused)
-
+  @PublishedApi internal fun withKeepUnused(keepUnused: Boolean): StyleImageOptions = copy(keepUnused = keepUnused)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): StyleImageOptions = StyleImageOptions()
   }
 }
-
 /**
  * How the map picks the tiles to load.
  *
- * The `lod_` members lower the level of detail away from the camera, so the map loads fewer tiles
- * when the pitch is high.
+ * The `lod_` members lower the level of detail away from the camera, so the map
+ * loads fewer tiles when the pitch is high.
  *
  * See `mln_map_tile_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MapTileOptions(
   /**
-   * How many zoom levels lower the map also loads tiles for, so it can show a coarse map while the
-   * current tiles load. 0 loads only the current tiles.
+   * How many zoom levels lower the map also loads tiles for, so it can show a
+   * coarse map while the current tiles load. 0 loads only the current tiles.
    */
   @get:JvmSynthetic public val prefetchZoomDelta: UInt? = null,
-  /** The radius around the view point, in tiles, that keeps full detail. */
+  /**
+   * The radius around the view point, in tiles, that keeps full detail.
+   */
   public val lodMinRadius: Double? = null,
-  /** Scales the distance to the view point. Above 1 lowers the detail. */
+  /**
+   * Scales the distance to the view point. Above 1 lowers the detail.
+   */
   public val lodScale: Double? = null,
-  /** The pitch, in degrees, above which the map lowers the detail. */
+  /**
+   * The pitch, in degrees, above which the map lowers the detail.
+   */
   public val lodPitchThreshold: Double? = null,
-  /** Zoom levels to add for picking the detail. Below 0 loads fewer tiles. */
+  /**
+   * Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
+   */
   public val lodZoomShift: Double? = null,
-  /** `TileLodMode.DISTANCE` ignores `lod_min_radius`. */
-  public val lodMode: TileLodMode? = null,
+  /**
+   * `TileLodMode.DISTANCE` ignores `lod_min_radius`.
+   */
+  public val lodMode: TileLodMode? = null
 ) {
-  @PublishedApi
-  @JvmName("getPrefetchZoomDelta")
-  internal fun prefetchZoomDeltaForJava(): Int? = prefetchZoomDelta?.toInt()
-
-  @PublishedApi
-  internal fun withPrefetchZoomDelta(prefetchZoomDelta: Int): MapTileOptions =
-    copy(prefetchZoomDelta = prefetchZoomDelta.toUInt())
-
-  @PublishedApi
-  internal fun withLodMinRadius(lodMinRadius: Double): MapTileOptions =
-    copy(lodMinRadius = lodMinRadius)
-
-  @PublishedApi
-  internal fun withLodScale(lodScale: Double): MapTileOptions = copy(lodScale = lodScale)
-
-  @PublishedApi
-  internal fun withLodPitchThreshold(lodPitchThreshold: Double): MapTileOptions =
-    copy(lodPitchThreshold = lodPitchThreshold)
-
-  @PublishedApi
-  internal fun withLodZoomShift(lodZoomShift: Double): MapTileOptions =
-    copy(lodZoomShift = lodZoomShift)
-
-  @PublishedApi
-  internal fun withLodMode(lodMode: TileLodMode): MapTileOptions = copy(lodMode = lodMode)
-
+  @PublishedApi @JvmName("getPrefetchZoomDelta") internal fun prefetchZoomDeltaForJava(): Int? = prefetchZoomDelta?.toInt()
+  @PublishedApi internal fun withPrefetchZoomDelta(prefetchZoomDelta: Int): MapTileOptions = copy(prefetchZoomDelta = prefetchZoomDelta.toUInt())
+  @PublishedApi internal fun withLodMinRadius(lodMinRadius: Double): MapTileOptions = copy(lodMinRadius = lodMinRadius)
+  @PublishedApi internal fun withLodScale(lodScale: Double): MapTileOptions = copy(lodScale = lodScale)
+  @PublishedApi internal fun withLodPitchThreshold(lodPitchThreshold: Double): MapTileOptions = copy(lodPitchThreshold = lodPitchThreshold)
+  @PublishedApi internal fun withLodZoomShift(lodZoomShift: Double): MapTileOptions = copy(lodZoomShift = lodZoomShift)
+  @PublishedApi internal fun withLodMode(lodMode: TileLodMode): MapTileOptions = copy(lodMode = lodMode)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): MapTileOptions = MapTileOptions()
   }
 }
-
 /**
  * How the map orients and constrains its view.
  *
@@ -7099,38 +5911,22 @@ public data class MapViewportOptions(
   public val northOrientation: NorthOrientation? = null,
   public val constrainMode: ConstrainMode? = null,
   public val viewportMode: ViewportMode? = null,
-  public val frustumOffset: EdgeInsets? = null,
+  public val frustumOffset: EdgeInsets? = null
 ) {
-  @PublishedApi
-  internal fun withNorthOrientation(northOrientation: NorthOrientation): MapViewportOptions =
-    copy(northOrientation = northOrientation)
-
-  @PublishedApi
-  internal fun withConstrainMode(constrainMode: ConstrainMode): MapViewportOptions =
-    copy(constrainMode = constrainMode)
-
-  @PublishedApi
-  internal fun withViewportMode(viewportMode: ViewportMode): MapViewportOptions =
-    copy(viewportMode = viewportMode)
-
-  @PublishedApi
-  internal fun withFrustumOffset(frustumOffset: EdgeInsets): MapViewportOptions =
-    copy(frustumOffset = frustumOffset)
-
+  @PublishedApi internal fun withNorthOrientation(northOrientation: NorthOrientation): MapViewportOptions = copy(northOrientation = northOrientation)
+  @PublishedApi internal fun withConstrainMode(constrainMode: ConstrainMode): MapViewportOptions = copy(constrainMode = constrainMode)
+  @PublishedApi internal fun withViewportMode(viewportMode: ViewportMode): MapViewportOptions = copy(viewportMode = viewportMode)
+  @PublishedApi internal fun withFrustumOffset(frustumOffset: EdgeInsets): MapViewportOptions = copy(frustumOffset = frustumOffset)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): MapViewportOptions = MapViewportOptions()
   }
 }
-
 /**
  * A camera change for `MapHandle.updateCamera()`.
  *
- * A jump uses only the end handler of `animation`, and the handler runs as soon as the camera
- * moves.
+ * A jump uses only the end handler of `animation`, and the handler runs as soon
+ * as the camera moves.
  *
  * See `mln_camera_update` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -7139,29 +5935,17 @@ public data class CameraUpdate(
   public val mode: CameraUpdateMode = CameraUpdateMode.JUMP,
   public val camera: CameraOptions = CameraOptions(),
   public val animation: AnimationOptions = AnimationOptions(),
-  public val gesturePhase: GesturePhase = GesturePhase.NONE,
+  public val gesturePhase: GesturePhase = GesturePhase.NONE
 ) {
   @PublishedApi internal fun withMode(mode: CameraUpdateMode): CameraUpdate = copy(mode = mode)
-
   @PublishedApi internal fun withCamera(camera: CameraOptions): CameraUpdate = copy(camera = camera)
-
-  @PublishedApi
-  internal fun withAnimation(animation: AnimationOptions): CameraUpdate =
-    copy(animation = animation)
-
-  @PublishedApi
-  internal fun withGesturePhase(gesturePhase: GesturePhase): CameraUpdate =
-    copy(gesturePhase = gesturePhase)
-
+  @PublishedApi internal fun withAnimation(animation: AnimationOptions): CameraUpdate = copy(animation = animation)
+  @PublishedApi internal fun withGesturePhase(gesturePhase: GesturePhase): CameraUpdate = copy(gesturePhase = gesturePhase)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): CameraUpdate = CameraUpdate()
   }
 }
-
 /**
  * A projection's camera, as `MapProjectionHandle.getCamera()` reports it.
  *
@@ -7169,9 +5953,8 @@ public data class CameraUpdate(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
  */
 public data class MapProjectionCameraResult(
-  public val camera: Camera,
+  public val camera: Camera
 )
-
 /**
  * The outcome of `RenderSessionHandle.abandon()`.
  *
@@ -7180,23 +5963,13 @@ public data class MapProjectionCameraResult(
  */
 public data class RenderAbandonResult(
   public val disposition: RenderAbandonDisposition,
-  @get:JvmName("getQuarantinedResourceCount") public val quarantinedResourceCount: UInt,
+  @get:JvmName("getQuarantinedResourceCount") public val quarantinedResourceCount: UInt
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      disposition: RenderAbandonDisposition,
-      quarantinedResourceCount: Int,
-    ): RenderAbandonResult =
-      RenderAbandonResult(
-        disposition = disposition,
-        quarantinedResourceCount = quarantinedResourceCount.toUInt(),
-      )
+    @JvmStatic @PublishedApi internal fun of(disposition: RenderAbandonDisposition, quarantinedResourceCount: Int): RenderAbandonResult = RenderAbandonResult(disposition = disposition, quarantinedResourceCount = quarantinedResourceCount.toUInt())
   }
 }
-
 /**
  * A demand for one frame.
  *
@@ -7205,28 +5978,20 @@ public data class RenderAbandonResult(
  */
 public data class FrameDemand(
   public val flags: FrameDemandFlag = FrameDemandFlag.NONE,
-  /** A value of your choice that the demand's frame result carries. */
-  @get:JvmName("getToken") public val token: ULong = 0uL,
+  /**
+   * A value of your choice that the demand's frame result carries.
+   */
+  @get:JvmName("getToken") public val token: ULong = 0uL
 ) {
   @PublishedApi internal fun withFlags(flags: FrameDemandFlag): FrameDemand = copy(flags = flags)
-
   @PublishedApi internal fun withToken(token: Long): FrameDemand = copy(token = token.toULong())
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): FrameDemand = FrameDemand()
-
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(flags: FrameDemandFlag, token: Long): FrameDemand =
-      FrameDemand(flags = flags, token = token.toULong())
+    @JvmStatic @PublishedApi internal fun of(flags: FrameDemandFlag, token: Long): FrameDemand = FrameDemand(flags = flags, token = token.toULong())
   }
 }
-
 /**
  * What an attached render session supports.
  *
@@ -7235,38 +6000,32 @@ public data class FrameDemand(
  */
 public data class RenderSessionCapabilities(
   public val driver: RenderDriverKind,
-  /** How many textures the session's texture ring has. */
+  /**
+   * How many textures the session's texture ring has.
+   */
   @get:JvmName("getTextureRingDepth") public val textureRingDepth: UInt,
   public val flags: RenderSessionCapabilityFlag,
-  /** The kind of `GpuSync` that `AcquiredFrameHandle.withProducerSync()` reports. */
+  /**
+   * The kind of `GpuSync` that `AcquiredFrameHandle.withProducerSync()`
+   * reports.
+   */
   public val producerSyncKind: GpuSyncKind,
   /**
-   * The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts. They depend on the target
-   * and on what the device supports.
+   * The kinds of `GpuSync` that `AcquiredFrameHandle.release()` accepts. They
+   * depend on the target and on what the device supports.
    */
   public val consumerSyncKinds: GpuSyncKindFlag,
+  /**
+   * How an exported ring shares its textures, which says which getter gets an
+   * acquired frame's texture, or `GpuExportKind.NONE` for another target.
+   */
+  public val exportKind: GpuExportKind
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      driver: RenderDriverKind,
-      textureRingDepth: Int,
-      flags: RenderSessionCapabilityFlag,
-      producerSyncKind: GpuSyncKind,
-      consumerSyncKinds: GpuSyncKindFlag,
-    ): RenderSessionCapabilities =
-      RenderSessionCapabilities(
-        driver = driver,
-        textureRingDepth = textureRingDepth.toUInt(),
-        flags = flags,
-        producerSyncKind = producerSyncKind,
-        consumerSyncKinds = consumerSyncKinds,
-      )
+    @JvmStatic @PublishedApi internal fun of(driver: RenderDriverKind, textureRingDepth: Int, flags: RenderSessionCapabilityFlag, producerSyncKind: GpuSyncKind, consumerSyncKinds: GpuSyncKindFlag, exportKind: GpuExportKind): RenderSessionCapabilities = RenderSessionCapabilities(driver = driver, textureRingDepth = textureRingDepth.toUInt(), flags = flags, producerSyncKind = producerSyncKind, consumerSyncKinds = consumerSyncKinds, exportKind = exportKind)
   }
 }
-
 /**
  * The state of a render session at one moment.
  *
@@ -7275,47 +6034,31 @@ public data class RenderSessionCapabilities(
  */
 public data class RenderSessionSnapshot(
   public val state: RenderSessionState,
-  /** The target's logical size, and the map's scale factor. */
+  /**
+   * The target's logical size, and the map's scale factor.
+   */
   public val extent: LogicalExtent,
   @get:JvmName("getGeneration") public val generation: ULong,
   @get:JvmName("getFrameGeneration") public val frameGeneration: ULong,
   @get:JvmName("getAcquiredFrameCount") public val acquiredFrameCount: UInt,
   /**
-   * `Status.OK` until the session fails. Then `Status.TARGET_LOST` when it failed because it lost
-   * its target, or `Status.NATIVE_ERROR` when it failed for another reason.
+   * `Status.OK` until the session fails. Then `Status.TARGET_LOST` when it
+   * failed because it lost its target, or `Status.NATIVE_ERROR` when it failed
+   * for another reason.
    */
   public val failureStatus: Status,
   /**
-   * Whether the session is attached and has a target to render to. It's false from when
-   * `RenderSessionHandle.releaseTarget()` completes until you give the session a new target.
+   * Whether the session is attached and has a target to render to. It's false
+   * from when `RenderSessionHandle.releaseTarget()` completes until you give
+   * the session a new target.
    */
-  public val hasTarget: Boolean,
+  public val hasTarget: Boolean
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      state: RenderSessionState,
-      extent: LogicalExtent,
-      generation: Long,
-      frameGeneration: Long,
-      acquiredFrameCount: Int,
-      failureStatus: Status,
-      hasTarget: Boolean,
-    ): RenderSessionSnapshot =
-      RenderSessionSnapshot(
-        state = state,
-        extent = extent,
-        generation = generation.toULong(),
-        frameGeneration = frameGeneration.toULong(),
-        acquiredFrameCount = acquiredFrameCount.toUInt(),
-        failureStatus = failureStatus,
-        hasTarget = hasTarget,
-      )
+    @JvmStatic @PublishedApi internal fun of(state: RenderSessionState, extent: LogicalExtent, generation: Long, frameGeneration: Long, acquiredFrameCount: Int, failureStatus: Status, hasTarget: Boolean): RenderSessionSnapshot = RenderSessionSnapshot(state = state, extent = extent, generation = generation.toULong(), frameGeneration = frameGeneration.toULong(), acquiredFrameCount = acquiredFrameCount.toUInt(), failureStatus = failureStatus, hasTarget = hasTarget)
   }
 }
-
 /**
  * A rectangle of the screen, from its `min` corner to its `max` corner.
  *
@@ -7324,21 +6067,15 @@ public data class RenderSessionSnapshot(
  */
 public data class ScreenBox(
   public val min: ScreenPoint = ScreenPoint(),
-  public val max: ScreenPoint = ScreenPoint(),
+  public val max: ScreenPoint = ScreenPoint()
 ) {
   @PublishedApi internal fun withMin(min: ScreenPoint): ScreenBox = copy(min = min)
-
   @PublishedApi internal fun withMax(max: ScreenPoint): ScreenBox = copy(max = max)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ScreenBox = ScreenBox()
   }
 }
-
 /**
  * A line through points on the screen.
  *
@@ -7346,20 +6083,14 @@ public data class ScreenBox(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class ScreenLineString(
-  public val points: List<ScreenPoint> = emptyList(),
+  public val points: List<ScreenPoint> = emptyList()
 ) {
-  @PublishedApi
-  internal fun withPoints(points: List<ScreenPoint>): ScreenLineString = copy(points = points)
-
+  @PublishedApi internal fun withPoints(points: List<ScreenPoint>): ScreenLineString = copy(points = points)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ScreenLineString = ScreenLineString()
   }
 }
-
 /**
  * The screen area that a rendered feature query covers.
  *
@@ -7367,13 +6098,10 @@ public data class ScreenLineString(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public sealed interface RenderedQueryGeometry {
-  public data class Point(public val value: ScreenPoint) : RenderedQueryGeometry
-
-  public data class Box(public val value: ScreenBox) : RenderedQueryGeometry
-
-  public data class LineString(public val value: ScreenLineString) : RenderedQueryGeometry
+  public data class Point(public val value: ScreenPoint): RenderedQueryGeometry
+  public data class Box(public val value: ScreenBox): RenderedQueryGeometry
+  public data class LineString(public val value: ScreenLineString): RenderedQueryGeometry
 }
-
 /**
  * Options for a rendered feature query.
  *
@@ -7381,32 +6109,23 @@ public sealed interface RenderedQueryGeometry {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class RenderedFeatureQueryOptions(
-  /** The layers to query. Without them, the query covers every layer. */
+  /**
+   * The layers to query. Without them, the query covers every layer.
+   */
   public val layerIds: List<String>? = null,
   /**
-   * A &#91;filter&#93;(https://maplibre.org/maplibre-style-spec/expressions/) that each feature
-   * must match. Empty matches every feature.
+   * A &#91;filter&#93;(https://maplibre.org/maplibre-style-spec/expressions/)
+   * that each feature must match. Empty matches every feature.
    */
-  public val filter: String = "",
+  public val filter: String = ""
 ) {
-  @PublishedApi
-  internal fun withLayerIds(layerIds: List<String>): RenderedFeatureQueryOptions =
-    copy(layerIds = layerIds)
-
-  @PublishedApi
-  internal fun withFilter(filter: String): RenderedFeatureQueryOptions = copy(filter = filter)
-
+  @PublishedApi internal fun withLayerIds(layerIds: List<String>): RenderedFeatureQueryOptions = copy(layerIds = layerIds)
+  @PublishedApi internal fun withFilter(filter: String): RenderedFeatureQueryOptions = copy(filter = filter)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(): RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(): RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
   }
 }
-
 /**
  * A feature that a rendered feature query found.
  *
@@ -7414,17 +6133,24 @@ public data class RenderedFeatureQueryOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class RenderedFeature(
-  /** The feature, as a GeoJSON feature. */
+  /**
+   * The feature, as a GeoJSON feature.
+   */
   public val feature: String,
-  /** The layer that drew the feature. */
+  /**
+   * The layer that drew the feature.
+   */
   public val layerId: String,
   public val sourceId: String,
-  /** The feature's source layer, or empty when its source has none. */
+  /**
+   * The feature's source layer, or empty when its source has none.
+   */
   public val sourceLayerId: String,
-  /** The feature's state, as a JSON object. */
-  public val state: String,
+  /**
+   * The feature's state, as a JSON object.
+   */
+  public val state: String
 )
-
 /**
  * Options for a source feature query.
  *
@@ -7433,34 +6159,23 @@ public data class RenderedFeature(
  */
 public data class SourceFeatureQueryOptions(
   /**
-   * The source layers to query. A vector source finds features only in the source layers named
-   * here.
+   * The source layers to query. A vector source finds features only in the
+   * source layers named here.
    */
   public val sourceLayerIds: List<String>? = null,
   /**
-   * A &#91;filter&#93;(https://maplibre.org/maplibre-style-spec/expressions/) that each feature
-   * must match. Empty matches every feature.
+   * A &#91;filter&#93;(https://maplibre.org/maplibre-style-spec/expressions/)
+   * that each feature must match. Empty matches every feature.
    */
-  public val filter: String = "",
+  public val filter: String = ""
 ) {
-  @PublishedApi
-  internal fun withSourceLayerIds(sourceLayerIds: List<String>): SourceFeatureQueryOptions =
-    copy(sourceLayerIds = sourceLayerIds)
-
-  @PublishedApi
-  internal fun withFilter(filter: String): SourceFeatureQueryOptions = copy(filter = filter)
-
+  @PublishedApi internal fun withSourceLayerIds(sourceLayerIds: List<String>): SourceFeatureQueryOptions = copy(sourceLayerIds = sourceLayerIds)
+  @PublishedApi internal fun withFilter(filter: String): SourceFeatureQueryOptions = copy(filter = filter)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(): SourceFeatureQueryOptions = SourceFeatureQueryOptions()
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(): SourceFeatureQueryOptions = SourceFeatureQueryOptions()
   }
 }
-
 /**
  * A feature that a source feature query found.
  *
@@ -7468,12 +6183,15 @@ public data class SourceFeatureQueryOptions(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 public data class SourceFeature(
-  /** The feature, as a GeoJSON feature. */
+  /**
+   * The feature, as a GeoJSON feature.
+   */
   public val feature: String,
-  /** The feature's source layer, or empty when its source has none. */
-  public val sourceLayerId: String,
+  /**
+   * The feature's source layer, or empty when its source has none.
+   */
+  public val sourceLayerId: String
 )
-
 /**
  * The layout of the pixels that `RenderSessionHandle.readTexture()` reads.
  *
@@ -7483,24 +6201,17 @@ public data class SourceFeature(
 public data class TextureImageInfo(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
-  /** The bytes from the start of one row to the start of the next. */
+  /**
+   * The bytes from the start of one row to the start of the next.
+   */
   @get:JvmName("getStride") public val stride: UInt,
-  @get:JvmName("getByteLength") public val byteLength: ULong,
+  @get:JvmName("getByteLength") public val byteLength: ULong
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(width: Int, height: Int, stride: Int, byteLength: Long): TextureImageInfo =
-      TextureImageInfo(
-        width = width.toUInt(),
-        height = height.toUInt(),
-        stride = stride.toUInt(),
-        byteLength = byteLength.toULong(),
-      )
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int, stride: Int, byteLength: Long): TextureImageInfo = TextureImageInfo(width = width.toUInt(), height = height.toUInt(), stride = stride.toUInt(), byteLength = byteLength.toULong())
   }
 }
-
 /**
  * The pixels that `RenderSessionHandle.readTexture()` reads.
  *
@@ -7508,287 +6219,17 @@ public data class TextureImageInfo(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class TextureReadbackResult(
-  /** Premultiplied RGBA pixels with 8 bits per channel, in rows from top to bottom. */
+  /**
+   * Premultiplied RGBA pixels with 8 bits per channel, in rows from top to
+   * bottom.
+   */
   public val data: ByteArray,
-  public val info: TextureImageInfo,
+  public val info: TextureImageInfo
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(data, info)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is TextureReadbackResult && contentFields().contentDeepEquals(other.contentFields())
-
+  override fun equals(other: Any?): Boolean = this === other || other is TextureReadbackResult && contentFields().contentDeepEquals(other.contentFields())
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }
-
-/**
- * A new Android window for `RenderSessionHandle.setAndroidSurfaceTarget()`.
- *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
- * to the window, so you can release yours once the call returns.
- *
- * See `mln_android_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
- */
-public data class AndroidSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
-  public val window: NativePointer,
-  /** The calling thread's `JNIEnv*`, with `surface`. */
-  public val jniEnv: NativePointer,
-  /** An `android.view.Surface`, with `jni_env`. */
-  public val surface: NativePointer,
-)
-
-/**
- * New Metal textures for a borrowed ring, for
- * `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
- *
- * The members and the textures follow the rules of `MetalBorrowedTextureDescriptor`. The ring keeps
- * its depth, device, and command queue, so give it as many textures as it attached with, on the
- * same device.
- *
- * See `mln_metal_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class MetalBorrowedTextureReplacement(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<MetalBorrowedTexture>,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<MetalBorrowedTexture>,
-    ): MetalBorrowedTextureReplacement =
-      MetalBorrowedTextureReplacement(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-      )
-  }
-}
-
-/**
- * A new Metal layer for `RenderSessionHandle.setMetalSurfaceTarget()`.
- *
- * The session renders to it with the device that it attached with. It uses the layer until a
- * replacement or release of the target completes, a detach or release of the session completes, or
- * an abandon of it returns.
- *
- * See `mln_metal_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class MetalSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your CAMetalLayer. */
-  public val layer: NativePointer,
-)
-
-/**
- * New OpenGL textures for a borrowed ring, for
- * `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
- *
- * The members and the textures follow the rules of `OpenGlBorrowedTextureDescriptor`. The ring
- * keeps its depth, context, and texture target, so give it as many textures as it attached with, in
- * the same share group.
- *
- * See `mln_open_gl_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class OpenGlBorrowedTextureReplacement(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<OpenGlBorrowedTexture>,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<OpenGlBorrowedTexture>,
-    ): OpenGlBorrowedTextureReplacement =
-      OpenGlBorrowedTextureReplacement(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-      )
-  }
-}
-
-/**
- * A new OpenGL surface for `RenderSessionHandle.setOpenGlSurfaceTarget()`.
- *
- * The session presents to it with the context that it attached with. It uses the surface until a
- * replacement or release of the target completes, a detach or release of the session completes, or
- * an abandon of it returns.
- *
- * See `mln_open_gl_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class OpenGlSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so leave it null. */
-  public val surface: NativePointer,
-)
-
-/**
- * New Vulkan images for a borrowed ring, for
- * `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
- *
- * The members and the images follow the rules of `VulkanBorrowedTextureDescriptor`. The ring keeps
- * its depth, context, `format`, `final_layout`, and `owner`, so give it as many images as it
- * attached with, in that format, on the same device.
- *
- * See `mln_vulkan_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class VulkanBorrowedTextureReplacement(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<VulkanBorrowedTexture>,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<VulkanBorrowedTexture>,
-    ): VulkanBorrowedTextureReplacement =
-      VulkanBorrowedTextureReplacement(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-      )
-  }
-}
-
-/**
- * A new Vulkan surface for `RenderSessionHandle.setVulkanSurfaceTarget()`.
- *
- * The session presents to it with the context that it attached with, so the queue family of that
- * context's `graphics_queue_family_index` must support presenting to the surface. It uses the
- * surface until a replacement or release of the target completes, a detach or release of the
- * session completes, or an abandon of it returns.
- *
- * See `mln_vulkan_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class VulkanSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your VkSurfaceKHR. */
-  @get:JvmName("getSurface") public val surface: ULong,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(logicalSize: LogicalSize, surface: Long): VulkanSurfaceReplacement =
-      VulkanSurfaceReplacement(logicalSize = logicalSize, surface = surface.toULong())
-  }
-}
-
-/**
- * A new Wayland surface for `RenderSessionHandle.setWaylandSurfaceTarget()`.
- *
- * See `mln_wayland_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
- */
-public data class WaylandSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your `wl_surface*`, on the display that the session attached with. */
-  public val surface: NativePointer,
-)
-
-/**
- * New WebGPU textures for a borrowed ring, for
- * `RenderSessionHandle.setWebGpuBorrowedTextureTarget()`.
- *
- * The members and the textures follow the rules of `WebGpuBorrowedTextureDescriptor`. The ring
- * keeps its depth, context, and `format`, so give it as many textures as it attached with, in that
- * format, on the same device.
- *
- * See `mln_web_gpu_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class WebGpuBorrowedTextureReplacement(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<WebGpuBorrowedTexture>,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<WebGpuBorrowedTexture>,
-    ): WebGpuBorrowedTextureReplacement =
-      WebGpuBorrowedTextureReplacement(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-      )
-  }
-}
-
-/**
- * A new WebGPU surface for `RenderSessionHandle.setWebGpuSurfaceTarget()`.
- *
- * The session configures it with the context and format that it attached with. It uses the surface
- * until a replacement or release of the target completes, a detach or release of the session
- * completes, or an abandon of it returns.
- *
- * See `mln_web_gpu_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class WebGpuSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your `OffscreenCanvas` or `HTMLCanvasElement`. */
-  @get:JvmName("getCanvas") public val canvas: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(logicalSize: LogicalSize, canvas: Int): WebGpuSurfaceReplacement =
-      WebGpuSurfaceReplacement(logicalSize = logicalSize, canvas = canvas.toUInt())
-  }
-}
-
-/**
- * A new Win32 window for `RenderSessionHandle.setWin32WindowTarget()`.
- *
- * See `mln_win32_window_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
- */
-public data class Win32WindowReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your `HWND`. */
-  public val window: NativePointer,
-)
-
 /**
  * The answer to a resource request.
  *
@@ -7797,80 +6238,51 @@ public data class Win32WindowReplacement(
  */
 public data class ResourceResponse(
   public val status: ResourceResponseStatus = ResourceResponseStatus.OK,
-  /** Why the request failed, for `ResourceResponseStatus.ERROR`. */
+  /**
+   * Why the request failed, for `ResourceResponseStatus.ERROR`.
+   */
   public val errorReason: ResourceErrorReason = ResourceErrorReason.OTHER,
-  /** The resource, for `ResourceResponseStatus.OK`. */
+  /**
+   * The resource, for `ResourceResponseStatus.OK`.
+   */
   public val bytes: ByteArray = byteArrayOf(),
-  /** A description of the error, for `ResourceResponseStatus.ERROR`. */
+  /**
+   * A description of the error, for `ResourceResponseStatus.ERROR`.
+   */
   public val errorMessage: String = "",
-  /** Whether the library must request the resource again before it reuses this copy. */
+  /**
+   * Whether the library must request the resource again before it reuses this
+   * copy.
+   */
   public val mustRevalidate: Boolean = false,
   public val modifiedUnixMs: Long? = null,
   public val expiresUnixMs: Long? = null,
-  /** Empty when the resource has no ETag. */
+  /**
+   * Empty when the resource has no ETag.
+   */
   public val etag: String = "",
-  /** When to retry, for `ResourceResponseStatus.ERROR`. */
-  public val retryAfterUnixMs: Long? = null,
+  /**
+   * When to retry, for `ResourceResponseStatus.ERROR`.
+   */
+  public val retryAfterUnixMs: Long? = null
 ) {
-  private fun contentFields(): Array<Any?> =
-    arrayOf(
-      status,
-      errorReason,
-      bytes,
-      errorMessage,
-      mustRevalidate,
-      modifiedUnixMs,
-      expiresUnixMs,
-      etag,
-      retryAfterUnixMs,
-    )
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is ResourceResponse && contentFields().contentDeepEquals(other.contentFields())
-
+  private fun contentFields(): Array<Any?> = arrayOf(status, errorReason, bytes, errorMessage, mustRevalidate, modifiedUnixMs, expiresUnixMs, etag, retryAfterUnixMs)
+  override fun equals(other: Any?): Boolean = this === other || other is ResourceResponse && contentFields().contentDeepEquals(other.contentFields())
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
-  @PublishedApi
-  internal fun withStatus(status: ResourceResponseStatus): ResourceResponse = copy(status = status)
-
-  @PublishedApi
-  internal fun withErrorReason(errorReason: ResourceErrorReason): ResourceResponse =
-    copy(errorReason = errorReason)
-
+  @PublishedApi internal fun withStatus(status: ResourceResponseStatus): ResourceResponse = copy(status = status)
+  @PublishedApi internal fun withErrorReason(errorReason: ResourceErrorReason): ResourceResponse = copy(errorReason = errorReason)
   @PublishedApi internal fun withBytes(bytes: ByteArray): ResourceResponse = copy(bytes = bytes)
-
-  @PublishedApi
-  internal fun withErrorMessage(errorMessage: String): ResourceResponse =
-    copy(errorMessage = errorMessage)
-
-  @PublishedApi
-  internal fun withMustRevalidate(mustRevalidate: Boolean): ResourceResponse =
-    copy(mustRevalidate = mustRevalidate)
-
-  @PublishedApi
-  internal fun withModifiedUnixMs(modifiedUnixMs: Long): ResourceResponse =
-    copy(modifiedUnixMs = modifiedUnixMs)
-
-  @PublishedApi
-  internal fun withExpiresUnixMs(expiresUnixMs: Long): ResourceResponse =
-    copy(expiresUnixMs = expiresUnixMs)
-
+  @PublishedApi internal fun withErrorMessage(errorMessage: String): ResourceResponse = copy(errorMessage = errorMessage)
+  @PublishedApi internal fun withMustRevalidate(mustRevalidate: Boolean): ResourceResponse = copy(mustRevalidate = mustRevalidate)
+  @PublishedApi internal fun withModifiedUnixMs(modifiedUnixMs: Long): ResourceResponse = copy(modifiedUnixMs = modifiedUnixMs)
+  @PublishedApi internal fun withExpiresUnixMs(expiresUnixMs: Long): ResourceResponse = copy(expiresUnixMs = expiresUnixMs)
   @PublishedApi internal fun withEtag(etag: String): ResourceResponse = copy(etag = etag)
-
-  @PublishedApi
-  internal fun withRetryAfterUnixMs(retryAfterUnixMs: Long): ResourceResponse =
-    copy(retryAfterUnixMs = retryAfterUnixMs)
-
+  @PublishedApi internal fun withRetryAfterUnixMs(retryAfterUnixMs: Long): ResourceResponse = copy(retryAfterUnixMs = retryAfterUnixMs)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ResourceResponse = ResourceResponse()
   }
 }
-
 /**
  * Why a resource transform fails a request.
  *
@@ -7880,29 +6292,19 @@ public data class ResourceResponse(
 public data class ResourceTransformError(
   public val reason: ResourceErrorReason = ResourceErrorReason.OTHER,
   public val message: String = "",
-  /** When to retry, for `ResourceErrorReason.RATE_LIMIT`. */
-  public val retryAfterUnixMs: Long? = null,
+  /**
+   * When to retry, for `ResourceErrorReason.RATE_LIMIT`.
+   */
+  public val retryAfterUnixMs: Long? = null
 ) {
-  @PublishedApi
-  internal fun withReason(reason: ResourceErrorReason): ResourceTransformError =
-    copy(reason = reason)
-
-  @PublishedApi
-  internal fun withMessage(message: String): ResourceTransformError = copy(message = message)
-
-  @PublishedApi
-  internal fun withRetryAfterUnixMs(retryAfterUnixMs: Long): ResourceTransformError =
-    copy(retryAfterUnixMs = retryAfterUnixMs)
-
+  @PublishedApi internal fun withReason(reason: ResourceErrorReason): ResourceTransformError = copy(reason = reason)
+  @PublishedApi internal fun withMessage(message: String): ResourceTransformError = copy(message = message)
+  @PublishedApi internal fun withRetryAfterUnixMs(retryAfterUnixMs: Long): ResourceTransformError = copy(retryAfterUnixMs = retryAfterUnixMs)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ResourceTransformError = ResourceTransformError()
   }
 }
-
 /**
  * Options for `RuntimeHandle.createMap()`.
  *
@@ -7911,60 +6313,45 @@ public data class ResourceTransformError(
  */
 public data class MapOptions(
   /**
-   * The map's first size, and its scale factor. The scale factor stays fixed for the map's life,
-   * and every render session of the map renders at it.
+   * The map's first size, and its scale factor. Render sessions of the map
+   * render at its scale factor. `MapHandle.resize()` changes both, or
+   * `RenderSessionHandle.resize()` while a render session is attached.
    */
   public val initialExtent: LogicalExtent,
   public val mapMode: MapMode = MapMode.CONTINUOUS,
   /**
-   * Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer encoding. Without it,
-   * such tiles fail to load.
+   * Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
+   * encoding. Without it, such tiles fail to load.
    */
   public val fastPforEnabled: Boolean = false,
-  /** The events that the map reports. Without it, the map reports them all. */
+  /**
+   * The events that the map reports. Without it, the map reports them all.
+   */
   public val eventMask: RuntimeEventFlag? = null,
   /**
-   * Whether the map keeps tiles in memory after they leave the view, so they show again without
-   * loading. Without it, the map keeps them.
+   * Whether the map keeps tiles in memory after they leave the view, so they
+   * show again without loading. Without it, the map keeps them.
    */
   public val tileCacheEnabled: Boolean? = null,
   /**
-   * Fonts for the text that a style's own fonts don't draw, such as scripts that need complex
-   * shaping, like Myanmar or Devanagari. A JSON array of font files, each an object with a `url`
-   * and an optional `unicode-range`, as in a font face of a style's `font-faces`, which every font
-   * stack uses after the style's own font faces. Empty for none.
+   * Fonts for the text that a style's own fonts don't draw, such as scripts
+   * that need complex shaping, like Myanmar or Devanagari. A JSON array of font
+   * files, each an object with a `url` and an optional `unicode-range`, as in a
+   * font face of a style's `font-faces`, which every font stack uses after the
+   * style's own font faces. Empty for none.
    */
-  public val fallbackFontFaces: String = "",
+  public val fallbackFontFaces: String = ""
 ) {
   @PublishedApi internal fun withMapMode(mapMode: MapMode): MapOptions = copy(mapMode = mapMode)
-
-  @PublishedApi
-  internal fun withFastPforEnabled(fastPforEnabled: Boolean): MapOptions =
-    copy(fastPforEnabled = fastPforEnabled)
-
-  @PublishedApi
-  internal fun withEventMask(eventMask: RuntimeEventFlag): MapOptions = copy(eventMask = eventMask)
-
-  @PublishedApi
-  internal fun withTileCacheEnabled(tileCacheEnabled: Boolean): MapOptions =
-    copy(tileCacheEnabled = tileCacheEnabled)
-
-  @PublishedApi
-  internal fun withFallbackFontFaces(fallbackFontFaces: String): MapOptions =
-    copy(fallbackFontFaces = fallbackFontFaces)
-
+  @PublishedApi internal fun withFastPforEnabled(fastPforEnabled: Boolean): MapOptions = copy(fastPforEnabled = fastPforEnabled)
+  @PublishedApi internal fun withEventMask(eventMask: RuntimeEventFlag): MapOptions = copy(eventMask = eventMask)
+  @PublishedApi internal fun withTileCacheEnabled(tileCacheEnabled: Boolean): MapOptions = copy(tileCacheEnabled = tileCacheEnabled)
+  @PublishedApi internal fun withFallbackFontFaces(fallbackFontFaces: String): MapOptions = copy(fallbackFontFaces = fallbackFontFaces)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(initialExtent: LogicalExtent): MapOptions =
-      MapOptions(initialExtent = initialExtent)
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(initialExtent: LogicalExtent): MapOptions = MapOptions(initialExtent = initialExtent)
   }
 }
-
 /**
  * An offline region that covers a rectangle of the map.
  *
@@ -7973,59 +6360,41 @@ public data class MapOptions(
  */
 public data class OfflineTilePyramidRegionDefinition(
   /**
-   * The style whose resources the region holds. Maps use the region when they load the same style
-   * URL.
+   * The style whose resources the region holds. Maps use the region when they
+   * load the same style URL.
    */
   public val styleUrl: String = "",
   public val bounds: LatLngBounds = LatLngBounds(),
   public val minZoom: Double = 0.0,
-  /** INFINITY covers every zoom level that the style's sources have. */
+  /**
+   * INFINITY covers every zoom level that the style's sources have.
+   */
   public val maxZoom: Double = 0.0,
-  /** The pixel ratio of the images to download, such as 2 for dense screens. */
+  /**
+   * The pixel ratio of the images to download, such as 2 for dense screens.
+   */
   public val pixelRatio: Float = 0f,
-  /** Whether the region holds the glyphs of CJK ideographs. */
-  public val includeIdeographs: Boolean = false,
+  /**
+   * Whether the region holds the glyphs of CJK ideographs.
+   */
+  public val includeIdeographs: Boolean = false
 ) {
-  @PublishedApi
-  internal fun withStyleUrl(styleUrl: String): OfflineTilePyramidRegionDefinition =
-    copy(styleUrl = styleUrl)
-
-  @PublishedApi
-  internal fun withBounds(bounds: LatLngBounds): OfflineTilePyramidRegionDefinition =
-    copy(bounds = bounds)
-
-  @PublishedApi
-  internal fun withMinZoom(minZoom: Double): OfflineTilePyramidRegionDefinition =
-    copy(minZoom = minZoom)
-
-  @PublishedApi
-  internal fun withMaxZoom(maxZoom: Double): OfflineTilePyramidRegionDefinition =
-    copy(maxZoom = maxZoom)
-
-  @PublishedApi
-  internal fun withPixelRatio(pixelRatio: Float): OfflineTilePyramidRegionDefinition =
-    copy(pixelRatio = pixelRatio)
-
-  @PublishedApi
-  internal fun withIncludeIdeographs(
-    includeIdeographs: Boolean,
-  ): OfflineTilePyramidRegionDefinition = copy(includeIdeographs = includeIdeographs)
-
+  @PublishedApi internal fun withStyleUrl(styleUrl: String): OfflineTilePyramidRegionDefinition = copy(styleUrl = styleUrl)
+  @PublishedApi internal fun withBounds(bounds: LatLngBounds): OfflineTilePyramidRegionDefinition = copy(bounds = bounds)
+  @PublishedApi internal fun withMinZoom(minZoom: Double): OfflineTilePyramidRegionDefinition = copy(minZoom = minZoom)
+  @PublishedApi internal fun withMaxZoom(maxZoom: Double): OfflineTilePyramidRegionDefinition = copy(maxZoom = maxZoom)
+  @PublishedApi internal fun withPixelRatio(pixelRatio: Float): OfflineTilePyramidRegionDefinition = copy(pixelRatio = pixelRatio)
+  @PublishedApi internal fun withIncludeIdeographs(includeIdeographs: Boolean): OfflineTilePyramidRegionDefinition = copy(includeIdeographs = includeIdeographs)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(): OfflineTilePyramidRegionDefinition = OfflineTilePyramidRegionDefinition()
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(): OfflineTilePyramidRegionDefinition = OfflineTilePyramidRegionDefinition()
   }
 }
-
 /**
  * An offline region that covers a GeoJSON geometry.
  *
- * The members other than `geometry` mean the same as those of `OfflineTilePyramidRegionDefinition`.
+ * The members other than `geometry` mean the same as those of
+ * `OfflineTilePyramidRegionDefinition`.
  *
  * See `mln_offline_geometry_region_definition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -8036,40 +6405,18 @@ public data class OfflineGeometryRegionDefinition(
   public val minZoom: Double = 0.0,
   public val maxZoom: Double = 0.0,
   public val pixelRatio: Float = 0f,
-  public val includeIdeographs: Boolean = false,
+  public val includeIdeographs: Boolean = false
 ) {
-  @PublishedApi
-  internal fun withStyleUrl(styleUrl: String): OfflineGeometryRegionDefinition =
-    copy(styleUrl = styleUrl)
-
-  @PublishedApi
-  internal fun withMinZoom(minZoom: Double): OfflineGeometryRegionDefinition =
-    copy(minZoom = minZoom)
-
-  @PublishedApi
-  internal fun withMaxZoom(maxZoom: Double): OfflineGeometryRegionDefinition =
-    copy(maxZoom = maxZoom)
-
-  @PublishedApi
-  internal fun withPixelRatio(pixelRatio: Float): OfflineGeometryRegionDefinition =
-    copy(pixelRatio = pixelRatio)
-
-  @PublishedApi
-  internal fun withIncludeIdeographs(includeIdeographs: Boolean): OfflineGeometryRegionDefinition =
-    copy(includeIdeographs = includeIdeographs)
-
+  @PublishedApi internal fun withStyleUrl(styleUrl: String): OfflineGeometryRegionDefinition = copy(styleUrl = styleUrl)
+  @PublishedApi internal fun withMinZoom(minZoom: Double): OfflineGeometryRegionDefinition = copy(minZoom = minZoom)
+  @PublishedApi internal fun withMaxZoom(maxZoom: Double): OfflineGeometryRegionDefinition = copy(maxZoom = maxZoom)
+  @PublishedApi internal fun withPixelRatio(pixelRatio: Float): OfflineGeometryRegionDefinition = copy(pixelRatio = pixelRatio)
+  @PublishedApi internal fun withIncludeIdeographs(includeIdeographs: Boolean): OfflineGeometryRegionDefinition = copy(includeIdeographs = includeIdeographs)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(geometry: String): OfflineGeometryRegionDefinition =
-      OfflineGeometryRegionDefinition(geometry = geometry)
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(geometry: String): OfflineGeometryRegionDefinition = OfflineGeometryRegionDefinition(geometry = geometry)
   }
 }
-
 /**
  * The area, zoom range, and style that an offline region covers.
  *
@@ -8077,33 +6424,18 @@ public data class OfflineGeometryRegionDefinition(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public sealed interface OfflineRegionDefinition {
-  public data class TilePyramid(public val value: OfflineTilePyramidRegionDefinition) :
-    OfflineRegionDefinition
-
-  public data class Geometry(public val value: OfflineGeometryRegionDefinition) :
-    OfflineRegionDefinition
-
-  public data class Unknown(
-    @get:JvmName("getTag") public val tag: UInt,
-    public val bytes: ByteArray,
-  ) : OfflineRegionDefinition {
-    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
-
-    override fun equals(other: Any?): Boolean =
-      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
-
-    override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
-    public companion object {
-      /** Creates a value, for Java, which can't call the constructor. */
-      @JvmStatic
-      @PublishedApi
-      internal fun of(tag: Int, bytes: ByteArray): Unknown =
-        Unknown(tag = tag.toUInt(), bytes = bytes)
-    }
+  public data class TilePyramid(public val value: OfflineTilePyramidRegionDefinition): OfflineRegionDefinition
+  public data class Geometry(public val value: OfflineGeometryRegionDefinition): OfflineRegionDefinition
+  public data class Unknown(@get:JvmName("getTag") public val tag: UInt, public val bytes: ByteArray): OfflineRegionDefinition {
+  private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+  override fun equals(other: Any?): Boolean = this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(tag: Int, bytes: ByteArray): Unknown = Unknown(tag = tag.toUInt(), bytes = bytes)
   }
 }
-
+}
 /**
  * An offline region in the runtime's cache file.
  *
@@ -8113,17 +6445,12 @@ public sealed interface OfflineRegionDefinition {
 public data class OfflineRegionInfo(
   public val id: Long,
   public val definition: OfflineRegionDefinition,
-  public val metadata: ByteArray,
+  public val metadata: ByteArray
 ) {
   private fun contentFields(): Array<Any?> = arrayOf(id, definition, metadata)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is OfflineRegionInfo && contentFields().contentDeepEquals(other.contentFields())
-
+  override fun equals(other: Any?): Boolean = this === other || other is OfflineRegionInfo && contentFields().contentDeepEquals(other.contentFields())
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }
-
 /**
  * The download progress of an offline region.
  *
@@ -8132,52 +6459,36 @@ public data class OfflineRegionInfo(
  */
 public data class OfflineRegionStatus(
   public val downloadState: OfflineRegionDownloadState,
-  /** The resources downloaded so far, tiles included. */
+  /**
+   * The resources downloaded so far, tiles included.
+   */
   @get:JvmName("getCompletedResourceCount") public val completedResourceCount: ULong,
-  /** The size of the downloaded resources in bytes, tiles included. */
+  /**
+   * The size of the downloaded resources in bytes, tiles included.
+   */
   @get:JvmName("getCompletedResourceSize") public val completedResourceSize: ULong,
   @get:JvmName("getCompletedTileCount") public val completedTileCount: ULong,
   @get:JvmName("getRequiredTileCount") public val requiredTileCount: ULong,
-  /** The size of the downloaded tiles in bytes. */
+  /**
+   * The size of the downloaded tiles in bytes.
+   */
   @get:JvmName("getCompletedTileSize") public val completedTileSize: ULong,
   /**
-   * The resources that the region needs, tiles included. Until `required_resource_count_is_precise`
-   * is true, this is only a lower bound.
+   * The resources that the region needs, tiles included. Until
+   * `required_resource_count_is_precise` is true, this is only a lower bound.
    */
   @get:JvmName("getRequiredResourceCount") public val requiredResourceCount: ULong,
   public val requiredResourceCountIsPrecise: Boolean,
-  /** Whether the region has downloaded every resource it needs. */
-  public val complete: Boolean,
+  /**
+   * Whether the region has downloaded every resource it needs.
+   */
+  public val complete: Boolean
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      downloadState: OfflineRegionDownloadState,
-      completedResourceCount: Long,
-      completedResourceSize: Long,
-      completedTileCount: Long,
-      requiredTileCount: Long,
-      completedTileSize: Long,
-      requiredResourceCount: Long,
-      requiredResourceCountIsPrecise: Boolean,
-      complete: Boolean,
-    ): OfflineRegionStatus =
-      OfflineRegionStatus(
-        downloadState = downloadState,
-        completedResourceCount = completedResourceCount.toULong(),
-        completedResourceSize = completedResourceSize.toULong(),
-        completedTileCount = completedTileCount.toULong(),
-        requiredTileCount = requiredTileCount.toULong(),
-        completedTileSize = completedTileSize.toULong(),
-        requiredResourceCount = requiredResourceCount.toULong(),
-        requiredResourceCountIsPrecise = requiredResourceCountIsPrecise,
-        complete = complete,
-      )
+    @JvmStatic @PublishedApi internal fun of(downloadState: OfflineRegionDownloadState, completedResourceCount: Long, completedResourceSize: Long, completedTileCount: Long, requiredTileCount: Long, completedTileSize: Long, requiredResourceCount: Long, requiredResourceCountIsPrecise: Boolean, complete: Boolean): OfflineRegionStatus = OfflineRegionStatus(downloadState = downloadState, completedResourceCount = completedResourceCount.toULong(), completedResourceSize = completedResourceSize.toULong(), completedTileCount = completedTileCount.toULong(), requiredTileCount = requiredTileCount.toULong(), completedTileSize = completedTileSize.toULong(), requiredResourceCount = requiredResourceCount.toULong(), requiredResourceCountIsPrecise = requiredResourceCountIsPrecise, complete = complete)
   }
 }
-
 /**
  * The details of `RuntimeEventType.MAP_CAMERA_WILL_CHANGE` and
  * `RuntimeEventType.MAP_CAMERA_DID_CHANGE`.
@@ -8187,9 +6498,8 @@ public data class OfflineRegionStatus(
  */
 public data class RuntimeEventCameraChange(
   public val mode: CameraChangeMode,
-  public val source: CameraChangeSource,
+  public val source: CameraChangeSource
 )
-
 /**
  * The details of `RuntimeEventType.MAP_LOADING_FAILED`.
  *
@@ -8197,9 +6507,8 @@ public data class RuntimeEventCameraChange(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventLoadingFailed(
-  public val error: MapLoadError,
+  public val error: MapLoadError
 )
-
 /**
  * Statistics about the frames that a map renders.
  *
@@ -8207,18 +6516,27 @@ public data class RuntimeEventLoadingFailed(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RenderingStats(
-  /** The time that the frame took to encode, in milliseconds. */
+  /**
+   * The time that the frame took to encode, in milliseconds.
+   */
   public val encodingTimeMs: Double,
-  /** The time that the frame took to render, in milliseconds. */
+  /**
+   * The time that the frame took to render, in milliseconds.
+   */
   public val renderingTimeMs: Double,
-  /** The frames rendered so far. */
+  /**
+   * The frames rendered so far.
+   */
   public val frameCount: Long,
-  /** The draw calls in the frame. */
+  /**
+   * The draw calls in the frame.
+   */
   public val drawCallCount: Long,
-  /** The draw calls in every frame so far. */
-  public val totalDrawCallCount: Long,
+  /**
+   * The draw calls in every frame so far.
+   */
+  public val totalDrawCallCount: Long
 )
-
 /**
  * The details of `RuntimeEventType.MAP_RENDER_FRAME_FINISHED`.
  *
@@ -8229,9 +6547,8 @@ public data class RuntimeEventRenderFrame(
   public val mode: RenderMode,
   public val needsRepaint: Boolean,
   public val placementChanged: Boolean,
-  public val stats: RenderingStats,
+  public val stats: RenderingStats
 )
-
 /**
  * The details of `RuntimeEventType.MAP_STYLE_IMAGE_MISSING`.
  *
@@ -8239,16 +6556,16 @@ public data class RuntimeEventRenderFrame(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventStyleImage(
-  public val imageId: String,
+  public val imageId: String
 )
-
 /**
  * The ID of a tile.
  *
- * `canonical_x` and `canonical_y` place the tile in the source's grid at zoom `canonical_z`.
- * `overscaled_z` is the zoom that the map draws the tile at, and is greater when the source has no
- * tiles that deep. `wrap` says which copy of the world holds the tile: zero for the main one,
- * negative to the west, and positive to the east.
+ * `canonical_x` and `canonical_y` place the tile in the source's grid at zoom
+ * `canonical_z`. `overscaled_z` is the zoom that the map draws the tile at, and
+ * is greater when the source has no tiles that deep. `wrap` says which copy of
+ * the world holds the tile: zero for the main one, negative to the west, and
+ * positive to the east.
  *
  * See `mln_tile_id` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -8258,29 +6575,13 @@ public data class TileId(
   public val wrap: Int,
   @get:JvmName("getCanonicalZ") public val canonicalZ: UInt,
   @get:JvmName("getCanonicalX") public val canonicalX: UInt,
-  @get:JvmName("getCanonicalY") public val canonicalY: UInt,
+  @get:JvmName("getCanonicalY") public val canonicalY: UInt
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      overscaledZ: Int,
-      wrap: Int,
-      canonicalZ: Int,
-      canonicalX: Int,
-      canonicalY: Int,
-    ): TileId =
-      TileId(
-        overscaledZ = overscaledZ.toUInt(),
-        wrap = wrap,
-        canonicalZ = canonicalZ.toUInt(),
-        canonicalX = canonicalX.toUInt(),
-        canonicalY = canonicalY.toUInt(),
-      )
+    @JvmStatic @PublishedApi internal fun of(overscaledZ: Int, wrap: Int, canonicalZ: Int, canonicalX: Int, canonicalY: Int): TileId = TileId(overscaledZ = overscaledZ.toUInt(), wrap = wrap, canonicalZ = canonicalZ.toUInt(), canonicalX = canonicalX.toUInt(), canonicalY = canonicalY.toUInt())
   }
 }
-
 /**
  * The details of `RuntimeEventType.MAP_TILE_ACTION`.
  *
@@ -8288,12 +6589,13 @@ public data class TileId(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventTileAction(
-  /** The source that the tile belongs to. */
+  /**
+   * The source that the tile belongs to.
+   */
   public val sourceId: String,
   public val operation: TileOperation,
-  public val tileId: TileId,
+  public val tileId: TileId
 )
-
 /**
  * The details of `RuntimeEventType.MAP_SOURCE_CHANGED`.
  *
@@ -8301,9 +6603,8 @@ public data class RuntimeEventTileAction(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventSourceChanged(
-  public val sourceId: String,
+  public val sourceId: String
 )
-
 /**
  * The details of `RuntimeEventType.OFFLINE_REGION_STATUS_CHANGED`.
  *
@@ -8312,9 +6613,8 @@ public data class RuntimeEventSourceChanged(
  */
 public data class RuntimeEventOfflineRegionStatus(
   public val regionId: Long,
-  public val status: OfflineRegionStatus,
+  public val status: OfflineRegionStatus
 )
-
 /**
  * The details of `RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR`.
  *
@@ -8323,29 +6623,8 @@ public data class RuntimeEventOfflineRegionStatus(
  */
 public data class RuntimeEventOfflineRegionResponseError(
   public val regionId: Long,
-  public val reason: ResourceErrorReason,
+  public val reason: ResourceErrorReason
 )
-
-/**
- * The details of `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
- *
- * See `mln_runtime_event_offline_region_tile_count_limit` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventOfflineRegionTileCountLimit(
-  public val regionId: Long,
-  /** The number of demo server tiles that the cache file's offline regions may hold together. */
-  @get:JvmName("getLimit") public val limit: ULong,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(regionId: Long, limit: Long): RuntimeEventOfflineRegionTileCountLimit =
-      RuntimeEventOfflineRegionTileCountLimit(regionId = regionId, limit = limit.toULong())
-  }
-}
-
 /**
  * The details of a glyph event.
  *
@@ -8355,31 +6634,19 @@ public data class RuntimeEventOfflineRegionTileCountLimit(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventGlyphs(
-  /** The fonts that the glyphs come from, in order of preference. */
+  /**
+   * The fonts that the glyphs come from, in order of preference.
+   */
   public val fontStack: List<String>,
   @get:JvmName("getFirst") public val first: UInt,
   @get:JvmName("getLast") public val last: UInt,
-  public val fontFace: Boolean,
+  public val fontFace: Boolean
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      fontStack: List<String>,
-      first: Int,
-      last: Int,
-      fontFace: Boolean,
-    ): RuntimeEventGlyphs =
-      RuntimeEventGlyphs(
-        fontStack = fontStack,
-        first = first.toUInt(),
-        last = last.toUInt(),
-        fontFace = fontFace,
-      )
+    @JvmStatic @PublishedApi internal fun of(fontStack: List<String>, first: Int, last: Int, fontFace: Boolean): RuntimeEventGlyphs = RuntimeEventGlyphs(fontStack = fontStack, first = first.toUInt(), last = last.toUInt(), fontFace = fontFace)
   }
 }
-
 /**
  * The details of a sprite event.
  *
@@ -8390,9 +6657,8 @@ public data class RuntimeEventGlyphs(
  */
 public data class RuntimeEventSprite(
   public val id: String,
-  public val url: String,
+  public val url: String
 )
-
 /**
  * The details of an event, in the member that its `payload_type` names.
  *
@@ -8400,56 +6666,27 @@ public data class RuntimeEventSprite(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public sealed interface RuntimeEventPayload {
-  public data class CameraChange(public val value: RuntimeEventCameraChange) : RuntimeEventPayload
-
-  public data class LoadingFailed(public val value: RuntimeEventLoadingFailed) : RuntimeEventPayload
-
-  public data class RenderFrame(public val value: RuntimeEventRenderFrame) : RuntimeEventPayload
-
-  public data class StyleImage(public val value: RuntimeEventStyleImage) : RuntimeEventPayload
-
-  public data class TileAction(public val value: RuntimeEventTileAction) : RuntimeEventPayload
-
-  public data class SourceChanged(public val value: RuntimeEventSourceChanged) : RuntimeEventPayload
-
-  public data class OfflineRegionStatus(public val value: RuntimeEventOfflineRegionStatus) :
-    RuntimeEventPayload
-
-  public data class OfflineRegionResponseError(
-    public val value: RuntimeEventOfflineRegionResponseError,
-  ) : RuntimeEventPayload
-
-  public data class OfflineRegionTileCountLimit(
-    public val value: RuntimeEventOfflineRegionTileCountLimit,
-  ) : RuntimeEventPayload
-
-  public data class Glyphs(public val value: RuntimeEventGlyphs) : RuntimeEventPayload
-
-  public data class Sprite(public val value: RuntimeEventSprite) : RuntimeEventPayload
-
-  public data object None : RuntimeEventPayload
-
-  public data class Unknown(
-    @get:JvmName("getTag") public val tag: UInt,
-    public val bytes: ByteArray,
-  ) : RuntimeEventPayload {
-    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
-
-    override fun equals(other: Any?): Boolean =
-      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
-
-    override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
-    public companion object {
-      /** Creates a value, for Java, which can't call the constructor. */
-      @JvmStatic
-      @PublishedApi
-      internal fun of(tag: Int, bytes: ByteArray): Unknown =
-        Unknown(tag = tag.toUInt(), bytes = bytes)
-    }
+  public data class CameraChange(public val value: RuntimeEventCameraChange): RuntimeEventPayload
+  public data class LoadingFailed(public val value: RuntimeEventLoadingFailed): RuntimeEventPayload
+  public data class RenderFrame(public val value: RuntimeEventRenderFrame): RuntimeEventPayload
+  public data class StyleImage(public val value: RuntimeEventStyleImage): RuntimeEventPayload
+  public data class TileAction(public val value: RuntimeEventTileAction): RuntimeEventPayload
+  public data class SourceChanged(public val value: RuntimeEventSourceChanged): RuntimeEventPayload
+  public data class OfflineRegionStatus(public val value: RuntimeEventOfflineRegionStatus): RuntimeEventPayload
+  public data class OfflineRegionResponseError(public val value: RuntimeEventOfflineRegionResponseError): RuntimeEventPayload
+  public data class Glyphs(public val value: RuntimeEventGlyphs): RuntimeEventPayload
+  public data class Sprite(public val value: RuntimeEventSprite): RuntimeEventPayload
+  public data object None: RuntimeEventPayload
+  public data class Unknown(@get:JvmName("getTag") public val tag: UInt, public val bytes: ByteArray): RuntimeEventPayload {
+  private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+  override fun equals(other: Any?): Boolean = this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic @PublishedApi internal fun of(tag: Int, bytes: ByteArray): Unknown = Unknown(tag = tag.toUInt(), bytes = bytes)
   }
 }
-
+}
 /**
  * An event that a runtime or one of its maps raised.
  *
@@ -8459,40 +6696,26 @@ public sealed interface RuntimeEventPayload {
 public data class RuntimeEvent(
   public val type: RuntimeEventType,
   public val sourceType: RuntimeEventSourceType,
-  /** The runtime or map that raised the event, as `source_type` says. */
+  /**
+   * The runtime or map that raised the event, as `source_type` says.
+   */
   @get:JvmName("getSource") public val source: ULong,
   /**
-   * For a map event, a map snapshot with this generation or a later one includes what the event
-   * reports. Zero for a runtime event.
+   * For a map event, a map snapshot with this generation or a later one
+   * includes what the event reports. Zero for a runtime event.
    */
   @get:JvmName("getGeneration") public val generation: ULong,
-  /** The error's text for an event that reports a failure, or empty. */
+  /**
+   * The error's text for an event that reports a failure, or empty.
+   */
   public val message: String,
-  public val payload: RuntimeEventPayload,
+  public val payload: RuntimeEventPayload
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      type: RuntimeEventType,
-      sourceType: RuntimeEventSourceType,
-      source: Long,
-      generation: Long,
-      message: String,
-      payload: RuntimeEventPayload,
-    ): RuntimeEvent =
-      RuntimeEvent(
-        type = type,
-        sourceType = sourceType,
-        source = source.toULong(),
-        generation = generation.toULong(),
-        message = message,
-        payload = payload,
-      )
+    @JvmStatic @PublishedApi internal fun of(type: RuntimeEventType, sourceType: RuntimeEventSourceType, source: Long, generation: Long, message: String, payload: RuntimeEventPayload): RuntimeEvent = RuntimeEvent(type = type, sourceType = sourceType, source = source.toULong(), generation = generation.toULong(), message = message, payload = payload)
   }
 }
-
 /**
  * An HTTP header.
  *
@@ -8503,19 +6726,14 @@ public data class RuntimeEvent(
  */
 public data class HttpHeader(
   public val name: String,
-  public val value: String = "",
+  public val value: String = ""
 ) {
   @PublishedApi internal fun withValue(value: String): HttpHeader = copy(value = value)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(name: String): HttpHeader = HttpHeader(name = name)
   }
 }
-
 /**
  * Headers to add to the HTTP requests whose URL matches a pattern.
  *
@@ -8523,31 +6741,23 @@ public data class HttpHeader(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class HttpHeaderRule(
-  /** The kinds of resource that the rule covers. Zero covers every kind. */
+  /**
+   * The kinds of resource that the rule covers. Zero covers every kind.
+   */
   public val kinds: ResourceKindFlag = ResourceKindFlag.NONE,
   public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
   public val url: String = "",
-  public val headers: List<HttpHeader> = emptyList(),
+  public val headers: List<HttpHeader> = emptyList()
 ) {
-  @PublishedApi
-  internal fun withKinds(kinds: ResourceKindFlag): HttpHeaderRule = copy(kinds = kinds)
-
+  @PublishedApi internal fun withKinds(kinds: ResourceKindFlag): HttpHeaderRule = copy(kinds = kinds)
   @PublishedApi internal fun withFlags(flags: UrlMatchFlag): HttpHeaderRule = copy(flags = flags)
-
   @PublishedApi internal fun withUrl(url: String): HttpHeaderRule = copy(url = url)
-
-  @PublishedApi
-  internal fun withHeaders(headers: List<HttpHeader>): HttpHeaderRule = copy(headers = headers)
-
+  @PublishedApi internal fun withHeaders(headers: List<HttpHeader>): HttpHeaderRule = copy(headers = headers)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): HttpHeaderRule = HttpHeaderRule()
   }
 }
-
 /**
  * The bytes from `start` to `end` of a resource, both included.
  *
@@ -8556,31 +6766,30 @@ public data class HttpHeaderRule(
  */
 public data class ResourceRange(
   @get:JvmName("getStart") public val start: ULong,
-  @get:JvmName("getEnd") public val end: ULong,
+  @get:JvmName("getEnd") public val end: ULong
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(start: Long, end: Long): ResourceRange =
-      ResourceRange(start = start.toULong(), end = end.toULong())
+    @JvmStatic @PublishedApi internal fun of(start: Long, end: Long): ResourceRange = ResourceRange(start = start.toULong(), end = end.toULong())
   }
 }
-
 /**
  * A request that a resource provider serves.
  *
- * When the cache holds an earlier copy of the resource, the `prior_` fields describe it.
+ * When the cache holds an earlier copy of the resource, the `prior_` fields
+ * describe it.
  *
  * See `mln_resource_request_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceRequestInfo(
-  /** The URL as the style names it. */
+  /**
+   * The URL as the style names it.
+   */
   public val requestedUrl: String,
   /**
-   * The URL to load, after the library expands any shorthand in `requested_url` and before any
-   * resource transform. Routes match this URL.
+   * The URL to load, after the library expands any shorthand in `requested_url`
+   * and before any resource transform. Routes match this URL.
    */
   public val resolvedUrl: String,
   public val kind: ResourceKind,
@@ -8588,37 +6797,22 @@ public data class ResourceRequestInfo(
   public val priority: ResourcePriority,
   public val usage: ResourceUsage,
   public val storagePolicy: ResourceStoragePolicy,
-  /** The only bytes of the resource that the request wants. */
+  /**
+   * The only bytes of the resource that the request wants.
+   */
   public val range: ResourceRange?,
   public val priorModifiedUnixMs: Long?,
   public val priorExpiresUnixMs: Long?,
-  /** Empty when the earlier copy has no ETag. */
+  /**
+   * Empty when the earlier copy has no ETag.
+   */
   public val priorEtag: String,
-  public val priorData: ByteArray,
+  public val priorData: ByteArray
 ) {
-  private fun contentFields(): Array<Any?> =
-    arrayOf(
-      requestedUrl,
-      resolvedUrl,
-      kind,
-      loadingMethod,
-      priority,
-      usage,
-      storagePolicy,
-      range,
-      priorModifiedUnixMs,
-      priorExpiresUnixMs,
-      priorEtag,
-      priorData,
-    )
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is ResourceRequestInfo && contentFields().contentDeepEquals(other.contentFields())
-
+  private fun contentFields(): Array<Any?> = arrayOf(requestedUrl, resolvedUrl, kind, loadingMethod, priority, usage, storagePolicy, range, priorModifiedUnixMs, priorExpiresUnixMs, priorEtag, priorData)
+  override fun equals(other: Any?): Boolean = this === other || other is ResourceRequestInfo && contentFields().contentDeepEquals(other.contentFields())
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
 }
-
 /**
  * The requests that a resource provider serves.
  *
@@ -8626,89 +6820,69 @@ public data class ResourceRequestInfo(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceRoute(
-  /** The kinds of resource that the route covers. Zero covers every kind. */
+  /**
+   * The kinds of resource that the route covers. Zero covers every kind.
+   */
   public val kinds: ResourceKindFlag = ResourceKindFlag.NONE,
   public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
-  public val url: String = "",
+  public val url: String = ""
 ) {
   @PublishedApi internal fun withKinds(kinds: ResourceKindFlag): ResourceRoute = copy(kinds = kinds)
-
   @PublishedApi internal fun withFlags(flags: UrlMatchFlag): ResourceRoute = copy(flags = flags)
-
   @PublishedApi internal fun withUrl(url: String): ResourceRoute = copy(url = url)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ResourceRoute = ResourceRoute()
   }
 }
-
 /**
  * A query parameter that a resource transform rule adds to a URL.
  *
- * Pass `name` and `value` unencoded. The library percent-encodes every byte of them except the
- * letters, digits, `-`, `.`, `_`, and `~`, and adds them as `name=value`.
+ * Pass `name` and `value` unencoded. The library percent-encodes every byte of
+ * them except the letters, digits, `-`, `.`, `_`, and `~`, and adds them as
+ * `name=value`.
  *
  * See `mln_url_query_parameter` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class UrlQueryParameter(
   public val name: String,
-  public val value: String = "",
+  public val value: String = ""
 ) {
   @PublishedApi internal fun withValue(value: String): UrlQueryParameter = copy(value = value)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(name: String): UrlQueryParameter = UrlQueryParameter(name = name)
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(name: String): UrlQueryParameter = UrlQueryParameter(name = name)
   }
 }
-
 /**
  * Query parameters to add to the URLs of requests that match a pattern.
  *
- * The library adds the parameters, in order, at the end of the URL's query and before any fragment.
- * It keeps the parameters that the URL already has, even one with the same name.
+ * The library adds the parameters, in order, at the end of the URL's query and
+ * before any fragment. It keeps the parameters that the URL already has, even
+ * one with the same name.
  *
  * See `mln_resource_transform_rule` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceTransformRule(
-  /** The kinds of resource that the rule covers. Zero covers every kind. */
+  /**
+   * The kinds of resource that the rule covers. Zero covers every kind.
+   */
   public val kinds: ResourceKindFlag = ResourceKindFlag.NONE,
   public val flags: UrlMatchFlag = UrlMatchFlag.NONE,
   public val url: String = "",
-  public val parameters: List<UrlQueryParameter> = emptyList(),
+  public val parameters: List<UrlQueryParameter> = emptyList()
 ) {
-  @PublishedApi
-  internal fun withKinds(kinds: ResourceKindFlag): ResourceTransformRule = copy(kinds = kinds)
-
-  @PublishedApi
-  internal fun withFlags(flags: UrlMatchFlag): ResourceTransformRule = copy(flags = flags)
-
+  @PublishedApi internal fun withKinds(kinds: ResourceKindFlag): ResourceTransformRule = copy(kinds = kinds)
+  @PublishedApi internal fun withFlags(flags: UrlMatchFlag): ResourceTransformRule = copy(flags = flags)
   @PublishedApi internal fun withUrl(url: String): ResourceTransformRule = copy(url = url)
-
-  @PublishedApi
-  internal fun withParameters(parameters: List<UrlQueryParameter>): ResourceTransformRule =
-    copy(parameters = parameters)
-
+  @PublishedApi internal fun withParameters(parameters: List<UrlQueryParameter>): ResourceTransformRule = copy(parameters = parameters)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ResourceTransformRule = ResourceTransformRule()
   }
 }
-
 /**
  * The inputs that a style expression reads while it evaluates.
  *
@@ -8717,56 +6891,44 @@ public data class ResourceTransformRule(
  */
 public data class StyleExpressionInputs(
   public val zoom: Double? = null,
-  /** The value of `heatmap-density`, `line-progress`, and `elevation`. */
+  /**
+   * The value of `heatmap-density`, `line-progress`, and `elevation`.
+   */
   public val colorRampParameter: Double? = null,
-  /** The feature to evaluate against, as a GeoJSON feature, or empty for none. */
+  /**
+   * The feature to evaluate against, as a GeoJSON feature, or empty for none.
+   */
   public val feature: String = "",
-  /** The feature's state, as a JSON object, or empty for none. */
+  /**
+   * The feature's state, as a JSON object, or empty for none.
+   */
   public val featureState: String = "",
-  /** The values that `global-state` reads, as a JSON object, or empty for none. */
+  /**
+   * The values that `global-state` reads, as a JSON object, or empty for none.
+   */
   public val globalState: String = "",
   /**
-   * The tile that holds the feature. `within` and `distance` need it to read the feature's
-   * geometry.
+   * The tile that holds the feature. `within` and `distance` need it to read
+   * the feature's geometry.
    */
   public val canonicalTileId: CanonicalTileId? = null,
-  /** The IDs of the images that `image` treats as available. */
-  public val availableImages: List<String> = emptyList(),
+  /**
+   * The IDs of the images that `image` treats as available.
+   */
+  public val availableImages: List<String> = emptyList()
 ) {
   @PublishedApi internal fun withZoom(zoom: Double): StyleExpressionInputs = copy(zoom = zoom)
-
-  @PublishedApi
-  internal fun withColorRampParameter(colorRampParameter: Double): StyleExpressionInputs =
-    copy(colorRampParameter = colorRampParameter)
-
-  @PublishedApi
-  internal fun withFeature(feature: String): StyleExpressionInputs = copy(feature = feature)
-
-  @PublishedApi
-  internal fun withFeatureState(featureState: String): StyleExpressionInputs =
-    copy(featureState = featureState)
-
-  @PublishedApi
-  internal fun withGlobalState(globalState: String): StyleExpressionInputs =
-    copy(globalState = globalState)
-
-  @PublishedApi
-  internal fun withCanonicalTileId(canonicalTileId: CanonicalTileId): StyleExpressionInputs =
-    copy(canonicalTileId = canonicalTileId)
-
-  @PublishedApi
-  internal fun withAvailableImages(availableImages: List<String>): StyleExpressionInputs =
-    copy(availableImages = availableImages)
-
+  @PublishedApi internal fun withColorRampParameter(colorRampParameter: Double): StyleExpressionInputs = copy(colorRampParameter = colorRampParameter)
+  @PublishedApi internal fun withFeature(feature: String): StyleExpressionInputs = copy(feature = feature)
+  @PublishedApi internal fun withFeatureState(featureState: String): StyleExpressionInputs = copy(featureState = featureState)
+  @PublishedApi internal fun withGlobalState(globalState: String): StyleExpressionInputs = copy(globalState = globalState)
+  @PublishedApi internal fun withCanonicalTileId(canonicalTileId: CanonicalTileId): StyleExpressionInputs = copy(canonicalTileId = canonicalTileId)
+  @PublishedApi internal fun withAvailableImages(availableImages: List<String>): StyleExpressionInputs = copy(availableImages = availableImages)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): StyleExpressionInputs = StyleExpressionInputs()
   }
 }
-
 /**
  * What a style expression's result depends on.
  *
@@ -8774,73 +6936,112 @@ public data class StyleExpressionInputs(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style__expression_8h.html).
  */
 public data class StyleExpressionInfo(
-  /** True when the result doesn't depend on the feature or its state. */
+  /**
+   * True when the result doesn't depend on the feature or its state.
+   */
   public val isFeatureConstant: Boolean,
-  /** True when the result doesn't depend on the zoom level. */
-  public val isZoomConstant: Boolean,
+  /**
+   * True when the result doesn't depend on the zoom level.
+   */
+  public val isZoomConstant: Boolean
 )
-
-/**
- * A Vulkan device's context, as `VulkanDeviceHandle.getContext()` reports it.
- *
- * See `mln_vulkan_device_context_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- */
-public data class VulkanDeviceContextResult(
-  public val context: VulkanContextDescriptor,
-)
-
 public data class LogicalExtentPhysicalSizeResult(
   @get:JvmName("getWidth") public val width: UInt,
-  @get:JvmName("getHeight") public val height: UInt,
+  @get:JvmName("getHeight") public val height: UInt
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(width: Int, height: Int): LogicalExtentPhysicalSizeResult =
-      LogicalExtentPhysicalSizeResult(width = width.toUInt(), height = height.toUInt())
+    @JvmStatic @PublishedApi internal fun of(width: Int, height: Int): LogicalExtentPhysicalSizeResult = LogicalExtentPhysicalSizeResult(width = width.toUInt(), height = height.toUInt())
   }
 }
+/**
+ * Your lock on a Vulkan queue that you and the render sessions of a GPU device
+ * all submit to.
+ *
+ * A session holds the lock only while it submits or presents to the queue, or
+ * submits the empty batch that drains its work from the queue. It never holds
+ * the lock while it waits. Set both `lock` and `unlock`, or neither when you
+ * don't submit to the queue yourself.
+ *
+ * Don't hold the lock while you call the library.
+ *
+ * It can run on a library thread, and it can't call the library.
+ *
+ * The JVM, Android, and Kotlin/Native also create one from the host's native
+ * functions with `QueueLock.native`.
+ *
+ * See `mln_queue_lock` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+@ConsistentCopyVisibility
+public data class QueueLock private constructor(
+  public val lock: QueueLockCallback?,
+  public val unlock: QueueLockCallback?,
+  private val nativeRegistration: NativeRegistration?
+) {
+  /** A registration of Kotlin callbacks. */
+  public constructor(lock: QueueLockCallback? = null, unlock: QueueLockCallback? = null) : this(lock, unlock, null)
 
+  /** A registration that does nothing, for Java, which can't leave out the constructor's arguments. */
+  @PublishedApi internal constructor() : this(null, null, null)
+
+  @get:JvmSynthetic internal val bindingNative: NativeRegistration?
+    get() = nativeRegistration
+
+  public companion object {
+    /** A registration of native functions, which only `native` creates. */
+    @JvmSynthetic internal fun wrap(native: NativeRegistration): QueueLock =
+      QueueLock(null, null, native)
+  }
+}
+/**
+ * Locks or unlocks the Vulkan queue that you share with the render sessions of
+ * a GPU device.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads and relies on its work being done when it returns. Kotlin/Wasm
+ * cannot run Kotlin on a native thread, so it refuses a registration that sets
+ * one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_queue_lock_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public fun interface QueueLockCallback {
+  public operator fun invoke()
+}
 /**
  * A log callback, for `setLogCallback()`.
  *
- * Runs on the thread that logged the message, or on a background thread for the severities that
- * `setLogAsyncSeverityMask()` selects. The callback can't call the library.
+ * Runs on the thread that logged the message, or on a background thread for the
+ * severities that `setLogAsyncSeverityMask()` selects. The callback can't call
+ * the library.
  *
  * See `mln_log_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
  */
 public data class LogHandler(
   /**
-   * The severities that also go to the platform's log, as they do without a callback. 0 sends none.
-   * A message of these severities goes to the platform's log even when the handler's queue can't
-   * accept it.
+   * The severities that also go to the platform's log, as they do without a
+   * callback. 0 sends none. A message of these severities goes to the
+   * platform's log even when the handler's queue can't accept it.
    */
   public val platformSeverities: LogSeverityFlag = LogSeverityFlag.NONE,
-  public val callback: LogCallback,
+  public val callback: LogCallback
 ) {
-  @PublishedApi
-  internal fun withPlatformSeverities(platformSeverities: LogSeverityFlag): LogHandler =
-    copy(platformSeverities = platformSeverities)
-
+  @PublishedApi internal fun withPlatformSeverities(platformSeverities: LogSeverityFlag): LogHandler = copy(platformSeverities = platformSeverities)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(callback: LogCallback): LogHandler = LogHandler(callback = callback)
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(callback: LogCallback): LogHandler = LogHandler(callback = callback)
   }
 }
-
 /**
  * Receives a log message.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -8850,7 +7051,6 @@ public data class LogHandler(
 public fun interface LogCallback {
   public operator fun invoke(severity: LogSeverity, event: LogEvent, code: Long, message: String)
 }
-
 /**
  * The callbacks and options of a custom geometry source.
  *
@@ -8862,76 +7062,57 @@ public fun interface LogCallback {
 public data class CustomGeometrySourceOptions(
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
-  /** How far, in pixels, simplified geometry can stray from the original. */
+  /**
+   * How far, in pixels, simplified geometry can stray from the original.
+   */
   public val tolerance: Double? = null,
-  /** The width of a tile in pixels, a power of two no larger than 8192. */
+  /**
+   * The width of a tile in pixels, a power of two no larger than 8192.
+   */
   @get:JvmSynthetic public val tileSize: UInt? = null,
   /**
-   * The width in pixels of the margin around a tile that holds geometry from beyond its edges.
-   * `buffer` times 8192 / `tile_size` must be at most 65535.
+   * The width in pixels of the margin around a tile that holds geometry from
+   * beyond its edges. `buffer` times 8192 / `tile_size` must be at most 65535.
    */
   @get:JvmSynthetic public val buffer: UInt? = null,
-  /** Whether to cut geometry at the outer edge of a tile's margin. */
+  /**
+   * Whether to cut geometry at the outer edge of a tile's margin.
+   */
   public val clip: Boolean? = null,
-  /** Whether to wrap geometry that crosses the antimeridian. */
+  /**
+   * Whether to wrap geometry that crosses the antimeridian.
+   */
   public val wrap: Boolean? = null,
   public val fetchTile: CustomSourceFetchTileCallback,
-  public val cancelTile: CustomSourceCancelTileCallback? = null,
+  public val cancelTile: CustomSourceCancelTileCallback? = null
 ) {
   @PublishedApi @JvmName("getTileSize") internal fun tileSizeForJava(): Int? = tileSize?.toInt()
-
   @PublishedApi @JvmName("getBuffer") internal fun bufferForJava(): Int? = buffer?.toInt()
-
-  @PublishedApi
-  internal fun withMinZoom(minZoom: Double): CustomGeometrySourceOptions = copy(minZoom = minZoom)
-
-  @PublishedApi
-  internal fun withMaxZoom(maxZoom: Double): CustomGeometrySourceOptions = copy(maxZoom = maxZoom)
-
-  @PublishedApi
-  internal fun withTolerance(tolerance: Double): CustomGeometrySourceOptions =
-    copy(tolerance = tolerance)
-
-  @PublishedApi
-  internal fun withTileSize(tileSize: Int): CustomGeometrySourceOptions =
-    copy(tileSize = tileSize.toUInt())
-
-  @PublishedApi
-  internal fun withBuffer(buffer: Int): CustomGeometrySourceOptions = copy(buffer = buffer.toUInt())
-
-  @PublishedApi
-  internal fun withClip(clip: Boolean): CustomGeometrySourceOptions = copy(clip = clip)
-
-  @PublishedApi
-  internal fun withWrap(wrap: Boolean): CustomGeometrySourceOptions = copy(wrap = wrap)
-
-  @PublishedApi
-  internal fun withCancelTile(
-    cancelTile: CustomSourceCancelTileCallback,
-  ): CustomGeometrySourceOptions = copy(cancelTile = cancelTile)
-
+  @PublishedApi internal fun withMinZoom(minZoom: Double): CustomGeometrySourceOptions = copy(minZoom = minZoom)
+  @PublishedApi internal fun withMaxZoom(maxZoom: Double): CustomGeometrySourceOptions = copy(maxZoom = maxZoom)
+  @PublishedApi internal fun withTolerance(tolerance: Double): CustomGeometrySourceOptions = copy(tolerance = tolerance)
+  @PublishedApi internal fun withTileSize(tileSize: Int): CustomGeometrySourceOptions = copy(tileSize = tileSize.toUInt())
+  @PublishedApi internal fun withBuffer(buffer: Int): CustomGeometrySourceOptions = copy(buffer = buffer.toUInt())
+  @PublishedApi internal fun withClip(clip: Boolean): CustomGeometrySourceOptions = copy(clip = clip)
+  @PublishedApi internal fun withWrap(wrap: Boolean): CustomGeometrySourceOptions = copy(wrap = wrap)
+  @PublishedApi internal fun withCancelTile(cancelTile: CustomSourceCancelTileCallback): CustomGeometrySourceOptions = copy(cancelTile = cancelTile)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(fetchTile: CustomSourceFetchTileCallback): CustomGeometrySourceOptions =
-      CustomGeometrySourceOptions(fetchTile = fetchTile)
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(fetchTile: CustomSourceFetchTileCallback): CustomGeometrySourceOptions = CustomGeometrySourceOptions(fetchTile = fetchTile)
   }
 }
-
 /**
  * Asks for the data of a tile in a custom source.
  *
- * `map` and `sourceId` name the source that asks. Return quickly. Once the data is ready, pass it
- * to `MapHandle.setCustomGeometrySourceTileData()` or `MapHandle.setCustomVectorSourceTileData()`.
- * If it fails to load, report that with `MapHandle.setCustomGeometrySourceTileError()` or
+ * `map` and `sourceId` name the source that asks. Return quickly. Once the data
+ * is ready, pass it to `MapHandle.setCustomGeometrySourceTileData()` or
+ * `MapHandle.setCustomVectorSourceTileData()`. If it fails to load, report that
+ * with `MapHandle.setCustomGeometrySourceTileError()` or
  * `MapHandle.setCustomVectorSourceTileError()`.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -8941,14 +7122,14 @@ public data class CustomGeometrySourceOptions(
 public fun interface CustomSourceFetchTileCallback {
   public operator fun invoke(map: MapHandle, sourceId: String, tileId: CanonicalTileId)
 }
-
 /**
  * Reports that a custom source no longer needs a tile.
  *
  * `map` and `sourceId` name the source.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -8958,7 +7139,123 @@ public fun interface CustomSourceFetchTileCallback {
 public fun interface CustomSourceCancelTileCallback {
   public operator fun invoke(map: MapHandle, sourceId: String, tileId: CanonicalTileId)
 }
+/**
+ * The callbacks of a custom layer, which draws with your own GPU commands in
+ * the map's frame.
+ *
+ * A session runs the callbacks only when it can hand you its commands as one of
+ * `CustomLayerRenderParametersPass`'s variants, so a session on another
+ * backend, such as WebGPU outside a browser, doesn't draw the layer. Nor does a
+ * browser WebGPU session yet: the library's WebGPU (wgpu) exposes no command
+ * encoder or render pass to hand you. Leave unset the callbacks that you don't
+ * need.
+ *
+ * Runs on the thread that runs the session's graphics work: a library thread,
+ * or yours with `RenderDriverKind.CALLER_GRAPHICS_THREAD`. It can't call the
+ * library.
+ *
+ * Runs on the thread that runs the session's graphics work, as
+ * `CustomLayerPrerenderCallback` says. It can't call the library.
+ *
+ * The JVM, Android, and Kotlin/Native also create one from the host's native
+ * functions with `CustomLayerHost.native`.
+ *
+ * See `mln_custom_layer_host` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+@ConsistentCopyVisibility
+public data class CustomLayerHost private constructor(
+  public val prerender: CustomLayerPrerenderCallback?,
+  public val render: CustomLayerRenderCallback?,
+  public val deinitialize: CustomLayerSessionEndCallback?,
+  public val contextLost: CustomLayerSessionEndCallback?,
+  private val nativeRegistration: NativeRegistration?
+) {
+  /** A registration of Kotlin callbacks. */
+  public constructor(prerender: CustomLayerPrerenderCallback? = null, render: CustomLayerRenderCallback? = null, deinitialize: CustomLayerSessionEndCallback? = null, contextLost: CustomLayerSessionEndCallback? = null) : this(prerender, render, deinitialize, contextLost, null)
 
+  /** A registration that does nothing, for Java, which can't leave out the constructor's arguments. */
+  @PublishedApi internal constructor() : this(null, null, null, null, null)
+
+  @get:JvmSynthetic internal val bindingNative: NativeRegistration?
+    get() = nativeRegistration
+
+  public companion object {
+    /** A registration of native functions, which only `native` creates. */
+    @JvmSynthetic internal fun wrap(native: NativeRegistration): CustomLayerHost =
+      CustomLayerHost(null, null, null, null, native)
+  }
+}
+/**
+ * Records a custom layer's GPU work that can't run in the map's render pass,
+ * such as drawing into textures of your own.
+ *
+ * Each frame that shows the layer runs the prerender callbacks of its custom
+ * layers, from the bottom of the style to the top, before the map begins its
+ * render pass, and so before any render callback.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads and relies on its work being done when it returns. Kotlin/Wasm
+ * cannot run Kotlin on a native thread, so it refuses a registration that sets
+ * one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_custom_layer_prerender_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public fun interface CustomLayerPrerenderCallback {
+  public operator fun invoke(parameters: CustomLayerPrerenderParameters)
+}
+/**
+ * Draws a custom layer into the map's render pass, at its place in the style.
+ *
+ * The map draws its layers below the custom layer before the callback, and
+ * those above it after, except for the opaque fragments of 2D layers, which it
+ * draws before either, as `CustomLayerRenderParameters.layerDepth` describes.
+ * Draw through `frame.frame_projection.matrix` to depth-test against the map's
+ * 3D layers.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads and relies on its work being done when it returns. Kotlin/Wasm
+ * cannot run Kotlin on a native thread, so it refuses a registration that sets
+ * one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_custom_layer_render_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public fun interface CustomLayerRenderCallback {
+  public operator fun invoke(parameters: CustomLayerRenderParameters)
+}
+/**
+ * Tells a custom layer that a session stopped drawing it.
+ *
+ * `deinitialize` runs once a session that ran the layer's prerender or render
+ * callback stops drawing the layer: when the layer leaves the style, or the
+ * session detaches, is released, or replaces its device's backend. Destroy the
+ * GPU objects that you made for that session then. The session's GPU no longer
+ * uses them, and an OpenGL session's context is current. `context_lost` runs
+ * instead when the session is abandoned. Its graphics objects may be gone
+ * already, so forget yours without destroying them.
+ *
+ * A later prerender or render callback is for a new session, which can render
+ * on another device or backend.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads and relies on its work being done when it returns. Kotlin/Wasm
+ * cannot run Kotlin on a native thread, so it refuses a registration that sets
+ * one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_custom_layer_session_end_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public fun interface CustomLayerSessionEndCallback {
+  public operator fun invoke()
+}
 /**
  * The callbacks and options of a custom vector source.
  *
@@ -8971,61 +7268,40 @@ public data class CustomVectorSourceOptions(
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   public val fetchTile: CustomSourceFetchTileCallback,
-  public val cancelTile: CustomSourceCancelTileCallback? = null,
+  public val cancelTile: CustomSourceCancelTileCallback? = null
 ) {
-  @PublishedApi
-  internal fun withMinZoom(minZoom: Double): CustomVectorSourceOptions = copy(minZoom = minZoom)
-
-  @PublishedApi
-  internal fun withMaxZoom(maxZoom: Double): CustomVectorSourceOptions = copy(maxZoom = maxZoom)
-
-  @PublishedApi
-  internal fun withCancelTile(
-    cancelTile: CustomSourceCancelTileCallback,
-  ): CustomVectorSourceOptions = copy(cancelTile = cancelTile)
-
+  @PublishedApi internal fun withMinZoom(minZoom: Double): CustomVectorSourceOptions = copy(minZoom = minZoom)
+  @PublishedApi internal fun withMaxZoom(maxZoom: Double): CustomVectorSourceOptions = copy(maxZoom = maxZoom)
+  @PublishedApi internal fun withCancelTile(cancelTile: CustomSourceCancelTileCallback): CustomVectorSourceOptions = copy(cancelTile = cancelTile)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(fetchTile: CustomSourceFetchTileCallback): CustomVectorSourceOptions =
-      CustomVectorSourceOptions(fetchTile = fetchTile)
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(fetchTile: CustomSourceFetchTileCallback): CustomVectorSourceOptions = CustomVectorSourceOptions(fetchTile = fetchTile)
   }
 }
-
 /**
  * A callback for the end of a camera change, for `AnimationOptions`.
  *
- * The callback runs once for each camera command, after every part of the change that the command
- * started has ended.
+ * The callback runs once for each camera command, after every part of the
+ * change that the command started has ended.
  *
  * See `mln_camera_transition_handler` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraTransitionHandler(
-  public val callback: CameraTransitionEndCallback? = null,
+  public val callback: CameraTransitionEndCallback? = null
 ) {
-  @PublishedApi
-  internal fun withCallback(callback: CameraTransitionEndCallback): CameraTransitionHandler =
-    copy(callback = callback)
-
+  @PublishedApi internal fun withCallback(callback: CameraTransitionEndCallback): CameraTransitionHandler = copy(callback = callback)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): CameraTransitionHandler = CameraTransitionHandler()
   }
 }
-
 /**
  * Receives the end of a camera change.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -9035,51 +7311,50 @@ public data class CameraTransitionHandler(
 public fun interface CameraTransitionEndCallback {
   public operator fun invoke(end: CameraTransitionEnd)
 }
-
 /**
  * A callback that tells the caller when work is ready.
  *
- * Can run on any thread, including the caller's own thread during a library call. Return quickly
- * and don't block.
+ * Can run on any thread, including the caller's own thread during a library
+ * call. Return quickly and don't block.
  *
- * The JVM, Android, and Kotlin/Native also create one from the host's native functions with
- * `Wake.native`.
+ * The JVM, Android, and Kotlin/Native also create one from the host's native
+ * functions with `Wake.native`.
  *
  * See `mln_wake` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
  */
 @ConsistentCopyVisibility
-public data class Wake
-private constructor(
-  /** Null to turn the wake off. */
+public data class Wake private constructor(
+  /**
+   * Null to turn the wake off.
+   */
   public val callback: WakeCallback?,
-  private val nativeRegistration: NativeRegistration?,
+  private val nativeRegistration: NativeRegistration?
 ) {
   /** A registration of Kotlin callbacks. */
   public constructor(callback: WakeCallback? = null) : this(callback, null)
 
-  /**
-   * A registration that does nothing, for Java, which can't leave out the constructor's arguments.
-   */
+  /** A registration that does nothing, for Java, which can't leave out the constructor's arguments. */
   @PublishedApi internal constructor() : this(null, null)
 
-  @get:JvmSynthetic
-  internal val bindingNative: NativeRegistration?
+  @get:JvmSynthetic internal val bindingNative: NativeRegistration?
     get() = nativeRegistration
 
   public companion object {
     /** A registration of native functions, which only `native` creates. */
-    @JvmSynthetic internal fun wrap(native: NativeRegistration): Wake = Wake(null, native)
+    @JvmSynthetic internal fun wrap(native: NativeRegistration): Wake =
+      Wake(null, native)
   }
 }
-
 /**
  * Tells the caller that work is ready for it.
  *
- * One call can stand for several pieces of ready work, so take all of it each time.
+ * One call can stand for several pieces of ready work, so take all of it each
+ * time.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -9089,66 +7364,6 @@ private constructor(
 public fun interface WakeCallback {
   public operator fun invoke()
 }
-
-/**
- * Your lock on a Vulkan queue that you and a render session both submit to.
- *
- * The session holds the lock only while it submits or presents to the queue. Set both `lock` and
- * `unlock`, or neither when you don't submit to the queue yourself.
- *
- * It can run on a library thread, and it can't call the library.
- *
- * The JVM, Android, and Kotlin/Native also create one from the host's native functions with
- * `QueueLock.native`.
- *
- * See `mln_queue_lock` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-@ConsistentCopyVisibility
-public data class QueueLock
-private constructor(
-  public val lock: QueueLockCallback?,
-  public val unlock: QueueLockCallback?,
-  private val nativeRegistration: NativeRegistration?,
-) {
-  /** A registration of Kotlin callbacks. */
-  public constructor(
-    lock: QueueLockCallback? = null,
-    unlock: QueueLockCallback? = null,
-  ) : this(lock, unlock, null)
-
-  /**
-   * A registration that does nothing, for Java, which can't leave out the constructor's arguments.
-   */
-  @PublishedApi internal constructor() : this(null, null, null)
-
-  @get:JvmSynthetic
-  internal val bindingNative: NativeRegistration?
-    get() = nativeRegistration
-
-  public companion object {
-    /** A registration of native functions, which only `native` creates. */
-    @JvmSynthetic
-    internal fun wrap(native: NativeRegistration): QueueLock = QueueLock(null, null, native)
-  }
-}
-
-/**
- * Locks or unlocks the Vulkan queue that you share with a render session.
- *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads and relies
- * on its work being done when it returns. Kotlin/Wasm cannot run Kotlin on a native thread, so it
- * refuses a registration that sets one.
- *
- * If it throws, the binding reports it as a `CallbackException`.
- *
- * See `mln_queue_lock_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public fun interface QueueLockCallback {
-  public operator fun invoke()
-}
-
 /**
  * A cancel callback, for `ResourceRequestHandle.setCancelCallback()`.
  *
@@ -9156,16 +7371,17 @@ public fun interface QueueLockCallback {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceRequestCancelHandler(
-  public val callback: ResourceRequestCancelCallback,
+  public val callback: ResourceRequestCancelCallback
 )
-
 /**
  * Reports that the library no longer needs a resource request.
  *
- * The request no longer accepts an answer, so stop working on it and release it.
+ * The request no longer accepts an answer, so stop working on it and release
+ * it.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -9175,7 +7391,6 @@ public data class ResourceRequestCancelHandler(
 public fun interface ResourceRequestCancelCallback {
   public operator fun invoke()
 }
-
 /**
  * An event callback, for `RuntimeHandle.setEventHandler()`.
  *
@@ -9183,14 +7398,14 @@ public fun interface ResourceRequestCancelCallback {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeEventHandler(
-  public val callback: RuntimeEventCallback,
+  public val callback: RuntimeEventCallback
 )
-
 /**
  * Receives a batch of events.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -9200,7 +7415,6 @@ public data class RuntimeEventHandler(
 public fun interface RuntimeEventCallback {
   public operator fun invoke(events: List<RuntimeEvent>)
 }
-
 /**
  * A resource provider, for `RuntimeHandle.setResourceProvider()`.
  *
@@ -9208,34 +7422,29 @@ public fun interface RuntimeEventCallback {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class ResourceProvider(
-  /** The requests that the provider serves. Without routes, it serves every network request. */
+  /**
+   * The requests that the provider serves. Without routes, it serves every
+   * network request.
+   */
   public val routes: List<ResourceRoute> = emptyList(),
-  public val callback: ResourceProviderCallback,
+  public val callback: ResourceProviderCallback
 ) {
-  @PublishedApi
-  internal fun withRoutes(routes: List<ResourceRoute>): ResourceProvider = copy(routes = routes)
-
+  @PublishedApi internal fun withRoutes(routes: List<ResourceRoute>): ResourceProvider = copy(routes = routes)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(callback: ResourceProviderCallback): ResourceProvider =
-      ResourceProvider(callback = callback)
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
+    @JvmStatic @PublishedApi internal fun of(callback: ResourceProviderCallback): ResourceProvider = ResourceProvider(callback = callback)
   }
 }
-
 /**
  * Serves a network request in place of the library.
  *
- * Answer with `ResourceRequestHandle.complete()`, or hand the request back to the library with
- * `ResourceRequestHandle.passThrough()`. Either can come now or later, from any thread. A request
- * released without an answer fails.
+ * Answer with `ResourceRequestHandle.complete()`, or hand the request back to
+ * the library with `ResourceRequestHandle.passThrough()`. Either can come now
+ * or later, from any thread. A request released without an answer fails.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -9245,7 +7454,6 @@ public data class ResourceProvider(
 public fun interface ResourceProviderCallback {
   public operator fun invoke(request: ResourceRequestInfo, handle: ResourceRequestHandle)
 }
-
 /**
  * How to rewrite request URLs, for `RuntimeHandle.setResourceTransform()`.
  *
@@ -9256,38 +7464,31 @@ public fun interface ResourceProviderCallback {
  */
 public data class ResourceTransform(
   /**
-   * The first rule that matches a request adds its parameters, and no other. A request that no rule
-   * matches keeps its URL.
+   * The first rule that matches a request adds its parameters, and no other. A
+   * request that no rule matches keeps its URL.
    */
   public val rules: List<ResourceTransformRule> = emptyList(),
-  public val callback: ResourceTransformCallback? = null,
+  public val callback: ResourceTransformCallback? = null
 ) {
-  @PublishedApi
-  internal fun withRules(rules: List<ResourceTransformRule>): ResourceTransform =
-    copy(rules = rules)
-
-  @PublishedApi
-  internal fun withCallback(callback: ResourceTransformCallback): ResourceTransform =
-    copy(callback = callback)
-
+  @PublishedApi internal fun withRules(rules: List<ResourceTransformRule>): ResourceTransform = copy(rules = rules)
+  @PublishedApi internal fun withCallback(callback: ResourceTransformCallback): ResourceTransform = copy(callback = callback)
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
+    /** Creates a value from the members without defaults, for Java, which sets the others with the `withX` methods. */
     @JvmStatic @PublishedApi internal fun of(): ResourceTransform = ResourceTransform()
   }
 }
-
 /**
  * Rewrites the URL of a network request before the library sends it.
  *
- * The request waits until you answer with `ResourceTransformRequestHandle.complete()` or
- * `ResourceTransformRequestHandle.fail()`. To keep `url`, complete with it. Releasing `request`
- * without an answer fails the request. You can answer now or later, from any thread.
+ * The request waits until you answer with
+ * `ResourceTransformRequestHandle.complete()` or
+ * `ResourceTransformRequestHandle.fail()`. To keep `url`, complete with it.
+ * Releasing `request` without an answer fails the request. You can answer now
+ * or later, from any thread.
  *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads. On
- * Kotlin/Wasm, the page calls it when it dispatches the binding's delivery queue.
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its
+ * own threads. On Kotlin/Wasm, the page calls it when it dispatches the
+ * binding's delivery queue.
  *
  * If it throws, the binding reports it as a `CallbackException`.
  *
@@ -9295,11 +7496,7 @@ public data class ResourceTransform(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public fun interface ResourceTransformCallback {
-  public operator fun invoke(
-    kind: ResourceKind,
-    url: String,
-    request: ResourceTransformRequestHandle,
-  )
+  public operator fun invoke(kind: ResourceKind, url: String, request: ResourceTransformRequestHandle)
 }
 
 /**
@@ -9311,8 +7508,9 @@ public fun interface ResourceTransformCallback {
 public const val DIAGNOSTIC_MESSAGE_CAPACITY: UInt = 4096u
 
 /**
- * The token of the frame results that a session adds when it renders an image for
- * `MapHandle.requestStillImage()`. Your own demands can't use it.
+ * The token of the frame results of the demand that a session holds for an
+ * image of `MapHandle.requestStillImage()`, which says how that demand runs.
+ * Your own demands can't use it.
  *
  * See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

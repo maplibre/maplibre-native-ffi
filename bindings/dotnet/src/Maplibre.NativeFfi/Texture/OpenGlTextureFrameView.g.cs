@@ -19,4 +19,6 @@ public sealed class OpenGlTextureFrameView
     public uint Slot => value.Slot;
     public uint Texture => scope.Active(value).Texture;
     public uint Target => value.Target;
+    public uint DepthTexture => scope.Active(value).DepthTexture;
+    public uint DepthInternalFormat => value.DepthInternalFormat;
 }

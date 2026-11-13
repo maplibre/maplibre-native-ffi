@@ -3,6 +3,33 @@
 internal import MaplibreNativeC
 import Foundation
 
+/// A render backend.
+///
+/// See `mln_render_backend` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+public struct RenderBackend: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let metal: RenderBackend = .init(rawValue: 1)
+  public static let vulkan: RenderBackend = .init(rawValue: 2)
+  public static let openGl: RenderBackend = .init(rawValue: 3)
+  public static let webGpu: RenderBackend = .init(rawValue: 4)
+  public var description: String {
+    switch rawValue {
+    case 1: return "metal"
+    case 2: return "vulkan"
+    case 3: return "openGl"
+    case 4: return "webGpu"
+    default: return "RenderBackend(\(rawValue))"
+    }
+  }
+}
+
 /// A render backend, as a bit in a set.
 ///
 /// See `mln_render_backend_flag` in the

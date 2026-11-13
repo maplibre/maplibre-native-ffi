@@ -49,6 +49,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_acquired_frame_get_opaque_fd(
+        MlnAcquiredFrame frame,
+        mln_opaque_fd_frame* out_frame,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_get_open_gl_texture(
         MlnAcquiredFrame frame,
         mln_open_gl_texture_frame* out_frame,
@@ -94,23 +101,9 @@ internal static unsafe partial class NativeMethods
     internal static partial void mln_acquired_frame_view_end(void* scope);
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_android_frame_pacer_create(
-        mln_frame_pacer_options* options,
-        MlnFramePacer* out_pacer,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_android_init(
         void* jni_env,
         void* context,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_apple_frame_pacer_create(
-        mln_frame_pacer_options* options,
-        MlnFramePacer* out_pacer,
         mln_diagnostic* out_diagnostic
     );
 
@@ -126,7 +119,66 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_frame_pacer_create(
+        mln_frame_pacer_options* options,
+        MlnFramePacer* out_pacer,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial void mln_frame_pacer_release(MlnFramePacer pacer);
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_frame_pacer_set_options(
+        MlnFramePacer pacer,
+        mln_frame_pacer_options* options,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gpu_device_create(
+        mln_gpu_device_options* options,
+        MlnGpuDevice* out_device,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gpu_device_get_capabilities(
+        MlnGpuDevice device,
+        mln_gpu_device_capabilities* out_capabilities,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gpu_device_get_vulkan_context(
+        MlnGpuDevice device,
+        mln_gpu_device_vulkan_context_result* out_result,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial void mln_gpu_device_release(MlnGpuDevice device);
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gpu_device_wrap_metal(
+        mln_metal_device_descriptor* descriptor,
+        MlnGpuDevice* out_device,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gpu_device_wrap_open_gl(
+        mln_open_gl_context_descriptor* context,
+        MlnGpuDevice* out_device,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gpu_device_wrap_vulkan(
+        mln_vulkan_device_descriptor* descriptor,
+        MlnGpuDevice* out_device,
+        mln_diagnostic* out_diagnostic
+    );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_http_header_transform_response_set_header(
@@ -171,6 +223,16 @@ internal static unsafe partial class NativeMethods
         MlnMap map,
         mln_buffer_view source_id,
         mln_custom_geometry_source_options* options,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_add_custom_layer(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        mln_buffer_view before_layer_id,
+        mln_custom_layer_host* host,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -232,146 +294,10 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_android_hardware_buffer_ring(
+    internal static partial mln_status mln_map_attach(
         MlnMap map,
-        mln_android_hardware_buffer_ring_descriptor* descriptor,
-        MlnVulkanDevice device,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_android_surface(
-        MlnMap map,
-        mln_android_surface_descriptor* descriptor,
-        MlnVulkanDevice device,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_dma_buf_ring(
-        MlnMap map,
-        mln_dma_buf_ring_descriptor* descriptor,
-        MlnVulkanDevice device,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_dxgi_shared_texture_ring(
-        MlnMap map,
-        mln_dxgi_shared_texture_ring_descriptor* descriptor,
-        MlnVulkanDevice device,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_io_surface_ring(
-        MlnMap map,
-        mln_io_surface_ring_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_metal_borrowed_texture(
-        MlnMap map,
-        mln_metal_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_metal_surface(
-        MlnMap map,
-        mln_metal_surface_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_offscreen(
-        MlnMap map,
-        mln_offscreen_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnOffscreenDevice device,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_open_gl_borrowed_texture(
-        MlnMap map,
-        mln_open_gl_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_open_gl_surface(
-        MlnMap map,
-        mln_open_gl_surface_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_vulkan_borrowed_texture(
-        MlnMap map,
-        mln_vulkan_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_vulkan_surface(
-        MlnMap map,
-        mln_vulkan_surface_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_wayland_surface(
-        MlnMap map,
-        mln_wayland_surface_descriptor* descriptor,
-        MlnVulkanDevice device,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_attach_win32_window(
-        MlnMap map,
-        mln_win32_window_descriptor* descriptor,
-        MlnVulkanDevice device,
+        mln_render_target* target,
+        MlnGpuDevice device,
         mln_render_session_attach_options* options,
         MlnRenderSession* out_session,
         mln_completion* completion,
@@ -802,7 +728,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_resize(
         MlnMap map,
-        mln_logical_size logical_size,
+        mln_logical_extent extent,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1085,16 +1011,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_offscreen_device_create(
-        mln_offscreen_device_options* options,
-        MlnOffscreenDevice* out_device,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial void mln_offscreen_device_release(MlnOffscreenDevice device);
-
-    [LibraryImport(LibraryName)]
     internal static partial uint mln_open_gl_supported_context_provider_mask();
 
     [LibraryImport(LibraryName)]
@@ -1271,7 +1187,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_resize(
         MlnRenderSession session,
-        mln_logical_size logical_size,
+        mln_logical_extent extent,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1283,14 +1199,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_android_surface_target(
-        MlnRenderSession session,
-        mln_android_surface_replacement* replacement,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_set_frame_pacer(
         MlnRenderSession session,
         MlnFramePacer pacer,
@@ -1298,65 +1206,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_metal_borrowed_texture_target(
+    internal static partial mln_status mln_render_session_set_target(
         MlnRenderSession session,
-        mln_metal_borrowed_texture_replacement* replacement,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_metal_surface_target(
-        MlnRenderSession session,
-        mln_metal_surface_replacement* replacement,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_open_gl_borrowed_texture_target(
-        MlnRenderSession session,
-        mln_open_gl_borrowed_texture_replacement* replacement,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_open_gl_surface_target(
-        MlnRenderSession session,
-        mln_open_gl_surface_replacement* replacement,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_vulkan_borrowed_texture_target(
-        MlnRenderSession session,
-        mln_vulkan_borrowed_texture_replacement* replacement,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_vulkan_surface_target(
-        MlnRenderSession session,
-        mln_vulkan_surface_replacement* replacement,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_wayland_surface_target(
-        MlnRenderSession session,
-        mln_wayland_surface_replacement* replacement,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_win32_window_target(
-        MlnRenderSession session,
-        mln_win32_window_replacement* replacement,
+        mln_render_target* target,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1631,21 +1483,4 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial uint mln_supported_render_backend_mask();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_vulkan_device_create(
-        mln_vulkan_device_options* options,
-        MlnVulkanDevice* out_device,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_vulkan_device_get_context(
-        MlnVulkanDevice device,
-        mln_vulkan_device_context_result* out_result,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial void mln_vulkan_device_release(MlnVulkanDevice device);
 }

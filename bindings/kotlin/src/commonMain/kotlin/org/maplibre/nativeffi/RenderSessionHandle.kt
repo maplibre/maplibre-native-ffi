@@ -60,6 +60,11 @@ private constructor(
    * Abandon keeps the session's OpenGL and WebGPU objects until the process exits, and reports how
    * many it kept. Detach the session instead to free them.
    *
+   * A session lets go of your graphics objects later when you call this on the thread that runs its
+   * graphics work: from a callback that the session runs there, once the callback returns, and for
+   * a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD`, at your next
+   * `RenderSessionHandle.serviceDriverWork()` for it.
+   *
    * See `mln_render_session_abandon` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
@@ -147,6 +152,7 @@ private constructor(
    *
    * Errors:
    *
+   * - `Status.INVALID_ARGUMENT` when `demand.token` is `FRAME_DEMAND_TOKEN_STILL_IMAGE`.
    * - `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, as `RenderSessionSnapshot.failureStatus`
    *   reports, when the session has failed.
    * - `Status.INVALID_STATE` when you detached, abandoned, released, or disposed the session, or
@@ -230,7 +236,7 @@ private constructor(
    */
   public fun getCapabilities(): RenderSessionCapabilities =
     nativeCall(this, binding) {
-      val out = sized(24, 4)
+      val out = sized(28, 4)
       check(C.mln_render_session_get_capabilities(handle, out, diagnostic))
       readRenderSessionCapabilities(out)
     }
@@ -547,16 +553,23 @@ private constructor(
    * Use it when the platform takes a surface away, such as when your app goes to the background.
    * Release every acquired frame first. Frame demands that are still pending, and later ones until
    * you give the session a new target, finish with `RenderResult.TARGET_NOT_READY`. Once the
-   * release completes, you can destroy the old target.
+   * release completes, you can destroy the old target. An Android or OpenHarmony window can go away
+   * sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
+   *
+   * For a borrowed ring, a completed release also means that the session has stopped waiting on the
+   * consumer sync that you released its frames with, so you can reuse or destroy the textures. The
+   * session waits about a second at most for that sync, and logs a warning when the wait runs out.
+   * It checks the sync without blocking a thread: keep servicing a session driven by
+   * `RenderDriverKind.CALLER_GRAPHICS_THREAD` until the release completes. The session keeps
+   * nothing of the released textures: a texture that a later target gives it again is a new one,
+   * even one that you discarded a frame of.
    *
    * See `mln_render_session_release_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    *
    * Errors:
    *
-   * - `Status.UNSUPPORTED` when the session renders offscreen or into Android hardware buffers,
-   *   dmabufs, DXGI shared textures, or IOSurfaces that it allocates.
-   * - `Status.UNSUPPORTED` when the target is a WebGL canvas.
+   * - `Status.UNSUPPORTED` when the session renders offscreen or into an exported ring.
    * - `Status.TARGET_LOST` when the session loses its target before the release runs.
    */
   public fun releaseTarget(): Completion<Unit> =
@@ -565,10 +578,14 @@ private constructor(
     }
 
   /**
-   * Resizes the session's target and its map.
+   * Resizes the session's target and its map, and sets the map's scale factor.
    *
-   * The session renders at the map's scale factor. Release every acquired frame first. You can call
+   * Use it when the window changes size, or moves to a display with another scale factor. The map
+   * keeps its loaded tiles, and draws its next frame at the new size and scale factor. You can call
    * it once the attach call returns. While the attach runs, the resize waits for it to complete.
+   *
+   * An exported ring gets textures of the new size. The frames that you hold keep their textures,
+   * of the old size, until you release or discard them.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -577,15 +594,13 @@ private constructor(
    *
    * - `Status.UNSUPPORTED` when the session renders into a borrowed ring. Give it new textures of
    *   the new size instead.
-   * - `Status.INVALID_STATE` while you hold one of the session's acquired frames, or when the
-   *   session failed, or you detached, abandoned, released, or disposed it.
+   * - `Status.INVALID_STATE` when the session failed, or you detached, abandoned, released, or
+   *   disposed it.
    * - `Status.TARGET_LOST` when the session loses its target before the resize applies.
    */
-  public fun resize(logicalSize: LogicalSize): Completion<CommandCompletion> =
+  public fun resize(extent: LogicalExtent): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
-      check(
-        C.mln_render_session_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic),
-      )
+      check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
   /**
@@ -635,48 +650,44 @@ private constructor(
     }
 
   /**
-   * Replaces the OpenGL textures that a borrowed ring renders into.
+   * Replaces the window, surface, or borrowed ring that the session renders to, and resizes the map
+   * to it.
    *
-   * Use it to resize the ring, or to give the session textures again after
-   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
-   * completes, the session no longer uses the old textures.
+   * Use it to give the session a target again after `RenderSessionHandle.releaseTarget()`, to move
+   * it to another window or surface, or to give a borrowed ring new textures, such as of a new
+   * size. The session renders to `target` with the device that it attached with. Once the
+   * replacement completes, the session no longer uses the old target. A borrowed ring takes only a
+   * ring of the kind it attached with, with as many textures, with depth textures only when it
+   * attached with them, and with the same formats, final layouts, and owner. Release every acquired
+   * frame of a borrowed ring first. Once the replacement completes, the session has also stopped
+   * waiting on the consumer sync of the textures that the new ring doesn't have, as
+   * `RenderSessionHandle.releaseTarget()` says, so you can reuse or destroy them.
    *
-   * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   * See `mln_render_session_set_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when a borrowed ring gets more or fewer textures than it attached
+   *   with, or depth textures but not one for each texture.
+   * - `Status.INVALID_STATE` when a window is minimized or has no client area, or while you hold
+   *   one of a borrowed ring's acquired frames.
+   * - `Status.UNSUPPORTED` when the session renders offscreen or into an exported ring, when
+   *   `target` is offscreen or an exported ring, when a session that presents gets a borrowed ring
+   *   or a borrowed ring gets anything else, or when no backend of this build renders to the
+   *   target's kind. An exported ring takes a new size from `RenderSessionHandle.resize()` instead.
+   * - `Status.INVALID_STATE` when a window was minimized or had no client area when the replacement
+   *   ran.
+   * - `Status.UNSUPPORTED` when the session's device can't render to `target`, the new target needs
+   *   a different color format or pre-rotation support than the old one, or a borrowed ring's new
+   *   textures differ from the old ones in their formats, final layouts, or owner, or in having
+   *   depth textures. Attach a new session instead.
+   * - `Status.NATIVE_ERROR` when the library can't render to the new target.
    */
-  public fun setOpenGlBorrowedTextureTarget(
-    replacement: OpenGlBorrowedTextureReplacement,
-  ): Completion<Unit> =
+  public fun setTarget(target: RenderTarget): Completion<Unit> =
     nativeUnit(this, binding) {
       check(
-        C.mln_render_session_set_open_gl_borrowed_texture_target(
-          handle,
-          writeOpenGlBorrowedTextureReplacement(replacement),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
-
-  /**
-   * Replaces the OpenGL surface that the session presents to.
-   *
-   * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
-   * it to another surface, or to resize it. Once the replacement completes, the session no longer
-   * uses the old surface.
-   *
-   * See `mln_render_session_set_open_gl_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun setOpenGlSurfaceTarget(replacement: OpenGlSurfaceReplacement): Completion<Unit> =
-    nativeUnit(this, binding) {
-      check(
-        C.mln_render_session_set_open_gl_surface_target(
-          handle,
-          writeOpenGlSurfaceReplacement(replacement),
-          completion,
-          diagnostic,
-        ),
+        C.mln_render_session_set_target(handle, writeRenderTarget(target), completion, diagnostic),
       )
     }
 
@@ -709,11 +720,9 @@ private constructor(@get:JvmSynthetic internal val owner: RenderSessionHandle) {
     get() = owner.binding
 
   /** [RenderSessionHandle.resize] without its completion. */
-  public fun resize(logicalSize: LogicalSize): Unit =
+  public fun resize(extent: LogicalExtent): Unit =
     nativeDiscard(owner, binding) {
-      check(
-        C.mln_render_session_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic),
-      )
+      check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
   internal companion object {

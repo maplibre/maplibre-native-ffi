@@ -32,19 +32,10 @@ public extension MapHandle {
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func applyCameraDelta(_ bindingArg0: CameraDelta) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_apply_camera_delta(
-        raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `applyCameraDelta`(_ bindingArg0: CameraDelta) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in try mln_map_apply_camera_delta(raw, arena.store(try bindingArg0.nativeValue(arena: arena)), completion, diagnostic) }
+}
 
   /// Computes a camera that fits a GeoJSON geometry in the map's view.
   ///
@@ -59,22 +50,9 @@ public extension MapHandle {
   ///
   /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
   ///   for the area.
-  func cameraForGeometry(
-    _ bindingArg0: String,
-    fitOptions bindingArg1: CameraFitOptions? = nil
-  ) async throws -> CameraOptions {
-    try await nativeStart(copying: CameraOptions
-      .init(raw:))
-    { raw, arena, completion, diagnostic in
-      mln_map_camera_for_geometry(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.map { arena.store($0.nativeValue()) },
-        completion,
-        diagnostic
-      )
-    }
-  }
+func `cameraForGeometry`(_ bindingArg0: String, `fitOptions` bindingArg1: CameraFitOptions? = nil) async throws -> CameraOptions {
+  try await nativeStart(copying: CameraOptions.init(raw:)) { raw, arena, completion, diagnostic in mln_map_camera_for_geometry(raw, arena.view(bindingArg0), bindingArg1.map { arena.store($0.nativeValue()) }, completion, diagnostic) }
+}
 
   /// Computes a camera that fits `bounds` in the map's view.
   ///
@@ -88,22 +66,9 @@ public extension MapHandle {
   ///
   /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
   ///   for the area.
-  func cameraForLatLngBounds(
-    _ bindingArg0: LatLngBounds,
-    fitOptions bindingArg1: CameraFitOptions? = nil
-  ) async throws -> CameraOptions {
-    try await nativeStart(copying: CameraOptions
-      .init(raw:))
-    { raw, arena, completion, diagnostic in
-      mln_map_camera_for_lat_lng_bounds(
-        raw,
-        bindingArg0.nativeValue(),
-        bindingArg1.map { arena.store($0.nativeValue()) },
-        completion,
-        diagnostic
-      )
-    }
-  }
+func `cameraForLatLngBounds`(_ bindingArg0: LatLngBounds, `fitOptions` bindingArg1: CameraFitOptions? = nil) async throws -> CameraOptions {
+  try await nativeStart(copying: CameraOptions.init(raw:)) { raw, arena, completion, diagnostic in mln_map_camera_for_lat_lng_bounds(raw, bindingArg0.nativeValue(), bindingArg1.map { arena.store($0.nativeValue()) }, completion, diagnostic) }
+}
 
   /// Computes a camera that fits `coordinates` in the map's view.
   ///
@@ -118,23 +83,9 @@ public extension MapHandle {
   ///
   /// - `Status.invalidArgument` when the padding in `fitOptions` leaves no room
   ///   for the area.
-  func cameraForLatLngs(
-    coordinates bindingArg0: [LatLng],
-    fitOptions bindingArg2: CameraFitOptions? = nil
-  ) async throws -> CameraOptions {
-    try await nativeStart(copying: CameraOptions
-      .init(raw:))
-    { raw, arena, completion, diagnostic in
-      try mln_map_camera_for_lat_lngs(
-        raw,
-        arena.array(bindingArg0.map { $0.nativeValue() }),
-        NativeInputArena.count(bindingArg0.count),
-        bindingArg2.map { arena.store($0.nativeValue()) },
-        completion,
-        diagnostic
-      )
-    }
-  }
+func `cameraForLatLngs`(`coordinates` bindingArg0: [LatLng], `fitOptions` bindingArg2: CameraFitOptions? = nil) async throws -> CameraOptions {
+  try await nativeStart(copying: CameraOptions.init(raw:)) { raw, arena, completion, diagnostic in try mln_map_camera_for_lat_lngs(raw, arena.array(bindingArg0.map { $0.nativeValue() }), try NativeInputArena.count(bindingArg0.count), bindingArg2.map { arena.store($0.nativeValue()) }, completion, diagnostic) }
+}
 
   /// Stops every running camera animation where it is.
   ///
@@ -143,16 +94,10 @@ public extension MapHandle {
   ///
   /// See `mln_map_cancel_camera_transitions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func cancelCameraTransitions() async throws -> CommandCompletion {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_cancel_camera_transitions(
-        raw,
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `cancelCameraTransitions`() async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_cancel_camera_transitions(raw, completion, diagnostic) }
+}
 
   /// Stops the running camera animations whose animation options set
   /// `transitionId`.
@@ -162,36 +107,19 @@ public extension MapHandle {
   ///
   /// See `mln_map_cancel_camera_transitions_with_id` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func cancelCameraTransitionsWithId(
-    transitionId bindingArg0: UInt64
-  ) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_cancel_camera_transitions_with_id(
-        raw,
-        bindingArg0,
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `cancelCameraTransitionsWithId`(`transitionId` bindingArg0: UInt64) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_cancel_camera_transitions_with_id(raw, bindingArg0, completion, diagnostic) }
+}
 
   /// Logs debugging information about the map's style and sources.
   ///
   /// See `mln_map_dump_debug_logs` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func dumpDebugLogs() async throws -> CommandCompletion {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_dump_debug_logs(
-        raw,
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `dumpDebugLogs`() async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_dump_debug_logs(raw, completion, diagnostic) }
+}
 
   /// Moves the camera to fit a GeoJSON geometry in the map's view, at once or
   /// with an animation.
@@ -208,21 +136,10 @@ public extension MapHandle {
   ///
   /// - `Status.invalidArgument` when the padding in `update` leaves no room for
   ///   the area. The camera doesn't move.
-  @discardableResult
-  func fitCameraToGeometry(
-    _ bindingArg0: String,
-    update bindingArg1: CameraFitUpdate
-  ) async throws -> CommandCompletion {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_fit_camera_to_geometry(
-        raw,
-        arena.view(bindingArg0),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `fitCameraToGeometry`(_ bindingArg0: String, `update` bindingArg1: CameraFitUpdate) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in try mln_map_fit_camera_to_geometry(raw, arena.view(bindingArg0), arena.store(try bindingArg1.nativeValue(arena: arena)), completion, diagnostic) }
+}
 
   /// Moves the camera to fit `bounds` in the map's view, at once or with an
   /// animation.
@@ -238,21 +155,10 @@ public extension MapHandle {
   ///
   /// - `Status.invalidArgument` when the padding in `update` leaves no room for
   ///   the area. The camera doesn't move.
-  @discardableResult
-  func fitCameraToLatLngBounds(
-    _ bindingArg0: LatLngBounds,
-    update bindingArg1: CameraFitUpdate
-  ) async throws -> CommandCompletion {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_fit_camera_to_lat_lng_bounds(
-        raw,
-        bindingArg0.nativeValue(),
-        arena.store(bindingArg1.nativeValue(arena: arena)),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `fitCameraToLatLngBounds`(_ bindingArg0: LatLngBounds, `update` bindingArg1: CameraFitUpdate) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in try mln_map_fit_camera_to_lat_lng_bounds(raw, bindingArg0.nativeValue(), arena.store(try bindingArg1.nativeValue(arena: arena)), completion, diagnostic) }
+}
 
   /// Moves the camera to fit `coordinates` in the map's view, at once or with
   /// an animation.
@@ -269,22 +175,10 @@ public extension MapHandle {
   ///
   /// - `Status.invalidArgument` when the padding in `update` leaves no room for
   ///   the area. The camera doesn't move.
-  @discardableResult
-  func fitCameraToLatLngs(
-    coordinates bindingArg0: [LatLng],
-    update bindingArg2: CameraFitUpdate
-  ) async throws -> CommandCompletion {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_fit_camera_to_lat_lngs(
-        raw,
-        arena.array(bindingArg0.map { $0.nativeValue() }),
-        NativeInputArena.count(bindingArg0.count),
-        arena.store(bindingArg2.nativeValue(arena: arena)),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `fitCameraToLatLngs`(`coordinates` bindingArg0: [LatLng], `update` bindingArg2: CameraFitUpdate) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in try mln_map_fit_camera_to_lat_lngs(raw, arena.array(bindingArg0.map { $0.nativeValue() }), try NativeInputArena.count(bindingArg0.count), arena.store(try bindingArg2.nativeValue(arena: arena)), completion, diagnostic) }
+}
 
   /// Reads the map's camera.
   ///
@@ -293,15 +187,9 @@ public extension MapHandle {
   ///
   /// See `mln_map_get_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func getCamera() async throws -> CameraQueryResult {
-    try await nativeStart(copying: CameraQueryResult
-      .init(raw:))
-    { raw, _, completion, diagnostic in mln_map_get_camera(
-      raw,
-      completion,
-      diagnostic
-    ) }
-  }
+func `getCamera`() async throws -> CameraQueryResult {
+  try await nativeStart(copying: CameraQueryResult.init(raw:)) { raw, arena, completion, diagnostic in mln_map_get_camera(raw, completion, diagnostic) }
+}
 
   /// Computes the area that the map would show with `camera`.
   ///
@@ -311,20 +199,9 @@ public extension MapHandle {
   ///
   /// See `mln_map_lat_lng_bounds_for_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func latLngBoundsForCamera(_ bindingArg0: CameraOptions) async throws
-    -> LatLngBounds
-  {
-    try await nativeStart(copying: LatLngBounds
-      .init(raw:))
-    { raw, arena, completion, diagnostic in
-      mln_map_lat_lng_bounds_for_camera(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
+func `latLngBoundsForCamera`(_ bindingArg0: CameraOptions) async throws -> LatLngBounds {
+  try await nativeStart(copying: LatLngBounds.init(raw:)) { raw, arena, completion, diagnostic in mln_map_lat_lng_bounds_for_camera(raw, arena.store(bindingArg0.nativeValue()), completion, diagnostic) }
+}
 
   /// Limits the camera's center to an area, and its zoom and pitch to ranges.
   ///
@@ -333,19 +210,10 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setBounds(options bindingArg0: BoundOptions) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_bounds(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `setBounds`(`options` bindingArg0: BoundOptions) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_set_bounds(raw, arena.store(bindingArg0.nativeValue()), completion, diagnostic) }
+}
 
   /// Draws debugging overlays, such as tile borders, on the map.
   ///
@@ -353,19 +221,10 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_debug_flags` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setDebugFlags(_ bindingArg0: MapDebugFlag) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_set_debug_flags(
-        raw,
-        bindingArg0.rawValue,
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `setDebugFlags`(_ bindingArg0: MapDebugFlag) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_set_debug_flags(raw, bindingArg0.rawValue, completion, diagnostic) }
+}
 
   /// Places the camera at a position and orientation in space.
   ///
@@ -375,19 +234,10 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_free_camera_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setFreeCameraOptions(_ bindingArg0: FreeCameraOptions) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_free_camera_options(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `setFreeCameraOptions`(_ bindingArg0: FreeCameraOptions) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_set_free_camera_options(raw, arena.store(bindingArg0.nativeValue()), completion, diagnostic) }
+}
 
   /// Sets whether drags and zooms on a globe turn the bearing.
   ///
@@ -399,19 +249,10 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_globe_free_bearing_enabled` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setGlobeFreeBearingEnabled(_ bindingArg0: Bool) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_set_globe_free_bearing_enabled(
-        raw,
-        bindingArg0,
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `setGlobeFreeBearingEnabled`(_ bindingArg0: Bool) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_set_globe_free_bearing_enabled(raw, bindingArg0, completion, diagnostic) }
+}
 
   /// Sets whether the map draws in perspective or axonometric projection, and
   /// how much it skews the view.
@@ -420,39 +261,19 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_projection_mode` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setProjectionMode(
-    options bindingArg0: ProjectionModeOptions
-  ) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_projection_mode(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `setProjectionMode`(`options` bindingArg0: ProjectionModeOptions) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_set_projection_mode(raw, arena.store(bindingArg0.nativeValue()), completion, diagnostic) }
+}
 
   /// Shows or hides an overlay of rendering statistics on the map.
   ///
   /// See `mln_map_set_rendering_stats_view_enabled` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setRenderingStatsViewEnabled(_ bindingArg0: Bool) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_set_rendering_stats_view_enabled(
-        raw,
-        bindingArg0,
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `setRenderingStatsViewEnabled`(_ bindingArg0: Bool) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_set_rendering_stats_view_enabled(raw, bindingArg0, completion, diagnostic) }
+}
 
   /// Sets how the map chooses which tiles to load, and at what detail.
   ///
@@ -460,19 +281,10 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_tile_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setTileOptions(_ bindingArg0: MapTileOptions) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_tile_options(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `setTileOptions`(_ bindingArg0: MapTileOptions) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_set_tile_options(raw, arena.store(bindingArg0.nativeValue()), completion, diagnostic) }
+}
 
   /// Sets how the map orients and constrains its view.
   ///
@@ -480,19 +292,10 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_viewport_options` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setViewportOptions(_ bindingArg0: MapViewportOptions) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      mln_map_set_viewport_options(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `setViewportOptions`(_ bindingArg0: MapViewportOptions) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in mln_map_set_viewport_options(raw, arena.store(bindingArg0.nativeValue()), completion, diagnostic) }
+}
 
   /// Moves the camera, at once or with an animation.
   ///
@@ -504,198 +307,74 @@ public extension MapHandle {
   ///
   /// See `mln_map_update_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func updateCamera(_ bindingArg0: CameraUpdate) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, arena, completion, diagnostic in
-      try mln_map_update_camera(
-        raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        completion,
-        diagnostic
-      )
-    }
-  }
+@discardableResult
+func `updateCamera`(_ bindingArg0: CameraUpdate) async throws -> CommandCompletion {
+  try await nativeCommand() { raw, arena, completion, diagnostic in try mln_map_update_camera(raw, arena.store(try bindingArg0.nativeValue(arena: arena)), completion, diagnostic) }
+}
 }
 
 public extension MapHandleDiscarding {
-  func applyCameraDelta(_ bindingArg0: CameraDelta) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in try mln_map_apply_camera_delta(
-        raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        nil,
-        diagnostic
-      ) }
-  }
+func `applyCameraDelta`(_ bindingArg0: CameraDelta) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in try mln_map_apply_camera_delta(raw, arena.store(try bindingArg0.nativeValue(arena: arena)), nil, diagnostic) }
+}
 
-  func cancelCameraTransitions() throws {
-    try owner
-      .nativeInvoke { raw, _, diagnostic in mln_map_cancel_camera_transitions(
-        raw,
-        nil,
-        diagnostic
-      ) }
-  }
+func `cancelCameraTransitions`() throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_cancel_camera_transitions(raw, nil, diagnostic) }
+}
 
-  func cancelCameraTransitionsWithId(transitionId bindingArg0: UInt64) throws {
-    try owner
-      .nativeInvoke { raw, _, diagnostic in
-        mln_map_cancel_camera_transitions_with_id(
-          raw,
-          bindingArg0,
-          nil,
-          diagnostic
-        )
-      }
-  }
+func `cancelCameraTransitionsWithId`(`transitionId` bindingArg0: UInt64) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_cancel_camera_transitions_with_id(raw, bindingArg0, nil, diagnostic) }
+}
 
-  func dumpDebugLogs() throws {
-    try owner.nativeInvoke { raw, _, diagnostic in mln_map_dump_debug_logs(
-      raw,
-      nil,
-      diagnostic
-    ) }
-  }
+func `dumpDebugLogs`() throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_dump_debug_logs(raw, nil, diagnostic) }
+}
 
-  func fitCameraToGeometry(
-    _ bindingArg0: String,
-    update bindingArg1: CameraFitUpdate
-  ) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in
-        try mln_map_fit_camera_to_geometry(
-          raw,
-          arena.view(bindingArg0),
-          arena.store(bindingArg1.nativeValue(arena: arena)),
-          nil,
-          diagnostic
-        )
-      }
-  }
+func `fitCameraToGeometry`(_ bindingArg0: String, `update` bindingArg1: CameraFitUpdate) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in try mln_map_fit_camera_to_geometry(raw, arena.view(bindingArg0), arena.store(try bindingArg1.nativeValue(arena: arena)), nil, diagnostic) }
+}
 
-  func fitCameraToLatLngBounds(
-    _ bindingArg0: LatLngBounds,
-    update bindingArg1: CameraFitUpdate
-  ) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in
-        try mln_map_fit_camera_to_lat_lng_bounds(
-          raw,
-          bindingArg0.nativeValue(),
-          arena.store(bindingArg1.nativeValue(arena: arena)),
-          nil,
-          diagnostic
-        )
-      }
-  }
+func `fitCameraToLatLngBounds`(_ bindingArg0: LatLngBounds, `update` bindingArg1: CameraFitUpdate) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in try mln_map_fit_camera_to_lat_lng_bounds(raw, bindingArg0.nativeValue(), arena.store(try bindingArg1.nativeValue(arena: arena)), nil, diagnostic) }
+}
 
-  func fitCameraToLatLngs(
-    coordinates bindingArg0: [LatLng],
-    update bindingArg2: CameraFitUpdate
-  ) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in
-        try mln_map_fit_camera_to_lat_lngs(
-          raw,
-          arena.array(bindingArg0.map { $0.nativeValue() }),
-          NativeInputArena.count(bindingArg0.count),
-          arena.store(bindingArg2.nativeValue(arena: arena)),
-          nil,
-          diagnostic
-        )
-      }
-  }
+func `fitCameraToLatLngs`(`coordinates` bindingArg0: [LatLng], `update` bindingArg2: CameraFitUpdate) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in try mln_map_fit_camera_to_lat_lngs(raw, arena.array(bindingArg0.map { $0.nativeValue() }), try NativeInputArena.count(bindingArg0.count), arena.store(try bindingArg2.nativeValue(arena: arena)), nil, diagnostic) }
+}
 
-  func setBounds(options bindingArg0: BoundOptions) throws {
-    try owner.nativeInvoke { raw, arena, diagnostic in mln_map_set_bounds(
-      raw,
-      arena.store(bindingArg0.nativeValue()),
-      nil,
-      diagnostic
-    ) }
-  }
+func `setBounds`(`options` bindingArg0: BoundOptions) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_set_bounds(raw, arena.store(bindingArg0.nativeValue()), nil, diagnostic) }
+}
 
-  func setDebugFlags(_ bindingArg0: MapDebugFlag) throws {
-    try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_debug_flags(
-      raw,
-      bindingArg0.rawValue,
-      nil,
-      diagnostic
-    ) }
-  }
+func `setDebugFlags`(_ bindingArg0: MapDebugFlag) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_set_debug_flags(raw, bindingArg0.rawValue, nil, diagnostic) }
+}
 
-  func setFreeCameraOptions(_ bindingArg0: FreeCameraOptions) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in mln_map_set_free_camera_options(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        nil,
-        diagnostic
-      ) }
-  }
+func `setFreeCameraOptions`(_ bindingArg0: FreeCameraOptions) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_set_free_camera_options(raw, arena.store(bindingArg0.nativeValue()), nil, diagnostic) }
+}
 
-  func setGlobeFreeBearingEnabled(_ bindingArg0: Bool) throws {
-    try owner
-      .nativeInvoke { raw, _, diagnostic in
-        mln_map_set_globe_free_bearing_enabled(
-          raw,
-          bindingArg0,
-          nil,
-          diagnostic
-        )
-      }
-  }
+func `setGlobeFreeBearingEnabled`(_ bindingArg0: Bool) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_set_globe_free_bearing_enabled(raw, bindingArg0, nil, diagnostic) }
+}
 
-  func setProjectionMode(options bindingArg0: ProjectionModeOptions) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in mln_map_set_projection_mode(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        nil,
-        diagnostic
-      ) }
-  }
+func `setProjectionMode`(`options` bindingArg0: ProjectionModeOptions) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_set_projection_mode(raw, arena.store(bindingArg0.nativeValue()), nil, diagnostic) }
+}
 
-  func setRenderingStatsViewEnabled(_ bindingArg0: Bool) throws {
-    try owner
-      .nativeInvoke { raw, _, diagnostic in
-        mln_map_set_rendering_stats_view_enabled(
-          raw,
-          bindingArg0,
-          nil,
-          diagnostic
-        )
-      }
-  }
+func `setRenderingStatsViewEnabled`(_ bindingArg0: Bool) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_set_rendering_stats_view_enabled(raw, bindingArg0, nil, diagnostic) }
+}
 
-  func setTileOptions(_ bindingArg0: MapTileOptions) throws {
-    try owner.nativeInvoke { raw, arena, diagnostic in mln_map_set_tile_options(
-      raw,
-      arena.store(bindingArg0.nativeValue()),
-      nil,
-      diagnostic
-    ) }
-  }
+func `setTileOptions`(_ bindingArg0: MapTileOptions) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_set_tile_options(raw, arena.store(bindingArg0.nativeValue()), nil, diagnostic) }
+}
 
-  func setViewportOptions(_ bindingArg0: MapViewportOptions) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in mln_map_set_viewport_options(
-        raw,
-        arena.store(bindingArg0.nativeValue()),
-        nil,
-        diagnostic
-      ) }
-  }
+func `setViewportOptions`(_ bindingArg0: MapViewportOptions) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in mln_map_set_viewport_options(raw, arena.store(bindingArg0.nativeValue()), nil, diagnostic) }
+}
 
-  func updateCamera(_ bindingArg0: CameraUpdate) throws {
-    try owner
-      .nativeInvoke { raw, arena, diagnostic in try mln_map_update_camera(
-        raw,
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        nil,
-        diagnostic
-      ) }
-  }
+func `updateCamera`(_ bindingArg0: CameraUpdate) throws {
+  try owner.nativeInvoke() { raw, arena, diagnostic in try mln_map_update_camera(raw, arena.store(try bindingArg0.nativeValue(arena: arena)), nil, diagnostic) }
+}
 }

@@ -161,6 +161,70 @@ public final class MetalTextureFrameView {
   public var pixelFormat: UInt64 {
     snapshot.pixelFormat
   }
+
+  public var depthTexture: NativePointer {
+    get throws { try scope.check(); return snapshot.depthTexture }
+  }
+
+  public var depthPixelFormat: UInt64 {
+    snapshot.depthPixelFormat
+  }
+}
+
+public final class OpaqueFdFrameView {
+  private let snapshot: OpaqueFdFrame
+  private let scope: NativeViewScope
+  init(_ value: OpaqueFdFrame, scope: NativeViewScope) {
+    snapshot = value; self.scope = scope
+  }
+
+  public var width: UInt32 {
+    snapshot.width
+  }
+
+  public var height: UInt32 {
+    snapshot.height
+  }
+
+  public var scaleFactor: Double {
+    snapshot.scaleFactor
+  }
+
+  public var slot: UInt32 {
+    snapshot.slot
+  }
+
+  public var fd: Int32 {
+    get throws { try scope.check(); return snapshot.fd }
+  }
+
+  public var allocationSize: UInt64 {
+    snapshot.allocationSize
+  }
+
+  public var dedicated: Bool {
+    snapshot.dedicated
+  }
+
+  public var format: UInt32 {
+    snapshot.format
+  }
+
+  public var depthFd: Int32 {
+    get throws { try scope.check(); return snapshot.depthFd }
+  }
+
+  public var depthAllocationSize: UInt64 {
+    snapshot.depthAllocationSize
+  }
+
+  public var depthDedicated: Bool {
+    snapshot.depthDedicated
+  }
+
+  public var depthFormat: UInt32 {
+    snapshot.depthFormat
+  }
 }
 
 public final class OpenGlTextureFrameView {
@@ -192,6 +256,14 @@ public final class OpenGlTextureFrameView {
 
   public var target: UInt32 {
     snapshot.target
+  }
+
+  public var depthTexture: UInt32 {
+    get throws { try scope.check(); return snapshot.depthTexture }
+  }
+
+  public var depthInternalFormat: UInt32 {
+    snapshot.depthInternalFormat
   }
 }
 
@@ -256,5 +328,21 @@ public final class VulkanTextureFrameView {
 
   public var layout: UInt32 {
     snapshot.layout
+  }
+
+  public var depthImage: UInt64 {
+    get throws { try scope.check(); return snapshot.depthImage }
+  }
+
+  public var depthImageView: UInt64 {
+    get throws { try scope.check(); return snapshot.depthImageView }
+  }
+
+  public var depthFormat: UInt32 {
+    snapshot.depthFormat
+  }
+
+  public var depthLayout: UInt32 {
+    snapshot.depthLayout
   }
 }

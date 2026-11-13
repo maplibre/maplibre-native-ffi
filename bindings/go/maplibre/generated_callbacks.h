@@ -4,6 +4,8 @@
 #include "binding_callback.h"
 #include "maplibre_native_c.h"
 void binding_release(void*);
+void binding_mln_queue_lock_lock(void* user_data);
+void binding_mln_queue_lock_unlock(void* user_data);
 void binding_mln_log_handler_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
@@ -16,6 +18,14 @@ void binding_mln_custom_geometry_source_options_cancel_tile(
   void* user_data, mln_map map, mln_buffer_view source_id,
   mln_canonical_tile_id tile_id
 );
+void binding_mln_custom_layer_host_prerender(
+  void* user_data, const mln_custom_layer_prerender_parameters* parameters
+);
+void binding_mln_custom_layer_host_render(
+  void* user_data, const mln_custom_layer_render_parameters* parameters
+);
+void binding_mln_custom_layer_host_deinitialize(void* user_data);
+void binding_mln_custom_layer_host_context_lost(void* user_data);
 void binding_mln_custom_vector_source_options_fetch_tile(
   void* user_data, mln_map map, mln_buffer_view source_id,
   mln_canonical_tile_id tile_id
@@ -28,8 +38,6 @@ void binding_mln_camera_transition_handler_callback(
   void* user_data, const mln_camera_transition_end* end
 );
 void binding_mln_wake_callback(void* user_data);
-void binding_mln_queue_lock_lock(void* user_data);
-void binding_mln_queue_lock_unlock(void* user_data);
 void binding_mln_resource_request_cancel_handler_callback(
   void* user_data, mln_resource_request handle
 );

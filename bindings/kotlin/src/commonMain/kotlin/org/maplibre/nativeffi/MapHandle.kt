@@ -2,13 +2,15 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
-import org.maplibre.nativeffi.internal.JvmSynthetic
+import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
+import org.maplibre.nativeffi.internal.JvmSynthetic
 
 /**
  * A map, with its style and camera.
@@ -16,44 +18,27 @@ import org.maplibre.nativeffi.internal.memory.*
  * See `mln_map` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
-public class MapHandle
-private constructor(
+public class MapHandle private constructor(
   handle: Long,
   @Suppress("unused") private val parent: RuntimeHandle?,
-  /**
-   * Completes once the map is ready, and fails with a [MaplibreException] when it fails to become
-   * ready. Asynchronous calls on the map before then wait for it.
-   */
+  /** Completes once the map is ready, and fails with a [MaplibreException] when it fails to become ready. Asynchronous calls on the map before then wait for it. */
   public val ready: Completion<Unit>,
   borrowed: Boolean,
 ) : AsyncReleasable, AutoCloseable {
-  @get:JvmSynthetic
-  internal val binding = HandleState("MapHandle", handle, GeneratedOwnerDisposal::map, borrowed)
-  @Suppress("unused")
-  private val cleanup = if (borrowed) null else disposeWhenUnreachable(this, binding)
+  @get:JvmSynthetic internal val binding = HandleState("MapHandle", handle, GeneratedOwnerDisposal::map, borrowed)
+  @Suppress("unused") private val cleanup = if (borrowed) null else disposeWhenUnreachable(this, binding)
   /**
-   * The native handle value, which runtime events report as their source. It stays readable after
-   * release, so events drained later still match this handle.
+   * The native handle value, which runtime events report as their source. It stays readable
+   * after release, so events drained later still match this handle.
    */
-  @get:JvmName("getId")
-  public val id: ULong
-    get() = binding.handle.toULong()
-
+  @get:JvmName("getId") public val id: ULong get() = binding.handle.toULong()
   /** Whether a release, dispose, or discard has ended the handle. */
-  public override val isClosed: Boolean
-    get() = binding.isReleased
-
+  public override val isClosed: Boolean get() = binding.isReleased
   /**
-   * Calls [dispose], for the standard library's `use`, which can't wait. [useReleasing] waits for
-   * [release] instead.
+   * Calls [dispose], for the standard library's `use`, which can't wait. [useReleasing] waits for [release] instead.
    */
-  public override fun close() {
-    dispose()
-  }
-
-  @get:JvmSynthetic
-  internal val bindingCallbacks: CallbackOwner =
-    if (binding.borrowed) CallbackOwner.global else CallbackOwner()
+  public override fun close() { dispose() }
+  @get:JvmSynthetic internal val bindingCallbacks: CallbackOwner = if (binding.borrowed) CallbackOwner.global else CallbackOwner()
 
   /**
    * Adds a source whose GeoJSON tiles come from callbacks.
@@ -63,24 +48,40 @@ private constructor(
    *
    * Errors:
    *
-   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named
+   *   `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun addCustomGeometrySource(
-    sourceId: String,
-    options: CustomGeometrySourceOptions,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding, bindingCallbacks) {
-      check(
-        C.mln_map_add_custom_geometry_source(
-          handle,
-          view(sourceId),
-          writeCustomGeometrySourceOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions): Completion<CommandCompletion> = nativeCommand(this, binding, bindingCallbacks) { check(C.mln_map_add_custom_geometry_source(handle, view(sourceId), writeCustomGeometrySourceOptions(options), completion, diagnostic)) }
+
+  /**
+   * Adds a layer that draws with your own GPU commands, through `host`.
+   *
+   * The layer goes below the layer named `beforeLayerId`, or above every layer
+   * when `beforeLayerId` is empty. Its type is `custom`, and it takes the
+   * `visibility`, `minzoom`, and `maxzoom` properties, but no paint properties.
+   * `MapHandle.removeStyleLayer()` removes it.
+   *
+   * Runs on the thread that runs the session's graphics work: a library thread,
+   * or yours with `RenderDriverKind.CALLER_GRAPHICS_THREAD`. It can't call the
+   * library.
+   *
+   * Runs on the thread that runs the session's graphics work, as
+   * `CustomLayerPrerenderCallback` says. It can't call the library.
+   *
+   * See `mln_map_add_custom_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no layer named `beforeLayerId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a layer named
+   *   `layerId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
+   */
+  public fun addCustomLayer(layerId: String, beforeLayerId: String? = null, host: CustomLayerHost): Completion<CommandCompletion> = nativeCommand(this, binding, bindingCallbacks) { check(C.mln_map_add_custom_layer(handle, view(layerId), view(beforeLayerId), writeCustomLayerHost(host), completion, diagnostic)) }
 
   /**
    * Adds a source whose vector tiles come from callbacks.
@@ -90,34 +91,23 @@ private constructor(
    *
    * Errors:
    *
-   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named
+   *   `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun addCustomVectorSource(
-    sourceId: String,
-    options: CustomVectorSourceOptions,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding, bindingCallbacks) {
-      check(
-        C.mln_map_add_custom_vector_source(
-          handle,
-          view(sourceId),
-          writeCustomVectorSourceOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addCustomVectorSource(sourceId: String, options: CustomVectorSourceOptions): Completion<CommandCompletion> = nativeCommand(this, binding, bindingCallbacks) { check(C.mln_map_add_custom_vector_source(handle, view(sourceId), writeCustomVectorSourceOptions(options), completion, diagnostic)) }
 
   /**
    * Adds a GeoJSON source with no data.
    *
-   * Give it data with `MapHandle.setGeoJsonSourceData()` or `MapHandle.setGeoJsonSourceUrl()`. Its
-   * options stay fixed for as long as the style holds it.
+   * Give it data with `MapHandle.setGeoJsonSourceData()` or
+   * `MapHandle.setGeoJsonSourceUrl()`. Its options stay fixed for as long as
+   * the style holds it.
    *
    * `attribution` is the source's
-   * &#91;attribution&#93;(https://maplibre.org/maplibre-style-spec/sources/#attribution), or empty
-   * for none.
+   * &#91;attribution&#93;(https://maplibre.org/maplibre-style-spec/sources/#attribution),
+   * or empty for none.
    *
    * See `mln_map_add_geo_json_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -125,26 +115,12 @@ private constructor(
    * Errors:
    *
    * - `Status.INVALID_ARGUMENT` when an option in `options` is out of range.
-   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named
+   *   `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun addGeoJsonSource(
-    sourceId: String,
-    options: GeoJsonSourceOptions? = null,
-    attribution: String? = null,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_add_geo_json_source(
-          handle,
-          view(sourceId),
-          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
-          view(attribution),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addGeoJsonSource(sourceId: String, options: GeoJsonSourceOptions? = null, attribution: String? = null): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_add_geo_json_source(handle, view(sourceId), options?.let { writeGeoJsonSourceOptions(it) } ?: 0L, view(attribution), completion, diagnostic)) }
 
   /**
    * Adds an image source that shows `image`.
@@ -156,379 +132,210 @@ private constructor(
    *
    * Errors:
    *
-   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named
+   *   `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun addImageSourceImage(
-    sourceId: String,
-    coordinates: List<LatLng>,
-    image: PremultipliedRgba8Image,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_add_image_source_image(
-          handle,
-          view(sourceId),
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          writePremultipliedRgba8Image(image),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addImageSourceImage(sourceId: String, coordinates: List<LatLng>, image: PremultipliedRgba8Image): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_add_image_source_image(handle, view(sourceId), array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) }, coordinates.size.toLong(), writePremultipliedRgba8Image(image), completion, diagnostic)) }
 
   /**
    * Adds a layer to the map's style.
    *
-   * `layerJson` is a &#91;layer&#93;(https://maplibre.org/maplibre-style-spec/layers/) object. The
-   * layer goes below the layer named `beforeLayerId`, or above every layer when `beforeLayerId` is
-   * empty.
+   * `layerJson` is a
+   * &#91;layer&#93;(https://maplibre.org/maplibre-style-spec/layers/) object.
+   * The layer goes below the layer named `beforeLayerId`, or above every layer
+   * when `beforeLayerId` is empty.
    *
    * See `mln_map_add_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
    * Errors:
    *
-   * - `Status.NOT_FOUND` when the style has no layer named `beforeLayerId`, or no source with the
-   *   ID that the layer uses.
-   * - `Status.ALREADY_EXISTS` when the style already has a layer with the new layer's ID.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.NOT_FOUND` when the style has no layer named `beforeLayerId`, or
+   *   no source with the ID that the layer uses.
+   * - `Status.ALREADY_EXISTS` when the style already has a layer with the new
+   *   layer's ID.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun addStyleLayerJson(
-    layerJson: String,
-    beforeLayerId: String? = null,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_add_style_layer_json(
-          handle,
-          view(layerJson),
-          view(beforeLayerId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addStyleLayerJson(layerJson: String, beforeLayerId: String? = null): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_add_style_layer_json(handle, view(layerJson), view(beforeLayerId), completion, diagnostic)) }
 
   /**
    * Adds a source to the map's style.
    *
-   * `sourceJson` is a &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/) object.
+   * `sourceJson` is a
+   * &#91;source&#93;(https://maplibre.org/maplibre-style-spec/sources/) object.
    *
    * See `mln_map_add_style_source_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
    * Errors:
    *
-   * - `Status.ALREADY_EXISTS` when the style already has a source named `sourceId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.ALREADY_EXISTS` when the style already has a source named
+   *   `sourceId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun addStyleSourceJson(
-    sourceId: String,
-    sourceJson: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_add_style_source_json(
-          handle,
-          view(sourceId),
-          view(sourceJson),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addStyleSourceJson(sourceId: String, sourceJson: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_add_style_source_json(handle, view(sourceId), view(sourceJson), completion, diagnostic)) }
 
   /**
    * Moves the camera relative to where it is, as a gesture does.
    *
-   * `delta` can pan the map's content by an offset on the screen, scale the zoom, and add to the
-   * bearing and pitch. An anchor keeps one screen point in place while the scale, bearing, or pitch
-   * changes. An anchor needs one of those changes, and combines with an offset only when the delta
-   * has no animation. The function finishes when the map applies the delta, before an animation
-   * ends.
+   * `delta` can pan the map's content by an offset on the screen, scale the
+   * zoom, and add to the bearing and pitch. An anchor keeps one screen point in
+   * place while the scale, bearing, or pitch changes. An anchor needs one of
+   * those changes, and combines with an offset only when the delta has no
+   * animation. The function finishes when the map applies the delta, before an
+   * animation ends.
    *
-   * A delta that replaces an animated one starts from where that animation left the camera, so the
-   * rest of the replaced change never happens. To reach an exact camera, use
-   * `MapHandle.updateCamera()`.
+   * A delta that replaces an animated one starts from where that animation left
+   * the camera, so the rest of the replaced change never happens. To reach an
+   * exact camera, use `MapHandle.updateCamera()`.
    *
-   * A delta in the end phase can carry momentum, which keeps the camera moving from the gesture's
-   * release velocities and slows it on each rendered frame. The gesture lasts until the momentum
-   * ends: the snapshot keeps `gesture_in_progress` set, and camera events report
-   * `CameraChangeSource.MOMENTUM`. With momentum, `animation` sets only `transition_id` and the end
-   * handler, which runs when the gesture ends.
+   * A delta in the end phase can carry momentum, which keeps the camera moving
+   * from the gesture's release velocities and slows it on each rendered frame.
+   * The gesture lasts until the momentum ends: the snapshot keeps
+   * `gesture_in_progress` set, and camera events report
+   * `CameraChangeSource.MOMENTUM`. With momentum, `animation` sets only
+   * `transition_id` and the end handler, which runs when the gesture ends.
    *
-   * A delta in the begin phase, `MapHandle.cancelCameraTransitions()`, or a cancellation by that ID
-   * stops the momentum. A later command that sets a field stops only the parts of the momentum that
-   * move that field. On a tilted map, the pan moves the map's content the same distance on the
-   * screen in every direction.
+   * A delta in the begin phase, `MapHandle.cancelCameraTransitions()`, or a
+   * cancellation by that ID stops the momentum. A later command that sets a
+   * field stops only the parts of the momentum that move that field. On a
+   * tilted map, the pan moves the map's content the same distance on the screen
+   * in every direction.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun applyCameraDelta(delta: CameraDelta): Completion<CommandCompletion> =
-    nativeCommand(this, binding, bindingCallbacks) {
-      check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic))
-    }
+  public fun applyCameraDelta(delta: CameraDelta): Completion<CommandCompletion> = nativeCommand(this, binding, bindingCallbacks) { check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic)) }
 
   /**
-   * Attaches a render session that renders the map offscreen.
+   * Attaches a render session that renders the map into `target`.
    *
-   * Read each image's pixels with `RenderSessionHandle.readTexture()`.
+   * The session renders on `device`. When `device` is null, the session creates
+   * a device with the default options, and releases it when the session ends.
    *
-   * The session renders on `device`. When `device` is null, the session creates a device with the
-   * default options, and releases it when the session ends.
-   *
-   * See `mln_map_attach_offscreen` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+   * See `mln_map_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` when the map already has a render session.
-   * - `Status.NATIVE_ERROR` when `device` is null and the platform can't create a device.
+   * - `Status.INVALID_ARGUMENT` when a borrowed ring has depth textures, but
+   *   not one for each of its textures.
+   * - `Status.INVALID_STATE` when the map already has a render session, or a
+   *   window is minimized or has no client area.
+   * - `Status.UNSUPPORTED` when the device's
+   *   `GpuDeviceCapabilities.targetKinds` lacks the target's kind, or, for a
+   *   null `device`, when no backend of this build renders to it, when
+   *   `options` sets `keep_depth` for a target other than an exported ring, or
+   *   when a borrowed ring's depth format isn't one of the device's
+   *   `GpuDeviceCapabilities.depthStencilFormats`.
+   * - `Status.INVALID_STATE` when a window was minimized or had no client area
+   *   when the attach ran.
+   * - `Status.UNSUPPORTED` when the GPU or the graphics driver can't present to
+   *   the window.
+   * - `Status.NATIVE_ERROR` when `device` is null and the platform can't create
+   *   a device, or when the library can't create its graphics context or
+   *   present to the window.
    */
-  public fun attachOffscreen(
-    descriptor: OffscreenDescriptor,
-    options: RenderSessionAttachOptions,
-    device: OffscreenDeviceHandle? = null,
-  ): RenderSessionHandle =
-    nativeCall(this, binding) {
-      attach(
-        { out, completion ->
-          C.mln_map_attach_offscreen(
-            handle,
-            writeOffscreenDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            device?.let { argument(it, it.binding) } ?: 0L,
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-      )
-    }
+  public fun attach(target: RenderTarget, device: GpuDeviceHandle? = null, options: RenderSessionAttachOptions): RenderSessionHandle = nativeCall(this, binding) { attach({ out, completion -> C.mln_map_attach(handle, writeRenderTarget(target), device?.let { argument(it, it.binding) } ?: 0L, writeRenderSessionAttachOptions(options), out, completion, diagnostic) }, GeneratedOwnerDisposal::renderSession, { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) }, { it.bindingCallbacks }, { it.dispose() }) }
 
   /**
-   * Creates a session that renders the map into a ring of your OpenGL textures.
-   *
-   * See `mln_map_attach_open_gl_borrowed_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.UNSUPPORTED` when `openGlSupportedContextProviderMask()` lacks the context's
-   *   platform, or when the target supports none of the `producer_sync_kinds` in `options`.
-   */
-  public fun attachOpenGlBorrowedTexture(
-    descriptor: OpenGlBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle =
-    nativeCall(this, binding) {
-      attach(
-        { out, completion ->
-          C.mln_map_attach_open_gl_borrowed_texture(
-            handle,
-            writeOpenGlBorrowedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-      )
-    }
-
-  /**
-   * Creates a session that renders the map to an OpenGL surface.
-   *
-   * See `mln_map_attach_open_gl_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.UNSUPPORTED` when `openGlSupportedContextProviderMask()` lacks the context's
-   *   platform.
-   */
-  public fun attachOpenGlSurface(
-    descriptor: OpenGlSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle =
-    nativeCall(this, binding) {
-      attach(
-        { out, completion ->
-          C.mln_map_attach_open_gl_surface(
-            handle,
-            writeOpenGlSurfaceDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-      )
-    }
-
-  /**
-   * Holds back the map's changes from rendering until `MapHandle.endCommandGroup()`, so they show
-   * in the same frame.
+   * Holds back the map's changes from rendering until
+   * `MapHandle.endCommandGroup()`, so they show in the same frame.
    *
    * Groups nest, and the changes render when the outermost group ends.
    *
    * See `mln_map_begin_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun beginCommandGroup(): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_begin_command_group(handle, completion, diagnostic))
-    }
+  public fun beginCommandGroup(): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_begin_command_group(handle, completion, diagnostic)) }
 
   /**
    * Computes a camera that fits a GeoJSON geometry in the map's view.
    *
-   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a feature. The camera
-   * keeps the map's bearing and pitch unless `fitOptions` sets them, and its zoom stays within the
-   * map's zoom limits.
+   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
+   * feature. The camera keeps the map's bearing and pitch unless `fitOptions`
+   * sets them, and its zoom stays within the map's zoom limits.
    *
    * See `mln_map_camera_for_geometry` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area.
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room
+   *   for the area.
    */
-  public fun cameraForGeometry(
-    geometry: String,
-    fitOptions: CameraFitOptions? = null,
-  ): Completion<CameraOptions> =
-    nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
-      check(
-        C.mln_map_camera_for_geometry(
-          handle,
-          view(geometry),
-          fitOptions?.let { writeCameraFitOptions(it) } ?: 0L,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun cameraForGeometry(geometry: String, fitOptions: CameraFitOptions? = null): Completion<CameraOptions> = nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) { check(C.mln_map_camera_for_geometry(handle, view(geometry), fitOptions?.let { writeCameraFitOptions(it) } ?: 0L, completion, diagnostic)) }
 
   /**
    * Computes a camera that fits `bounds` in the map's view.
    *
-   * The camera keeps the map's bearing and pitch unless `fitOptions` sets them, and its zoom stays
-   * within the map's zoom limits.
+   * The camera keeps the map's bearing and pitch unless `fitOptions` sets them,
+   * and its zoom stays within the map's zoom limits.
    *
    * See `mln_map_camera_for_lat_lng_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area.
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room
+   *   for the area.
    */
-  public fun cameraForLatLngBounds(
-    bounds: LatLngBounds,
-    fitOptions: CameraFitOptions? = null,
-  ): Completion<CameraOptions> =
-    nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
-      check(
-        C.mln_map_camera_for_lat_lng_bounds(
-          handle,
-          writeLatLngBounds(bounds),
-          fitOptions?.let { writeCameraFitOptions(it) } ?: 0L,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun cameraForLatLngBounds(bounds: LatLngBounds, fitOptions: CameraFitOptions? = null): Completion<CameraOptions> = nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) { check(C.mln_map_camera_for_lat_lng_bounds(handle, writeLatLngBounds(bounds), fitOptions?.let { writeCameraFitOptions(it) } ?: 0L, completion, diagnostic)) }
 
   /**
    * Computes a camera that fits `coordinates` in the map's view.
    *
-   * `coordinates` must not be empty. The camera keeps the map's bearing and pitch unless
-   * `fitOptions` sets them, and its zoom stays within the map's zoom limits.
+   * `coordinates` must not be empty. The camera keeps the map's bearing and
+   * pitch unless `fitOptions` sets them, and its zoom stays within the map's
+   * zoom limits.
    *
    * See `mln_map_camera_for_lat_lngs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room for the area.
+   * - `Status.INVALID_ARGUMENT` when the padding in `fitOptions` leaves no room
+   *   for the area.
    */
-  public fun cameraForLatLngs(
-    coordinates: List<LatLng>,
-    fitOptions: CameraFitOptions? = null,
-  ): Completion<CameraOptions> =
-    nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) {
-      check(
-        C.mln_map_camera_for_lat_lngs(
-          handle,
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          fitOptions?.let { writeCameraFitOptions(it) } ?: 0L,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun cameraForLatLngs(coordinates: List<LatLng>, fitOptions: CameraFitOptions? = null): Completion<CameraOptions> = nativeSubmit(this, binding, { result -> readCameraOptions(CompletionBridge.value(result)) }) { check(C.mln_map_camera_for_lat_lngs(handle, array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) }, coordinates.size.toLong(), fitOptions?.let { writeCameraFitOptions(it) } ?: 0L, completion, diagnostic)) }
 
   /**
    * Stops every running camera animation where it is.
    *
-   * The end handler of each stopped animation reports `CameraTransitionOutcome.CANCELLED`.
+   * The end handler of each stopped animation reports
+   * `CameraTransitionOutcome.CANCELLED`.
    *
    * See `mln_map_cancel_camera_transitions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun cancelCameraTransitions(): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_cancel_camera_transitions(handle, completion, diagnostic))
-    }
+  public fun cancelCameraTransitions(): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_cancel_camera_transitions(handle, completion, diagnostic)) }
 
   /**
-   * Stops the running camera animations whose animation options set `transitionId`.
+   * Stops the running camera animations whose animation options set
+   * `transitionId`.
    *
-   * Other animations keep running. The end handler of each stopped animation reports
-   * `CameraTransitionOutcome.CANCELLED`.
+   * Other animations keep running. The end handler of each stopped animation
+   * reports `CameraTransitionOutcome.CANCELLED`.
    *
    * See `mln_map_cancel_camera_transitions_with_id` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  @JvmName("cancelCameraTransitionsWithId")
-  public fun cancelCameraTransitionsWithId(transitionId: ULong): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_cancel_camera_transitions_with_id(
-          handle,
-          transitionId.toLong(),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  @JvmName("cancelCameraTransitionsWithId") public fun cancelCameraTransitionsWithId(transitionId: ULong): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_cancel_camera_transitions_with_id(handle, transitionId.toLong(), completion, diagnostic)) }
 
   /**
    * Releases the map in any state, and finishes in the background.
    *
-   * Use it from destructors and finalizers. Otherwise, use `MapHandle.release()`.
+   * Use it from destructors and finalizers. Otherwise, use
+   * `MapHandle.release()`.
    *
    * See `mln_map_dispose` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun dispose(): Unit =
-    nativeClose(this, binding) { check(C.mln_map_dispose(handle, diagnostic)) }
+  public fun dispose(): Unit = nativeClose(this, binding) { check(C.mln_map_dispose(handle, diagnostic)) }
 
   /**
    * Logs debugging information about the map's style and sources.
@@ -536,10 +343,7 @@ private constructor(
    * See `mln_map_dump_debug_logs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun dumpDebugLogs(): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_dump_debug_logs(handle, completion, diagnostic))
-    }
+  public fun dumpDebugLogs(): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_dump_debug_logs(handle, completion, diagnostic)) }
 
   /**
    * Ends the group that `MapHandle.beginCommandGroup()` began.
@@ -547,142 +351,86 @@ private constructor(
    * See `mln_map_end_command_group` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun endCommandGroup(): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_end_command_group(handle, completion, diagnostic))
-    }
+  public fun endCommandGroup(): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_end_command_group(handle, completion, diagnostic)) }
 
   /**
-   * Moves the camera to fit a GeoJSON geometry in the map's view, at once or with an animation.
+   * Moves the camera to fit a GeoJSON geometry in the map's view, at once or
+   * with an animation.
    *
-   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a feature. The camera
-   * is the one that `MapHandle.cameraForGeometry()` computes after the commands sent before this
-   * one apply. The function finishes when the map applies the change, before an animation ends.
+   * `geometry` is a GeoJSON geometry object with at least one coordinate, not a
+   * feature. The camera is the one that `MapHandle.cameraForGeometry()`
+   * computes after the commands sent before this one apply. The function
+   * finishes when the map applies the change, before an animation ends.
    *
    * See `mln_map_fit_camera_to_geometry` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area. The
-   *   camera doesn't move.
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for
+   *   the area. The camera doesn't move.
    */
-  public fun fitCameraToGeometry(
-    geometry: String,
-    update: CameraFitUpdate,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding, bindingCallbacks) {
-      check(
-        C.mln_map_fit_camera_to_geometry(
-          handle,
-          view(geometry),
-          writeCameraFitUpdate(update),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun fitCameraToGeometry(geometry: String, update: CameraFitUpdate): Completion<CommandCompletion> = nativeCommand(this, binding, bindingCallbacks) { check(C.mln_map_fit_camera_to_geometry(handle, view(geometry), writeCameraFitUpdate(update), completion, diagnostic)) }
 
   /**
-   * Moves the camera to fit `bounds` in the map's view, at once or with an animation.
+   * Moves the camera to fit `bounds` in the map's view, at once or with an
+   * animation.
    *
-   * The camera is the one that `MapHandle.cameraForLatLngBounds()` computes after the commands sent
-   * before this one apply. The function finishes when the map applies the change, before an
-   * animation ends.
+   * The camera is the one that `MapHandle.cameraForLatLngBounds()` computes
+   * after the commands sent before this one apply. The function finishes when
+   * the map applies the change, before an animation ends.
    *
    * See `mln_map_fit_camera_to_lat_lng_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area. The
-   *   camera doesn't move.
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for
+   *   the area. The camera doesn't move.
    */
-  public fun fitCameraToLatLngBounds(
-    bounds: LatLngBounds,
-    update: CameraFitUpdate,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding, bindingCallbacks) {
-      check(
-        C.mln_map_fit_camera_to_lat_lng_bounds(
-          handle,
-          writeLatLngBounds(bounds),
-          writeCameraFitUpdate(update),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun fitCameraToLatLngBounds(bounds: LatLngBounds, update: CameraFitUpdate): Completion<CommandCompletion> = nativeCommand(this, binding, bindingCallbacks) { check(C.mln_map_fit_camera_to_lat_lng_bounds(handle, writeLatLngBounds(bounds), writeCameraFitUpdate(update), completion, diagnostic)) }
 
   /**
-   * Moves the camera to fit `coordinates` in the map's view, at once or with an animation.
+   * Moves the camera to fit `coordinates` in the map's view, at once or with an
+   * animation.
    *
-   * `coordinates` must not be empty. The camera is the one that `MapHandle.cameraForLatLngs()`
-   * computes after the commands sent before this one apply. The function finishes when the map
-   * applies the change, before an animation ends.
+   * `coordinates` must not be empty. The camera is the one that
+   * `MapHandle.cameraForLatLngs()` computes after the commands sent before this
+   * one apply. The function finishes when the map applies the change, before an
+   * animation ends.
    *
    * See `mln_map_fit_camera_to_lat_lngs` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for the area. The
-   *   camera doesn't move.
+   * - `Status.INVALID_ARGUMENT` when the padding in `update` leaves no room for
+   *   the area. The camera doesn't move.
    */
-  public fun fitCameraToLatLngs(
-    coordinates: List<LatLng>,
-    update: CameraFitUpdate,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding, bindingCallbacks) {
-      check(
-        C.mln_map_fit_camera_to_lat_lngs(
-          handle,
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          writeCameraFitUpdate(update),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun fitCameraToLatLngs(coordinates: List<LatLng>, update: CameraFitUpdate): Completion<CommandCompletion> = nativeCommand(this, binding, bindingCallbacks) { check(C.mln_map_fit_camera_to_lat_lngs(handle, array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) }, coordinates.size.toLong(), writeCameraFitUpdate(update), completion, diagnostic)) }
 
   /**
    * Reads the map's camera.
    *
-   * The query reads the camera after the map applies the commands sent before it.
+   * The query reads the camera after the map applies the commands sent before
+   * it.
    *
    * See `mln_map_get_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun getCamera(): Completion<CameraQueryResult> =
-    nativeSubmit(
-      this,
-      binding,
-      { result -> readCameraQueryResult(CompletionBridge.value(result)) },
-    ) {
-      check(C.mln_map_get_camera(handle, completion, diagnostic))
-    }
+  public fun getCamera(): Completion<CameraQueryResult> = nativeSubmit(this, binding, { result -> readCameraQueryResult(CompletionBridge.value(result)) }) { check(C.mln_map_get_camera(handle, completion, diagnostic)) }
 
   /**
    * Reads the state of a feature, as a JSON object.
    *
-   * The object is empty when the feature has no state, including after its source leaves the style
-   * or a style loads, as `MapHandle.setFeatureState()` describes.
+   * The object is empty when the feature has no state, including after its
+   * source leaves the style or a style loads, as `MapHandle.setFeatureState()`
+   * describes.
    *
    * See `mln_map_get_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getFeatureState(selector: FeatureStateSelector): Completion<String> =
-    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
-      check(
-        C.mln_map_get_feature_state(
-          handle,
-          writeFeatureStateSelector(selector),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun getFeatureState(selector: FeatureStateSelector): Completion<String> = nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) { check(C.mln_map_get_feature_state(handle, writeFeatureStateSelector(selector), completion, diagnostic)) }
 
   /**
    * Reads the global state of the map's style as a JSON object.
@@ -690,10 +438,7 @@ private constructor(
    * See `mln_map_get_global_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getGlobalState(): Completion<String> =
-    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
-      check(C.mln_map_get_global_state(handle, completion, diagnostic))
-    }
+  public fun getGlobalState(): Completion<String> = nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) { check(C.mln_map_get_global_state(handle, completion, diagnostic)) }
 
   /**
    * Reads the corners of an image source's image, clockwise from the top left.
@@ -704,25 +449,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image
+   *   source.
    */
-  public fun getImageSourceCoordinates(sourceId: String): Completion<List<LatLng>> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        readStrided(
-          CompletionBridge.valuePointer(result),
-          CompletionBridge.valueCount(result),
-          CompletionBridge.valueSize(result),
-          16,
-        ) {
-          readLatLng(it)
-        }
-      },
-    ) {
-      check(C.mln_map_get_image_source_coordinates(handle, view(sourceId), completion, diagnostic))
-    }
+  public fun getImageSourceCoordinates(sourceId: String): Completion<List<LatLng>> = nativeSubmit(this, binding, { result -> readStrided(CompletionBridge.valuePointer(result), CompletionBridge.valueCount(result), CompletionBridge.valueSize(result), 16) { readLatLng(it) } }) { check(C.mln_map_get_image_source_coordinates(handle, view(sourceId), completion, diagnostic)) }
 
   /**
    * Reads the JSON of the style that the map loaded.
@@ -732,30 +462,23 @@ private constructor(
    * See `mln_map_get_loaded_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getLoadedStyleJson(): Completion<String> =
-    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
-      check(C.mln_map_get_loaded_style_json(handle, completion, diagnostic))
-    }
+  public fun getLoadedStyleJson(): Completion<String> = nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) { check(C.mln_map_get_loaded_style_json(handle, completion, diagnostic)) }
 
   /**
    * Copies the map's state.
    *
-   * The copy doesn't wait for pending commands. To read the camera after they apply, use
-   * `MapHandle.getCamera()`.
+   * The copy doesn't wait for pending commands. To read the camera after they
+   * apply, use `MapHandle.getCamera()`.
    *
    * See `mln_map_get_snapshot` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` until `RuntimeHandle.createMap()` completes with `Status.OK`.
+   * - `Status.INVALID_STATE` until `RuntimeHandle.createMap()` completes with
+   *   `Status.OK`.
    */
-  public fun getSnapshot(): MapSnapshot =
-    nativeCall(this, binding) {
-      val out = sized(w(432, 432, 400), w(8, 8, 4))
-      check(C.mln_map_get_snapshot(handle, out, diagnostic))
-      readMapSnapshot(out)
-    }
+  public fun getSnapshot(): MapSnapshot = nativeCall(this, binding) { val out = sized(w(432, 432, 400), w(8, 8, 4)); check(C.mln_map_get_snapshot(handle, out, diagnostic)); readMapSnapshot(out) }
 
   /**
    * Reads an image of the map's style.
@@ -765,17 +488,7 @@ private constructor(
    * See `mln_map_get_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleImage(imageId: String): Completion<StyleImageInfo?> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleImageInfo(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_image(handle, view(imageId), completion, diagnostic))
-    }
+  public fun getStyleImage(imageId: String): Completion<StyleImageInfo?> = nativeSubmit(this, binding, { result -> if (CompletionBridge.valueCount(result) == 0uL) null else readStyleImageInfo(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_image(handle, view(imageId), completion, diagnostic)) }
 
   /**
    * Reads a layer of the map's style.
@@ -785,17 +498,7 @@ private constructor(
    * See `mln_map_get_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLayer(layerId: String): Completion<StyleLayerInfo?> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleLayerInfo(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_layer(handle, view(layerId), completion, diagnostic))
-    }
+  public fun getStyleLayer(layerId: String): Completion<StyleLayerInfo?> = nativeSubmit(this, binding, { result -> if (CompletionBridge.valueCount(result) == 0uL) null else readStyleLayerInfo(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_layer(handle, view(layerId), completion, diagnostic)) }
 
   /**
    * Reads a layer of the map's style as a
@@ -806,23 +509,13 @@ private constructor(
    * See `mln_map_get_style_layer_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLayerJson(layerId: String): Completion<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readViewString(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_layer_json(handle, view(layerId), completion, diagnostic))
-    }
+  public fun getStyleLayerJson(layerId: String): Completion<String?> = nativeSubmit(this, binding, { result -> if (CompletionBridge.valueCount(result) == 0uL) null else readViewString(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_layer_json(handle, view(layerId), completion, diagnostic)) }
 
   /**
    * Reads a property of a layer in the map's style.
    *
-   * The value can differ in form from the value that was set: a color set as `"#ff0000"` reads back
-   * as `["rgba", 255, 0, 0, 1]`.
+   * The value can differ in form from the value that was set: a color set as
+   * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
    *
    * Completes with no value when the layer doesn't set the property.
    *
@@ -833,101 +526,55 @@ private constructor(
    *
    * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
    */
-  public fun getStyleLayerProperty(layerId: String, propertyName: String): Completion<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readViewString(CompletionBridge.value(result))
-      },
-    ) {
-      check(
-        C.mln_map_get_style_layer_property(
-          handle,
-          view(layerId),
-          view(propertyName),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun getStyleLayerProperty(layerId: String, propertyName: String): Completion<String?> = nativeSubmit(this, binding, { result -> if (CompletionBridge.valueCount(result) == 0uL) null else readViewString(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_layer_property(handle, view(layerId), view(propertyName), completion, diagnostic)) }
 
   /**
    * Reads a property of the light of the map's style.
    *
-   * The value can differ in form from the value that was set: a color set as `"#ff0000"` reads back
-   * as `["rgba", 255, 0, 0, 1]`.
+   * The value can differ in form from the value that was set: a color set as
+   * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
    *
    * Completes with no value when the light doesn't set the property.
    *
    * See `mln_map_get_style_light_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLightProperty(propertyName: String): Completion<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readViewString(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_light_property(handle, view(propertyName), completion, diagnostic))
-    }
+  public fun getStyleLightProperty(propertyName: String): Completion<String?> = nativeSubmit(this, binding, { result -> if (CompletionBridge.valueCount(result) == 0uL) null else readViewString(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_light_property(handle, view(propertyName), completion, diagnostic)) }
 
   /**
-   * Reads a &#91;root property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
+   * Reads a &#91;root
+   * property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
    * style.
    *
-   * The value can differ in form from the value that was set: a color set as `"#ff0000"` reads back
-   * as `["rgba", 255, 0, 0, 1]`.
+   * The value can differ in form from the value that was set: a color set as
+   * `"#ff0000"` reads back as `["rgba", 255, 0, 0, 1]`.
    *
-   * Completes with no value when neither the style nor the library sets the property. The library
-   * can give a property a value of its own, such as a default `transition`.
+   * Completes with no value when neither the style nor the library sets the
+   * property. The library can give a property a value of its own, such as a
+   * default `transition`.
    *
    * See `mln_map_get_style_root_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when `propertyName` isn't a root property, or is `sources` or
-   *   `layers`.
+   * - `Status.INVALID_ARGUMENT` when `propertyName` isn't a root property, or
+   *   is `sources` or `layers`.
    */
-  public fun getStyleRootProperty(propertyName: String): Completion<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readViewString(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_root_property(handle, view(propertyName), completion, diagnostic))
-    }
+  public fun getStyleRootProperty(propertyName: String): Completion<String?> = nativeSubmit(this, binding, { result -> if (CompletionBridge.valueCount(result) == 0uL) null else readViewString(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_root_property(handle, view(propertyName), completion, diagnostic)) }
 
   /**
    * Reads a source of the map's style.
    *
-   * A tile source with a `url` has an empty attribution until its TileJSON loads, which raises
-   * `RuntimeEventType.MAP_SOURCE_CHANGED`.
+   * A tile source with a `url` has an empty attribution until its TileJSON
+   * loads, which raises `RuntimeEventType.MAP_SOURCE_CHANGED`.
    *
    * Completes with no value when the style has no source named `sourceId`.
    *
    * See `mln_map_get_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleSource(sourceId: String): Completion<StyleSourceInfo?> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleSourceInfo(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_source(handle, view(sourceId), completion, diagnostic))
-    }
+  public fun getStyleSource(sourceId: String): Completion<StyleSourceInfo?> = nativeSubmit(this, binding, { result -> if (CompletionBridge.valueCount(result) == 0uL) null else readStyleSourceInfo(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_source(handle, view(sourceId), completion, diagnostic)) }
 
   /**
    * Reads the default transition of the map's style.
@@ -935,14 +582,7 @@ private constructor(
    * See `mln_map_get_style_transition_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleTransitionOptions(): Completion<StyleTransitionOptions> =
-    nativeSubmit(
-      this,
-      binding,
-      { result -> readStyleTransitionOptions(CompletionBridge.value(result)) },
-    ) {
-      check(C.mln_map_get_style_transition_options(handle, completion, diagnostic))
-    }
+  public fun getStyleTransitionOptions(): Completion<StyleTransitionOptions> = nativeSubmit(this, binding, { result -> readStyleTransitionOptions(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_transition_options(handle, completion, diagnostic)) }
 
   /**
    * Reads the URL of the map's style.
@@ -952,13 +592,11 @@ private constructor(
    * See `mln_map_get_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getStyleUrl(): Completion<String> =
-    nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) {
-      check(C.mln_map_get_style_url(handle, completion, diagnostic))
-    }
+  public fun getStyleUrl(): Completion<String> = nativeSubmit(this, binding, { result -> readViewString(CompletionBridge.value(result)) }) { check(C.mln_map_get_style_url(handle, completion, diagnostic)) }
 
   /**
-   * Makes a custom geometry source ask again for the tiles in `bounds` that the map still needs.
+   * Makes a custom geometry source ask again for the tiles in `bounds` that the
+   * map still needs.
    *
    * See `mln_map_invalidate_custom_geometry_source_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -966,23 +604,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom geometry source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom
+   *   geometry source.
    */
-  public fun invalidateCustomGeometrySourceRegion(
-    sourceId: String,
-    bounds: LatLngBounds,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_invalidate_custom_geometry_source_region(
-          handle,
-          view(sourceId),
-          writeLatLngBounds(bounds),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_invalidate_custom_geometry_source_region(handle, view(sourceId), writeLatLngBounds(bounds), completion, diagnostic)) }
 
   /**
    * Makes a custom geometry source ask for a tile again when the map needs it.
@@ -993,26 +618,14 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom geometry source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom
+   *   geometry source.
    */
-  public fun invalidateCustomGeometrySourceTile(
-    sourceId: String,
-    tileId: CanonicalTileId,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_invalidate_custom_geometry_source_tile(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_invalidate_custom_geometry_source_tile(handle, view(sourceId), writeCanonicalTileId(tileId), completion, diagnostic)) }
 
   /**
-   * Makes a custom vector source ask again for the tiles in `bounds` that the map still needs.
+   * Makes a custom vector source ask again for the tiles in `bounds` that the
+   * map still needs.
    *
    * See `mln_map_invalidate_custom_vector_source_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1020,23 +633,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom vector source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom
+   *   vector source.
    */
-  public fun invalidateCustomVectorSourceRegion(
-    sourceId: String,
-    bounds: LatLngBounds,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_invalidate_custom_vector_source_region(
-          handle,
-          view(sourceId),
-          writeLatLngBounds(bounds),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun invalidateCustomVectorSourceRegion(sourceId: String, bounds: LatLngBounds): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_invalidate_custom_vector_source_region(handle, view(sourceId), writeLatLngBounds(bounds), completion, diagnostic)) }
 
   /**
    * Makes a custom vector source ask for a tile again when the map needs it.
@@ -1047,44 +647,22 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom vector source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom
+   *   vector source.
    */
-  public fun invalidateCustomVectorSourceTile(
-    sourceId: String,
-    tileId: CanonicalTileId,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_invalidate_custom_vector_source_tile(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun invalidateCustomVectorSourceTile(sourceId: String, tileId: CanonicalTileId): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_invalidate_custom_vector_source_tile(handle, view(sourceId), writeCanonicalTileId(tileId), completion, diagnostic)) }
 
   /**
    * Computes the area that the map would show with `camera`.
    *
-   * Camera fields that `camera` doesn't set come from the map's camera. The longitudes can fall
-   * outside -180 to 180, so a view across the antimeridian gives one continuous range.
+   * Camera fields that `camera` doesn't set come from the map's camera. The
+   * longitudes can fall outside -180 to 180, so a view across the antimeridian
+   * gives one continuous range.
    *
    * See `mln_map_lat_lng_bounds_for_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun latLngBoundsForCamera(camera: CameraOptions): Completion<LatLngBounds> =
-    nativeSubmit(this, binding, { result -> readLatLngBounds(CompletionBridge.value(result)) }) {
-      check(
-        C.mln_map_lat_lng_bounds_for_camera(
-          handle,
-          writeCameraOptions(camera),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun latLngBoundsForCamera(camera: CameraOptions): Completion<LatLngBounds> = nativeSubmit(this, binding, { result -> readLatLngBounds(CompletionBridge.value(result)) }) { check(C.mln_map_lat_lng_bounds_for_camera(handle, writeCameraOptions(camera), completion, diagnostic)) }
 
   /**
    * Lists the layers of the map's style, from bottom to top.
@@ -1092,23 +670,7 @@ private constructor(
    * See `mln_map_list_style_layers` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun listStyleLayers(): Completion<List<StyleLayerInfo>> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        readStrided(
-          CompletionBridge.valuePointer(result),
-          CompletionBridge.valueCount(result),
-          CompletionBridge.valueSize(result),
-          w(56, 88, 52),
-        ) {
-          readStyleLayerInfo(it)
-        }
-      },
-    ) {
-      check(C.mln_map_list_style_layers(handle, completion, diagnostic))
-    }
+  public fun listStyleLayers(): Completion<List<StyleLayerInfo>> = nativeSubmit(this, binding, { result -> readStrided(CompletionBridge.valuePointer(result), CompletionBridge.valueCount(result), CompletionBridge.valueSize(result), w(56, 88, 52)) { readStyleLayerInfo(it) } }) { check(C.mln_map_list_style_layers(handle, completion, diagnostic)) }
 
   /**
    * Lists the sources of the map's style.
@@ -1116,51 +678,23 @@ private constructor(
    * See `mln_map_list_style_sources` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun listStyleSources(): Completion<List<StyleSourceInfo>> =
-    nativeSubmit(
-      this,
-      binding,
-      { result ->
-        readStrided(
-          CompletionBridge.valuePointer(result),
-          CompletionBridge.valueCount(result),
-          CompletionBridge.valueSize(result),
-          w(192, 232, 176),
-        ) {
-          readStyleSourceInfo(it)
-        }
-      },
-    ) {
-      check(C.mln_map_list_style_sources(handle, completion, diagnostic))
-    }
+  public fun listStyleSources(): Completion<List<StyleSourceInfo>> = nativeSubmit(this, binding, { result -> readStrided(CompletionBridge.valuePointer(result), CompletionBridge.valueCount(result), CompletionBridge.valueSize(result), w(192, 232, 176)) { readStyleSourceInfo(it) } }) { check(C.mln_map_list_style_sources(handle, completion, diagnostic)) }
 
   /**
-   * Moves a layer of the map's style below the layer named `beforeLayerId`, or above every layer
-   * when `beforeLayerId` is empty.
+   * Moves a layer of the map's style below the layer named `beforeLayerId`, or
+   * above every layer when `beforeLayerId` is empty.
    *
    * See `mln_map_move_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
    * Errors:
    *
-   * - `Status.NOT_FOUND` when the style has no layer named `layerId` or `beforeLayerId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.NOT_FOUND` when the style has no layer named `layerId` or
+   *   `beforeLayerId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun moveStyleLayer(
-    layerId: String,
-    beforeLayerId: String? = null,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_move_style_layer(
-          handle,
-          view(layerId),
-          view(beforeLayerId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String? = null): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_move_style_layer(handle, view(layerId), view(beforeLayerId), completion, diagnostic)) }
 
   /**
    * Releases the map.
@@ -1170,8 +704,7 @@ private constructor(
    * See `mln_map_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public override fun release(): Completion<Unit> =
-    nativeRetire(this, binding) { check(C.mln_map_release(handle, completion, diagnostic)) }
+  public override fun release(): Completion<Unit> = nativeRetire(this, binding) { check(C.mln_map_release(handle, completion, diagnostic)) }
 
   /**
    * Removes the feature state that `selector` selects.
@@ -1179,17 +712,7 @@ private constructor(
    * See `mln_map_remove_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun removeFeatureState(selector: FeatureStateSelector): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_remove_feature_state(
-          handle,
-          writeFeatureStateSelector(selector),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun removeFeatureState(selector: FeatureStateSelector): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_remove_feature_state(handle, writeFeatureStateSelector(selector), completion, diagnostic)) }
 
   /**
    * Removes an image from the map's style.
@@ -1200,12 +723,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no image named `imageId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun removeStyleImage(imageId: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic))
-    }
+  public fun removeStyleImage(imageId: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic)) }
 
   /**
    * Removes a layer from the map's style.
@@ -1216,12 +737,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun removeStyleLayer(layerId: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic))
-    }
+  public fun removeStyleLayer(layerId: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic)) }
 
   /**
    * Removes a source from the map's style.
@@ -1232,13 +751,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_STATE` when a layer still uses the source, or while the style isn't loaded,
-   *   as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` when a layer still uses the source, or while the
+   *   style isn't loaded, as `MapHandle.setStyleUrl()` describes.
    */
-  public fun removeStyleSource(sourceId: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic))
-    }
+  public fun removeStyleSource(sourceId: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic)) }
 
   /**
    * Renders a new frame of a continuous map, even when nothing changed.
@@ -1246,15 +762,26 @@ private constructor(
    * See `mln_map_request_repaint` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun requestRepaint(): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_request_repaint(handle, completion, diagnostic))
-    }
+  public fun requestRepaint(): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_request_repaint(handle, completion, diagnostic)) }
 
   /**
    * Renders a still image of a static or tile map.
    *
-   * The map's render session draws the image once every resource that the image needs has loaded.
+   * The map's render session draws the image once every resource that the image
+   * needs has loaded. While the image waits, the session holds a demand of its
+   * own for it, whose frame result carries `FRAME_DEMAND_TOKEN_STILL_IMAGE`:
+   *
+   * - It waits for the map to load what the image needs, and while every
+   *   texture of a borrowed ring holds a frame.
+   * - It finishes with the image's frame, and the image completes once that
+   *   frame's result is queued. Frames of your own demands complete no image.
+   * - Your demands never replace it, nor it them.
+   * - `RenderSessionHandle.barrier()` ends it with `RenderResult.NO_UPDATE`,
+   *   and a detach or `RenderSessionHandle.releaseTarget()` ends it with
+   *   `RenderResult.TARGET_NOT_READY`. The image gets a new demand once the
+   *   barrier runs, the session has a target again, or the next session
+   *   attaches.
+   * - An image that fails ends its demand with `RenderResult.NO_UPDATE`.
    *
    * See `mln_map_request_still_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1262,17 +789,16 @@ private constructor(
    * Errors:
    *
    * - `Status.CANCELLED` when the map is released before the image is done.
-   * - `Status.NATIVE_ERROR` when the style or a resource that the image needs fails to load.
+   * - `Status.NATIVE_ERROR` when the style or a resource that the image needs
+   *   fails to load.
    */
-  public fun requestStillImage(): Completion<Unit> =
-    nativeUnit(this, binding) {
-      check(C.mln_map_request_still_image(handle, completion, diagnostic))
-    }
+  public fun requestStillImage(): Completion<Unit> = nativeUnit(this, binding) { check(C.mln_map_request_still_image(handle, completion, diagnostic)) }
 
   /**
-   * Sets the map's size.
+   * Sets the map's size and scale factor.
    *
-   * A map with a render session takes its size from the session, so resize the session with
+   * The map keeps its loaded tiles. A map with a render session takes its size
+   * and scale factor from the session, so resize the session with
    * `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
@@ -1281,32 +807,27 @@ private constructor(
    * Errors:
    *
    * - `Status.INVALID_STATE` when the map has a render session.
-   * - `Status.INVALID_STATE` when a render session attached to the map before the resize applied.
+   * - `Status.INVALID_STATE` when a render session attached to the map before
+   *   the resize applied.
    */
-  public fun resize(logicalSize: LogicalSize): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic))
-    }
+  public fun resize(extent: LogicalExtent): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic)) }
 
   /**
    * Limits the camera's center to an area, and its zoom and pitch to ranges.
    *
-   * Limits that `options` doesn't set keep their current values. When the camera is outside the new
-   * limits, it moves inside them.
+   * Limits that `options` doesn't set keep their current values. When the
+   * camera is outside the new limits, it moves inside them.
    *
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setBounds(options: BoundOptions): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic))
-    }
+  public fun setBounds(options: BoundOptions): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic)) }
 
   /**
    * Sets the data of a tile in a custom geometry source.
    *
-   * `data` is a GeoJSON feature collection, feature, or geometry. The source ignores data for a
-   * tile that it hasn't asked for, or has since cancelled.
+   * `data` is a GeoJSON feature collection, feature, or geometry. The source
+   * ignores data for a tile that it hasn't asked for, or has since cancelled.
    *
    * See `mln_map_set_custom_geometry_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1314,25 +835,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom geometry source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom
+   *   geometry source.
    */
-  public fun setCustomGeometrySourceTileData(
-    sourceId: String,
-    tileId: CanonicalTileId,
-    data: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_custom_geometry_source_tile_data(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          view(data),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setCustomGeometrySourceTileData(sourceId: String, tileId: CanonicalTileId, data: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_custom_geometry_source_tile_data(handle, view(sourceId), writeCanonicalTileId(tileId), view(data), completion, diagnostic)) }
 
   /**
    * Reports that a tile of a custom geometry source failed to load.
@@ -1343,31 +849,16 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom geometry source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom
+   *   geometry source.
    */
-  public fun setCustomGeometrySourceTileError(
-    sourceId: String,
-    tileId: CanonicalTileId,
-    message: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_custom_geometry_source_tile_error(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          view(message),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setCustomGeometrySourceTileError(sourceId: String, tileId: CanonicalTileId, message: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_custom_geometry_source_tile_error(handle, view(sourceId), writeCanonicalTileId(tileId), view(message), completion, diagnostic)) }
 
   /**
    * Sets the data of a tile in a custom vector source.
    *
-   * `data` is the tile, encoded as `encoding`. The source ignores data for a tile that it hasn't
-   * asked for, or has since cancelled.
+   * `data` is the tile, encoded as `encoding`. The source ignores data for a
+   * tile that it hasn't asked for, or has since cancelled.
    *
    * See `mln_map_set_custom_vector_source_tile_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1375,27 +866,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom vector source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom
+   *   vector source.
    */
-  public fun setCustomVectorSourceTileData(
-    sourceId: String,
-    tileId: CanonicalTileId,
-    encoding: StyleVectorTileEncoding,
-    data: ByteArray,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_custom_vector_source_tile_data(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          encoding.rawValue.toInt(),
-          view(data),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setCustomVectorSourceTileData(sourceId: String, tileId: CanonicalTileId, encoding: StyleVectorTileEncoding, data: ByteArray): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_custom_vector_source_tile_data(handle, view(sourceId), writeCanonicalTileId(tileId), encoding.rawValue.toInt(), view(data), completion, diagnostic)) }
 
   /**
    * Reports that a tile of a custom vector source failed to load.
@@ -1406,25 +880,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom vector source.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a custom
+   *   vector source.
    */
-  public fun setCustomVectorSourceTileError(
-    sourceId: String,
-    tileId: CanonicalTileId,
-    message: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_custom_vector_source_tile_error(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          view(message),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setCustomVectorSourceTileError(sourceId: String, tileId: CanonicalTileId, message: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_custom_vector_source_tile_error(handle, view(sourceId), writeCanonicalTileId(tileId), view(message), completion, diagnostic)) }
 
   /**
    * Draws debugging overlays, such as tile borders, on the map.
@@ -1434,10 +893,7 @@ private constructor(
    * See `mln_map_set_debug_flags` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setDebugFlags(flags: MapDebugFlag): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic))
-    }
+  public fun setDebugFlags(flags: MapDebugFlag): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic)) }
 
   /**
    * Selects the events that the map reports.
@@ -1445,73 +901,52 @@ private constructor(
    * See `mln_map_set_event_mask` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun setEventMask(mask: RuntimeEventFlag): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
-    }
+  public fun setEventMask(mask: RuntimeEventFlag): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic)) }
 
   /**
    * Merges `state` into the state of a feature.
    *
-   * `state` is a JSON object. Its keys replace the same keys in the feature's state, and the other
-   * keys stay.
+   * `state` is a JSON object. Its keys replace the same keys in the feature's
+   * state, and the other keys stay.
    *
-   * The map keeps the state until it is removed, its source leaves the style, or a style loads.
-   * `MapHandle.removeStyleSource()` removes the state of the source's features, and a style that
-   * loads removes the state of every source, so a later source with the same ID starts with no
-   * state. To set state for a new style's sources, wait until `MapHandle.setStyleUrl()` or
-   * `MapHandle.setStyleJson()` completes. The style load removes state set before then.
+   * The map keeps the state until it is removed, its source leaves the style,
+   * or a style loads. `MapHandle.removeStyleSource()` removes the state of the
+   * source's features, and a style that loads removes the state of every
+   * source, so a later source with the same ID starts with no state. To set
+   * state for a new style's sources, wait until `MapHandle.setStyleUrl()` or
+   * `MapHandle.setStyleJson()` completes. The style load removes state set
+   * before then.
    *
    * See `mln_map_set_feature_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun setFeatureState(
-    selector: FeatureStateSelector,
-    state: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_feature_state(
-          handle,
-          writeFeatureStateSelector(selector),
-          view(state),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setFeatureState(selector: FeatureStateSelector, state: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_feature_state(handle, writeFeatureStateSelector(selector), view(state), completion, diagnostic)) }
 
   /**
    * Places the camera at a position and orientation in space.
    *
-   * The map adjusts them to a camera that it can show. It stops running camera animations first,
-   * and their end handlers report `CameraTransitionOutcome.CANCELLED`.
+   * The map adjusts them to a camera that it can show. It stops running camera
+   * animations first, and their end handlers report
+   * `CameraTransitionOutcome.CANCELLED`.
    *
    * See `mln_map_set_free_camera_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setFreeCameraOptions(options: FreeCameraOptions): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_free_camera_options(
-          handle,
-          writeFreeCameraOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setFreeCameraOptions(options: FreeCameraOptions): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_free_camera_options(handle, writeFreeCameraOptions(options), completion, diagnostic)) }
 
   /**
    * Replaces the data of a GeoJSON source.
    *
-   * `data` is a GeoJSON feature collection, feature, or geometry. The library prepares it for the
-   * source with the source's options, off the threads that the caller and the runtime use, and the
-   * command completes once the source holds it. Later commands don't wait for it. While the source
-   * is still preparing earlier data, only the newest data waits to follow it.
+   * `data` is a GeoJSON feature collection, feature, or geometry. The library
+   * prepares it for the source with the source's options, off the threads that
+   * the caller and the runtime use, and the command completes once the source
+   * holds it. Later commands don't wait for it. While the source is still
+   * preparing earlier data, only the newest data waits to follow it.
    *
-   * With synchronous tiling on, as `MapHandle.setGeoJsonSourceSynchronousTiling()` describes, the
-   * command prepares `data` before later commands run, so the data shows in the next frame.
+   * With synchronous tiling on, as
+   * `MapHandle.setGeoJsonSourceSynchronousTiling()` describes, the command
+   * prepares `data` before later commands run, so the data shows in the next
+   * frame.
    *
    * See `mln_map_set_geo_json_source_data` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1519,33 +954,24 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source, when
-   *   `data` isn't valid GeoJSON, or when the source clusters and `data` isn't a feature collection
-   *   of points. The source keeps its data.
-   * - `Status.CANCELLED` when newer data for the source replaces `data` while it waits, or when the
-   *   source's URL, its removal, a style load, or the map's release replaces the source's data
-   *   before `data` is ready.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a
+   *   GeoJSON source, when `data` isn't valid GeoJSON, or when the source
+   *   clusters and `data` isn't a feature collection of points. The source
+   *   keeps its data.
+   * - `Status.CANCELLED` when newer data for the source replaces `data` while
+   *   it waits, or when the source's URL, its removal, a style load, or the
+   *   map's release replaces the source's data before `data` is ready.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setGeoJsonSourceData(sourceId: String, data: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_geo_json_source_data(
-          handle,
-          view(sourceId),
-          view(data),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setGeoJsonSourceData(sourceId: String, data: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_geo_json_source_data(handle, view(sourceId), view(data), completion, diagnostic)) }
 
   /**
    * Sets whether a GeoJSON source builds its tiles while the map renders.
    *
-   * Building tiles while the map renders, instead of in the background, makes new data show in the
-   * next frame. The setting replaces the `synchronousUpdate` member of the source's JSON, which
-   * defaults to false.
+   * Building tiles while the map renders, instead of in the background, makes
+   * new data show in the next frame. The setting replaces the
+   * `synchronousUpdate` member of the source's JSON, which defaults to false.
    *
    * See `mln_map_set_geo_json_source_synchronous_tiling` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1553,24 +979,12 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a
+   *   GeoJSON source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setGeoJsonSourceSynchronousTiling(
-    sourceId: String,
-    enabled: Boolean,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_geo_json_source_synchronous_tiling(
-          handle,
-          view(sourceId),
-          enabled,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_geo_json_source_synchronous_tiling(handle, view(sourceId), enabled, completion, diagnostic)) }
 
   /**
    * Makes a GeoJSON source load its data from `url`.
@@ -1581,64 +995,41 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a GeoJSON source.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't a
+   *   GeoJSON source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_geo_json_source_url(
-          handle,
-          view(sourceId),
-          view(url),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_geo_json_source_url(handle, view(sourceId), view(url), completion, diagnostic)) }
 
   /**
    * Sets a value that the style's `global-state`
-   * &#91;expressions&#93;(https://maplibre.org/maplibre-style-spec/expressions/) read.
+   * &#91;expressions&#93;(https://maplibre.org/maplibre-style-spec/expressions/)
+   * read.
    *
    * See `mln_map_set_global_state_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setGlobalStateProperty(
-    propertyName: String,
-    value: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_global_state_property(
-          handle,
-          view(propertyName),
-          view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setGlobalStateProperty(propertyName: String, value: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_global_state_property(handle, view(propertyName), view(value), completion, diagnostic)) }
 
   /**
    * Sets whether drags and zooms on a globe turn the bearing.
    *
-   * When it's on, a drag or a zoom around a point on the globe turns the bearing so the planet
-   * keeps its orientation, and a drag can carry the camera over a pole. When it's off, the default,
-   * they keep the bearing, as MapLibre GL JS does. Turn it on for a map whose users can rotate it.
-   * It changes nothing while the map draws Mercator.
+   * When it's on, a drag or a zoom around a point on the globe turns the
+   * bearing so the planet keeps its orientation, and a drag can carry the
+   * camera over a pole. When it's off, the default, they keep the bearing, as
+   * MapLibre GL JS does. Turn it on for a map whose users can rotate it. It
+   * changes nothing while the map draws Mercator.
    *
    * See `mln_map_set_globe_free_bearing_enabled` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setGlobeFreeBearingEnabled(enabled: Boolean): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic))
-    }
+  public fun setGlobeFreeBearingEnabled(enabled: Boolean): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic)) }
 
   /**
    * Moves the image of an image source.
@@ -1651,25 +1042,12 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image
+   *   source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setImageSourceCoordinates(
-    sourceId: String,
-    coordinates: List<LatLng>,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_image_source_coordinates(
-          handle,
-          view(sourceId),
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_image_source_coordinates(handle, view(sourceId), array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) }, coordinates.size.toLong(), completion, diagnostic)) }
 
   /**
    * Replaces the image of an image source.
@@ -1680,24 +1058,12 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image
+   *   source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setImageSourceImage(
-    sourceId: String,
-    image: PremultipliedRgba8Image,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_image_source_image(
-          handle,
-          view(sourceId),
-          writePremultipliedRgba8Image(image),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_image_source_image(handle, view(sourceId), writePremultipliedRgba8Image(image), completion, diagnostic)) }
 
   /**
    * Makes an image source load its image from `url`.
@@ -1708,36 +1074,23 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image source.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_ARGUMENT` when the source named `sourceId` isn't an image
+   *   source.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setImageSourceUrl(sourceId: String, url: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic),
-      )
-    }
+  public fun setImageSourceUrl(sourceId: String, url: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic)) }
 
   /**
-   * Sets whether the map draws in perspective or axonometric projection, and how much it skews the
-   * view.
+   * Sets whether the map draws in perspective or axonometric projection, and
+   * how much it skews the view.
    *
    * Settings that `options` doesn't set keep their current values.
    *
    * See `mln_map_set_projection_mode` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setProjectionMode(options: ProjectionModeOptions): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_projection_mode(
-          handle,
-          writeProjectionModeOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setProjectionMode(options: ProjectionModeOptions): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_projection_mode(handle, writeProjectionModeOptions(options), completion, diagnostic)) }
 
   /**
    * Shows or hides an overlay of rendering statistics on the map.
@@ -1745,10 +1098,7 @@ private constructor(
    * See `mln_map_set_rendering_stats_view_enabled` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setRenderingStatsViewEnabled(enabled: Boolean): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
-    }
+  public fun setRenderingStatsViewEnabled(enabled: Boolean): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic)) }
 
   /**
    * Adds an image to the map's style, or replaces the image named `imageId`.
@@ -1758,52 +1108,35 @@ private constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setStyleImage(
-    imageId: String,
-    image: PremultipliedRgba8Image,
-    options: StyleImageOptions? = null,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_style_image(
-          handle,
-          view(imageId),
-          writePremultipliedRgba8Image(image),
-          options?.let { writeStyleImageOptions(it) } ?: 0L,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleImage(imageId: String, image: PremultipliedRgba8Image, options: StyleImageOptions? = null): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_style_image(handle, view(imageId), writePremultipliedRgba8Image(image), options?.let { writeStyleImageOptions(it) } ?: 0L, completion, diagnostic)) }
 
   /**
    * Loads the map's style from `json`.
    *
-   * The command completes once the style has parsed, and the map's style is then loaded, as
-   * `MapHandle.setStyleUrl()` describes. The style's sources, sprites, and glyphs load in the
-   * background.
+   * The command completes once the style has parsed, and the map's style is
+   * then loaded, as `MapHandle.setStyleUrl()` describes. The style's sources,
+   * sprites, and glyphs load in the background.
    *
    * See `mln_map_set_style_json` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when `json` isn't a valid style. The map keeps its current style.
+   * - `Status.INVALID_ARGUMENT` when `json` isn't a valid style. The map keeps
+   *   its current style.
    */
-  public fun setStyleJson(json: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
-    }
+  public fun setStyleJson(json: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic)) }
 
   /**
    * Sets a property of a layer in the map's style.
    *
    * `propertyName` is one of the layer's layout or paint
-   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), or `filter`, `minzoom`,
-   * `maxzoom`, `source`, or `source-layer`. A null `value` resets any of these but `source` and
-   * `source-layer` to its default.
+   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), or
+   * `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value`
+   * resets any of these but `source` and `source-layer` to its default.
    *
    * See `mln_map_set_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1811,25 +1144,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no layer named `layerId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setStyleLayerProperty(
-    layerId: String,
-    propertyName: String,
-    value: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_style_layer_property(
-          handle,
-          view(layerId),
-          view(propertyName),
-          view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleLayerProperty(layerId: String, propertyName: String, value: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_style_layer_property(handle, view(layerId), view(propertyName), view(value), completion, diagnostic)) }
 
   /**
    * Sets a property of the light of the map's style.
@@ -1839,62 +1157,40 @@ private constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setStyleLightProperty(
-    propertyName: String,
-    value: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_style_light_property(
-          handle,
-          view(propertyName),
-          view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleLightProperty(propertyName: String, value: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_style_light_property(handle, view(propertyName), view(value), completion, diagnostic)) }
 
   /**
-   * Sets a &#91;root property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
-   * style, such as `light`, `sky`, `projection`, or `terrain`, without reloading the style.
+   * Sets a &#91;root
+   * property&#93;(https://maplibre.org/maplibre-style-spec/root/) of the map's
+   * style, such as `light`, `sky`, `projection`, or `terrain`, without
+   * reloading the style.
    *
-   * `propertyName` is a root property other than `sources` and `layers`, which the source and layer
-   * calls change. A null `value` resets the property to its default, as if the style didn't set it.
+   * `propertyName` is a root property other than `sources` and `layers`, which
+   * the source and layer calls change. A null `value` resets the property to
+   * its default, as if the style didn't set it.
    *
    * See `mln_map_set_style_root_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_ARGUMENT` when `propertyName` isn't a root property, is `sources` or
-   *   `layers`, or when `value` isn't a valid value for it.
-   * - `Status.UNSUPPORTED` when the library can't change the property while the style is loaded.
-   *   Load a style that sets it instead.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_ARGUMENT` when `propertyName` isn't a root property, is
+   *   `sources` or `layers`, or when `value` isn't a valid value for it.
+   * - `Status.UNSUPPORTED` when the library can't change the property while the
+   *   style is loaded. Load a style that sets it instead.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setStyleRootProperty(
-    propertyName: String,
-    value: String,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_style_root_property(
-          handle,
-          view(propertyName),
-          view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleRootProperty(propertyName: String, value: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_style_root_property(handle, view(propertyName), view(value), completion, diagnostic)) }
 
   /**
    * Sets whether a source is volatile.
    *
-   * The map doesn't store the tiles of a volatile source in the persistent cache.
+   * The map doesn't store the tiles of a volatile source in the persistent
+   * cache.
    *
    * See `mln_map_set_style_source_volatile` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1902,23 +1198,10 @@ private constructor(
    * Errors:
    *
    * - `Status.NOT_FOUND` when the style has no source named `sourceId`.
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setStyleSourceVolatile(
-    sourceId: String,
-    isVolatile: Boolean,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_style_source_volatile(
-          handle,
-          view(sourceId),
-          isVolatile,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_style_source_volatile(handle, view(sourceId), isVolatile, completion, diagnostic)) }
 
   /**
    * Sets the default transition of the map's style.
@@ -1928,46 +1211,35 @@ private constructor(
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
    */
-  public fun setStyleTransitionOptions(
-    options: StyleTransitionOptions,
-  ): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_style_transition_options(
-          handle,
-          writeStyleTransitionOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleTransitionOptions(options: StyleTransitionOptions): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_style_transition_options(handle, writeStyleTransitionOptions(options), completion, diagnostic)) }
 
   /**
    * Loads the map's style from `url`.
    *
-   * The command completes once the style document has loaded and parsed. The style's sources,
-   * sprites, and glyphs then load in the background.
+   * The command completes once the style document has loaded and parsed. The
+   * style's sources, sprites, and glyphs then load in the background.
    *
-   * The map's style is loaded from the time a style document parses until the next call to this
-   * function. While the style isn't loaded, the commands that change it complete with
-   * `Status.INVALID_STATE`. To change a new map's style without a style document, first load an
-   * empty style, such as `{"version":8,"sources":{},"layers":[]}`.
+   * The map's style is loaded from the time a style document parses until the
+   * next call to this function. While the style isn't loaded, the commands that
+   * change it complete with `Status.INVALID_STATE`. To change a new map's style
+   * without a style document, first load an empty style, such as
+   * `{"version":8,"sources":{},"layers":[]}`.
    *
    * See `mln_map_set_style_url` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    *
    * Errors:
    *
-   * - `Status.NATIVE_ERROR` when the style document fails to load or isn't a valid style.
-   * - `Status.CANCELLED` when the map is released, or this function or `MapHandle.setStyleJson()`
-   *   loads another style, before the style document parses.
+   * - `Status.NATIVE_ERROR` when the style document fails to load or isn't a
+   *   valid style.
+   * - `Status.CANCELLED` when the map is released, or this function or
+   *   `MapHandle.setStyleJson()` loads another style, before the style document
+   *   parses.
    */
-  public fun setStyleUrl(url: String): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic))
-    }
+  public fun setStyleUrl(url: String): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic)) }
 
   /**
    * Sets how the map chooses which tiles to load, and at what detail.
@@ -1977,12 +1249,7 @@ private constructor(
    * See `mln_map_set_tile_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setTileOptions(options: MapTileOptions): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic),
-      )
-    }
+  public fun setTileOptions(options: MapTileOptions): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic)) }
 
   /**
    * Sets how the map orients and constrains its view.
@@ -1992,730 +1259,209 @@ private constructor(
    * See `mln_map_set_viewport_options` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun setViewportOptions(options: MapViewportOptions): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(
-        C.mln_map_set_viewport_options(
-          handle,
-          writeMapViewportOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setViewportOptions(options: MapViewportOptions): Completion<CommandCompletion> = nativeCommand(this, binding) { check(C.mln_map_set_viewport_options(handle, writeMapViewportOptions(options), completion, diagnostic)) }
 
   /**
    * Moves the camera, at once or with an animation.
    *
-   * Camera fields that `update` doesn't set keep their values, and the update stops any running
-   * animation of the fields it sets. The function finishes when the map applies the update, before
-   * an animation ends. To learn when an animation ends, set an `CameraTransitionHandler` in its
-   * animation options.
+   * Camera fields that `update` doesn't set keep their values, and the update
+   * stops any running animation of the fields it sets. The function finishes
+   * when the map applies the update, before an animation ends. To learn when an
+   * animation ends, set an `CameraTransitionHandler` in its animation options.
    *
    * See `mln_map_update_camera` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
-  public fun updateCamera(update: CameraUpdate): Completion<CommandCompletion> =
-    nativeCommand(this, binding, bindingCallbacks) {
-      check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
-    }
+  public fun updateCamera(update: CameraUpdate): Completion<CommandCompletion> = nativeCommand(this, binding, bindingCallbacks) { check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic)) }
 
   /**
-   * This handle's commands without their completions. A discarding call returns once native accepts
-   * the command, and native logs a command that fails as a warning.
+   * This handle's commands without their completions. A discarding call returns once native
+   * accepts the command, and native logs a command that fails as a warning.
    */
-  public val discarding: MapDiscarding
-    get() = MapDiscarding.wrap(this)
+  public val discarding: MapDiscarding get() = MapDiscarding.wrap(this)
 
-  override fun toString(): String =
-    "MapHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
-
+  override fun toString(): String = "MapHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
   internal companion object {
     /** Creates the owner of `handle`. */
-    @JvmSynthetic
-    internal fun wrap(
-      handle: Long,
-      parent: RuntimeHandle?,
-      ready: Completion<Unit> = Completion.completed(Unit),
-      borrowed: Boolean = false,
-    ): MapHandle = MapHandle(handle, parent, ready, borrowed)
+    @JvmSynthetic internal fun wrap(handle: Long, parent: RuntimeHandle?, ready: Completion<Unit> = Completion.completed(Unit), borrowed: Boolean = false): MapHandle =
+      MapHandle(handle, parent, ready, borrowed)
   }
 }
 
 /** The commands of a [MapHandle] that drop their completions. */
 public class MapDiscarding private constructor(@get:JvmSynthetic internal val owner: MapHandle) {
-  @get:JvmSynthetic
-  internal val binding
-    get() = owner.binding
-
-  @get:JvmSynthetic
-  internal val bindingCallbacks
-    get() = owner.bindingCallbacks
-
+  @get:JvmSynthetic internal val binding get() = owner.binding
+  @get:JvmSynthetic internal val bindingCallbacks get() = owner.bindingCallbacks
   /** [MapHandle.addCustomGeometrySource] without its completion. */
-  public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions): Unit =
-    nativeDiscard(owner, binding, bindingCallbacks) {
-      check(
-        C.mln_map_add_custom_geometry_source(
-          handle,
-          view(sourceId),
-          writeCustomGeometrySourceOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions): Unit = nativeDiscard(owner, binding, bindingCallbacks) { check(C.mln_map_add_custom_geometry_source(handle, view(sourceId), writeCustomGeometrySourceOptions(options), completion, diagnostic)) }
+
+  /** [MapHandle.addCustomLayer] without its completion. */
+  public fun addCustomLayer(layerId: String, beforeLayerId: String? = null, host: CustomLayerHost): Unit = nativeDiscard(owner, binding, bindingCallbacks) { check(C.mln_map_add_custom_layer(handle, view(layerId), view(beforeLayerId), writeCustomLayerHost(host), completion, diagnostic)) }
 
   /** [MapHandle.addCustomVectorSource] without its completion. */
-  public fun addCustomVectorSource(sourceId: String, options: CustomVectorSourceOptions): Unit =
-    nativeDiscard(owner, binding, bindingCallbacks) {
-      check(
-        C.mln_map_add_custom_vector_source(
-          handle,
-          view(sourceId),
-          writeCustomVectorSourceOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addCustomVectorSource(sourceId: String, options: CustomVectorSourceOptions): Unit = nativeDiscard(owner, binding, bindingCallbacks) { check(C.mln_map_add_custom_vector_source(handle, view(sourceId), writeCustomVectorSourceOptions(options), completion, diagnostic)) }
 
   /** [MapHandle.addGeoJsonSource] without its completion. */
-  public fun addGeoJsonSource(
-    sourceId: String,
-    options: GeoJsonSourceOptions? = null,
-    attribution: String? = null,
-  ): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_add_geo_json_source(
-          handle,
-          view(sourceId),
-          options?.let { writeGeoJsonSourceOptions(it) } ?: 0L,
-          view(attribution),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addGeoJsonSource(sourceId: String, options: GeoJsonSourceOptions? = null, attribution: String? = null): Unit = nativeDiscard(owner, binding) { check(C.mln_map_add_geo_json_source(handle, view(sourceId), options?.let { writeGeoJsonSourceOptions(it) } ?: 0L, view(attribution), completion, diagnostic)) }
 
   /** [MapHandle.addImageSourceImage] without its completion. */
-  public fun addImageSourceImage(
-    sourceId: String,
-    coordinates: List<LatLng>,
-    image: PremultipliedRgba8Image,
-  ): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_add_image_source_image(
-          handle,
-          view(sourceId),
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          writePremultipliedRgba8Image(image),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addImageSourceImage(sourceId: String, coordinates: List<LatLng>, image: PremultipliedRgba8Image): Unit = nativeDiscard(owner, binding) { check(C.mln_map_add_image_source_image(handle, view(sourceId), array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) }, coordinates.size.toLong(), writePremultipliedRgba8Image(image), completion, diagnostic)) }
 
   /** [MapHandle.addStyleLayerJson] without its completion. */
-  public fun addStyleLayerJson(layerJson: String, beforeLayerId: String? = null): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_add_style_layer_json(
-          handle,
-          view(layerJson),
-          view(beforeLayerId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addStyleLayerJson(layerJson: String, beforeLayerId: String? = null): Unit = nativeDiscard(owner, binding) { check(C.mln_map_add_style_layer_json(handle, view(layerJson), view(beforeLayerId), completion, diagnostic)) }
 
   /** [MapHandle.addStyleSourceJson] without its completion. */
-  public fun addStyleSourceJson(sourceId: String, sourceJson: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_add_style_source_json(
-          handle,
-          view(sourceId),
-          view(sourceJson),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun addStyleSourceJson(sourceId: String, sourceJson: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_add_style_source_json(handle, view(sourceId), view(sourceJson), completion, diagnostic)) }
 
   /** [MapHandle.applyCameraDelta] without its completion. */
-  public fun applyCameraDelta(delta: CameraDelta): Unit =
-    nativeDiscard(owner, binding, bindingCallbacks) {
-      check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic))
-    }
+  public fun applyCameraDelta(delta: CameraDelta): Unit = nativeDiscard(owner, binding, bindingCallbacks) { check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic)) }
 
   /** [MapHandle.beginCommandGroup] without its completion. */
-  public fun beginCommandGroup(): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_begin_command_group(handle, completion, diagnostic))
-    }
+  public fun beginCommandGroup(): Unit = nativeDiscard(owner, binding) { check(C.mln_map_begin_command_group(handle, completion, diagnostic)) }
 
   /** [MapHandle.cancelCameraTransitions] without its completion. */
-  public fun cancelCameraTransitions(): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_cancel_camera_transitions(handle, completion, diagnostic))
-    }
+  public fun cancelCameraTransitions(): Unit = nativeDiscard(owner, binding) { check(C.mln_map_cancel_camera_transitions(handle, completion, diagnostic)) }
 
   /** [MapHandle.cancelCameraTransitionsWithId] without its completion. */
-  @JvmName("cancelCameraTransitionsWithId")
-  public fun cancelCameraTransitionsWithId(transitionId: ULong): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_cancel_camera_transitions_with_id(
-          handle,
-          transitionId.toLong(),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  @JvmName("cancelCameraTransitionsWithId") public fun cancelCameraTransitionsWithId(transitionId: ULong): Unit = nativeDiscard(owner, binding) { check(C.mln_map_cancel_camera_transitions_with_id(handle, transitionId.toLong(), completion, diagnostic)) }
 
   /** [MapHandle.dumpDebugLogs] without its completion. */
-  public fun dumpDebugLogs(): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_dump_debug_logs(handle, completion, diagnostic))
-    }
+  public fun dumpDebugLogs(): Unit = nativeDiscard(owner, binding) { check(C.mln_map_dump_debug_logs(handle, completion, diagnostic)) }
 
   /** [MapHandle.endCommandGroup] without its completion. */
-  public fun endCommandGroup(): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_end_command_group(handle, completion, diagnostic))
-    }
+  public fun endCommandGroup(): Unit = nativeDiscard(owner, binding) { check(C.mln_map_end_command_group(handle, completion, diagnostic)) }
 
   /** [MapHandle.fitCameraToGeometry] without its completion. */
-  public fun fitCameraToGeometry(geometry: String, update: CameraFitUpdate): Unit =
-    nativeDiscard(owner, binding, bindingCallbacks) {
-      check(
-        C.mln_map_fit_camera_to_geometry(
-          handle,
-          view(geometry),
-          writeCameraFitUpdate(update),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun fitCameraToGeometry(geometry: String, update: CameraFitUpdate): Unit = nativeDiscard(owner, binding, bindingCallbacks) { check(C.mln_map_fit_camera_to_geometry(handle, view(geometry), writeCameraFitUpdate(update), completion, diagnostic)) }
 
   /** [MapHandle.fitCameraToLatLngBounds] without its completion. */
-  public fun fitCameraToLatLngBounds(bounds: LatLngBounds, update: CameraFitUpdate): Unit =
-    nativeDiscard(owner, binding, bindingCallbacks) {
-      check(
-        C.mln_map_fit_camera_to_lat_lng_bounds(
-          handle,
-          writeLatLngBounds(bounds),
-          writeCameraFitUpdate(update),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun fitCameraToLatLngBounds(bounds: LatLngBounds, update: CameraFitUpdate): Unit = nativeDiscard(owner, binding, bindingCallbacks) { check(C.mln_map_fit_camera_to_lat_lng_bounds(handle, writeLatLngBounds(bounds), writeCameraFitUpdate(update), completion, diagnostic)) }
 
   /** [MapHandle.fitCameraToLatLngs] without its completion. */
-  public fun fitCameraToLatLngs(coordinates: List<LatLng>, update: CameraFitUpdate): Unit =
-    nativeDiscard(owner, binding, bindingCallbacks) {
-      check(
-        C.mln_map_fit_camera_to_lat_lngs(
-          handle,
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          writeCameraFitUpdate(update),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun fitCameraToLatLngs(coordinates: List<LatLng>, update: CameraFitUpdate): Unit = nativeDiscard(owner, binding, bindingCallbacks) { check(C.mln_map_fit_camera_to_lat_lngs(handle, array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) }, coordinates.size.toLong(), writeCameraFitUpdate(update), completion, diagnostic)) }
 
   /** [MapHandle.invalidateCustomGeometrySourceRegion] without its completion. */
-  public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_invalidate_custom_geometry_source_region(
-          handle,
-          view(sourceId),
-          writeLatLngBounds(bounds),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds): Unit = nativeDiscard(owner, binding) { check(C.mln_map_invalidate_custom_geometry_source_region(handle, view(sourceId), writeLatLngBounds(bounds), completion, diagnostic)) }
 
   /** [MapHandle.invalidateCustomGeometrySourceTile] without its completion. */
-  public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_invalidate_custom_geometry_source_tile(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId): Unit = nativeDiscard(owner, binding) { check(C.mln_map_invalidate_custom_geometry_source_tile(handle, view(sourceId), writeCanonicalTileId(tileId), completion, diagnostic)) }
 
   /** [MapHandle.invalidateCustomVectorSourceRegion] without its completion. */
-  public fun invalidateCustomVectorSourceRegion(sourceId: String, bounds: LatLngBounds): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_invalidate_custom_vector_source_region(
-          handle,
-          view(sourceId),
-          writeLatLngBounds(bounds),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun invalidateCustomVectorSourceRegion(sourceId: String, bounds: LatLngBounds): Unit = nativeDiscard(owner, binding) { check(C.mln_map_invalidate_custom_vector_source_region(handle, view(sourceId), writeLatLngBounds(bounds), completion, diagnostic)) }
 
   /** [MapHandle.invalidateCustomVectorSourceTile] without its completion. */
-  public fun invalidateCustomVectorSourceTile(sourceId: String, tileId: CanonicalTileId): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_invalidate_custom_vector_source_tile(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun invalidateCustomVectorSourceTile(sourceId: String, tileId: CanonicalTileId): Unit = nativeDiscard(owner, binding) { check(C.mln_map_invalidate_custom_vector_source_tile(handle, view(sourceId), writeCanonicalTileId(tileId), completion, diagnostic)) }
 
   /** [MapHandle.moveStyleLayer] without its completion. */
-  public fun moveStyleLayer(layerId: String, beforeLayerId: String? = null): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_move_style_layer(
-          handle,
-          view(layerId),
-          view(beforeLayerId),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String? = null): Unit = nativeDiscard(owner, binding) { check(C.mln_map_move_style_layer(handle, view(layerId), view(beforeLayerId), completion, diagnostic)) }
 
   /** [MapHandle.removeFeatureState] without its completion. */
-  public fun removeFeatureState(selector: FeatureStateSelector): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_remove_feature_state(
-          handle,
-          writeFeatureStateSelector(selector),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun removeFeatureState(selector: FeatureStateSelector): Unit = nativeDiscard(owner, binding) { check(C.mln_map_remove_feature_state(handle, writeFeatureStateSelector(selector), completion, diagnostic)) }
 
   /** [MapHandle.removeStyleImage] without its completion. */
-  public fun removeStyleImage(imageId: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic))
-    }
+  public fun removeStyleImage(imageId: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic)) }
 
   /** [MapHandle.removeStyleLayer] without its completion. */
-  public fun removeStyleLayer(layerId: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic))
-    }
+  public fun removeStyleLayer(layerId: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic)) }
 
   /** [MapHandle.removeStyleSource] without its completion. */
-  public fun removeStyleSource(sourceId: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic))
-    }
+  public fun removeStyleSource(sourceId: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic)) }
 
   /** [MapHandle.requestRepaint] without its completion. */
-  public fun requestRepaint(): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_request_repaint(handle, completion, diagnostic))
-    }
+  public fun requestRepaint(): Unit = nativeDiscard(owner, binding) { check(C.mln_map_request_repaint(handle, completion, diagnostic)) }
 
   /** [MapHandle.resize] without its completion. */
-  public fun resize(logicalSize: LogicalSize): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic))
-    }
+  public fun resize(extent: LogicalExtent): Unit = nativeDiscard(owner, binding) { check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic)) }
 
   /** [MapHandle.setBounds] without its completion. */
-  public fun setBounds(options: BoundOptions): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic))
-    }
+  public fun setBounds(options: BoundOptions): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic)) }
 
   /** [MapHandle.setCustomGeometrySourceTileData] without its completion. */
-  public fun setCustomGeometrySourceTileData(
-    sourceId: String,
-    tileId: CanonicalTileId,
-    data: String,
-  ): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_custom_geometry_source_tile_data(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          view(data),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setCustomGeometrySourceTileData(sourceId: String, tileId: CanonicalTileId, data: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_custom_geometry_source_tile_data(handle, view(sourceId), writeCanonicalTileId(tileId), view(data), completion, diagnostic)) }
 
   /** [MapHandle.setCustomGeometrySourceTileError] without its completion. */
-  public fun setCustomGeometrySourceTileError(
-    sourceId: String,
-    tileId: CanonicalTileId,
-    message: String,
-  ): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_custom_geometry_source_tile_error(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          view(message),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setCustomGeometrySourceTileError(sourceId: String, tileId: CanonicalTileId, message: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_custom_geometry_source_tile_error(handle, view(sourceId), writeCanonicalTileId(tileId), view(message), completion, diagnostic)) }
 
   /** [MapHandle.setCustomVectorSourceTileData] without its completion. */
-  public fun setCustomVectorSourceTileData(
-    sourceId: String,
-    tileId: CanonicalTileId,
-    encoding: StyleVectorTileEncoding,
-    data: ByteArray,
-  ): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_custom_vector_source_tile_data(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          encoding.rawValue.toInt(),
-          view(data),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setCustomVectorSourceTileData(sourceId: String, tileId: CanonicalTileId, encoding: StyleVectorTileEncoding, data: ByteArray): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_custom_vector_source_tile_data(handle, view(sourceId), writeCanonicalTileId(tileId), encoding.rawValue.toInt(), view(data), completion, diagnostic)) }
 
   /** [MapHandle.setCustomVectorSourceTileError] without its completion. */
-  public fun setCustomVectorSourceTileError(
-    sourceId: String,
-    tileId: CanonicalTileId,
-    message: String,
-  ): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_custom_vector_source_tile_error(
-          handle,
-          view(sourceId),
-          writeCanonicalTileId(tileId),
-          view(message),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setCustomVectorSourceTileError(sourceId: String, tileId: CanonicalTileId, message: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_custom_vector_source_tile_error(handle, view(sourceId), writeCanonicalTileId(tileId), view(message), completion, diagnostic)) }
 
   /** [MapHandle.setDebugFlags] without its completion. */
-  public fun setDebugFlags(flags: MapDebugFlag): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic))
-    }
+  public fun setDebugFlags(flags: MapDebugFlag): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic)) }
 
   /** [MapHandle.setEventMask] without its completion. */
-  public fun setEventMask(mask: RuntimeEventFlag): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
-    }
+  public fun setEventMask(mask: RuntimeEventFlag): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic)) }
 
   /** [MapHandle.setFeatureState] without its completion. */
-  public fun setFeatureState(selector: FeatureStateSelector, state: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_feature_state(
-          handle,
-          writeFeatureStateSelector(selector),
-          view(state),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setFeatureState(selector: FeatureStateSelector, state: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_feature_state(handle, writeFeatureStateSelector(selector), view(state), completion, diagnostic)) }
 
   /** [MapHandle.setFreeCameraOptions] without its completion. */
-  public fun setFreeCameraOptions(options: FreeCameraOptions): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_free_camera_options(
-          handle,
-          writeFreeCameraOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setFreeCameraOptions(options: FreeCameraOptions): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_free_camera_options(handle, writeFreeCameraOptions(options), completion, diagnostic)) }
 
   /** [MapHandle.setGeoJsonSourceData] without its completion. */
-  public fun setGeoJsonSourceData(sourceId: String, data: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_geo_json_source_data(
-          handle,
-          view(sourceId),
-          view(data),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setGeoJsonSourceData(sourceId: String, data: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_geo_json_source_data(handle, view(sourceId), view(data), completion, diagnostic)) }
 
   /** [MapHandle.setGeoJsonSourceSynchronousTiling] without its completion. */
-  public fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_geo_json_source_synchronous_tiling(
-          handle,
-          view(sourceId),
-          enabled,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_geo_json_source_synchronous_tiling(handle, view(sourceId), enabled, completion, diagnostic)) }
 
   /** [MapHandle.setGeoJsonSourceUrl] without its completion. */
-  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_geo_json_source_url(
-          handle,
-          view(sourceId),
-          view(url),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_geo_json_source_url(handle, view(sourceId), view(url), completion, diagnostic)) }
 
   /** [MapHandle.setGlobalStateProperty] without its completion. */
-  public fun setGlobalStateProperty(propertyName: String, value: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_global_state_property(
-          handle,
-          view(propertyName),
-          view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setGlobalStateProperty(propertyName: String, value: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_global_state_property(handle, view(propertyName), view(value), completion, diagnostic)) }
 
   /** [MapHandle.setGlobeFreeBearingEnabled] without its completion. */
-  public fun setGlobeFreeBearingEnabled(enabled: Boolean): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic))
-    }
+  public fun setGlobeFreeBearingEnabled(enabled: Boolean): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic)) }
 
   /** [MapHandle.setImageSourceCoordinates] without its completion. */
-  public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_image_source_coordinates(
-          handle,
-          view(sourceId),
-          array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) },
-          coordinates.size.toLong(),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_image_source_coordinates(handle, view(sourceId), array(coordinates, 16, w(8, 8, 4)) { at, item -> putLatLng(at, item) }, coordinates.size.toLong(), completion, diagnostic)) }
 
   /** [MapHandle.setImageSourceImage] without its completion. */
-  public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_image_source_image(
-          handle,
-          view(sourceId),
-          writePremultipliedRgba8Image(image),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_image_source_image(handle, view(sourceId), writePremultipliedRgba8Image(image), completion, diagnostic)) }
 
   /** [MapHandle.setImageSourceUrl] without its completion. */
-  public fun setImageSourceUrl(sourceId: String, url: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic),
-      )
-    }
+  public fun setImageSourceUrl(sourceId: String, url: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_image_source_url(handle, view(sourceId), view(url), completion, diagnostic)) }
 
   /** [MapHandle.setProjectionMode] without its completion. */
-  public fun setProjectionMode(options: ProjectionModeOptions): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_projection_mode(
-          handle,
-          writeProjectionModeOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setProjectionMode(options: ProjectionModeOptions): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_projection_mode(handle, writeProjectionModeOptions(options), completion, diagnostic)) }
 
   /** [MapHandle.setRenderingStatsViewEnabled] without its completion. */
-  public fun setRenderingStatsViewEnabled(enabled: Boolean): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
-    }
+  public fun setRenderingStatsViewEnabled(enabled: Boolean): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic)) }
 
   /** [MapHandle.setStyleImage] without its completion. */
-  public fun setStyleImage(
-    imageId: String,
-    image: PremultipliedRgba8Image,
-    options: StyleImageOptions? = null,
-  ): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_style_image(
-          handle,
-          view(imageId),
-          writePremultipliedRgba8Image(image),
-          options?.let { writeStyleImageOptions(it) } ?: 0L,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleImage(imageId: String, image: PremultipliedRgba8Image, options: StyleImageOptions? = null): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_style_image(handle, view(imageId), writePremultipliedRgba8Image(image), options?.let { writeStyleImageOptions(it) } ?: 0L, completion, diagnostic)) }
 
   /** [MapHandle.setStyleJson] without its completion. */
-  public fun setStyleJson(json: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
-    }
+  public fun setStyleJson(json: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic)) }
 
   /** [MapHandle.setStyleLayerProperty] without its completion. */
-  public fun setStyleLayerProperty(layerId: String, propertyName: String, value: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_style_layer_property(
-          handle,
-          view(layerId),
-          view(propertyName),
-          view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleLayerProperty(layerId: String, propertyName: String, value: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_style_layer_property(handle, view(layerId), view(propertyName), view(value), completion, diagnostic)) }
 
   /** [MapHandle.setStyleLightProperty] without its completion. */
-  public fun setStyleLightProperty(propertyName: String, value: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_style_light_property(
-          handle,
-          view(propertyName),
-          view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleLightProperty(propertyName: String, value: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_style_light_property(handle, view(propertyName), view(value), completion, diagnostic)) }
 
   /** [MapHandle.setStyleRootProperty] without its completion. */
-  public fun setStyleRootProperty(propertyName: String, value: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_style_root_property(
-          handle,
-          view(propertyName),
-          view(value),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleRootProperty(propertyName: String, value: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_style_root_property(handle, view(propertyName), view(value), completion, diagnostic)) }
 
   /** [MapHandle.setStyleSourceVolatile] without its completion. */
-  public fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_style_source_volatile(
-          handle,
-          view(sourceId),
-          isVolatile,
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleSourceVolatile(sourceId: String, isVolatile: Boolean): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_style_source_volatile(handle, view(sourceId), isVolatile, completion, diagnostic)) }
 
   /** [MapHandle.setStyleTransitionOptions] without its completion. */
-  public fun setStyleTransitionOptions(options: StyleTransitionOptions): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_style_transition_options(
-          handle,
-          writeStyleTransitionOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setStyleTransitionOptions(options: StyleTransitionOptions): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_style_transition_options(handle, writeStyleTransitionOptions(options), completion, diagnostic)) }
 
   /** [MapHandle.setStyleUrl] without its completion. */
-  public fun setStyleUrl(url: String): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic))
-    }
+  public fun setStyleUrl(url: String): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_style_url(handle, view(url), completion, diagnostic)) }
 
   /** [MapHandle.setTileOptions] without its completion. */
-  public fun setTileOptions(options: MapTileOptions): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic),
-      )
-    }
+  public fun setTileOptions(options: MapTileOptions): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_tile_options(handle, writeMapTileOptions(options), completion, diagnostic)) }
 
   /** [MapHandle.setViewportOptions] without its completion. */
-  public fun setViewportOptions(options: MapViewportOptions): Unit =
-    nativeDiscard(owner, binding) {
-      check(
-        C.mln_map_set_viewport_options(
-          handle,
-          writeMapViewportOptions(options),
-          completion,
-          diagnostic,
-        ),
-      )
-    }
+  public fun setViewportOptions(options: MapViewportOptions): Unit = nativeDiscard(owner, binding) { check(C.mln_map_set_viewport_options(handle, writeMapViewportOptions(options), completion, diagnostic)) }
 
   /** [MapHandle.updateCamera] without its completion. */
-  public fun updateCamera(update: CameraUpdate): Unit =
-    nativeDiscard(owner, binding, bindingCallbacks) {
-      check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
-    }
-
+  public fun updateCamera(update: CameraUpdate): Unit = nativeDiscard(owner, binding, bindingCallbacks) { check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic)) }
   internal companion object {
     /** Creates the discarding view of `owner`. */
     @JvmSynthetic internal fun wrap(owner: MapHandle): MapDiscarding = MapDiscarding(owner)

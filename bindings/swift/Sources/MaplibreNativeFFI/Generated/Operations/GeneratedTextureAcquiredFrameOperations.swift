@@ -4,43 +4,175 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension AcquiredFrameHandle {
-  #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
-    /// Gets the Metal texture of an acquired frame.
-    ///
-    /// See `mln_acquired_frame_get_metal_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `Status.targetLost` when the session failed, or you detached,
-    /// abandoned,
-    ///   or disposed it.
-    func withMetalTexture<Result>(_ body: (MetalTextureFrameView) throws
-      -> Result) throws -> Result
-    {
-      var raw = mln_metal_texture_frame()
-      raw.size = UInt32(MemoryLayout<mln_metal_texture_frame>.size)
-      return try nativeView(
-        reading: raw,
-        begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
-          raw,
-          token,
-          diagnostic
-        ) },
-        end: { mln_acquired_frame_view_end($0) },
-        get: { raw, value, diagnostic in mln_acquired_frame_get_metal_texture(
-          raw,
-          value,
-          diagnostic
-        ) }
-      ) { raw, scope in try body(MetalTextureFrameView(
-        MetalTextureFrame(raw: raw),
-        scope: scope
-      )) }
-    }
-  #endif
+#if os(Android)
+  /// Gets the Android hardware buffer of an exported ring's acquired frame.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// buffer. Once you release or discard the frame, the session may render into
+  /// the buffer again. A reference that you take with `AHardwareBuffer_acquire`
+  /// keeps the buffer's memory, but not its contents.
+  ///
+  /// See `mln_acquired_frame_get_android_hardware_buffer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the session's ring shares its textures in
+  ///   another way.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+func withAndroidHardwareBuffer<Result>(_ body: (AndroidHardwareBufferFrameView) throws -> Result) throws -> Result {
+  var raw = mln_android_hardware_buffer_frame()
+  raw.size = UInt32(MemoryLayout<mln_android_hardware_buffer_frame>.size)
+  return try nativeView(reading: raw, begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(raw, token, diagnostic) }, end: { mln_acquired_frame_view_end($0) }, get: { raw, value, diagnostic in mln_acquired_frame_get_android_hardware_buffer(raw, value, diagnostic) }) { raw, scope in try body(AndroidHardwareBufferFrameView(AndroidHardwareBufferFrame(raw: raw), scope: scope)) }
+}
+#endif
+
+#if os(Linux)
+  /// Gets the dmabuf of an exported ring's acquired frame.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// buffer. Once you release or discard the frame, the session may render into
+  /// the buffer again. You can map a buffer with DRM_FORMAT_MOD_LINEAR, which
+  /// has one plane, with `mmap`, and bracket your reads with
+  /// DMA_BUF_IOCTL_SYNC.
+  ///
+  /// The session owns the planes' file descriptors, so don't close them. To
+  /// keep the buffer after you release the frame, duplicate each file
+  /// descriptor with `dup`. A duplicate keeps the buffer's memory, but not its
+  /// contents.
+  ///
+  /// See `mln_acquired_frame_get_dma_buf` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the session's ring shares its textures in
+  ///   another way.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+func withDmaBuf<Result>(_ body: (DmaBufFrameView) throws -> Result) throws -> Result {
+  var raw = mln_dma_buf_frame()
+  raw.size = UInt32(MemoryLayout<mln_dma_buf_frame>.size)
+  return try nativeView(reading: raw, begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(raw, token, diagnostic) }, end: { mln_acquired_frame_view_end($0) }, get: { raw, value, diagnostic in mln_acquired_frame_get_dma_buf(raw, value, diagnostic) }) { raw, scope in try body(DmaBufFrameView(try DmaBufFrame(raw: raw), scope: scope)) }
+}
+#endif
+
+#if os(Windows)
+  /// Gets the DXGI shared texture of an exported ring's acquired frame.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// texture. Once you release or discard the frame, the session may render
+  /// into the texture again. Open the handle with
+  /// `ID3D11Device1::OpenSharedResource1` or `ID3D12Device::OpenSharedHandle`.
+  /// A texture that you open keeps its memory, but not its contents.
+  ///
+  /// The session owns the handle, so don't close it. To keep the handle after
+  /// you release the frame, duplicate it with `DuplicateHandle`.
+  ///
+  /// See `mln_acquired_frame_get_dxgi_shared_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the session's ring shares its textures in
+  ///   another way.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+func withDxgiSharedTexture<Result>(_ body: (DxgiSharedTextureFrameView) throws -> Result) throws -> Result {
+  var raw = mln_dxgi_shared_texture_frame()
+  raw.size = UInt32(MemoryLayout<mln_dxgi_shared_texture_frame>.size)
+  return try nativeView(reading: raw, begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(raw, token, diagnostic) }, end: { mln_acquired_frame_view_end($0) }, get: { raw, value, diagnostic in mln_acquired_frame_get_dxgi_shared_texture(raw, value, diagnostic) }) { raw, scope in try body(DxgiSharedTextureFrameView(DxgiSharedTextureFrame(raw: raw), scope: scope)) }
+}
+#endif
+
+#if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
+  /// Gets the IOSurface of an exported ring's acquired frame.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// surface. Once you release or discard the frame, the session may render
+  /// into the surface again. For an API that takes a `CVPixelBuffer`, wrap the
+  /// surface with `CVPixelBufferCreateWithIOSurface`. A reference that you take
+  /// with `CFRetain`, or a pixel buffer that wraps the surface, keeps the
+  /// surface's memory, but not its contents.
+  ///
+  /// See `mln_acquired_frame_get_io_surface` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the session's ring shares its textures in
+  ///   another way.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+func withIoSurface<Result>(_ body: (IoSurfaceFrameView) throws -> Result) throws -> Result {
+  var raw = mln_io_surface_frame()
+  raw.size = UInt32(MemoryLayout<mln_io_surface_frame>.size)
+  return try nativeView(reading: raw, begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(raw, token, diagnostic) }, end: { mln_acquired_frame_view_end($0) }, get: { raw, value, diagnostic in mln_acquired_frame_get_io_surface(raw, value, diagnostic) }) { raw, scope in try body(IoSurfaceFrameView(IoSurfaceFrame(raw: raw), scope: scope)) }
+}
+#endif
+
+#if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
+  /// Gets the Metal texture of an acquired frame.
+  ///
+  /// It gets a borrowed ring's texture, or an exported ring's on a Metal
+  /// device: the texture of the IOSurface that
+  /// `AcquiredFrameHandle.withIoSurface()` gets, and the frame's depth texture
+  /// with `RenderSessionAttachOptions.keepDepth`. Wait for
+  /// `AcquiredFrameHandle.withProducerSync()` before you use them.
+  ///
+  /// See `mln_acquired_frame_get_metal_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+func withMetalTexture<Result>(_ body: (MetalTextureFrameView) throws -> Result) throws -> Result {
+  var raw = mln_metal_texture_frame()
+  raw.size = UInt32(MemoryLayout<mln_metal_texture_frame>.size)
+  return try nativeView(reading: raw, begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(raw, token, diagnostic) }, end: { mln_acquired_frame_view_end($0) }, get: { raw, value, diagnostic in mln_acquired_frame_get_metal_texture(raw, value, diagnostic) }) { raw, scope in try body(MetalTextureFrameView(MetalTextureFrame(raw: raw), scope: scope)) }
+}
+#endif
+
+#if os(Android) || os(Linux)
+  /// Gets the memory of an exported ring's acquired frame, as an opaque file
+  /// descriptor.
+  ///
+  /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+  /// image. Once you release or discard the frame, the session may render into
+  /// the image again.
+  ///
+  /// The session owns the file descriptor, so don't close it. An import takes
+  /// the descriptor, so import a duplicate from `dup`. Memory that you import
+  /// keeps the image's memory, but not its contents.
+  ///
+  /// See `mln_acquired_frame_get_opaque_fd` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the session's ring shares its textures in
+  ///   another way.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+func withOpaqueFd<Result>(_ body: (OpaqueFdFrameView) throws -> Result) throws -> Result {
+  var raw = mln_opaque_fd_frame()
+  raw.size = UInt32(MemoryLayout<mln_opaque_fd_frame>.size)
+  return try nativeView(reading: raw, begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(raw, token, diagnostic) }, end: { mln_acquired_frame_view_end($0) }, get: { raw, value, diagnostic in mln_acquired_frame_get_opaque_fd(raw, value, diagnostic) }) { raw, scope in try body(OpaqueFdFrameView(OpaqueFdFrame(raw: raw), scope: scope)) }
+}
+#endif
 
   /// Gets the OpenGL texture of an acquired frame.
+  ///
+  /// It gets a borrowed ring's texture, or an exported ring's on an OpenGL
+  /// device: the texture of the dmabuf that `AcquiredFrameHandle.withDmaBuf()`
+  /// gets, and the frame's depth texture with
+  /// `RenderSessionAttachOptions.keepDepth`, in the device's share group. An
+  /// exported ring's textures hold the frame upside down from OpenGL's rows,
+  /// top row first, as a dmabuf's readers take it, so negate clip y to draw
+  /// into them. Wait for `AcquiredFrameHandle.withProducerSync()` before you
+  /// use them.
   ///
   /// See `mln_acquired_frame_get_open_gl_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -49,63 +181,32 @@ public extension AcquiredFrameHandle {
   ///
   /// - `Status.targetLost` when the session failed, or you detached, abandoned,
   ///   or disposed it.
-  func withOpenGlTexture<Result>(_ body: (OpenGlTextureFrameView) throws
-    -> Result) throws -> Result
-  {
-    var raw = mln_open_gl_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_open_gl_texture_frame>.size)
-    return try nativeView(
-      reading: raw,
-      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
-        raw,
-        token,
-        diagnostic
-      ) },
-      end: { mln_acquired_frame_view_end($0) },
-      get: { raw, value, diagnostic in mln_acquired_frame_get_open_gl_texture(
-        raw,
-        value,
-        diagnostic
-      ) }
-    ) { raw, scope in try body(OpenGlTextureFrameView(
-      OpenGlTextureFrame(raw: raw),
-      scope: scope
-    )) }
-  }
+func withOpenGlTexture<Result>(_ body: (OpenGlTextureFrameView) throws -> Result) throws -> Result {
+  var raw = mln_open_gl_texture_frame()
+  raw.size = UInt32(MemoryLayout<mln_open_gl_texture_frame>.size)
+  return try nativeView(reading: raw, begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(raw, token, diagnostic) }, end: { mln_acquired_frame_view_end($0) }, get: { raw, value, diagnostic in mln_acquired_frame_get_open_gl_texture(raw, value, diagnostic) }) { raw, scope in try body(OpenGlTextureFrameView(OpenGlTextureFrame(raw: raw), scope: scope)) }
+}
 
-  #if os(Android) || os(Linux) || os(macOS) || os(Windows)
-    /// Gets the Vulkan image of an acquired frame.
-    ///
-    /// See `mln_acquired_frame_get_vulkan_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `Status.targetLost` when the session failed, or you detached,
-    /// abandoned,
-    ///   or disposed it.
-    func withVulkanTexture<Result>(_ body: (VulkanTextureFrameView) throws
-      -> Result) throws -> Result
-    {
-      var raw = mln_vulkan_texture_frame()
-      raw.size = UInt32(MemoryLayout<mln_vulkan_texture_frame>.size)
-      return try nativeView(
-        reading: raw,
-        begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
-          raw,
-          token,
-          diagnostic
-        ) },
-        end: { mln_acquired_frame_view_end($0) },
-        get: { raw, value, diagnostic in mln_acquired_frame_get_vulkan_texture(
-          raw,
-          value,
-          diagnostic
-        ) }
-      ) { raw, scope in try body(VulkanTextureFrameView(
-        VulkanTextureFrame(raw: raw),
-        scope: scope
-      )) }
-    }
-  #endif
+#if os(Android) || os(Linux) || os(macOS) || os(Windows)
+  /// Gets the Vulkan image of an acquired frame.
+  ///
+  /// It gets a borrowed ring's image, or an exported ring's on a Vulkan device:
+  /// the image whose memory the ring shares, and the frame's depth image with
+  /// `RenderSessionAttachOptions.keepDepth`. An exported ring's frame releases
+  /// them to VK_QUEUE_FAMILY_EXTERNAL, so acquire them from there. Wait for
+  /// `AcquiredFrameHandle.withProducerSync()` before you use them.
+  ///
+  /// See `mln_acquired_frame_get_vulkan_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+func withVulkanTexture<Result>(_ body: (VulkanTextureFrameView) throws -> Result) throws -> Result {
+  var raw = mln_vulkan_texture_frame()
+  raw.size = UInt32(MemoryLayout<mln_vulkan_texture_frame>.size)
+  return try nativeView(reading: raw, begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(raw, token, diagnostic) }, end: { mln_acquired_frame_view_end($0) }, get: { raw, value, diagnostic in mln_acquired_frame_get_vulkan_texture(raw, value, diagnostic) }) { raw, scope in try body(VulkanTextureFrameView(VulkanTextureFrame(raw: raw), scope: scope)) }
+}
+#endif
 }

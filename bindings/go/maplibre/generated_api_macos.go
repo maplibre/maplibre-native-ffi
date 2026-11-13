@@ -11,7 +11,7 @@ package maplibre
 import "C"
 import "unsafe"
 
-// WithIoSurface gets the IOSurface of an acquired frame.
+// WithIoSurface gets the IOSurface of an exported ring's acquired frame.
 //
 // Wait for AcquiredFrameHandle.WithProducerSync() before you read the surface.
 // Once you release or discard the frame, the session may render into the
@@ -21,9 +21,11 @@ import "unsafe"
 // its contents.
 //
 // See mln_acquired_frame_get_io_surface in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 //
 // Errors:
+//   - StatusUnsupported when the session's ring shares its textures in another
+//     way.
 //   - StatusTargetLost when the session failed, or you detached, abandoned, or
 //     disposed it.
 func (receiver *AcquiredFrameHandle) WithIoSurface(callback func(IoSurfaceFrameView) error) error {
@@ -39,6 +41,11 @@ func (receiver *AcquiredFrameHandle) WithIoSurface(callback func(IoSurfaceFrameV
 }
 
 // WithMetalTexture gets the Metal texture of an acquired frame.
+//
+// It gets a borrowed ring's texture, or an exported ring's on a Metal device:
+// the texture of the IOSurface that AcquiredFrameHandle.WithIoSurface() gets,
+// and the frame's depth texture with RenderSessionAttachOptions.KeepDepth. Wait
+// for AcquiredFrameHandle.WithProducerSync() before you use them.
 //
 // See mln_acquired_frame_get_metal_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -58,155 +65,21 @@ func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTexture
 	})
 }
 
-// AppleFramePacerCreate creates a frame pacer that follows the display through
-// a CADisplayLink.
+// NewGPUDevice wraps your Metal device and command queue, so that sessions
+// render on them.
 //
-// You can call it on any thread. The pacer needs no run loop of yours. On
-// macOS, it follows the main display, the one with the menu bar.
-//
-// With FramePacerOptions.MaximumFramesPerSecond, the pacer also asks the system
-// for that refresh rate. On iPhone, a rate above 60 needs
-// CADisableMinimumFrameDurationOnPhone in the app's Info.plist.
-//
-// See mln_apple_frame_pacer_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
+// See mln_gpu_device_wrap_metal in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
 //
 // Errors:
-//   - StatusNativeError when the system has no display to follow.
-func AppleFramePacerCreate(options *FramePacerOptions) (*FramePacerHandle, error) {
-	var outPacer C.mln_frame_pacer
+//   - StatusUnsupported when SupportedRenderBackendMask() lacks
+//     RenderBackendFlagMetal.
+func NewGPUDevice(descriptor MetalDeviceDescriptor) (*GPUDeviceHandle, error) {
+	var outDevice C.mln_gpu_device
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_apple_frame_pacer_create(bindingStoreOptional(options, arena, nativeFramePacerOptions), &outPacer, diagnostic))
-	}, func(arena *bindingArena) *FramePacerHandle {
-		adopted := adoptFramePacerHandle(uint64(outPacer), nil)
+		return int32(C.mln_gpu_device_wrap_metal(bindingStore(nativeMetalDeviceDescriptor(descriptor, arena), arena), &outDevice, diagnostic))
+	}, func(arena *bindingArena) *GPUDeviceHandle {
+		adopted := adoptGPUDeviceHandle(uint64(outDevice), nil)
 		return adopted
 	})
-}
-
-// AttachIoSurfaceRing creates a session that renders the map into a ring of
-// IOSurfaces that the library allocates.
-//
-// Acquire each frame with RenderSessionHandle.AcquireFrame(), and get its
-// surface with AcquiredFrameHandle.WithIoSurface().
-// RenderSessionHandle.Resize() gives the ring new surfaces of the new size.
-// Attach with RenderDriverKindCoreWorker.
-//
-// To hand frames to a reader that can't wait on an event, such as Flutter's
-// copyPixelBuffer, attach without GPUSyncKindFlagMetalSharedEvent in
-// RenderSessionAttachOptions.ProducerSyncKinds, so that each frame finishes
-// before you acquire it. Release a frame with GPUSyncKindCPUComplete only once
-// the reader has finished with its surface.
-//
-// See mln_map_attach_io_surface_ring in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
-//
-// Errors:
-//   - StatusUnsupported when SupportedRenderBackendMask() lacks
-//     RenderBackendFlagMetal.
-//   - StatusNativeError when context names no device and the system has no
-//     Metal device.
-func (receiver *MapHandle) AttachIoSurfaceRing(descriptor IoSurfaceRingDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_io_surface_ring(C.mln_map(raw), bindingStore(nativeIoSurfaceRingDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachMetalBorrowedTexture creates a session that renders the map into a ring
-// of your Metal textures.
-//
-// See mln_map_attach_metal_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-//
-// Errors:
-//   - StatusUnsupported when SupportedRenderBackendMask() lacks
-//     RenderBackendFlagMetal, or when the target supports none of the
-//     producer_sync_kinds in options.
-func (receiver *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_metal_borrowed_texture(C.mln_map(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachMetalSurface creates a session that renders the map to a Metal layer.
-//
-// See mln_map_attach_metal_surface in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-//
-// Errors:
-//   - StatusUnsupported when SupportedRenderBackendMask() lacks
-//     RenderBackendFlagMetal.
-func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_metal_surface(C.mln_map(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// SetMetalBorrowedTextureTarget replaces the Metal textures that a borrowed
-// ring renders into.
-//
-// Use it to resize the ring, or to give the session textures again after
-// RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. Once
-// the replacement completes, the session no longer uses the old textures.
-//
-// See mln_render_session_set_metal_borrowed_texture_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-//
-// Errors:
-//   - StatusUnsupported when the new textures have a different pixel format
-//     than the old ones. Attach a new session to change it.
-func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(replacement MetalBorrowedTextureReplacement) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_metal_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureReplacement(replacement, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-// SetMetalSurfaceTarget replaces the Metal layer that the session renders to.
-//
-// Use it to give the session a layer again after
-// RenderSessionHandle.ReleaseTarget(), to move it to another layer, or to
-// resize it. Once the replacement completes, the session no longer uses the old
-// layer.
-//
-// See mln_render_session_set_metal_surface_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(replacement MetalSurfaceReplacement) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_metal_surface_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceReplacement(replacement, arena), arena), completion, diagnostic))
-	}, completionUnit)
 }

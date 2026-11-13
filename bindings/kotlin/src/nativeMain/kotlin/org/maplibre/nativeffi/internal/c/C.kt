@@ -65,6 +65,17 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_acquired_frame_get_opaque_fd(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_opaque_fd(
+      frame.toULong(),
+      outFrame.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_acquired_frame_get_open_gl_texture(
     frame: Long,
     outFrame: Long,
@@ -140,28 +151,10 @@ internal actual object C {
     )
   }
 
-  actual fun mln_android_frame_pacer_create(
-    options: Long,
-    outPacer: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_android_frame_pacer_create(
-      options.toCPointer(),
-      outPacer.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_android_init(
       jniEnv.toCPointer<CPointed>(),
       context.toCPointer<CPointed>(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_apple_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_apple_frame_pacer_create(
-      options.toCPointer(),
-      outPacer.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -197,9 +190,92 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_release(queue.toULong())
   }
 
+  actual fun mln_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_frame_pacer_create(
+      options.toCPointer(),
+      outPacer.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_frame_pacer_release(pacer: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_frame_pacer_release(pacer.toULong())
   }
+
+  actual fun mln_frame_pacer_set_options(pacer: Long, options: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_frame_pacer_set_options(
+      pacer.toULong(),
+      options.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gpu_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_create(
+      options.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gpu_device_get_capabilities(
+    device: Long,
+    outCapabilities: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_get_capabilities(
+      device.toULong(),
+      outCapabilities.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gpu_device_get_vulkan_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_get_vulkan_context(
+      device.toULong(),
+      outResult.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gpu_device_release(device: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_release(device.toULong())
+  }
+
+  actual fun mln_gpu_device_wrap_metal(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_wrap_metal(
+      descriptor.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gpu_device_wrap_open_gl(context: Long, outDevice: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_wrap_open_gl(
+      context.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gpu_device_wrap_vulkan(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_wrap_vulkan(
+      descriptor.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gpu_device_wrap_web_gpu(context: Long, outDevice: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_wrap_web_gpu(
+      context.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
 
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
@@ -264,6 +340,23 @@ internal actual object C {
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       options.toCPointer(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_add_custom_layer(
+    map: Long,
+    layerId: Long,
+    beforeLayerId: Long,
+    host: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_add_custom_layer(
+      map.toULong(),
+      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      beforeLayerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
+      host.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -362,285 +455,18 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_attach_android_hardware_buffer_ring(
+  actual fun mln_map_attach(
     map: Long,
-    descriptor: Long,
+    target: Long,
     device: Long,
     options: Long,
     outSession: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_android_hardware_buffer_ring(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_attach(
       map.toULong(),
-      descriptor.toCPointer(),
-      device.toULong(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_android_surface(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_android_surface(
-      map.toULong(),
-      descriptor.toCPointer(),
-      device.toULong(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_dma_buf_ring(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_dma_buf_ring(
-      map.toULong(),
-      descriptor.toCPointer(),
-      device.toULong(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_dxgi_shared_texture_ring(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_dxgi_shared_texture_ring(
-      map.toULong(),
-      descriptor.toCPointer(),
-      device.toULong(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_io_surface_ring(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_io_surface_ring(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_metal_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_metal_borrowed_texture(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_metal_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_metal_surface(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_offscreen(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    device: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_offscreen(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      device.toULong(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_open_gl_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_open_gl_borrowed_texture(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_open_gl_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_open_gl_surface(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_vulkan_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_vulkan_borrowed_texture(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_vulkan_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_vulkan_surface(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_wayland_surface(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_wayland_surface(
-      map.toULong(),
-      descriptor.toCPointer(),
-      device.toULong(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_web_gpu_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_web_gpu_borrowed_texture(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_web_gpu_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_web_gpu_surface(
-      map.toULong(),
-      descriptor.toCPointer(),
-      options.toCPointer(),
-      outSession.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_attach_win32_window(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_attach_win32_window(
-      map.toULong(),
-      descriptor.toCPointer(),
+      target.toCPointer(),
       device.toULong(),
       options.toCPointer(),
       outSession.toCPointer(),
@@ -1276,15 +1102,10 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_resize(
-    map: Long,
-    logicalSize: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
+  actual fun mln_map_resize(map: Long, extent: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_resize(
       map.toULong(),
-      logicalSize.toCPointer<mln_logical_size>()!!.pointed.readValue(),
+      extent.toCPointer<mln_logical_extent>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -1741,17 +1562,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_offscreen_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_offscreen_device_create(
-      options.toCPointer(),
-      outDevice.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_offscreen_device_release(device: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_offscreen_device_release(device.toULong())
-  }
-
   actual fun mln_open_gl_supported_context_provider_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_open_gl_supported_context_provider_mask().toInt()
 
@@ -2012,13 +1822,13 @@ internal actual object C {
 
   actual fun mln_render_session_resize(
     session: Long,
-    logicalSize: Long,
+    extent: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_resize(
       session.toULong(),
-      logicalSize.toCPointer<mln_logical_size>()!!.pointed.readValue(),
+      extent.toCPointer<mln_logical_extent>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -2026,19 +1836,6 @@ internal actual object C {
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_service_driver_work(
       session.toULong(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_android_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_android_surface_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2053,132 +1850,15 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_set_metal_borrowed_texture_target(
+  actual fun mln_render_session_set_target(
     session: Long,
-    replacement: Long,
+    target: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_metal_borrowed_texture_target(
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_target(
       session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_metal_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_metal_surface_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_open_gl_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_open_gl_borrowed_texture_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_open_gl_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_open_gl_surface_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_vulkan_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_vulkan_borrowed_texture_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_vulkan_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_vulkan_surface_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_wayland_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_wayland_surface_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_web_gpu_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_web_gpu_borrowed_texture_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_web_gpu_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_web_gpu_surface_target(
-      session.toULong(),
-      replacement.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_session_set_win32_window_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_win32_window_target(
-      session.toULong(),
-      replacement.toCPointer(),
+      target.toCPointer(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -2596,28 +2276,6 @@ internal actual object C {
 
   actual fun mln_supported_render_backend_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_supported_render_backend_mask().toInt()
-
-  actual fun mln_vulkan_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_vulkan_device_create(
-      options.toCPointer(),
-      outDevice.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_vulkan_device_get_context(
-    device: Long,
-    outResult: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_vulkan_device_get_context(
-      device.toULong(),
-      outResult.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_vulkan_device_release(device: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_vulkan_device_release(device.toULong())
-  }
 
   actual fun mln_web_alloc(size: Long, align: Long): Long =
     org.maplibre.nativeffi.internal.cinterop.mln_web_alloc(size.convert(), align.convert()).toLong()

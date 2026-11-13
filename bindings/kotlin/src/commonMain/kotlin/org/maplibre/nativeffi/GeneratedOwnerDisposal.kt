@@ -17,6 +17,11 @@ internal object GeneratedOwnerDisposal {
   }
 
   @JvmSynthetic
+  fun gpuDevice(handle: Long) {
+    C.mln_gpu_device_release(handle)
+  }
+
+  @JvmSynthetic
   fun map(handle: Long) {
     NativeDiagnostics.check { diagnostic -> C.mln_map_dispose(handle, diagnostic) }
   }
@@ -24,11 +29,6 @@ internal object GeneratedOwnerDisposal {
   @JvmSynthetic
   fun mapProjection(handle: Long) {
     C.mln_map_projection_release(handle)
-  }
-
-  @JvmSynthetic
-  fun offscreenDevice(handle: Long) {
-    C.mln_offscreen_device_release(handle)
   }
 
   @JvmSynthetic
@@ -54,10 +54,5 @@ internal object GeneratedOwnerDisposal {
   @JvmSynthetic
   fun styleExpression(handle: Long) {
     C.mln_style_expression_release(handle)
-  }
-
-  @JvmSynthetic
-  fun vulkanDevice(handle: Long) {
-    C.mln_vulkan_device_release(handle)
   }
 }

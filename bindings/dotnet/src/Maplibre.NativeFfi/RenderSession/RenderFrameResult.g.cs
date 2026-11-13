@@ -17,6 +17,10 @@ namespace Maplibre.NativeFfi;
 /// <param name="View">
 /// The camera and extent that a rendered frame shows.
 /// </param>
+/// <param name="FrameProjection">
+/// Where a rendered frame drew the map, for drawing into its frame with depth.
+/// All zero for a demand that rendered nothing.
+/// </param>
 public readonly partial record struct RenderFrameResult(
     RenderResult Disposition,
     ulong Token,
@@ -25,5 +29,6 @@ public readonly partial record struct RenderFrameResult(
     ulong FrameGeneration,
     bool NeedsRepaint,
     MapView View,
+    FrameProjection FrameProjection,
     RenderMode Mode
 );

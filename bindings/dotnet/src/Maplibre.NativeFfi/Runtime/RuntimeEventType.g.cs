@@ -67,18 +67,10 @@ public enum RuntimeEventType : uint
     /// A resource that the region needs failed to download.
     /// </summary>
     OfflineRegionResponseError = 18,
-
-    /// <summary>
-    /// The region's download became inactive because the cache file's offline
-    /// regions hold as many tiles from MapLibre's demo tile server as the limit
-    /// allows. Only tiles of sources with a <c>maplibre://</c> URL count toward
-    /// the limit.
-    /// </summary>
-    OfflineRegionTileCountLimitExceeded = 19,
-    MapGlyphsRequested = 20,
-    MapGlyphsLoaded = 21,
-    MapGlyphsError = 22,
-    MapSpriteRequested = 23,
-    MapSpriteLoaded = 24,
-    MapSpriteError = 25,
+    MapGlyphsRequested = 19,
+    MapGlyphsLoaded = 20,
+    MapGlyphsError = 21,
+    MapSpriteRequested = 22,
+    MapSpriteLoaded = 23,
+    MapSpriteError = 24,
 }

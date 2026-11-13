@@ -37,8 +37,9 @@ pub const Diagnostic = diagnostics.Diagnostic;
 /// See `MLN_DIAGNOSTIC_MESSAGE_CAPACITY` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const diagnostic_message_capacity: u32 = 4096;
-/// The token of the frame results that a session adds when it renders an image
-/// for `Map.requestStillImage()`. Your own demands can't use it.
+/// The token of the frame results of the demand that a session holds for an
+/// image of `Map.requestStillImage()`, which says how that demand runs. Your
+/// own demands can't use it.
 ///
 /// See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -70,7 +71,10 @@ pub const AcquiredFrame = struct {
     /// Gives up an acquired frame without saying when your GPU stops reading it.
     ///
     /// Because your GPU may still read the frame's texture, the session never
-    /// renders into that texture again.
+    /// renders into that texture again, even when `RenderSession.setTarget()` gives
+    /// it the texture again, until `RenderSession.releaseTarget()` releases the
+    /// ring. A view that is open on the frame keeps the frame's sync objects in
+    /// place until it ends.
     ///
     /// See `mln_acquired_frame_discard` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -80,7 +84,7 @@ pub const AcquiredFrame = struct {
         self.closed = true;
     }
 
-    /// Gets the Android hardware buffer of an acquired frame.
+    /// Gets the Android hardware buffer of an exported ring's acquired frame.
     ///
     /// Wait for `AcquiredFrame.getProducerSync()` before you read the buffer. Once
     /// you release or discard the frame, the session may render into the buffer
@@ -88,10 +92,12 @@ pub const AcquiredFrame = struct {
     /// buffer's memory, but not its contents.
     ///
     /// See `mln_acquired_frame_get_android_hardware_buffer` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// Errors:
     ///
+    /// - `error.Unsupported` when the session's ring shares its textures in another
+    ///   way.
     /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
     ///   disposed it.
     pub const getAndroidHardwareBuffer = if (builtin.abi.isAndroid()) struct {
@@ -100,7 +106,7 @@ pub const AcquiredFrame = struct {
         }
     }.function else {};
 
-    /// Gets the dmabuf of an acquired frame.
+    /// Gets the dmabuf of an exported ring's acquired frame.
     ///
     /// Wait for `AcquiredFrame.getProducerSync()` before you read the buffer. Once
     /// you release or discard the frame, the session may render into the buffer
@@ -112,10 +118,12 @@ pub const AcquiredFrame = struct {
     /// `dup`. A duplicate keeps the buffer's memory, but not its contents.
     ///
     /// See `mln_acquired_frame_get_dma_buf` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// Errors:
     ///
+    /// - `error.Unsupported` when the session's ring shares its textures in another
+    ///   way.
     /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
     ///   disposed it.
     pub const getDmaBuf = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
@@ -124,7 +132,7 @@ pub const AcquiredFrame = struct {
         }
     }.function else {};
 
-    /// Gets the DXGI shared texture of an acquired frame.
+    /// Gets the DXGI shared texture of an exported ring's acquired frame.
     ///
     /// Wait for `AcquiredFrame.getProducerSync()` before you read the texture. Once
     /// you release or discard the frame, the session may render into the texture
@@ -136,10 +144,12 @@ pub const AcquiredFrame = struct {
     /// release the frame, duplicate it with `DuplicateHandle`.
     ///
     /// See `mln_acquired_frame_get_dxgi_shared_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// Errors:
     ///
+    /// - `error.Unsupported` when the session's ring shares its textures in another
+    ///   way.
     /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
     ///   disposed it.
     pub const getDxgiSharedTexture = if (builtin.os.tag == .windows) struct {
@@ -148,7 +158,7 @@ pub const AcquiredFrame = struct {
         }
     }.function else {};
 
-    /// Gets the IOSurface of an acquired frame.
+    /// Gets the IOSurface of an exported ring's acquired frame.
     ///
     /// Wait for `AcquiredFrame.getProducerSync()` before you read the surface. Once
     /// you release or discard the frame, the session may render into the surface
@@ -158,10 +168,12 @@ pub const AcquiredFrame = struct {
     /// memory, but not its contents.
     ///
     /// See `mln_acquired_frame_get_io_surface` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// Errors:
     ///
+    /// - `error.Unsupported` when the session's ring shares its textures in another
+    ///   way.
     /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
     ///   disposed it.
     pub const getIoSurface = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
@@ -171,6 +183,11 @@ pub const AcquiredFrame = struct {
     }.function else {};
 
     /// Gets the Metal texture of an acquired frame.
+    ///
+    /// It gets a borrowed ring's texture, or an exported ring's on a Metal device:
+    /// the texture of the IOSurface that `AcquiredFrame.getIoSurface()` gets, and
+    /// the frame's depth texture with `RenderSessionAttachOptions.keep_depth`. Wait
+    /// for `AcquiredFrame.getProducerSync()` before you use them.
     ///
     /// See `mln_acquired_frame_get_metal_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -185,7 +202,41 @@ pub const AcquiredFrame = struct {
         }
     }.function else {};
 
+    /// Gets the memory of an exported ring's acquired frame, as an opaque file
+    /// descriptor.
+    ///
+    /// Wait for `AcquiredFrame.getProducerSync()` before you read the image. Once
+    /// you release or discard the frame, the session may render into the image
+    /// again.
+    ///
+    /// The session owns the file descriptor, so don't close it. An import takes the
+    /// descriptor, so import a duplicate from `dup`. Memory that you import keeps
+    /// the image's memory, but not its contents.
+    ///
+    /// See `mln_acquired_frame_get_opaque_fd` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when the session's ring shares its textures in another
+    ///   way.
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
+    pub const getOpaqueFd = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.abi.isOpenHarmony()) struct {
+        fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+            return call.scopedView("mln_acquired_frame_get_opaque_fd", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", OpaqueFdFrame, self, context, use, diagnostic);
+        }
+    }.function else {};
+
     /// Gets the OpenGL texture of an acquired frame.
+    ///
+    /// It gets a borrowed ring's texture, or an exported ring's on an OpenGL
+    /// device: the texture of the dmabuf that `AcquiredFrame.getDmaBuf()` gets, and
+    /// the frame's depth texture with `RenderSessionAttachOptions.keep_depth`, in
+    /// the device's share group. An exported ring's textures hold the frame upside
+    /// down from OpenGL's rows, top row first, as a dmabuf's readers take it, so
+    /// negate clip y to draw into them. Wait for `AcquiredFrame.getProducerSync()`
+    /// before you use them.
     ///
     /// See `mln_acquired_frame_get_open_gl_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -224,6 +275,12 @@ pub const AcquiredFrame = struct {
 
     /// Gets the Vulkan image of an acquired frame.
     ///
+    /// It gets a borrowed ring's image, or an exported ring's on a Vulkan device:
+    /// the image whose memory the ring shares, and the frame's depth image with
+    /// `RenderSessionAttachOptions.keep_depth`. An exported ring's frame releases
+    /// them to VK_QUEUE_FAMILY_EXTERNAL, so acquire them from there. Wait for
+    /// `AcquiredFrame.getProducerSync()` before you use them.
+    ///
     /// See `mln_acquired_frame_get_vulkan_texture` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
@@ -239,11 +296,11 @@ pub const AcquiredFrame = struct {
 
     /// Gives an acquired frame back to the session once you're done reading it.
     ///
-    /// `consumer_completion` says when your GPU work that reads the texture
-    /// finishes. Pass `GpuSyncKind.cpu_complete` when that work has already
-    /// finished. The session waits for that point before it renders into the
-    /// texture again. If that wait fails, such as for an OpenGL fence outside the
-    /// session's share group, the session fails.
+    /// `consumer_completion` says when your GPU work on the texture, and on its
+    /// depth texture, finishes. Pass `GpuSyncKind.cpu_complete` when that work has
+    /// already finished. The session waits for that point before it renders into
+    /// the textures again. If that wait fails, such as for an OpenGL fence outside
+    /// the session's share group, the session fails.
     ///
     /// See `mln_acquired_frame_release` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -277,6 +334,41 @@ pub const FramePacer = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
+    /// Creates a frame pacer that follows the platform's display.
+    ///
+    /// On iOS, macOS, and tvOS, the pacer follows the display through a
+    /// `CADisplayLink`. You can call it on any thread, and the pacer needs no run
+    /// loop of yours. On macOS, it follows the main display, the one with the menu
+    /// bar. With `FramePacerOptions.maximum_frames_per_second`, the pacer also asks
+    /// the system for that refresh rate. On iPhone, a rate above 60 needs
+    /// `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+    ///
+    /// On Android, the pacer follows the display through the calling thread's
+    /// `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+    /// main thread, and keep that thread running its looper while sessions use the
+    /// pacer. `AChoreographer` can stop while the phone's display is off, even
+    /// while a Surface on another display, such as an Android Auto projection,
+    /// still shows the map. The pacer then keeps demanding frames from a timer on
+    /// the looper, within the frame rate limit, until vsyncs arrive again.
+    ///
+    /// On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
+    /// can call it on any thread, and the pacer needs no event loop of yours.
+    ///
+    /// See `mln_frame_pacer_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` on the other platforms, such as visionOS, Linux, and
+    ///   Windows, where the library has no source of display refreshes.
+    /// - `error.InvalidState` on Android when the calling thread has no `ALooper`.
+    /// - `error.NativeError` on iOS, macOS, and tvOS when the system has no display
+    ///   to follow, and on OpenHarmony when the system can't report the display's
+    ///   refreshes to the process.
+    pub fn create(options: ?FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!FramePacer {
+        return call.invoke("mln_frame_pacer_create", .none, {}, null, diagnostic, .{ options, call.adopt(FramePacer) });
+    }
+
     /// Releases a frame pacer.
     ///
     /// Render sessions that use the pacer stay paced until you release them or set
@@ -289,6 +381,177 @@ pub const FramePacer = struct {
         c.mln_frame_pacer_release(self.raw);
         self.closed = true;
     }
+
+    /// Changes a frame pacer's settings.
+    ///
+    /// Settings that `options` doesn't set keep their current values. To remove the
+    /// frame rate limit, set `FramePacerOptions.unlimited_frames_per_second`. You
+    /// can call it on any thread.
+    ///
+    /// The sessions that the pacer serves follow the new settings from the next
+    /// display refresh, including a refresh that they already wait for. The pacer
+    /// counts a new limit from the last frames it demanded, so a higher limit can
+    /// demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
+    /// the system for the new limit's refresh rate, or for the display's own rate
+    /// once the limit is removed.
+    ///
+    /// See `mln_frame_pacer_set_options` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` when you released `pacer`, even while sessions still
+    ///   use it.
+    pub fn setOptions(self: FramePacer, options: FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        return call.invoke("mln_frame_pacer_set_options", .handle, self, null, diagnostic, .{options});
+    }
+};
+
+/// A GPU, and the queue that render sessions on it share.
+///
+/// See `mln_gpu_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const GpuDevice = struct {
+    raw: u64,
+    closed: bool = false,
+    pub const native_name = "mln_gpu_device";
+    const methods = owner.Handle(@This(), "GpuDevice", struct {
+        fn dispose(raw: u64) status.Error!void {
+            c.mln_gpu_device_release(raw);
+        }
+    }.dispose);
+    pub const adopt = methods.adopt;
+    pub const id = methods.id;
+    pub const isClosed = methods.isClosed;
+    pub const format = methods.format;
+    pub const deinit = methods.deinit;
+    /// Creates a GPU device that the library owns, for render sessions to share.
+    ///
+    /// The sessions on a device share its GPU and queue: one `VkDevice` and queue,
+    /// one `MTLDevice` and command queue, or one OpenGL share group. `Map.attach()`
+    /// creates a device of its own when it gets none. Create one to share it among
+    /// the sessions of many maps, or to pick the backend or the GPU. A Vulkan
+    /// device enables the presentation, timeline semaphore, external memory, and
+    /// external semaphore extensions that its GPU offers.
+    ///
+    /// See `mln_gpu_device_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when this build or platform lacks `backend`, when the
+    ///   device can't render with `open_gl_client_api`, when a device that doesn't
+    ///   render with Vulkan gets a `queue_lock`, or in a browser for every backend:
+    ///   WebGPU makes devices asynchronously, and a WebGL2 context needs a canvas.
+    ///   Attach without a device, which the session makes itself, or wrap your
+    ///   WebGL2 context.
+    /// - `error.NotFound` when no GPU matches `adapter_index`, `adapter_uuid`, or
+    ///   `adapter_luid`.
+    /// - `error.NativeError` when the platform can't create the device.
+    pub fn create(options: ?GpuDeviceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDevice {
+        return call.invoke("mln_gpu_device_create", .none, {}, null, diagnostic, .{ options, call.adopt(GpuDevice) });
+    }
+
+    /// Reads what the device can do.
+    ///
+    /// Check `export_kinds` before you attach an exported ring, to choose between
+    /// the ring and a way of your own to show the map.
+    ///
+    /// See `mln_gpu_device_get_capabilities` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    pub fn getCapabilities(self: GpuDevice, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDeviceCapabilities {
+        return call.invoke("mln_gpu_device_get_capabilities", .handle, self, null, diagnostic, .{call.sizedOut(GpuDeviceCapabilities)});
+    }
+
+    /// Gets the Vulkan instance, device, and graphics queue of a Vulkan device.
+    ///
+    /// Use them to make the images of a borrowed ring, or a surface, that sessions
+    /// on the device render to. The sessions on the device share its graphics
+    /// queue. To submit to the queue yourself, create the device with
+    /// `GpuDeviceOptions.queue_lock`.
+    ///
+    /// See `mln_gpu_device_get_vulkan_context` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when the device doesn't render with Vulkan.
+    pub const getVulkanContext = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+        fn function(self: GpuDevice, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDeviceVulkanContextResult {
+            return call.invoke("mln_gpu_device_get_vulkan_context", .handle, self, null, diagnostic, .{call.sizedOut(GpuDeviceVulkanContextResult)});
+        }
+    }.function else {};
+
+    /// Releases a GPU device.
+    ///
+    /// Render sessions on the device keep using it until they detach, or their
+    /// release finishes.
+    ///
+    /// See `mln_gpu_device_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    pub fn release(self: *GpuDevice) void {
+        if (self.closed) return;
+        c.mln_gpu_device_release(self.raw);
+        self.closed = true;
+    }
+
+    /// Wraps your Metal device and command queue, so that sessions render on them.
+    ///
+    /// See `mln_gpu_device_wrap_metal` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
+    ///   `RenderBackendFlag.metal`.
+    pub const wrapMetal = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
+        fn function(descriptor: MetalDeviceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDevice {
+            return call.invoke("mln_gpu_device_wrap_metal", .none, {}, null, diagnostic, .{ descriptor, call.adopt(GpuDevice) });
+        }
+    }.function else {};
+
+    /// Makes an OpenGL device whose share group is your context's.
+    ///
+    /// Each session on the device makes a context of its own that shares objects
+    /// with yours, so that it can render into your textures and present to your
+    /// surfaces. A device that the library creates is a share group of its own.
+    ///
+    /// WebGL has no share groups: a WebGL device is your context. Its sessions
+    /// present to a web canvas target whose canvas is the context's own, and take
+    /// turns in the context. The library resets the context's state that it tracks
+    /// at the start of each frame, and leaves it undefined after.
+    ///
+    /// See `mln_gpu_device_wrap_open_gl` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when `openGlSupportedContextProviderMask()` lacks the
+    ///   context's platform.
+    /// - `error.NativeError` when the platform rejects the context.
+    pub fn wrapOpenGl(context: OpenGlContextDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDevice {
+        return call.invoke("mln_gpu_device_wrap_open_gl", .none, {}, null, diagnostic, .{ context, call.adopt(GpuDevice) });
+    }
+
+    /// Wraps your Vulkan device and queue, so that sessions render on them.
+    ///
+    /// Sessions on the device render into your images, present to your surfaces,
+    /// and submit to your queue, under your queue lock when you give one. Sessions
+    /// of several devices that wrap one queue never submit to it at once.
+    ///
+    /// See `mln_gpu_device_wrap_vulkan` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
+    ///   `RenderBackendFlag.vulkan`.
+    /// - `error.NativeError` when the library can't load the device's functions.
+    pub const wrapVulkan = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
+        fn function(allocator: std.mem.Allocator, descriptor: VulkanDeviceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDevice {
+            return call.invoke("mln_gpu_device_wrap_vulkan", .none, {}, allocator, diagnostic, .{ descriptor, call.adopt(GpuDevice) });
+        }
+    }.function else {};
 };
 
 /// A map, with its style and camera.
@@ -331,6 +594,32 @@ pub const Map = struct {
     ///   describes.
     pub fn addCustomGeometrySource(self: Map, source_id: []const u8, options: CustomGeometrySourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_add_custom_geometry_source", .handle, self, call.command, null, diagnostic, .{ source_id, options });
+    }
+
+    /// Adds a layer that draws with your own GPU commands, through `host`.
+    ///
+    /// The layer goes below the layer named `before_layer_id`, or above every layer
+    /// when `before_layer_id` is empty. Its type is `custom`, and it takes the
+    /// `visibility`, `minzoom`, and `maxzoom` properties, but no paint properties.
+    /// `Map.removeStyleLayer()` removes it.
+    ///
+    /// Runs on the thread that runs the session's graphics work: a library thread,
+    /// or yours with `RenderDriverKind.caller_graphics_thread`. It can't call the
+    /// library.
+    ///
+    /// It can't call the library.
+    ///
+    /// See `mln_map_add_custom_layer` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.NotFound` when the style has no layer named `before_layer_id`.
+    /// - `error.AlreadyExists` when the style already has a layer named `layer_id`.
+    /// - `error.InvalidState` while the style isn't loaded, as `Map.setStyleUrl()`
+    ///   describes.
+    pub fn addCustomLayer(self: Map, layer_id: []const u8, before_layer_id: ?[]const u8, host: CustomLayerHost, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_add_custom_layer", .handle, self, call.command, null, diagnostic, .{ layer_id, before_layer_id, host });
     }
 
     /// Adds a source whose vector tiles come from callbacks.
@@ -461,404 +750,36 @@ pub const Map = struct {
         return call.submit("mln_map_apply_camera_delta", .handle, self, call.command, null, diagnostic, .{delta});
     }
 
-    /// Creates a session that renders the map into a ring of Android hardware
-    /// buffers that the library allocates.
-    ///
-    /// Acquire each frame with `RenderSession.acquireFrame()`, and get its buffer
-    /// with `AcquiredFrame.getAndroidHardwareBuffer()`. `RenderSession.resize()`
-    /// gives the ring new buffers of the new size.
-    ///
-    /// A Vulkan build renders with `device`, or, when `device` is null, with a
-    /// device that the library creates. An OpenGL build uses an EGL context on the
-    /// default display, and `device` must be null. Attach with
-    /// `RenderDriverKind.core_worker`.
-    ///
-    /// To show the buffers through Android's UI, such as with
-    /// `Bitmap.wrapHardwareBuffer`, attach without `GpuSyncKindFlag.sync_fd` in
-    /// `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
-    /// finishes before you acquire it. Keep each frame acquired until the next one
-    /// replaces it on screen, then release it with `GpuSyncKind.cpu_complete`. Give
-    /// the ring 3 buffers, so the session can render while you hold two frames.
-    ///
-    /// See `mln_map_attach_android_hardware_buffer_ring` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when Android is older than 8.0, API level 26, or when
-    ///   the graphics context can't render into hardware buffers: the Vulkan device
-    ///   lacks VK_ANDROID_external_memory_android_hardware_buffer, or the EGL
-    ///   display lacks EGL_ANDROID_get_native_client_buffer or
-    ///   EGL_ANDROID_image_native_buffer.
-    /// - `error.NativeError` when the library can't create its Vulkan device or
-    ///   initialize the default EGL display.
-    pub const attachAndroidHardwareBufferRing = if (builtin.abi.isAndroid()) struct {
-        fn function(self: Map, descriptor: AndroidHardwareBufferRingDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_android_hardware_buffer_ring", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that presents the map to an Android window, with a
-    /// graphics context that the library creates.
-    ///
-    /// A Vulkan build presents with `device`, or, when `device` is null, with a
-    /// device that the library creates. An OpenGL build uses an EGL context on the
-    /// default display, and `device` must be null. Attach with
-    /// `RenderDriverKind.core_worker`.
-    ///
-    /// When the platform destroys the window, such as in
-    /// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
-    /// `RenderSession.releaseTarget()`, or give the session a new window with
-    /// `RenderSession.setAndroidSurfaceTarget()`, without waiting for that to
-    /// complete. The session keeps its own reference to the window and stays usable
-    /// for the next window. A frame to the destroyed window finishes with
-    /// `RenderResult.target_not_ready`, or with `RenderResult.rendered` if the
-    /// window went away while the frame was presenting.
-    ///
-    /// See `mln_map_attach_android_surface` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidArgument` when `surface` has no window, such as after the
-    ///   platform destroyed it.
-    /// - `error.Unsupported` when you created `device` without
-    ///   `VulkanDeviceOptions.presentation`.
-    /// - `error.Unsupported` when the GPU or the Vulkan loader can't present.
-    /// - `error.NativeError` when the library can't create the graphics context or
-    ///   the window's surface.
-    pub const attachAndroidSurface = if (builtin.abi.isAndroid()) struct {
-        fn function(self: Map, descriptor: AndroidSurfaceDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_android_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that renders the map into a ring of dmabufs that the
-    /// library allocates.
-    ///
-    /// Acquire each frame with `RenderSession.acquireFrame()`, and get its buffer
-    /// with `AcquiredFrame.getDmaBuf()`. `RenderSession.resize()` gives the ring
-    /// new buffers of the new size.
-    ///
-    /// A Vulkan build renders with `device`, or, when `device` is null, with a
-    /// device that the library creates. An OpenGL build uses an EGL context of its
-    /// own, and `device` must be null. Attach with `RenderDriverKind.core_worker`.
-    ///
-    /// For a reader that waits on no sync file, such as a Wayland compositor
-    /// without explicit synchronization, attach without `GpuSyncKindFlag.sync_fd`
-    /// in `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
-    /// finishes before you acquire it. Keep each frame acquired until its reader is
-    /// done with the buffer. Give the ring 3 buffers, so the session can render
-    /// while you hold two frames.
-    ///
-    /// See `mln_map_attach_dma_buf_ring` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when the graphics context can't render into a dmabuf
-    ///   of any of `formats`.
-    /// - `error.NativeError` when the library can't create its Vulkan device or
-    ///   initialize an EGL display.
-    pub const attachDmaBufRing = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
-        fn function(self: Map, allocator: std.mem.Allocator, descriptor: DmaBufRingDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_dma_buf_ring", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that renders the map into a ring of DXGI shared textures
-    /// that the library allocates.
-    ///
-    /// Acquire each frame with `RenderSession.acquireFrame()`, and get its texture
-    /// with `AcquiredFrame.getDxgiSharedTexture()`. `RenderSession.resize()` gives
-    /// the ring new textures of the new size.
-    ///
-    /// The session renders with the Vulkan device `device`, or, when `device` is
-    /// null, with one that the library creates. The textures belong to the device's
-    /// GPU, so open them on a D3D11 or D3D12 device of the same adapter. To pick
-    /// the GPU, create `device` with `VulkanDeviceOptions.device_luid` set to your
-    /// adapter's LUID. Attach with `RenderDriverKind.core_worker`.
-    ///
-    /// For a reader that waits on no fence, such as Flutter's texture registrar,
-    /// attach without `GpuSyncKindFlag.d3d12_fence` in
-    /// `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
-    /// finishes before you acquire it. Release a frame with
-    /// `GpuSyncKind.cpu_complete` only once the reader has finished with its
-    /// texture.
-    ///
-    /// See `mln_map_attach_dxgi_shared_texture_ring` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` in an OpenGL build, or when the GPU can't share the
-    ///   textures: D3D11 has no adapter with the Vulkan device's LUID or can't
-    ///   share textures through NT handles, or the device lacks
-    ///   VK_KHR_external_memory_win32 or can't import D3D11 textures.
-    /// - `error.NativeError` when the library can't create its Vulkan device or a
-    ///   D3D11 device on the adapter.
-    pub const attachDxgiSharedTextureRing = if (builtin.os.tag == .windows) struct {
-        fn function(self: Map, descriptor: DxgiSharedTextureRingDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_dxgi_shared_texture_ring", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that renders the map into a ring of IOSurfaces that the
-    /// library allocates.
-    ///
-    /// Acquire each frame with `RenderSession.acquireFrame()`, and get its surface
-    /// with `AcquiredFrame.getIoSurface()`. `RenderSession.resize()` gives the ring
-    /// new surfaces of the new size. Attach with `RenderDriverKind.core_worker`.
-    ///
-    /// To hand frames to a reader that can't wait on an event, such as Flutter's
-    /// `copyPixelBuffer`, attach without `GpuSyncKindFlag.metal_shared_event` in
-    /// `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
-    /// finishes before you acquire it. Release a frame with
-    /// `GpuSyncKind.cpu_complete` only once the reader has finished with its
-    /// surface.
-    ///
-    /// See `mln_map_attach_io_surface_ring` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.metal`.
-    /// - `error.NativeError` when `context` names no device and the system has no
-    ///   Metal device.
-    pub const attachIoSurfaceRing = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-        fn function(self: Map, descriptor: IoSurfaceRingDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_io_surface_ring", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that renders the map into a ring of your Metal textures.
-    ///
-    /// See `mln_map_attach_metal_borrowed_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.metal`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    pub const attachMetalBorrowedTexture = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-        fn function(self: Map, allocator: std.mem.Allocator, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_metal_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that renders the map to a Metal layer.
-    ///
-    /// See `mln_map_attach_metal_surface` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.metal`.
-    pub const attachMetalSurface = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-        fn function(self: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_metal_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Attaches a render session that renders the map offscreen.
-    ///
-    /// Read each image's pixels with `RenderSession.readTexture()`.
+    /// Attaches a render session that renders the map into `target`.
     ///
     /// The session renders on `device`. When `device` is null, the session creates
     /// a device with the default options, and releases it when the session ends.
     ///
-    /// See `mln_map_attach_offscreen` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    /// See `mln_map_attach` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     ///
     /// Errors:
     ///
-    /// - `error.InvalidState` when the map already has a render session.
+    /// - `error.InvalidArgument` when a borrowed ring has depth textures, but not
+    ///   one for each of its textures.
+    /// - `error.InvalidState` when the map already has a render session, or a
+    ///   window is minimized or has no client area.
+    /// - `error.Unsupported` when the device's `GpuDeviceCapabilities.target_kinds`
+    ///   lacks the target's kind, or, for a null `device`, when no backend of this
+    ///   build renders to it, when `options` sets `keep_depth` for a target other
+    ///   than an exported ring, or when a borrowed ring's depth format isn't one of
+    ///   the device's `GpuDeviceCapabilities.depth_stencil_formats`.
+    /// - `error.InvalidState` when a window was minimized or had no client area
+    ///   when the attach ran.
+    /// - `error.Unsupported` when the GPU or the graphics driver can't present to
+    ///   the window.
     /// - `error.NativeError` when `device` is null and the platform can't create a
-    ///   device.
-    pub fn attachOffscreen(self: Map, descriptor: OffscreenDescriptor, options: RenderSessionAttachOptions, device: ?OffscreenDevice, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-        const started = try call.submit("mln_map_attach_offscreen", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, device, call.adopt(RenderSession) });
+    ///   device, or when the library can't create its graphics context or present
+    ///   to the window.
+    pub fn attach(self: Map, allocator: std.mem.Allocator, target: RenderTarget, device: ?GpuDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
+        const started = try call.submit("mln_map_attach", .handle, self, call.unit, allocator, diagnostic, .{ target, device, options, call.adopt(RenderSession) });
         return .{ .session = started.outputs, .ready = started.ready };
     }
-
-    /// Creates a session that presents the map to an OpenHarmony window, with a
-    /// graphics context that the library creates.
-    ///
-    /// A Vulkan build presents with `device`, or, when `device` is null, with a
-    /// device that the library creates. An OpenGL build uses an EGL context on the
-    /// default display, and `device` must be null. Attach with
-    /// `RenderDriverKind.core_worker`.
-    ///
-    /// When the platform destroys the window, such as in an `XComponent`'s
-    /// `onSurfaceDestroyed` callback, release the target with
-    /// `RenderSession.releaseTarget()`, or give the session a new window with
-    /// `RenderSession.setOhosSurfaceTarget()`, without waiting for that to
-    /// complete. The session keeps its own reference to the window and stays usable
-    /// for the next window. A frame to the destroyed window finishes with
-    /// `RenderResult.target_not_ready`, or with `RenderResult.rendered` if the
-    /// window went away while the frame was presenting.
-    ///
-    /// See `mln_map_attach_ohos_surface` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidArgument` when no surface in this process has
-    ///   `OhosSurfaceDescriptor.surface_id`, such as after the platform destroyed
-    ///   it.
-    /// - `error.Unsupported` when you created `device` without
-    ///   `VulkanDeviceOptions.presentation`.
-    /// - `error.Unsupported` when the GPU or the Vulkan loader can't present.
-    /// - `error.NativeError` when the library can't create the graphics context or
-    ///   the window's surface.
-    pub const attachOhosSurface = if (builtin.abi.isOpenHarmony()) struct {
-        fn function(self: Map, descriptor: OhosSurfaceDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_ohos_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that renders the map into a ring of your OpenGL textures.
-    ///
-    /// See `mln_map_attach_open_gl_borrowed_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `openGlSupportedContextProviderMask()` lacks the
-    ///   context's platform, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    pub fn attachOpenGlBorrowedTexture(self: Map, allocator: std.mem.Allocator, descriptor: OpenGlBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-        const started = try call.submit("mln_map_attach_open_gl_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-        return .{ .session = started.outputs, .ready = started.ready };
-    }
-
-    /// Creates a session that renders the map to an OpenGL surface.
-    ///
-    /// See `mln_map_attach_open_gl_surface` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `openGlSupportedContextProviderMask()` lacks the
-    ///   context's platform.
-    pub fn attachOpenGlSurface(self: Map, descriptor: OpenGlSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-        const started = try call.submit("mln_map_attach_open_gl_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-        return .{ .session = started.outputs, .ready = started.ready };
-    }
-
-    /// Creates a session that renders the map into a ring of your Vulkan images.
-    ///
-    /// See `mln_map_attach_vulkan_borrowed_texture` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.vulkan`, or when the target supports none of the
-    ///   `producer_sync_kinds` in `options`.
-    pub const attachVulkanBorrowedTexture = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(self: Map, allocator: std.mem.Allocator, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_vulkan_borrowed_texture", .handle, self, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that renders the map to a Vulkan surface.
-    ///
-    /// See `mln_map_attach_vulkan_surface` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.vulkan`.
-    pub const attachVulkanSurface = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(self: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_vulkan_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that presents the map to a Wayland surface, with a
-    /// graphics context that the library creates.
-    ///
-    /// A Vulkan build presents with `device`, or, when `device` is null, with a
-    /// device that the library creates. An OpenGL build uses an EGL context on the
-    /// display, and `device` must be null. Attach with
-    /// `RenderDriverKind.core_worker`.
-    ///
-    /// The session presents without waiting for the compositor, so demand at most
-    /// one frame per display refresh.
-    ///
-    /// Keep the surface until a release or replacement of the target, or a detach
-    /// of the session, completes. Keep the display connected until the session's
-    /// detach completes. In an OpenGL build, if you also use EGL on the display,
-    /// initialize it before you attach.
-    ///
-    /// See `mln_map_attach_wayland_surface` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when you created `device` without
-    ///   `VulkanDeviceOptions.presentation`.
-    /// - `error.Unsupported` when the GPU or the Vulkan loader can't present to
-    ///   Wayland.
-    /// - `error.NativeError` when the library can't create the graphics context or
-    ///   present to the surface.
-    pub const attachWaylandSurface = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
-        fn function(self: Map, descriptor: WaylandSurfaceDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_wayland_surface", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
-
-    /// Creates a session that presents the map to a Win32 window, with a graphics
-    /// context that the library creates.
-    ///
-    /// A Vulkan build presents with `device`, or, when `device` is null, with a
-    /// device that the library creates. An OpenGL build uses a WGL context, and
-    /// `device` must be null. Attach with `RenderDriverKind.core_worker`.
-    ///
-    /// An OpenGL build sets the window's pixel format, so don't set one yourself.
-    ///
-    /// The session presents without waiting for the display, so demand at most one
-    /// frame per display refresh. While the window is minimized, frame demands
-    /// finish with `RenderResult.target_not_ready`.
-    ///
-    /// Keep the window until a release or replacement of the target, or a detach of
-    /// the session, completes.
-    ///
-    /// See `mln_map_attach_win32_window` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidArgument` when `window` isn't a window, or, in an OpenGL
-    ///   build, already has another pixel format.
-    /// - `error.InvalidState` when `window` is minimized or has no client area.
-    /// - `error.Unsupported` when you created `device` without
-    ///   `VulkanDeviceOptions.presentation`.
-    /// - `error.InvalidState` when `window` was minimized before the attach ran.
-    /// - `error.Unsupported` when the GPU or the Vulkan loader can't present.
-    /// - `error.NativeError` when the library can't create the graphics context or
-    ///   present to the window.
-    pub const attachWin32Window = if (builtin.os.tag == .windows) struct {
-        fn function(self: Map, descriptor: Win32WindowDescriptor, device: ?VulkanDevice, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!NewRenderSession {
-            const started = try call.submit("mln_map_attach_win32_window", .handle, self, call.unit, null, diagnostic, .{ descriptor, device, options, call.adopt(RenderSession) });
-            return .{ .session = started.outputs, .ready = started.ready };
-        }
-    }.function else {};
 
     /// Holds back the map's changes from rendering until `Map.endCommandGroup()`,
     /// so they show in the same frame.
@@ -1389,7 +1310,20 @@ pub const Map = struct {
     /// Renders a still image of a static or tile map.
     ///
     /// The map's render session draws the image once every resource that the image
-    /// needs has loaded.
+    /// needs has loaded. While the image waits, the session holds a demand of its
+    /// own for it, whose frame result carries `frame_demand_token_still_image`:
+    ///
+    /// - It waits for the map to load what the image needs, and while every texture
+    ///   of a borrowed ring holds a frame.
+    /// - It finishes with the image's frame, and the image completes once that
+    ///   frame's result is queued. Frames of your own demands complete no image.
+    /// - Your demands never replace it, nor it them.
+    /// - `RenderSession.barrier()` ends it with `RenderResult.no_update`, and a
+    ///   detach or `RenderSession.releaseTarget()` ends it with
+    ///   `RenderResult.target_not_ready`. The image gets a new demand once the
+    ///   barrier runs, the session has a target again, or the next session
+    ///   attaches.
+    /// - An image that fails ends its demand with `RenderResult.no_update`.
     ///
     /// See `mln_map_request_still_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1403,10 +1337,11 @@ pub const Map = struct {
         return call.submit("mln_map_request_still_image", .handle, self, call.unit, null, diagnostic, .{});
     }
 
-    /// Sets the map's size.
+    /// Sets the map's size and scale factor.
     ///
-    /// A map with a render session takes its size from the session, so resize the
-    /// session with `RenderSession.resize()` instead.
+    /// The map keeps its loaded tiles. A map with a render session takes its size
+    /// and scale factor from the session, so resize the session with
+    /// `RenderSession.resize()` instead.
     ///
     /// See `mln_map_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1416,8 +1351,8 @@ pub const Map = struct {
     /// - `error.InvalidState` when the map has a render session.
     /// - `error.InvalidState` when a render session attached to the map before the
     ///   resize applied.
-    pub fn resize(self: Map, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_resize", .handle, self, call.command, null, diagnostic, .{logical_size});
+    pub fn resize(self: Map, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_map_resize", .handle, self, call.command, null, diagnostic, .{extent});
     }
 
     /// Limits the camera's center to an area, and its zoom and pitch to ranges.
@@ -2025,57 +1960,6 @@ pub const MapProjection = struct {
     }
 };
 
-/// A GPU device that the library creates to render maps offscreen.
-///
-/// See `mln_offscreen_device` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const OffscreenDevice = struct {
-    raw: u64,
-    closed: bool = false,
-    pub const native_name = "mln_offscreen_device";
-    const methods = owner.Handle(@This(), "OffscreenDevice", struct {
-        fn dispose(raw: u64) status.Error!void {
-            c.mln_offscreen_device_release(raw);
-        }
-    }.dispose);
-    pub const adopt = methods.adopt;
-    pub const id = methods.id;
-    pub const isClosed = methods.isClosed;
-    pub const format = methods.format;
-    pub const deinit = methods.deinit;
-    /// Creates a GPU device for rendering maps offscreen.
-    ///
-    /// `Map.attachOffscreen()` creates a device of its own when it gets none.
-    /// Create one to share it among the sessions on many maps, or to pick a GPU.
-    ///
-    /// In a browser WebGPU build, attach without a device instead.
-    ///
-    /// See `mln_offscreen_device_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` in a browser WebGPU build, or when the device can't
-    ///   render with `client_api`.
-    /// - `error.NativeError` when `adapter_index` names no GPU, or the platform
-    ///   can't create the device.
-    pub fn create(options: ?OffscreenDeviceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!OffscreenDevice {
-        return call.invoke("mln_offscreen_device_create", .none, {}, null, diagnostic, .{ options, call.adopt(OffscreenDevice) });
-    }
-
-    /// Releases an offscreen device.
-    ///
-    /// Render sessions on the device keep working until they detach.
-    ///
-    /// See `mln_offscreen_device_release` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-    pub fn release(self: *OffscreenDevice) void {
-        if (self.closed) return;
-        c.mln_offscreen_device_release(self.raw);
-        self.closed = true;
-    }
-};
-
 /// A render session draws a map into a surface or a texture.
 ///
 /// See `mln_render_session` in the
@@ -2109,6 +1993,12 @@ pub const RenderSession = struct {
     /// Abandon keeps the session's OpenGL and WebGPU objects until the process
     /// exits, and reports how many it kept. Detach the session instead to free
     /// them.
+    ///
+    /// A session lets go of your graphics objects later when you call this on the
+    /// thread that runs its graphics work: from a callback that the session runs
+    /// there, once the callback returns, and for a session driven by
+    /// `RenderDriverKind.caller_graphics_thread`, at your next
+    /// `RenderSession.serviceDriverWork()` for it.
     ///
     /// See `mln_render_session_abandon` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2185,6 +2075,8 @@ pub const RenderSession = struct {
     ///
     /// Errors:
     ///
+    /// - `error.InvalidArgument` when `demand.token` is
+    ///   `frame_demand_token_still_image`.
     /// - `error.TargetLost` or `error.NativeError`, as
     ///   `RenderSessionSnapshot.failure_status` reports, when the session has
     ///   failed.
@@ -2434,28 +2326,39 @@ pub const RenderSession = struct {
     /// still pending, and later ones until you give the session a new target,
     /// finish with `RenderResult.target_not_ready`. Once the release completes, you
     /// can destroy the old target. An Android or OpenHarmony window can go away
-    /// sooner, as `Map.attachAndroidSurface()` and `Map.attachOhosSurface()` say.
+    /// sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
+    ///
+    /// For a borrowed ring, a completed release also means that the session has
+    /// stopped waiting on the consumer sync that you released its frames with, so
+    /// you can reuse or destroy the textures. The session waits about a second at
+    /// most for that sync, and logs a warning when the wait runs out. It checks the
+    /// sync without blocking a thread: keep servicing a session driven by
+    /// `RenderDriverKind.caller_graphics_thread` until the release completes. The
+    /// session keeps nothing of the released textures: a texture that a later
+    /// target gives it again is a new one, even one that you discarded a frame of.
     ///
     /// See `mln_render_session_release_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     ///
     /// Errors:
     ///
-    /// - `error.Unsupported` when the session renders offscreen or into Android
-    ///   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
-    ///   allocates.
-    /// - `error.Unsupported` when the target is a WebGL canvas.
+    /// - `error.Unsupported` when the session renders offscreen or into an exported
+    ///   ring.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
     pub fn releaseTarget(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
         return call.submit("mln_render_session_release_target", .handle, self, call.unit, null, diagnostic, .{});
     }
 
-    /// Resizes the session's target and its map.
+    /// Resizes the session's target and its map, and sets the map's scale factor.
     ///
-    /// The session renders at the map's scale factor. Release every acquired frame
-    /// first. You can call it once the attach call returns. While the attach runs,
-    /// the resize waits for it to complete.
+    /// Use it when the window changes size, or moves to a display with another
+    /// scale factor. The map keeps its loaded tiles, and draws its next frame at
+    /// the new size and scale factor. You can call it once the attach call returns.
+    /// While the attach runs, the resize waits for it to complete.
+    ///
+    /// An exported ring gets textures of the new size. The frames that you hold
+    /// keep their textures, of the old size, until you release or discard them.
     ///
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2464,13 +2367,12 @@ pub const RenderSession = struct {
     ///
     /// - `error.Unsupported` when the session renders into a borrowed ring. Give it
     ///   new textures of the new size instead.
-    /// - `error.InvalidState` while you hold one of the session's acquired frames,
-    ///   or when the session failed, or you detached, abandoned, released, or
-    ///   disposed it.
+    /// - `error.InvalidState` when the session failed, or you detached, abandoned,
+    ///   released, or disposed it.
     /// - `error.TargetLost` when the session loses its target before the resize
     ///   applies.
-    pub fn resize(self: RenderSession, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_render_session_resize", .handle, self, call.command, null, diagnostic, .{logical_size});
+    pub fn resize(self: RenderSession, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+        return call.submit("mln_render_session_resize", .handle, self, call.command, null, diagnostic, .{extent});
     }
 
     /// Runs the session's ready graphics work on your graphics thread.
@@ -2489,30 +2391,6 @@ pub const RenderSession = struct {
     pub fn serviceDriverWork(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         return call.invoke("mln_render_session_service_driver_work", .handle, self, null, diagnostic, .{});
     }
-
-    /// Replaces the Android window that the session presents to.
-    ///
-    /// Use it to give the session a window again after
-    /// `RenderSession.releaseTarget()`, to move it to another window, or to resize
-    /// it. Once the replacement completes, the session no longer uses the old
-    /// window.
-    ///
-    /// See `mln_render_session_set_android_surface_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidArgument` when `surface` has no window, such as after the
-    ///   platform destroyed it.
-    /// - `error.Unsupported` when, in a Vulkan build, the new window needs a
-    ///   different color format or pre-rotation support than the old one. Attach a
-    ///   new session instead.
-    /// - `error.NativeError` when the library can't create the window's surface.
-    pub const setAndroidSurfaceTarget = if (builtin.abi.isAndroid()) struct {
-        fn function(self: RenderSession, replacement: AndroidSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_android_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
-        }
-    }.function else {};
 
     /// Sets the frame pacer that demands the session's frames.
     ///
@@ -2535,170 +2413,47 @@ pub const RenderSession = struct {
         return call.invoke("mln_render_session_set_frame_pacer", .handle, self, null, diagnostic, .{pacer});
     }
 
-    /// Replaces the Metal textures that a borrowed ring renders into.
+    /// Replaces the window, surface, or borrowed ring that the session renders to,
+    /// and resizes the map to it.
     ///
-    /// Use it to resize the ring, or to give the session textures again after
-    /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
-    /// the replacement completes, the session no longer uses the old textures.
+    /// Use it to give the session a target again after
+    /// `RenderSession.releaseTarget()`, to move it to another window or surface, or
+    /// to give a borrowed ring new textures, such as of a new size. The session
+    /// renders to `target` with the device that it attached with. Once the
+    /// replacement completes, the session no longer uses the old target. A borrowed
+    /// ring takes only a ring of the kind it attached with, with as many textures,
+    /// with depth textures only when it attached with them, and with the same
+    /// formats, final layouts, and owner. Release every acquired frame of a
+    /// borrowed ring first. Once the replacement completes, the session has also
+    /// stopped waiting on the consumer sync of the textures that the new ring
+    /// doesn't have, as `RenderSession.releaseTarget()` says, so you can reuse or
+    /// destroy them.
     ///
-    /// See `mln_render_session_set_metal_borrowed_texture_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when the new textures have a different pixel format
-    ///   than the old ones. Attach a new session to change it.
-    pub const setMetalBorrowedTextureTarget = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-        fn function(self: RenderSession, allocator: std.mem.Allocator, replacement: MetalBorrowedTextureReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_metal_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{replacement});
-        }
-    }.function else {};
-
-    /// Replaces the Metal layer that the session renders to.
-    ///
-    /// Use it to give the session a layer again after
-    /// `RenderSession.releaseTarget()`, to move it to another layer, or to resize
-    /// it. Once the replacement completes, the session no longer uses the old
-    /// layer.
-    ///
-    /// See `mln_render_session_set_metal_surface_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub const setMetalSurfaceTarget = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-        fn function(self: RenderSession, replacement: MetalSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_metal_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
-        }
-    }.function else {};
-
-    /// Replaces the OpenHarmony window that the session presents to.
-    ///
-    /// Use it to give the session a window again after
-    /// `RenderSession.releaseTarget()`, to move it to another window, or to resize
-    /// it. Once the replacement completes, the session no longer uses the old
-    /// window.
-    ///
-    /// See `mln_render_session_set_ohos_surface_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+    /// See `mln_render_session_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     ///
     /// Errors:
     ///
-    /// - `error.InvalidArgument` when no surface in this process has
-    ///   `OhosSurfaceReplacement.surface_id`, such as after the platform destroyed
-    ///   it.
-    /// - `error.Unsupported` when, in a Vulkan build, the new window needs a
-    ///   different color format or pre-rotation support than the old one. Attach a
-    ///   new session instead.
-    /// - `error.NativeError` when the library can't create the window's surface.
-    pub const setOhosSurfaceTarget = if (builtin.abi.isOpenHarmony()) struct {
-        fn function(self: RenderSession, replacement: OhosSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_ohos_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
-        }
-    }.function else {};
-
-    /// Replaces the OpenGL textures that a borrowed ring renders into.
-    ///
-    /// Use it to resize the ring, or to give the session textures again after
-    /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
-    /// the replacement completes, the session no longer uses the old textures.
-    ///
-    /// See `mln_render_session_set_open_gl_borrowed_texture_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn setOpenGlBorrowedTextureTarget(self: RenderSession, allocator: std.mem.Allocator, replacement: OpenGlBorrowedTextureReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_render_session_set_open_gl_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{replacement});
+    /// - `error.InvalidArgument` when a borrowed ring gets more or fewer textures
+    ///   than it attached with, or depth textures but not one for each texture.
+    /// - `error.InvalidState` when a window is minimized or has no client area, or
+    ///   while you hold one of a borrowed ring's acquired frames.
+    /// - `error.Unsupported` when the session renders offscreen or into an exported
+    ///   ring, when `target` is offscreen or an exported ring, when a session that
+    ///   presents gets a borrowed ring or a borrowed ring gets anything else, or
+    ///   when no backend of this build renders to the target's kind. An exported
+    ///   ring takes a new size from `RenderSession.resize()` instead.
+    /// - `error.InvalidState` when a window was minimized or had no client area
+    ///   when the replacement ran.
+    /// - `error.Unsupported` when the session's device can't render to `target`,
+    ///   the new target needs a different color format or pre-rotation support than
+    ///   the old one, or a borrowed ring's new textures differ from the old ones in
+    ///   their formats, final layouts, or owner, or in having depth textures.
+    ///   Attach a new session instead.
+    /// - `error.NativeError` when the library can't render to the new target.
+    pub fn setTarget(self: RenderSession, allocator: std.mem.Allocator, target: RenderTarget, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+        return call.submit("mln_render_session_set_target", .handle, self, call.unit, allocator, diagnostic, .{target});
     }
-
-    /// Replaces the OpenGL surface that the session presents to.
-    ///
-    /// Use it to give the session a surface again after
-    /// `RenderSession.releaseTarget()`, to move it to another surface, or to resize
-    /// it. Once the replacement completes, the session no longer uses the old
-    /// surface.
-    ///
-    /// See `mln_render_session_set_open_gl_surface_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    pub fn setOpenGlSurfaceTarget(self: RenderSession, replacement: OpenGlSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_render_session_set_open_gl_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
-    }
-
-    /// Replaces the Vulkan images that a borrowed ring renders into.
-    ///
-    /// Use it to resize the ring, or to give the session images again after
-    /// `RenderSession.releaseTarget()`. Release every acquired frame first. Once
-    /// the replacement completes, the session no longer uses the old images.
-    ///
-    /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub const setVulkanBorrowedTextureTarget = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(self: RenderSession, allocator: std.mem.Allocator, replacement: VulkanBorrowedTextureReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_vulkan_borrowed_texture_target", .handle, self, call.unit, allocator, diagnostic, .{replacement});
-        }
-    }.function else {};
-
-    /// Replaces the Vulkan surface that the session presents to.
-    ///
-    /// Use it to give the session a surface again after
-    /// `RenderSession.releaseTarget()`, to move it to another surface, or to resize
-    /// it. Once the replacement completes, the session no longer uses the old
-    /// surface.
-    ///
-    /// See `mln_render_session_set_vulkan_surface_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when the new surface needs a different color format or
-    ///   pre-rotation support than the old one. Attach a new session instead.
-    pub const setVulkanSurfaceTarget = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(self: RenderSession, replacement: VulkanSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_vulkan_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
-        }
-    }.function else {};
-
-    /// Replaces the Wayland surface that the session presents to.
-    ///
-    /// Use it to give the session a surface again after
-    /// `RenderSession.releaseTarget()`, to move it to another surface, or to resize
-    /// it. Once the replacement completes, the session no longer uses the old
-    /// surface.
-    ///
-    /// See `mln_render_session_set_wayland_surface_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when, in a Vulkan build, the new surface needs a
-    ///   different color format than the old one. Attach a new session instead.
-    /// - `error.NativeError` when the library can't present to the new surface.
-    pub const setWaylandSurfaceTarget = if (builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony())) struct {
-        fn function(self: RenderSession, replacement: WaylandSurfaceReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_wayland_surface_target", .handle, self, call.unit, null, diagnostic, .{replacement});
-        }
-    }.function else {};
-
-    /// Replaces the Win32 window that the session presents to.
-    ///
-    /// Use it to give the session a window again after
-    /// `RenderSession.releaseTarget()`, to move it to another window, or to resize
-    /// it. Once the replacement completes, the session no longer uses the old
-    /// window.
-    ///
-    /// See `mln_render_session_set_win32_window_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.InvalidArgument` when `window` isn't a window, or, in an OpenGL
-    ///   build, already has another pixel format.
-    /// - `error.InvalidState` when `window` is minimized or has no client area.
-    /// - `error.InvalidState` when `window` was minimized before the replacement
-    ///   ran.
-    /// - `error.Unsupported` when, in a Vulkan build, the new window needs a
-    ///   different color format than the old one. Attach a new session instead.
-    /// - `error.NativeError` when the library can't present to the new window.
-    pub const setWin32WindowTarget = if (builtin.os.tag == .windows) struct {
-        fn function(self: RenderSession, replacement: Win32WindowReplacement, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-            return call.submit("mln_render_session_set_win32_window_target", .handle, self, call.unit, null, diagnostic, .{replacement});
-        }
-    }.function else {};
 };
 
 /// A resource load that a resource provider answers.
@@ -3051,8 +2806,6 @@ pub const Runtime = struct {
     ///
     /// - `error.InvalidArgument` when `side_database_path` isn't a readable
     ///   database file.
-    /// - `error.NativeError` when the merge would exceed the tile limit that
-    ///   `RuntimeEventType.offline_region_tile_count_limit_exceeded` describes.
     pub fn mergeOfflineRegions(self: Runtime, allocator: std.mem.Allocator, side_database_path: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
         return call.submit("mln_runtime_merge_offline_regions", .handle, self, call.slice(OfflineRegionInfo, c.mln_offline_region_info), allocator, diagnostic, .{side_database_path});
     }
@@ -3254,77 +3007,6 @@ pub const StyleExpression = struct {
     }
 };
 
-/// A Vulkan instance, device, and queue that the library creates and owns.
-///
-/// See `mln_vulkan_device` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const VulkanDevice = struct {
-    raw: u64,
-    closed: bool = false,
-    pub const native_name = "mln_vulkan_device";
-    const methods = owner.Handle(@This(), "VulkanDevice", struct {
-        fn dispose(raw: u64) status.Error!void {
-            c.mln_vulkan_device_release(raw);
-        }
-    }.dispose);
-    pub const adopt = methods.adopt;
-    pub const id = methods.id;
-    pub const isClosed = methods.isClosed;
-    pub const format = methods.format;
-    pub const deinit = methods.deinit;
-    /// Creates a Vulkan instance, device, and graphics queue for render sessions.
-    ///
-    /// Attach sessions with the context from `VulkanDevice.getContext()`, in place
-    /// of a device of your own. Without `device_uuid` or `device_luid`, it prefers
-    /// a discrete GPU. The device enables the external memory and semaphore
-    /// extensions that the GPU offers.
-    ///
-    /// See `mln_vulkan_device_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
-    ///   `RenderBackendFlag.vulkan`, or when `presentation` is true and the Vulkan
-    ///   loader or the GPU can't present.
-    /// - `error.NotFound` when no GPU matches `device_uuid` and `device_luid`.
-    /// - `error.NativeError` when there is no Vulkan loader, no GPU has a graphics
-    ///   queue, or Vulkan can't create the instance or the device.
-    pub const create = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(options: ?VulkanDeviceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!VulkanDevice {
-            return call.invoke("mln_vulkan_device_create", .none, {}, null, diagnostic, .{ options, call.adopt(VulkanDevice) });
-        }
-    }.function else {};
-
-    /// Gets the context to attach render sessions to the device with.
-    ///
-    /// Pass it as the context of `Map.attachVulkanSurface()` or
-    /// `Map.attachVulkanBorrowedTexture()`. The sessions on the device share its
-    /// graphics queue. To submit to the queue yourself, set
-    /// `RenderSessionAttachOptions.queue_lock` on each session.
-    ///
-    /// See `mln_vulkan_device_get_context` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-    pub const getContext = if (builtin.abi.isAndroid() or builtin.os.tag == .freebsd or (builtin.os.tag == .linux and !builtin.abi.isAndroid() and !builtin.abi.isOpenHarmony()) or builtin.os.tag == .macos or builtin.abi.isOpenHarmony() or builtin.os.tag == .windows) struct {
-        fn function(self: VulkanDevice, diagnostic: ?*diagnostics.Diagnostic) status.Error!VulkanDeviceContextResult {
-            return call.invoke("mln_vulkan_device_get_context", .handle, self, null, diagnostic, .{call.sizedOut(VulkanDeviceContextResult)});
-        }
-    }.function else {};
-
-    /// Releases a Vulkan device.
-    ///
-    /// Render sessions that attached with the device's context keep using it until
-    /// they detach or their release finishes.
-    ///
-    /// See `mln_vulkan_device_release` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-    pub fn release(self: *VulkanDevice) void {
-        if (self.closed) return;
-        c.mln_vulkan_device_release(self.raw);
-        self.closed = true;
-    }
-};
-
 /// How a gesture's zoom, bearing, or pitch keeps changing after release.
 ///
 /// See `mln_anchored_momentum` in the
@@ -3360,10 +3042,10 @@ pub const AnchoredMomentum = struct {
     }
 };
 
-/// The Android hardware buffer of an acquired frame.
+/// The Android hardware buffer of an exported ring's acquired frame.
 ///
 /// See `mln_android_hardware_buffer_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const AndroidHardwareBufferFrame = struct {
     width: u32 = 0,
     height: u32 = 0,
@@ -3383,106 +3065,33 @@ pub const AndroidHardwareBufferFrame = struct {
     }
 };
 
-/// A ring of Android hardware buffers that the library allocates, for
-/// `Map.attachAndroidHardwareBufferRing()`.
+/// An Android window to present to.
 ///
-/// Each buffer has the map's size in pixels, `logical_size` times the map's
-/// scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its
-/// usage is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
-/// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
+/// The session takes its own reference to the window, so you can release yours
+/// once the call returns. When the platform destroys the window, such as in
+/// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+/// `RenderSession.releaseTarget()`, or give the session another window with
+/// `RenderSession.setTarget()`, without waiting for that to complete. A frame
+/// to the destroyed window finishes with `RenderResult.target_not_ready`, or
+/// with `RenderResult.rendered` if the window went away while the frame was
+/// presenting.
 ///
-/// See `mln_android_hardware_buffer_ring_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-pub const AndroidHardwareBufferRingDescriptor = struct {
+/// See `mln_android_window_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const AndroidWindowTarget = struct {
     logical_size: LogicalSize,
-    /// How many buffers the ring has, from 1 to 8.
-    buffer_count: u32,
-    /// More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
-    /// AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
-    usage: u64 = 0,
-    pub fn toNative(self: AndroidHardwareBufferRingDescriptor) c.mln_android_hardware_buffer_ring_descriptor {
-        var raw = std.mem.zeroes(c.mln_android_hardware_buffer_ring_descriptor);
-        raw.size = @sizeOf(c.mln_android_hardware_buffer_ring_descriptor);
-        raw.logical_size = self.logical_size.toNative();
-        raw.buffer_count = self.buffer_count;
-        raw.usage = self.usage;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_android_hardware_buffer_ring_descriptor) AndroidHardwareBufferRingDescriptor {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .buffer_count = raw.buffer_count,
-            .usage = raw.usage,
-        };
-    }
-};
-
-/// An Android window to present to, for `Map.attachAndroidSurface()`.
-///
-/// Name the window by `window`, or by `jni_env` and `surface`. The session
-/// takes its own reference to the window, so you can release yours once the
-/// call returns.
-///
-/// See `mln_android_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-pub const AndroidSurfaceDescriptor = struct {
-    logical_size: LogicalSize,
-    /// Your `ANativeWindow*`, or null to name the window by `surface`.
-    window: ?*anyopaque = null,
-    /// The calling thread's `JNIEnv*`, with `surface`.
-    jni_env: ?*anyopaque = null,
-    /// An `android.view.Surface`, with `jni_env`.
-    surface: ?*anyopaque = null,
-    pub fn toNative(self: AndroidSurfaceDescriptor) c.mln_android_surface_descriptor {
-        var raw = std.mem.zeroes(c.mln_android_surface_descriptor);
-        raw.size = @sizeOf(c.mln_android_surface_descriptor);
+    /// Your `ANativeWindow*`.
+    window: ?*anyopaque,
+    pub fn toNative(self: AndroidWindowTarget) c.mln_android_window_target {
+        var raw = std.mem.zeroes(c.mln_android_window_target);
         raw.logical_size = self.logical_size.toNative();
         raw.window = self.window;
-        raw.jni_env = self.jni_env;
-        raw.surface = self.surface;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_android_surface_descriptor) AndroidSurfaceDescriptor {
+    pub fn fromNative(raw: c.mln_android_window_target) AndroidWindowTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .window = raw.window,
-            .jni_env = raw.jni_env,
-            .surface = raw.surface,
-        };
-    }
-};
-
-/// A new Android window for `RenderSession.setAndroidSurfaceTarget()`.
-///
-/// Name the window by `window`, or by `jni_env` and `surface`. The session
-/// takes its own reference to the window, so you can release yours once the
-/// call returns.
-///
-/// See `mln_android_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-pub const AndroidSurfaceReplacement = struct {
-    logical_size: LogicalSize,
-    /// Your `ANativeWindow*`, or null to name the window by `surface`.
-    window: ?*anyopaque = null,
-    /// The calling thread's `JNIEnv*`, with `surface`.
-    jni_env: ?*anyopaque = null,
-    /// An `android.view.Surface`, with `jni_env`.
-    surface: ?*anyopaque = null,
-    pub fn toNative(self: AndroidSurfaceReplacement) c.mln_android_surface_replacement {
-        var raw = std.mem.zeroes(c.mln_android_surface_replacement);
-        raw.size = @sizeOf(c.mln_android_surface_replacement);
-        raw.logical_size = self.logical_size.toNative();
-        raw.window = self.window;
-        raw.jni_env = self.jni_env;
-        raw.surface = self.surface;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_android_surface_replacement) AndroidSurfaceReplacement {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .window = raw.window,
-            .jni_env = raw.jni_env,
-            .surface = raw.surface,
         };
     }
 };
@@ -4107,6 +3716,21 @@ pub const CanonicalTileId = struct {
     }
 };
 
+/// How a graphics API's clip space holds depth.
+///
+/// See `mln_clip_depth_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const ClipDepthRange = enum(u32) {
+    /// Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and
+    /// OpenGL with `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+    zero_to_one = 1,
+    /// Clip z runs from -w to w, as in OpenGL by default.
+    negative_one_to_one = 2,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
 /// How the map keeps the camera within the world or within its bounds.
 ///
 /// See `mln_constrain_mode` in the
@@ -4224,6 +3848,250 @@ pub const CustomGeometrySourceOptions = struct {
     }
 };
 
+/// The GPU commands of a frame outside the map's render pass, by the backend
+/// that the session renders with.
+///
+/// An OpenGL session has no variant: its context is current, and it draws
+/// through no object that the callback needs.
+///
+/// See `mln_custom_layer_encoder_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const CustomLayerEncoderData = union(enum) {
+    metal: MetalCustomLayerEncoder,
+    vulkan: VulkanCustomLayerEncoder,
+    web_gpu: WebGpuCustomLayerEncoder,
+    empty,
+    unknown: u32,
+};
+
+/// The frame that a custom layer draws into, as its callbacks get it.
+///
+/// The view and the frame projection are the ones that the frame draws the map
+/// with, so they are never newer than the frame, unlike the map's camera.
+///
+/// See `mln_custom_layer_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const CustomLayerFrame = struct {
+    /// The camera, extent, and scale factor that the frame shows.
+    view: MapView = .{},
+    /// Where the frame draws the map, and the depth that it writes there.
+    frame_projection: FrameProjection = .{},
+    /// The width of the frame's attachments, in physical pixels.
+    width: u32 = 0,
+    /// The height of the frame's attachments, in physical pixels.
+    height: u32 = 0,
+    pub fn fromNative(raw: c.mln_custom_layer_frame) CustomLayerFrame {
+        return .{
+            .view = MapView.fromNative(raw.view),
+            .frame_projection = FrameProjection.fromNative(raw.frame_projection),
+            .width = raw.width,
+            .height = raw.height,
+        };
+    }
+};
+
+/// The callbacks of a custom layer, which draws with your own GPU commands in
+/// the map's frame.
+///
+/// A session runs the callbacks only when it can hand you its commands as one
+/// of `CustomLayerPassData`'s variants, so a session on another backend, such
+/// as WebGPU outside a browser, doesn't draw the layer. Nor does a browser
+/// WebGPU session yet: the library's WebGPU (wgpu) exposes no command encoder
+/// or render pass to hand you. Leave unset the callbacks that you don't need.
+///
+/// Runs on the thread that runs the session's graphics work: a library thread,
+/// or yours with `RenderDriverKind.caller_graphics_thread`. It can't call the
+/// library.
+///
+/// It can't call the library.
+///
+/// See `mln_custom_layer_host` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const CustomLayerHost = struct {
+    context: ?*anyopaque = null,
+    release_context: ?*const fn (?*anyopaque) void = null,
+    prerender: ?*const fn (context: ?*anyopaque, parameters: CustomLayerPrerenderParameters) anyerror!void = null,
+    render: ?*const fn (context: ?*anyopaque, parameters: CustomLayerRenderParameters) anyerror!void = null,
+    deinitialize: ?*const fn (context: ?*anyopaque) anyerror!void = null,
+    context_lost: ?*const fn (context: ?*anyopaque) anyerror!void = null,
+    pub fn toNative(self: CustomLayerHost, roots: *callbacks.Roots) status.Error!c.mln_custom_layer_host {
+        var raw = std.mem.zeroes(c.mln_custom_layer_host);
+        raw.size = @sizeOf(c.mln_custom_layer_host);
+        raw.prerender = if (self.prerender != null) prerenderTrampoline else null;
+        raw.render = if (self.render != null) renderTrampoline else null;
+        raw.deinitialize = if (self.deinitialize != null) deinitializeTrampoline else null;
+        raw.context_lost = if (self.context_lost != null) context_lostTrampoline else null;
+        if (!(self.prerender == null and self.render == null and self.deinitialize == null and self.context_lost == null)) {
+            const retained = try roots.retain(CustomLayerHost, self);
+            raw.user_data = retained;
+            raw.release_user_data = callbacks.Registration(CustomLayerHost).releaseNative;
+        }
+        return raw;
+    }
+    fn prerenderTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_layer_prerender_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_layer_prerender_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_layer_prerender_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_layer_prerender_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_layer_prerender_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_layer_prerender_callback) {
+                const state = callbacks.Registration(CustomLayerHost).get(callback_arg_0);
+                const host = state.value.prerender orelse {
+                    return;
+                };
+                try host(state.value.context, try CustomLayerPrerenderParameters.fromNative((callback_arg_1 orelse return error.NativeError).*));
+            }
+        }.invoke(native_arg_0, native_arg_1) catch |err| {
+            callbacks.reportError("mln_custom_layer_prerender_callback", err);
+            return;
+        };
+    }
+    fn renderTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_layer_render_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_layer_render_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_layer_render_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_layer_render_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_layer_render_callback, 1)) anyerror!marshal.CallbackResult(c.mln_custom_layer_render_callback) {
+                const state = callbacks.Registration(CustomLayerHost).get(callback_arg_0);
+                const host = state.value.render orelse {
+                    return;
+                };
+                try host(state.value.context, try CustomLayerRenderParameters.fromNative((callback_arg_1 orelse return error.NativeError).*));
+            }
+        }.invoke(native_arg_0, native_arg_1) catch |err| {
+            callbacks.reportError("mln_custom_layer_render_callback", err);
+            return;
+        };
+    }
+    fn deinitializeTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_layer_session_end_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_custom_layer_session_end_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_layer_session_end_callback, 0)) anyerror!marshal.CallbackResult(c.mln_custom_layer_session_end_callback) {
+                const state = callbacks.Registration(CustomLayerHost).get(callback_arg_0);
+                const host = state.value.deinitialize orelse {
+                    return;
+                };
+                try host(state.value.context);
+            }
+        }.invoke(native_arg_0) catch |err| {
+            callbacks.reportError("mln_custom_layer_session_end_callback", err);
+            return;
+        };
+    }
+    fn context_lostTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_layer_session_end_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_custom_layer_session_end_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_layer_session_end_callback, 0)) anyerror!marshal.CallbackResult(c.mln_custom_layer_session_end_callback) {
+                const state = callbacks.Registration(CustomLayerHost).get(callback_arg_0);
+                const host = state.value.context_lost orelse {
+                    return;
+                };
+                try host(state.value.context);
+            }
+        }.invoke(native_arg_0) catch |err| {
+            callbacks.reportError("mln_custom_layer_session_end_callback", err);
+            return;
+        };
+    }
+    /// Builds a `CustomLayerHost` whose callbacks receive `context`, a pointer, as
+    /// its own type. Each callback takes the context and then the arguments
+    /// of its field, and may return any error; pass null to leave one unset.
+    /// Native runs `release`, when it is not null, once it releases the
+    /// registration.
+    pub fn init(context: anytype, comptime prerender: anytype, comptime render: anytype, comptime deinitialize: anytype, comptime context_lost: anytype, comptime release: ?fn (@TypeOf(context)) void) CustomLayerHost {
+        const Context = @TypeOf(context);
+        if (@typeInfo(Context) != .pointer) @compileError("a CustomLayerHost context must be a pointer");
+        return .{
+            .context = @ptrCast(@constCast(context)),
+            .release_context = if (release == null) null else struct {
+                fn call(erased: ?*anyopaque) void {
+                    release.?(@as(Context, @ptrCast(@alignCast(erased.?))));
+                }
+            }.call,
+            .prerender = if (@TypeOf(prerender) == @TypeOf(null)) null else struct {
+                fn call(erased: ?*anyopaque, argument_0: CustomLayerPrerenderParameters) anyerror!void {
+                    return prerender(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
+                }
+            }.call,
+            .render = if (@TypeOf(render) == @TypeOf(null)) null else struct {
+                fn call(erased: ?*anyopaque, argument_0: CustomLayerRenderParameters) anyerror!void {
+                    return render(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0);
+                }
+            }.call,
+            .deinitialize = if (@TypeOf(deinitialize) == @TypeOf(null)) null else struct {
+                fn call(erased: ?*anyopaque) anyerror!void {
+                    return deinitialize(@as(Context, @ptrCast(@alignCast(erased.?))));
+                }
+            }.call,
+            .context_lost = if (@TypeOf(context_lost) == @TypeOf(null)) null else struct {
+                fn call(erased: ?*anyopaque) anyerror!void {
+                    return context_lost(@as(Context, @ptrCast(@alignCast(erased.?))));
+                }
+            }.call,
+        };
+    }
+};
+
+/// The map's render pass at a custom layer's place in the style, by the backend
+/// that the session renders with.
+///
+/// See `mln_custom_layer_pass_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const CustomLayerPassData = union(enum) {
+    metal: MetalCustomLayerPass,
+    vulkan: VulkanCustomLayerPass,
+    open_gl: OpenGlCustomLayerPass,
+    web_gpu: WebGpuCustomLayerPass,
+    unknown: u32,
+};
+
+/// What a custom layer's prerender callback gets.
+///
+/// See `mln_custom_layer_prerender_parameters` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const CustomLayerPrerenderParameters = struct {
+    encoder: CustomLayerEncoderData = .{ .unknown = 0 },
+    frame: CustomLayerFrame = .{},
+
+    /// Borrows the record's text, which native lends until the callback returns.
+    pub fn fromNative(raw: c.mln_custom_layer_prerender_parameters) status.Error!CustomLayerPrerenderParameters {
+        return .{
+            .encoder = switch (raw.backend) {
+                c.MLN_RENDER_BACKEND_METAL => .{ .metal = MetalCustomLayerEncoder.fromNative(raw.encoder.metal) },
+                c.MLN_RENDER_BACKEND_VULKAN => .{ .vulkan = VulkanCustomLayerEncoder.fromNative(raw.encoder.vulkan) },
+                c.MLN_RENDER_BACKEND_WEB_GPU => .{ .web_gpu = WebGpuCustomLayerEncoder.fromNative(raw.encoder.web_gpu) },
+                c.MLN_RENDER_BACKEND_OPEN_GL => .empty,
+                else => |tag| .{ .unknown = @intCast(tag) },
+            },
+            .frame = CustomLayerFrame.fromNative(raw.frame),
+        };
+    }
+};
+
+/// What a custom layer's render callback gets.
+///
+/// See `mln_custom_layer_render_parameters` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const CustomLayerRenderParameters = struct {
+    pass: CustomLayerPassData = .{ .unknown = 0 },
+    frame: CustomLayerFrame = .{},
+    /// The depth that a 2D layer at the layer's place in the style writes, as
+    /// `FrameProjection` describes, between `frame.frame_projection.far_depth`
+    /// and 1.
+    ///
+    /// The map draws the opaque fragments of its 2D layers before the render
+    /// callback runs, those above the custom layer too. A fragment that you
+    /// draw at this depth, tested with less-or-equal, stays under those above
+    /// that wrote depth.
+    layer_depth: f64 = 0,
+
+    /// Borrows the record's text, which native lends until the callback returns.
+    pub fn fromNative(raw: c.mln_custom_layer_render_parameters) status.Error!CustomLayerRenderParameters {
+        return .{
+            .pass = switch (raw.backend) {
+                c.MLN_RENDER_BACKEND_METAL => .{ .metal = MetalCustomLayerPass.fromNative(raw.pass.metal) },
+                c.MLN_RENDER_BACKEND_VULKAN => .{ .vulkan = VulkanCustomLayerPass.fromNative(raw.pass.vulkan) },
+                c.MLN_RENDER_BACKEND_OPEN_GL => .{ .open_gl = OpenGlCustomLayerPass.fromNative(raw.pass.open_gl) },
+                c.MLN_RENDER_BACKEND_WEB_GPU => .{ .web_gpu = try WebGpuCustomLayerPass.fromNative(raw.pass.web_gpu) },
+                else => |tag| .{ .unknown = @intCast(tag) },
+            },
+            .frame = CustomLayerFrame.fromNative(raw.frame),
+            .layer_depth = raw.layer_depth,
+        };
+    }
+};
+
 /// The callbacks and options of a custom vector source.
 ///
 /// Zoom levels are whole numbers from 0 to 32.
@@ -4307,10 +4175,30 @@ pub const CustomVectorSourceOptions = struct {
     }
 };
 
+/// A format of depth and stencil textures, as a bit in a set.
+///
+/// See `mln_depth_stencil_format_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const DepthStencilFormatFlag = struct {
+    /// 24-bit normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
+    /// MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
+    /// WGPUTextureFormat_Depth24PlusStencil8 (`depth24plus-stencil8`).
+    depth24_stencil8: bool = false,
+    /// 32-bit float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
+    /// MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
+    /// WGPUTextureFormat_Depth32FloatStencil8 (`depth32float-stencil8`).
+    depth32_float_stencil8: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+};
+
 /// A DRM format and modifier that you can import.
 ///
 /// See `mln_dma_buf_format` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const DmaBufFormat = struct {
     /// A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
     fourcc: u32 = 0,
@@ -4330,10 +4218,10 @@ pub const DmaBufFormat = struct {
     }
 };
 
-/// The dmabuf of an acquired frame.
+/// The dmabuf of an exported ring's acquired frame.
 ///
 /// See `mln_dma_buf_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const DmaBufFrame = struct {
     width: u32 = 0,
     height: u32 = 0,
@@ -4367,7 +4255,7 @@ pub const DmaBufFrame = struct {
 /// Where one plane of a dmabuf keeps its data.
 ///
 /// See `mln_dma_buf_plane` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const DmaBufPlane = struct {
     /// The file descriptor of the dmabuf that holds the plane. The planes of a
     /// buffer often share one.
@@ -4385,54 +4273,10 @@ pub const DmaBufPlane = struct {
     }
 };
 
-/// A ring of dmabufs that the library allocates, for `Map.attachDmaBufRing()`.
-///
-/// Each buffer has the map's size in pixels and a format and modifier from
-/// `formats`. The library renders only DRM_FORMAT_ABGR8888 and
-/// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
-/// format has, such as a plane of compression metadata, and the library takes
-/// any such modifier that its GPU can render into and share.
-///
-/// See `mln_dma_buf_ring_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
-pub const DmaBufRingDescriptor = struct {
-    logical_size: LogicalSize,
-    /// How many buffers the ring has, from 1 to 8.
-    buffer_count: u32,
-    /// The formats and modifiers that your reader imports, most preferred
-    /// first, such as those that eglQueryDmaBufModifiersEXT() reports.
-    formats: []const DmaBufFormat,
-    pub fn toNative(self: DmaBufRingDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_dma_buf_ring_descriptor {
-        var raw = std.mem.zeroes(c.mln_dma_buf_ring_descriptor);
-        raw.size = @sizeOf(c.mln_dma_buf_ring_descriptor);
-        raw.logical_size = self.logical_size.toNative();
-        raw.buffer_count = self.buffer_count;
-        raw.formats = blk: {
-            const items = try allocator.alloc(c.mln_dma_buf_format, self.formats.len);
-            for (self.formats, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.format_count = std.math.cast(@TypeOf(raw.format_count), self.formats.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_dma_buf_ring_descriptor) status.Error!DmaBufRingDescriptor {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .buffer_count = raw.buffer_count,
-            .formats = blk: {
-                const copied = try allocator.alloc(DmaBufFormat, raw.format_count);
-                for (try marshal.nativeSlice(c.mln_dma_buf_format, raw.formats, raw.format_count), 0..) |item, index| copied[index] = DmaBufFormat.fromNative(item);
-                break :blk copied;
-            },
-        };
-    }
-};
-
-/// The DXGI shared texture of an acquired frame.
+/// The DXGI shared texture of an exported ring's acquired frame.
 ///
 /// See `mln_dxgi_shared_texture_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const DxgiSharedTextureFrame = struct {
     width: u32 = 0,
     height: u32 = 0,
@@ -4451,34 +4295,6 @@ pub const DxgiSharedTextureFrame = struct {
             .slot = raw.slot,
             .format = raw.format,
             .handle = raw.handle,
-        };
-    }
-};
-
-/// A ring of DXGI shared textures that the library allocates, for
-/// `Map.attachDxgiSharedTextureRing()`.
-///
-/// Each texture is a D3D11 2D texture with the map's size in pixels and the
-/// format DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a
-/// render target, and is shared through an NT handle.
-///
-/// See `mln_dxgi_shared_texture_ring_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-pub const DxgiSharedTextureRingDescriptor = struct {
-    logical_size: LogicalSize,
-    /// How many textures the ring has, from 1 to 8.
-    texture_count: u32,
-    pub fn toNative(self: DxgiSharedTextureRingDescriptor) c.mln_dxgi_shared_texture_ring_descriptor {
-        var raw = std.mem.zeroes(c.mln_dxgi_shared_texture_ring_descriptor);
-        raw.size = @sizeOf(c.mln_dxgi_shared_texture_ring_descriptor);
-        raw.logical_size = self.logical_size.toNative();
-        raw.texture_count = self.texture_count;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_dxgi_shared_texture_ring_descriptor) DxgiSharedTextureRingDescriptor {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .texture_count = raw.texture_count,
         };
     }
 };
@@ -4510,19 +4326,20 @@ pub const EdgeInsets = struct {
     }
 };
 
-/// The EGL objects that a render session makes its OpenGL context from.
+/// Your EGL context, which each session's context shares objects with.
+///
+/// Each session makes its context on `display` with `config` and the client API
+/// and version of `share_context`.
 ///
 /// See `mln_egl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const EglContextDescriptor = struct {
-    /// An `EGLDisplay`.
+    /// An `EGLDisplay`, which you initialized.
     display: ?*anyopaque,
-    /// An `EGLConfig`.
+    /// The `EGLConfig` of `share_context`.
     config: ?*anyopaque,
-    /// Your `EGLContext`, for a shared context.
-    share_context: ?*anyopaque = null,
-    /// The API of a dedicated context. A shared context uses the API of yours.
-    client_api: OpenGlClientApi = .unspecified,
+    /// Your `EGLContext`.
+    share_context: ?*anyopaque,
     /// Your `eglGetProcAddress`, or null to use the system's.
     get_proc_address: ?*anyopaque = null,
     pub fn toNative(self: EglContextDescriptor) c.mln_egl_context_descriptor {
@@ -4530,7 +4347,6 @@ pub const EglContextDescriptor = struct {
         raw.display = self.display;
         raw.config = self.config;
         raw.share_context = self.share_context;
-        raw.client_api = self.client_api.toNative();
         raw.get_proc_address = self.get_proc_address;
         return raw;
     }
@@ -4539,8 +4355,107 @@ pub const EglContextDescriptor = struct {
             .display = raw.display,
             .config = raw.config,
             .share_context = raw.share_context,
-            .client_api = OpenGlClientApi.fromNative(raw.client_api),
             .get_proc_address = raw.get_proc_address,
+        };
+    }
+};
+
+/// A ring of textures that the session allocates on its device and shares with
+/// you, in one of the ways that you can import.
+///
+/// Each texture has the size in pixels of `logical_size` at the map's scale
+/// factor. `RenderSession.resize()` gives the ring textures of the new size,
+/// and a frame that you hold keeps its texture of the old size until you
+/// release or discard it.
+///
+/// The ring shares its textures in the first kind of `export_kinds` that the
+/// device exports, in this order, and `RenderSessionCapabilities.export_kind`
+/// reports it:
+///
+/// - `GpuExportKind.io_surface`: IOSurfaces of the pixel format
+///   kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm. Get
+///   each frame's surface with `AcquiredFrame.getIoSurface()`.
+/// - `GpuExportKind.android_hardware_buffer`: hardware buffers of the format
+///   AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage
+///   AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+///   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+///   `android_hardware_buffer_usage`. Get each frame's buffer with
+///   `AcquiredFrame.getAndroidHardwareBuffer()`.
+/// - `GpuExportKind.dxgi_shared_handle`: D3D11 textures of the format
+///   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
+///   resources and render targets. Open them on a D3D11 or D3D12 device of the
+///   same adapter, which you pick with `GpuDeviceOptions.adapter_luid`. Get
+///   each frame's texture with `AcquiredFrame.getDxgiSharedTexture()`.
+/// - `GpuExportKind.dma_buf`: dmabufs of a format and modifier from
+///   `dma_buf_formats`. Get each frame's buffer with
+///   `AcquiredFrame.getDmaBuf()`.
+/// - `GpuExportKind.opaque_fd`: the memory of Vulkan images, which only a
+///   Vulkan device or an OpenGL context with GL_EXT_memory_object_fd on the
+///   same GPU and driver imports. To pick the GPU, create the device with
+///   `GpuDeviceOptions.adapter_uuid` set to your context's GL_DEVICE_UUID_EXT.
+///   Get each frame's memory with `AcquiredFrame.getOpaqueFd()`.
+///
+/// `GpuDeviceCapabilities.export_kinds` reports the kinds that a device
+/// exports. Attach with `RenderDriverKind.core_worker`. Without a device, the
+/// session renders on the first of the platform's backends whose device exports
+/// one of `export_kinds`.
+///
+/// Each frame hands over with `GpuSyncKind.cpu_complete` or with the sync kind
+/// that crosses APIs on its platform: `GpuSyncKind.metal_shared_event` for an
+/// IOSurface, and `GpuSyncKind.sync_fd` for the others, where the device has
+/// them. For a reader that waits on neither, such as a Wayland compositor
+/// without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
+/// out of `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+/// finishes before you acquire it, and release each frame only once the reader
+/// is done with its texture. Give the ring 3 textures, so the session can
+/// render while you hold two frames.
+///
+/// See `mln_exported_ring_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const ExportedRingTarget = struct {
+    logical_size: LogicalSize,
+    /// How many textures the ring has, from 1 to `texture_ring_max_depth`.
+    texture_count: u32,
+    /// The ways of sharing a texture that you can import.
+    export_kinds: GpuExportKindFlag,
+    /// The dmabuf formats and modifiers that you import, most preferred first,
+    /// such as those that eglQueryDmaBufModifiersEXT() reports. A ring exports
+    /// dmabufs only of one of them. The library renders only
+    /// DRM_FORMAT_ABGR8888 and DRM_FORMAT_ARGB8888. A modifier can give a
+    /// buffer more planes than its format has, such as a plane of compression
+    /// metadata, and the library takes any such modifier that its GPU can
+    /// render into and share. The library takes no implicit modifier: it skips
+    /// DRM_FORMAT_MOD_INVALID, so a list of only that one gets no dmabuf.
+    dma_buf_formats: []const DmaBufFormat = &.{},
+    /// More `AHARDWAREBUFFER_USAGE_*` bits that your reads of a hardware buffer
+    /// need, such as AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+    android_hardware_buffer_usage: u64 = 0,
+    pub fn toNative(self: ExportedRingTarget, allocator: std.mem.Allocator) status.Error!c.mln_exported_ring_target {
+        var raw = std.mem.zeroes(c.mln_exported_ring_target);
+        raw.logical_size = self.logical_size.toNative();
+        raw.texture_count = self.texture_count;
+        raw.export_kinds = self.export_kinds.toNative();
+        raw.dma_buf_formats = blk: {
+            const items = try allocator.alloc(c.mln_dma_buf_format, self.dma_buf_formats.len);
+            for (self.dma_buf_formats, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.dma_buf_format_count = std.math.cast(@TypeOf(raw.dma_buf_format_count), self.dma_buf_formats.len) orelse return error.InvalidArgument;
+        raw.android_hardware_buffer_usage = self.android_hardware_buffer_usage;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_exported_ring_target) status.Error!ExportedRingTarget {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .texture_count = raw.texture_count,
+            .export_kinds = GpuExportKindFlag.fromNative(raw.export_kinds),
+            .dma_buf_formats = blk: {
+                const copied = try allocator.alloc(DmaBufFormat, raw.dma_buf_format_count);
+                for (try marshal.nativeSlice(c.mln_dma_buf_format, raw.dma_buf_formats, raw.dma_buf_format_count), 0..) |item, index| copied[index] = DmaBufFormat.fromNative(item);
+                break :blk copied;
+            },
+            .android_hardware_buffer_usage = raw.android_hardware_buffer_usage,
         };
     }
 };
@@ -4677,11 +4592,14 @@ pub const FrameDemandFlag = struct {
     pub const toNative = methods.toNative;
 };
 
-/// Options for creating a frame pacer.
+/// Options for creating a frame pacer, or for `FramePacer.setOptions()`.
 ///
 /// See `mln_frame_pacer_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const FramePacerOptions = struct {
+    /// Removes the frame rate limit, so the pacer can demand frames at every
+    /// display refresh, as it does by default.
+    unlimited_frames_per_second: bool = false,
     /// The most frames per second that the pacer demands, greater than zero.
     /// The pacer skips display refreshes to stay within it. By default, it can
     /// demand frames at every refresh.
@@ -4689,13 +4607,82 @@ pub const FramePacerOptions = struct {
     pub fn toNative(self: FramePacerOptions) c.mln_frame_pacer_options {
         var raw = std.mem.zeroes(c.mln_frame_pacer_options);
         raw.fields = 0;
+        if (self.unlimited_frames_per_second) raw.fields |= c.MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
         raw.size = @sizeOf(c.mln_frame_pacer_options);
         marshal.present(&raw.fields, c.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND, &raw.maximum_frames_per_second, self.maximum_frames_per_second);
         return raw;
     }
     pub fn fromNative(raw: c.mln_frame_pacer_options) FramePacerOptions {
         return .{
+            .unlimited_frames_per_second = raw.fields & c.MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND != 0,
             .maximum_frames_per_second = if (raw.fields & c.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND != 0) raw.maximum_frames_per_second else null,
+        };
+    }
+};
+
+/// Where a frame drew the map, and the depth that it wrote there.
+///
+/// World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at
+/// 180° east, and on past both into the copies of the world beside the first. y
+/// runs from 0 at the north edge of the Mercator world, about 85.05° north, to
+/// 1 at its south edge. z is the altitude in meters above sea level, at the
+/// scale of the heights of the map's 3D layers, and the map draws its ground at
+/// 0.
+///
+/// `matrix` takes a world point to the clip coordinates where the frame drew
+/// it, with the camera's padding, roll, field of view, and center altitude, and
+/// the map's viewport and projection mode. Clip y points up, as the map draws
+/// with OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so
+/// negate it there too. At high zooms, single precision can't tell nearby world
+/// points apart: subtract an origin near your geometry from its coordinates in
+/// double precision, and fold the origin into the matrix, before you convert to
+/// float.
+///
+/// Clip z follows `clip_depth_range`, the convention of the device's graphics
+/// API. With the API's default depth range of 0 to 1, a fragment that you draw
+/// through `matrix` gets the depth that the map's 3D layers, such as fill
+/// extrusions, wrote at the same place: 0 at `near_distance` from the camera,
+/// up to `far_depth` at `far_distance`. Depth-tested against the frame's depth,
+/// your fragments hide behind the map's 3D layers where those stand in front of
+/// them.
+///
+/// The frame's depth starts at 1. The map's 3D layers write the depth of each
+/// of their fragments. A 2D layer below every 3D layer of the style that draws
+/// opaque fragments, such as an opaque fill, writes one depth over all of them,
+/// wherever they are: the higher the layer, the lower its depth, and every one
+/// between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D
+/// layers above a 3D layer, such as labels, write no depth. So what you draw
+/// through `matrix`, even on the ground, lies in front of every 2D layer.
+///
+/// While `globe` is true, the frame drew the map onto a globe, and its 2D
+/// layers wrote no depth. `matrix` then is the map's Mercator one, which
+/// doesn't place points on the globe.
+///
+/// See `mln_frame_projection` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const FrameProjection = struct {
+    matrix: Mat4 = .{},
+    clip_depth_range: ClipDepthRange = @fromBackingInt(@intCast(0)),
+    /// The distance from the camera to the plane where the depth that you get
+    /// through `matrix` is 0, along the camera's view. Like `far_distance`, it
+    /// is in pixels of the map at the camera's zoom, where the world is 512 ×
+    /// 2^zoom pixels wide.
+    near_distance: f64 = 0,
+    /// The distance to the plane where the depth is `far_depth`.
+    far_distance: f64 = 0,
+    /// The depth at `far_distance`, below 1.
+    far_depth: f64 = 0,
+    /// Whether the frame drew the map as a globe, alone or blending into
+    /// Mercator.
+    globe: bool = false,
+    pub fn fromNative(raw: c.mln_frame_projection) FrameProjection {
+        return .{
+            .matrix = Mat4.fromNative(raw.matrix),
+            .clip_depth_range = ClipDepthRange.fromNative(raw.clip_depth_range),
+            .near_distance = raw.near_distance,
+            .far_distance = raw.far_distance,
+            .far_depth = raw.far_depth,
+            .globe = raw.globe,
         };
     }
 };
@@ -4864,6 +4851,161 @@ pub const GesturePhase = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
+/// What a GPU device can do.
+///
+/// See `mln_gpu_device_capabilities` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+pub const GpuDeviceCapabilities = struct {
+    backend: RenderBackend = @fromBackingInt(@intCast(0)),
+    /// The kinds of `RenderTarget` that sessions on the device render to.
+    target_kinds: RenderTargetKindFlag = .{},
+    /// The ways that the device can share the textures of an exported ring. A
+    /// kind is here only once the device has exported a texture of it, so a
+    /// driver that offers an extension but can't allocate the memory reports no
+    /// kind of it.
+    export_kinds: GpuExportKindFlag = .{},
+    /// The kinds of `GpuSync` that the device can signal and wait on.
+    sync_kinds: GpuSyncKindFlag = .{},
+    /// The formats of the depth textures that a borrowed ring takes.
+    depth_stencil_formats: DepthStencilFormatFlag = .{},
+    /// The kinds of `export_kinds` whose rings also share each frame's depth
+    /// texture, with `RenderSessionAttachOptions.keep_depth`. An IOSurface or a
+    /// dmabuf holds no depth format, so only `GpuExportKind.opaque_fd` can be
+    /// here.
+    depth_export_kinds: GpuExportKindFlag = .{},
+    pub fn fromNative(raw: c.mln_gpu_device_capabilities) GpuDeviceCapabilities {
+        return .{
+            .backend = RenderBackend.fromNative(raw.backend),
+            .target_kinds = RenderTargetKindFlag.fromNative(raw.target_kinds),
+            .export_kinds = GpuExportKindFlag.fromNative(raw.export_kinds),
+            .sync_kinds = GpuSyncKindFlag.fromNative(raw.sync_kinds),
+            .depth_stencil_formats = DepthStencilFormatFlag.fromNative(raw.depth_stencil_formats),
+            .depth_export_kinds = GpuExportKindFlag.fromNative(raw.depth_export_kinds),
+        };
+    }
+};
+
+/// Options for `GpuDevice.create()`.
+///
+/// Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
+/// `adapter_luid`. Without one, the device prefers a discrete GPU.
+///
+/// See `mln_gpu_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+pub const GpuDeviceOptions = struct {
+    /// The backend that the device renders with. By default, the platform's
+    /// own: Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the
+    /// system has no Vulkan driver, and in a browser the build's one backend:
+    /// WebGPU or OpenGL (WebGL2).
+    backend: ?RenderBackend = null,
+    /// The GPU to use, as an index into the backend's list of GPUs.
+    adapter_index: ?u32 = null,
+    /// The 16-byte UUID of the GPU to use: Vulkan's
+    /// `VkPhysicalDeviceIDProperties.deviceUUID`, or OpenGL's
+    /// `GL_DEVICE_UUID_EXT`.
+    adapter_uuid: ?[]const u8 = null,
+    /// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
+    /// which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`, and
+    /// on Apple platforms, its `MTLDevice.registryID`, in the platform's byte
+    /// order.
+    adapter_luid: ?[]const u8 = null,
+    /// The OpenGL API that an OpenGL device renders with. An EGL device
+    /// defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too
+    /// on Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
+    /// default, and a WebGL device only `OpenGlClientApi.gles`, its default.
+    open_gl_client_api: ?OpenGlClientApi = null,
+    /// Whether the sessions of an EGL device take turns in one OpenGL context
+    /// instead of having one each.
+    open_gl_single_context: ?bool = null,
+    /// Your lock on a Vulkan device's queue, when you submit to the queue that
+    /// `GpuDevice.getVulkanContext()` reports. Only a Vulkan device takes one.
+    queue_lock: QueueLock = .{},
+    pub fn toNative(self: GpuDeviceOptions, roots: *callbacks.Roots) status.Error!c.mln_gpu_device_options {
+        var raw = std.mem.zeroes(c.mln_gpu_device_options);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_gpu_device_options);
+        marshal.present(&raw.fields, c.MLN_GPU_DEVICE_OPTION_BACKEND, &raw.backend, self.backend);
+        marshal.present(&raw.fields, c.MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, self.adapter_index);
+        if (self.adapter_uuid) |item| {
+            raw.fields |= c.MLN_GPU_DEVICE_OPTION_ADAPTER_UUID;
+            raw.adapter_uuid = marshal.view(item);
+        }
+        if (self.adapter_luid) |item| {
+            raw.fields |= c.MLN_GPU_DEVICE_OPTION_ADAPTER_LUID;
+            raw.adapter_luid = marshal.view(item);
+        }
+        marshal.present(&raw.fields, c.MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API, &raw.open_gl_client_api, self.open_gl_client_api);
+        marshal.present(&raw.fields, c.MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT, &raw.open_gl_single_context, self.open_gl_single_context);
+        raw.queue_lock = try self.queue_lock.toNative(roots);
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_gpu_device_options) status.Error!GpuDeviceOptions {
+        return .{
+            .backend = if (raw.fields & c.MLN_GPU_DEVICE_OPTION_BACKEND != 0) RenderBackend.fromNative(raw.backend) else null,
+            .adapter_index = if (raw.fields & c.MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX != 0) raw.adapter_index else null,
+            .adapter_uuid = if (raw.fields & c.MLN_GPU_DEVICE_OPTION_ADAPTER_UUID != 0) try marshal.copyView(allocator, raw.adapter_uuid) else null,
+            .adapter_luid = if (raw.fields & c.MLN_GPU_DEVICE_OPTION_ADAPTER_LUID != 0) try marshal.copyView(allocator, raw.adapter_luid) else null,
+            .open_gl_client_api = if (raw.fields & c.MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API != 0) OpenGlClientApi.fromNative(raw.open_gl_client_api) else null,
+            .open_gl_single_context = if (raw.fields & c.MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT != 0) raw.open_gl_single_context else null,
+            .queue_lock = .{},
+        };
+    }
+};
+
+/// The Vulkan objects of a device, as `GpuDevice.getVulkanContext()` reports
+/// them.
+///
+/// See `mln_gpu_device_vulkan_context_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+pub const GpuDeviceVulkanContextResult = struct {
+    context: VulkanContextDescriptor,
+    pub fn fromNative(raw: c.mln_gpu_device_vulkan_context_result) GpuDeviceVulkanContextResult {
+        return .{
+            .context = VulkanContextDescriptor.fromNative(raw.context),
+        };
+    }
+};
+
+/// A way to share a texture's memory with another API or process.
+///
+/// See `mln_gpu_export_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const GpuExportKind = enum(u32) {
+    /// The texture isn't shared.
+    none = 0,
+    /// An `IOSurfaceRef`.
+    io_surface = 1,
+    /// A Linux dmabuf, as file descriptors with a DRM format and modifier.
+    dma_buf = 2,
+    /// An `AHardwareBuffer*`.
+    android_hardware_buffer = 3,
+    /// A DXGI shared texture's NT handle.
+    dxgi_shared_handle = 4,
+    /// A Vulkan or OpenGL opaque memory file descriptor.
+    opaque_fd = 5,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// A way to share a texture's memory, as a bit in a set.
+///
+/// See `mln_gpu_export_kind_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const GpuExportKindFlag = struct {
+    io_surface: bool = false,
+    dma_buf: bool = false,
+    android_hardware_buffer: bool = false,
+    dxgi_shared_handle: bool = false,
+    opaque_fd: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+};
+
 /// A point in GPU work that the other side waits for before using a texture.
 ///
 /// See `mln_gpu_sync` in the
@@ -4910,7 +5052,9 @@ pub const GpuSyncKind = enum(u32) {
     queue_order = 2,
     /// `handle` is a `VkSemaphore`. Wait until it reaches `value`.
     vulkan_timeline_semaphore = 3,
-    /// `handle` is a sync file descriptor.
+    /// `handle` is a sync file descriptor. A descriptor of -1, as Vulkan
+    /// exports for a semaphore that has already signaled, counts as
+    /// `GpuSyncKind.cpu_complete`.
     sync_fd = 4,
     /// `handle` is an `MTLSharedEvent`. Wait until it reaches `value`.
     metal_shared_event = 5,
@@ -5154,10 +5298,10 @@ pub const ImageStretch = struct {
     }
 };
 
-/// The IOSurface of an acquired frame.
+/// The IOSurface of an exported ring's acquired frame.
 ///
 /// See `mln_io_surface_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const IoSurfaceFrame = struct {
     width: u32 = 0,
     height: u32 = 0,
@@ -5173,38 +5317,6 @@ pub const IoSurfaceFrame = struct {
             .scale_factor = raw.scale_factor,
             .slot = raw.slot,
             .surface = raw.surface,
-        };
-    }
-};
-
-/// A ring of IOSurfaces that the library allocates, for
-/// `Map.attachIoSurfaceRing()`.
-///
-/// Each surface has the map's size in pixels, `logical_size` times the map's
-/// scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
-/// names MTLPixelFormatBGRA8Unorm.
-///
-/// See `mln_io_surface_ring_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
-pub const IoSurfaceRingDescriptor = struct {
-    logical_size: LogicalSize,
-    /// How many surfaces the ring has, from 1 to 8.
-    buffer_count: u32,
-    /// The MTLDevice to render with. A null device picks the system's default.
-    context: MetalContextDescriptor = .{},
-    pub fn toNative(self: IoSurfaceRingDescriptor) c.mln_io_surface_ring_descriptor {
-        var raw = std.mem.zeroes(c.mln_io_surface_ring_descriptor);
-        raw.size = @sizeOf(c.mln_io_surface_ring_descriptor);
-        raw.logical_size = self.logical_size.toNative();
-        raw.buffer_count = self.buffer_count;
-        raw.context = self.context.toNative();
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_io_surface_ring_descriptor) IoSurfaceRingDescriptor {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .buffer_count = raw.buffer_count,
-            .context = MetalContextDescriptor.fromNative(raw.context),
         };
     }
 };
@@ -5470,8 +5582,9 @@ pub const MapMode = enum(u32) {
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapOptions = struct {
-    /// The map's first size, and its scale factor. The scale factor stays fixed
-    /// for the map's life, and every render session of the map renders at it.
+    /// The map's first size, and its scale factor. Render sessions of the map
+    /// render at its scale factor. `Map.resize()` changes both, or
+    /// `RenderSession.resize()` while a render session is attached.
     initial_extent: LogicalExtent,
     map_mode: MapMode = .continuous,
     /// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
@@ -5732,12 +5845,34 @@ pub const MapViewportOptions = struct {
     }
 };
 
+/// A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x,
+/// plus `y` times its y, `z` times its z, and `w` times its w. In memory it is
+/// 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and WebGPU
+/// shaders take a matrix.
+///
+/// See `mln_mat4` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const Mat4 = struct {
+    x: Vec4 = .{},
+    y: Vec4 = .{},
+    z: Vec4 = .{},
+    w: Vec4 = .{},
+    pub fn fromNative(raw: c.mln_mat4) Mat4 {
+        return .{
+            .x = Vec4.fromNative(raw.x),
+            .y = Vec4.fromNative(raw.y),
+            .z = Vec4.fromNative(raw.z),
+            .w = Vec4.fromNative(raw.w),
+        };
+    }
+};
+
 /// A Metal texture of a borrowed ring.
 ///
 /// See `mln_metal_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const MetalBorrowedTexture = struct {
-    /// Your MTLTexture.
+    /// Your `MTLTexture`.
     texture: ?*anyopaque,
     pub fn toNative(self: MetalBorrowedTexture) c.mln_metal_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_metal_borrowed_texture);
@@ -5751,32 +5886,34 @@ pub const MetalBorrowedTexture = struct {
     }
 };
 
-/// A ring of your Metal textures, for `Map.attachMetalBorrowedTexture()`.
+/// A ring of your Metal textures to render into, on the Metal device that you
+/// attach on.
 ///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the textures' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. The textures must all have that size, one device, one
-/// pixel format, one sample, and MTLTextureUsageRenderTarget. The ring holds up
-/// to `texture_ring_max_depth` distinct textures.
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. The textures
+/// must all have that size, the device's `MTLDevice`, one pixel format, one
+/// sample, and `MTLTextureUsageRenderTarget`. The ring holds up to
+/// `texture_ring_max_depth` distinct textures.
 ///
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, and stores them. They must have the size of
+/// `textures`, one pixel format of
+/// `GpuDeviceCapabilities.depth_stencil_formats`, one sample,
+/// `MTLTextureUsageRenderTarget`, and a storage mode other than
+/// `MTLStorageModeMemoryless`.
 ///
-/// See `mln_metal_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const MetalBorrowedTextureDescriptor = struct {
+/// See `mln_metal_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const MetalBorrowedTexturesTarget = struct {
     logical_size: LogicalSize,
     physical_width: u32,
     physical_height: u32,
     textures: []const MetalBorrowedTexture,
-    /// Your MTLCommandQueue on the textures' device, or null for a queue of the
-    /// session's own. With your queue, frames can use
-    /// `GpuSyncKind.queue_order`.
-    command_queue: ?*anyopaque = null,
-    pub fn toNative(self: MetalBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_metal_borrowed_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_metal_borrowed_texture_descriptor);
-        raw.size = @sizeOf(c.mln_metal_borrowed_texture_descriptor);
+    depth_textures: []const MetalBorrowedTexture = &.{},
+    pub fn toNative(self: MetalBorrowedTexturesTarget, allocator: std.mem.Allocator) status.Error!c.mln_metal_borrowed_textures_target {
+        var raw = std.mem.zeroes(c.mln_metal_borrowed_textures_target);
         raw.logical_size = self.logical_size.toNative();
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
@@ -5786,11 +5923,16 @@ pub const MetalBorrowedTextureDescriptor = struct {
             break :blk items.ptr;
         };
         raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
-        raw.command_queue = self.command_queue;
+        raw.depth_textures = blk: {
+            const items = try allocator.alloc(c.mln_metal_borrowed_texture, self.depth_textures.len);
+            for (self.depth_textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.depth_texture_count = std.math.cast(@TypeOf(raw.depth_texture_count), self.depth_textures.len) orelse return error.InvalidArgument;
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_metal_borrowed_texture_descriptor) status.Error!MetalBorrowedTextureDescriptor {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_metal_borrowed_textures_target) status.Error!MetalBorrowedTexturesTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .physical_width = raw.physical_width,
@@ -5800,125 +5942,111 @@ pub const MetalBorrowedTextureDescriptor = struct {
                 for (try marshal.nativeSlice(c.mln_metal_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = MetalBorrowedTexture.fromNative(item);
                 break :blk copied;
             },
+            .depth_textures = blk: {
+                const copied = try allocator.alloc(MetalBorrowedTexture, raw.depth_texture_count);
+                for (try marshal.nativeSlice(c.mln_metal_borrowed_texture, raw.depth_textures, raw.depth_texture_count), 0..) |item, index| copied[index] = MetalBorrowedTexture.fromNative(item);
+                break :blk copied;
+            },
+        };
+    }
+};
+
+/// The frame's Metal command buffer, outside the map's render pass.
+///
+/// End each encoder that you make on `command_buffer` before the callback
+/// returns, and don't commit the buffer.
+///
+/// See `mln_metal_custom_layer_encoder` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const MetalCustomLayerEncoder = struct {
+    /// The frame's `MTLCommandBuffer`, with no encoder open.
+    command_buffer: ?*anyopaque = null,
+    pub fn fromNative(raw: c.mln_metal_custom_layer_encoder) MetalCustomLayerEncoder {
+        return .{
+            .command_buffer = raw.command_buffer,
+        };
+    }
+};
+
+/// The map's Metal render pass, at a custom layer's place in the style.
+///
+/// Set your own pipeline state, depth-stencil state, buffers, textures, and
+/// samplers on `encoder`, and any other state that your draws need. After the
+/// callback returns, the map sets the state that its own draws need again.
+/// Don't end `encoder`.
+///
+/// See `mln_metal_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const MetalCustomLayerPass = struct {
+    /// The pass's `MTLRenderCommandEncoder`.
+    encoder: ?*anyopaque = null,
+    /// The `MTLCommandBuffer` that `encoder` encodes into. Don't commit it.
+    command_buffer: ?*anyopaque = null,
+    /// The `MTLPixelFormat` of the pass's color attachment.
+    color_format: u64 = 0,
+    /// The `MTLPixelFormat` of the pass's depth attachment, or
+    /// `MTLPixelFormatInvalid` when it has none.
+    depth_format: u64 = 0,
+    /// The `MTLPixelFormat` of the pass's stencil attachment, or
+    /// `MTLPixelFormatInvalid` when it has none.
+    stencil_format: u64 = 0,
+    /// The sample count of the pass's attachments.
+    sample_count: u32 = 0,
+    pub fn fromNative(raw: c.mln_metal_custom_layer_pass) MetalCustomLayerPass {
+        return .{
+            .encoder = raw.encoder,
+            .command_buffer = raw.command_buffer,
+            .color_format = raw.color_format,
+            .depth_format = raw.depth_format,
+            .stencil_format = raw.stencil_format,
+            .sample_count = raw.sample_count,
+        };
+    }
+};
+
+/// Your Metal device and command queue, for `GpuDevice.wrapMetal()`.
+///
+/// See `mln_metal_device_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+pub const MetalDeviceDescriptor = struct {
+    /// Your `MTLDevice`.
+    device: ?*anyopaque,
+    /// Your `MTLCommandQueue` on `device`, or null for a queue of the
+    /// library's. With your queue, borrowed rings can use
+    /// `GpuSyncKind.queue_order`.
+    command_queue: ?*anyopaque = null,
+    pub fn toNative(self: MetalDeviceDescriptor) c.mln_metal_device_descriptor {
+        var raw = std.mem.zeroes(c.mln_metal_device_descriptor);
+        raw.size = @sizeOf(c.mln_metal_device_descriptor);
+        raw.device = self.device;
+        raw.command_queue = self.command_queue;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_metal_device_descriptor) MetalDeviceDescriptor {
+        return .{
+            .device = raw.device,
             .command_queue = raw.command_queue,
         };
     }
 };
 
-/// New Metal textures for a borrowed ring, for
-/// `RenderSession.setMetalBorrowedTextureTarget()`.
+/// A `CAMetalLayer` to present to.
 ///
-/// The members and the textures follow the rules of
-/// `MetalBorrowedTextureDescriptor`. The ring keeps its depth, device, and
-/// command queue, so give it as many textures as it attached with, on the same
-/// device.
+/// The session sets the layer's device, pixel format, and drawable size.
 ///
-/// See `mln_metal_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const MetalBorrowedTextureReplacement = struct {
-    logical_size: LogicalSize,
-    physical_width: u32,
-    physical_height: u32,
-    textures: []const MetalBorrowedTexture,
-    pub fn toNative(self: MetalBorrowedTextureReplacement, allocator: std.mem.Allocator) status.Error!c.mln_metal_borrowed_texture_replacement {
-        var raw = std.mem.zeroes(c.mln_metal_borrowed_texture_replacement);
-        raw.size = @sizeOf(c.mln_metal_borrowed_texture_replacement);
-        raw.logical_size = self.logical_size.toNative();
-        raw.physical_width = self.physical_width;
-        raw.physical_height = self.physical_height;
-        raw.textures = blk: {
-            const items = try allocator.alloc(c.mln_metal_borrowed_texture, self.textures.len);
-            for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_metal_borrowed_texture_replacement) status.Error!MetalBorrowedTextureReplacement {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .physical_width = raw.physical_width,
-            .physical_height = raw.physical_height,
-            .textures = blk: {
-                const copied = try allocator.alloc(MetalBorrowedTexture, raw.texture_count);
-                for (try marshal.nativeSlice(c.mln_metal_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = MetalBorrowedTexture.fromNative(item);
-                break :blk copied;
-            },
-        };
-    }
-};
-
-/// The Metal device that a render session uses.
-///
-/// See `mln_metal_context_descriptor` in the
+/// See `mln_metal_layer_target` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub const MetalContextDescriptor = struct {
-    /// An `MTLDevice`.
-    device: ?*anyopaque = null,
-    pub fn toNative(self: MetalContextDescriptor) c.mln_metal_context_descriptor {
-        var raw = std.mem.zeroes(c.mln_metal_context_descriptor);
-        raw.device = self.device;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_metal_context_descriptor) MetalContextDescriptor {
-        return .{
-            .device = raw.device,
-        };
-    }
-};
-
-/// A Metal layer to render to, for `Map.attachMetalSurface()`.
-///
-/// The session sets the layer's device, pixel format, and drawable size. It
-/// uses the layer until a replacement or release of the target completes, a
-/// detach or release of the session completes, or an abandon of it returns.
-///
-/// See `mln_metal_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub const MetalSurfaceDescriptor = struct {
+pub const MetalLayerTarget = struct {
     logical_size: LogicalSize,
-    /// The MTLDevice to render with. A null device picks the system's default.
-    context: MetalContextDescriptor = .{},
-    /// Your CAMetalLayer.
+    /// Your `CAMetalLayer*`.
     layer: ?*anyopaque,
-    pub fn toNative(self: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
-        var raw = std.mem.zeroes(c.mln_metal_surface_descriptor);
-        raw.size = @sizeOf(c.mln_metal_surface_descriptor);
-        raw.logical_size = self.logical_size.toNative();
-        raw.context = self.context.toNative();
-        raw.layer = self.layer;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_metal_surface_descriptor) MetalSurfaceDescriptor {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .context = MetalContextDescriptor.fromNative(raw.context),
-            .layer = raw.layer,
-        };
-    }
-};
-
-/// A new Metal layer for `RenderSession.setMetalSurfaceTarget()`.
-///
-/// The session renders to it with the device that it attached with. It uses the
-/// layer until a replacement or release of the target completes, a detach or
-/// release of the session completes, or an abandon of it returns.
-///
-/// See `mln_metal_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub const MetalSurfaceReplacement = struct {
-    logical_size: LogicalSize,
-    /// Your CAMetalLayer.
-    layer: ?*anyopaque,
-    pub fn toNative(self: MetalSurfaceReplacement) c.mln_metal_surface_replacement {
-        var raw = std.mem.zeroes(c.mln_metal_surface_replacement);
-        raw.size = @sizeOf(c.mln_metal_surface_replacement);
+    pub fn toNative(self: MetalLayerTarget) c.mln_metal_layer_target {
+        var raw = std.mem.zeroes(c.mln_metal_layer_target);
         raw.logical_size = self.logical_size.toNative();
         raw.layer = self.layer;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_metal_surface_replacement) MetalSurfaceReplacement {
+    pub fn fromNative(raw: c.mln_metal_layer_target) MetalLayerTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .layer = raw.layer,
@@ -5927,6 +6055,10 @@ pub const MetalSurfaceReplacement = struct {
 };
 
 /// The Metal texture of an acquired frame.
+///
+/// The depth members are set when the frame has a depth texture: one of a
+/// borrowed ring's `depth_textures`, or an exported ring's with
+/// `RenderSessionAttachOptions.keep_depth`. Otherwise they are zero.
 ///
 /// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -5942,6 +6074,10 @@ pub const MetalTextureFrame = struct {
     device: ?*anyopaque = null,
     /// The texture's MTLPixelFormat.
     pixel_format: u64 = 0,
+    /// The MTLTexture that holds the frame's depth and stencil.
+    depth_texture: ?*anyopaque = null,
+    /// The depth texture's MTLPixelFormat.
+    depth_pixel_format: u64 = 0,
     pub fn fromNative(raw: c.mln_metal_texture_frame) MetalTextureFrame {
         return .{
             .width = raw.width,
@@ -5951,6 +6087,8 @@ pub const MetalTextureFrame = struct {
             .texture = raw.texture,
             .device = raw.device,
             .pixel_format = raw.pixel_format,
+            .depth_texture = raw.depth_texture,
+            .depth_pixel_format = raw.depth_pixel_format,
         };
     }
 };
@@ -6279,120 +6417,114 @@ pub const OfflineTilePyramidRegionDefinition = struct {
     }
 };
 
-/// The image that `Map.attachOffscreen()` renders. The session renders it at
-/// the map's scale factor.
+/// An image that the session allocates, renders at the map's scale factor, and
+/// reads back with `RenderSession.readTexture()`.
 ///
-/// See `mln_offscreen_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-pub const OffscreenDescriptor = struct {
+/// See `mln_offscreen_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const OffscreenTarget = struct {
     logical_size: LogicalSize,
-    pub fn toNative(self: OffscreenDescriptor) c.mln_offscreen_descriptor {
-        var raw = std.mem.zeroes(c.mln_offscreen_descriptor);
-        raw.size = @sizeOf(c.mln_offscreen_descriptor);
+    pub fn toNative(self: OffscreenTarget) c.mln_offscreen_target {
+        var raw = std.mem.zeroes(c.mln_offscreen_target);
         raw.logical_size = self.logical_size.toNative();
         return raw;
     }
-    pub fn fromNative(raw: c.mln_offscreen_descriptor) OffscreenDescriptor {
+    pub fn fromNative(raw: c.mln_offscreen_target) OffscreenTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
         };
     }
 };
 
-/// Options for `OffscreenDevice.create()`.
+/// An OpenHarmony window to present to.
 ///
-/// See `mln_offscreen_device_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-pub const OffscreenDeviceOptions = struct {
-    /// The GPU to use, as an index into the platform's list of GPUs.
-    adapter_index: ?u32 = null,
-    /// Whether the device's sessions take turns in one OpenGL context instead
-    /// of having one each. Only an EGL device reads it.
-    single_context: ?bool = null,
-    /// The OpenGL API that the device's sessions render with. An EGL device
-    /// defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too
-    /// on Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
-    /// default, and a WebGL device only `OpenGlClientApi.gles`, its default.
-    /// Other devices take neither.
-    client_api: ?OpenGlClientApi = null,
-    pub fn toNative(self: OffscreenDeviceOptions) c.mln_offscreen_device_options {
-        var raw = std.mem.zeroes(c.mln_offscreen_device_options);
-        raw.fields = 0;
-        raw.size = @sizeOf(c.mln_offscreen_device_options);
-        marshal.present(&raw.fields, c.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, self.adapter_index);
-        marshal.present(&raw.fields, c.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, self.single_context);
-        marshal.present(&raw.fields, c.MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API, &raw.client_api, self.client_api);
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_offscreen_device_options) OffscreenDeviceOptions {
-        return .{
-            .adapter_index = if (raw.fields & c.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX != 0) raw.adapter_index else null,
-            .single_context = if (raw.fields & c.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT != 0) raw.single_context else null,
-            .client_api = if (raw.fields & c.MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API != 0) OpenGlClientApi.fromNative(raw.client_api) else null,
-        };
-    }
-};
-
-/// An OpenHarmony window to present to, for `Map.attachOhosSurface()`.
+/// The session takes its own reference to the window, so you can release yours
+/// once the call returns. When the platform destroys the window, such as in an
+/// `XComponent`'s `onSurfaceDestroyed` callback, release the target or give the
+/// session another window without waiting, as for an Android window.
 ///
-/// Name the window by `window` or by `surface_id`. The session takes its own
-/// reference to the window, so you can release yours once the call returns.
-///
-/// See `mln_ohos_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
-pub const OhosSurfaceDescriptor = struct {
+/// See `mln_ohos_window_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const OhosWindowTarget = struct {
     logical_size: LogicalSize,
-    /// Your `OHNativeWindow*`, or null to name the window by `surface_id`.
-    window: ?*anyopaque = null,
-    /// The surface ID of a surface in this process, such as the one that
-    /// `XComponentController.getXComponentSurfaceId()` reports, or 0 to name
-    /// the window by `window`.
-    surface_id: u64 = 0,
-    pub fn toNative(self: OhosSurfaceDescriptor) c.mln_ohos_surface_descriptor {
-        var raw = std.mem.zeroes(c.mln_ohos_surface_descriptor);
-        raw.size = @sizeOf(c.mln_ohos_surface_descriptor);
+    /// Your `OHNativeWindow*`.
+    window: ?*anyopaque,
+    pub fn toNative(self: OhosWindowTarget) c.mln_ohos_window_target {
+        var raw = std.mem.zeroes(c.mln_ohos_window_target);
         raw.logical_size = self.logical_size.toNative();
         raw.window = self.window;
-        raw.surface_id = self.surface_id;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_ohos_surface_descriptor) OhosSurfaceDescriptor {
+    pub fn fromNative(raw: c.mln_ohos_window_target) OhosWindowTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .window = raw.window,
-            .surface_id = raw.surface_id,
         };
     }
 };
 
-/// A new OpenHarmony window for `RenderSession.setOhosSurfaceTarget()`.
+/// The memory of an exported ring's acquired frame, as an opaque file
+/// descriptor.
 ///
-/// Name the window by `window` or by `surface_id`. The session takes its own
-/// reference to the window, so you can release yours once the call returns.
+/// The memory holds a 2D Vulkan image of `format`, with one mip level, one
+/// layer, optimal tiling, and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+/// VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a
+/// Vulkan image that imports it has too. In OpenGL, import it with
+/// glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the texture
+/// with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
+/// glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
+/// VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
 ///
-/// See `mln_ohos_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
-pub const OhosSurfaceReplacement = struct {
-    logical_size: LogicalSize,
-    /// Your `OHNativeWindow*`, or null to name the window by `surface_id`.
-    window: ?*anyopaque = null,
-    /// The surface ID of a surface in this process, such as the one that
-    /// `XComponentController.getXComponentSurfaceId()` reports, or 0 to name
-    /// the window by `window`.
-    surface_id: u64 = 0,
-    pub fn toNative(self: OhosSurfaceReplacement) c.mln_ohos_surface_replacement {
-        var raw = std.mem.zeroes(c.mln_ohos_surface_replacement);
-        raw.size = @sizeOf(c.mln_ohos_surface_replacement);
-        raw.logical_size = self.logical_size.toNative();
-        raw.window = self.window;
-        raw.surface_id = self.surface_id;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_ohos_surface_replacement) OhosSurfaceReplacement {
+/// With `RenderSessionAttachOptions.keep_depth`, on a device whose
+/// `GpuDeviceCapabilities.depth_export_kinds` has `GpuExportKind.opaque_fd`,
+/// the depth members share the memory of the frame's depth image in the same
+/// way. Otherwise `depth_fd` is -1 and the others are zero. The depth image is
+/// 2D, of `depth_format`, with one mip level, one layer, optimal tiling, and
+/// the usage VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+/// VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame
+/// leaves it in VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+/// In OpenGL, make its texture with the internal format that
+/// `DepthStencilFormatFlag` names for `depth_format`.
+///
+/// See `mln_opaque_fd_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub const OpaqueFdFrame = struct {
+    width: u32 = 0,
+    height: u32 = 0,
+    scale_factor: f64 = 0,
+    /// The texture's index in the ring.
+    slot: u32 = 0,
+    /// The file descriptor of the image's memory.
+    fd: i32 = 0,
+    /// The size of the memory in bytes.
+    allocation_size: u64 = 0,
+    /// Whether the memory is the image's own, which an import says, such as
+    /// with GL_DEDICATED_MEMORY_OBJECT_EXT.
+    dedicated: bool = false,
+    /// The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8.
+    format: u32 = 0,
+    /// The file descriptor of the depth image's memory.
+    depth_fd: i32 = 0,
+    /// The size of the depth image's memory in bytes.
+    depth_allocation_size: u64 = 0,
+    /// Whether the memory is the depth image's own.
+    depth_dedicated: bool = false,
+    /// The depth image's `VkFormat`.
+    depth_format: u32 = 0,
+    pub fn fromNative(raw: c.mln_opaque_fd_frame) OpaqueFdFrame {
         return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .window = raw.window,
-            .surface_id = raw.surface_id,
+            .width = raw.width,
+            .height = raw.height,
+            .scale_factor = raw.scale_factor,
+            .slot = raw.slot,
+            .fd = raw.fd,
+            .allocation_size = raw.allocation_size,
+            .dedicated = raw.dedicated,
+            .format = raw.format,
+            .depth_fd = raw.depth_fd,
+            .depth_allocation_size = raw.depth_allocation_size,
+            .depth_dedicated = raw.depth_dedicated,
+            .depth_format = raw.depth_format,
         };
     }
 };
@@ -6400,7 +6532,7 @@ pub const OhosSurfaceReplacement = struct {
 /// An OpenGL texture of a borrowed ring.
 ///
 /// See `mln_open_gl_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const OpenGlBorrowedTexture = struct {
     /// Your texture name.
     texture: u32,
@@ -6416,35 +6548,36 @@ pub const OpenGlBorrowedTexture = struct {
     }
 };
 
-/// A ring of your OpenGL textures, for `Map.attachOpenGlBorrowedTexture()`.
+/// A ring of your OpenGL textures to render into, on an OpenGL device that
+/// `GpuDevice.wrapOpenGl()` made from your context.
 ///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the textures' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. The context must use `OpenGlContextOwnership.shared`.
-/// Each texture must be in your context's share group, with storage of that
-/// size. The ring holds up to `texture_ring_max_depth` distinct textures.
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each texture
+/// must be in your context's share group, with RGBA8 storage of that size. The
+/// ring holds up to `texture_ring_max_depth` distinct textures.
 ///
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, and renders the map's
+/// depth and stencil into it. They must be `GL_TEXTURE_2D` textures in the
+/// share group, with storage of the size of `textures` in a format of
+/// `GpuDeviceCapabilities.depth_stencil_formats`.
 ///
-/// See `mln_open_gl_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const OpenGlBorrowedTextureDescriptor = struct {
+/// See `mln_open_gl_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const OpenGlBorrowedTexturesTarget = struct {
     logical_size: LogicalSize,
     physical_width: u32,
     physical_height: u32,
-    context: OpenGlContextDescriptor,
     textures: []const OpenGlBorrowedTexture,
-    /// The textures' target. It must be GL_TEXTURE_2D.
+    /// The textures' target. It must be `GL_TEXTURE_2D`.
     target: u32,
-    pub fn toNative(self: OpenGlBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_open_gl_borrowed_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_open_gl_borrowed_texture_descriptor);
-        raw.size = @sizeOf(c.mln_open_gl_borrowed_texture_descriptor);
+    depth_textures: []const OpenGlBorrowedTexture = &.{},
+    pub fn toNative(self: OpenGlBorrowedTexturesTarget, allocator: std.mem.Allocator) status.Error!c.mln_open_gl_borrowed_textures_target {
+        var raw = std.mem.zeroes(c.mln_open_gl_borrowed_textures_target);
         raw.logical_size = self.logical_size.toNative();
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
-        raw.context = try self.context.toNative();
         raw.textures = blk: {
             const items = try allocator.alloc(c.mln_open_gl_borrowed_texture, self.textures.len);
             for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
@@ -6452,63 +6585,29 @@ pub const OpenGlBorrowedTextureDescriptor = struct {
         };
         raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
         raw.target = self.target;
+        raw.depth_textures = blk: {
+            const items = try allocator.alloc(c.mln_open_gl_borrowed_texture, self.depth_textures.len);
+            for (self.depth_textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.depth_texture_count = std.math.cast(@TypeOf(raw.depth_texture_count), self.depth_textures.len) orelse return error.InvalidArgument;
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_borrowed_texture_descriptor) status.Error!OpenGlBorrowedTextureDescriptor {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_borrowed_textures_target) status.Error!OpenGlBorrowedTexturesTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
-            .context = try OpenGlContextDescriptor.fromNative(allocator, raw.context),
             .textures = blk: {
                 const copied = try allocator.alloc(OpenGlBorrowedTexture, raw.texture_count);
                 for (try marshal.nativeSlice(c.mln_open_gl_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = OpenGlBorrowedTexture.fromNative(item);
                 break :blk copied;
             },
             .target = raw.target,
-        };
-    }
-};
-
-/// New OpenGL textures for a borrowed ring, for
-/// `RenderSession.setOpenGlBorrowedTextureTarget()`.
-///
-/// The members and the textures follow the rules of
-/// `OpenGlBorrowedTextureDescriptor`. The ring keeps its depth, context, and
-/// texture target, so give it as many textures as it attached with, in the same
-/// share group.
-///
-/// See `mln_open_gl_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const OpenGlBorrowedTextureReplacement = struct {
-    logical_size: LogicalSize,
-    physical_width: u32,
-    physical_height: u32,
-    textures: []const OpenGlBorrowedTexture,
-    pub fn toNative(self: OpenGlBorrowedTextureReplacement, allocator: std.mem.Allocator) status.Error!c.mln_open_gl_borrowed_texture_replacement {
-        var raw = std.mem.zeroes(c.mln_open_gl_borrowed_texture_replacement);
-        raw.size = @sizeOf(c.mln_open_gl_borrowed_texture_replacement);
-        raw.logical_size = self.logical_size.toNative();
-        raw.physical_width = self.physical_width;
-        raw.physical_height = self.physical_height;
-        raw.textures = blk: {
-            const items = try allocator.alloc(c.mln_open_gl_borrowed_texture, self.textures.len);
-            for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_borrowed_texture_replacement) status.Error!OpenGlBorrowedTextureReplacement {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .physical_width = raw.physical_width,
-            .physical_height = raw.physical_height,
-            .textures = blk: {
-                const copied = try allocator.alloc(OpenGlBorrowedTexture, raw.texture_count);
-                for (try marshal.nativeSlice(c.mln_open_gl_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = OpenGlBorrowedTexture.fromNative(item);
+            .depth_textures = blk: {
+                const copied = try allocator.alloc(OpenGlBorrowedTexture, raw.depth_texture_count);
+                for (try marshal.nativeSlice(c.mln_open_gl_borrowed_texture, raw.depth_textures, raw.depth_texture_count), 0..) |item, index| copied[index] = OpenGlBorrowedTexture.fromNative(item);
                 break :blk copied;
             },
         };
@@ -6528,20 +6627,19 @@ pub const OpenGlClientApi = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// How a render session gets the OpenGL context that it renders with.
-///
-/// Keep the objects that it names alive until a detach or release of the
-/// session completes, or an abandon of it returns.
+/// Your OpenGL context, for `GpuDevice.wrapOpenGl()`: the root of the share
+/// group that the device's sessions join.
 ///
 /// See `mln_open_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub const OpenGlContextDescriptor = struct {
-    ownership: OpenGlContextOwnership = .shared,
-    data: OpenGlContextDescriptorData,
+pub const OpenGlContextDescriptor = union(enum) {
+    wgl: WglContextDescriptor,
+    egl: EglContextDescriptor,
+    web_gl: WebGlContextDescriptor,
+
     pub fn toNative(self: OpenGlContextDescriptor) status.Error!c.mln_open_gl_context_descriptor {
         var raw = std.mem.zeroes(c.mln_open_gl_context_descriptor);
-        raw.ownership = self.ownership.toNative();
-        switch (self.data) {
+        switch (self) {
             .wgl => |item| {
                 raw.platform = c.MLN_OPEN_GL_CONTEXT_PLATFORM_WGL;
                 raw.data.wgl = item.toNative();
@@ -6560,40 +6658,13 @@ pub const OpenGlContextDescriptor = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_context_descriptor) status.Error!OpenGlContextDescriptor {
         _ = allocator;
-        return .{
-            .ownership = OpenGlContextOwnership.fromNative(raw.ownership),
-            .data = switch (raw.platform) {
-                c.MLN_OPEN_GL_CONTEXT_PLATFORM_WGL => .{ .wgl = WglContextDescriptor.fromNative(raw.data.wgl) },
-                c.MLN_OPEN_GL_CONTEXT_PLATFORM_EGL => .{ .egl = EglContextDescriptor.fromNative(raw.data.egl) },
-                c.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL => .{ .web_gl = WebGlContextDescriptor.fromNative(raw.data.web_gl) },
-                else => return error.NativeError,
-            },
+        return switch (raw.platform) {
+            c.MLN_OPEN_GL_CONTEXT_PLATFORM_WGL => .{ .wgl = WglContextDescriptor.fromNative(raw.data.wgl) },
+            c.MLN_OPEN_GL_CONTEXT_PLATFORM_EGL => .{ .egl = EglContextDescriptor.fromNative(raw.data.egl) },
+            c.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL => .{ .web_gl = WebGlContextDescriptor.fromNative(raw.data.web_gl) },
+            else => return error.NativeError,
         };
     }
-};
-
-/// The WGL, EGL, or WebGL part of an OpenGL context descriptor.
-///
-/// See `mln_open_gl_context_descriptor_data` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub const OpenGlContextDescriptorData = union(enum) {
-    wgl: WglContextDescriptor,
-    egl: EglContextDescriptor,
-    web_gl: WebGlContextDescriptor,
-};
-
-/// Whether a render session's OpenGL context shares objects with yours.
-///
-/// See `mln_open_gl_context_ownership` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub const OpenGlContextOwnership = enum(u32) {
-    /// The session's context shares objects with your `share_context`.
-    shared = 0,
-    /// The session's context shares objects with no other context.
-    dedicated = 1,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// An OpenGL context platform, as a bit in a set.
@@ -6611,58 +6682,52 @@ pub const OpenGlContextProviderFlag = struct {
     pub const toNative = methods.toNative;
 };
 
-/// An OpenGL surface to present to, for `Map.attachOpenGlSurface()`.
+/// The map's OpenGL framebuffer, at a custom layer's place in the style.
 ///
-/// The session uses the surface until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
+/// The session's context is current, with `framebuffer` bound and the viewport
+/// covering it. You can change the program, the vertex array, the buffers bound
+/// to each target, the framebuffer, the viewport, the active texture unit and
+/// the textures bound to each unit, the uniform buffer bindings, and the
+/// scissor, depth, stencil, blend, color mask, cull face, and line width state.
+/// After the callback returns, the map sets again what its own draws need of
+/// these. The vertex array bound when the callback starts is 0, so bind your
+/// own before you set vertex attributes. Leave any other state as you found it,
+/// such as the sampler objects bound to texture units, the pixel pack and
+/// unpack buffers and parameters, polygon offset, and rasterizer discard. Don't
+/// clear or invalidate the framebuffer's attachments.
 ///
-/// See `mln_open_gl_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub const OpenGlSurfaceDescriptor = struct {
-    logical_size: LogicalSize,
-    context: OpenGlContextDescriptor,
-    /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
-    surface: ?*anyopaque = null,
-    pub fn toNative(self: OpenGlSurfaceDescriptor) status.Error!c.mln_open_gl_surface_descriptor {
-        var raw = std.mem.zeroes(c.mln_open_gl_surface_descriptor);
-        raw.size = @sizeOf(c.mln_open_gl_surface_descriptor);
-        raw.logical_size = self.logical_size.toNative();
-        raw.context = try self.context.toNative();
-        raw.surface = self.surface;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_open_gl_surface_descriptor) status.Error!OpenGlSurfaceDescriptor {
+/// See `mln_open_gl_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const OpenGlCustomLayerPass = struct {
+    /// The framebuffer that the map draws into, or 0 for the default one.
+    framebuffer: u32 = 0,
+    pub fn fromNative(raw: c.mln_open_gl_custom_layer_pass) OpenGlCustomLayerPass {
         return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .context = try OpenGlContextDescriptor.fromNative(allocator, raw.context),
-            .surface = raw.surface,
+            .framebuffer = raw.framebuffer,
         };
     }
 };
 
-/// A new OpenGL surface for `RenderSession.setOpenGlSurfaceTarget()`.
+/// Your OpenGL surface to present to, with the context that
+/// `GpuDevice.wrapOpenGl()` wrapped.
 ///
-/// The session presents to it with the context that it attached with. It uses
-/// the surface until a replacement or release of the target completes, a detach
-/// or release of the session completes, or an abandon of it returns.
+/// The session makes its context current on the surface for each frame, and
+/// swaps the surface's buffers to present.
 ///
-/// See `mln_open_gl_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub const OpenGlSurfaceReplacement = struct {
+/// See `mln_open_gl_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const OpenGlSurfaceTarget = struct {
     logical_size: LogicalSize,
-    /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
-    /// leave it null.
-    surface: ?*anyopaque = null,
-    pub fn toNative(self: OpenGlSurfaceReplacement) c.mln_open_gl_surface_replacement {
-        var raw = std.mem.zeroes(c.mln_open_gl_surface_replacement);
-        raw.size = @sizeOf(c.mln_open_gl_surface_replacement);
+    /// Your `EGLSurface` on the context's display, with its config, or your
+    /// `HDC` with the context's pixel format.
+    surface: ?*anyopaque,
+    pub fn toNative(self: OpenGlSurfaceTarget) c.mln_open_gl_surface_target {
+        var raw = std.mem.zeroes(c.mln_open_gl_surface_target);
         raw.logical_size = self.logical_size.toNative();
         raw.surface = self.surface;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_open_gl_surface_replacement) OpenGlSurfaceReplacement {
+    pub fn fromNative(raw: c.mln_open_gl_surface_target) OpenGlSurfaceTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .surface = raw.surface,
@@ -6671,6 +6736,9 @@ pub const OpenGlSurfaceReplacement = struct {
 };
 
 /// The OpenGL texture of an acquired frame.
+///
+/// The depth members are set when the frame has a depth texture, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
 ///
 /// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -6682,6 +6750,11 @@ pub const OpenGlTextureFrame = struct {
     slot: u32 = 0,
     texture: u32 = 0,
     target: u32 = 0,
+    /// The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil.
+    depth_texture: u32 = 0,
+    /// The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or
+    /// zero for a borrowed ring's.
+    depth_internal_format: u32 = 0,
     pub fn fromNative(raw: c.mln_open_gl_texture_frame) OpenGlTextureFrame {
         return .{
             .width = raw.width,
@@ -6690,6 +6763,8 @@ pub const OpenGlTextureFrame = struct {
             .slot = raw.slot,
             .texture = raw.texture,
             .target = raw.target,
+            .depth_texture = raw.depth_texture,
+            .depth_internal_format = raw.depth_internal_format,
         };
     }
 };
@@ -6897,11 +6972,15 @@ pub const Quaternion = struct {
     }
 };
 
-/// Your lock on a Vulkan queue that you and a render session both submit to.
+/// Your lock on a Vulkan queue that you and the render sessions of a GPU device
+/// all submit to.
 ///
-/// The session holds the lock only while it submits or presents to the queue.
-/// Set both `lock` and `unlock`, or neither when you don't submit to the queue
-/// yourself.
+/// A session holds the lock only while it submits or presents to the queue, or
+/// submits the empty batch that drains its work from the queue. It never holds
+/// the lock while it waits. Set both `lock` and `unlock`, or neither when you
+/// don't submit to the queue yourself.
+///
+/// Don't hold the lock while you call the library.
 ///
 /// It can run on a library thread, and it can't call the library.
 ///
@@ -7009,6 +7088,20 @@ pub const RenderAbandonResult = struct {
     }
 };
 
+/// A render backend.
+///
+/// See `mln_render_backend` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+pub const RenderBackend = enum(u32) {
+    metal = 1,
+    vulkan = 2,
+    open_gl = 3,
+    web_gpu = 4,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
 /// A render backend, as a bit in a set.
 ///
 /// See `mln_render_backend_flag` in the
@@ -7055,6 +7148,9 @@ pub const RenderFrameResult = struct {
     needs_repaint: bool = false,
     /// The camera and extent that a rendered frame shows.
     view: MapView = .{},
+    /// Where a rendered frame drew the map, for drawing into its frame with
+    /// depth. All zero for a demand that rendered nothing.
+    frame_projection: FrameProjection = .{},
     mode: RenderMode = .partial,
     pub fn fromNative(raw: c.mln_render_frame_result) RenderFrameResult {
         return .{
@@ -7065,6 +7161,7 @@ pub const RenderFrameResult = struct {
             .frame_generation = raw.frame_generation,
             .needs_repaint = raw.needs_repaint,
             .view = MapView.fromNative(raw.view),
+            .frame_projection = FrameProjection.fromNative(raw.frame_projection),
             .mode = RenderMode.fromNative(raw.mode),
         };
     }
@@ -7113,14 +7210,18 @@ pub const RenderSessionAttachOptions = struct {
     /// The thread that runs the session's graphics work, which depends on the
     /// target:
     ///
-    /// - `RenderDriverKind.caller_graphics_thread` for a shared or dedicated
-    ///   EGL or WGL context, an existing WebGL context, or a browser's WebGPU
-    ///   device.
-    /// - `RenderDriverKind.core_worker` for a transferred WebGL canvas, an
-    ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-    ///   Android hardware buffers, dmabufs, DXGI shared textures, or
-    ///   IOSurfaces, or an offscreen session.
-    /// - Either one for another Metal or Vulkan target.
+    /// - `RenderDriverKind.caller_graphics_thread` for a borrowed ring of
+    ///   WebGPU textures.
+    /// - `RenderDriverKind.core_worker` for an offscreen target, a window, or
+    ///   an exported ring.
+    /// - Either one for a web canvas. In a browser both run on the thread that
+    ///   loaded the library: `RenderDriverKind.core_worker` in the library's
+    ///   own tasks, and `RenderDriverKind.caller_graphics_thread` when you
+    ///   service the session.
+    /// - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or
+    ///   a borrowed ring of Metal, Vulkan, or OpenGL textures. A build may
+    ///   drive these on `RenderDriverKind.core_worker` only, and fails an
+    ///   attach with `RenderDriverKind.caller_graphics_thread` then.
     ///
     /// An attach with another driver fails with `error.Unsupported`.
     driver: RenderDriverKind,
@@ -7141,8 +7242,17 @@ pub const RenderSessionAttachOptions = struct {
     /// `RenderSession.serviceDriverWork()`. It isn't called again until a
     /// service runs.
     driver_work_wake: Wake = .{},
-    /// Your lock on the Vulkan queue, when you submit to it yourself.
-    queue_lock: QueueLock = .{},
+    /// Whether an exported ring keeps the depth and stencil of each frame for
+    /// you, so that you can draw into the frame depth-tested against the map,
+    /// as `FrameProjection` says. The getter of the device's API, such as
+    /// `AcquiredFrame.getVulkanTexture()`, gets a frame's depth texture on the
+    /// device, and `AcquiredFrame.getOpaqueFd()` shares it across APIs when
+    /// `GpuDeviceCapabilities.depth_export_kinds` has the ring's kind. Keeping
+    /// depth costs memory bandwidth, most on tile-based GPUs. A borrowed ring
+    /// keeps depth in the textures that you give it instead, and the other
+    /// targets keep none, so an attach to them with `keep_depth` fails with
+    /// `error.Unsupported`.
+    keep_depth: bool = false,
     pub fn toNative(self: RenderSessionAttachOptions, roots: *callbacks.Roots) status.Error!c.mln_render_session_attach_options {
         var raw = std.mem.zeroes(c.mln_render_session_attach_options);
         raw.size = @sizeOf(c.mln_render_session_attach_options);
@@ -7151,7 +7261,7 @@ pub const RenderSessionAttachOptions = struct {
         raw.frame_wake = try self.frame_wake.toNative(roots);
         raw.redraw_wake = try self.redraw_wake.toNative(roots);
         raw.driver_work_wake = try self.driver_work_wake.toNative(roots);
-        raw.queue_lock = try self.queue_lock.toNative(roots);
+        raw.keep_depth = self.keep_depth;
         return raw;
     }
 
@@ -7163,7 +7273,7 @@ pub const RenderSessionAttachOptions = struct {
             .frame_wake = .{},
             .redraw_wake = .{},
             .driver_work_wake = .{},
-            .queue_lock = .{},
+            .keep_depth = raw.keep_depth,
         };
     }
 };
@@ -7182,6 +7292,9 @@ pub const RenderSessionCapabilities = struct {
     /// The kinds of `GpuSync` that `AcquiredFrame.release()` accepts. They
     /// depend on the target and on what the device supports.
     consumer_sync_kinds: GpuSyncKindFlag = .{},
+    /// How an exported ring shares its textures, which says which getter gets
+    /// an acquired frame's texture, or `GpuExportKind.none` for another target.
+    export_kind: GpuExportKind = .none,
     pub fn fromNative(raw: c.mln_render_session_capabilities) RenderSessionCapabilities {
         return .{
             .driver = RenderDriverKind.fromNative(raw.driver),
@@ -7189,6 +7302,7 @@ pub const RenderSessionCapabilities = struct {
             .flags = RenderSessionCapabilityFlag.fromNative(raw.flags),
             .producer_sync_kind = GpuSyncKind.fromNative(raw.producer_sync_kind),
             .consumer_sync_kinds = GpuSyncKindFlag.fromNative(raw.consumer_sync_kinds),
+            .export_kind = GpuExportKind.fromNative(raw.export_kind),
         };
     }
 };
@@ -7257,6 +7371,155 @@ pub const RenderSessionState = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// What a render session renders into: one kind of target, and its descriptor.
+///
+/// Every target has a size in logical pixels, which sets the map's size. The
+/// session renders it at the map's scale factor. A borrowed or exported ring
+/// hands each frame to you: acquire it with `RenderSession.acquireFrame()`, and
+/// release it with your GPU's synchronization once you have read it.
+///
+/// The session uses the objects that the descriptor names until a replacement
+/// or release of the target completes, a detach or release of the session
+/// completes, or an abandon of it returns, except as a kind's descriptor says.
+/// A window target presents without waiting for the display, so demand at most
+/// one frame per display refresh.
+///
+/// See `mln_render_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const RenderTarget = union(enum) {
+    offscreen: OffscreenTarget,
+    metal_layer: MetalLayerTarget,
+    win32_window: Win32WindowTarget,
+    xlib_window: XlibWindowTarget,
+    wayland_surface: WaylandSurfaceTarget,
+    android_window: AndroidWindowTarget,
+    ohos_window: OhosWindowTarget,
+    vulkan_surface: VulkanSurfaceTarget,
+    open_gl_surface: OpenGlSurfaceTarget,
+    metal_borrowed_textures: MetalBorrowedTexturesTarget,
+    vulkan_borrowed_textures: VulkanBorrowedTexturesTarget,
+    open_gl_borrowed_textures: OpenGlBorrowedTexturesTarget,
+    web_gpu_borrowed_textures: WebGpuBorrowedTexturesTarget,
+    exported_ring: ExportedRingTarget,
+    web_canvas: WebCanvasTarget,
+
+    pub fn toNative(self: RenderTarget, allocator: std.mem.Allocator) status.Error!c.mln_render_target {
+        var raw = std.mem.zeroes(c.mln_render_target);
+        raw.size = @sizeOf(c.mln_render_target);
+        switch (self) {
+            .offscreen => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_OFFSCREEN;
+                raw.data.offscreen = item.toNative();
+            },
+            .metal_layer => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_METAL_LAYER;
+                raw.data.metal_layer = item.toNative();
+            },
+            .win32_window => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_WIN32_WINDOW;
+                raw.data.win32_window = item.toNative();
+            },
+            .xlib_window => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_XLIB_WINDOW;
+                raw.data.xlib_window = item.toNative();
+            },
+            .wayland_surface => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE;
+                raw.data.wayland_surface = item.toNative();
+            },
+            .android_window => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_ANDROID_WINDOW;
+                raw.data.android_window = item.toNative();
+            },
+            .ohos_window => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_OHOS_WINDOW;
+                raw.data.ohos_window = item.toNative();
+            },
+            .vulkan_surface => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_VULKAN_SURFACE;
+                raw.data.vulkan_surface = item.toNative();
+            },
+            .open_gl_surface => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE;
+                raw.data.open_gl_surface = item.toNative();
+            },
+            .metal_borrowed_textures => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES;
+                raw.data.metal_borrowed_textures = try item.toNative(allocator);
+            },
+            .vulkan_borrowed_textures => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES;
+                raw.data.vulkan_borrowed_textures = try item.toNative(allocator);
+            },
+            .open_gl_borrowed_textures => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES;
+                raw.data.open_gl_borrowed_textures = try item.toNative(allocator);
+            },
+            .web_gpu_borrowed_textures => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES;
+                raw.data.web_gpu_borrowed_textures = try item.toNative(allocator);
+            },
+            .exported_ring => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_EXPORTED_RING;
+                raw.data.exported_ring = try item.toNative(allocator);
+            },
+            .web_canvas => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_WEB_CANVAS;
+                raw.data.web_canvas = try item.toNative();
+            },
+        }
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_render_target) status.Error!RenderTarget {
+        return switch (raw.kind) {
+            c.MLN_RENDER_TARGET_KIND_OFFSCREEN => .{ .offscreen = OffscreenTarget.fromNative(raw.data.offscreen) },
+            c.MLN_RENDER_TARGET_KIND_METAL_LAYER => .{ .metal_layer = MetalLayerTarget.fromNative(raw.data.metal_layer) },
+            c.MLN_RENDER_TARGET_KIND_WIN32_WINDOW => .{ .win32_window = Win32WindowTarget.fromNative(raw.data.win32_window) },
+            c.MLN_RENDER_TARGET_KIND_XLIB_WINDOW => .{ .xlib_window = XlibWindowTarget.fromNative(raw.data.xlib_window) },
+            c.MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE => .{ .wayland_surface = WaylandSurfaceTarget.fromNative(raw.data.wayland_surface) },
+            c.MLN_RENDER_TARGET_KIND_ANDROID_WINDOW => .{ .android_window = AndroidWindowTarget.fromNative(raw.data.android_window) },
+            c.MLN_RENDER_TARGET_KIND_OHOS_WINDOW => .{ .ohos_window = OhosWindowTarget.fromNative(raw.data.ohos_window) },
+            c.MLN_RENDER_TARGET_KIND_VULKAN_SURFACE => .{ .vulkan_surface = VulkanSurfaceTarget.fromNative(raw.data.vulkan_surface) },
+            c.MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE => .{ .open_gl_surface = OpenGlSurfaceTarget.fromNative(raw.data.open_gl_surface) },
+            c.MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES => .{ .metal_borrowed_textures = try MetalBorrowedTexturesTarget.fromNative(allocator, raw.data.metal_borrowed_textures) },
+            c.MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES => .{ .vulkan_borrowed_textures = try VulkanBorrowedTexturesTarget.fromNative(allocator, raw.data.vulkan_borrowed_textures) },
+            c.MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES => .{ .open_gl_borrowed_textures = try OpenGlBorrowedTexturesTarget.fromNative(allocator, raw.data.open_gl_borrowed_textures) },
+            c.MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES => .{ .web_gpu_borrowed_textures = try WebGpuBorrowedTexturesTarget.fromNative(allocator, raw.data.web_gpu_borrowed_textures) },
+            c.MLN_RENDER_TARGET_KIND_EXPORTED_RING => .{ .exported_ring = try ExportedRingTarget.fromNative(allocator, raw.data.exported_ring) },
+            c.MLN_RENDER_TARGET_KIND_WEB_CANVAS => .{ .web_canvas = try WebCanvasTarget.fromNative(allocator, raw.data.web_canvas) },
+            else => return error.NativeError,
+        };
+    }
+};
+
+/// A render target kind, as a bit in a set.
+///
+/// See `mln_render_target_kind_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const RenderTargetKindFlag = struct {
+    offscreen: bool = false,
+    metal_layer: bool = false,
+    win32_window: bool = false,
+    xlib_window: bool = false,
+    wayland_surface: bool = false,
+    android_window: bool = false,
+    ohos_window: bool = false,
+    vulkan_surface: bool = false,
+    open_gl_surface: bool = false,
+    metal_borrowed_textures: bool = false,
+    vulkan_borrowed_textures: bool = false,
+    open_gl_borrowed_textures: bool = false,
+    web_gpu_borrowed_textures: bool = false,
+    exported_ring: bool = false,
+    web_canvas: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
 };
 
 /// A feature that a rendered feature query found.
@@ -7953,7 +8216,6 @@ pub const RuntimeEvent = struct {
                 c.MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED => .{ .source_changed = try RuntimeEventSourceChanged.fromNative(raw.payload.source_changed) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => .{ .offline_region_status = RuntimeEventOfflineRegionStatus.fromNative(raw.payload.offline_region_status) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => .{ .offline_region_response_error = RuntimeEventOfflineRegionResponseError.fromNative(raw.payload.offline_region_response_error) },
-                c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => .{ .offline_region_tile_count_limit = RuntimeEventOfflineRegionTileCountLimit.fromNative(raw.payload.offline_region_tile_count_limit) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS => .{ .glyphs = try RuntimeEventGlyphs.fromNative(allocator, raw.payload.glyphs) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_SPRITE => .{ .sprite = try RuntimeEventSprite.fromNative(raw.payload.sprite) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_NONE => .empty,
@@ -8002,7 +8264,6 @@ pub const RuntimeEventFlag = struct {
     map_source_changed: bool = false,
     offline_region_status_changed: bool = false,
     offline_region_response_error: bool = false,
-    offline_region_tile_count_limit_exceeded: bool = false,
     map_glyphs_requested: bool = false,
     map_glyphs_loaded: bool = false,
     map_glyphs_error: bool = false,
@@ -8010,14 +8271,14 @@ pub const RuntimeEventFlag = struct {
     map_sprite_loaded: bool = false,
     map_sprite_error: bool = false,
     unknown_bits: u64 = 0,
-    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216, 33554432 };
+    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
     pub const none: RuntimeEventFlag = .{};
     pub const all_map_events: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true, .map_glyphs_requested = true, .map_glyphs_loaded = true, .map_glyphs_error = true, .map_sprite_requested = true, .map_sprite_loaded = true, .map_sprite_error = true };
-    pub const all_runtime_events: RuntimeEventFlag = .{ .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true };
-    pub const all: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true, .offline_region_status_changed = true, .offline_region_response_error = true, .offline_region_tile_count_limit_exceeded = true, .map_glyphs_requested = true, .map_glyphs_loaded = true, .map_glyphs_error = true, .map_sprite_requested = true, .map_sprite_loaded = true, .map_sprite_error = true };
+    pub const all_runtime_events: RuntimeEventFlag = .{ .offline_region_status_changed = true, .offline_region_response_error = true };
+    pub const all: RuntimeEventFlag = .{ .map_camera_will_change = true, .map_camera_is_changing = true, .map_camera_did_change = true, .map_style_loaded = true, .map_loading_started = true, .map_loading_finished = true, .map_loading_failed = true, .map_idle = true, .map_render_error = true, .map_render_frame_started = true, .map_render_frame_finished = true, .map_render_map_started = true, .map_render_map_finished = true, .map_style_image_missing = true, .map_tile_action = true, .map_source_changed = true, .offline_region_status_changed = true, .offline_region_response_error = true, .map_glyphs_requested = true, .map_glyphs_loaded = true, .map_glyphs_error = true, .map_sprite_requested = true, .map_sprite_loaded = true, .map_sprite_error = true };
 };
 
 /// The details of a glyph event.
@@ -8157,23 +8418,6 @@ pub const RuntimeEventOfflineRegionStatus = struct {
     }
 };
 
-/// The details of `RuntimeEventType.offline_region_tile_count_limit_exceeded`.
-///
-/// See `mln_runtime_event_offline_region_tile_count_limit` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const RuntimeEventOfflineRegionTileCountLimit = struct {
-    region_id: i64 = 0,
-    /// The number of demo server tiles that the cache file's offline regions
-    /// may hold together.
-    limit: u64 = 0,
-    pub fn fromNative(raw: c.mln_runtime_event_offline_region_tile_count_limit) RuntimeEventOfflineRegionTileCountLimit {
-        return .{
-            .region_id = raw.region_id,
-            .limit = raw.limit,
-        };
-    }
-};
-
 /// The details of an event, in the member that its `payload_type` names.
 ///
 /// See `mln_runtime_event_payload` in the
@@ -8187,7 +8431,6 @@ pub const RuntimeEventPayload = union(enum) {
     source_changed: RuntimeEventSourceChanged,
     offline_region_status: RuntimeEventOfflineRegionStatus,
     offline_region_response_error: RuntimeEventOfflineRegionResponseError,
-    offline_region_tile_count_limit: RuntimeEventOfflineRegionTileCountLimit,
     glyphs: RuntimeEventGlyphs,
     sprite: RuntimeEventSprite,
     empty,
@@ -8332,17 +8575,12 @@ pub const RuntimeEventType = enum(u32) {
     offline_region_status_changed = 17,
     /// A resource that the region needs failed to download.
     offline_region_response_error = 18,
-    /// The region's download became inactive because the cache file's offline
-    /// regions hold as many tiles from MapLibre's demo tile server as the limit
-    /// allows. Only tiles of sources with a `maplibre://` URL count toward the
-    /// limit.
-    offline_region_tile_count_limit_exceeded = 19,
-    map_glyphs_requested = 20,
-    map_glyphs_loaded = 21,
-    map_glyphs_error = 22,
-    map_sprite_requested = 23,
-    map_sprite_loaded = 24,
-    map_sprite_error = 25,
+    map_glyphs_requested = 19,
+    map_glyphs_loaded = 20,
+    map_glyphs_error = 21,
+    map_sprite_requested = 22,
+    map_sprite_loaded = 23,
+    map_sprite_error = 24,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -9201,6 +9439,25 @@ pub const Vec3 = struct {
     }
 };
 
+/// A vector in four dimensions, such as a point in homogeneous coordinates.
+///
+/// See `mln_vec4` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const Vec4 = struct {
+    x: f64 = 0,
+    y: f64 = 0,
+    z: f64 = 0,
+    w: f64 = 0,
+    pub fn fromNative(raw: c.mln_vec4) Vec4 {
+        return .{
+            .x = raw.x,
+            .y = raw.y,
+            .z = raw.z,
+            .w = raw.w,
+        };
+    }
+};
+
 /// The vertical direction of the image that the map renders.
 ///
 /// See `mln_viewport_mode` in the
@@ -9217,11 +9474,11 @@ pub const ViewportMode = enum(u32) {
 /// A Vulkan image of a borrowed ring.
 ///
 /// See `mln_vulkan_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const VulkanBorrowedTexture = struct {
-    /// Your VkImage.
+    /// Your `VkImage`.
     image: u64,
-    /// A 2D VkImageView of `image` with one mip level and one layer.
+    /// A 2D `VkImageView` of `image` with one mip level and one layer.
     image_view: u64,
     pub fn toNative(self: VulkanBorrowedTexture) c.mln_vulkan_borrowed_texture {
         var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture);
@@ -9237,38 +9494,47 @@ pub const VulkanBorrowedTexture = struct {
     }
 };
 
-/// A ring of your Vulkan images, for `Map.attachVulkanBorrowedTexture()`.
+/// A ring of your Vulkan images to render into, on the Vulkan device that you
+/// attach on.
 ///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the images' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. Each image must have that size, `format`, and
-/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
-/// ring holds up to `texture_ring_max_depth` distinct images.
+/// `physical_width` and `physical_height` give the images' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each image
+/// must have that size, `format`, and `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT`,
+/// and belong to the device's `VkDevice`. The ring holds up to
+/// `texture_ring_max_depth` distinct images.
 ///
-/// The session uses the images until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, stores them, and leaves it in
+/// `depth_final_layout`, with `owner` as for the color image. They must have
+/// the size of `textures`, `depth_format`, one sample, and
+/// `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and their views both the
+/// depth and the stencil aspect.
 ///
-/// See `mln_vulkan_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const VulkanBorrowedTextureDescriptor = struct {
+/// See `mln_vulkan_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const VulkanBorrowedTexturesTarget = struct {
     logical_size: LogicalSize,
     physical_width: u32,
     physical_height: u32,
-    context: VulkanContextDescriptor,
     textures: []const VulkanBorrowedTexture,
-    /// The images' VkFormat.
+    /// The images' `VkFormat`.
     format: u32,
-    /// The VkImageLayout that each frame leaves its image in.
+    /// The `VkImageLayout` that each frame leaves its image in.
     final_layout: u32,
     owner: VulkanImageOwner = .graphics_queue,
-    pub fn toNative(self: VulkanBorrowedTextureDescriptor, allocator: std.mem.Allocator) status.Error!c.mln_vulkan_borrowed_texture_descriptor {
-        var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture_descriptor);
-        raw.size = @sizeOf(c.mln_vulkan_borrowed_texture_descriptor);
+    depth_textures: []const VulkanBorrowedTexture = &.{},
+    /// The depth images' `VkFormat`, of
+    /// `GpuDeviceCapabilities.depth_stencil_formats`.
+    depth_format: u32 = 0,
+    /// The `VkImageLayout` that each frame leaves its depth image in.
+    depth_final_layout: u32 = 0,
+    pub fn toNative(self: VulkanBorrowedTexturesTarget, allocator: std.mem.Allocator) status.Error!c.mln_vulkan_borrowed_textures_target {
+        var raw = std.mem.zeroes(c.mln_vulkan_borrowed_textures_target);
         raw.logical_size = self.logical_size.toNative();
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
-        raw.context = self.context.toNative();
         raw.textures = blk: {
             const items = try allocator.alloc(c.mln_vulkan_borrowed_texture, self.textures.len);
             for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
@@ -9278,15 +9544,22 @@ pub const VulkanBorrowedTextureDescriptor = struct {
         raw.format = self.format;
         raw.final_layout = self.final_layout;
         raw.owner = self.owner.toNative();
+        raw.depth_textures = blk: {
+            const items = try allocator.alloc(c.mln_vulkan_borrowed_texture, self.depth_textures.len);
+            for (self.depth_textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.depth_texture_count = std.math.cast(@TypeOf(raw.depth_texture_count), self.depth_textures.len) orelse return error.InvalidArgument;
+        raw.depth_format = self.depth_format;
+        raw.depth_final_layout = self.depth_final_layout;
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_vulkan_borrowed_texture_descriptor) status.Error!VulkanBorrowedTextureDescriptor {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_vulkan_borrowed_textures_target) status.Error!VulkanBorrowedTexturesTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
-            .context = VulkanContextDescriptor.fromNative(raw.context),
             .textures = blk: {
                 const copied = try allocator.alloc(VulkanBorrowedTexture, raw.texture_count);
                 for (try marshal.nativeSlice(c.mln_vulkan_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = VulkanBorrowedTexture.fromNative(item);
@@ -9295,50 +9568,13 @@ pub const VulkanBorrowedTextureDescriptor = struct {
             .format = raw.format,
             .final_layout = raw.final_layout,
             .owner = VulkanImageOwner.fromNative(raw.owner),
-        };
-    }
-};
-
-/// New Vulkan images for a borrowed ring, for
-/// `RenderSession.setVulkanBorrowedTextureTarget()`.
-///
-/// The members and the images follow the rules of
-/// `VulkanBorrowedTextureDescriptor`. The ring keeps its depth, context,
-/// `format`, `final_layout`, and `owner`, so give it as many images as it
-/// attached with, in that format, on the same device.
-///
-/// See `mln_vulkan_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub const VulkanBorrowedTextureReplacement = struct {
-    logical_size: LogicalSize,
-    physical_width: u32,
-    physical_height: u32,
-    textures: []const VulkanBorrowedTexture,
-    pub fn toNative(self: VulkanBorrowedTextureReplacement, allocator: std.mem.Allocator) status.Error!c.mln_vulkan_borrowed_texture_replacement {
-        var raw = std.mem.zeroes(c.mln_vulkan_borrowed_texture_replacement);
-        raw.size = @sizeOf(c.mln_vulkan_borrowed_texture_replacement);
-        raw.logical_size = self.logical_size.toNative();
-        raw.physical_width = self.physical_width;
-        raw.physical_height = self.physical_height;
-        raw.textures = blk: {
-            const items = try allocator.alloc(c.mln_vulkan_borrowed_texture, self.textures.len);
-            for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_vulkan_borrowed_texture_replacement) status.Error!VulkanBorrowedTextureReplacement {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .physical_width = raw.physical_width,
-            .physical_height = raw.physical_height,
-            .textures = blk: {
-                const copied = try allocator.alloc(VulkanBorrowedTexture, raw.texture_count);
-                for (try marshal.nativeSlice(c.mln_vulkan_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = VulkanBorrowedTexture.fromNative(item);
+            .depth_textures = blk: {
+                const copied = try allocator.alloc(VulkanBorrowedTexture, raw.depth_texture_count);
+                for (try marshal.nativeSlice(c.mln_vulkan_borrowed_texture, raw.depth_textures, raw.depth_texture_count), 0..) |item, index| copied[index] = VulkanBorrowedTexture.fromNative(item);
                 break :blk copied;
             },
+            .depth_format = raw.depth_format,
+            .depth_final_layout = raw.depth_final_layout,
         };
     }
 };
@@ -9358,7 +9594,7 @@ pub const VulkanContextDescriptor = struct {
     /// A `VkDevice`.
     device: ?*anyopaque,
     /// A `VkQueue` from `graphics_queue_family_index` that supports graphics.
-    /// If you submit to it too, set `RenderSessionAttachOptions.queue_lock`.
+    /// If you submit to it too, give the device your `QueueLock`.
     graphics_queue: ?*anyopaque,
     graphics_queue_family_index: u32 = 0,
     /// Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
@@ -9389,56 +9625,112 @@ pub const VulkanContextDescriptor = struct {
     }
 };
 
-/// A Vulkan device's context, as `VulkanDevice.getContext()` reports it.
+/// The frame's Vulkan command buffer, outside the map's render pass.
 ///
-/// See `mln_vulkan_device_context_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-pub const VulkanDeviceContextResult = struct {
+/// Record work such as copies, compute dispatches, and render passes of your
+/// own, with the barriers that it needs. The map's render pass loads its
+/// attachments after a barrier of its own, but it doesn't wait for writes to
+/// your images: give those the barriers that your later reads need. Don't end
+/// or submit `command_buffer`.
+///
+/// See `mln_vulkan_custom_layer_encoder` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const VulkanCustomLayerEncoder = struct {
+    /// The device that the session renders on. Make the objects that your
+    /// commands use on `context.device`. Don't submit to
+    /// `context.graphics_queue` from a callback.
     context: VulkanContextDescriptor,
-    pub fn fromNative(raw: c.mln_vulkan_device_context_result) VulkanDeviceContextResult {
+    /// The frame's `VkCommandBuffer`, recording outside a render pass.
+    command_buffer: ?*anyopaque = null,
+    pub fn fromNative(raw: c.mln_vulkan_custom_layer_encoder) VulkanCustomLayerEncoder {
         return .{
             .context = VulkanContextDescriptor.fromNative(raw.context),
+            .command_buffer = raw.command_buffer,
         };
     }
 };
 
-/// Options for `VulkanDevice.create()`.
+/// The map's Vulkan render pass, at a custom layer's place in the style.
 ///
-/// See `mln_vulkan_device_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-pub const VulkanDeviceOptions = struct {
-    /// Whether the device can present to a window. The instance then enables
-    /// VK_KHR_surface and the platform's surface extensions, and the device
-    /// enables VK_KHR_swapchain. Defaults to false.
-    presentation: ?bool = null,
-    /// The 16-byte `deviceUUID` of the GPU to use, as
-    /// `VkPhysicalDeviceIDProperties` reports it.
-    device_uuid: ?[]const u8 = null,
-    /// The 8-byte `deviceLUID` of the GPU to use, as
-    /// `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
-    /// DXGI adapter LUID.
-    device_luid: ?[]const u8 = null,
-    pub fn toNative(self: VulkanDeviceOptions) status.Error!c.mln_vulkan_device_options {
-        var raw = std.mem.zeroes(c.mln_vulkan_device_options);
-        raw.fields = 0;
-        raw.size = @sizeOf(c.mln_vulkan_device_options);
-        marshal.present(&raw.fields, c.MLN_VULKAN_DEVICE_OPTION_PRESENTATION, &raw.presentation, self.presentation);
-        if (self.device_uuid) |item| {
-            raw.fields |= c.MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
-            raw.device_uuid = marshal.view(item);
-        }
-        if (self.device_luid) |item| {
-            raw.fields |= c.MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID;
-            raw.device_luid = marshal.view(item);
-        }
+/// Record draws into `command_buffer`, with pipelines that you make for
+/// `render_pass`, `subpass`, and `sample_count`. Bind your own pipeline,
+/// descriptor sets, vertex and index buffers, and push constants, and set the
+/// dynamic state that your pipelines have, such as the viewport and scissor.
+/// After the callback returns, the map binds and sets again what its own draws
+/// need. Your pipeline layouts can differ from the map's. Record nothing that a
+/// render pass can't hold, and don't end the render pass.
+///
+/// See `mln_vulkan_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const VulkanCustomLayerPass = struct {
+    /// The device that the session renders on. Make the objects that your
+    /// commands use on `context.device`. Don't submit to
+    /// `context.graphics_queue` from a callback.
+    context: VulkanContextDescriptor,
+    /// The frame's `VkCommandBuffer`, recording inside `render_pass`.
+    command_buffer: ?*anyopaque = null,
+    /// The `VkRenderPass` that `command_buffer` records in.
+    render_pass: u64 = 0,
+    /// The index of the subpass that `command_buffer` records in.
+    subpass: u32 = 0,
+    /// The `VkSampleCountFlagBits` of the render pass's attachments.
+    sample_count: u32 = 0,
+    /// The `VkFormat` of the render pass's color attachment.
+    color_format: u32 = 0,
+    /// The `VkFormat` of the render pass's depth-stencil attachment, or
+    /// `VK_FORMAT_UNDEFINED` when it has none.
+    depth_stencil_format: u32 = 0,
+    pub fn fromNative(raw: c.mln_vulkan_custom_layer_pass) VulkanCustomLayerPass {
+        return .{
+            .context = VulkanContextDescriptor.fromNative(raw.context),
+            .command_buffer = raw.command_buffer,
+            .render_pass = raw.render_pass,
+            .subpass = raw.subpass,
+            .sample_count = raw.sample_count,
+            .color_format = raw.color_format,
+            .depth_stencil_format = raw.depth_stencil_format,
+        };
+    }
+};
+
+/// Your Vulkan device and queue, for `GpuDevice.wrapVulkan()`.
+///
+/// See `mln_vulkan_device_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+pub const VulkanDeviceDescriptor = struct {
+    context: VulkanContextDescriptor,
+    /// Your lock on `context.graphics_queue`, when you submit to it yourself.
+    /// Give every device that wraps the queue the same lock.
+    queue_lock: QueueLock = .{},
+    /// The names of the device extensions that you enabled on `context.device`,
+    /// such as "VK_KHR_external_semaphore_fd". Vulkan offers no way to ask a
+    /// device which extensions it has, so the device offers the export kinds
+    /// and `GpuSyncKind.sync_fd` only when the extensions that they need are
+    /// listed here, and none of them when the list is empty.
+    enabled_extensions: []const []const u8 = &.{},
+    pub fn toNative(self: VulkanDeviceDescriptor, allocator: std.mem.Allocator, roots: *callbacks.Roots) status.Error!c.mln_vulkan_device_descriptor {
+        var raw = std.mem.zeroes(c.mln_vulkan_device_descriptor);
+        raw.size = @sizeOf(c.mln_vulkan_device_descriptor);
+        raw.context = self.context.toNative();
+        raw.queue_lock = try self.queue_lock.toNative(roots);
+        raw.enabled_extensions = blk: {
+            const items = try allocator.alloc(c.mln_buffer_view, self.enabled_extensions.len);
+            for (self.enabled_extensions, 0..) |array_item_0, index| items[index] = marshal.view(array_item_0);
+            break :blk items.ptr;
+        };
+        raw.enabled_extension_count = std.math.cast(@TypeOf(raw.enabled_extension_count), self.enabled_extensions.len) orelse return error.InvalidArgument;
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_vulkan_device_options) status.Error!VulkanDeviceOptions {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_vulkan_device_descriptor) status.Error!VulkanDeviceDescriptor {
         return .{
-            .presentation = if (raw.fields & c.MLN_VULKAN_DEVICE_OPTION_PRESENTATION != 0) raw.presentation else null,
-            .device_uuid = if (raw.fields & c.MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID != 0) try marshal.copyView(allocator, raw.device_uuid) else null,
-            .device_luid = if (raw.fields & c.MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID != 0) try marshal.copyView(allocator, raw.device_luid) else null,
+            .context = VulkanContextDescriptor.fromNative(raw.context),
+            .queue_lock = .{},
+            .enabled_extensions = blk: {
+                const copied = try allocator.alloc([]const u8, raw.enabled_extension_count);
+                for (try marshal.nativeSlice(c.mln_buffer_view, raw.enabled_extensions, raw.enabled_extension_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
+                break :blk copied;
+            },
         };
     }
 };
@@ -9449,9 +9741,9 @@ pub const VulkanDeviceOptions = struct {
 /// image on your side before you read it. You don't need to release it back.
 ///
 /// See `mln_vulkan_image_owner` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const VulkanImageOwner = enum(u32) {
-    /// The image stays with the queue family of `graphics_queue_family_index`.
+    /// The image stays with the queue family of the device's queue.
     graphics_queue = 0,
     /// Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL.
     external = 1,
@@ -9462,60 +9754,25 @@ pub const VulkanImageOwner = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// A Vulkan surface to present to, for `Map.attachVulkanSurface()`.
+/// Your Vulkan surface to present to.
 ///
-/// The device must have VK_KHR_swapchain enabled, and the queue family of
-/// `graphics_queue_family_index` must support presenting to the surface. The
-/// session creates the swapchain. It uses the surface until a replacement or
-/// release of the target completes, a detach or release of the session
-/// completes, or an abandon of it returns.
+/// Make it with the instance of the Vulkan device that you attach on. The
+/// device's queue family must support presenting to the surface. The session
+/// creates the swapchain, and destroys it but not the surface.
 ///
-/// See `mln_vulkan_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub const VulkanSurfaceDescriptor = struct {
+/// See `mln_vulkan_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const VulkanSurfaceTarget = struct {
     logical_size: LogicalSize,
-    context: VulkanContextDescriptor,
-    /// Your VkSurfaceKHR.
+    /// Your `VkSurfaceKHR`.
     surface: u64,
-    pub fn toNative(self: VulkanSurfaceDescriptor) c.mln_vulkan_surface_descriptor {
-        var raw = std.mem.zeroes(c.mln_vulkan_surface_descriptor);
-        raw.size = @sizeOf(c.mln_vulkan_surface_descriptor);
-        raw.logical_size = self.logical_size.toNative();
-        raw.context = self.context.toNative();
-        raw.surface = self.surface;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_vulkan_surface_descriptor) VulkanSurfaceDescriptor {
-        return .{
-            .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .context = VulkanContextDescriptor.fromNative(raw.context),
-            .surface = raw.surface,
-        };
-    }
-};
-
-/// A new Vulkan surface for `RenderSession.setVulkanSurfaceTarget()`.
-///
-/// The session presents to it with the context that it attached with, so the
-/// queue family of that context's `graphics_queue_family_index` must support
-/// presenting to the surface. It uses the surface until a replacement or
-/// release of the target completes, a detach or release of the session
-/// completes, or an abandon of it returns.
-///
-/// See `mln_vulkan_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub const VulkanSurfaceReplacement = struct {
-    logical_size: LogicalSize,
-    /// Your VkSurfaceKHR.
-    surface: u64,
-    pub fn toNative(self: VulkanSurfaceReplacement) c.mln_vulkan_surface_replacement {
-        var raw = std.mem.zeroes(c.mln_vulkan_surface_replacement);
-        raw.size = @sizeOf(c.mln_vulkan_surface_replacement);
+    pub fn toNative(self: VulkanSurfaceTarget) c.mln_vulkan_surface_target {
+        var raw = std.mem.zeroes(c.mln_vulkan_surface_target);
         raw.logical_size = self.logical_size.toNative();
         raw.surface = self.surface;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_vulkan_surface_replacement) VulkanSurfaceReplacement {
+    pub fn fromNative(raw: c.mln_vulkan_surface_target) VulkanSurfaceTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .surface = raw.surface,
@@ -9524,6 +9781,9 @@ pub const VulkanSurfaceReplacement = struct {
 };
 
 /// The Vulkan image of an acquired frame.
+///
+/// The depth members are set when the frame has a depth image, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
 ///
 /// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -9543,6 +9803,14 @@ pub const VulkanTextureFrame = struct {
     format: u32 = 0,
     /// The VkImageLayout that the frame left the image in.
     layout: u32 = 0,
+    /// The VkImage that holds the frame's depth and stencil.
+    depth_image: u64 = 0,
+    /// A VkImageView of the depth image's depth and stencil aspects.
+    depth_image_view: u64 = 0,
+    /// The depth image's VkFormat.
+    depth_format: u32 = 0,
+    /// The VkImageLayout that the frame left the depth image in.
+    depth_layout: u32 = 0,
     pub fn fromNative(raw: c.mln_vulkan_texture_frame) VulkanTextureFrame {
         return .{
             .width = raw.width,
@@ -9554,6 +9822,10 @@ pub const VulkanTextureFrame = struct {
             .device = raw.device,
             .format = raw.format,
             .layout = raw.layout,
+            .depth_image = raw.depth_image,
+            .depth_image_view = raw.depth_image_view,
+            .depth_format = raw.depth_format,
+            .depth_layout = raw.depth_layout,
         };
     }
 };
@@ -9617,25 +9889,28 @@ pub const Wake = struct {
     }
 };
 
-/// A Wayland surface to present to, for `Map.attachWaylandSurface()`.
+/// A Wayland surface to present to.
 ///
-/// See `mln_wayland_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
-pub const WaylandSurfaceDescriptor = struct {
+/// Keep the display connected until the session's detach completes. On an
+/// OpenGL device, if you also use EGL on the display, initialize it before you
+/// attach.
+///
+/// See `mln_wayland_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const WaylandSurfaceTarget = struct {
     logical_size: LogicalSize,
     /// Your `wl_display*`.
     display: ?*anyopaque,
     /// Your `wl_surface*`, on `display`.
     surface: ?*anyopaque,
-    pub fn toNative(self: WaylandSurfaceDescriptor) c.mln_wayland_surface_descriptor {
-        var raw = std.mem.zeroes(c.mln_wayland_surface_descriptor);
-        raw.size = @sizeOf(c.mln_wayland_surface_descriptor);
+    pub fn toNative(self: WaylandSurfaceTarget) c.mln_wayland_surface_target {
+        var raw = std.mem.zeroes(c.mln_wayland_surface_target);
         raw.logical_size = self.logical_size.toNative();
         raw.display = self.display;
         raw.surface = self.surface;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_wayland_surface_descriptor) WaylandSurfaceDescriptor {
+    pub fn fromNative(raw: c.mln_wayland_surface_target) WaylandSurfaceTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .display = raw.display,
@@ -9644,25 +9919,41 @@ pub const WaylandSurfaceDescriptor = struct {
     }
 };
 
-/// A new Wayland surface for `RenderSession.setWaylandSurfaceTarget()`.
+/// A canvas to present to.
 ///
-/// See `mln_wayland_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
-pub const WaylandSurfaceReplacement = struct {
+/// The session makes the canvas's "webgpu" or "webgl2" context with the
+/// device's backend, and sets the canvas's size to `logical_size` at the map's
+/// scale factor. Attached without a device, it renders with the build's
+/// backend: a WebGPU build asks the browser for a device, and attaches once it
+/// has one. For an OpenGL device that wraps your WebGL2 context, the canvas
+/// must be the context's own.
+///
+/// See `mln_web_canvas_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const WebCanvasTarget = struct {
     logical_size: LogicalSize,
-    /// Your `wl_surface*`, on the display that the session attached with.
-    surface: ?*anyopaque,
-    pub fn toNative(self: WaylandSurfaceReplacement) c.mln_wayland_surface_replacement {
-        var raw = std.mem.zeroes(c.mln_wayland_surface_replacement);
-        raw.size = @sizeOf(c.mln_wayland_surface_replacement);
+    /// An `OffscreenCanvas`, such as one from
+    /// `HTMLCanvasElement.transferControlToOffscreen()` that you posted to the
+    /// library's Web Worker, or an `HTMLCanvasElement` when the library runs on
+    /// the page's thread.
+    canvas: u32,
+    /// For a WebGPU device, the `GPUTextureFormat` to configure the canvas
+    /// with, such as `bgra8unorm`. Empty for a format that the device's adapter
+    /// prefers.
+    format: []const u8 = &.{},
+    pub fn toNative(self: WebCanvasTarget) status.Error!c.mln_web_canvas_target {
+        var raw = std.mem.zeroes(c.mln_web_canvas_target);
         raw.logical_size = self.logical_size.toNative();
-        raw.surface = self.surface;
+        raw.canvas = self.canvas;
+        raw.format = marshal.view(self.format);
         return raw;
     }
-    pub fn fromNative(raw: c.mln_wayland_surface_replacement) WaylandSurfaceReplacement {
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_web_canvas_target) status.Error!WebCanvasTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
-            .surface = raw.surface,
+            .canvas = raw.canvas,
+            .format = try marshal.copyView(allocator, raw.format),
         };
     }
 };
@@ -9686,15 +9977,159 @@ pub const WebGlContextDescriptor = struct {
     }
 };
 
-/// The WGL objects that a render session makes its OpenGL context from.
+/// A WebGPU texture of a borrowed ring.
+///
+/// See `mln_web_gpu_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const WebGpuBorrowedTexture = struct {
+    /// Your `GPUTexture`.
+    texture: u32,
+    pub fn toNative(self: WebGpuBorrowedTexture) c.mln_web_gpu_borrowed_texture {
+        var raw = std.mem.zeroes(c.mln_web_gpu_borrowed_texture);
+        raw.texture = self.texture;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_web_gpu_borrowed_texture) WebGpuBorrowedTexture {
+        return .{
+            .texture = raw.texture,
+        };
+    }
+};
+
+/// A ring of your WebGPU textures to render into, on a WebGPU device that wraps
+/// yours.
+///
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each texture
+/// must be 2D with that size, `format`, one layer, one mip level, one sample,
+/// and `GPUTextureUsage.RENDER_ATTACHMENT`. The ring holds up to
+/// `texture_ring_max_depth` distinct textures.
+///
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, and stores them. They must be 2D with the size of
+/// `textures`, `depth_format`, one layer, one mip level, one sample, and
+/// `GPUTextureUsage.RENDER_ATTACHMENT`.
+///
+/// See `mln_web_gpu_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const WebGpuBorrowedTexturesTarget = struct {
+    logical_size: LogicalSize,
+    physical_width: u32,
+    physical_height: u32,
+    textures: []const WebGpuBorrowedTexture,
+    /// The textures' `GPUTextureFormat`, such as `rgba8unorm`.
+    format: []const u8,
+    depth_textures: []const WebGpuBorrowedTexture = &.{},
+    /// The depth textures' `GPUTextureFormat`, of
+    /// `GpuDeviceCapabilities.depth_stencil_formats`.
+    depth_format: []const u8 = &.{},
+    pub fn toNative(self: WebGpuBorrowedTexturesTarget, allocator: std.mem.Allocator) status.Error!c.mln_web_gpu_borrowed_textures_target {
+        var raw = std.mem.zeroes(c.mln_web_gpu_borrowed_textures_target);
+        raw.logical_size = self.logical_size.toNative();
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = blk: {
+            const items = try allocator.alloc(c.mln_web_gpu_borrowed_texture, self.textures.len);
+            for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
+        raw.format = marshal.view(self.format);
+        raw.depth_textures = blk: {
+            const items = try allocator.alloc(c.mln_web_gpu_borrowed_texture, self.depth_textures.len);
+            for (self.depth_textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.depth_texture_count = std.math.cast(@TypeOf(raw.depth_texture_count), self.depth_textures.len) orelse return error.InvalidArgument;
+        raw.depth_format = marshal.view(self.depth_format);
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_web_gpu_borrowed_textures_target) status.Error!WebGpuBorrowedTexturesTarget {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .physical_width = raw.physical_width,
+            .physical_height = raw.physical_height,
+            .textures = blk: {
+                const copied = try allocator.alloc(WebGpuBorrowedTexture, raw.texture_count);
+                for (try marshal.nativeSlice(c.mln_web_gpu_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = WebGpuBorrowedTexture.fromNative(item);
+                break :blk copied;
+            },
+            .format = try marshal.copyView(allocator, raw.format),
+            .depth_textures = blk: {
+                const copied = try allocator.alloc(WebGpuBorrowedTexture, raw.depth_texture_count);
+                for (try marshal.nativeSlice(c.mln_web_gpu_borrowed_texture, raw.depth_textures, raw.depth_texture_count), 0..) |item, index| copied[index] = WebGpuBorrowedTexture.fromNative(item);
+                break :blk copied;
+            },
+            .depth_format = try marshal.copyView(allocator, raw.depth_format),
+        };
+    }
+};
+
+/// The frame's WebGPU command encoder, outside the map's render pass.
+///
+/// End each pass that you begin on `encoder` before the callback returns, and
+/// don't finish the encoder.
+///
+/// See `mln_web_gpu_custom_layer_encoder` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const WebGpuCustomLayerEncoder = struct {
+    /// The `GPUDevice` that the session renders on.
+    device: u32 = 0,
+    /// The frame's `GPUCommandEncoder`, with no pass open.
+    encoder: u32 = 0,
+    pub fn fromNative(raw: c.mln_web_gpu_custom_layer_encoder) WebGpuCustomLayerEncoder {
+        return .{
+            .device = raw.device,
+            .encoder = raw.encoder,
+        };
+    }
+};
+
+/// The map's WebGPU render pass, at a custom layer's place in the style.
+///
+/// Set your own pipeline, bind groups, vertex and index buffers, viewport,
+/// scissor rectangle, and stencil reference on `encoder`. After the callback
+/// returns, the map sets again what its own draws need. Don't end `encoder`.
+///
+/// See `mln_web_gpu_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const WebGpuCustomLayerPass = struct {
+    /// The `GPUDevice` that the session renders on.
+    device: u32 = 0,
+    /// The pass's `GPURenderPassEncoder`.
+    encoder: u32 = 0,
+    /// The `GPUTextureFormat` of the pass's color attachment.
+    color_format: []const u8 = &.{},
+    /// The `GPUTextureFormat` of the pass's depth-stencil attachment, or empty
+    /// when it has none.
+    depth_stencil_format: []const u8 = &.{},
+    /// The sample count of the pass's attachments.
+    sample_count: u32 = 0,
+
+    /// Borrows the record's text, which native lends until the callback returns.
+    pub fn fromNative(raw: c.mln_web_gpu_custom_layer_pass) status.Error!WebGpuCustomLayerPass {
+        return .{
+            .device = raw.device,
+            .encoder = raw.encoder,
+            .color_format = try marshal.borrowView(raw.color_format),
+            .depth_stencil_format = try marshal.borrowView(raw.depth_stencil_format),
+            .sample_count = raw.sample_count,
+        };
+    }
+};
+
+/// Your WGL context, which each session's context shares objects with.
 ///
 /// See `mln_wgl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WglContextDescriptor = struct {
-    /// An `HDC`.
+    /// An `HDC` with the pixel format of `share_context`.
     device_context: ?*anyopaque,
-    /// Your `HGLRC`, for a shared context.
-    share_context: ?*anyopaque = null,
+    /// Your `HGLRC`.
+    share_context: ?*anyopaque,
     /// Your `wglGetProcAddress`, or null to use the system's.
     get_proc_address: ?*anyopaque = null,
     pub fn toNative(self: WglContextDescriptor) c.mln_wgl_context_descriptor {
@@ -9713,22 +10148,25 @@ pub const WglContextDescriptor = struct {
     }
 };
 
-/// A Win32 window to present to, for `Map.attachWin32Window()`.
+/// A Win32 window to present to.
 ///
-/// See `mln_win32_window_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-pub const Win32WindowDescriptor = struct {
+/// On an OpenGL device, the session sets the window's pixel format, so don't
+/// set one yourself. While the window is minimized, frame demands finish with
+/// `RenderResult.target_not_ready`.
+///
+/// See `mln_win32_window_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const Win32WindowTarget = struct {
     logical_size: LogicalSize,
     /// Your `HWND`.
     window: ?*anyopaque,
-    pub fn toNative(self: Win32WindowDescriptor) c.mln_win32_window_descriptor {
-        var raw = std.mem.zeroes(c.mln_win32_window_descriptor);
-        raw.size = @sizeOf(c.mln_win32_window_descriptor);
+    pub fn toNative(self: Win32WindowTarget) c.mln_win32_window_target {
+        var raw = std.mem.zeroes(c.mln_win32_window_target);
         raw.logical_size = self.logical_size.toNative();
         raw.window = self.window;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_win32_window_descriptor) Win32WindowDescriptor {
+    pub fn fromNative(raw: c.mln_win32_window_target) Win32WindowTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
             .window = raw.window,
@@ -9736,24 +10174,29 @@ pub const Win32WindowDescriptor = struct {
     }
 };
 
-/// A new Win32 window for `RenderSession.setWin32WindowTarget()`.
+/// An X11 window to present to, through Xlib.
 ///
-/// See `mln_win32_window_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-pub const Win32WindowReplacement = struct {
+/// Keep the display connected until the session's detach completes.
+///
+/// See `mln_xlib_window_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const XlibWindowTarget = struct {
     logical_size: LogicalSize,
-    /// Your `HWND`.
-    window: ?*anyopaque,
-    pub fn toNative(self: Win32WindowReplacement) c.mln_win32_window_replacement {
-        var raw = std.mem.zeroes(c.mln_win32_window_replacement);
-        raw.size = @sizeOf(c.mln_win32_window_replacement);
+    /// Your `Display*`.
+    display: ?*anyopaque,
+    /// Your `Window`, on `display`.
+    window: u64,
+    pub fn toNative(self: XlibWindowTarget) c.mln_xlib_window_target {
+        var raw = std.mem.zeroes(c.mln_xlib_window_target);
         raw.logical_size = self.logical_size.toNative();
+        raw.display = self.display;
         raw.window = self.window;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_win32_window_replacement) Win32WindowReplacement {
+    pub fn fromNative(raw: c.mln_xlib_window_target) XlibWindowTarget {
         return .{
             .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .display = raw.display,
             .window = raw.window,
         };
     }
@@ -9777,29 +10220,6 @@ pub const NewRenderSession = struct {
     ready: completion.Future(void),
 };
 
-/// Creates a frame pacer that follows the display through the calling thread's
-/// `AChoreographer`.
-///
-/// Call it on a thread with an `ALooper`, such as the app's main thread, and
-/// keep that thread running its looper while sessions use the pacer.
-///
-/// `AChoreographer` can stop while the phone's display is off, even while a
-/// Surface on another display, such as an Android Auto projection, still shows
-/// the map. The pacer then keeps demanding frames from a timer on the looper,
-/// within the frame rate limit, until vsyncs arrive again.
-///
-/// See `mln_android_frame_pacer_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-///
-/// Errors:
-///
-/// - `error.InvalidState` when the calling thread has no `ALooper`.
-pub const androidFramePacerCreate = if (builtin.abi.isAndroid()) struct {
-    fn function(options: ?FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!FramePacer {
-        return call.invoke("mln_android_frame_pacer_create", .none, {}, null, diagnostic, .{ options, call.adopt(FramePacer) });
-    }
-}.function else {};
-
 /// Gives the library the Java VM and the app context that it needs on Android.
 ///
 /// Call it before creating a runtime. `jni_env` is the calling thread's
@@ -9810,27 +10230,6 @@ pub const androidFramePacerCreate = if (builtin.abi.isAndroid()) struct {
 pub const initAndroid = if (builtin.abi.isAndroid()) struct {
     fn function(jni_env: ?*anyopaque, context: ?*anyopaque, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         return call.invoke("mln_android_init", .none, {}, null, diagnostic, .{ jni_env, context });
-    }
-}.function else {};
-
-/// Creates a frame pacer that follows the display through a `CADisplayLink`.
-///
-/// You can call it on any thread. The pacer needs no run loop of yours. On
-/// macOS, it follows the main display, the one with the menu bar.
-///
-/// With `FramePacerOptions.maximum_frames_per_second`, the pacer also asks the
-/// system for that refresh rate. On iPhone, a rate above 60 needs
-/// `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
-///
-/// See `mln_apple_frame_pacer_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
-///
-/// Errors:
-///
-/// - `error.NativeError` when the system has no display to follow.
-pub const appleFramePacerCreate = if (builtin.os.tag == .maccatalyst or builtin.os.tag == .macos) struct {
-    fn function(options: ?FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!FramePacer {
-        return call.invoke("mln_apple_frame_pacer_create", .none, {}, null, diagnostic, .{ options, call.adopt(FramePacer) });
     }
 }.function else {};
 
@@ -9938,24 +10337,6 @@ pub fn setNetworkStatus(status_input: NetworkStatus, diagnostic: ?*diagnostics.D
     return call.invoke("mln_network_set_status", .none, {}, null, diagnostic, .{status_input});
 }
 
-/// Creates a frame pacer that follows the display through OpenHarmony's
-/// `OH_NativeVSync`.
-///
-/// You can call it on any thread. The pacer needs no event loop of yours.
-///
-/// See `mln_ohos_frame_pacer_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
-///
-/// Errors:
-///
-/// - `error.NativeError` when the system can't report the display's refreshes
-///   to the process.
-pub const ohosFramePacerCreate = if (builtin.abi.isOpenHarmony()) struct {
-    fn function(options: ?FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!FramePacer {
-        return call.invoke("mln_ohos_frame_pacer_create", .none, {}, null, diagnostic, .{ options, call.adopt(FramePacer) });
-    }
-}.function else {};
-
 /// Reports the OpenGL context platforms that this build of the library has.
 ///
 /// See `mln_open_gl_supported_context_provider_mask` in the
@@ -9987,6 +10368,11 @@ pub const MapDiscarding = struct {
     pub fn addCustomGeometrySource(self: MapDiscarding, source_id: []const u8, options: CustomGeometrySourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_add_custom_geometry_source", .handle, map, null, diagnostic, .{ source_id, options });
+    }
+
+    pub fn addCustomLayer(self: MapDiscarding, layer_id: []const u8, before_layer_id: ?[]const u8, host: CustomLayerHost, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        const map = self.receiver;
+        return call.discard("mln_map_add_custom_layer", .handle, map, null, diagnostic, .{ layer_id, before_layer_id, host });
     }
 
     pub fn addCustomVectorSource(self: MapDiscarding, source_id: []const u8, options: CustomVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
@@ -10109,9 +10495,9 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_request_repaint", .handle, map, null, diagnostic, .{});
     }
 
-    pub fn resize(self: MapDiscarding, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn resize(self: MapDiscarding, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
-        return call.discard("mln_map_resize", .handle, map, null, diagnostic, .{logical_size});
+        return call.discard("mln_map_resize", .handle, map, null, diagnostic, .{extent});
     }
 
     pub fn setBounds(self: MapDiscarding, options: BoundOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
@@ -10267,9 +10653,9 @@ pub const MapDiscarding = struct {
 
 pub const RenderSessionDiscarding = struct {
     receiver: RenderSession,
-    pub fn resize(self: RenderSessionDiscarding, logical_size: LogicalSize, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    pub fn resize(self: RenderSessionDiscarding, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const session = self.receiver;
-        return call.discard("mln_render_session_resize", .handle, session, null, diagnostic, .{logical_size});
+        return call.discard("mln_render_session_resize", .handle, session, null, diagnostic, .{extent});
     }
 };
 

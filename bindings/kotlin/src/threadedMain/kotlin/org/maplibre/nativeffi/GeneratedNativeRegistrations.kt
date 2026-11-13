@@ -7,31 +7,6 @@ package org.maplibre.nativeffi
 import org.maplibre.nativeffi.internal.callback.NativeRegistration
 
 /**
- * Creates a `Wake` of the host's native functions, which the binding copies to native code
- * unchanged. Each function has the C type of the record field that it fills, and native code calls
- * each with `userData`. A null pointer leaves its field null.
- *
- * The first call that carries the registration consumes it. Native code calls `releaseUserData`
- * once it accepts the call. When native code does not accept the call, the binding calls
- * `releaseUserData` before the call returns or throws. A later call that carries the registration
- * throws an `IllegalStateException` before it calls native code.
- *
- * Only the JVM, Android, and Kotlin/Native declare this function, because a Kotlin/Wasm page has no
- * native functions of its own.
- *
- * See `mln_wake` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
- */
-public fun Wake.Companion.native(
-  callback: NativePointer,
-  userData: NativePointer = NativePointer.NULL_POINTER,
-  releaseUserData: NativePointer = NativePointer.NULL_POINTER,
-): Wake =
-  Wake.wrap(
-    NativeRegistration(longArrayOf(callback.address), userData.address, releaseUserData.address),
-  )
-
-/**
  * Creates a `QueueLock` of the host's native functions, which the binding copies to native code
  * unchanged. Each function has the C type of the record field that it fills, and native code calls
  * each with `userData`. A null pointer leaves its field null.
@@ -59,4 +34,61 @@ public fun QueueLock.Companion.native(
       userData.address,
       releaseUserData.address,
     ),
+  )
+
+/**
+ * Creates a `CustomLayerHost` of the host's native functions, which the binding copies to native
+ * code unchanged. Each function has the C type of the record field that it fills, and native code
+ * calls each with `userData`. A null pointer leaves its field null.
+ *
+ * The first call that carries the registration consumes it. Native code calls `releaseUserData`
+ * once it accepts the call. When native code does not accept the call, the binding calls
+ * `releaseUserData` before the call returns or throws. A later call that carries the registration
+ * throws an `IllegalStateException` before it calls native code.
+ *
+ * Only the JVM, Android, and Kotlin/Native declare this function, because a Kotlin/Wasm page has no
+ * native functions of its own.
+ *
+ * See `mln_custom_layer_host` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public fun CustomLayerHost.Companion.native(
+  prerender: NativePointer,
+  render: NativePointer,
+  deinitialize: NativePointer,
+  contextLost: NativePointer,
+  userData: NativePointer = NativePointer.NULL_POINTER,
+  releaseUserData: NativePointer = NativePointer.NULL_POINTER,
+): CustomLayerHost =
+  CustomLayerHost.wrap(
+    NativeRegistration(
+      longArrayOf(prerender.address, render.address, deinitialize.address, contextLost.address),
+      userData.address,
+      releaseUserData.address,
+    ),
+  )
+
+/**
+ * Creates a `Wake` of the host's native functions, which the binding copies to native code
+ * unchanged. Each function has the C type of the record field that it fills, and native code calls
+ * each with `userData`. A null pointer leaves its field null.
+ *
+ * The first call that carries the registration consumes it. Native code calls `releaseUserData`
+ * once it accepts the call. When native code does not accept the call, the binding calls
+ * `releaseUserData` before the call returns or throws. A later call that carries the registration
+ * throws an `IllegalStateException` before it calls native code.
+ *
+ * Only the JVM, Android, and Kotlin/Native declare this function, because a Kotlin/Wasm page has no
+ * native functions of its own.
+ *
+ * See `mln_wake` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
+ */
+public fun Wake.Companion.native(
+  callback: NativePointer,
+  userData: NativePointer = NativePointer.NULL_POINTER,
+  releaseUserData: NativePointer = NativePointer.NULL_POINTER,
+): Wake =
+  Wake.wrap(
+    NativeRegistration(longArrayOf(callback.address), userData.address, releaseUserData.address),
   )

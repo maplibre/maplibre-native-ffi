@@ -50,6 +50,14 @@ internal actual object UpcallStubs {
       mln_buffer_view,
       mln_canonical_tile_id,
     )
+  actual val customLayerHostPrerender: Long =
+    Ffm.upcall(Upcalls::class.java, "customLayerHostPrerender", null, JAVA_LONG, JAVA_LONG)
+  actual val customLayerHostRender: Long =
+    Ffm.upcall(Upcalls::class.java, "customLayerHostRender", null, JAVA_LONG, JAVA_LONG)
+  actual val customLayerHostDeinitialize: Long =
+    Ffm.upcall(Upcalls::class.java, "customLayerHostDeinitialize", null, JAVA_LONG)
+  actual val customLayerHostContextLost: Long =
+    Ffm.upcall(Upcalls::class.java, "customLayerHostContextLost", null, JAVA_LONG)
   actual val customVectorSourceOptionsFetchTile: Long =
     Ffm.upcall(
       Upcalls::class.java,
@@ -99,10 +107,10 @@ internal actual object UpcallStubs {
       mln_buffer_view,
       JAVA_LONG,
     )
-  actual val wakeCallback: Long = Ffm.upcall(Upcalls::class.java, "wakeCallback", null, JAVA_LONG)
   actual val queueLockLock: Long = Ffm.upcall(Upcalls::class.java, "queueLockLock", null, JAVA_LONG)
   actual val queueLockUnlock: Long =
     Ffm.upcall(Upcalls::class.java, "queueLockUnlock", null, JAVA_LONG)
+  actual val wakeCallback: Long = Ffm.upcall(Upcalls::class.java, "wakeCallback", null, JAVA_LONG)
   actual val cameraTransitionHandlerCallback: Long =
     Ffm.upcall(Upcalls::class.java, "cameraTransitionHandlerCallback", null, JAVA_LONG, JAVA_LONG)
 }

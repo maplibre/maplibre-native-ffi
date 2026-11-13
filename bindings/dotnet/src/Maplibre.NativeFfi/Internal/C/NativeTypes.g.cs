@@ -9,11 +9,11 @@ internal readonly record struct MlnDeliveryQueue(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnFramePacer(ulong Value) : IMlnHandle;
 
+internal readonly record struct MlnGpuDevice(ulong Value) : IMlnHandle;
+
 internal readonly record struct MlnMap(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnMapProjection(ulong Value) : IMlnHandle;
-
-internal readonly record struct MlnOffscreenDevice(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnRenderFrameBatch(ulong Value) : IMlnHandle;
 
@@ -26,8 +26,6 @@ internal readonly record struct MlnResourceTransformRequest(ulong Value) : IMlnH
 internal readonly record struct MlnRuntime(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnStyleExpression(ulong Value) : IMlnHandle;
-
-internal readonly record struct MlnVulkanDevice(ulong Value) : IMlnHandle;
 
 internal unsafe struct mln_anchored_momentum
 {
@@ -48,30 +46,10 @@ internal unsafe struct mln_android_hardware_buffer_frame
     public void* buffer;
 }
 
-internal unsafe struct mln_android_hardware_buffer_ring_descriptor
+internal unsafe struct mln_android_window_target
 {
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint buffer_count;
-    public ulong usage;
-}
-
-internal unsafe struct mln_android_surface_descriptor
-{
-    public uint size;
     public mln_logical_size logical_size;
     public void* window;
-    public void* jni_env;
-    public void* surface;
-}
-
-internal unsafe struct mln_android_surface_replacement
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public void* window;
-    public void* jni_env;
-    public void* surface;
 }
 
 internal unsafe struct mln_animation_options
@@ -268,6 +246,74 @@ internal unsafe struct mln_custom_geometry_source_options
     public MlnDeliveryQueue queue;
 }
 
+[StructLayout(LayoutKind.Explicit)]
+internal unsafe struct mln_custom_layer_encoder_data
+{
+    [FieldOffset(0)]
+    public mln_metal_custom_layer_encoder metal;
+
+    [FieldOffset(0)]
+    public mln_vulkan_custom_layer_encoder vulkan;
+
+    [FieldOffset(0)]
+    public mln_web_gpu_custom_layer_encoder web_gpu;
+}
+
+internal unsafe struct mln_custom_layer_frame
+{
+    public mln_map_view view;
+    public mln_frame_projection frame_projection;
+    public uint width;
+    public uint height;
+}
+
+internal unsafe struct mln_custom_layer_host
+{
+    public uint size;
+    public delegate* unmanaged[Cdecl]<
+        void*,
+        mln_custom_layer_prerender_parameters*,
+        void> prerender;
+    public delegate* unmanaged[Cdecl]<void*, mln_custom_layer_render_parameters*, void> render;
+    public delegate* unmanaged[Cdecl]<void*, void> deinitialize;
+    public delegate* unmanaged[Cdecl]<void*, void> context_lost;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+internal unsafe struct mln_custom_layer_pass_data
+{
+    [FieldOffset(0)]
+    public mln_metal_custom_layer_pass metal;
+
+    [FieldOffset(0)]
+    public mln_vulkan_custom_layer_pass vulkan;
+
+    [FieldOffset(0)]
+    public mln_open_gl_custom_layer_pass open_gl;
+
+    [FieldOffset(0)]
+    public mln_web_gpu_custom_layer_pass web_gpu;
+}
+
+internal unsafe struct mln_custom_layer_prerender_parameters
+{
+    public uint size;
+    public mln_render_backend backend;
+    public mln_custom_layer_encoder_data encoder;
+    public mln_custom_layer_frame frame;
+}
+
+internal unsafe struct mln_custom_layer_render_parameters
+{
+    public uint size;
+    public mln_render_backend backend;
+    public mln_custom_layer_pass_data pass;
+    public mln_custom_layer_frame frame;
+    public double layer_depth;
+}
+
 internal unsafe struct mln_custom_vector_source_options
 {
     public uint size;
@@ -329,15 +375,6 @@ internal unsafe struct mln_dma_buf_plane
     public uint stride;
 }
 
-internal unsafe struct mln_dma_buf_ring_descriptor
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint buffer_count;
-    public mln_dma_buf_format* formats;
-    public nuint format_count;
-}
-
 internal unsafe struct mln_dxgi_shared_texture_frame
 {
     public uint size;
@@ -347,13 +384,6 @@ internal unsafe struct mln_dxgi_shared_texture_frame
     public uint slot;
     public uint format;
     public void* handle;
-}
-
-internal unsafe struct mln_dxgi_shared_texture_ring_descriptor
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint texture_count;
 }
 
 internal unsafe struct mln_edge_insets
@@ -369,7 +399,6 @@ internal unsafe struct mln_egl_context_descriptor
     public void* display;
     public void* config;
     public void* share_context;
-    public mln_open_gl_client_api client_api;
     public void* get_proc_address;
 }
 
@@ -379,6 +408,16 @@ internal unsafe struct mln_event_batch_view
     public uint event_size;
     public mln_runtime_event* events;
     public nuint event_count;
+}
+
+internal unsafe struct mln_exported_ring_target
+{
+    public mln_logical_size logical_size;
+    public uint texture_count;
+    public uint export_kinds;
+    public mln_dma_buf_format* dma_buf_formats;
+    public nuint dma_buf_format_count;
+    public ulong android_hardware_buffer_usage;
 }
 
 internal unsafe struct mln_feature_id
@@ -427,6 +466,16 @@ internal unsafe struct mln_frame_pacer_options
     public uint maximum_frames_per_second;
 }
 
+internal unsafe struct mln_frame_projection
+{
+    public mln_mat4 matrix;
+    public mln_clip_depth_range clip_depth_range;
+    public double near_distance;
+    public double far_distance;
+    public double far_depth;
+    public byte globe;
+}
+
 internal unsafe struct mln_free_camera
 {
     public mln_vec3 position;
@@ -463,6 +512,36 @@ internal unsafe struct mln_gesture_momentum
     public mln_anchored_momentum zoom;
     public mln_anchored_momentum bearing;
     public mln_anchored_momentum pitch;
+}
+
+internal unsafe struct mln_gpu_device_capabilities
+{
+    public uint size;
+    public mln_render_backend backend;
+    public uint target_kinds;
+    public uint export_kinds;
+    public uint sync_kinds;
+    public uint depth_stencil_formats;
+    public uint depth_export_kinds;
+}
+
+internal unsafe struct mln_gpu_device_options
+{
+    public uint size;
+    public mln_gpu_device_option_field fields;
+    public mln_render_backend backend;
+    public uint adapter_index;
+    public mln_buffer_view adapter_uuid;
+    public mln_buffer_view adapter_luid;
+    public mln_open_gl_client_api open_gl_client_api;
+    public byte open_gl_single_context;
+    public mln_queue_lock queue_lock;
+}
+
+internal unsafe struct mln_gpu_device_vulkan_context_result
+{
+    public uint size;
+    public mln_vulkan_context_descriptor context;
 }
 
 internal unsafe struct mln_gpu_sync
@@ -532,14 +611,6 @@ internal unsafe struct mln_io_surface_frame
     public double scale_factor;
     public uint slot;
     public void* surface;
-}
-
-internal unsafe struct mln_io_surface_ring_descriptor
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint buffer_count;
-    public mln_metal_context_descriptor context;
 }
 
 internal unsafe struct mln_lat_lng
@@ -670,30 +741,28 @@ internal unsafe struct mln_map_viewport_options
     public mln_edge_insets frustum_offset;
 }
 
+internal unsafe struct mln_mat4
+{
+    public mln_vec4 x;
+    public mln_vec4 y;
+    public mln_vec4 z;
+    public mln_vec4 w;
+}
+
 internal unsafe struct mln_metal_borrowed_texture
 {
     public void* texture;
 }
 
-internal unsafe struct mln_metal_borrowed_texture_descriptor
+internal unsafe struct mln_metal_borrowed_textures_target
 {
-    public uint size;
     public mln_logical_size logical_size;
     public uint physical_width;
     public uint physical_height;
     public mln_metal_borrowed_texture* textures;
     public nuint texture_count;
-    public void* command_queue;
-}
-
-internal unsafe struct mln_metal_borrowed_texture_replacement
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint physical_width;
-    public uint physical_height;
-    public mln_metal_borrowed_texture* textures;
-    public nuint texture_count;
+    public mln_metal_borrowed_texture* depth_textures;
+    public nuint depth_texture_count;
 }
 
 internal unsafe struct mln_metal_context_descriptor
@@ -701,17 +770,30 @@ internal unsafe struct mln_metal_context_descriptor
     public void* device;
 }
 
-internal unsafe struct mln_metal_surface_descriptor
+internal unsafe struct mln_metal_custom_layer_encoder
 {
-    public uint size;
-    public mln_logical_size logical_size;
-    public mln_metal_context_descriptor context;
-    public void* layer;
+    public void* command_buffer;
 }
 
-internal unsafe struct mln_metal_surface_replacement
+internal unsafe struct mln_metal_custom_layer_pass
+{
+    public void* encoder;
+    public void* command_buffer;
+    public ulong color_format;
+    public ulong depth_format;
+    public ulong stencil_format;
+    public uint sample_count;
+}
+
+internal unsafe struct mln_metal_device_descriptor
 {
     public uint size;
+    public void* device;
+    public void* command_queue;
+}
+
+internal unsafe struct mln_metal_layer_target
+{
     public mln_logical_size logical_size;
     public void* layer;
 }
@@ -726,6 +808,8 @@ internal unsafe struct mln_metal_texture_frame
     public void* texture;
     public void* device;
     public ulong pixel_format;
+    public void* depth_texture;
+    public ulong depth_pixel_format;
 }
 
 internal unsafe struct mln_momentum_decay
@@ -809,35 +893,32 @@ internal unsafe struct mln_offline_tile_pyramid_region_definition
     public byte include_ideographs;
 }
 
-internal unsafe struct mln_offscreen_descriptor
+internal unsafe struct mln_offscreen_target
 {
-    public uint size;
     public mln_logical_size logical_size;
 }
 
-internal unsafe struct mln_offscreen_device_options
+internal unsafe struct mln_ohos_window_target
 {
-    public uint size;
-    public mln_offscreen_device_option_field fields;
-    public uint adapter_index;
-    public byte single_context;
-    public mln_open_gl_client_api client_api;
-}
-
-internal unsafe struct mln_ohos_surface_descriptor
-{
-    public uint size;
     public mln_logical_size logical_size;
     public void* window;
-    public ulong surface_id;
 }
 
-internal unsafe struct mln_ohos_surface_replacement
+internal unsafe struct mln_opaque_fd_frame
 {
     public uint size;
-    public mln_logical_size logical_size;
-    public void* window;
-    public ulong surface_id;
+    public uint width;
+    public uint height;
+    public double scale_factor;
+    public uint slot;
+    public int fd;
+    public ulong allocation_size;
+    public byte dedicated;
+    public uint format;
+    public int depth_fd;
+    public ulong depth_allocation_size;
+    public byte depth_dedicated;
+    public uint depth_format;
 }
 
 internal unsafe struct mln_open_gl_borrowed_texture
@@ -845,32 +926,21 @@ internal unsafe struct mln_open_gl_borrowed_texture
     public uint texture;
 }
 
-internal unsafe struct mln_open_gl_borrowed_texture_descriptor
+internal unsafe struct mln_open_gl_borrowed_textures_target
 {
-    public uint size;
     public mln_logical_size logical_size;
     public uint physical_width;
     public uint physical_height;
-    public mln_open_gl_context_descriptor context;
     public mln_open_gl_borrowed_texture* textures;
     public nuint texture_count;
     public uint target;
-}
-
-internal unsafe struct mln_open_gl_borrowed_texture_replacement
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint physical_width;
-    public uint physical_height;
-    public mln_open_gl_borrowed_texture* textures;
-    public nuint texture_count;
+    public mln_open_gl_borrowed_texture* depth_textures;
+    public nuint depth_texture_count;
 }
 
 internal unsafe struct mln_open_gl_context_descriptor
 {
     public mln_open_gl_context_platform platform;
-    public mln_open_gl_context_ownership ownership;
     public mln_open_gl_context_descriptor_data data;
 }
 
@@ -887,17 +957,13 @@ internal unsafe struct mln_open_gl_context_descriptor_data
     public mln_web_gl_context_descriptor web_gl;
 }
 
-internal unsafe struct mln_open_gl_surface_descriptor
+internal unsafe struct mln_open_gl_custom_layer_pass
 {
-    public uint size;
-    public mln_logical_size logical_size;
-    public mln_open_gl_context_descriptor context;
-    public void* surface;
+    public uint framebuffer;
 }
 
-internal unsafe struct mln_open_gl_surface_replacement
+internal unsafe struct mln_open_gl_surface_target
 {
-    public uint size;
     public mln_logical_size logical_size;
     public void* surface;
 }
@@ -911,6 +977,8 @@ internal unsafe struct mln_open_gl_texture_frame
     public uint slot;
     public uint texture;
     public uint target;
+    public uint depth_texture;
+    public uint depth_internal_format;
 }
 
 internal unsafe struct mln_pan_momentum
@@ -1001,6 +1069,7 @@ internal unsafe struct mln_render_frame_result
     public ulong frame_generation;
     public byte needs_repaint;
     public mln_map_view view;
+    public mln_frame_projection frame_projection;
     public mln_render_mode mode;
 }
 
@@ -1012,7 +1081,7 @@ internal unsafe struct mln_render_session_attach_options
     public mln_wake frame_wake;
     public mln_wake redraw_wake;
     public mln_wake driver_work_wake;
-    public mln_queue_lock queue_lock;
+    public byte keep_depth;
 }
 
 internal unsafe struct mln_render_session_capabilities
@@ -1023,6 +1092,7 @@ internal unsafe struct mln_render_session_capabilities
     public uint flags;
     public mln_gpu_sync_kind producer_sync_kind;
     public uint consumer_sync_kinds;
+    public mln_gpu_export_kind export_kind;
 }
 
 internal unsafe struct mln_render_session_snapshot
@@ -1035,6 +1105,62 @@ internal unsafe struct mln_render_session_snapshot
     public uint acquired_frame_count;
     public mln_status failure_status;
     public byte has_target;
+}
+
+internal unsafe struct mln_render_target
+{
+    public uint size;
+    public mln_render_target_kind kind;
+    public mln_render_target_data data;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+internal unsafe struct mln_render_target_data
+{
+    [FieldOffset(0)]
+    public mln_offscreen_target offscreen;
+
+    [FieldOffset(0)]
+    public mln_metal_layer_target metal_layer;
+
+    [FieldOffset(0)]
+    public mln_win32_window_target win32_window;
+
+    [FieldOffset(0)]
+    public mln_xlib_window_target xlib_window;
+
+    [FieldOffset(0)]
+    public mln_wayland_surface_target wayland_surface;
+
+    [FieldOffset(0)]
+    public mln_android_window_target android_window;
+
+    [FieldOffset(0)]
+    public mln_ohos_window_target ohos_window;
+
+    [FieldOffset(0)]
+    public mln_vulkan_surface_target vulkan_surface;
+
+    [FieldOffset(0)]
+    public mln_open_gl_surface_target open_gl_surface;
+
+    [FieldOffset(0)]
+    public mln_metal_borrowed_textures_target metal_borrowed_textures;
+
+    [FieldOffset(0)]
+    public mln_vulkan_borrowed_textures_target vulkan_borrowed_textures;
+
+    [FieldOffset(0)]
+    public mln_open_gl_borrowed_textures_target open_gl_borrowed_textures;
+
+    [FieldOffset(0)]
+    public mln_web_gpu_borrowed_textures_target web_gpu_borrowed_textures;
+
+    [FieldOffset(0)]
+    public mln_exported_ring_target exported_ring;
+
+    [FieldOffset(0)]
+    public mln_web_canvas_target web_canvas;
 }
 
 internal unsafe struct mln_rendered_feature
@@ -1244,12 +1370,6 @@ internal unsafe struct mln_runtime_event_offline_region_status
     public mln_offline_region_status status;
 }
 
-internal unsafe struct mln_runtime_event_offline_region_tile_count_limit
-{
-    public long region_id;
-    public ulong limit;
-}
-
 [StructLayout(LayoutKind.Explicit)]
 internal unsafe struct mln_runtime_event_payload
 {
@@ -1276,9 +1396,6 @@ internal unsafe struct mln_runtime_event_payload
 
     [FieldOffset(0)]
     public mln_runtime_event_offline_region_response_error offline_region_response_error;
-
-    [FieldOffset(0)]
-    public mln_runtime_event_offline_region_tile_count_limit offline_region_tile_count_limit;
 
     [FieldOffset(0)]
     public mln_runtime_event_glyphs glyphs;
@@ -1516,34 +1633,34 @@ internal unsafe struct mln_vec3
     public double z;
 }
 
+internal unsafe struct mln_vec4
+{
+    public double x;
+    public double y;
+    public double z;
+    public double w;
+}
+
 internal unsafe struct mln_vulkan_borrowed_texture
 {
     public ulong image;
     public ulong image_view;
 }
 
-internal unsafe struct mln_vulkan_borrowed_texture_descriptor
+internal unsafe struct mln_vulkan_borrowed_textures_target
 {
-    public uint size;
     public mln_logical_size logical_size;
     public uint physical_width;
     public uint physical_height;
-    public mln_vulkan_context_descriptor context;
     public mln_vulkan_borrowed_texture* textures;
     public nuint texture_count;
     public uint format;
     public uint final_layout;
     public mln_vulkan_image_owner owner;
-}
-
-internal unsafe struct mln_vulkan_borrowed_texture_replacement
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint physical_width;
-    public uint physical_height;
-    public mln_vulkan_borrowed_texture* textures;
-    public nuint texture_count;
+    public mln_vulkan_borrowed_texture* depth_textures;
+    public nuint depth_texture_count;
+    public uint depth_format;
+    public uint depth_final_layout;
 }
 
 internal unsafe struct mln_vulkan_context_descriptor
@@ -1557,32 +1674,34 @@ internal unsafe struct mln_vulkan_context_descriptor
     public void* get_device_proc_addr;
 }
 
-internal unsafe struct mln_vulkan_device_context_result
+internal unsafe struct mln_vulkan_custom_layer_encoder
+{
+    public mln_vulkan_context_descriptor context;
+    public void* command_buffer;
+}
+
+internal unsafe struct mln_vulkan_custom_layer_pass
+{
+    public mln_vulkan_context_descriptor context;
+    public void* command_buffer;
+    public ulong render_pass;
+    public uint subpass;
+    public uint sample_count;
+    public uint color_format;
+    public uint depth_stencil_format;
+}
+
+internal unsafe struct mln_vulkan_device_descriptor
 {
     public uint size;
     public mln_vulkan_context_descriptor context;
+    public mln_queue_lock queue_lock;
+    public mln_buffer_view* enabled_extensions;
+    public nuint enabled_extension_count;
 }
 
-internal unsafe struct mln_vulkan_device_options
+internal unsafe struct mln_vulkan_surface_target
 {
-    public uint size;
-    public mln_vulkan_device_option_field fields;
-    public byte presentation;
-    public mln_buffer_view device_uuid;
-    public mln_buffer_view device_luid;
-}
-
-internal unsafe struct mln_vulkan_surface_descriptor
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public mln_vulkan_context_descriptor context;
-    public ulong surface;
-}
-
-internal unsafe struct mln_vulkan_surface_replacement
-{
-    public uint size;
     public mln_logical_size logical_size;
     public ulong surface;
 }
@@ -1599,6 +1718,10 @@ internal unsafe struct mln_vulkan_texture_frame
     public void* device;
     public uint format;
     public uint layout;
+    public ulong depth_image;
+    public ulong depth_image_view;
+    public uint depth_format;
+    public uint depth_layout;
 }
 
 internal unsafe struct mln_wake
@@ -1609,19 +1732,18 @@ internal unsafe struct mln_wake
     public MlnDeliveryQueue queue;
 }
 
-internal unsafe struct mln_wayland_surface_descriptor
+internal unsafe struct mln_wayland_surface_target
 {
-    public uint size;
     public mln_logical_size logical_size;
     public void* display;
     public void* surface;
 }
 
-internal unsafe struct mln_wayland_surface_replacement
+internal unsafe struct mln_web_canvas_target
 {
-    public uint size;
     public mln_logical_size logical_size;
-    public void* surface;
+    public uint canvas;
+    public mln_buffer_view format;
 }
 
 internal unsafe struct mln_web_gl_context_descriptor
@@ -1634,26 +1756,17 @@ internal unsafe struct mln_web_gpu_borrowed_texture
     public uint texture;
 }
 
-internal unsafe struct mln_web_gpu_borrowed_texture_descriptor
+internal unsafe struct mln_web_gpu_borrowed_textures_target
 {
-    public uint size;
     public mln_logical_size logical_size;
     public uint physical_width;
     public uint physical_height;
-    public mln_web_gpu_context_descriptor context;
     public mln_web_gpu_borrowed_texture* textures;
     public nuint texture_count;
     public mln_buffer_view format;
-}
-
-internal unsafe struct mln_web_gpu_borrowed_texture_replacement
-{
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint physical_width;
-    public uint physical_height;
-    public mln_web_gpu_borrowed_texture* textures;
-    public nuint texture_count;
+    public mln_web_gpu_borrowed_texture* depth_textures;
+    public nuint depth_texture_count;
+    public mln_buffer_view depth_format;
 }
 
 internal unsafe struct mln_web_gpu_context_descriptor
@@ -1661,20 +1774,19 @@ internal unsafe struct mln_web_gpu_context_descriptor
     public uint device;
 }
 
-internal unsafe struct mln_web_gpu_surface_descriptor
+internal unsafe struct mln_web_gpu_custom_layer_encoder
 {
-    public uint size;
-    public mln_logical_size logical_size;
-    public mln_web_gpu_context_descriptor context;
-    public uint canvas;
-    public mln_buffer_view format;
+    public uint device;
+    public uint encoder;
 }
 
-internal unsafe struct mln_web_gpu_surface_replacement
+internal unsafe struct mln_web_gpu_custom_layer_pass
 {
-    public uint size;
-    public mln_logical_size logical_size;
-    public uint canvas;
+    public uint device;
+    public uint encoder;
+    public mln_buffer_view color_format;
+    public mln_buffer_view depth_stencil_format;
+    public uint sample_count;
 }
 
 internal unsafe struct mln_web_gpu_texture_frame
@@ -1687,6 +1799,8 @@ internal unsafe struct mln_web_gpu_texture_frame
     public uint texture;
     public uint device;
     public mln_buffer_view format;
+    public uint depth_texture;
+    public mln_buffer_view depth_format;
 }
 
 internal unsafe struct mln_wgl_context_descriptor
@@ -1696,18 +1810,17 @@ internal unsafe struct mln_wgl_context_descriptor
     public void* get_proc_address;
 }
 
-internal unsafe struct mln_win32_window_descriptor
+internal unsafe struct mln_win32_window_target
 {
-    public uint size;
     public mln_logical_size logical_size;
     public void* window;
 }
 
-internal unsafe struct mln_win32_window_replacement
+internal unsafe struct mln_xlib_window_target
 {
-    public uint size;
     public mln_logical_size logical_size;
-    public void* window;
+    public void* display;
+    public ulong window;
 }
 
 internal enum mln_anchored_momentum_field : uint
@@ -1803,6 +1916,12 @@ internal enum mln_camera_update_mode : uint
     MLN_CAMERA_UPDATE_MODE_FLY = 2,
 }
 
+internal enum mln_clip_depth_range : uint
+{
+    MLN_CLIP_DEPTH_RANGE_ZERO_TO_ONE = 1,
+    MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE = 2,
+}
+
 internal enum mln_constrain_mode : uint
 {
     MLN_CONSTRAIN_MODE_NONE = 0,
@@ -1828,6 +1947,12 @@ internal enum mln_custom_vector_source_option_field : uint
     MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2,
 }
 
+internal enum mln_depth_stencil_format_flag : uint
+{
+    MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8 = 1,
+    MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8 = 2,
+}
+
 internal enum mln_feature_id_type : uint
 {
     MLN_FEATURE_ID_TYPE_STRING = 1,
@@ -1850,6 +1975,7 @@ internal enum mln_frame_demand_flag : uint
 internal enum mln_frame_pacer_option_field : uint
 {
     MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1,
+    MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND = 2,
 }
 
 internal enum mln_free_camera_option_field : uint
@@ -1878,6 +2004,35 @@ internal enum mln_gesture_phase : uint
     MLN_GESTURE_PHASE_UPDATE = 2,
     MLN_GESTURE_PHASE_END = 3,
     MLN_GESTURE_PHASE_CANCEL = 4,
+}
+
+internal enum mln_gpu_device_option_field : uint
+{
+    MLN_GPU_DEVICE_OPTION_BACKEND = 1,
+    MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX = 2,
+    MLN_GPU_DEVICE_OPTION_ADAPTER_UUID = 4,
+    MLN_GPU_DEVICE_OPTION_ADAPTER_LUID = 8,
+    MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API = 16,
+    MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT = 32,
+}
+
+internal enum mln_gpu_export_kind : uint
+{
+    MLN_GPU_EXPORT_KIND_NONE = 0,
+    MLN_GPU_EXPORT_KIND_IO_SURFACE = 1,
+    MLN_GPU_EXPORT_KIND_DMA_BUF = 2,
+    MLN_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER = 3,
+    MLN_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE = 4,
+    MLN_GPU_EXPORT_KIND_OPAQUE_FD = 5,
+}
+
+internal enum mln_gpu_export_kind_flag : uint
+{
+    MLN_GPU_EXPORT_KIND_FLAG_IO_SURFACE = 1,
+    MLN_GPU_EXPORT_KIND_FLAG_DMA_BUF = 2,
+    MLN_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER = 4,
+    MLN_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE = 8,
+    MLN_GPU_EXPORT_KIND_FLAG_OPAQUE_FD = 16,
 }
 
 internal enum mln_gpu_sync_kind : uint
@@ -2041,24 +2196,11 @@ internal enum mln_offline_region_download_state : uint
     MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
 }
 
-internal enum mln_offscreen_device_option_field : uint
-{
-    MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX = 1,
-    MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT = 2,
-    MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API = 4,
-}
-
 internal enum mln_open_gl_client_api : uint
 {
     MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0,
     MLN_OPEN_GL_CLIENT_API_GL = 1,
     MLN_OPEN_GL_CLIENT_API_GLES = 2,
-}
-
-internal enum mln_open_gl_context_ownership : uint
-{
-    MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0,
-    MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1,
 }
 
 internal enum mln_open_gl_context_platform : uint
@@ -2099,6 +2241,14 @@ internal enum mln_render_abandon_disposition : uint
 {
     MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0,
     MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1,
+}
+
+internal enum mln_render_backend : uint
+{
+    MLN_RENDER_BACKEND_METAL = 1,
+    MLN_RENDER_BACKEND_VULKAN = 2,
+    MLN_RENDER_BACKEND_OPEN_GL = 3,
+    MLN_RENDER_BACKEND_WEB_GPU = 4,
 }
 
 internal enum mln_render_backend_flag : uint
@@ -2145,6 +2295,44 @@ internal enum mln_render_session_state : uint
     MLN_RENDER_SESSION_STATE_DETACHED = 4,
     MLN_RENDER_SESSION_STATE_FAILED = 5,
     MLN_RENDER_SESSION_STATE_ABANDONED = 6,
+}
+
+internal enum mln_render_target_kind : uint
+{
+    MLN_RENDER_TARGET_KIND_OFFSCREEN = 1,
+    MLN_RENDER_TARGET_KIND_METAL_LAYER = 2,
+    MLN_RENDER_TARGET_KIND_WIN32_WINDOW = 3,
+    MLN_RENDER_TARGET_KIND_XLIB_WINDOW = 4,
+    MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE = 5,
+    MLN_RENDER_TARGET_KIND_ANDROID_WINDOW = 6,
+    MLN_RENDER_TARGET_KIND_OHOS_WINDOW = 7,
+    MLN_RENDER_TARGET_KIND_VULKAN_SURFACE = 10,
+    MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE = 11,
+    MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES = 12,
+    MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES = 13,
+    MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES = 14,
+    MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES = 15,
+    MLN_RENDER_TARGET_KIND_EXPORTED_RING = 16,
+    MLN_RENDER_TARGET_KIND_WEB_CANVAS = 17,
+}
+
+internal enum mln_render_target_kind_flag : uint
+{
+    MLN_RENDER_TARGET_KIND_FLAG_OFFSCREEN = 1,
+    MLN_RENDER_TARGET_KIND_FLAG_METAL_LAYER = 2,
+    MLN_RENDER_TARGET_KIND_FLAG_WIN32_WINDOW = 4,
+    MLN_RENDER_TARGET_KIND_FLAG_XLIB_WINDOW = 8,
+    MLN_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE = 16,
+    MLN_RENDER_TARGET_KIND_FLAG_ANDROID_WINDOW = 32,
+    MLN_RENDER_TARGET_KIND_FLAG_OHOS_WINDOW = 64,
+    MLN_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE = 512,
+    MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_SURFACE = 1024,
+    MLN_RENDER_TARGET_KIND_FLAG_METAL_BORROWED_TEXTURES = 2048,
+    MLN_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES = 4096,
+    MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES = 8192,
+    MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 16384,
+    MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 32768,
+    MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS = 65536,
 }
 
 internal enum mln_rendered_feature_query_option_field : uint
@@ -2266,16 +2454,15 @@ internal enum mln_runtime_event_flag : ulong
     MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED = 65536,
     MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED = 131072,
     MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 262144,
-    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288,
-    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 1048576,
-    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 2097152,
-    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 4194304,
-    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 8388608,
-    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 16777216,
-    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 33554432,
-    MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 66191358,
-    MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 917504,
-    MLN_RUNTIME_EVENT_FLAG_ALL = 67108862,
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 524288,
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 1048576,
+    MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 2097152,
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 4194304,
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 8388608,
+    MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 16777216,
+    MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 33161214,
+    MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 393216,
+    MLN_RUNTIME_EVENT_FLAG_ALL = 33554430,
 }
 
 internal enum mln_runtime_event_payload_type : uint
@@ -2289,9 +2476,8 @@ internal enum mln_runtime_event_payload_type : uint
     MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED = 6,
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 7,
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 8,
-    MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 9,
-    MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 10,
-    MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 11,
+    MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 9,
+    MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 10,
 }
 
 internal enum mln_runtime_event_source_type : uint
@@ -2320,13 +2506,12 @@ internal enum mln_runtime_event_type : uint
     MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16,
     MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
     MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
-    MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
-    MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
-    MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
-    MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22,
-    MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23,
-    MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24,
-    MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 19,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 20,
+    MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 21,
+    MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 22,
+    MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 23,
+    MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 24,
 }
 
 internal enum mln_source_feature_query_option_field : uint
@@ -2484,13 +2669,6 @@ internal enum mln_viewport_mode : uint
 {
     MLN_VIEWPORT_MODE_DEFAULT = 0,
     MLN_VIEWPORT_MODE_FLIPPED_Y = 1,
-}
-
-internal enum mln_vulkan_device_option_field : uint
-{
-    MLN_VULKAN_DEVICE_OPTION_PRESENTATION = 1,
-    MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID = 2,
-    MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID = 4,
 }
 
 internal enum mln_vulkan_image_owner : uint

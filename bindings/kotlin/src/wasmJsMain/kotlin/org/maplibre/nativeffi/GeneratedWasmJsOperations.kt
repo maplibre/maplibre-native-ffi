@@ -22,10 +22,29 @@ public fun <T> AcquiredFrameHandle.withWebGpuTexture(block: (WebGpuTextureFrame)
       { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
       { C.mln_acquired_frame_view_end(it) },
     ) { scope ->
-      val out = sized(w(48, 56, 40), w(8, 8, 4))
+      val out = sized(w(56, 80, 52), w(8, 8, 4))
       check(C.mln_acquired_frame_get_web_gpu_texture(handle, out, diagnostic))
       block(readWebGpuTextureFrame(out, scope))
     }
+  }
+
+/**
+ * Wraps your WebGPU device, so that sessions render on it, into your textures and your canvases.
+ *
+ * See `mln_gpu_device_wrap_web_gpu` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` in every build: the library's WebGPU (wgpu) can't wrap a `GPUDevice` yet
+ *   (https://github.com/louwers/mln-rs/issues/263). Attach a web canvas target without a device,
+ *   and the session asks the browser for one.
+ */
+public fun GpuDeviceHandle.Companion.wrapWebGpu(context: WebGpuContextDescriptor): GpuDeviceHandle =
+  nativeCall(null, null) {
+    val out = allocate(8, w(8, 8, 4))
+    check(C.mln_gpu_device_wrap_web_gpu(writeWebGpuContextDescriptor(context), out, diagnostic))
+    adopt(out, GeneratedOwnerDisposal::gpuDevice) { GpuDeviceHandle.wrap(it) }
   }
 
 /**
@@ -61,120 +80,3 @@ public fun webFree(pointer: NativePointer, size: ULong, align: ULong): Unit =
  */
 public fun webObjectRelease(`object`: UInt): Unit =
   nativeCall(null, null) { C.mln_web_object_release(`object`.toInt()) }
-
-/**
- * Creates a session that renders the map into a ring of your WebGPU textures.
- *
- * See `mln_map_attach_web_gpu_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.WEB_GPU`, or
- *   when the target supports none of the `producer_sync_kinds` in `options`.
- */
-public fun MapHandle.attachWebGpuBorrowedTexture(
-  descriptor: WebGpuBorrowedTextureDescriptor,
-  options: RenderSessionAttachOptions,
-): RenderSessionHandle =
-  nativeCall(this, binding) {
-    attach(
-      { out, completion ->
-        C.mln_map_attach_web_gpu_borrowed_texture(
-          handle,
-          writeWebGpuBorrowedTextureDescriptor(descriptor),
-          writeRenderSessionAttachOptions(options),
-          out,
-          completion,
-          diagnostic,
-        )
-      },
-      GeneratedOwnerDisposal::renderSession,
-      { created, ready ->
-        RenderSessionHandle.wrap(created, this@attachWebGpuBorrowedTexture, ready)
-      },
-      { it.bindingCallbacks },
-      { it.dispose() },
-    )
-  }
-
-/**
- * Creates a session that renders the map to a WebGPU surface.
- *
- * See `mln_map_attach_web_gpu_surface` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.WEB_GPU`.
- */
-public fun MapHandle.attachWebGpuSurface(
-  descriptor: WebGpuSurfaceDescriptor,
-  options: RenderSessionAttachOptions,
-): RenderSessionHandle =
-  nativeCall(this, binding) {
-    attach(
-      { out, completion ->
-        C.mln_map_attach_web_gpu_surface(
-          handle,
-          writeWebGpuSurfaceDescriptor(descriptor),
-          writeRenderSessionAttachOptions(options),
-          out,
-          completion,
-          diagnostic,
-        )
-      },
-      GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle.wrap(created, this@attachWebGpuSurface, ready) },
-      { it.bindingCallbacks },
-      { it.dispose() },
-    )
-  }
-
-/**
- * Replaces the WebGPU textures that a borrowed ring renders into.
- *
- * Use it to resize the ring, or to give the session textures again after
- * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
- * completes, the session no longer uses the old textures.
- *
- * See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public fun RenderSessionHandle.setWebGpuBorrowedTextureTarget(
-  replacement: WebGpuBorrowedTextureReplacement,
-): Completion<Unit> =
-  nativeUnit(this, binding) {
-    check(
-      C.mln_render_session_set_web_gpu_borrowed_texture_target(
-        handle,
-        writeWebGpuBorrowedTextureReplacement(replacement),
-        completion,
-        diagnostic,
-      ),
-    )
-  }
-
-/**
- * Replaces the WebGPU surface that the session presents to.
- *
- * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
- * it to another surface, or to resize it. Once the replacement completes, the session no longer
- * uses the old surface.
- *
- * See `mln_render_session_set_web_gpu_surface_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public fun RenderSessionHandle.setWebGpuSurfaceTarget(
-  replacement: WebGpuSurfaceReplacement,
-): Completion<Unit> =
-  nativeUnit(this, binding) {
-    check(
-      C.mln_render_session_set_web_gpu_surface_target(
-        handle,
-        writeWebGpuSurfaceReplacement(replacement),
-        completion,
-        diagnostic,
-      ),
-    )
-  }
