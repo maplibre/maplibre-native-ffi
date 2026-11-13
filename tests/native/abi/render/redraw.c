@@ -86,7 +86,6 @@ static void a_change_asks_for_one_redraw_until_the_next_demand(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(__EMSCRIPTEN__)
 static void a_session_without_a_target_asks_for_no_redraw(void) {
   atomic_store(&redraws, 0);
   mln_runtime runtime = mln_test_create_runtime();
@@ -129,11 +128,8 @@ static void a_session_without_a_target_asks_for_no_redraw(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
-#endif
 
 MLN_TEST_GROUP {
   RUN_TEST(a_change_asks_for_one_redraw_until_the_next_demand);
-#if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_session_without_a_target_asks_for_no_redraw);
-#endif
 }

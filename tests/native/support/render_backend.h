@@ -1,9 +1,8 @@
 #ifndef MLN_NATIVE_TESTS_RENDER_BACKEND_H
 #define MLN_NATIVE_TESTS_RENDER_BACKEND_H
 
-// What the preset's backend file, render_graphics.c on native targets or a
-// browser file, provides to render.c, and what render.c shares with it. Only
-// the support layer includes this header.
+// What the preset's backend file, render_graphics.c, provides to render.c, and
+// what render.c shares with it. Only the support layer includes this header.
 
 #include <stdbool.h>
 #include <stddef.h>

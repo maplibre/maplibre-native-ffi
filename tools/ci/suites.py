@@ -82,8 +82,8 @@ def binding_command(binding: str, target: Target) -> list[str]:
         else:
             action = "test:jvm" if runnable else "build:jvm"
     elif binding == "kotlin-native":
-        if platform == "emscripten":
-            action = "test:wasm" if runnable else "wasm-module"
+        if platform == "web":
+            action = "test:wasm" if runnable else "build"
         elif runnable:
             action = "test:native"
         elif platform in {"ios", "tvos"}:
@@ -138,7 +138,7 @@ def consumer_commands(target: Target) -> list[list[str]]:
             }.get(binding)
         elif target.preset == "macos-arm64-metal" and binding == "go":
             extra = "//bindings/go:test:package"
-        elif target.preset == "emscripten-wasm32-webgl" and binding == "kotlin-native":
+        elif target.preset == "web-wasm32-webgl" and binding == "kotlin-native":
             extra = "//bindings/kotlin:test:wasm-canary"
         if extra and gaps.supported(binding, target, "test"):
             commands.append(["mise", "run", extra, target.preset])

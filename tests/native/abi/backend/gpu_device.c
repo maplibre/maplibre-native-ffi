@@ -61,12 +61,10 @@ static void create_rejects_malformed_options(void) {
   MLN_TEST_INVALID(mln_gpu_device_get_capabilities(
     MLN_HANDLE_NULL, &capabilities, MLN_TEST_DIAGNOSTIC
   ));
-#if !defined(__EMSCRIPTEN__)
   mln_gpu_device_vulkan_context_result result = {.size = sizeof(result)};
   MLN_TEST_INVALID(mln_gpu_device_get_vulkan_context(
     MLN_HANDLE_NULL, &result, MLN_TEST_DIAGNOSTIC
   ));
-#endif
   mln_gpu_device_release(MLN_HANDLE_NULL);
 }
 
@@ -121,7 +119,6 @@ static void create_reports_each_backend_that_the_build_lacks(void) {
   }
 }
 
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 static mln_gpu_device create_device(const mln_gpu_device_options* options) {
   mln_gpu_device device = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_gpu_device_create(options, &device, MLN_TEST_DIAGNOSTIC));
@@ -216,7 +213,6 @@ static void create_reports_an_unusable_client_api(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
 }
-#endif
 #endif
 
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -467,12 +463,10 @@ MLN_TEST_GROUP {
   RUN_TEST(create_rejects_malformed_options);
   RUN_TEST(create_reports_each_backend_that_the_build_lacks);
   RUN_TEST(wrap_web_gpu_rejects_malformed_contexts);
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   RUN_TEST(a_device_reports_its_backend_and_renders_offscreen);
   RUN_TEST(create_reports_a_missing_adapter);
 #if !defined(MLN_FFI_TEST_OPENGL_EGL)
   RUN_TEST(create_reports_an_unusable_client_api);
-#endif
 #endif
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
   RUN_TEST(a_session_renders_with_the_device_context);

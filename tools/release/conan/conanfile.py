@@ -8,7 +8,6 @@ mode do not rebuild it.
 
 import json
 import os
-import shlex
 from typing import ClassVar
 
 from conan import ConanFile
@@ -44,14 +43,12 @@ class MaplibreNativeC(ConanFile):
             "iOS": "ios",
             "tvOS": "tvos",
             "visionOS": "visionos",
-            "Emscripten": "emscripten",
         }
         architectures = {
             "x86": "x86",
             "x86_64": "x64",
             "armv8": "arm64",
             "armv7": "arm",
-            "wasm": "wasm32",
         }
         platform = platforms.get(str(self.settings.os))
         arch = architectures.get(str(self.settings.arch))
@@ -72,13 +69,9 @@ class MaplibreNativeC(ConanFile):
                 backend = "metal"
             elif self.settings.os in ("Linux", "Windows", "FreeBSD"):
                 backend = "vulkan"
-            elif self.settings.os == "Emscripten":
-                backend = "webgpu"
             else:
                 backend = "opengl"
-        suffix = {"Windows": "wgl", "Emscripten": "webgl"}.get(
-            str(self.settings.os), "egl"
-        )
+        suffix = {"Windows": "wgl"}.get(str(self.settings.os), "egl")
         key = f"{self._platform}-{suffix if backend == 'opengl' else backend}"
         try:
             return self.conan_data["sources"][str(self.version)][key]
@@ -165,29 +158,3 @@ class MaplibreNativeC(ConanFile):
         if self.settings.os == "Linux" and self.options.libc == "gnu":
             self.cpp_info.system_libs.append("gcc_s")
         self.cpp_info.frameworks = descriptor["link"]["frameworks"]
-        # The archive's pkg-config file carries Emscripten's compile flags;
-        # its installed header directory is supplied by Conan instead.
-        if self.settings.os == "Emscripten":
-            pc = load(
-                self,
-                os.path.join(
-                    self.package_folder, "share/pkgconfig/maplibre-native-c.pc"
-                ),
-            )
-            cflags = next(
-                line.removeprefix("Cflags:").strip()
-                for line in pc.splitlines()
-                if line.startswith("Cflags:")
-            )
-            flags = [flag for flag in shlex.split(cflags) if not flag.startswith("-I")]
-            self.cpp_info.cflags = flags
-            self.cpp_info.cxxflags = flags
-            link_flags = load(
-                self,
-                os.path.join(
-                    self.package_folder,
-                    "share/maplibre-native-c/emscripten-link-flags.txt",
-                ),
-            ).splitlines()
-            self.cpp_info.exelinkflags = link_flags
-            self.cpp_info.sharedlinkflags = link_flags

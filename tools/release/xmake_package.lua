@@ -24,7 +24,7 @@ package("maplibre-native-c")
         import("core.project.config")
         local platforms = {
             macosx = "macos", windows = "windows", android = "android",
-            harmony = "ohos", bsd = "freebsd", wasm = "emscripten",
+            harmony = "ohos", bsd = "freebsd",
             iphoneos = "ios", appletvos = "tvos", applexros = "visionos"
         }
         local platform = platforms[package:plat()]
@@ -78,28 +78,4 @@ package("maplibre-native-c")
                 os.cp(directory, package:installdir())
             end
         end
-    end)
-
-    on_fetch(function (package, opt)
-        if opt.system or not package:is_plat("wasm") then
-            return
-        end
-        local prefix = package:installdir()
-        if not os.isdir(path.join(prefix, "include")) then
-            return
-        end
-        import("core.base.json")
-        local artifact = json.loadfile(path.join(prefix, "share/maplibre-native-c/artifact.json"))
-        local pc = io.readfile(path.join(prefix, "share/pkgconfig/maplibre-native-c.pc"))
-        local cflags = pc:match("Cflags: [^\n]*"):gsub("Cflags: ", ""):gsub("%-I[^ ]+", "")
-        return {
-            version = package:version_str(),
-            includedirs = {path.join(prefix, "include")},
-            linkdirs = {path.join(prefix, "lib")},
-            links = {"maplibre-native-c"},
-            defines = {"MLN_STATIC"},
-            syslinks = artifact.link.libraries,
-            cxflags = os.argv(cflags),
-            ldflags = io.readfile(path.join(prefix, "share/maplibre-native-c/emscripten-link-flags.txt")):split("\n", {plain = true, trim = true})
-        }
     end)

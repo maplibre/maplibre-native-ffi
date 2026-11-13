@@ -218,11 +218,7 @@ static void revalidation_keeps_omitted_cache_validators(void) {
 
 // The browser's HTTP cache already holds what an in-memory ambient cache would.
 static void only_the_browser_starts_without_an_ambient_cache(void) {
-#if defined(__EMSCRIPTEN__)
-  const bool cached = false;
-#else
   const bool cached = true;
-#endif
   mln_test_provider* provider = mln_test_provider_create(fresh_style, 1);
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider_install(runtime, provider);

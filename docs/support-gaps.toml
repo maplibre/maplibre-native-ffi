@@ -18,20 +18,6 @@ reason = "The .NET port to OpenHarmony is still landing on the runtime's main br
 link = "https://github.com/dotnet/runtime/issues/132866"
 
 [[entry]]
-bindings = ["python"]
-platforms = ["emscripten"]
-status = "blocked"
-reason = "PyEmscripten wheels forbid the pthreads that the C library needs."
-link = "https://peps.python.org/pep-0783/#the-pyemscripten-platform"
-
-[[entry]]
-bindings = ["zig"]
-platforms = ["emscripten"]
-status = "blocked"
-reason = "Zig 0.17.1 has no `std.heap.page_allocator` for multithreaded WebAssembly, and every safe build reaches it through the panic handler. Each thread that `std.Thread` spawns also panics, because Emscripten lacks `sigaltstack`. A program can override both from its root module, but every consumer would have to."
-link = "https://github.com/ziglang/zig/issues/22807"
-
-[[entry]]
 bindings = ["zig"]
 platforms = ["ios", "tvos", "visionos"]
 status = "blocked"
@@ -139,13 +125,6 @@ link = "https://github.com/dart-lang/native/issues/961"
 
 [[entry]]
 bindings = ["c"]
-platforms = ["emscripten"]
-status = "path-known"
-reason = "mln-rs, which implements the C library, builds for the browser as `wasm32-unknown-unknown`, with wasm-bindgen and tile workers in WebAssembly instances of their own. It doesn't build for `wasm32-unknown-emscripten`, whose pthreads and modules the browser builds and the TypeScript binding use: mln-rs's OpenGL and storage crates take their wasm-bindgen paths for every `wasm32` target."
-link = "https://github.com/louwers/mln-rs"
-
-[[entry]]
-bindings = ["c"]
 platforms = ["freebsd"]
 archs = ["arm64"]
 backends = ["vulkan", "opengl"]
@@ -153,9 +132,27 @@ status = "not-investigated"
 
 [[entry]]
 bindings = ["dotnet"]
-platforms = ["emscripten"]
+platforms = ["web"]
 status = "not-investigated"
-reason = "A browser WebAssembly host needs native archives linked through `NativeFileReference` with matching Emscripten flags, and browser tests."
+reason = "The browser package is a module that JavaScript loads, not an archive that `NativeFileReference` links, so a browser .NET host would call it through JavaScript interop (`JSImport`)."
+
+[[entry]]
+bindings = ["python"]
+platforms = ["web"]
+status = "not-investigated"
+reason = "The browser package is a module that JavaScript loads, which the binding's native extension can't link. A browser Python host, such as Pyodide, would call it through JavaScript."
+
+[[entry]]
+bindings = ["zig"]
+platforms = ["web"]
+status = "not-investigated"
+reason = "The browser package is a wasm-bindgen module that JavaScript loads. A Zig program in the browser would need Zig's linker to link mln-rs-c as a Rust library that wasm-bindgen then processes."
+
+[[entry]]
+bindings = ["typescript"]
+platforms = ["web"]
+status = "path-known"
+reason = "TODO(part 2 of the move off Emscripten): the binding's browser module still builds its Node-API code with Emscripten, which the library no longer builds for. It moves onto the browser package's raw C exports next."
 
 [[entry]]
 bindings = ["python"]
@@ -227,7 +224,7 @@ platforms = [
   "tvos",
   "visionos",
   "ohos",
-  "emscripten",
+  "web",
 ]
 status = "not-investigated"
 
@@ -313,7 +310,7 @@ link = "https://github.com/dart-lang/native/blob/code_assets-v2.1.0/pkgs/code_as
 
 [[entry]]
 bindings = ["dart"]
-platforms = ["emscripten"]
+platforms = ["web"]
 status = "blocked"
 reason = "`dart:ffi` serves the Dart Native platform alone, and dart2wasm forbids user imports of it."
 link = "https://dart.dev/interop/c-interop"
@@ -327,7 +324,7 @@ link = "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os
 
 [[entry]]
 bindings = ["go"]
-platforms = ["emscripten"]
+platforms = ["web"]
 status = "blocked"
 reason = "Go's WebAssembly ports, `js/wasm` and `wasip1/wasm`, have no cgo ABI."
 link = "https://github.com/golang/go/issues/55351"
@@ -341,7 +338,7 @@ link = "https://github.com/golang/go/issues/65251"
 
 [[entry]]
 bindings = ["kotlin-jvm"]
-platforms = ["ios", "ios-maccatalyst", "tvos", "visionos", "ohos", "emscripten"]
+platforms = ["ios", "ios-maccatalyst", "tvos", "visionos", "ohos", "web"]
 status = "blocked"
 reason = "No JVM runs on these platforms."
 
@@ -378,9 +375,9 @@ link = "https://github.com/swiftlang/swift/blob/main/utils/swift_build_support/s
 
 [[entry]]
 bindings = ["swift"]
-platforms = ["emscripten"]
+platforms = ["web"]
 status = "blocked"
-reason = "The Swift WebAssembly SDK targets WASI, not Emscripten."
+reason = "The Swift WebAssembly SDK targets WASI, not a JavaScript host."
 link = "https://www.swift.org/documentation/articles/wasm-getting-started.html"
 
 # Missing runner integration must be explicit, even when a toolchain exists.

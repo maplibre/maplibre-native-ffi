@@ -9,12 +9,14 @@ belong to the test seams: a name containing `mln_test`, `testing`, or
 A preset without shared libraries installs only the static archive, where
 hidden symbols stay visible to a static link. There the check covers the
 archive's C symbols with the `mln_` prefix, which are the ones a host links
-against by name.
+against by name. A web preset installs a WebAssembly module, whose exports
+with the `mln_` prefix are the C API that a JavaScript host calls; its other
+exports are wasm-bindgen's.
 
 The library is read from `build/<preset>/install`, so run this after
 `mise run build <preset>`. The symbols come from `nm` on macOS and ELF
-targets, `llvm-nm` for Emscripten archives, and `llvm-readobj`, or `dumpbin`
-when it is missing, on Windows.
+targets, `llvm-readobj`, or `dumpbin` when it is missing, on Windows, and the
+module's export section on the web.
 """
 
 from __future__ import annotations
@@ -62,8 +64,14 @@ def run(command: list[str]) -> str:
     return result.stdout
 
 
+WEB_MODULE = f"share/{LIBRARY_STEM}/web/maplibre_native_c_bg.wasm"
+
+
 def find_library(install: pathlib.Path) -> tuple[pathlib.Path, bool]:
     """The installed library, and whether it is shared."""
+    module = install / WEB_MODULE
+    if module.is_file():
+        return module, True
     shared = [
         path
         for pattern in (
@@ -83,15 +91,41 @@ def find_library(install: pathlib.Path) -> tuple[pathlib.Path, bool]:
     )
 
 
-def nm_tool(preset: str) -> str:
-    if preset.startswith("emscripten-"):
-        emsdk = os.environ.get("EMSDK")
-        if emsdk:
-            candidate = pathlib.Path(emsdk) / "upstream" / "bin" / "llvm-nm"
-            if candidate.exists():
-                return str(candidate)
-        return "llvm-nm"
-    return "nm"
+def leb128(data: bytes, offset: int) -> tuple[int, int]:
+    """The unsigned LEB128 number at `offset`, and the offset after it."""
+    value = shift = 0
+    while True:
+        byte = data[offset]
+        offset += 1
+        value |= (byte & 0x7F) << shift
+        shift += 7
+        if not byte & 0x80:
+            return value, offset
+
+
+def wasm_function_exports(module: pathlib.Path) -> set[str]:
+    """The names of the functions that a WebAssembly module exports."""
+    data = module.read_bytes()
+    if data[:4] != b"\0asm":
+        raise SystemExit(f"error: {module} is not a WebAssembly module")
+    offset = 8
+    while offset < len(data):
+        section, offset = data[offset], offset + 1
+        size, offset = leb128(data, offset)
+        end = offset + size
+        if section == 7:
+            count, offset = leb128(data, offset)
+            names = set()
+            for _ in range(count):
+                length, offset = leb128(data, offset)
+                name = data[offset : offset + length].decode()
+                kind = data[offset + length]
+                _, offset = leb128(data, offset + length + 1)
+                if kind == 0:
+                    names.add(name)
+            return names
+        offset = end
+    return set()
 
 
 def nm_symbols(tool: str, library: pathlib.Path, dynamic: bool) -> set[str]:
@@ -146,13 +180,17 @@ def pe_symbols(library: pathlib.Path) -> set[str]:
 
 
 def library_symbols(preset: str, library: pathlib.Path, shared: bool) -> set[str]:
+    if library.suffix == ".wasm":
+        return {
+            name for name in wasm_function_exports(library) if name.startswith("mln_")
+        }
     if library.suffix == ".dll":
         return pe_symbols(library)
     macho = library.suffix == ".dylib" or (
         not shared
         and preset.startswith(("macos-", "ios-", "tvos-", "visionos-", "maccatalyst-"))
     )
-    names = nm_symbols(nm_tool(preset), library, dynamic=library.suffix == ".so")
+    names = nm_symbols("nm", library, dynamic=library.suffix == ".so")
     if macho:
         # Mach-O prefixes every C symbol with an underscore.
         names = {name.removeprefix("_") for name in names}

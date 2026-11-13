@@ -229,86 +229,6 @@ static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
   detach(runtime, map, &fixture);
 }
 
-#if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-// A WebGPU render returns before the GPU finishes its frame, and the queue
-// reports it done once this thread returns to its event loop. With as many
-// frames unfinished as the ring has slots the driver runs nothing more, so
-// demands past the ring depth wait rather than pile more frames onto the GPU.
-static void webgpu_demands_past_the_ring_depth_wait_for_the_gpu(void) {
-  mln_runtime runtime;
-  mln_map map;
-  mln_test_render_fixture fixture = {0};
-  attach(&runtime, &map, &fixture);
-  mln_render_session_capabilities capabilities = {
-    .size = sizeof(mln_render_session_capabilities)
-  };
-  MLN_TEST_OK(
-    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
-  );
-  const uint64_t depth = capabilities.texture_ring_depth;
-  // The demands wait for the map to apply the commands that set it up.
-  MLN_TEST_OK(mln_test_map_fence(map));
-  for (uint64_t token = 1; token <= depth + 1; token += 1) {
-    mln_test_render_demand_forced(&fixture, token);
-  }
-
-  // One service runs every queued demand without returning to the event loop.
-  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_drain_frame_results(fixture.session, &batch, NULL));
-  TEST_ASSERT_EQUAL_size_t(
-    depth, mln_test_render_batch_view(batch).result_count
-  );
-  mln_render_frame_batch_release(batch);
-
-  batch = mln_test_render_wait_for_results(&fixture);
-  const mln_render_frame_result last = mln_test_render_batch_result(batch, 0);
-  mln_render_frame_batch_release(batch);
-  TEST_ASSERT_EQUAL_UINT64(depth + 1, last.token);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, last.disposition);
-  detach(runtime, map, &fixture);
-}
-
-// A demand that arrives once the ring's frames are all unfinished wakes the
-// driver anyway: only a service asks the queue to report them done, so a host
-// that services on the driver-work wake alone would otherwise never render it.
-static void webgpu_a_demand_behind_unfinished_frames_wakes_the_driver(void) {
-  mln_runtime runtime;
-  mln_map map;
-  mln_test_render_fixture fixture = {0};
-  attach(&runtime, &map, &fixture);
-  mln_render_session_capabilities capabilities = {
-    .size = sizeof(mln_render_session_capabilities)
-  };
-  MLN_TEST_OK(
-    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
-  );
-  const uint64_t depth = capabilities.texture_ring_depth;
-  // The demands wait for the map to apply the commands that set it up.
-  MLN_TEST_OK(mln_test_map_fence(map));
-  for (uint64_t token = 1; token <= depth; token += 1) {
-    mln_test_render_demand_forced(&fixture, token);
-  }
-  MLN_TEST_OK(mln_test_render_fixture_service(&fixture));
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_drain_frame_results(fixture.session, &batch, NULL));
-  TEST_ASSERT_EQUAL_size_t(
-    depth, mln_test_render_batch_view(batch).result_count
-  );
-  mln_render_frame_batch_release(batch);
-
-  const unsigned before = atomic_load(&fixture.driver_wakes);
-  mln_test_render_demand_forced(&fixture, depth + 1);
-  TEST_ASSERT_GREATER_THAN_UINT(before, atomic_load(&fixture.driver_wakes));
-  batch = mln_test_render_wait_for_results(&fixture);
-  const mln_render_frame_result last = mln_test_render_batch_result(batch, 0);
-  mln_render_frame_batch_release(batch);
-  TEST_ASSERT_EQUAL_UINT64(depth + 1, last.token);
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, last.disposition);
-  detach(runtime, map, &fixture);
-}
-#endif
-
 static void resizes_apply_in_order_and_publish_generations(void) {
   mln_runtime runtime;
   mln_map map;
@@ -848,10 +768,6 @@ MLN_TEST_GROUP {
   RUN_TEST(frame_results_wake_the_host_and_drain_into_an_owned_batch);
   RUN_TEST(a_barrier_ends_a_demand_while_the_ring_stays_acquired);
   RUN_TEST(sustained_demands_past_the_ring_depth_keep_the_newest_frames);
-#if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  RUN_TEST(webgpu_demands_past_the_ring_depth_wait_for_the_gpu);
-  RUN_TEST(webgpu_a_demand_behind_unfinished_frames_wakes_the_driver);
-#endif
   RUN_TEST(resizes_apply_in_order_and_publish_generations);
   RUN_TEST(a_session_renders_at_its_maps_scale_factor);
   RUN_TEST(attaching_sizes_the_map_to_the_target);

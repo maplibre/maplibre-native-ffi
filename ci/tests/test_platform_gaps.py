@@ -242,7 +242,7 @@ class PlatformGapsTest(unittest.TestCase):
             "windows-arm64-wgl",
             "mingw-x64-vulkan",
             "freebsd-x64-egl",
-            "emscripten-wasm32-webgl",
+            "web-wasm32-webgl",
             "ohos-x64-egl",
             "android-x64-egl",
             "android-arm64-egl",

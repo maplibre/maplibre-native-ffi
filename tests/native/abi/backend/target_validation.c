@@ -333,7 +333,6 @@ static void set_target_rejects_malformed_targets(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 // A device renders to the kinds that its capabilities name, and refuses a
 // well-formed target of any other kind before it uses the target's objects.
 static void attach_refuses_the_kinds_that_the_device_lacks(void) {
@@ -366,12 +365,9 @@ static void attach_refuses_the_kinds_that_the_device_lacks(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
-#endif
 
 MLN_TEST_GROUP {
   RUN_TEST(attach_rejects_malformed_targets);
   RUN_TEST(set_target_rejects_malformed_targets);
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   RUN_TEST(attach_refuses_the_kinds_that_the_device_lacks);
-#endif
 }

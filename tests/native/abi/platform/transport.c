@@ -1,7 +1,5 @@
 // The platform's resource transports: local files and PMTiles archives on
-// every target, and the HTTP client against a loopback server. The browser's
-// HTTP client runs against the runner's routes in browser_http_emscripten.c
-// instead.
+// every target, and the HTTP client against a loopback server.
 
 #if defined(_WIN32)
 #include <windows.h>

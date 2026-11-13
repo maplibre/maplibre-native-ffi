@@ -25,7 +25,7 @@
 #if defined(__APPLE__)
 #define MLN_TG_HAS_METAL 1
 #endif
-#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#if !defined(_WIN32)
 #define MLN_TG_HAS_EGL 1
 #endif
 #if defined(_WIN32)
@@ -2191,11 +2191,9 @@ mln_test_graphics* mln_test_graphics_create(uint32_t backend) {
       created = metal_create(graphics);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       created = vulkan_create(graphics);
       break;
-#endif
 #if defined(MLN_TG_HAS_EGL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
       created = egl_create(graphics);
@@ -2224,7 +2222,6 @@ mln_test_graphics* mln_test_graphics_create(uint32_t backend) {
 mln_test_graphics* mln_test_graphics_create_vulkan_borrowed(
   const mln_test_graphics_context* context
 ) {
-#if !defined(__EMSCRIPTEN__)
   mln_test_graphics* graphics = calloc(1, sizeof(*graphics));
   if (graphics == NULL) {
     set_error("out of memory");
@@ -2235,11 +2232,6 @@ mln_test_graphics* mln_test_graphics_create_vulkan_borrowed(
     return NULL;
   }
   return graphics;
-#else
-  (void)context;
-  set_error("this platform has no Vulkan");
-  return NULL;
-#endif
 }
 
 void mln_test_graphics_destroy(mln_test_graphics* graphics) {
@@ -2250,11 +2242,9 @@ void mln_test_graphics_destroy(mln_test_graphics* graphics) {
       metal_destroy(graphics);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       vulkan_destroy(graphics);
       break;
-#endif
 #if defined(MLN_TG_HAS_EGL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
       egl_destroy(graphics);
@@ -2360,7 +2350,6 @@ void* mln_test_graphics_metal_command_queue(mln_test_graphics* graphics) {
 static PFN_vkVoidFunction vulkan_device_proc(
   mln_test_graphics* graphics, const char* name
 ) {
-#if !defined(__EMSCRIPTEN__)
   if (graphics->context.backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN) {
     PFN_vkVoidFunction proc = graphics->vk.get_device_proc_addr(
       (VkDevice)graphics->context.vulkan_device, name
@@ -2368,9 +2357,6 @@ static PFN_vkVoidFunction vulkan_device_proc(
     if (proc == NULL) set_error("the Vulkan device lacks %s", name);
     return proc;
   }
-#else
-  (void)name;
-#endif
   set_error("only a Vulkan graphics object has timeline semaphores");
   return NULL;
 }
@@ -2589,11 +2575,9 @@ mln_test_graphics_texture* mln_test_graphics_texture_create(
       created = metal_texture_create(graphics, texture);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       created = vulkan_texture_create(graphics, texture);
       break;
-#endif
 #if defined(MLN_TG_HAS_GL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
@@ -2621,11 +2605,9 @@ void mln_test_graphics_texture_destroy(mln_test_graphics_texture* texture) {
       metal_texture_destroy(texture);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       vulkan_texture_destroy(texture);
       break;
-#endif
 #if defined(MLN_TG_HAS_GL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
@@ -2670,10 +2652,8 @@ bool mln_test_graphics_texture_read_rgba8(
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
       return metal_texture_read(texture, pixels);
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       return vulkan_texture_read(texture, pixels);
-#endif
 #if defined(MLN_TG_HAS_GL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
@@ -2692,7 +2672,6 @@ mln_test_graphics_texture* mln_test_graphics_depth_texture_create(
     set_error("a texture needs a graphics object and a nonzero size");
     return NULL;
   }
-#if !defined(__EMSCRIPTEN__)
   if (graphics->context.backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN) {
     mln_test_graphics_texture* texture = calloc(1, sizeof(*texture));
     if (texture == NULL) {
@@ -2712,7 +2691,6 @@ mln_test_graphics_texture* mln_test_graphics_depth_texture_create(
     }
     return texture;
   }
-#endif
   set_error("only a Vulkan graphics object makes depth textures");
   return NULL;
 }
@@ -2731,12 +2709,7 @@ bool mln_test_graphics_depth_texture_read(
     );
     return false;
   }
-#if !defined(__EMSCRIPTEN__)
   return vulkan_texture_read(texture, (uint8_t*)depths);
-#else
-  set_error("only a Vulkan graphics object makes depth textures");
-  return false;
-#endif
 }
 
 mln_test_graphics_surface* mln_test_graphics_surface_create(
@@ -2761,11 +2734,9 @@ mln_test_graphics_surface* mln_test_graphics_surface_create(
       created = metal_surface_create(graphics, surface);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       created = vulkan_surface_create(graphics, surface);
       break;
-#endif
 #if defined(MLN_TG_HAS_EGL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
       created = egl_surface_create(graphics, surface);
@@ -2797,14 +2768,12 @@ void mln_test_graphics_surface_destroy(mln_test_graphics_surface* surface) {
       metal_surface_destroy(surface);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       vulkan_surface_destroy(surface);
 #if defined(MLN_TG_HAS_WGL)
       if (surface->window != NULL) DestroyWindow(surface->window);
 #endif
       break;
-#endif
 #if defined(MLN_TG_HAS_EGL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
       egl_surface_destroy(surface);

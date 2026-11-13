@@ -28,6 +28,10 @@ function(mln_ffi_install_components target artifact_file)
   set(records)
   foreach(component_target ${target} mln_ffi_platform_dependencies
           mln_ffi_render_dependencies)
+    # A web preset has neither dependency target.
+    if(NOT TARGET ${component_target})
+      continue()
+    endif()
     get_target_property(components ${component_target} MLN_FFI_COMPONENTS)
     if(components)
       list(APPEND records ${components})

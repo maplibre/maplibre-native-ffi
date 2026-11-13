@@ -64,7 +64,7 @@ done
 shopt -u nullglob
 # A build tree that installed the component's files but left none of them in the
 # install directory would lose the fixtures without a trace. A target without
-# the library, such as Emscripten, installs the component with an empty manifest.
+# the library installs the component with an empty manifest.
 if ((${#test_graphics_files[@]} == 0)) &&
   [[ -s "$build_dir/install_manifest_test-graphics.txt" ]]; then
   echo "The build installed the test-graphics component, but $install_dir holds none of its files:" >&2

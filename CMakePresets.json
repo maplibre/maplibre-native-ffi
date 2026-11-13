@@ -358,21 +358,19 @@
       }
     },
     {
-      "name": "_emscripten-wasm32",
+      "name": "_web-wasm32",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${fileDir}/cmake/toolchains/emscripten.cmake",
       "cacheVariables": {
-        "MLN_FFI_TARGET_PLATFORM": "emscripten-wasm32",
-        "MLN_FFI_ZIG_TARGET": "wasm32-emscripten",
-        "MLN_FFI_RUST_TARGET": "wasm32-unknown-emscripten",
+        "MLN_FFI_TARGET_PLATFORM": "web-wasm32",
+        "MLN_FFI_RUST_TARGET": "wasm32-unknown-unknown",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "webgpu"
       },
       "vendor": {
         "maplibre-native-ffi": {
           "unit": "web",
           "runner": "blacksmith-4vcpu-ubuntu-2404",
-          "miseEnv": "emscripten"
+          "miseEnv": "web"
         }
       }
     },
@@ -644,14 +642,14 @@
       "inherits": ["_freebsd-x64", "_vulkan"]
     },
     {
-      "name": "emscripten-wasm32-webgl",
+      "name": "web-wasm32-webgl",
       "displayName": "Browser WASM32 WebGL",
-      "inherits": ["_emscripten-wasm32", "_webgl"]
+      "inherits": ["_web-wasm32", "_webgl"]
     },
     {
-      "name": "emscripten-wasm32-webgpu",
+      "name": "web-wasm32-webgpu",
       "displayName": "Browser WASM32 WebGPU",
-      "inherits": ["_emscripten-wasm32", "_webgpu"]
+      "inherits": ["_web-wasm32", "_webgpu"]
     },
     {
       "name": "macos-arm64-metal",

@@ -68,49 +68,6 @@ function(mln_ffi_json_string_array out_var)
   set(${out_var} "${MLN_FFI_JOINED}" PARENT_SCOPE)
 endfunction()
 
-function(mln_ffi_install_emscripten_options)
-  if(NOT EMSCRIPTEN)
-    return()
-  endif()
-  set(link_options)
-  set(compile_options)
-  foreach(
-    dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
-    foreach(kind LINK COMPILE)
-      get_target_property(options ${dependencies} INTERFACE_${kind}_OPTIONS)
-      if(options AND NOT options MATCHES "-NOTFOUND$")
-        string(TOLOWER "${kind}" kind_lower)
-        list(APPEND ${kind_lower}_options ${options})
-      endif()
-    endforeach()
-  endforeach()
-  if(NOT link_options)
-    return()
-  endif()
-  list(REMOVE_DUPLICATES link_options)
-
-  set(link_options_file "${CMAKE_CURRENT_BINARY_DIR}/emscripten-link-flags.txt")
-  list(JOIN link_options "\n" link_options_lines)
-  file(WRITE "${link_options_file}" "${link_options_lines}\n")
-  install(
-    FILES "${link_options_file}"
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
-    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-
-  list(JOIN link_options " " pkg_config_link_options)
-  set(MLN_FFI_PKG_CONFIG_LIBS
-      "${MLN_FFI_PKG_CONFIG_LIBS} ${pkg_config_link_options}"
-      PARENT_SCOPE)
-
-  list(REMOVE_DUPLICATES compile_options)
-  set(MLN_FFI_CMAKE_LINK_OPTIONS "${link_options}" PARENT_SCOPE)
-  set(MLN_FFI_CMAKE_COMPILE_OPTIONS "${compile_options}" PARENT_SCOPE)
-  list(JOIN compile_options " " pkg_config_compile_options)
-  set(MLN_FFI_PKG_CONFIG_CFLAGS
-      "${MLN_FFI_PKG_CONFIG_CFLAGS} ${pkg_config_compile_options}"
-      PARENT_SCOPE)
-endfunction()
-
 # Writes a dSYM beside an installed Apple binary from the unstripped build-tree
 # binary, so debuggers and crash reports can name what stripping removes.
 # Release builds have no debug information, so the dSYM holds only the symbol
@@ -167,7 +124,6 @@ function(mln_ffi_install_c_api_library target)
         "{ \"abi\": \"${ANDROID_ABI}\", \"api\": ${android_api} }")
   endif()
   set(MLN_FFI_PKG_CONFIG_LIBS "")
-  mln_ffi_install_emscripten_options()
   # Filled in at build time from what rustc reports; see
   # cmake/mln_ffi_package_metadata.cmake.
   set(MLN_FFI_STATIC_LINK_LIBRARIES_JSON "%%LINK_LIBRARIES_JSON%%")

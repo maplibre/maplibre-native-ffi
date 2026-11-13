@@ -577,28 +577,12 @@ def run_harness(
     env["MLN_FFI_TEST_FIXTURE_DIR"] = str(fixtures)
     apply_environment(env, descriptor["environment"])
     arguments = list(arguments)
-    if descriptor["browser"]:
-        arguments.append(f"--mln_fixture_dir={descriptor['fixture_argument']}")
-        command = [
-            "node",
-            str(ROOT / "scripts" / "run-browser-test.mjs"),
-            descriptor["executable"],
-            "--timeout-seconds",
-            str(RUN_TIMEOUT_SECONDS),
-            "--render-backend",
-            descriptor["render_backend"],
-            "--print-output",
-            "--hardware-gpu",
-        ]
-        for argument in arguments:
-            command += ["--module-arg", argument]
-    else:
-        if not platform_id.startswith(("android-", "ohos-")):
-            arguments.append(f"--mln_fixture_dir={fixtures}")
-        runner = str(ROOT / "tools" / "devices" / "run")
-        # The device boots first, so its boot is in no number.
-        subprocess.run([runner, "--boot"], env=env, check=True)
-        command = [runner, descriptor["executable"], *arguments]
+    if not platform_id.startswith(("android-", "ohos-")):
+        arguments.append(f"--mln_fixture_dir={fixtures}")
+    runner = str(ROOT / "tools" / "devices" / "run")
+    # The device boots first, so its boot is in no number.
+    subprocess.run([runner, "--boot"], env=env, check=True)
+    command = [runner, descriptor["executable"], *arguments]
     load_before = load_average()
     log(f"{side.label}: $ " + " ".join(command))
     completed = subprocess.run(

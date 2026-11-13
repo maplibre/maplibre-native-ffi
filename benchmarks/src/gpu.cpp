@@ -6,80 +6,6 @@
 #include <string>
 
 #include "bench.hpp"
-
-#if defined(__EMSCRIPTEN__)
-
-#include <cstdlib>
-
-#include <emscripten/em_js.h>
-
-EM_JS_DEPS(mln_bench_gpu, "$stringToNewUTF8");
-
-// The browser's default adapter, which an implementation gets when it asks for
-// none in particular. The formatter would mangle the JavaScript.
-// clang-format off
-EM_ASYNC_JS(char*, bench_browser_adapter, (), {
-  try {
-    const adapter = await navigator.gpu?.requestAdapter();
-    if (!adapter) return 0;
-    const info = adapter.info ?? {};
-    const software =
-      info.isFallbackAdapter === true ||
-      /swiftshader|llvmpipe|lavapipe|software/i.test(
-        `${info.architecture} ${info.description} ${info.device}`
-      );
-    const name =
-      [info.vendor, info.architecture, info.device, info.description]
-        .filter((part) => part)
-        .join(" ") || "unnamed adapter";
-    return stringToNewUTF8(`${software ? "1" : "0"}${name}`);
-  } catch (error) {
-    return 0;
-  }
-});
-// clang-format on
-
-namespace bench {
-
-void gpu_describe(Environment& environment) {
-  environment.render_target = "offscreen";
-  environment.gpu_device = "the browser's, unknown";
-  environment.gpu_type = "unknown";
-  if (char* adapter = bench_browser_adapter()) {
-    environment.software_gpu = adapter[0] == '1';
-    environment.gpu_device =
-      std::string{"the browser's default adapter: "} + (adapter + 1);
-    environment.gpu_type = environment.software_gpu ? "cpu" : "unknown";
-    std::free(adapter);
-  }
-}
-
-auto gpu_has_ring() -> bool { return false; }
-auto gpu_driver() -> mln_render_driver_kind {
-  return MLN_RENDER_DRIVER_CORE_WORKER;
-}
-auto gpu_producer_sync_kinds() -> mln_gpu_sync_kind_flags { return 0; }
-auto gpu_frame_slot(mln_acquired_frame) -> int { return -1; }
-auto gpu_wait(const mln_gpu_sync& sync) -> bool {
-  return sync.kind == MLN_GPU_SYNC_CPU_COMPLETE;
-}
-auto gpu_read_texture(void*, Image&) -> bool { return false; }
-
-void gpu_create_ring(void**, uint32_t* texture_count) { *texture_count = 0; }
-
-auto gpu_attach_ring(
-  mln_map, const mln_render_session_attach_options&, void* const*,
-  mln_render_session*, const mln_completion*, mln_diagnostic*
-) -> mln_status {
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-void gpu_destroy_ring(void**, uint32_t) {}
-
-}  // namespace bench
-
-#else
-
 #include "mln_test_graphics.h"
 
 #if defined(BENCH_BACKEND_VULKAN)
@@ -492,5 +418,3 @@ void gpu_destroy_ring(void** textures, uint32_t texture_count) {
 }
 
 }  // namespace bench
-
-#endif

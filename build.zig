@@ -165,7 +165,7 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
     const target = targetOption(b, if (local) |install| install.descriptor else null);
     switch (target.result.os.tag) {
         .ios, .tvos, .visionos => @panic("The Zig binding does not support iOS, tvOS, or visionOS targets, including simulators"),
-        .emscripten => @panic("The Zig binding does not support Emscripten"),
+        .emscripten => @panic("The Zig binding does not support the browser"),
         else => {},
     }
     const selected_backend = b.option(

@@ -149,7 +149,6 @@ static void a_frame_projection_places_points_where_the_frame_drew_them(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 static void a_device_reports_the_depth_that_its_rings_keep(void) {
   mln_gpu_device device = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_gpu_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
@@ -177,7 +176,6 @@ static void a_device_reports_the_depth_that_its_rings_keep(void) {
   );
   mln_gpu_device_release(device);
 }
-#endif
 
 static void only_an_exported_ring_keeps_depth(void) {
   mln_runtime runtime = mln_test_create_runtime();
@@ -207,8 +205,6 @@ static void only_an_exported_ring_keeps_depth(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_frame_projection_places_points_where_the_frame_drew_them);
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   RUN_TEST(a_device_reports_the_depth_that_its_rings_keep);
-#endif
   RUN_TEST(only_an_exported_ring_keeps_depth);
 }

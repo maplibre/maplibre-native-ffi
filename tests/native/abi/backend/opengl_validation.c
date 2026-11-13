@@ -12,9 +12,6 @@
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
 #define PRESET_PLATFORM MLN_OPEN_GL_CONTEXT_PLATFORM_WGL
 #define PRESET_PROVIDERS MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL
-#elif defined(MLN_FFI_TEST_OPENGL_WEBGL)
-#define PRESET_PLATFORM MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL
-#define PRESET_PROVIDERS MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
 #define PRESET_PLATFORM MLN_OPEN_GL_CONTEXT_PLATFORM_EGL
 #define PRESET_PROVIDERS MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL
@@ -61,7 +58,7 @@ static void surface_without_surface(void* call) {
   ((mln_test_target_call*)call)
     ->descriptor.target.data.open_gl_surface.surface = NULL;
 }
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
 // A replacement that names two textures for a session's ring of one.
 static void ring_with_another_depth(void* call) {
   mln_test_target_call* edited = call;
@@ -88,7 +85,7 @@ static void describe_ring(mln_test_target_call* call) {
       .texture_count = 1,
       // GL_TEXTURE_2D.
       .target = UINT32_C(0x0de1),
-    };
+  };
 }
 
 static void opengl_attach_rejects_malformed_calls(void) {
@@ -150,7 +147,7 @@ static void opengl_set_target_rejects_malformed_replacements(void) {
     sizeof(ring_rows) / sizeof(ring_rows[0])
   );
 
-#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_borrowed_ring(

@@ -9,9 +9,7 @@
 #include "support/map.h"
 #include "support/test_support.h"
 
-#if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 #define DEVICE_SUPPORTED 1
-#endif
 
 static mln_render_target offscreen_target(void) {
   mln_render_target target = {

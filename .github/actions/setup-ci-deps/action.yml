@@ -6,8 +6,8 @@ description: Install the toolchain and target-specific CI prerequisites
 inputs:
   mise-env:
     description:
-      The mise configuration environment that supplies the target's SDK, such as
-      emscripten or ohos
+      The mise configuration environment that supplies the target's SDK or
+      tools, such as web or ohos
     required: false
     default: ""
   device:
@@ -389,7 +389,7 @@ runs:
     # in the version catalog fixes all three, so the key is that file's hash,
     # and an exact hit skips the save.
     - name: Cache Kotlin/Wasm tooling
-      if: ${{ inputs.gradle == 'true' && inputs.mise-env == 'emscripten' }}
+      if: ${{ inputs.gradle == 'true' && inputs.mise-env == 'web' }}
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -510,16 +510,14 @@ runs:
         # repository cache. Re-fetching one costs less than the eviction pressure an
         # entry that size adds.
         #
-        # mise keeps emsdk and the OpenHarmony SDK in content-addressed
-        # `<tool>-<hash>` directories, which `<tool>/` links to, so `emsdk*` and
-        # `ohos-sdk*` exclude both. The `http:` backend's installs have no hash.
+        # mise keeps the OpenHarmony SDK in content-addressed `<tool>-<hash>`
+        # directories, which `<tool>/` links to, so `ohos-sdk*` excludes both. The `http:` backend's installs have no hash.
         # The OpenHarmony SDK's hash covers the archive but not the plugin, so a
         # cached install could also predate the plugin's current layout. Its
         # plugin is excluded too: mise keeps an installed plugin when its
         # `[plugins]` tag changes, so a near-miss restore would run the old tag.
         path: |
           ~/.local/share/mise
-          !~/.local/share/mise/installs/emsdk*
           !~/.local/share/mise/installs/http-oniro-emulator
           !~/.local/share/mise/installs/ohos-sdk*
           !~/.local/share/mise/plugins/ohos-sdk
@@ -614,7 +612,6 @@ runs:
         # Matches the restore above, exclusions included.
         path: |
           ~/.local/share/mise
-          !~/.local/share/mise/installs/emsdk*
           !~/.local/share/mise/installs/http-oniro-emulator
           !~/.local/share/mise/installs/ohos-sdk*
           !~/.local/share/mise/plugins/ohos-sdk

@@ -583,19 +583,15 @@ ci:
           then: apply
     web:
       covers: >-
-        The browser, built with Emscripten for WebGL and WebGPU. Runs the C and
-        Kotlin/Wasm tests in a browser, and adds the docs site's live demo to
-        its preview. Catches Emscripten, wasm32, and browser rendering problems.
+        The browser package, built from mln-rs for WebGL and WebGPU. Runs
+        mln-rs's browser check against it and the Kotlin/Wasm tests in a
+        browser. Catches wasm32 and browser rendering problems.
         Platform-independent code that Linux x64 tests doesn't need it.
       rules:
         - if:
             files:
-              - cmake/platform/emscripten.cmake
-              - cmake/toolchains/emscripten.cmake
-              - cmake/mln_ffi_emscripten.cmake
-              - .config/mise.emscripten.*
+              - cmake/mln_ffi_web.cmake
               - bindings/kotlin/src/wasmJs*/**
-              - bindings/kotlin/wasm/**
               - bindings/kotlin/karma.config.d/**
               - examples/browser/**
               - examples/styles.json

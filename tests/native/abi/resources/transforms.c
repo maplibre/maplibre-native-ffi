@@ -9,7 +9,7 @@
 
 // The browser and OpenHarmony transports cannot drop a transformed header when
 // a redirect changes origin, so they refuse the header transform.
-#if defined(__EMSCRIPTEN__) || defined(__OHOS__)
+#if defined(__OHOS__)
 #define MLN_TEST_HEADER_TRANSFORM_SUPPORTED 0
 #else
 #define MLN_TEST_HEADER_TRANSFORM_SUPPORTED 1
