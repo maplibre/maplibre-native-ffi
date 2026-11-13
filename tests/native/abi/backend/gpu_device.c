@@ -174,19 +174,13 @@ static void a_device_reports_its_backend_and_renders_offscreen(void) {
   }
 }
 
-// OpenGL picks no GPU, so a build that draws with OpenGL alone refuses to
-// look for one.
 static void create_reports_a_missing_adapter(void) {
   mln_gpu_device_options options = {.size = sizeof(mln_gpu_device_options)};
   options.fields = MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX;
   options.adapter_index = UINT32_MAX;
-  const bool picks_gpus =
-    (mln_supported_render_backend_mask() &
-     (MLN_RENDER_BACKEND_FLAG_METAL | MLN_RENDER_BACKEND_FLAG_VULKAN |
-      MLN_RENDER_BACKEND_FLAG_WEB_GPU)) != 0;
   mln_gpu_device device = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
-    picks_gpus ? MLN_STATUS_NOT_FOUND : MLN_STATUS_UNSUPPORTED,
+    MLN_STATUS_NOT_FOUND,
     mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
