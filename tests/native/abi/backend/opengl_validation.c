@@ -204,9 +204,16 @@ static void wrap_open_gl_rejects_malformed_contexts(void) {
   MLN_TEST_INVALID(wrap(&edited));
 }
 
+// A build carries its preset's provider, and can carry others beside it, as
+// one that renders with Vulkan and OpenGL does. A context of a provider that
+// the build lacks doesn't wrap.
 static void only_the_builds_providers_wrap(void) {
+  const uint32_t supported = mln_open_gl_supported_context_provider_mask();
+  TEST_ASSERT_EQUAL_HEX32(PRESET_PROVIDERS, supported & PRESET_PROVIDERS);
   TEST_ASSERT_EQUAL_HEX32(
-    PRESET_PROVIDERS, mln_open_gl_supported_context_provider_mask()
+    0, supported & ~(uint32_t)(MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL |
+                               MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL |
+                               MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL)
   );
   static const struct {
     uint32_t platform;
@@ -219,7 +226,7 @@ static void only_the_builds_providers_wrap(void) {
   };
   for (size_t index = 0; index < sizeof(providers) / sizeof(providers[0]);
        index += 1) {
-    if ((PRESET_PROVIDERS & providers[index].provider) != 0) {
+    if ((supported & providers[index].provider) != 0) {
       continue;
     }
     const mln_open_gl_context_descriptor context =
