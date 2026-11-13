@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-#MISE description="Run the GObject library's GTest suite and GJS smoke test, and compile its docs snippets, against the installed library."
-#MISE extends="ffi:preset"
+#MISE description="Run the GObject library's GTest suite with one render backend and its GJS smoke test, and compile its docs snippets, against the installed library."
+#MISE extends="ffi:test"
 #MISE depends=[{ task = ":build", args = ["{{usage.preset}}"] }]
 #MISE shell="bash"
 set -euo pipefail
 
 # Where a target builds the library itself, MLN_FFI_GOBJECT_PREFIX names the
-# prefix it installed into, beside a copy of the native install.
+# prefix it installed into, beside a copy of the native install, and the
+# target's device runner exports MLN_FFI_TEST_BACKEND.
+if [[ -z "${MLN_FFI_GOBJECT_PREFIX:-}" ]]; then
+  source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "${usage_preset?}" "${usage_backend:-}"
+fi
+: "${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the render backend under test}"
 install_dir=${MLN_FFI_GOBJECT_PREFIX:-"$MISE_MONOREPO_ROOT/build/$usage_preset/install"}
 sources="$PWD/tests"
 scratch="$(mktemp -d)"
@@ -15,7 +20,8 @@ trap 'rm -rf "$scratch"' EXIT
 export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
 package=maplibre-native-ffi-gobject-0
 
-# The suite renders with the graphics objects of the C suite's fixtures.
+# The suite renders with the backend that MLN_FFI_TEST_BACKEND names, and with
+# the graphics objects of the C suite's fixtures.
 # shellcheck disable=SC2046 # pkg-config prints one flag per word.
 cc -std=c11 -Wall -Wextra -Werror "$sources/suite/main.c" \
   $(pkg-config --cflags --libs "$package" mln-test-graphics) -o "$scratch/suite"
