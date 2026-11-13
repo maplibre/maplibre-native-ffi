@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# Builds the Android package consumer, and runs the portable binding suite on emulator targets.
+# Builds the Android package consumer, and runs the portable binding suite on
+# emulator targets with the render backend under test.
 set -euo pipefail
 
-preset=${1:?usage: test-dotnet-android.sh <preset> [--build-only]}
+usage="usage: test-dotnet-android.sh <preset> <backend>|--build-only"
+preset=${1:?$usage}
+mode=${2:?$usage}
 case "$preset" in
-  android-arm-*) abi=armeabi-v7a; rid=android-arm ;;
-  android-arm64-*) abi=arm64-v8a; rid=android-arm64 ;;
-  android-x86-*) abi=x86; rid=android-x86 ;;
-  android-x64-*) abi=x86_64; rid=android-x64 ;;
+  android-arm) abi=armeabi-v7a; rid=android-arm ;;
+  android-arm64) abi=arm64-v8a; rid=android-arm64 ;;
+  android-x86) abi=x86; rid=android-x86 ;;
+  android-x64) abi=x86_64; rid=android-x64 ;;
   *) echo "The .NET Android suite cannot build $preset." >&2; exit 2 ;;
-esac
-case "$preset" in
-  *-egl) backend=OpenGL ;;
-  *-vulkan) backend=Vulkan ;;
 esac
 
 dotnet workload install android --skip-manifest-update --verbosity quiet
@@ -25,15 +24,17 @@ arguments=(
   "-p:MaplibreNativeCInstallDir=$MISE_MONOREPO_ROOT/build/$preset/install"
   "-p:MaplibreAndroidAbi=$abi"
   "-p:MaplibreNativeFfiPackageVersion=0.0.0-android-ci"
-  "-p:MaplibreNativeFfiRenderBackend=$backend"
   "-p:BaseOutputPath=$work/app/"
   "-p:RestorePackagesPath=$work/restore"
   "-p:RestoreAdditionalProjectSources=$work/packages"
   "-p:AndroidSdkDirectory=$ANDROID_HOME"
 )
-if [[ ${2:-} == --build-only ]]; then
+if [[ $mode == --build-only ]]; then
   exec dotnet build "${arguments[@]}"
 fi
+# The app reads the backend under test from its environment file.
+printf 'MLN_FFI_TEST_BACKEND=%s\n' "$mode" >"$work/test-environment.txt"
+arguments+=("-p:MaplibreTestEnvironmentFile=$work/test-environment.txt")
 
 serial=$("$MISE_MONOREPO_ROOT/tools/devices/android-serial" "$preset")
 adb="$ANDROID_HOME/platform-tools/adb"

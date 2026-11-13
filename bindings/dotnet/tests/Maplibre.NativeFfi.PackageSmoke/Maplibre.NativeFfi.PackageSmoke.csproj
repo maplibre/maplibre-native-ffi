@@ -13,7 +13,7 @@
       VersionOverride="$(MaplibreNativeFfiPackageVersion)"
     />
     <PackageReference
-      Include="Maplibre.NativeFfi.Runtime.$(MaplibreNativeFfiRenderBackend)"
+      Include="Maplibre.NativeFfi.Runtime"
       VersionOverride="$(MaplibreNativeFfiPackageVersion)"
     />
   </ItemGroup>

@@ -14,27 +14,24 @@ class RuntimeTargetTests(unittest.TestCase):
     def test_each_dotnet_platform_preset_maps_to_its_runtime_identifier(self) -> None:
         targets = runtime_targets()
 
-        self.assertEqual(
-            {
-                "macos-arm64-metal": "osx-arm64",
-                "macos-x64-metal": "osx-x64",
-                "ios-arm64-metal": "ios-arm64",
-                "ios-simulator-arm64-metal": "iossimulator-arm64",
-                "ios-maccatalyst-arm64-metal": "maccatalyst-arm64",
-                "tvos-arm64-metal": "tvos-arm64",
-                "tvos-simulator-arm64-metal": "tvossimulator-arm64",
-            },
-            targets["Metal"],
-        )
-        self.assertEqual("win-x64", targets["OpenGL"]["windows-x64-wgl"])
-        self.assertEqual("linux-x64", targets["OpenGL"]["linux-gnu-x64-egl"])
-        self.assertEqual(
-            "linux-musl-arm64", targets["Vulkan"]["linux-musl-arm64-vulkan"]
-        )
-        self.assertEqual("android-arm", targets["Vulkan"]["android-arm-vulkan"])
-        self.assertEqual("android-x86", targets["OpenGL"]["android-x86-egl"])
-        self.assertEqual("android-x86", targets["Vulkan"]["android-x86-vulkan"])
-        presets = {preset for backend in targets.values() for preset in backend}
+        self.assertEqual({"", ".MinGW"}, set(targets))
+        runtime = targets[""]
+        for preset, rid in {
+            "macos-arm64": "osx-arm64",
+            "macos-x64": "osx-x64",
+            "ios-arm64": "ios-arm64",
+            "ios-simulator-arm64": "iossimulator-arm64",
+            "ios-maccatalyst-arm64": "maccatalyst-arm64",
+            "tvos-arm64": "tvos-arm64",
+            "tvos-simulator-arm64": "tvossimulator-arm64",
+            "windows-x64": "win-x64",
+            "linux-gnu-x64": "linux-x64",
+            "linux-musl-arm64": "linux-musl-arm64",
+            "android-arm": "android-arm",
+            "android-x86": "android-x86",
+        }.items():
+            self.assertEqual(rid, runtime[preset], preset)
+        presets = {preset for package in targets.values() for preset in package}
         self.assertEqual(
             set(),
             {
@@ -44,21 +41,14 @@ class RuntimeTargetTests(unittest.TestCase):
             },
         )
 
-    def test_mingw_runtime_packages_do_not_share_msvc_assets(self) -> None:
+    def test_mingw_runtime_package_does_not_share_msvc_assets(self) -> None:
         targets = runtime_targets()
-        for backend, preset in (
-            ("OpenGL", "mingw-x64-wgl"),
-            ("Vulkan", "mingw-x64-vulkan"),
-        ):
-            self.assertEqual(
-                {
-                    preset.replace("x64", arch): f"win-{arch}"
-                    for arch in ("x64", "arm64")
-                },
-                targets[f"{backend}.MinGW"],
-            )
-            for arch in ("x64", "arm64"):
-                self.assertNotIn(preset.replace("x64", arch), targets[backend])
+        self.assertEqual(
+            {"mingw-x64": "win-x64", "mingw-arm64": "win-arm64"}, targets[".MinGW"]
+        )
+        for arch in ("x64", "arm64"):
+            self.assertNotIn(f"mingw-{arch}", targets[""])
+            self.assertEqual(f"win-{arch}", targets[""][f"windows-{arch}"])
         for package, presets in targets.items():
             self.assertEqual(len(presets), len(set(presets.values())), package)
 
@@ -77,7 +67,7 @@ class AppleFrameworkTests(unittest.TestCase):
                 "Versions/Current/MaplibreNativeC"
             )
             copy_apple_framework(
-                root / "install", root / "output", "ios-maccatalyst-arm64-metal"
+                root / "install", root / "output", "ios-maccatalyst-arm64"
             )
             with zipfile.ZipFile(
                 root / "output/MaplibreNativeC.xcframework.zip"

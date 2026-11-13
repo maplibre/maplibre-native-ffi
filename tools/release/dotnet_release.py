@@ -40,13 +40,14 @@ MUSL_RUNTIME_IMAGE = "mcr.microsoft.com/dotnet/runtime:10.0-alpine3.22"
 
 
 def runtime_targets() -> dict[str, dict[str, str]]:
-    """The presets of each runtime package, with their runtime identifiers."""
+    """The presets of each runtime package, by its ID suffix, with their runtime
+    identifiers. A preset's library carries every backend of its platform."""
     targets: dict[str, dict[str, str]] = {}
     for preset in package_presets(ROOT):
         target = runtime_target(preset)
         if target is not None:
-            backend, rid = target
-            targets.setdefault(backend, {})[preset] = rid
+            suffix, rid = target
+            targets.setdefault(suffix, {})[preset] = rid
     return targets
 
 
@@ -84,7 +85,7 @@ def copy_apple_framework(
     source: pathlib.Path, destination: pathlib.Path, preset: str
 ) -> None:
     """Keep a framework's symlinks intact in the SDK's compressed XCFramework format."""
-    platform, arch, _ = preset.rsplit("-", 2)
+    platform, arch = preset.rsplit("-", 1)
     os_name = "tvos" if platform.startswith("tvos") else "ios"
     variant = (
         "simulator"
@@ -152,13 +153,17 @@ def pack(
     output: pathlib.Path,
     version: str,
     inventories: list[pathlib.Path] = (),
+    suffix: str = "",
     **properties: str | pathlib.Path,
 ) -> None:
+    """Pack a project. A runtime package's ID takes `suffix`, empty or `.MinGW`."""
     name = "Maplibre.NativeFfi"
     dependencies = []
     if project == RUNTIME_PROJECT:
-        name += f".Runtime.{properties['RenderBackend']}"
+        name += f".Runtime{suffix}"
         dependencies = [f"Maplibre.NativeFfi@{version}"]
+        if suffix:
+            properties["RuntimePackageIdSuffix"] = suffix
     sbom = output.parent / "sbom" / name / PACKAGE_SBOM
     package_inventory(
         name, version, "nuget", inventories, sbom, dependencies=dependencies
@@ -186,10 +191,10 @@ def package(args: argparse.Namespace) -> None:
 
     with tempfile.TemporaryDirectory() as temporary:
         staging = pathlib.Path(temporary)
-        for backend, presets in runtime_targets().items():
-            assets = staging / backend
+        for suffix, presets in runtime_targets().items():
+            assets = staging / f"Runtime{suffix}"
             inventories = []
-            frameworks = staging / "frameworks" / backend
+            frameworks = staging / "frameworks" / f"Runtime{suffix}"
             for preset, rid in presets.items():
                 extracted = staging / "extract" / preset
                 with tarfile.open(archive(args.input, preset)) as tar:
@@ -207,7 +212,7 @@ def package(args: argparse.Namespace) -> None:
                 args.output,
                 args.version,
                 inventories=inventories,
-                RenderBackend=backend,
+                suffix=suffix,
                 NativeAssetsDir=assets,
                 AppleFrameworksDir=frameworks,
                 BaseOutputPath=f"{base_output}/",
@@ -218,7 +223,7 @@ def smoke_musl(args: argparse.Namespace) -> None:
     target = runtime_target(args.preset)
     if target is None or not args.preset.startswith("linux-musl-"):
         raise SystemExit(f"the musl package smoke cannot run {args.preset}")
-    backend, rid = target
+    _, rid = target
     work = ROOT / "build" / args.preset / "dotnet-musl-test"
     install = ROOT / "build" / args.preset / "install"
     packages = work / "packages"
@@ -238,7 +243,6 @@ def smoke_musl(args: argparse.Namespace) -> None:
         packages,
         MUSL_SMOKE_VERSION,
         inventories=[install / "share/maplibre-native-c/sbom.cdx.json"],
-        RenderBackend=backend,
         NativeAssetsDir=assets,
         BaseOutputPath=f"{base_output}/",
     )
@@ -261,7 +265,6 @@ def smoke_musl(args: argparse.Namespace) -> None:
         # The smoke repacks a fixed version; restore from its fresh package directory
         # so a shared NuGet cache cannot substitute another revision's ABI.
         f"-p:RestorePackagesPath={work / 'restore'}",
-        f"-p:MaplibreNativeFfiRenderBackend={backend}",
         f"-p:BaseOutputPath={base_output}/",
     )
 
@@ -281,7 +284,7 @@ def prepare_android(args: argparse.Namespace) -> None:
     target = runtime_target(args.preset)
     if target is None or not args.preset.startswith("android-"):
         raise SystemExit(f"the Android package test cannot build {args.preset}")
-    backend, rid = target
+    _, rid = target
     work = ROOT / "build" / args.preset / "dotnet-android-test"
     install = ROOT / "build" / args.preset / "install"
     if work.exists():
@@ -302,7 +305,6 @@ def prepare_android(args: argparse.Namespace) -> None:
         packages,
         ANDROID_SMOKE_VERSION,
         inventories=[install / "share/maplibre-native-c/sbom.cdx.json"],
-        RenderBackend=backend,
         NativeAssetsDir=assets,
         BaseOutputPath=f"{base_output}/",
     )
@@ -312,7 +314,7 @@ def prepare_apple(args: argparse.Namespace) -> None:
     target = runtime_target(args.preset)
     if target is None or not args.preset.startswith(("ios-", "tvos-")):
         raise SystemExit(f"the Apple package test cannot build {args.preset}")
-    backend, rid = target
+    _, rid = target
     work = ROOT / "build" / args.preset / "dotnet-apple-test"
     install = ROOT / "build" / args.preset / "install"
     if work.exists():
@@ -330,7 +332,6 @@ def prepare_apple(args: argparse.Namespace) -> None:
         packages,
         APPLE_SMOKE_VERSION,
         inventories=[install / "share/maplibre-native-c/sbom.cdx.json"],
-        RenderBackend=backend,
         AppleFrameworksDir=frameworks,
         BaseOutputPath=f"{base_output}/",
     )
