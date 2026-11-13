@@ -1,0 +1,162 @@
+Check a Win32 window's pixel format when a session attaches to it with WGL.
+
+Windows lets a window set its pixel format once. Attaching to a window that
+already has another one used to return OK and fail later on the session's
+thread, while native-abi/render/window_windows expects the attach itself to
+fail with MLN_STATUS_INVALID_ARGUMENT, as the C++ library did. The attach
+now checks on the caller's thread whenever OpenGL presents to the window.
+Upstream: https://github.com/louwers/mln-rs/pull/325, which also carries
+0002's fix for WGL custom layers.
+
+diff --git a/crates/mln_gl/src/wgl.rs b/crates/mln_gl/src/wgl.rs
+index 755f7c65..e14d18f7 100644
+--- a/crates/mln_gl/src/wgl.rs
++++ b/crates/mln_gl/src/wgl.rs
+@@ -536,6 +536,25 @@ impl WindowDc {
+     }
+ }
+ 
++/// Whether `window` has no pixel format yet, or the library's: whether
++/// [`WindowDc::new`] takes it with format 0. Sets no pixel format.
++///
++/// # Safety
++///
++/// `window` is a live window.
++pub(crate) unsafe fn takes_library_pixel_format(window: HWND) -> Result<bool, String> {
++    // SAFETY: the caller's contract.
++    let dc = unsafe { GetDC(window) };
++    if dc.is_null() {
++        return Err(last_error("GetDC of the window"));
++    }
++    let dc = WindowDc { window, dc };
++    match pixel_format(dc.dc) {
++        0 => Ok(true),
++        current => Ok(current == choose_pixel_format(dc.dc, 0)?),
++    }
++}
++
+ impl Drop for WindowDc {
+     fn drop(&mut self) {
+         // SAFETY: the device context is this one's, got on this thread.
+diff --git a/crates/mln_gl/src/wgl_surface_target.rs b/crates/mln_gl/src/wgl_surface_target.rs
+index 1d6d8b32..ff7ea7e1 100644
+--- a/crates/mln_gl/src/wgl_surface_target.rs
++++ b/crates/mln_gl/src/wgl_surface_target.rs
+@@ -34,18 +34,25 @@ struct WglWindow {
+     _window: Arc<dyn Window>,
+ }
+ 
++/// The Win32 window of `window`.
++fn hwnd(window: &dyn Window) -> Result<HWND, Error> {
++    let handle =
++        window.window_handle().map_err(|e| Error::invalid_argument(format!("The window has no handle: {e}")))?;
++    let RawWindowHandle::Win32(handle) = handle.as_raw() else {
++        return Err(Error::invalid_argument("The window is no Win32 window."));
++    };
++    Ok(handle.hwnd.get() as HWND)
++}
++
++fn other_pixel_format() -> Error {
++    Error::invalid_argument("the window has a pixel format of its own, which Windows doesn't let change")
++}
++
+ impl WglWindow {
+     fn new(window: Arc<dyn Window>) -> Result<WglWindow, Error> {
+-        let handle =
+-            window.window_handle().map_err(|e| Error::invalid_argument(format!("The window has no handle: {e}")))?;
+-        let RawWindowHandle::Win32(handle) = handle.as_raw() else {
+-            return Err(Error::invalid_argument("The window is no Win32 window."));
+-        };
+-        let hwnd = handle.hwnd.get() as HWND;
++        let hwnd = hwnd(&*window)?;
+         // SAFETY: the window is the live one of `window`.
+-        let dc = unsafe { wgl::WindowDc::new(hwnd, 0) }.map_err(Error::native)?.ok_or_else(|| {
+-            Error::invalid_argument("the window has a pixel format of its own, which Windows doesn't let change")
+-        })?;
++        let dc = unsafe { wgl::WindowDc::new(hwnd, 0) }.map_err(Error::native)?.ok_or_else(other_pixel_format)?;
+         let context = wgl::create_context(dc.dc(), std::ptr::null_mut()).map_err(Error::unsupported)?;
+         Ok(WglWindow { window: hwnd, dc, context, _window: window })
+     }
+@@ -106,6 +113,24 @@ pub struct SurfaceTarget {
+ }
+ 
+ impl SurfaceTarget {
++    /// Checks, on any thread and without a context, that
++    /// [`with_backend`](Self::with_backend) can give `window` the library's
++    /// pixel format: that it has none yet, or that one. Sets none.
++    ///
++    /// Fails with [`ErrorKind::InvalidArgument`](mln_util::ErrorKind) for a
++    /// window that isn't a Win32 window or that has a pixel format of its
++    /// own, and with [`ErrorKind::Native`](mln_util::ErrorKind) when the
++    /// query fails.
++    pub fn check_window(window: &dyn Window) -> Result<(), Error> {
++        let hwnd = hwnd(window)?;
++        // SAFETY: the window that `window` names, which the caller keeps open.
++        if unsafe { wgl::takes_library_pixel_format(hwnd) }.map_err(Error::native)? {
++            Ok(())
++        } else {
++            Err(other_pixel_format())
++        }
++    }
++
+     /// A backend on a context of `window`, a Win32 window, and a target that
+     /// presents frames of `framebuffer_size` pixels to it, which it keeps.
+     /// It gives the window the library's pixel format. With
+diff --git a/crates/mln_runtime/src/map.rs b/crates/mln_runtime/src/map.rs
+index f6877536..4807be04 100644
+--- a/crates/mln_runtime/src/map.rs
++++ b/crates/mln_runtime/src/map.rs
+@@ -517,8 +517,9 @@ impl Map {
+     /// map already has a session or was released, or a window is minimized
+     /// or has no client area, and with
+     /// [`ErrorKind::InvalidArgument`](mln_util::ErrorKind) for an empty
+-    /// target, or a [`Surface::wgpu`](crate::Surface::wgpu) without the
+-    /// host's device. The completion fails as
++    /// target, a [`Surface::wgpu`](crate::Surface::wgpu) without the
++    /// host's device, or a Win32 window with a pixel format of its own that
++    /// OpenGL would present to. The completion fails as
+     /// [`Device::new`](crate::Device::new) does when the
+     /// session has to create its device and can't, with
+     /// [`ErrorKind::InvalidState`](mln_util::ErrorKind) when the window or
+diff --git a/crates/mln_runtime/src/render/session.rs b/crates/mln_runtime/src/render/session.rs
+index 2181c5df..93d308a4 100644
+--- a/crates/mln_runtime/src/render/session.rs
++++ b/crates/mln_runtime/src/render/session.rs
+@@ -750,6 +750,7 @@ fn attach_unlocked<R>(
+                 return Err(Error::invalid_argument("a surface that the host made needs the host's device"));
+             }
+             surface.check_area()?;
++            surface.check_pixel_format(device.as_ref())?;
+             (size, TargetInit::Surface { surface, device })
+         }
+         RenderTarget::Borrowed { size, ring: borrowed, device } => {
+diff --git a/crates/mln_runtime/src/render/target.rs b/crates/mln_runtime/src/render/target.rs
+index cb797d7e..4a832057 100644
+--- a/crates/mln_runtime/src/render/target.rs
++++ b/crates/mln_runtime/src/render/target.rs
+@@ -605,6 +605,25 @@ impl Surface {
+         Ok(())
+     }
+ 
++    /// Fails with [`ErrorKind::InvalidArgument`](mln_util::ErrorKind) for a
++    /// Win32 window whose pixel format isn't the library's when OpenGL
++    /// presents to it: on `device`, or without a device, in a build whose
++    /// first backend is OpenGL. Windows doesn't let a pixel format change.
++    /// A session that falls back to OpenGL because Vulkan is missing finds
++    /// out as it starts.
++    #[cfg_attr(not(all(feature = "gl", windows)), allow(clippy::unnecessary_wraps))]
++    pub(crate) fn check_pixel_format(&self, device: Option<&Device>) -> Result<(), Error> {
++        #[cfg(all(feature = "gl", windows))]
++        if let SurfaceKind::Window(window) = &self.kind
++            && device.map_or(cfg!(not(feature = "vulkan")), |device| device.backend() == BackendType::OpenGL)
++        {
++            mln_gl::SurfaceTarget::check_window(&**window)?;
++        }
++        #[cfg(not(all(feature = "gl", windows)))]
++        let _ = (self, device);
++        Ok(())
++    }
++
+     /// The window, for a surface of one.
+     #[allow(clippy::match_wildcard_for_single_variants)]
+     pub(crate) fn host_window(&self) -> Option<Arc<dyn Window>> {
