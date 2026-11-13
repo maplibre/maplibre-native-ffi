@@ -8,45 +8,6 @@ namespace Maplibre.NativeFfi;
 public static unsafe partial class MaplibreNative
 {
     /// <summary>
-    /// Creates a frame pacer that follows the display through the calling
-    /// thread's <c>AChoreographer</c>.
-    /// </summary>
-    /// <remarks>
-    /// <para>Call it on a thread with an <c>ALooper</c>, such as the app's main
-    /// thread, and keep that thread running its looper while sessions use the
-    /// pacer.</para>
-    /// <para><c>AChoreographer</c> can stop while the phone's display is off,
-    /// even while a Surface on another display, such as an Android Auto
-    /// projection, still shows the map. The pacer then keeps demanding frames
-    /// from a timer on the looper, within the frame rate limit, until vsyncs
-    /// arrive again.</para>
-    /// <para>See <c>mln_android_frame_pacer_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.InvalidState</c> when the calling thread
-    /// has no <c>ALooper</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    public static FramePacerHandle AndroidFramePacerCreate(FramePacerOptions? options = null)
-    {
-        using var call = Enter(null);
-        var nativeOptions = options is null
-            ? default(mln_frame_pacer_options)
-            : NativeFramePacerOptions(options);
-        MlnFramePacer outPacer = default;
-        Check(
-            NativeMethods.mln_android_frame_pacer_create(
-                options is null ? null : &nativeOptions,
-                &outPacer,
-                Diagnostic
-            )
-        );
-        return FramePacerHandle.Adopt(outPacer);
-    }
-
-    /// <summary>
     /// Gives the library the Java VM and the app context that it needs on
     /// Android.
     /// </summary>

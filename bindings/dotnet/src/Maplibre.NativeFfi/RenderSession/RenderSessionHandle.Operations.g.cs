@@ -106,6 +106,11 @@ public sealed unsafe partial class RenderSessionHandle
     /// <para>Abandon keeps the session's OpenGL and WebGPU objects until the
     /// process exits, and reports how many it kept. Detach the session instead
     /// to free them.</para>
+    /// <para>A session lets go of your graphics objects later when you call
+    /// this on the thread that runs its graphics work: from a callback that the
+    /// session runs there, once the callback returns, and for a session driven
+    /// by <c>RenderDriverKind.CallerGraphicsThread</c>, at your next
+    /// <c>RenderSessionHandle.ServiceDriverWork()</c> for it.</para>
     /// <para>See <c>mln_render_session_abandon</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -220,6 +225,9 @@ public sealed unsafe partial class RenderSessionHandle
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when
+    /// <c>demand.token</c> is
+    /// <c>MaplibreNative.FrameDemandTokenStillImage</c>.</description></item>
     /// <item><description><c>Status.TargetLost</c> or
     /// <c>Status.NativeError</c>, as <c>RenderSessionSnapshot.FailureStatus</c>
     /// reports, when the session has failed.</description></item>
@@ -725,16 +733,24 @@ public sealed unsafe partial class RenderSessionHandle
     /// app goes to the background. Release every acquired frame first. Frame
     /// demands that are still pending, and later ones until you give the
     /// session a new target, finish with <c>RenderResult.TargetNotReady</c>.
-    /// Once the release completes, you can destroy the old target.</para>
+    /// Once the release completes, you can destroy the old target. An Android
+    /// or OpenHarmony window can go away sooner, as <c>AndroidWindowTarget</c>
+    /// and <c>OhosWindowTarget</c> say.</para>
+    /// <para>For a borrowed ring, a completed release also means that the
+    /// session has stopped waiting on the consumer sync that you released its
+    /// frames with, so you can reuse or destroy the textures. The session waits
+    /// about a second at most for that sync, and logs a warning when the wait
+    /// runs out. It checks the sync without blocking a thread: keep servicing a
+    /// session driven by <c>RenderDriverKind.CallerGraphicsThread</c> until the
+    /// release completes. The session keeps nothing of the released textures: a
+    /// texture that a later target gives it again is a new one, even one that
+    /// you discarded a frame of.</para>
     /// <para>See <c>mln_render_session_release_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when the session renders
-    /// offscreen or into Android hardware buffers, dmabufs, DXGI shared
-    /// textures, or IOSurfaces that it allocates.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when the target is a WebGL
-    /// canvas.</description></item>
+    /// offscreen or into an exported ring.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session loses its
     /// target before the release runs.</description></item>
     /// </list>
@@ -752,12 +768,18 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Resizes the session's target and its map.
+    /// Resizes the session's target and its map, and sets the map's scale
+    /// factor.
     /// </summary>
     /// <remarks>
-    /// <para>The session renders at the map's scale factor. Release every
-    /// acquired frame first. You can call it once the attach call returns.
-    /// While the attach runs, the resize waits for it to complete.</para>
+    /// <para>Use it when the window changes size, or moves to a display with
+    /// another scale factor. The map keeps its loaded tiles, and draws its next
+    /// frame at the new size and scale factor. You can call it once the attach
+    /// call returns. While the attach runs, the resize waits for it to
+    /// complete.</para>
+    /// <para>An exported ring gets textures of the new size. The frames that
+    /// you hold keep their textures, of the old size, until you release or
+    /// discard them.</para>
     /// <para>See <c>mln_render_session_resize</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -765,20 +787,20 @@ public sealed unsafe partial class RenderSessionHandle
     /// <item><description><c>Status.Unsupported</c> when the session renders
     /// into a borrowed ring. Give it new textures of the new size
     /// instead.</description></item>
-    /// <item><description><c>Status.InvalidState</c> while you hold one of the
-    /// session's acquired frames, or when the session failed, or you detached,
-    /// abandoned, released, or disposed it.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when the session failed,
+    /// or you detached, abandoned, released, or disposed
+    /// it.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session loses its
     /// target before the resize applies.</description></item>
     /// </list>
     /// </remarks>
-    public Task<CommandCompletion> ResizeAsync(LogicalSize logicalSize)
+    public Task<CommandCompletion> ResizeAsync(LogicalExtent extent)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_resize(
             Handle,
-            NativeLogicalSize(logicalSize),
+            NativeLogicalExtent(extent),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -807,43 +829,6 @@ public sealed unsafe partial class RenderSessionHandle
     {
         using var call = Enter(this);
         Check(NativeMethods.mln_render_session_service_driver_work(Handle, Diagnostic));
-    }
-
-    /// <summary>
-    /// Replaces the Android window that the session presents to.
-    /// </summary>
-    /// <remarks>
-    /// <para>Use it to give the session a window again after
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
-    /// window, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old window.</para>
-    /// <para>See <c>mln_render_session_set_android_surface_target</c> in the
-    /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when <c>surface</c> has
-    /// no window, such as after the platform destroyed it.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when, in a Vulkan build,
-    /// the new window needs a different color format or pre-rotation support
-    /// than the old one. Attach a new session instead.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the library can't
-    /// create the window's surface.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    public Task SetAndroidSurfaceTargetAsync(AndroidSurfaceReplacement replacement)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeAndroidSurfaceReplacement(replacement);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_android_surface_target(
-            Handle,
-            &nativeReplacement,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
     }
 
     /// <summary>
@@ -880,258 +865,60 @@ public sealed unsafe partial class RenderSessionHandle
     }
 
     /// <summary>
-    /// Replaces the Metal textures that a borrowed ring renders into.
+    /// Replaces the window, surface, or borrowed ring that the session renders
+    /// to, and resizes the map to it.
     /// </summary>
     /// <remarks>
-    /// <para>Use it to resize the ring, or to give the session textures again
-    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
-    /// acquired frame first. Once the replacement completes, the session no
-    /// longer uses the old textures.</para>
-    /// <para>See <c>mln_render_session_set_metal_borrowed_texture_target</c> in
-    /// the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Use it to give the session a target again after
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
+    /// window or surface, or to give a borrowed ring new textures, such as of a
+    /// new size. The session renders to <c>target</c> with the device that it
+    /// attached with. Once the replacement completes, the session no longer
+    /// uses the old target. A borrowed ring takes only a ring of the kind it
+    /// attached with, with as many textures, with depth textures only when it
+    /// attached with them, and with the same formats, final layouts, and owner.
+    /// Release every acquired frame of a borrowed ring first. Once the
+    /// replacement completes, the session has also stopped waiting on the
+    /// consumer sync of the textures that the new ring doesn't have, as
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c> says, so you can reuse
+    /// or destroy them.</para>
+    /// <para>See <c>mln_render_session_set_target</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when the new textures have
-    /// a different pixel format than the old ones. Attach a new session to
-    /// change it.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
-    public Task SetMetalBorrowedTextureTargetAsync(MetalBorrowedTextureReplacement replacement)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeMetalBorrowedTextureReplacement(replacement, scope);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_metal_borrowed_texture_target(
-            Handle,
-            &nativeReplacement,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Replaces the Metal layer that the session renders to.
-    /// </summary>
-    /// <remarks>
-    /// <para>Use it to give the session a layer again after
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
-    /// layer, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old layer.</para>
-    /// <para>See <c>mln_render_session_set_metal_surface_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
-    public Task SetMetalSurfaceTargetAsync(MetalSurfaceReplacement replacement)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeMetalSurfaceReplacement(replacement);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_metal_surface_target(
-            Handle,
-            &nativeReplacement,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Replaces the OpenGL textures that a borrowed ring renders into.
-    /// </summary>
-    /// <remarks>
-    /// <para>Use it to resize the ring, or to give the session textures again
-    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
-    /// acquired frame first. Once the replacement completes, the session no
-    /// longer uses the old textures.</para>
-    /// <para>See <c>mln_render_session_set_open_gl_borrowed_texture_target</c>
-    /// in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    public Task SetOpenGlBorrowedTextureTargetAsync(OpenGlBorrowedTextureReplacement replacement)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeOpenGlBorrowedTextureReplacement(replacement, scope);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_open_gl_borrowed_texture_target(
-            Handle,
-            &nativeReplacement,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Replaces the OpenGL surface that the session presents to.
-    /// </summary>
-    /// <remarks>
-    /// <para>Use it to give the session a surface again after
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
-    /// surface, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old surface.</para>
-    /// <para>See <c>mln_render_session_set_open_gl_surface_target</c> in the
-    /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    public Task SetOpenGlSurfaceTargetAsync(OpenGlSurfaceReplacement replacement)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeOpenGlSurfaceReplacement(replacement);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_open_gl_surface_target(
-            Handle,
-            &nativeReplacement,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Replaces the Vulkan images that a borrowed ring renders into.
-    /// </summary>
-    /// <remarks>
-    /// <para>Use it to resize the ring, or to give the session images again
-    /// after <c>RenderSessionHandle.ReleaseTargetAsync()</c>. Release every
-    /// acquired frame first. Once the replacement completes, the session no
-    /// longer uses the old images.</para>
-    /// <para>See <c>mln_render_session_set_vulkan_borrowed_texture_target</c>
-    /// in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public Task SetVulkanBorrowedTextureTargetAsync(VulkanBorrowedTextureReplacement replacement)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeVulkanBorrowedTextureReplacement(replacement, scope);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_vulkan_borrowed_texture_target(
-            Handle,
-            &nativeReplacement,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Replaces the Vulkan surface that the session presents to.
-    /// </summary>
-    /// <remarks>
-    /// <para>Use it to give the session a surface again after
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
-    /// surface, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old surface.</para>
-    /// <para>See <c>mln_render_session_set_vulkan_surface_target</c> in the
-    /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when the new surface needs
-    /// a different color format or pre-rotation support than the old one.
-    /// Attach a new session instead.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public Task SetVulkanSurfaceTargetAsync(VulkanSurfaceReplacement replacement)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeVulkanSurfaceReplacement(replacement);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_vulkan_surface_target(
-            Handle,
-            &nativeReplacement,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Replaces the Wayland surface that the session presents to.
-    /// </summary>
-    /// <remarks>
-    /// <para>Use it to give the session a surface again after
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
-    /// surface, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old surface.</para>
-    /// <para>See <c>mln_render_session_set_wayland_surface_target</c> in the
-    /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when, in a Vulkan build,
-    /// the new surface needs a different color format than the old one. Attach
-    /// a new session instead.</description></item>
+    /// <item><description><c>Status.InvalidArgument</c> when a borrowed ring
+    /// gets more or fewer textures than it attached with, or depth textures but
+    /// not one for each texture.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when a window is minimized
+    /// or has no client area, or while you hold one of a borrowed ring's
+    /// acquired frames.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the session renders
+    /// offscreen or into an exported ring, when <c>target</c> is offscreen or
+    /// an exported ring, when a session that presents gets a borrowed ring or a
+    /// borrowed ring gets anything else, or when no backend of this build
+    /// renders to the target's kind. An exported ring takes a new size from
+    /// <c>RenderSessionHandle.ResizeAsync()</c> instead.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when a window was
+    /// minimized or had no client area when the replacement
+    /// ran.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the session's device
+    /// can't render to <c>target</c>, the new target needs a different color
+    /// format or pre-rotation support than the old one, or a borrowed ring's
+    /// new textures differ from the old ones in their formats, final layouts,
+    /// or owner, or in having depth textures. Attach a new session
+    /// instead.</description></item>
     /// <item><description><c>Status.NativeError</c> when the library can't
-    /// present to the new surface.</description></item>
+    /// render to the new target.</description></item>
     /// </list>
     /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
-    public Task SetWaylandSurfaceTargetAsync(WaylandSurfaceReplacement replacement)
+    public Task SetTargetAsync(RenderTarget target)
     {
         using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeWaylandSurfaceReplacement(replacement);
+        var nativeTarget = NativeRenderTarget(target, scope);
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_wayland_surface_target(
+        var nativeStatus = NativeMethods.mln_render_session_set_target(
             Handle,
-            &nativeReplacement,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Replaces the Win32 window that the session presents to.
-    /// </summary>
-    /// <remarks>
-    /// <para>Use it to give the session a window again after
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, to move it to another
-    /// window, or to resize it. Once the replacement completes, the session no
-    /// longer uses the old window.</para>
-    /// <para>See <c>mln_render_session_set_win32_window_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when <c>window</c>
-    /// isn't a window, or, in an OpenGL build, already has another pixel
-    /// format.</description></item>
-    /// <item><description><c>Status.InvalidState</c> when <c>window</c> is
-    /// minimized or has no client area.</description></item>
-    /// <item><description><c>Status.InvalidState</c> when <c>window</c> was
-    /// minimized before the replacement ran.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when, in a Vulkan build,
-    /// the new window needs a different color format than the old one. Attach a
-    /// new session instead.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the library can't
-    /// present to the new window.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public Task SetWin32WindowTargetAsync(Win32WindowReplacement replacement)
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeReplacement = NativeWin32WindowReplacement(replacement);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_render_session_set_win32_window_target(
-            Handle,
-            &nativeReplacement,
+            &nativeTarget,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -1157,14 +944,14 @@ public sealed unsafe partial class RenderSessionHandle
             this.owner = owner;
         }
 
-        public void Resize(LogicalSize logicalSize)
+        public void Resize(LogicalExtent extent)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_render_session_resize(
                     receiverHandle,
-                    NativeLogicalSize(logicalSize),
+                    NativeLogicalExtent(extent),
                     null,
                     Diagnostic
                 )

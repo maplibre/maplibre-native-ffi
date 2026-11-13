@@ -3,618 +3,253 @@
 internal import MaplibreNativeC
 import Foundation
 
-struct NativeAcquiredFrameHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_acquired_frame_discard(
-      raw,
-      nil
-    ) == MLN_STATUS_OK
-  }
-}
+struct NativeAcquiredFrameHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_acquired_frame_discard(raw, nil) == MLN_STATUS_OK } }
 
 /// A rendered frame that the caller holds to read or show.
 ///
 /// See `mln_acquired_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
+public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeAcquiredFrameHandle>
   init(adopting raw: mln_acquired_frame, parent: RenderSessionHandle) throws {
-    handle = try NativeHandleState(
-      typeName: "AcquiredFrameHandle",
-      handle: NativeAcquiredFrameHandle(raw: raw),
-      parent: parent
-    )
+    handle = try NativeHandleState(typeName: "AcquiredFrameHandle", handle: NativeAcquiredFrameHandle(raw: raw), parent: parent)
   }
-
   /// The native handle, which no later handle in the process reuses.
   /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: AcquiredFrameHandle,
-                         rhs: AcquiredFrameHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: AcquiredFrameHandle, rhs: AcquiredFrameHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct NativeFramePacerHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_frame_pacer_release(raw); return true
-  }
-}
+struct NativeFramePacerHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_frame_pacer_release(raw); return true } }
 
 /// Demands render sessions' frames at a display's refreshes.
 ///
 /// See `mln_frame_pacer` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class FramePacerHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
+public final class FramePacerHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeFramePacerHandle>
   init(adopting raw: mln_frame_pacer) throws {
-    handle = try NativeHandleState(
-      typeName: "FramePacerHandle",
-      handle: NativeFramePacerHandle(raw: raw)
-    )
+    handle = try NativeHandleState(typeName: "FramePacerHandle", handle: NativeFramePacerHandle(raw: raw))
   }
-
   /// The native handle, which no later handle in the process reuses.
   /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: FramePacerHandle,
-                         rhs: FramePacerHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: FramePacerHandle, rhs: FramePacerHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct NativeMapHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_map_dispose(
-      raw,
-      nil
-    ) == MLN_STATUS_OK
+struct NativeGpuDeviceHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_gpu_device_release(raw); return true } }
+
+/// A GPU, and the queue that render sessions on it share.
+///
+/// See `mln_gpu_device` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+public final class GpuDeviceHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
+  let handle: NativeHandleState<NativeGpuDeviceHandle>
+  init(adopting raw: mln_gpu_device) throws {
+    handle = try NativeHandleState(typeName: "GpuDeviceHandle", handle: NativeGpuDeviceHandle(raw: raw))
   }
+  /// The native handle, which no later handle in the process reuses.
+  /// It stays valid after the handle is released.
+  public var id: UInt64 { handle.value.raw }
+  /// Whether the binding has accepted a release, dispose, or discard of this
+  /// handle.
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: GpuDeviceHandle, rhs: GpuDeviceHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
+
+struct NativeMapHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_map_dispose(raw, nil) == MLN_STATUS_OK } }
 
 /// A map, with its style and camera.
 ///
 /// See `mln_map` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class MapHandle: @unchecked Sendable, NativeReceiver, Identifiable,
-  Hashable, CustomStringConvertible
-{
+public final class MapHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeMapHandle>
   private let readiness: Task<Void, Error>?
-  init(
-    adopting raw: mln_map,
-    parent: RuntimeHandle,
-    ready: Task<Void, Error>
-  ) throws {
-    handle = try NativeHandleState(
-      typeName: "MapHandle",
-      handle: NativeMapHandle(raw: raw),
-      parent: parent
-    )
+  init(adopting raw: mln_map, parent: RuntimeHandle, ready: Task<Void, Error>) throws {
+    handle = try NativeHandleState(typeName: "MapHandle", handle: NativeMapHandle(raw: raw), parent: parent)
     readiness = ready
   }
-
   init(borrowing raw: mln_map) throws {
-    handle = try NativeHandleState(
-      typeName: "MapHandle",
-      handle: NativeMapHandle(raw: raw),
-      borrowed: true
-    )
+    handle = try NativeHandleState(typeName: "MapHandle", handle: NativeMapHandle(raw: raw), borrowed: true)
     readiness = nil
   }
-
   /// Returns once the map is ready, and throws a ``MaplibreError`` when it
   /// fails to become ready. Asynchronous calls on the map before then wait for
   /// it.
   public var ready: Void {
     get async throws { try await readiness?.value }
   }
-
   /// The native handle, which no later handle in the process reuses
   /// and runtime events report as their source. It stays valid after
   /// the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: MapHandle,
-                         rhs: MapHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: MapHandle, rhs: MapHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct NativeMapProjectionHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_map_projection_release(raw); return true
-  }
-}
+struct NativeMapProjectionHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_map_projection_release(raw); return true } }
 
 /// A camera view for converting between screen points and coordinates.
 ///
 /// See `mln_map_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
+public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeMapProjectionHandle>
   init(adopting raw: mln_map_projection) throws {
-    handle = try NativeHandleState(
-      typeName: "MapProjectionHandle",
-      handle: NativeMapProjectionHandle(raw: raw)
-    )
+    handle = try NativeHandleState(typeName: "MapProjectionHandle", handle: NativeMapProjectionHandle(raw: raw))
   }
-
   /// The native handle, which no later handle in the process reuses.
   /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: MapProjectionHandle,
-                         rhs: MapProjectionHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: MapProjectionHandle, rhs: MapProjectionHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct NativeOffscreenDeviceHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_offscreen_device_release(raw); return true
-  }
-}
-
-/// A GPU device that the library creates to render maps offscreen.
-///
-/// See `mln_offscreen_device` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class OffscreenDeviceHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
-  let handle: NativeHandleState<NativeOffscreenDeviceHandle>
-  init(adopting raw: mln_offscreen_device) throws {
-    handle = try NativeHandleState(
-      typeName: "OffscreenDeviceHandle",
-      handle: NativeOffscreenDeviceHandle(raw: raw)
-    )
-  }
-
-  /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
-  /// Whether the binding has accepted a release, dispose, or discard of this
-  /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: OffscreenDeviceHandle,
-                         rhs: OffscreenDeviceHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
-}
-
-struct NativeRenderSessionHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_render_session_dispose(
-      raw,
-      nil
-    ) == MLN_STATUS_OK
-  }
-}
+struct NativeRenderSessionHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_render_session_dispose(raw, nil) == MLN_STATUS_OK } }
 
 /// A render session draws a map into a surface or a texture.
 ///
 /// See `mln_render_session` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
+public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeRenderSessionHandle>
   private let readiness: Task<Void, Error>?
-  init(
-    adopting raw: mln_render_session,
-    parent: MapHandle,
-    ready: Task<Void, Error>
-  ) throws {
-    handle = try NativeHandleState(
-      typeName: "RenderSessionHandle",
-      handle: NativeRenderSessionHandle(raw: raw),
-      parent: parent
-    )
+  init(adopting raw: mln_render_session, parent: MapHandle, ready: Task<Void, Error>) throws {
+    handle = try NativeHandleState(typeName: "RenderSessionHandle", handle: NativeRenderSessionHandle(raw: raw), parent: parent)
     readiness = ready
   }
-
   /// Returns once the session is ready, and throws a ``MaplibreError`` when it
   /// fails to become ready. Asynchronous calls on the session before then wait
   /// for it.
   public var ready: Void {
     get async throws { try await readiness?.value }
   }
-
   /// The native handle, which no later handle in the process reuses.
   /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: RenderSessionHandle,
-                         rhs: RenderSessionHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: RenderSessionHandle, rhs: RenderSessionHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct NativeResourceRequestHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_resource_request_release(raw); return true
-  }
-}
+struct NativeResourceRequestHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_resource_request_release(raw); return true } }
 
 /// A resource load that a resource provider answers.
 ///
 /// See `mln_resource_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
+public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeResourceRequestHandle>
   init(adopting raw: mln_resource_request) throws {
-    handle = try NativeHandleState(
-      typeName: "ResourceRequestHandle",
-      handle: NativeResourceRequestHandle(raw: raw)
-    )
+    handle = try NativeHandleState(typeName: "ResourceRequestHandle", handle: NativeResourceRequestHandle(raw: raw))
   }
-
   /// The native handle, which no later handle in the process reuses.
   /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: ResourceRequestHandle,
-                         rhs: ResourceRequestHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: ResourceRequestHandle, rhs: ResourceRequestHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct NativeResourceTransformRequestHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_resource_transform_request_release(raw); return true
-  }
-}
+struct NativeResourceTransformRequestHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_resource_transform_request_release(raw); return true } }
 
 /// A URL rewrite that a resource transform answers with the URL to load.
 ///
 /// See `mln_resource_transform_request` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class ResourceTransformRequestHandle: @unchecked Sendable,
-  NativeReceiver, Identifiable, Hashable, CustomStringConvertible
-{
+public final class ResourceTransformRequestHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeResourceTransformRequestHandle>
   init(adopting raw: mln_resource_transform_request) throws {
-    handle = try NativeHandleState(
-      typeName: "ResourceTransformRequestHandle",
-      handle: NativeResourceTransformRequestHandle(raw: raw)
-    )
+    handle = try NativeHandleState(typeName: "ResourceTransformRequestHandle", handle: NativeResourceTransformRequestHandle(raw: raw))
   }
-
   /// The native handle, which no later handle in the process reuses.
   /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (
-    lhs: ResourceTransformRequestHandle,
-    rhs: ResourceTransformRequestHandle
-  ) -> Bool {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: ResourceTransformRequestHandle, rhs: ResourceTransformRequestHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct NativeRuntimeHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_runtime_dispose(
-      raw,
-      nil
-    ) == MLN_STATUS_OK
-  }
-}
+struct NativeRuntimeHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_runtime_dispose(raw, nil) == MLN_STATUS_OK } }
 
 /// A runtime owns maps and the network and cache settings that they share.
 ///
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class RuntimeHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
+public final class RuntimeHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeRuntimeHandle>
   init(adopting raw: mln_runtime) throws {
-    handle = try NativeHandleState(
-      typeName: "RuntimeHandle",
-      handle: NativeRuntimeHandle(raw: raw)
-    )
+    handle = try NativeHandleState(typeName: "RuntimeHandle", handle: NativeRuntimeHandle(raw: raw))
   }
-
   /// The native handle, which no later handle in the process reuses
   /// and runtime events report as their source. It stays valid after
   /// the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: RuntimeHandle,
-                         rhs: RuntimeHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: RuntimeHandle, rhs: RuntimeHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-struct NativeStyleExpressionHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_style_expression_release(raw); return true
-  }
-}
+struct NativeStyleExpressionHandle: NativeHandle { let raw: UInt64; func disposeAbandoned() -> Bool { mln_style_expression_release(raw); return true } }
 
 /// A parsed style expression.
 ///
 /// See `mln_style_expression` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class StyleExpressionHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
+public final class StyleExpressionHandle: @unchecked Sendable, NativeReceiver, Identifiable, Hashable, CustomStringConvertible {
   let handle: NativeHandleState<NativeStyleExpressionHandle>
   init(adopting raw: mln_style_expression) throws {
-    handle = try NativeHandleState(
-      typeName: "StyleExpressionHandle",
-      handle: NativeStyleExpressionHandle(raw: raw)
-    )
+    handle = try NativeHandleState(typeName: "StyleExpressionHandle", handle: NativeStyleExpressionHandle(raw: raw))
   }
-
   /// The native handle, which no later handle in the process reuses.
   /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
+  public var id: UInt64 { handle.value.raw }
   /// Whether the binding has accepted a release, dispose, or discard of this
   /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: StyleExpressionHandle,
-                         rhs: StyleExpressionHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
-}
-
-struct NativeVulkanDeviceHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_vulkan_device_release(raw); return true
-  }
-}
-
-/// A Vulkan instance, device, and queue that the library creates and owns.
-///
-/// See `mln_vulkan_device` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class VulkanDeviceHandle: @unchecked Sendable, NativeReceiver,
-  Identifiable, Hashable, CustomStringConvertible
-{
-  let handle: NativeHandleState<NativeVulkanDeviceHandle>
-  init(adopting raw: mln_vulkan_device) throws {
-    handle = try NativeHandleState(
-      typeName: "VulkanDeviceHandle",
-      handle: NativeVulkanDeviceHandle(raw: raw)
-    )
-  }
-
-  /// The native handle, which no later handle in the process reuses.
-  /// It stays valid after the handle is released.
-  public var id: UInt64 {
-    handle.value.raw
-  }
-
-  /// Whether the binding has accepted a release, dispose, or discard of this
-  /// handle.
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var description: String {
-    handle.description
-  }
-
-  public static func == (lhs: VulkanDeviceHandle,
-                         rhs: VulkanDeviceHandle) -> Bool
-  {
-    lhs.id == rhs.id
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(id)
-  }
+  public var isClosed: Bool { handle.isClosed }
+  public var description: String { handle.description }
+  public static func == (lhs: StyleExpressionHandle, rhs: StyleExpressionHandle) -> Bool { lhs.id == rhs.id }
+  public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 public struct MapHandleDiscarding { let owner: MapHandle }
-public extension MapHandle {
-  var discarding: MapHandleDiscarding {
-    MapHandleDiscarding(owner: self)
-  }
-}
+public extension MapHandle { var discarding: MapHandleDiscarding { MapHandleDiscarding(owner: self) } }
 
 public struct RenderSessionHandleDiscarding { let owner: RenderSessionHandle }
-public extension RenderSessionHandle {
-  var discarding: RenderSessionHandleDiscarding {
-    RenderSessionHandleDiscarding(owner: self)
-  }
-}
+public extension RenderSessionHandle { var discarding: RenderSessionHandleDiscarding { RenderSessionHandleDiscarding(owner: self) } }
 
 public struct RuntimeHandleDiscarding { let owner: RuntimeHandle }
-public extension RuntimeHandle {
-  var discarding: RuntimeHandleDiscarding {
-    RuntimeHandleDiscarding(owner: self)
-  }
-}
+public extension RuntimeHandle { var discarding: RuntimeHandleDiscarding { RuntimeHandleDiscarding(owner: self) } }

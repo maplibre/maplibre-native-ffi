@@ -96,6 +96,28 @@ internal actual object UpcallStubs {
       }
     }
     .toLong()
+  actual val customLayerHostPrerender: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      parameters: CPointer<mln_custom_layer_prerender_parameters>? ->
+      Upcalls.customLayerHostPrerender(userData.toLong(), parameters.toLong())
+    }
+    .toLong()
+  actual val customLayerHostRender: Long =
+    staticCFunction {
+      userData: COpaquePointer?,
+      parameters: CPointer<mln_custom_layer_render_parameters>? ->
+      Upcalls.customLayerHostRender(userData.toLong(), parameters.toLong())
+    }
+    .toLong()
+  actual val customLayerHostDeinitialize: Long = staticCFunction { userData: COpaquePointer? ->
+    Upcalls.customLayerHostDeinitialize(userData.toLong())
+  }
+    .toLong()
+  actual val customLayerHostContextLost: Long = staticCFunction { userData: COpaquePointer? ->
+    Upcalls.customLayerHostContextLost(userData.toLong())
+  }
+    .toLong()
   actual val customVectorSourceOptionsFetchTile: Long =
     staticCFunction {
       userData: COpaquePointer?,
@@ -171,16 +193,16 @@ internal actual object UpcallStubs {
       }
     }
     .toLong()
-  actual val wakeCallback: Long = staticCFunction { userData: COpaquePointer? ->
-    Upcalls.wakeCallback(userData.toLong())
-  }
-    .toLong()
   actual val queueLockLock: Long = staticCFunction { userData: COpaquePointer? ->
     Upcalls.queueLockLock(userData.toLong())
   }
     .toLong()
   actual val queueLockUnlock: Long = staticCFunction { userData: COpaquePointer? ->
     Upcalls.queueLockUnlock(userData.toLong())
+  }
+    .toLong()
+  actual val wakeCallback: Long = staticCFunction { userData: COpaquePointer? ->
+    Upcalls.wakeCallback(userData.toLong())
   }
     .toLong()
   actual val cameraTransitionHandlerCallback: Long =

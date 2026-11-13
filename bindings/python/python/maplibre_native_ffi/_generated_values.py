@@ -82,6 +82,156 @@ class OpenGlContextDescriptorWebGlVariant:
 
 
 @dataclass(frozen=True, slots=True)
+class RenderTargetOffscreenVariant:
+    value: OffscreenTarget
+    _tag = 1
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(OffscreenTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetMetalLayerVariant:
+    value: MetalLayerTarget
+    _tag = 2
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(MetalLayerTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetWin32WindowVariant:
+    value: Win32WindowTarget
+    _tag = 3
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(Win32WindowTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetXlibWindowVariant:
+    value: XlibWindowTarget
+    _tag = 4
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(XlibWindowTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetWaylandSurfaceVariant:
+    value: WaylandSurfaceTarget
+    _tag = 5
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(WaylandSurfaceTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetAndroidWindowVariant:
+    value: AndroidWindowTarget
+    _tag = 6
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(AndroidWindowTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetOhosWindowVariant:
+    value: OhosWindowTarget
+    _tag = 7
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(OhosWindowTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetVulkanSurfaceVariant:
+    value: VulkanSurfaceTarget
+    _tag = 10
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(VulkanSurfaceTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetOpenGlSurfaceVariant:
+    value: OpenGlSurfaceTarget
+    _tag = 11
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(OpenGlSurfaceTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetMetalBorrowedTexturesVariant:
+    value: MetalBorrowedTexturesTarget
+    _tag = 12
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(MetalBorrowedTexturesTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetVulkanBorrowedTexturesVariant:
+    value: VulkanBorrowedTexturesTarget
+    _tag = 13
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(VulkanBorrowedTexturesTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetOpenGlBorrowedTexturesVariant:
+    value: OpenGlBorrowedTexturesTarget
+    _tag = 14
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(OpenGlBorrowedTexturesTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetWebGpuBorrowedTexturesVariant:
+    value: WebGpuBorrowedTexturesTarget
+    _tag = 15
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(WebGpuBorrowedTexturesTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetExportedRingVariant:
+    value: ExportedRingTarget
+    _tag = 16
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(ExportedRingTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetWebCanvasVariant:
+    value: WebCanvasTarget
+    _tag = 17
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(WebCanvasTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
 class FeatureIdStringValueVariant:
     value: str
     _tag = 1
@@ -254,19 +404,9 @@ class RuntimeEventOfflineRegionResponseErrorVariant:
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimeEventOfflineRegionTileCountLimitVariant:
-    value: RuntimeEventOfflineRegionTileCountLimit
-    _tag = 9
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(RuntimeEventOfflineRegionTileCountLimit._from_native(raw))
-
-
-@dataclass(frozen=True, slots=True)
 class RuntimeEventGlyphsVariant:
     value: RuntimeEventGlyphs
-    _tag = 10
+    _tag = 9
 
     @classmethod
     def _from_native(cls, raw):
@@ -276,7 +416,7 @@ class RuntimeEventGlyphsVariant:
 @dataclass(frozen=True, slots=True)
 class RuntimeEventSpriteVariant:
     value: RuntimeEventSprite
-    _tag = 11
+    _tag = 10
 
     @classmethod
     def _from_native(cls, raw):
@@ -352,6 +492,17 @@ class CameraUpdateMode(UnknownIntEnum):
     FLY = 2
 
 
+class ClipDepthRange(UnknownIntEnum):
+    """How a graphics API's clip space holds depth.
+
+    See `mln_clip_depth_range` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    ZERO_TO_ONE = 1
+    NEGATIVE_ONE_TO_ONE = 2
+
+
 class ConstrainMode(UnknownIntEnum):
     """How the map keeps the camera within the world or within its bounds.
 
@@ -363,6 +514,17 @@ class ConstrainMode(UnknownIntEnum):
     HEIGHT_ONLY = 1
     WIDTH_AND_HEIGHT = 2
     SCREEN = 3
+
+
+class DepthStencilFormatFlag(IntFlag):
+    """A format of depth and stencil textures, as a bit in a set.
+
+    See `mln_depth_stencil_format_flag` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    DEPTH24_STENCIL8 = 1
+    DEPTH32_FLOAT_STENCIL8 = 2
 
 
 class FrameDemandFlag(IntFlag):
@@ -395,6 +557,35 @@ class GesturePhase(UnknownIntEnum):
     UPDATE = 2
     END = 3
     CANCEL = 4
+
+
+class GpuExportKind(UnknownIntEnum):
+    """A way to share a texture's memory with another API or process.
+
+    See `mln_gpu_export_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    NONE = 0
+    IO_SURFACE = 1
+    DMA_BUF = 2
+    ANDROID_HARDWARE_BUFFER = 3
+    DXGI_SHARED_HANDLE = 4
+    OPAQUE_FD = 5
+
+
+class GpuExportKindFlag(IntFlag):
+    """A way to share a texture's memory, as a bit in a set.
+
+    See `mln_gpu_export_kind_flag` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    IO_SURFACE = 1
+    DMA_BUF = 2
+    ANDROID_HARDWARE_BUFFER = 4
+    DXGI_SHARED_HANDLE = 8
+    OPAQUE_FD = 16
 
 
 class GpuSyncKind(UnknownIntEnum):
@@ -585,17 +776,6 @@ class OpenGlClientApi(UnknownIntEnum):
     GLES = 2
 
 
-class OpenGlContextOwnership(UnknownIntEnum):
-    """Whether a render session's OpenGL context shares objects with yours.
-
-    See `mln_open_gl_context_ownership` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-    """
-
-    SHARED = 0
-    DEDICATED = 1
-
-
 class OpenGlContextProviderFlag(IntFlag):
     """An OpenGL context platform, as a bit in a set.
 
@@ -632,6 +812,19 @@ class RenderAbandonDisposition(UnknownIntEnum):
 
     CLEAN = 0
     QUARANTINED = 1
+
+
+class RenderBackend(UnknownIntEnum):
+    """A render backend.
+
+    See `mln_render_backend` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
+    METAL = 1
+    VULKAN = 2
+    OPEN_GL = 3
+    WEB_GPU = 4
 
 
 class RenderBackendFlag(IntFlag):
@@ -709,6 +902,30 @@ class RenderSessionState(UnknownIntEnum):
     DETACHED = 4
     FAILED = 5
     ABANDONED = 6
+
+
+class RenderTargetKindFlag(IntFlag):
+    """A render target kind, as a bit in a set.
+
+    See `mln_render_target_kind_flag` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    OFFSCREEN = 1
+    METAL_LAYER = 2
+    WIN32_WINDOW = 4
+    XLIB_WINDOW = 8
+    WAYLAND_SURFACE = 16
+    ANDROID_WINDOW = 32
+    OHOS_WINDOW = 64
+    VULKAN_SURFACE = 512
+    OPEN_GL_SURFACE = 1024
+    METAL_BORROWED_TEXTURES = 2048
+    VULKAN_BORROWED_TEXTURES = 4096
+    OPEN_GL_BORROWED_TEXTURES = 8192
+    WEB_GPU_BORROWED_TEXTURES = 16384
+    EXPORTED_RING = 32768
+    WEB_CANVAS = 65536
 
 
 class ResourceErrorReason(UnknownIntEnum):
@@ -844,16 +1061,15 @@ class RuntimeEventFlag(IntFlag):
     MAP_SOURCE_CHANGED = 65536
     OFFLINE_REGION_STATUS_CHANGED = 131072
     OFFLINE_REGION_RESPONSE_ERROR = 262144
-    OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288
-    MAP_GLYPHS_REQUESTED = 1048576
-    MAP_GLYPHS_LOADED = 2097152
-    MAP_GLYPHS_ERROR = 4194304
-    MAP_SPRITE_REQUESTED = 8388608
-    MAP_SPRITE_LOADED = 16777216
-    MAP_SPRITE_ERROR = 33554432
-    ALL_MAP_EVENTS = 66191358
-    ALL_RUNTIME_EVENTS = 917504
-    ALL = 67108862
+    MAP_GLYPHS_REQUESTED = 524288
+    MAP_GLYPHS_LOADED = 1048576
+    MAP_GLYPHS_ERROR = 2097152
+    MAP_SPRITE_REQUESTED = 4194304
+    MAP_SPRITE_LOADED = 8388608
+    MAP_SPRITE_ERROR = 16777216
+    ALL_MAP_EVENTS = 33161214
+    ALL_RUNTIME_EVENTS = 393216
+    ALL = 33554430
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
@@ -898,13 +1114,12 @@ class RuntimeEventType(UnknownIntEnum):
     MAP_SOURCE_CHANGED = 16
     OFFLINE_REGION_STATUS_CHANGED = 17
     OFFLINE_REGION_RESPONSE_ERROR = 18
-    OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19
-    MAP_GLYPHS_REQUESTED = 20
-    MAP_GLYPHS_LOADED = 21
-    MAP_GLYPHS_ERROR = 22
-    MAP_SPRITE_REQUESTED = 23
-    MAP_SPRITE_LOADED = 24
-    MAP_SPRITE_ERROR = 25
+    MAP_GLYPHS_REQUESTED = 19
+    MAP_GLYPHS_LOADED = 20
+    MAP_GLYPHS_ERROR = 21
+    MAP_SPRITE_REQUESTED = 22
+    MAP_SPRITE_LOADED = 23
+    MAP_SPRITE_ERROR = 24
 
 
 class Status(UnknownIntEnum):
@@ -1084,7 +1299,7 @@ class VulkanImageOwner(UnknownIntEnum):
     back.
 
     See `mln_vulkan_image_owner` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     GRAPHICS_QUEUE = 0
@@ -1130,10 +1345,10 @@ class AnchoredMomentum:
 
 @dataclass(frozen=True, slots=True)
 class AndroidHardwareBufferFrame:
-    """The Android hardware buffer of an acquired frame.
+    """The Android hardware buffer of an exported ring's acquired frame.
 
     See `mln_android_hardware_buffer_frame` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
     width: int
@@ -1160,103 +1375,32 @@ class AndroidHardwareBufferFrame:
 
 
 @dataclass(frozen=True, slots=True)
-class AndroidHardwareBufferRingDescriptor:
-    """A ring of Android hardware buffers that the library allocates, for
-    `MapHandle.attach_android_hardware_buffer_ring()`.
+class AndroidWindowTarget:
+    """An Android window to present to.
 
-    Each buffer has the map's size in pixels, `logical_size` times the map's
-    scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its
-    usage is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
-    AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
+    The session takes its own reference to the window, so you can release
+    yours once the call returns. When the platform destroys the window, such
+    as in `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+    `RenderSessionHandle.release_target()`, or give the session another
+    window with `RenderSessionHandle.set_target()`, without waiting for that
+    to complete. A frame to the destroyed window finishes with
+    `RenderResult.TARGET_NOT_READY`, or with `RenderResult.RENDERED` if the
+    window went away while the frame was presenting.
 
-    See `mln_android_hardware_buffer_ring_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+    See `mln_android_window_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
 
-    buffer_count: int
-    """How many buffers the ring has, from 1 to 8."""
-
-    usage: int = 0
-    """More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
-    AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
-    """
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            buffer_count=raw["buffer_count"],
-            usage=raw["usage"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class AndroidSurfaceDescriptor:
-    """An Android window to present to, for
-    `MapHandle.attach_android_surface()`.
-
-    Name the window by `window`, or by `jni_env` and `surface`. The session
-    takes its own reference to the window, so you can release yours once the
-    call returns.
-
-    See `mln_android_surface_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    window: int = 0
-    """Your `ANativeWindow*`, or null to name the window by `surface`."""
-
-    jni_env: int = 0
-    """The calling thread's `JNIEnv*`, with `surface`."""
-
-    surface: int = 0
-    """An `android.view.Surface`, with `jni_env`."""
+    window: int
+    """Your `ANativeWindow*`."""
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
             logical_size=LogicalSize._from_native(raw["logical_size"]),
             window=raw["window"],
-            jni_env=raw["jni_env"],
-            surface=raw["surface"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class AndroidSurfaceReplacement:
-    """A new Android window for
-    `RenderSessionHandle.set_android_surface_target()`.
-
-    Name the window by `window`, or by `jni_env` and `surface`. The session
-    takes its own reference to the window, so you can release yours once the
-    call returns.
-
-    See `mln_android_surface_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    window: int = 0
-    """Your `ANativeWindow*`, or null to name the window by `surface`."""
-
-    jni_env: int = 0
-    """The calling thread's `JNIEnv*`, with `surface`."""
-
-    surface: int = 0
-    """An `android.view.Surface`, with `jni_env`."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            window=raw["window"],
-            jni_env=raw["jni_env"],
-            surface=raw["surface"],
         )
 
 
@@ -1793,6 +1937,74 @@ class CustomGeometrySourceOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class CustomLayerHost:
+    """The callbacks of a custom layer, which draws with your own GPU commands
+    in the map's frame.
+
+    Nor does a browser WebGPU session yet: the library's WebGPU (wgpu)
+    exposes no command encoder or render pass to hand you. Leave unset the
+    callbacks that you don't need.
+
+    Runs on the thread that runs the session's graphics work: a library
+    thread, or yours with `RenderDriverKind.CALLER_GRAPHICS_THREAD`. It can't
+    call the library.
+
+    It can't call the library.
+
+    See `mln_custom_layer_host` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
+    @classmethod
+    def native(
+        cls,
+        prerender: int,
+        render: int,
+        deinitialize: int,
+        context_lost: int,
+        user_data: int = 0,
+        release_user_data: int = 0,
+    ) -> NativeCustomLayerHost:
+        """A native registration, whose function pointers, context, and release
+        the host's native code supplies as addresses. Zero is null. The
+        binding copies each address unchanged, and native code validates
+        them.
+        """
+        from . import _native
+
+        return NativeCustomLayerHost._from_registration(
+            _native._NativeRegistration(
+                "mln_custom_layer_host",
+                (prerender, render, deinitialize, context_lost),
+                user_data,
+                release_user_data,
+            )
+        )
+
+
+class NativeCustomLayerHost:
+    """A native `CustomLayerHost` from `CustomLayerHost.native`, accepted
+    wherever a `CustomLayerHost` is.
+
+    The first call that carries it consumes it. Native code releases the
+    context of a call that it accepts, and the binding releases the context
+    of a call that native code does not accept. A second call raises an
+    invalid-state error.
+    """
+
+    __slots__ = ("_registration",)
+
+    def __init__(self):
+        raise TypeError("native registrations come from CustomLayerHost.native")
+
+    @classmethod
+    def _from_registration(cls, registration):
+        value = cls.__new__(cls)
+        value._registration = registration
+        return value
+
+
+@dataclass(frozen=True, slots=True)
 class CustomVectorSourceOptions:
     """The callbacks and options of a custom vector source.
 
@@ -1825,7 +2037,7 @@ class DmaBufFormat:
     """A DRM format and modifier that you can import.
 
     See `mln_dma_buf_format` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     fourcc: int = 0
@@ -1841,10 +2053,10 @@ class DmaBufFormat:
 
 @dataclass(frozen=True, slots=True)
 class DmaBufFrame:
-    """The dmabuf of an acquired frame.
+    """The dmabuf of an exported ring's acquired frame.
 
     See `mln_dma_buf_frame` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
     width: int
@@ -1884,7 +2096,7 @@ class DmaBufPlane:
     """Where one plane of a dmabuf keeps its data.
 
     See `mln_dma_buf_plane` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
     fd: int
@@ -1904,48 +2116,11 @@ class DmaBufPlane:
 
 
 @dataclass(frozen=True, slots=True)
-class DmaBufRingDescriptor:
-    """A ring of dmabufs that the library allocates, for
-    `MapHandle.attach_dma_buf_ring()`.
-
-    Each buffer has the map's size in pixels and a format and modifier from
-    `formats`. The library renders only DRM_FORMAT_ABGR8888 and
-    DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
-    format has, such as a plane of compression metadata, and the library
-    takes any such modifier that its GPU can render into and share.
-
-    See `mln_dma_buf_ring_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    buffer_count: int
-    """How many buffers the ring has, from 1 to 8."""
-
-    formats: Sequence[DmaBufFormat]
-    """The formats and modifiers that your reader imports, most preferred first,
-    such as those that eglQueryDmaBufModifiersEXT() reports.
-    """
-
-    def __post_init__(self):
-        object.__setattr__(self, "formats", _sequence(self.formats))
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            buffer_count=raw["buffer_count"],
-            formats=tuple(DmaBufFormat._from_native(item) for item in raw["formats"]),
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class DxgiSharedTextureFrame:
-    """The DXGI shared texture of an acquired frame.
+    """The DXGI shared texture of an exported ring's acquired frame.
 
     See `mln_dxgi_shared_texture_frame` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
     width: int
@@ -1976,32 +2151,6 @@ class DxgiSharedTextureFrame:
 
 
 @dataclass(frozen=True, slots=True)
-class DxgiSharedTextureRingDescriptor:
-    """A ring of DXGI shared textures that the library allocates, for
-    `MapHandle.attach_dxgi_shared_texture_ring()`.
-
-    Each texture is a D3D11 2D texture with the map's size in pixels and the
-    format DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a
-    render target, and is shared through an NT handle.
-
-    See `mln_dxgi_shared_texture_ring_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    texture_count: int
-    """How many textures the ring has, from 1 to 8."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            texture_count=raw["texture_count"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class EdgeInsets:
     """Distances in logical pixels from each edge of the map.
 
@@ -2026,23 +2175,23 @@ class EdgeInsets:
 
 @dataclass(frozen=True, slots=True)
 class EglContextDescriptor:
-    """The EGL objects that a render session makes its OpenGL context from.
+    """Your EGL context, which each session's context shares objects with.
+
+    Each session makes its context on `display` with `config` and the client
+    API and version of `share_context`.
 
     See `mln_egl_context_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     display: int
-    """An `EGLDisplay`."""
+    """An `EGLDisplay`, which you initialized."""
 
     config: int
-    """An `EGLConfig`."""
+    """The `EGLConfig` of `share_context`."""
 
-    share_context: int = 0
-    """Your `EGLContext`, for a shared context."""
-
-    client_api: OpenGlClientApi = OpenGlClientApi.UNSPECIFIED
-    """The API of a dedicated context. A shared context uses the API of yours."""
+    share_context: int
+    """Your `EGLContext`."""
 
     get_proc_address: int = 0
     """Your `eglGetProcAddress`, or null to use the system's."""
@@ -2053,8 +2202,106 @@ class EglContextDescriptor:
             display=raw["display"],
             config=raw["config"],
             share_context=raw["share_context"],
-            client_api=OpenGlClientApi(raw["client_api"]),
             get_proc_address=raw["get_proc_address"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ExportedRingTarget:
+    """A ring of textures that the session allocates on its device and shares
+    with you, in one of the ways that you can import.
+
+    Each texture has the size in pixels of `logical_size` at the map's scale
+    factor. `RenderSessionHandle.resize()` gives the ring textures of the new
+    size, and a frame that you hold keeps its texture of the old size until
+    you release or discard it.
+
+    The ring shares its textures in the first kind of `export_kinds` that the
+    device exports, in this order, and
+    `RenderSessionCapabilities.export_kind` reports it:
+
+    - `GpuExportKind.IO_SURFACE`: IOSurfaces of the pixel format
+      kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm.
+      Get each frame's surface with `AcquiredFrameHandle.io_surface()`.
+    - `GpuExportKind.ANDROID_HARDWARE_BUFFER`: hardware buffers of the format
+      AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage
+      AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+      AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+      `android_hardware_buffer_usage`. Get each frame's buffer with
+      `AcquiredFrameHandle.android_hardware_buffer()`.
+    - `GpuExportKind.DXGI_SHARED_HANDLE`: D3D11 textures of the format
+      DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
+      resources and render targets. Open them on a D3D11 or D3D12 device of
+      the same adapter, which you pick with `GpuDeviceOptions.adapter_luid`.
+      Get each frame's texture with
+      `AcquiredFrameHandle.dxgi_shared_texture()`.
+    - `GpuExportKind.DMA_BUF`: dmabufs of a format and modifier from
+      `dma_buf_formats`. Get each frame's buffer with
+      `AcquiredFrameHandle.dma_buf()`.
+    - `GpuExportKind.OPAQUE_FD`: the memory of Vulkan images, which only a
+      Vulkan device or an OpenGL context with GL_EXT_memory_object_fd on the
+      same GPU and driver imports. To pick the GPU, create the device with
+      `GpuDeviceOptions.adapter_uuid` set to your context's
+      GL_DEVICE_UUID_EXT. Get each frame's memory with
+      `AcquiredFrameHandle.opaque_fd()`.
+
+    `GpuDeviceCapabilities.export_kinds` reports the kinds that a device
+    exports. Attach with `RenderDriverKind.CORE_WORKER`. Without a device,
+    the session renders on the first of the platform's backends whose device
+    exports one of `export_kinds`.
+
+    Each frame hands over with `GpuSyncKind.CPU_COMPLETE` or with the sync
+    kind that crosses APIs on its platform: `GpuSyncKind.METAL_SHARED_EVENT`
+    for an IOSurface, and `GpuSyncKind.SYNC_FD` for the others, where the
+    device has them. For a reader that waits on neither, such as a Wayland
+    compositor without explicit synchronization or Flutter's
+    `copyPixelBuffer`, leave them out of
+    `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+    finishes before you acquire it, and release each frame only once the
+    reader is done with its texture. Give the ring 3 textures, so the session
+    can render while you hold two frames.
+
+    See `mln_exported_ring_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    texture_count: int
+    """How many textures the ring has, from 1 to `TEXTURE_RING_MAX_DEPTH`."""
+
+    export_kinds: GpuExportKindFlag
+    """The ways of sharing a texture that you can import."""
+
+    dma_buf_formats: Sequence[DmaBufFormat] = ()
+    """The dmabuf formats and modifiers that you import, most preferred first,
+    such as those that eglQueryDmaBufModifiersEXT() reports. A ring exports
+    dmabufs only of one of them. The library renders only DRM_FORMAT_ABGR8888
+    and DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than
+    its format has, such as a plane of compression metadata, and the library
+    takes any such modifier that its GPU can render into and share. The
+    library takes no implicit modifier: it skips DRM_FORMAT_MOD_INVALID, so a
+    list of only that one gets no dmabuf.
+    """
+
+    android_hardware_buffer_usage: int = 0
+    """More `AHARDWAREBUFFER_USAGE_*` bits that your reads of a hardware buffer
+    need, such as AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+    """
+
+    def __post_init__(self):
+        object.__setattr__(self, "dma_buf_formats", _sequence(self.dma_buf_formats))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            texture_count=raw["texture_count"],
+            export_kinds=GpuExportKindFlag(raw["export_kinds"]),
+            dma_buf_formats=tuple(
+                DmaBufFormat._from_native(item) for item in raw["dma_buf_formats"]
+            ),
+            android_hardware_buffer_usage=raw["android_hardware_buffer_usage"],
         )
 
 
@@ -2141,7 +2388,8 @@ class FrameDemand:
 
 @dataclass(frozen=True, slots=True)
 class FramePacerOptions:
-    """Options for creating a frame pacer.
+    """Options for creating a frame pacer, or for
+    `FramePacerHandle.set_options()`.
 
     See `mln_frame_pacer_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2153,9 +2401,93 @@ class FramePacerOptions:
     demand frames at every refresh.
     """
 
+    unlimited_frames_per_second: bool = False
+
     @classmethod
     def _from_native(cls, raw):
-        return cls(maximum_frames_per_second=raw["maximum_frames_per_second"])
+        return cls(
+            maximum_frames_per_second=raw["maximum_frames_per_second"],
+            unlimited_frames_per_second=raw["unlimited_frames_per_second"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class FrameProjection:
+    """Where a frame drew the map, and the depth that it wrote there.
+
+    World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at
+    180° east, and on past both into the copies of the world beside the
+    first. y runs from 0 at the north edge of the Mercator world, about
+    85.05° north, to 1 at its south edge. z is the altitude in meters above
+    sea level, at the scale of the heights of the map's 3D layers, and the
+    map draws its ground at 0.
+
+    `matrix` takes a world point to the clip coordinates where the frame drew
+    it, with the camera's padding, roll, field of view, and center altitude,
+    and the map's viewport and projection mode. Clip y points up, as the map
+    draws with OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan,
+    so negate it there too. At high zooms, single precision can't tell nearby
+    world points apart: subtract an origin near your geometry from its
+    coordinates in double precision, and fold the origin into the matrix,
+    before you convert to float.
+
+    Clip z follows `clip_depth_range`, the convention of the device's
+    graphics API. With the API's default depth range of 0 to 1, a fragment
+    that you draw through `matrix` gets the depth that the map's 3D layers,
+    such as fill extrusions, wrote at the same place: 0 at `near_distance`
+    from the camera, up to `far_depth` at `far_distance`. Depth-tested
+    against the frame's depth, your fragments hide behind the map's 3D layers
+    where those stand in front of them.
+
+    The frame's depth starts at 1. The map's 3D layers write the depth of
+    each of their fragments. A 2D layer below every 3D layer of the style
+    that draws opaque fragments, such as an opaque fill, writes one depth
+    over all of them, wherever they are: the higher the layer, the lower its
+    depth, and every one between `far_depth` and 1. Backgrounds, translucent
+    fragments, and the 2D layers above a 3D layer, such as labels, write no
+    depth. So what you draw through `matrix`, even on the ground, lies in
+    front of every 2D layer.
+
+    While `globe` is true, the frame drew the map onto a globe, and its 2D
+    layers wrote no depth. `matrix` then is the map's Mercator one, which
+    doesn't place points on the globe.
+
+    See `mln_frame_projection` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    matrix: Mat4
+
+    clip_depth_range: ClipDepthRange
+
+    near_distance: float
+    """The distance from the camera to the plane where the depth that you get
+    through `matrix` is 0, along the camera's view. Like `far_distance`, it
+    is in pixels of the map at the camera's zoom, where the world is 512 ×
+    2^zoom pixels wide.
+    """
+
+    far_distance: float
+    """The distance to the plane where the depth is `far_depth`."""
+
+    far_depth: float
+    """The depth at `far_distance`, below 1."""
+
+    globe: bool
+    """Whether the frame drew the map as a globe, alone or blending into
+    Mercator.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            matrix=Mat4._from_native(raw["matrix"]),
+            clip_depth_range=ClipDepthRange(raw["clip_depth_range"]),
+            near_distance=raw["near_distance"],
+            far_distance=raw["far_distance"],
+            far_depth=raw["far_depth"],
+            globe=raw["globe"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2297,6 +2629,136 @@ class GestureMomentum:
 
 
 @dataclass(frozen=True, slots=True)
+class GpuDeviceCapabilities:
+    """What a GPU device can do.
+
+    See `mln_gpu_device_capabilities` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    """
+
+    backend: RenderBackend
+
+    target_kinds: RenderTargetKindFlag
+    """The kinds of `RenderTarget` that sessions on the device render to."""
+
+    export_kinds: GpuExportKindFlag
+    """The ways that the device can share the textures of an exported ring. A
+    kind is here only once the device has exported a texture of it, so a
+    driver that offers an extension but can't allocate the memory reports no
+    kind of it.
+    """
+
+    sync_kinds: GpuSyncKindFlag
+    """The kinds of `GpuSync` that the device can signal and wait on."""
+
+    depth_stencil_formats: DepthStencilFormatFlag
+    """The formats of the depth textures that a borrowed ring takes."""
+
+    depth_export_kinds: GpuExportKindFlag
+    """The kinds of `export_kinds` whose rings also share each frame's depth
+    texture, with `RenderSessionAttachOptions.keep_depth`. An IOSurface or a
+    dmabuf holds no depth format, so only `GpuExportKind.OPAQUE_FD` can be
+    here.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            backend=RenderBackend(raw["backend"]),
+            target_kinds=RenderTargetKindFlag(raw["target_kinds"]),
+            export_kinds=GpuExportKindFlag(raw["export_kinds"]),
+            sync_kinds=GpuSyncKindFlag(raw["sync_kinds"]),
+            depth_stencil_formats=DepthStencilFormatFlag(raw["depth_stencil_formats"]),
+            depth_export_kinds=GpuExportKindFlag(raw["depth_export_kinds"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GpuDeviceOptions:
+    """Options for `GpuDeviceHandle.create()`.
+
+    Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
+    `adapter_luid`. Without one, the device prefers a discrete GPU.
+
+    See `mln_gpu_device_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    """
+
+    backend: RenderBackend | None = None
+    """The backend that the device renders with. By default, the platform's own:
+    Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system
+    has no Vulkan driver, and in a browser the build's one backend: WebGPU or
+    OpenGL (WebGL2).
+    """
+
+    adapter_index: int | None = None
+    """The GPU to use, as an index into the backend's list of GPUs."""
+
+    adapter_uuid: Buffer | None = None
+    """The 16-byte UUID of the GPU to use: Vulkan's
+    `VkPhysicalDeviceIDProperties.deviceUUID`, or OpenGL's
+    `GL_DEVICE_UUID_EXT`.
+    """
+
+    adapter_luid: Buffer | None = None
+    """The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
+    which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`, and on
+    Apple platforms, its `MTLDevice.registryID`, in the platform's byte
+    order.
+    """
+
+    open_gl_client_api: OpenGlClientApi | None = None
+    """The OpenGL API that an OpenGL device renders with. An EGL device defaults
+    to `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on Linux
+    and FreeBSD. A WGL device takes only `OpenGlClientApi.GL`, its default,
+    and a WebGL device only `OpenGlClientApi.GLES`, its default.
+    """
+
+    open_gl_single_context: bool | None = None
+    """Whether the sessions of an EGL device take turns in one OpenGL context
+    instead of having one each.
+    """
+
+    queue_lock: QueueLock | NativeQueueLock = field(default_factory=lambda: QueueLock())
+    """Your lock on a Vulkan device's queue, when you submit to the queue that
+    `GpuDeviceHandle.get_vulkan_context()` reports. Only a Vulkan device
+    takes one.
+    """
+
+    def __post_init__(self):
+        object.__setattr__(self, "adapter_uuid", _bytes(self.adapter_uuid))
+        object.__setattr__(self, "adapter_luid", _bytes(self.adapter_luid))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            backend=_maybe(RenderBackend, raw["backend"]),
+            adapter_index=raw["adapter_index"],
+            adapter_uuid=raw["adapter_uuid"],
+            adapter_luid=raw["adapter_luid"],
+            open_gl_client_api=_maybe(OpenGlClientApi, raw["open_gl_client_api"]),
+            open_gl_single_context=raw["open_gl_single_context"],
+            queue_lock=QueueLock(),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GpuDeviceVulkanContextResult:
+    """The Vulkan objects of a device, as `GpuDeviceHandle.get_vulkan_context()`
+    reports them.
+
+    See `mln_gpu_device_vulkan_context_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    """
+
+    context: VulkanContextDescriptor
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(context=VulkanContextDescriptor._from_native(raw["context"]))
+
+
+@dataclass(frozen=True, slots=True)
 class GpuSync:
     """A point in GPU work that the other side waits for before using a texture.
 
@@ -2423,10 +2885,10 @@ class ImageStretch:
 
 @dataclass(frozen=True, slots=True)
 class IoSurfaceFrame:
-    """The IOSurface of an acquired frame.
+    """The IOSurface of an exported ring's acquired frame.
 
     See `mln_io_surface_frame` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
     width: int
@@ -2449,38 +2911,6 @@ class IoSurfaceFrame:
             scale_factor=raw["scale_factor"],
             slot=raw["slot"],
             surface=raw["surface"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class IoSurfaceRingDescriptor:
-    """A ring of IOSurfaces that the library allocates, for
-    `MapHandle.attach_io_surface_ring()`.
-
-    Each surface has the map's size in pixels, `logical_size` times the map's
-    scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
-    names MTLPixelFormatBGRA8Unorm.
-
-    See `mln_io_surface_ring_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    buffer_count: int
-    """How many surfaces the ring has, from 1 to 8."""
-
-    context: MetalContextDescriptor = field(
-        default_factory=lambda: MetalContextDescriptor()
-    )
-    """The MTLDevice to render with. A null device picks the system's default."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            buffer_count=raw["buffer_count"],
-            context=MetalContextDescriptor._from_native(raw["context"]),
         )
 
 
@@ -2593,8 +3023,9 @@ class MapOptions:
     """
 
     initial_extent: LogicalExtent
-    """The map's first size, and its scale factor. The scale factor stays fixed
-    for the map's life, and every render session of the map renders at it.
+    """The map's first size, and its scale factor. Render sessions of the map
+    render at its scale factor. `MapHandle.resize()` changes both, or
+    `RenderSessionHandle.resize()` while a render session is attached.
     """
 
     map_mode: MapMode = MapMode.CONTINUOUS
@@ -2873,15 +3304,44 @@ class MapViewportOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class Mat4:
+    """A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's
+    x, plus `y` times its y, `z` times its z, and `w` times its w. In memory
+    it is 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and
+    WebGPU shaders take a matrix.
+
+    See `mln_mat4` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    x: Vec4
+
+    y: Vec4
+
+    z: Vec4
+
+    w: Vec4
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            x=Vec4._from_native(raw["x"]),
+            y=Vec4._from_native(raw["y"]),
+            z=Vec4._from_native(raw["z"]),
+            w=Vec4._from_native(raw["w"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MetalBorrowedTexture:
     """A Metal texture of a borrowed ring.
 
     See `mln_metal_borrowed_texture` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     texture: int
-    """Your MTLTexture."""
+    """Your `MTLTexture`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -2889,154 +3349,94 @@ class MetalBorrowedTexture:
 
 
 @dataclass(frozen=True, slots=True)
-class MetalBorrowedTextureDescriptor:
-    """A ring of your Metal textures, for
-    `MapHandle.attach_metal_borrowed_texture()`.
+class MetalBorrowedTexturesTarget:
+    """A ring of your Metal textures to render into, on the Metal device that
+    you attach on.
 
-    `logical_size` sets the map's size. `physical_width` and
-    `physical_height` give the textures' size in pixels, which is usually
-    `logical_size` times the map's scale factor. The textures must all have
-    that size, one device, one pixel format, one sample, and
-    MTLTextureUsageRenderTarget. The ring holds up to
-    `TEXTURE_RING_MAX_DEPTH` distinct textures.
+    `physical_width` and `physical_height` give the textures' size in pixels,
+    which is usually `logical_size` times the map's scale factor. The
+    textures must all have that size, the device's `MTLDevice`, one pixel
+    format, one sample, and `MTLTextureUsageRenderTarget`. The ring holds up
+    to `TEXTURE_RING_MAX_DEPTH` distinct textures.
 
-    The session uses the textures until a replacement or release of the
-    target completes, a detach or release of the session completes, or an
-    abandon of it returns.
+    Give the ring `depth_textures` to draw into each frame depth-tested
+    against the map, as `FrameProjection` says: one for each of `textures`,
+    at the same index, or none. Each frame clears the one at its slot,
+    renders the map's depth and stencil into it, and stores them. They must
+    have the size of `textures`, one pixel format of
+    `GpuDeviceCapabilities.depth_stencil_formats`, one sample,
+    `MTLTextureUsageRenderTarget`, and a storage mode other than
+    `MTLStorageModeMemoryless`.
 
-    See `mln_metal_borrowed_texture_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    physical_width: int
-
-    physical_height: int
-
-    textures: Sequence[MetalBorrowedTexture]
-
-    command_queue: int = 0
-    """Your MTLCommandQueue on the textures' device, or null for a queue of the
-    session's own. With your queue, frames can use `GpuSyncKind.QUEUE_ORDER`.
-    """
-
-    def __post_init__(self):
-        object.__setattr__(self, "textures", _sequence(self.textures))
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            physical_width=raw["physical_width"],
-            physical_height=raw["physical_height"],
-            textures=tuple(
-                MetalBorrowedTexture._from_native(item) for item in raw["textures"]
-            ),
-            command_queue=raw["command_queue"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class MetalBorrowedTextureReplacement:
-    """New Metal textures for a borrowed ring, for
-    `RenderSessionHandle.set_metal_borrowed_texture_target()`.
-
-    The members and the textures follow the rules of
-    `MetalBorrowedTextureDescriptor`. The ring keeps its depth, device, and
-    command queue, so give it as many textures as it attached with, on the
-    same device.
-
-    See `mln_metal_borrowed_texture_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    physical_width: int
-
-    physical_height: int
-
-    textures: Sequence[MetalBorrowedTexture]
-
-    def __post_init__(self):
-        object.__setattr__(self, "textures", _sequence(self.textures))
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            physical_width=raw["physical_width"],
-            physical_height=raw["physical_height"],
-            textures=tuple(
-                MetalBorrowedTexture._from_native(item) for item in raw["textures"]
-            ),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class MetalContextDescriptor:
-    """The Metal device that a render session uses.
-
-    See `mln_metal_context_descriptor` in the
+    See `mln_metal_borrowed_textures_target` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    device: int = 0
-    """An `MTLDevice`."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(device=raw["device"])
-
-
-@dataclass(frozen=True, slots=True)
-class MetalSurfaceDescriptor:
-    """A Metal layer to render to, for `MapHandle.attach_metal_surface()`.
-
-    The session sets the layer's device, pixel format, and drawable size. It
-    uses the layer until a replacement or release of the target completes, a
-    detach or release of the session completes, or an abandon of it returns.
-
-    See `mln_metal_surface_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    """
-
     logical_size: LogicalSize
 
-    layer: int
-    """Your CAMetalLayer."""
+    physical_width: int
 
-    context: MetalContextDescriptor = field(
-        default_factory=lambda: MetalContextDescriptor()
-    )
-    """The MTLDevice to render with. A null device picks the system's default."""
+    physical_height: int
+
+    textures: Sequence[MetalBorrowedTexture]
+
+    depth_textures: Sequence[MetalBorrowedTexture] = ()
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
+        object.__setattr__(self, "depth_textures", _sequence(self.depth_textures))
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
             logical_size=LogicalSize._from_native(raw["logical_size"]),
-            context=MetalContextDescriptor._from_native(raw["context"]),
-            layer=raw["layer"],
+            physical_width=raw["physical_width"],
+            physical_height=raw["physical_height"],
+            textures=tuple(
+                MetalBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
+            depth_textures=tuple(
+                MetalBorrowedTexture._from_native(item)
+                for item in raw["depth_textures"]
+            ),
         )
 
 
 @dataclass(frozen=True, slots=True)
-class MetalSurfaceReplacement:
-    """A new Metal layer for `RenderSessionHandle.set_metal_surface_target()`.
+class MetalDeviceDescriptor:
+    """Your Metal device and command queue, for `GpuDeviceHandle.wrap_metal()`.
 
-    The session renders to it with the device that it attached with. It uses
-    the layer until a replacement or release of the target completes, a
-    detach or release of the session completes, or an abandon of it returns.
+    See `mln_metal_device_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    """
 
-    See `mln_metal_surface_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    device: int
+    """Your `MTLDevice`."""
+
+    command_queue: int = 0
+    """Your `MTLCommandQueue` on `device`, or null for a queue of the library's.
+    With your queue, borrowed rings can use `GpuSyncKind.QUEUE_ORDER`.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(device=raw["device"], command_queue=raw["command_queue"])
+
+
+@dataclass(frozen=True, slots=True)
+class MetalLayerTarget:
+    """A `CAMetalLayer` to present to.
+
+    The session sets the layer's device, pixel format, and drawable size.
+
+    See `mln_metal_layer_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
 
     layer: int
-    """Your CAMetalLayer."""
+    """Your `CAMetalLayer*`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3049,6 +3449,10 @@ class MetalSurfaceReplacement:
 @dataclass(frozen=True, slots=True)
 class MetalTextureFrame:
     """The Metal texture of an acquired frame.
+
+    The depth members are set when the frame has a depth texture: one of a
+    borrowed ring's `depth_textures`, or an exported ring's with
+    `RenderSessionAttachOptions.keep_depth`. Otherwise they are zero.
 
     See `mln_metal_texture_frame` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -3072,6 +3476,12 @@ class MetalTextureFrame:
     pixel_format: int
     """The texture's MTLPixelFormat."""
 
+    depth_texture: int
+    """The MTLTexture that holds the frame's depth and stencil."""
+
+    depth_pixel_format: int
+    """The depth texture's MTLPixelFormat."""
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -3082,6 +3492,8 @@ class MetalTextureFrame:
             texture=raw["texture"],
             device=raw["device"],
             pixel_format=raw["pixel_format"],
+            depth_texture=raw["depth_texture"],
+            depth_pixel_format=raw["depth_pixel_format"],
         )
 
 
@@ -3354,12 +3766,12 @@ class OfflineTilePyramidRegionDefinition:
 
 
 @dataclass(frozen=True, slots=True)
-class OffscreenDescriptor:
-    """The image that `MapHandle.attach_offscreen()` renders. The session
-    renders it at the map's scale factor.
+class OffscreenTarget:
+    """An image that the session allocates, renders at the map's scale factor,
+    and reads back with `RenderSessionHandle.read_texture()`.
 
-    See `mln_offscreen_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    See `mln_offscreen_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
@@ -3370,35 +3782,111 @@ class OffscreenDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class OffscreenDeviceOptions:
-    """Options for `OffscreenDeviceHandle.create()`.
+class OhosWindowTarget:
+    """An OpenHarmony window to present to.
 
-    See `mln_offscreen_device_options` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+    The session takes its own reference to the window, so you can release
+    yours once the call returns. When the platform destroys the window, such
+    as in an `XComponent`'s `onSurfaceDestroyed` callback, release the target
+    or give the session another window without waiting, as for an Android
+    window.
+
+    See `mln_ohos_window_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    adapter_index: int | None = None
-    """The GPU to use, as an index into the platform's list of GPUs."""
+    logical_size: LogicalSize
 
-    single_context: bool | None = None
-    """Whether the device's sessions take turns in one OpenGL context instead of
-    having one each. Only an EGL device reads it.
-    """
-
-    client_api: OpenGlClientApi | None = None
-    """The OpenGL API that the device's sessions render with. An EGL device
-    defaults to `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on
-    Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.GL`, its
-    default, and a WebGL device only `OpenGlClientApi.GLES`, its default.
-    Other devices take neither.
-    """
+    window: int
+    """Your `OHNativeWindow*`."""
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            adapter_index=raw["adapter_index"],
-            single_context=raw["single_context"],
-            client_api=_maybe(OpenGlClientApi, raw["client_api"]),
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            window=raw["window"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OpaqueFdFrame:
+    """The memory of an exported ring's acquired frame, as an opaque file
+    descriptor.
+
+    The memory holds a 2D Vulkan image of `format`, with one mip level, one
+    layer, optimal tiling, and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a
+    Vulkan image that imports it has too. In OpenGL, import it with
+    glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the
+    texture with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
+    glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
+    VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+
+    With `RenderSessionAttachOptions.keep_depth`, on a device whose
+    `GpuDeviceCapabilities.depth_export_kinds` has `GpuExportKind.OPAQUE_FD`,
+    the depth members share the memory of the frame's depth image in the same
+    way. Otherwise `depth_fd` is -1 and the others are zero. The depth image
+    is 2D, of `depth_format`, with one mip level, one layer, optimal tiling,
+    and the usage VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each
+    frame leaves it in VK_IMAGE_LAYOUT_GENERAL, released to
+    VK_QUEUE_FAMILY_EXTERNAL. In OpenGL, make its texture with the internal
+    format that `DepthStencilFormatFlag` names for `depth_format`.
+
+    See `mln_opaque_fd_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    width: int
+
+    height: int
+
+    scale_factor: float
+
+    slot: int
+    """The texture's index in the ring."""
+
+    fd: int
+    """The file descriptor of the image's memory."""
+
+    allocation_size: int
+    """The size of the memory in bytes."""
+
+    dedicated: bool
+    """Whether the memory is the image's own, which an import says, such as with
+    GL_DEDICATED_MEMORY_OBJECT_EXT.
+    """
+
+    format: int
+    """The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8."""
+
+    depth_fd: int
+    """The file descriptor of the depth image's memory."""
+
+    depth_allocation_size: int
+    """The size of the depth image's memory in bytes."""
+
+    depth_dedicated: bool
+    """Whether the memory is the depth image's own."""
+
+    depth_format: int
+    """The depth image's `VkFormat`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            slot=raw["slot"],
+            fd=raw["fd"],
+            allocation_size=raw["allocation_size"],
+            dedicated=raw["dedicated"],
+            format=raw["format"],
+            depth_fd=raw["depth_fd"],
+            depth_allocation_size=raw["depth_allocation_size"],
+            depth_dedicated=raw["depth_dedicated"],
+            depth_format=raw["depth_format"],
         )
 
 
@@ -3407,7 +3895,7 @@ class OpenGlBorrowedTexture:
     """An OpenGL texture of a borrowed ring.
 
     See `mln_open_gl_borrowed_texture` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     texture: int
@@ -3419,23 +3907,24 @@ class OpenGlBorrowedTexture:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenGlBorrowedTextureDescriptor:
-    """A ring of your OpenGL textures, for
-    `MapHandle.attach_open_gl_borrowed_texture()`.
+class OpenGlBorrowedTexturesTarget:
+    """A ring of your OpenGL textures to render into, on an OpenGL device that
+    `GpuDeviceHandle.wrap_open_gl()` made from your context.
 
-    `logical_size` sets the map's size. `physical_width` and
-    `physical_height` give the textures' size in pixels, which is usually
-    `logical_size` times the map's scale factor. The context must use
-    `OpenGlContextOwnership.SHARED`. Each texture must be in your context's
-    share group, with storage of that size. The ring holds up to
-    `TEXTURE_RING_MAX_DEPTH` distinct textures.
+    `physical_width` and `physical_height` give the textures' size in pixels,
+    which is usually `logical_size` times the map's scale factor. Each
+    texture must be in your context's share group, with RGBA8 storage of that
+    size. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
 
-    The session uses the textures until a replacement or release of the
-    target completes, a detach or release of the session completes, or an
-    abandon of it returns.
+    Give the ring `depth_textures` to draw into each frame depth-tested
+    against the map, as `FrameProjection` says: one for each of `textures`,
+    at the same index, or none. Each frame clears the one at its slot, and
+    renders the map's depth and stencil into it. They must be `GL_TEXTURE_2D`
+    textures in the share group, with storage of the size of `textures` in a
+    format of `GpuDeviceCapabilities.depth_stencil_formats`.
 
-    See `mln_open_gl_borrowed_texture_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    See `mln_open_gl_borrowed_textures_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
@@ -3443,16 +3932,17 @@ class OpenGlBorrowedTextureDescriptor:
     physical_width: int
 
     physical_height: int
-
-    context: OpenGlContextDescriptor
 
     textures: Sequence[OpenGlBorrowedTexture]
 
     target: int
-    """The textures' target. It must be GL_TEXTURE_2D."""
+    """The textures' target. It must be `GL_TEXTURE_2D`."""
+
+    depth_textures: Sequence[OpenGlBorrowedTexture] = ()
 
     def __post_init__(self):
         object.__setattr__(self, "textures", _sequence(self.textures))
+        object.__setattr__(self, "depth_textures", _sequence(self.depth_textures))
 
     @classmethod
     def _from_native(cls, raw):
@@ -3460,134 +3950,47 @@ class OpenGlBorrowedTextureDescriptor:
             logical_size=LogicalSize._from_native(raw["logical_size"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
-            context=OpenGlContextDescriptor._from_native(raw["context"]),
             textures=tuple(
                 OpenGlBorrowedTexture._from_native(item) for item in raw["textures"]
             ),
             target=raw["target"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class OpenGlBorrowedTextureReplacement:
-    """New OpenGL textures for a borrowed ring, for
-    `RenderSessionHandle.set_open_gl_borrowed_texture_target()`.
-
-    The members and the textures follow the rules of
-    `OpenGlBorrowedTextureDescriptor`. The ring keeps its depth, context, and
-    texture target, so give it as many textures as it attached with, in the
-    same share group.
-
-    See `mln_open_gl_borrowed_texture_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    physical_width: int
-
-    physical_height: int
-
-    textures: Sequence[OpenGlBorrowedTexture]
-
-    def __post_init__(self):
-        object.__setattr__(self, "textures", _sequence(self.textures))
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            physical_width=raw["physical_width"],
-            physical_height=raw["physical_height"],
-            textures=tuple(
-                OpenGlBorrowedTexture._from_native(item) for item in raw["textures"]
+            depth_textures=tuple(
+                OpenGlBorrowedTexture._from_native(item)
+                for item in raw["depth_textures"]
             ),
         )
 
 
+type OpenGlContextDescriptor = (
+    OpenGlContextDescriptorWglVariant
+    | OpenGlContextDescriptorEglVariant
+    | OpenGlContextDescriptorWebGlVariant
+)
+"""Your OpenGL context, for `GpuDeviceHandle.wrap_open_gl()`: the root of the
+share group that the device's sessions join.
+
+See `mln_open_gl_context_descriptor` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+"""
+
+
 @dataclass(frozen=True, slots=True)
-class OpenGlContextDescriptor:
-    """How a render session gets the OpenGL context that it renders with.
+class OpenGlSurfaceTarget:
+    """Your OpenGL surface to present to, with the context that
+    `GpuDeviceHandle.wrap_open_gl()` wrapped.
 
-    Keep the objects that it names alive until a detach or release of the
-    session completes, or an abandon of it returns.
+    The session makes its context current on the surface for each frame, and
+    swaps the surface's buffers to present.
 
-    See `mln_open_gl_context_descriptor` in the
+    See `mln_open_gl_surface_target` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    data: (
-        OpenGlContextDescriptorWglVariant
-        | OpenGlContextDescriptorEglVariant
-        | OpenGlContextDescriptorWebGlVariant
-    )
-
-    ownership: OpenGlContextOwnership = OpenGlContextOwnership.SHARED
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            ownership=OpenGlContextOwnership(raw["ownership"]),
-            data=_copy_variant(
-                raw["data"],
-                {
-                    "wgl": OpenGlContextDescriptorWglVariant,
-                    "egl": OpenGlContextDescriptorEglVariant,
-                    "web_gl": OpenGlContextDescriptorWebGlVariant,
-                },
-                None,
-            ),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class OpenGlSurfaceDescriptor:
-    """An OpenGL surface to present to, for
-    `MapHandle.attach_open_gl_surface()`.
-
-    The session uses the surface until a replacement or release of the target
-    completes, a detach or release of the session completes, or an abandon of
-    it returns.
-
-    See `mln_open_gl_surface_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    """
-
     logical_size: LogicalSize
 
-    context: OpenGlContextDescriptor
-
-    surface: int = 0
-    """Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            context=OpenGlContextDescriptor._from_native(raw["context"]),
-            surface=raw["surface"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class OpenGlSurfaceReplacement:
-    """A new OpenGL surface for
-    `RenderSessionHandle.set_open_gl_surface_target()`.
-
-    The session presents to it with the context that it attached with. It
-    uses the surface until a replacement or release of the target completes,
-    a detach or release of the session completes, or an abandon of it
-    returns.
-
-    See `mln_open_gl_surface_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    surface: int = 0
-    """Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
-    leave it null.
+    surface: int
+    """Your `EGLSurface` on the context's display, with its config, or your
+    `HDC` with the context's pixel format.
     """
 
     @classmethod
@@ -3601,6 +4004,9 @@ class OpenGlSurfaceReplacement:
 @dataclass(frozen=True, slots=True)
 class OpenGlTextureFrame:
     """The OpenGL texture of an acquired frame.
+
+    The depth members are set when the frame has a depth texture, as for
+    `MetalTextureFrame`. Otherwise they are zero.
 
     See `mln_open_gl_texture_frame` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -3619,6 +4025,14 @@ class OpenGlTextureFrame:
 
     target: int
 
+    depth_texture: int
+    """The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil."""
+
+    depth_internal_format: int
+    """The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero
+    for a borrowed ring's.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -3628,6 +4042,8 @@ class OpenGlTextureFrame:
             slot=raw["slot"],
             texture=raw["texture"],
             target=raw["target"],
+            depth_texture=raw["depth_texture"],
+            depth_internal_format=raw["depth_internal_format"],
         )
 
 
@@ -3800,11 +4216,15 @@ class Quaternion:
 
 @dataclass(frozen=True, slots=True)
 class QueueLock:
-    """Your lock on a Vulkan queue that you and a render session both submit to.
+    """Your lock on a Vulkan queue that you and the render sessions of a GPU
+    device all submit to.
 
-    The session holds the lock only while it submits or presents to the
-    queue. Set both `lock` and `unlock`, or neither when you don't submit to
-    the queue yourself.
+    A session holds the lock only while it submits or presents to the queue,
+    or submits the empty batch that drains its work from the queue. It never
+    holds the lock while it waits. Set both `lock` and `unlock`, or neither
+    when you don't submit to the queue yourself.
+
+    Don't hold the lock while you call the library.
 
     It can run on a library thread, and it can't call the library.
 
@@ -3899,6 +4319,11 @@ class RenderFrameResult:
     view: MapView
     """The camera and extent that a rendered frame shows."""
 
+    frame_projection: FrameProjection
+    """Where a rendered frame drew the map, for drawing into its frame with
+    depth. All zero for a demand that rendered nothing.
+    """
+
     mode: RenderMode
 
     @classmethod
@@ -3911,6 +4336,7 @@ class RenderFrameResult:
             frame_generation=raw["frame_generation"],
             needs_repaint=raw["needs_repaint"],
             view=MapView._from_native(raw["view"]),
+            frame_projection=FrameProjection._from_native(raw["frame_projection"]),
             mode=RenderMode(raw["mode"]),
         )
 
@@ -3927,14 +4353,18 @@ class RenderSessionAttachOptions:
     """The thread that runs the session's graphics work, which depends on the
     target:
 
-    - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a shared or dedicated EGL
-      or WGL context, an existing WebGL context, or a browser's WebGPU
-      device.
-    - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an
-      Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-      Android hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces,
-      or an offscreen session.
-    - Either one for another Metal or Vulkan target.
+    - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a borrowed ring of WebGPU
+      textures.
+    - `RenderDriverKind.CORE_WORKER` for an offscreen target, a window, or an
+      exported ring.
+    - Either one for a web canvas. In a browser both run on the thread that
+      loaded the library: `RenderDriverKind.CORE_WORKER` in the library's own
+      tasks, and `RenderDriverKind.CALLER_GRAPHICS_THREAD` when you service
+      the session.
+    - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
+      borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
+      these on `RenderDriverKind.CORE_WORKER` only, and fails an attach with
+      `RenderDriverKind.CALLER_GRAPHICS_THREAD` then.
 
     An attach with another driver fails with `Status.UNSUPPORTED`.
     """
@@ -3965,8 +4395,18 @@ class RenderSessionAttachOptions:
     again until a service runs.
     """
 
-    queue_lock: QueueLock | NativeQueueLock = field(default_factory=lambda: QueueLock())
-    """Your lock on the Vulkan queue, when you submit to it yourself."""
+    keep_depth: bool = False
+    """Whether an exported ring keeps the depth and stencil of each frame for
+    you, so that you can draw into the frame depth-tested against the map, as
+    `FrameProjection` says. The getter of the device's API, such as
+    `AcquiredFrameHandle.vulkan_texture()`, gets a frame's depth texture on
+    the device, and `AcquiredFrameHandle.opaque_fd()` shares it across APIs
+    when `GpuDeviceCapabilities.depth_export_kinds` has the ring's kind.
+    Keeping depth costs memory bandwidth, most on tile-based GPUs. A borrowed
+    ring keeps depth in the textures that you give it instead, and the other
+    targets keep none, so an attach to them with `keep_depth` fails with
+    `Status.UNSUPPORTED`.
+    """
 
     @classmethod
     def _from_native(cls, raw):
@@ -3976,7 +4416,7 @@ class RenderSessionAttachOptions:
             frame_wake=Wake(),
             redraw_wake=Wake(),
             driver_work_wake=Wake(),
-            queue_lock=QueueLock(),
+            keep_depth=raw["keep_depth"],
         )
 
 
@@ -4003,6 +4443,11 @@ class RenderSessionCapabilities:
     depend on the target and on what the device supports.
     """
 
+    export_kind: GpuExportKind
+    """How an exported ring shares its textures, which says which getter gets an
+    acquired frame's texture, or `GpuExportKind.NONE` for another target.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -4011,6 +4456,7 @@ class RenderSessionCapabilities:
             flags=RenderSessionCapabilityFlag(raw["flags"]),
             producer_sync_kind=GpuSyncKind(raw["producer_sync_kind"]),
             consumer_sync_kinds=GpuSyncKindFlag(raw["consumer_sync_kinds"]),
+            export_kind=GpuExportKind(raw["export_kind"]),
         )
 
 
@@ -4056,6 +4502,42 @@ class RenderSessionSnapshot:
             failure_status=Status(raw["failure_status"]),
             has_target=raw["has_target"],
         )
+
+
+type RenderTarget = (
+    RenderTargetOffscreenVariant
+    | RenderTargetMetalLayerVariant
+    | RenderTargetWin32WindowVariant
+    | RenderTargetXlibWindowVariant
+    | RenderTargetWaylandSurfaceVariant
+    | RenderTargetAndroidWindowVariant
+    | RenderTargetOhosWindowVariant
+    | RenderTargetVulkanSurfaceVariant
+    | RenderTargetOpenGlSurfaceVariant
+    | RenderTargetMetalBorrowedTexturesVariant
+    | RenderTargetVulkanBorrowedTexturesVariant
+    | RenderTargetOpenGlBorrowedTexturesVariant
+    | RenderTargetWebGpuBorrowedTexturesVariant
+    | RenderTargetExportedRingVariant
+    | RenderTargetWebCanvasVariant
+)
+"""What a render session renders into: one kind of target, and its descriptor.
+
+Every target has a size in logical pixels, which sets the map's size. The
+session renders it at the map's scale factor. A borrowed or exported ring
+hands each frame to you: acquire it with
+`RenderSessionHandle.acquire_frame()`, and release it with your GPU's
+synchronization once you have read it.
+
+The session uses the objects that the descriptor names until a replacement or
+release of the target completes, a detach or release of the session
+completes, or an abandon of it returns, except as a kind's descriptor says. A
+window target presents without waiting for the display, so demand at most one
+frame per display refresh.
+
+See `mln_render_target` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -4483,7 +4965,6 @@ class RuntimeEvent:
         | RuntimeEventSourceChangedVariant
         | RuntimeEventOfflineRegionStatusVariant
         | RuntimeEventOfflineRegionResponseErrorVariant
-        | RuntimeEventOfflineRegionTileCountLimitVariant
         | RuntimeEventGlyphsVariant
         | RuntimeEventSpriteVariant
         | UnknownVariant
@@ -4509,7 +4990,6 @@ class RuntimeEvent:
                     "source_changed": RuntimeEventSourceChangedVariant,
                     "offline_region_status": RuntimeEventOfflineRegionStatusVariant,
                     "offline_region_response_error": RuntimeEventOfflineRegionResponseErrorVariant,
-                    "offline_region_tile_count_limit": RuntimeEventOfflineRegionTileCountLimitVariant,
                     "glyphs": RuntimeEventGlyphsVariant,
                     "sprite": RuntimeEventSpriteVariant,
                 },
@@ -4634,27 +5114,6 @@ class RuntimeEventOfflineRegionStatus:
             region_id=raw["region_id"],
             status=OfflineRegionStatus._from_native(raw["status"]),
         )
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventOfflineRegionTileCountLimit:
-    """The details of
-    `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
-
-    See `mln_runtime_event_offline_region_tile_count_limit` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    region_id: int
-
-    limit: int
-    """The number of demo server tiles that the cache file's offline regions may
-    hold together.
-    """
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(region_id=raw["region_id"], limit=raw["limit"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -5405,18 +5864,39 @@ class Vec3:
 
 
 @dataclass(frozen=True, slots=True)
+class Vec4:
+    """A vector in four dimensions, such as a point in homogeneous coordinates.
+
+    See `mln_vec4` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    x: float
+
+    y: float
+
+    z: float
+
+    w: float
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(x=raw["x"], y=raw["y"], z=raw["z"], w=raw["w"])
+
+
+@dataclass(frozen=True, slots=True)
 class VulkanBorrowedTexture:
     """A Vulkan image of a borrowed ring.
 
     See `mln_vulkan_borrowed_texture` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     image: int
-    """Your VkImage."""
+    """Your `VkImage`."""
 
     image_view: int
-    """A 2D VkImageView of `image` with one mip level and one layer."""
+    """A 2D `VkImageView` of `image` with one mip level and one layer."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -5424,23 +5904,27 @@ class VulkanBorrowedTexture:
 
 
 @dataclass(frozen=True, slots=True)
-class VulkanBorrowedTextureDescriptor:
-    """A ring of your Vulkan images, for
-    `MapHandle.attach_vulkan_borrowed_texture()`.
+class VulkanBorrowedTexturesTarget:
+    """A ring of your Vulkan images to render into, on the Vulkan device that
+    you attach on.
 
-    `logical_size` sets the map's size. `physical_width` and
-    `physical_height` give the images' size in pixels, which is usually
-    `logical_size` times the map's scale factor. Each image must have that
-    size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to
-    the context's device. The ring holds up to `TEXTURE_RING_MAX_DEPTH`
-    distinct images.
+    `physical_width` and `physical_height` give the images' size in pixels,
+    which is usually `logical_size` times the map's scale factor. Each image
+    must have that size, `format`, and `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT`,
+    and belong to the device's `VkDevice`. The ring holds up to
+    `TEXTURE_RING_MAX_DEPTH` distinct images.
 
-    The session uses the images until a replacement or release of the target
-    completes, a detach or release of the session completes, or an abandon of
-    it returns.
+    Give the ring `depth_textures` to draw into each frame depth-tested
+    against the map, as `FrameProjection` says: one for each of `textures`,
+    at the same index, or none. Each frame clears the one at its slot,
+    renders the map's depth and stencil into it, stores them, and leaves it
+    in `depth_final_layout`, with `owner` as for the color image. They must
+    have the size of `textures`, `depth_format`, one sample, and
+    `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and their views both the
+    depth and the stencil aspect.
 
-    See `mln_vulkan_borrowed_texture_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    See `mln_vulkan_borrowed_textures_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
@@ -5449,20 +5933,29 @@ class VulkanBorrowedTextureDescriptor:
 
     physical_height: int
 
-    context: VulkanContextDescriptor
-
     textures: Sequence[VulkanBorrowedTexture]
 
     format: int
-    """The images' VkFormat."""
+    """The images' `VkFormat`."""
 
     final_layout: int
-    """The VkImageLayout that each frame leaves its image in."""
+    """The `VkImageLayout` that each frame leaves its image in."""
 
     owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE
 
+    depth_textures: Sequence[VulkanBorrowedTexture] = ()
+
+    depth_format: int = 0
+    """The depth images' `VkFormat`, of
+    `GpuDeviceCapabilities.depth_stencil_formats`.
+    """
+
+    depth_final_layout: int = 0
+    """The `VkImageLayout` that each frame leaves its depth image in."""
+
     def __post_init__(self):
         object.__setattr__(self, "textures", _sequence(self.textures))
+        object.__setattr__(self, "depth_textures", _sequence(self.depth_textures))
 
     @classmethod
     def _from_native(cls, raw):
@@ -5470,50 +5963,18 @@ class VulkanBorrowedTextureDescriptor:
             logical_size=LogicalSize._from_native(raw["logical_size"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
-            context=VulkanContextDescriptor._from_native(raw["context"]),
             textures=tuple(
                 VulkanBorrowedTexture._from_native(item) for item in raw["textures"]
             ),
             format=raw["format"],
             final_layout=raw["final_layout"],
             owner=VulkanImageOwner(raw["owner"]),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class VulkanBorrowedTextureReplacement:
-    """New Vulkan images for a borrowed ring, for
-    `RenderSessionHandle.set_vulkan_borrowed_texture_target()`.
-
-    The members and the images follow the rules of
-    `VulkanBorrowedTextureDescriptor`. The ring keeps its depth, context,
-    `format`, `final_layout`, and `owner`, so give it as many images as it
-    attached with, in that format, on the same device.
-
-    See `mln_vulkan_borrowed_texture_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    physical_width: int
-
-    physical_height: int
-
-    textures: Sequence[VulkanBorrowedTexture]
-
-    def __post_init__(self):
-        object.__setattr__(self, "textures", _sequence(self.textures))
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
-            physical_width=raw["physical_width"],
-            physical_height=raw["physical_height"],
-            textures=tuple(
-                VulkanBorrowedTexture._from_native(item) for item in raw["textures"]
+            depth_textures=tuple(
+                VulkanBorrowedTexture._from_native(item)
+                for item in raw["depth_textures"]
             ),
+            depth_format=raw["depth_format"],
+            depth_final_layout=raw["depth_final_layout"],
         )
 
 
@@ -5539,7 +6000,7 @@ class VulkanContextDescriptor:
 
     graphics_queue: int
     """A `VkQueue` from `graphics_queue_family_index` that supports graphics. If
-    you submit to it too, set `RenderSessionAttachOptions.queue_lock`.
+    you submit to it too, give the device your `QueueLock`.
     """
 
     graphics_queue_family_index: int = 0
@@ -5564,108 +6025,58 @@ class VulkanContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class VulkanDeviceContextResult:
-    """A Vulkan device's context, as `VulkanDeviceHandle.get_context()` reports
-    it.
+class VulkanDeviceDescriptor:
+    """Your Vulkan device and queue, for `GpuDeviceHandle.wrap_vulkan()`.
 
-    See `mln_vulkan_device_context_result` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+    See `mln_vulkan_device_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
     """
 
     context: VulkanContextDescriptor
 
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(context=VulkanContextDescriptor._from_native(raw["context"]))
-
-
-@dataclass(frozen=True, slots=True)
-class VulkanDeviceOptions:
-    """Options for `VulkanDeviceHandle.create()`.
-
-    See `mln_vulkan_device_options` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+    queue_lock: QueueLock | NativeQueueLock = field(default_factory=lambda: QueueLock())
+    """Your lock on `context.graphics_queue`, when you submit to it yourself.
+    Give every device that wraps the queue the same lock.
     """
 
-    presentation: bool | None = None
-    """Whether the device can present to a window. The instance then enables
-    VK_KHR_surface and the platform's surface extensions, and the device
-    enables VK_KHR_swapchain. Defaults to false.
-    """
-
-    device_uuid: Buffer | None = None
-    """The 16-byte `deviceUUID` of the GPU to use, as
-    `VkPhysicalDeviceIDProperties` reports it.
-    """
-
-    device_luid: Buffer | None = None
-    """The 8-byte `deviceLUID` of the GPU to use, as
-    `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
-    DXGI adapter LUID.
+    enabled_extensions: Sequence[str] = ()
+    """The names of the device extensions that you enabled on `context.device`,
+    such as "VK_KHR_external_semaphore_fd". Vulkan offers no way to ask a
+    device which extensions it has, so the device offers the export kinds and
+    `GpuSyncKind.SYNC_FD` only when the extensions that they need are listed
+    here, and none of them when the list is empty.
     """
 
     def __post_init__(self):
-        object.__setattr__(self, "device_uuid", _bytes(self.device_uuid))
-        object.__setattr__(self, "device_luid", _bytes(self.device_luid))
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            presentation=raw["presentation"],
-            device_uuid=raw["device_uuid"],
-            device_luid=raw["device_luid"],
+        object.__setattr__(
+            self, "enabled_extensions", _sequence(self.enabled_extensions)
         )
 
-
-@dataclass(frozen=True, slots=True)
-class VulkanSurfaceDescriptor:
-    """A Vulkan surface to present to, for `MapHandle.attach_vulkan_surface()`.
-
-    The device must have VK_KHR_swapchain enabled, and the queue family of
-    `graphics_queue_family_index` must support presenting to the surface. The
-    session creates the swapchain. It uses the surface until a replacement or
-    release of the target completes, a detach or release of the session
-    completes, or an abandon of it returns.
-
-    See `mln_vulkan_surface_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    """
-
-    logical_size: LogicalSize
-
-    context: VulkanContextDescriptor
-
-    surface: int
-    """Your VkSurfaceKHR."""
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            logical_size=LogicalSize._from_native(raw["logical_size"]),
             context=VulkanContextDescriptor._from_native(raw["context"]),
-            surface=raw["surface"],
+            queue_lock=QueueLock(),
+            enabled_extensions=tuple(item for item in raw["enabled_extensions"]),
         )
 
 
 @dataclass(frozen=True, slots=True)
-class VulkanSurfaceReplacement:
-    """A new Vulkan surface for
-    `RenderSessionHandle.set_vulkan_surface_target()`.
+class VulkanSurfaceTarget:
+    """Your Vulkan surface to present to.
 
-    The session presents to it with the context that it attached with, so the
-    queue family of that context's `graphics_queue_family_index` must support
-    presenting to the surface. It uses the surface until a replacement or
-    release of the target completes, a detach or release of the session
-    completes, or an abandon of it returns.
+    Make it with the instance of the Vulkan device that you attach on. The
+    device's queue family must support presenting to the surface. The session
+    creates the swapchain, and destroys it but not the surface.
 
-    See `mln_vulkan_surface_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    See `mln_vulkan_surface_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
 
     surface: int
-    """Your VkSurfaceKHR."""
+    """Your `VkSurfaceKHR`."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -5678,6 +6089,9 @@ class VulkanSurfaceReplacement:
 @dataclass(frozen=True, slots=True)
 class VulkanTextureFrame:
     """The Vulkan image of an acquired frame.
+
+    The depth members are set when the frame has a depth image, as for
+    `MetalTextureFrame`. Otherwise they are zero.
 
     See `mln_vulkan_texture_frame` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -5707,6 +6121,18 @@ class VulkanTextureFrame:
     layout: int
     """The VkImageLayout that the frame left the image in."""
 
+    depth_image: int
+    """The VkImage that holds the frame's depth and stencil."""
+
+    depth_image_view: int
+    """A VkImageView of the depth image's depth and stencil aspects."""
+
+    depth_format: int
+    """The depth image's VkFormat."""
+
+    depth_layout: int
+    """The VkImageLayout that the frame left the depth image in."""
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -5719,6 +6145,10 @@ class VulkanTextureFrame:
             device=raw["device"],
             format=raw["format"],
             layout=raw["layout"],
+            depth_image=raw["depth_image"],
+            depth_image_view=raw["depth_image_view"],
+            depth_format=raw["depth_format"],
+            depth_layout=raw["depth_layout"],
         )
 
 
@@ -5780,12 +6210,15 @@ class NativeWake:
 
 
 @dataclass(frozen=True, slots=True)
-class WaylandSurfaceDescriptor:
-    """A Wayland surface to present to, for
-    `MapHandle.attach_wayland_surface()`.
+class WaylandSurfaceTarget:
+    """A Wayland surface to present to.
 
-    See `mln_wayland_surface_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+    Keep the display connected until the session's detach completes. On an
+    OpenGL device, if you also use EGL on the display, initialize it before
+    you attach.
+
+    See `mln_wayland_surface_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
@@ -5806,24 +6239,41 @@ class WaylandSurfaceDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class WaylandSurfaceReplacement:
-    """A new Wayland surface for
-    `RenderSessionHandle.set_wayland_surface_target()`.
+class WebCanvasTarget:
+    """A canvas to present to.
 
-    See `mln_wayland_surface_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+    The session makes the canvas's "webgpu" or "webgl2" context with the
+    device's backend, and sets the canvas's size to `logical_size` at the
+    map's scale factor. Attached without a device, it renders with the
+    build's backend: a WebGPU build asks the browser for a device, and
+    attaches once it has one. For an OpenGL device that wraps your WebGL2
+    context, the canvas must be the context's own.
+
+    See `mln_web_canvas_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
 
-    surface: int
-    """Your `wl_surface*`, on the display that the session attached with."""
+    canvas: int
+    """An `OffscreenCanvas`, such as one from
+    `HTMLCanvasElement.transferControlToOffscreen()` that you posted to the
+    library's Web Worker, or an `HTMLCanvasElement` when the library runs on
+    the page's thread.
+    """
+
+    format: str = ""
+    """For a WebGPU device, the `GPUTextureFormat` to configure the canvas with,
+    such as `bgra8unorm`. Empty for a format that the device's adapter
+    prefers.
+    """
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
             logical_size=LogicalSize._from_native(raw["logical_size"]),
-            surface=raw["surface"],
+            canvas=raw["canvas"],
+            format=raw["format"],
         )
 
 
@@ -5844,18 +6294,96 @@ class WebGlContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class WebGpuBorrowedTexture:
+    """A WebGPU texture of a borrowed ring.
+
+    See `mln_web_gpu_borrowed_texture` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    texture: int
+    """Your `GPUTexture`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(texture=raw["texture"])
+
+
+@dataclass(frozen=True, slots=True)
+class WebGpuBorrowedTexturesTarget:
+    """A ring of your WebGPU textures to render into, on a WebGPU device that
+    wraps yours.
+
+    `physical_width` and `physical_height` give the textures' size in pixels,
+    which is usually `logical_size` times the map's scale factor. Each
+    texture must be 2D with that size, `format`, one layer, one mip level,
+    one sample, and `GPUTextureUsage.RENDER_ATTACHMENT`. The ring holds up to
+    `TEXTURE_RING_MAX_DEPTH` distinct textures.
+
+    Give the ring `depth_textures` to draw into each frame depth-tested
+    against the map, as `FrameProjection` says: one for each of `textures`,
+    at the same index, or none. Each frame clears the one at its slot,
+    renders the map's depth and stencil into it, and stores them. They must
+    be 2D with the size of `textures`, `depth_format`, one layer, one mip
+    level, one sample, and `GPUTextureUsage.RENDER_ATTACHMENT`.
+
+    See `mln_web_gpu_borrowed_textures_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    physical_width: int
+
+    physical_height: int
+
+    textures: Sequence[WebGpuBorrowedTexture]
+
+    format: str
+    """The textures' `GPUTextureFormat`, such as `rgba8unorm`."""
+
+    depth_textures: Sequence[WebGpuBorrowedTexture] = ()
+
+    depth_format: str = ""
+    """The depth textures' `GPUTextureFormat`, of
+    `GpuDeviceCapabilities.depth_stencil_formats`.
+    """
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
+        object.__setattr__(self, "depth_textures", _sequence(self.depth_textures))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            physical_width=raw["physical_width"],
+            physical_height=raw["physical_height"],
+            textures=tuple(
+                WebGpuBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
+            format=raw["format"],
+            depth_textures=tuple(
+                WebGpuBorrowedTexture._from_native(item)
+                for item in raw["depth_textures"]
+            ),
+            depth_format=raw["depth_format"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class WglContextDescriptor:
-    """The WGL objects that a render session makes its OpenGL context from.
+    """Your WGL context, which each session's context shares objects with.
 
     See `mln_wgl_context_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     device_context: int
-    """An `HDC`."""
+    """An `HDC` with the pixel format of `share_context`."""
 
-    share_context: int = 0
-    """Your `HGLRC`, for a shared context."""
+    share_context: int
+    """Your `HGLRC`."""
 
     get_proc_address: int = 0
     """Your `wglGetProcAddress`, or null to use the system's."""
@@ -5870,11 +6398,15 @@ class WglContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class Win32WindowDescriptor:
-    """A Win32 window to present to, for `MapHandle.attach_win32_window()`.
+class Win32WindowTarget:
+    """A Win32 window to present to.
 
-    See `mln_win32_window_descriptor` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    On an OpenGL device, the session sets the window's pixel format, so don't
+    set one yourself. While the window is minimized, frame demands finish
+    with `RenderResult.TARGET_NOT_READY`.
+
+    See `mln_win32_window_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
@@ -5891,22 +6423,28 @@ class Win32WindowDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class Win32WindowReplacement:
-    """A new Win32 window for `RenderSessionHandle.set_win32_window_target()`.
+class XlibWindowTarget:
+    """An X11 window to present to, through Xlib.
 
-    See `mln_win32_window_replacement` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+    Keep the display connected until the session's detach completes.
+
+    See `mln_xlib_window_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
     logical_size: LogicalSize
 
+    display: int
+    """Your `Display*`."""
+
     window: int
-    """Your `HWND`."""
+    """Your `Window`, on `display`."""
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
             logical_size=LogicalSize._from_native(raw["logical_size"]),
+            display=raw["display"],
             window=raw["window"],
         )
 
@@ -6051,8 +6589,9 @@ See `MLN_DIAGNOSTIC_MESSAGE_CAPACITY` in the
 """
 
 FRAME_DEMAND_TOKEN_STILL_IMAGE: Final[int] = 18446744073709551615
-"""The token of the frame results that a session adds when it renders an image
-for `MapHandle.request_still_image()`. Your own demands can't use it.
+"""The token of the frame results of the demand that a session holds for an
+image of `MapHandle.request_still_image()`, which says how that demand runs.
+Your own demands can't use it.
 
 See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
 [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

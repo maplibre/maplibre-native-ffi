@@ -12,8 +12,10 @@ namespace Maplibre.NativeFfi;
 public sealed record MapOptions
 {
     /// <summary>
-    /// The map's first size, and its scale factor. The scale factor stays fixed
-    /// for the map's life, and every render session of the map renders at it.
+    /// The map's first size, and its scale factor. Render sessions of the map
+    /// render at its scale factor. <c>MapHandle.ResizeAsync()</c> changes both,
+    /// or <c>RenderSessionHandle.ResizeAsync()</c> while a render session is
+    /// attached.
     /// </summary>
     public required LogicalExtent InitialExtent { get; init; }
     public MapMode MapMode { get; init; }

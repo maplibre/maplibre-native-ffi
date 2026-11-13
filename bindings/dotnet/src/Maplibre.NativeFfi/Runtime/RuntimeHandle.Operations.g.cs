@@ -427,10 +427,6 @@ public sealed unsafe partial class RuntimeHandle
     /// <item><description><c>Status.InvalidArgument</c> when
     /// <c>sideDatabasePath</c> isn't a readable database
     /// file.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the merge would exceed
-    /// the tile limit that
-    /// <c>RuntimeEventType.OfflineRegionTileCountLimitExceeded</c>
-    /// describes.</description></item>
     /// </list>
     /// </remarks>
     public Task<OfflineRegionInfo[]> MergeOfflineRegionsAsync(string sideDatabasePath)

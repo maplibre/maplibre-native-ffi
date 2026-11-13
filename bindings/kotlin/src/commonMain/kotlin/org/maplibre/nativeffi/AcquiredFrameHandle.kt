@@ -36,7 +36,9 @@ private constructor(
    * Gives up an acquired frame without saying when your GPU stops reading it.
    *
    * Because your GPU may still read the frame's texture, the session never renders into that
-   * texture again.
+   * texture again, even when `RenderSessionHandle.setTarget()` gives it the texture again, until
+   * `RenderSessionHandle.releaseTarget()` releases the ring. A view that is open on the frame keeps
+   * the frame's sync objects in place until it ends.
    *
    * See `mln_acquired_frame_discard` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -46,6 +48,13 @@ private constructor(
 
   /**
    * Gets the OpenGL texture of an acquired frame.
+   *
+   * It gets a borrowed ring's texture, or an exported ring's on an OpenGL device: the texture of
+   * the dmabuf that `AcquiredFrameHandle.withDmaBuf()` gets, and the frame's depth texture with
+   * `RenderSessionAttachOptions.keepDepth`, in the device's share group. An exported ring's
+   * textures hold the frame upside down from OpenGL's rows, top row first, as a dmabuf's readers
+   * take it, so negate clip y to draw into them. Wait for `AcquiredFrameHandle.withProducerSync()`
+   * before you use them.
    *
    * See `mln_acquired_frame_get_open_gl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -60,7 +69,7 @@ private constructor(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
-        val out = sized(w(40, 40, 32), w(8, 8, 4))
+        val out = sized(w(48, 48, 40), w(8, 8, 4))
         check(C.mln_acquired_frame_get_open_gl_texture(handle, out, diagnostic))
         block(readOpenGlTextureFrame(out, scope))
       }
@@ -98,7 +107,7 @@ private constructor(
    */
   public fun getResult(): RenderFrameResult =
     nativeCall(this, binding) {
-      val out = sized(w(264, 264, 244), w(8, 8, 4))
+      val out = sized(w(432, 432, 404), w(8, 8, 4))
       check(C.mln_acquired_frame_get_result(handle, out, diagnostic))
       readRenderFrameResult(out)
     }
@@ -106,10 +115,10 @@ private constructor(
   /**
    * Gives an acquired frame back to the session once you're done reading it.
    *
-   * `consumerCompletion` says when your GPU work that reads the texture finishes. Pass
-   * `GpuSyncKind.CPU_COMPLETE` when that work has already finished. The session waits for that
-   * point before it renders into the texture again. If that wait fails, such as for an OpenGL fence
-   * outside the session's share group, the session fails.
+   * `consumerCompletion` says when your GPU work on the texture, and on its depth texture,
+   * finishes. Pass `GpuSyncKind.CPU_COMPLETE` when that work has already finished. The session
+   * waits for that point before it renders into the textures again. If that wait fails, such as for
+   * an OpenGL fence outside the session's share group, the session fails.
    *
    * See `mln_acquired_frame_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

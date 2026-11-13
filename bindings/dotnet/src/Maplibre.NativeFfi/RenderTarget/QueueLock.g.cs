@@ -3,12 +3,15 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Your lock on a Vulkan queue that you and a render session both submit to.
+/// Your lock on a Vulkan queue that you and the render sessions of a GPU device
+/// all submit to.
 /// </summary>
 /// <remarks>
-/// <para>The session holds the lock only while it submits or presents to the
-/// queue. Set both <c>lock</c> and <c>unlock</c>, or neither when you don't
-/// submit to the queue yourself.</para>
+/// <para>A session holds the lock only while it submits or presents to the
+/// queue, or submits the empty batch that drains its work from the queue. It
+/// never holds the lock while it waits. Set both <c>lock</c> and <c>unlock</c>,
+/// or neither when you don't submit to the queue yourself.</para>
+/// <para>Don't hold the lock while you call the library.</para>
 /// <para>It can run on a library thread, and it can't call the library.</para>
 /// <para>See <c>mln_queue_lock</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>

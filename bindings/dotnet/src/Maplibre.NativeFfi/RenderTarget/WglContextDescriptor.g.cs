@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// The WGL objects that a render session makes its OpenGL context from.
+/// Your WGL context, which each session's context shares objects with.
 /// </summary>
 /// <remarks>
 /// See <c>mln_wgl_context_descriptor</c> in the <see
@@ -24,14 +24,14 @@ public readonly partial record struct WglContextDescriptor
     }
 
     /// <summary>
-    /// An <c>HDC</c>.
+    /// An <c>HDC</c> with the pixel format of <c>share_context</c>.
     /// </summary>
     public required NativePointer DeviceContext { get; init; }
 
     /// <summary>
-    /// Your <c>HGLRC</c>, for a shared context.
+    /// Your <c>HGLRC</c>.
     /// </summary>
-    public NativePointer ShareContext { get; init; }
+    public required NativePointer ShareContext { get; init; }
 
     /// <summary>
     /// Your <c>wglGetProcAddress</c>, or null to use the system's.

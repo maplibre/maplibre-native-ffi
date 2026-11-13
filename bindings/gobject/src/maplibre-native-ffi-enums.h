@@ -200,6 +200,28 @@ GType maplibre_native_ffi_camera_update_mode_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_camera_update_mode_get_type())
 
 /**
+ * MaplibreNativeFfiClipDepthRange:
+ * @MAPLIBRE_NATIVE_FFI_CLIP_DEPTH_RANGE_ZERO_TO_ONE: Clip z runs from 0 to w,
+ *   as in Metal, Vulkan, WebGPU, Direct3D, and OpenGL with
+ *   `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+ * @MAPLIBRE_NATIVE_FFI_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE: Clip z runs from
+ *   -w to w, as in OpenGL by default.
+ *
+ * How a graphics API's clip space holds depth.
+ *
+ * See `mln_clip_depth_range` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_CLIP_DEPTH_RANGE_ZERO_TO_ONE = 1,
+  MAPLIBRE_NATIVE_FFI_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE = 2,
+} MaplibreNativeFfiClipDepthRange;
+
+GType maplibre_native_ffi_clip_depth_range_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CLIP_DEPTH_RANGE \
+  (maplibre_native_ffi_clip_depth_range_get_type())
+
+/**
  * MaplibreNativeFfiConstrainMode:
  * @MAPLIBRE_NATIVE_FFI_CONSTRAIN_MODE_NONE:
  * @MAPLIBRE_NATIVE_FFI_CONSTRAIN_MODE_HEIGHT_ONLY: Keeps the world filling the
@@ -224,6 +246,31 @@ typedef enum {
 GType maplibre_native_ffi_constrain_mode_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_CONSTRAIN_MODE \
   (maplibre_native_ffi_constrain_mode_get_type())
+
+/**
+ * MaplibreNativeFfiDepthStencilFormatFlag:
+ * @MAPLIBRE_NATIVE_FFI_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8: 24-bit
+ *   normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
+ *   MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
+ *   WGPUTextureFormat_Depth24PlusStencil8 (`depth24plus-stencil8`).
+ * @MAPLIBRE_NATIVE_FFI_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8: 32-bit
+ *   float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
+ *   MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
+ *   WGPUTextureFormat_Depth32FloatStencil8 (`depth32float-stencil8`).
+ *
+ * A format of depth and stencil textures, as a bit in a set.
+ *
+ * See `mln_depth_stencil_format_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8 = 1,
+  MAPLIBRE_NATIVE_FFI_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8 = 2,
+} MaplibreNativeFfiDepthStencilFormatFlag;
+
+GType maplibre_native_ffi_depth_stencil_format_flag_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_DEPTH_STENCIL_FORMAT_FLAG \
+  (maplibre_native_ffi_depth_stencil_format_flag_get_type())
 
 /**
  * MaplibreNativeFfiFrameDemandFlag:
@@ -289,6 +336,62 @@ GType maplibre_native_ffi_gesture_phase_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_gesture_phase_get_type())
 
 /**
+ * MaplibreNativeFfiGpuExportKind:
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_NONE: The texture isn't shared.
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_IO_SURFACE: An `IOSurfaceRef`.
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_DMA_BUF: A Linux dmabuf, as file
+ *   descriptors with a DRM format and modifier.
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER: An
+ *   `AHardwareBuffer*`.
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE: A DXGI shared
+ *   texture's NT handle.
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_OPAQUE_FD: A Vulkan or OpenGL opaque
+ *   memory file descriptor.
+ *
+ * A way to share a texture's memory with another API or process.
+ *
+ * See `mln_gpu_export_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_NONE = 0,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_IO_SURFACE = 1,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_DMA_BUF = 2,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER = 3,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE = 4,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_OPAQUE_FD = 5,
+} MaplibreNativeFfiGpuExportKind;
+
+GType maplibre_native_ffi_gpu_export_kind_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_GPU_EXPORT_KIND \
+  (maplibre_native_ffi_gpu_export_kind_get_type())
+
+/**
+ * MaplibreNativeFfiGpuExportKindFlag:
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_IO_SURFACE:
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_DMA_BUF:
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER:
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE:
+ * @MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_OPAQUE_FD:
+ *
+ * A way to share a texture's memory, as a bit in a set.
+ *
+ * See `mln_gpu_export_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_IO_SURFACE = 1,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_DMA_BUF = 2,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER = 4,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE = 8,
+  MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_FLAG_OPAQUE_FD = 16,
+} MaplibreNativeFfiGpuExportKindFlag;
+
+GType maplibre_native_ffi_gpu_export_kind_flag_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_GPU_EXPORT_KIND_FLAG \
+  (maplibre_native_ffi_gpu_export_kind_flag_get_type())
+
+/**
  * MaplibreNativeFfiGpuSyncKind:
  * @MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE: The work has already finished, so
  *   there is nothing to wait for.
@@ -299,7 +402,9 @@ GType maplibre_native_ffi_gesture_phase_get_type(void) G_GNUC_CONST;
  *   after it.
  * @MAPLIBRE_NATIVE_FFI_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE: `handle` is a
  *   `VkSemaphore`. Wait until it reaches `value`.
- * @MAPLIBRE_NATIVE_FFI_GPU_SYNC_SYNC_FD: `handle` is a sync file descriptor.
+ * @MAPLIBRE_NATIVE_FFI_GPU_SYNC_SYNC_FD: `handle` is a sync file descriptor. A
+ *   descriptor of -1, as Vulkan exports for a semaphore that has already
+ *   signaled, counts as `MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE`.
  * @MAPLIBRE_NATIVE_FFI_GPU_SYNC_METAL_SHARED_EVENT: `handle` is an
  *   `MTLSharedEvent`. Wait until it reaches `value`.
  * @MAPLIBRE_NATIVE_FFI_GPU_SYNC_D3D12_FENCE: `handle` is a shared Windows
@@ -640,27 +745,6 @@ GType maplibre_native_ffi_open_gl_client_api_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_open_gl_client_api_get_type())
 
 /**
- * MaplibreNativeFfiOpenGlContextOwnership:
- * @MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_SHARED: The session's context
- *   shares objects with your `share_context`.
- * @MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED: The session's
- *   context shares objects with no other context.
- *
- * Whether a render session's OpenGL context shares objects with yours.
- *
- * See `mln_open_gl_context_ownership` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-typedef enum {
-  MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0,
-  MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1,
-} MaplibreNativeFfiOpenGlContextOwnership;
-
-GType maplibre_native_ffi_open_gl_context_ownership_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_CONTEXT_OWNERSHIP \
-  (maplibre_native_ffi_open_gl_context_ownership_get_type())
-
-/**
  * MaplibreNativeFfiOpenGlContextProviderFlag:
  * @MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL:
  * @MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL:
@@ -730,6 +814,29 @@ GType maplibre_native_ffi_render_abandon_disposition_get_type(
 ) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_ABANDON_DISPOSITION \
   (maplibre_native_ffi_render_abandon_disposition_get_type())
+
+/**
+ * MaplibreNativeFfiRenderBackend:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_METAL:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_VULKAN:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_OPEN_GL:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_WEB_GPU:
+ *
+ * A render backend.
+ *
+ * See `mln_render_backend` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_METAL = 1,
+  MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_VULKAN = 2,
+  MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_OPEN_GL = 3,
+  MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_WEB_GPU = 4,
+} MaplibreNativeFfiRenderBackend;
+
+GType maplibre_native_ffi_render_backend_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_BACKEND \
+  (maplibre_native_ffi_render_backend_get_type())
 
 /**
  * MaplibreNativeFfiRenderBackendFlag:
@@ -881,6 +988,51 @@ typedef enum {
 GType maplibre_native_ffi_render_session_state_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_SESSION_STATE \
   (maplibre_native_ffi_render_session_state_get_type())
+
+/**
+ * MaplibreNativeFfiRenderTargetKindFlag:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_OFFSCREEN:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_METAL_LAYER:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WIN32_WINDOW:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_XLIB_WINDOW:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_ANDROID_WINDOW:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_OHOS_WINDOW:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_OPEN_GL_SURFACE:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_METAL_BORROWED_TEXTURES:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_EXPORTED_RING:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WEB_CANVAS:
+ *
+ * A render target kind, as a bit in a set.
+ *
+ * See `mln_render_target_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_OFFSCREEN = 1,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_METAL_LAYER = 2,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WIN32_WINDOW = 4,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_XLIB_WINDOW = 8,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE = 16,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_ANDROID_WINDOW = 32,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_OHOS_WINDOW = 64,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE = 512,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_OPEN_GL_SURFACE = 1024,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_METAL_BORROWED_TEXTURES = 2048,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES = 4096,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES = 8192,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 16384,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 32768,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WEB_CANVAS = 65536,
+} MaplibreNativeFfiRenderTargetKindFlag;
+
+GType maplibre_native_ffi_render_target_kind_flag_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_TARGET_KIND_FLAG \
+  (maplibre_native_ffi_render_target_kind_flag_get_type())
 
 /**
  * MaplibreNativeFfiResourceErrorReason:
@@ -1098,7 +1250,6 @@ GType maplibre_native_ffi_resource_usage_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR:
- * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR:
@@ -1134,17 +1285,15 @@ typedef enum {
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED = 65536,
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED = 131072,
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 262144,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
-    524288,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 1048576,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 2097152,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 4194304,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 8388608,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 16777216,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 33554432,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 66191358,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 917504,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_ALL = 67108862,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 524288,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 1048576,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 2097152,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 4194304,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 8388608,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 16777216,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 33161214,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 393216,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_ALL = 33554430,
 } MaplibreNativeFfiRuntimeEventFlag;
 
 GType maplibre_native_ffi_runtime_event_flag_get_type(void) G_GNUC_CONST;
@@ -1198,11 +1347,6 @@ GType maplibre_native_ffi_runtime_event_source_type_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR: A resource
  *   that the region needs failed to download.
- * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED:
- *   The region's download became inactive because the cache file's offline
- *   regions hold as many tiles from MapLibre's demo tile server as the limit
- *   allows. Only tiles of sources with a `maplibre://` URL count toward the
- *   limit.
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_LOADED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_ERROR:
@@ -1240,14 +1384,12 @@ typedef enum {
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16,
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
   MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
-    19,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24,
-  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 19,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 20,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 21,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 22,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SPRITE_LOADED = 23,
+  MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_SPRITE_ERROR = 24,
 } MaplibreNativeFfiRuntimeEventType;
 
 GType maplibre_native_ffi_runtime_event_type_get_type(void) G_GNUC_CONST;
@@ -1526,7 +1668,7 @@ GType maplibre_native_ffi_viewport_mode_get_type(void) G_GNUC_CONST;
 /**
  * MaplibreNativeFfiVulkanImageOwner:
  * @MAPLIBRE_NATIVE_FFI_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE: The image stays with
- *   the queue family of `graphics_queue_family_index`.
+ *   the queue family of the device's queue.
  * @MAPLIBRE_NATIVE_FFI_VULKAN_IMAGE_OWNER_EXTERNAL: Each frame releases the
  *   image to VK_QUEUE_FAMILY_EXTERNAL.
  * @MAPLIBRE_NATIVE_FFI_VULKAN_IMAGE_OWNER_FOREIGN: Each frame releases the
@@ -1539,7 +1681,7 @@ GType maplibre_native_ffi_viewport_mode_get_type(void) G_GNUC_CONST;
  * side before you read it. You don't need to release it back.
  *
  * See `mln_vulkan_image_owner` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0,

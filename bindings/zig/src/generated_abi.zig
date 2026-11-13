@@ -13,16 +13,6 @@ pub fn mln_camera_for_tile(a0: Param(c.mln_camera_for_tile, 0), a1: Param(c.mln_
     return function(a0, word(a1), a2, a3);
 }
 
-pub fn mln_map_resize(a0: Param(c.mln_map_resize, 0), a1: Param(c.mln_map_resize, 1), a2: Param(c.mln_map_resize, 2), a3: Param(c.mln_map_resize, 3)) callconv(.c) Return(c.mln_map_resize) {
-    const function = @extern(*const fn (Param(c.mln_map_resize, 0), u64, Param(c.mln_map_resize, 2), Param(c.mln_map_resize, 3)) callconv(.c) Return(c.mln_map_resize), .{ .name = "mln_map_resize" });
-    return function(a0, word(a1), a2, a3);
-}
-
-pub fn mln_render_session_resize(a0: Param(c.mln_render_session_resize, 0), a1: Param(c.mln_render_session_resize, 1), a2: Param(c.mln_render_session_resize, 2), a3: Param(c.mln_render_session_resize, 3)) callconv(.c) Return(c.mln_render_session_resize) {
-    const function = @extern(*const fn (Param(c.mln_render_session_resize, 0), u64, Param(c.mln_render_session_resize, 2), Param(c.mln_render_session_resize, 3)) callconv(.c) Return(c.mln_render_session_resize), .{ .name = "mln_render_session_resize" });
-    return function(a0, word(a1), a2, a3);
-}
-
 fn Param(comptime function: anytype, comptime index: usize) type {
     return @typeInfo(@TypeOf(function)).@"fn".param_types[index].?;
 }

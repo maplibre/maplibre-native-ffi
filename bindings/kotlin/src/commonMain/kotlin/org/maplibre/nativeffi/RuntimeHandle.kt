@@ -273,8 +273,6 @@ private constructor(
    * Errors:
    *
    * - `Status.INVALID_ARGUMENT` when `sideDatabasePath` isn't a readable database file.
-   * - `Status.NATIVE_ERROR` when the merge would exceed the tile limit that
-   *   `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED` describes.
    */
   public fun mergeOfflineRegions(sideDatabasePath: String): Completion<List<OfflineRegionInfo>> =
     nativeSubmit(

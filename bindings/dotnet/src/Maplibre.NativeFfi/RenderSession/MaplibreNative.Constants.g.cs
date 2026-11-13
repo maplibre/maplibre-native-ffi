@@ -5,9 +5,9 @@ namespace Maplibre.NativeFfi;
 public static partial class MaplibreNative
 {
     /// <summary>
-    /// The token of the frame results that a session adds when it renders an
-    /// image for <c>MapHandle.RequestStillImageAsync()</c>. Your own demands
-    /// can't use it.
+    /// The token of the frame results of the demand that a session holds for an
+    /// image of <c>MapHandle.RequestStillImageAsync()</c>, which says how that
+    /// demand runs. Your own demands can't use it.
     /// </summary>
     /// <remarks>
     /// See <c>MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE</c> in the <see

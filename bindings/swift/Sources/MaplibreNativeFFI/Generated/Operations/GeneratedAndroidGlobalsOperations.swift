@@ -4,40 +4,6 @@ internal import MaplibreNativeC
 import Foundation
 
 #if os(Android)
-  /// Creates a frame pacer that follows the display through the calling
-  /// thread's
-  /// `AChoreographer`.
-  ///
-  /// Call it on a thread with an `ALooper`, such as the app's main thread, and
-  /// keep that thread running its looper while sessions use the pacer.
-  ///
-  /// `AChoreographer` can stop while the phone's display is off, even while a
-  /// Surface on another display, such as an Android Auto projection, still
-  /// shows
-  /// the map. The pacer then keeps demanding frames from a timer on the looper,
-  /// within the frame rate limit, until vsyncs arrive again.
-  ///
-  /// See `mln_android_frame_pacer_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.invalidState` when the calling thread has no `ALooper`.
-  public func androidFramePacerCreate(options bindingArg0: FramePacerOptions? =
-    nil) throws -> FramePacerHandle
-  {
-    var value0: mln_frame_pacer = 0
-    return try nativeInvoke { _, arena, diagnostic in
-      mln_android_frame_pacer_create(
-        bindingArg0.map { arena.store($0.nativeValue()) },
-        &value0,
-        diagnostic
-      )
-    } result: { try FramePacerHandle(adopting: value0) }
-  }
-#endif
-
-#if os(Android)
   /// Gives the library the Java VM and the app context that it needs on
   /// Android.
   ///

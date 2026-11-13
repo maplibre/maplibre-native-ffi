@@ -37,6 +37,34 @@ internal actual object UpcallStubs {
   actual val customGeometrySourceOptionsCancelTile: Long
     get() = upcallFunction("mln_custom_source_cancel_tile_callback")
 
+  actual val customLayerHostPrerender: Long
+    get() =
+      throw MaplibreException(
+        Status.UNSUPPORTED,
+        "customLayerHostPrerender needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+      )
+
+  actual val customLayerHostRender: Long
+    get() =
+      throw MaplibreException(
+        Status.UNSUPPORTED,
+        "customLayerHostRender needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+      )
+
+  actual val customLayerHostDeinitialize: Long
+    get() =
+      throw MaplibreException(
+        Status.UNSUPPORTED,
+        "customLayerHostDeinitialize needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+      )
+
+  actual val customLayerHostContextLost: Long
+    get() =
+      throw MaplibreException(
+        Status.UNSUPPORTED,
+        "customLayerHostContextLost needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
+      )
+
   actual val customVectorSourceOptionsFetchTile: Long
     get() = upcallFunction("mln_custom_source_fetch_tile_callback")
 
@@ -55,9 +83,6 @@ internal actual object UpcallStubs {
   actual val resourceTransformCallback: Long
     get() = upcallFunction("mln_resource_transform_callback")
 
-  actual val wakeCallback: Long
-    get() = upcallFunction("mln_wake_callback")
-
   actual val queueLockLock: Long
     get() =
       throw MaplibreException(
@@ -71,6 +96,9 @@ internal actual object UpcallStubs {
         Status.UNSUPPORTED,
         "queueLockUnlock needs Kotlin on a native thread, which Kotlin/Wasm cannot run",
       )
+
+  actual val wakeCallback: Long
+    get() = upcallFunction("mln_wake_callback")
 
   actual val cameraTransitionHandlerCallback: Long
     get() = upcallFunction("mln_camera_transition_end_callback")

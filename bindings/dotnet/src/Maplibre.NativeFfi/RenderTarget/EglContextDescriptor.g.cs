@@ -3,11 +3,13 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// The EGL objects that a render session makes its OpenGL context from.
+/// Your EGL context, which each session's context shares objects with.
 /// </summary>
 /// <remarks>
-/// See <c>mln_egl_context_descriptor</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
+/// <para>Each session makes its context on <c>display</c> with <c>config</c>
+/// and the client API and version of <c>share_context</c>.</para>
+/// <para>See <c>mln_egl_context_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>
 /// </remarks>
 public readonly partial record struct EglContextDescriptor
 {
@@ -16,36 +18,29 @@ public readonly partial record struct EglContextDescriptor
         NativePointer Display,
         NativePointer Config,
         NativePointer ShareContext,
-        OpenGlClientApi ClientApi,
         NativePointer GetProcAddress
     )
     {
         this.Display = Display;
         this.Config = Config;
         this.ShareContext = ShareContext;
-        this.ClientApi = ClientApi;
         this.GetProcAddress = GetProcAddress;
     }
 
     /// <summary>
-    /// An <c>EGLDisplay</c>.
+    /// An <c>EGLDisplay</c>, which you initialized.
     /// </summary>
     public required NativePointer Display { get; init; }
 
     /// <summary>
-    /// An <c>EGLConfig</c>.
+    /// The <c>EGLConfig</c> of <c>share_context</c>.
     /// </summary>
     public required NativePointer Config { get; init; }
 
     /// <summary>
-    /// Your <c>EGLContext</c>, for a shared context.
+    /// Your <c>EGLContext</c>.
     /// </summary>
-    public NativePointer ShareContext { get; init; }
-
-    /// <summary>
-    /// The API of a dedicated context. A shared context uses the API of yours.
-    /// </summary>
-    public OpenGlClientApi ClientApi { get; init; }
+    public required NativePointer ShareContext { get; init; }
 
     /// <summary>
     /// Your <c>eglGetProcAddress</c>, or null to use the system's.

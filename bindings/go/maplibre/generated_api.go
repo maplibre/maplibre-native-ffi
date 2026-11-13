@@ -180,6 +180,31 @@ func (value CameraUpdateMode) String() string {
 	return fmt.Sprintf("CameraUpdateMode(%d)", value)
 }
 
+// ClipDepthRange corresponds to mln_clip_depth_range. How a graphics API's clip
+// space holds depth.
+//
+// See mln_clip_depth_range in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type ClipDepthRange uint32
+
+const (
+	// Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and OpenGL
+	// with glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE).
+	ClipDepthRangeZeroToOne ClipDepthRange = ClipDepthRange(C.MLN_CLIP_DEPTH_RANGE_ZERO_TO_ONE)
+	// Clip z runs from -w to w, as in OpenGL by default.
+	ClipDepthRangeNegativeOneToOne ClipDepthRange = ClipDepthRange(C.MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE)
+)
+
+func (value ClipDepthRange) String() string {
+	switch value {
+	case 1:
+		return "ClipDepthRangeZeroToOne"
+	case 2:
+		return "ClipDepthRangeNegativeOneToOne"
+	}
+	return fmt.Sprintf("ClipDepthRange(%d)", value)
+}
+
 // ConstrainMode corresponds to mln_constrain_mode. How the map keeps the camera
 // within the world or within its bounds.
 //
@@ -209,6 +234,32 @@ func (value ConstrainMode) String() string {
 		return "ConstrainModeScreen"
 	}
 	return fmt.Sprintf("ConstrainMode(%d)", value)
+}
+
+// DepthStencilFormatFlag corresponds to mln_depth_stencil_format_flag. A format
+// of depth and stencil textures, as a bit in a set.
+//
+// See mln_depth_stencil_format_flag in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type DepthStencilFormatFlag uint32
+
+const (
+	// 24-bit normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
+	// MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
+	// WGPUTextureFormat_Depth24PlusStencil8 (depth24plus-stencil8).
+	DepthStencilFormatFlagDepth24Stencil8 DepthStencilFormatFlag = DepthStencilFormatFlag(C.MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8)
+	// 32-bit float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
+	// MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
+	// WGPUTextureFormat_Depth32FloatStencil8 (depth32float-stencil8).
+	DepthStencilFormatFlagDepth32FloatStencil8 DepthStencilFormatFlag = DepthStencilFormatFlag(C.MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8)
+)
+
+func (value DepthStencilFormatFlag) Has(flags DepthStencilFormatFlag) bool {
+	return value&flags == flags
+}
+
+func (value DepthStencilFormatFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "DepthStencilFormatFlagDepth24Stencil8"}, {2, "DepthStencilFormatFlagDepth32FloatStencil8"}})
 }
 
 // FrameDemandFlag corresponds to mln_frame_demand_flag. How a frame demand
@@ -278,6 +329,67 @@ func (value GesturePhase) String() string {
 	return fmt.Sprintf("GesturePhase(%d)", value)
 }
 
+// GPUExportKind corresponds to mln_gpu_export_kind. A way to share a texture's
+// memory with another API or process.
+//
+// See mln_gpu_export_kind in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type GPUExportKind uint32
+
+const (
+	// The texture isn't shared.
+	GPUExportKindNone GPUExportKind = GPUExportKind(C.MLN_GPU_EXPORT_KIND_NONE)
+	// An IOSurfaceRef.
+	GPUExportKindIoSurface GPUExportKind = GPUExportKind(C.MLN_GPU_EXPORT_KIND_IO_SURFACE)
+	// A Linux dmabuf, as file descriptors with a DRM format and modifier.
+	GPUExportKindDmaBuf GPUExportKind = GPUExportKind(C.MLN_GPU_EXPORT_KIND_DMA_BUF)
+	// An AHardwareBuffer*.
+	GPUExportKindAndroidHardwareBuffer GPUExportKind = GPUExportKind(C.MLN_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER)
+	// A DXGI shared texture's NT handle.
+	GPUExportKindDxgiSharedHandle GPUExportKind = GPUExportKind(C.MLN_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE)
+	// A Vulkan or OpenGL opaque memory file descriptor.
+	GPUExportKindOpaqueFd GPUExportKind = GPUExportKind(C.MLN_GPU_EXPORT_KIND_OPAQUE_FD)
+)
+
+func (value GPUExportKind) String() string {
+	switch value {
+	case 0:
+		return "GPUExportKindNone"
+	case 1:
+		return "GPUExportKindIoSurface"
+	case 2:
+		return "GPUExportKindDmaBuf"
+	case 3:
+		return "GPUExportKindAndroidHardwareBuffer"
+	case 4:
+		return "GPUExportKindDxgiSharedHandle"
+	case 5:
+		return "GPUExportKindOpaqueFd"
+	}
+	return fmt.Sprintf("GPUExportKind(%d)", value)
+}
+
+// GPUExportKindFlag corresponds to mln_gpu_export_kind_flag. A way to share a
+// texture's memory, as a bit in a set.
+//
+// See mln_gpu_export_kind_flag in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type GPUExportKindFlag uint32
+
+const (
+	GPUExportKindFlagIoSurface             GPUExportKindFlag = GPUExportKindFlag(C.MLN_GPU_EXPORT_KIND_FLAG_IO_SURFACE)
+	GPUExportKindFlagDmaBuf                GPUExportKindFlag = GPUExportKindFlag(C.MLN_GPU_EXPORT_KIND_FLAG_DMA_BUF)
+	GPUExportKindFlagAndroidHardwareBuffer GPUExportKindFlag = GPUExportKindFlag(C.MLN_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER)
+	GPUExportKindFlagDxgiSharedHandle      GPUExportKindFlag = GPUExportKindFlag(C.MLN_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE)
+	GPUExportKindFlagOpaqueFd              GPUExportKindFlag = GPUExportKindFlag(C.MLN_GPU_EXPORT_KIND_FLAG_OPAQUE_FD)
+)
+
+func (value GPUExportKindFlag) Has(flags GPUExportKindFlag) bool { return value&flags == flags }
+
+func (value GPUExportKindFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "GPUExportKindFlagIoSurface"}, {2, "GPUExportKindFlagDmaBuf"}, {4, "GPUExportKindFlagAndroidHardwareBuffer"}, {8, "GPUExportKindFlagDxgiSharedHandle"}, {16, "GPUExportKindFlagOpaqueFd"}})
+}
+
 // GPUSyncKind corresponds to mln_gpu_sync_kind. How one side waits for the
 // other's GPU work on a shared texture.
 //
@@ -301,7 +413,8 @@ const (
 	GPUSyncKindQueueOrder GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_QUEUE_ORDER)
 	// handle is a VkSemaphore. Wait until it reaches value.
 	GPUSyncKindVulkanTimelineSemaphore GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE)
-	// handle is a sync file descriptor.
+	// handle is a sync file descriptor. A descriptor of -1, as Vulkan exports for a
+	// semaphore that has already signaled, counts as GPUSyncKindCPUComplete.
 	GPUSyncKindSyncFd GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_SYNC_FD)
 	// handle is an MTLSharedEvent. Wait until it reaches value.
 	GPUSyncKindMetalSharedEvent GPUSyncKind = GPUSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)
@@ -669,30 +782,6 @@ func (value OpenGLClientAPI) String() string {
 	return fmt.Sprintf("OpenGLClientAPI(%d)", value)
 }
 
-// OpenGLContextOwnership corresponds to mln_open_gl_context_ownership. Whether
-// a render session's OpenGL context shares objects with yours.
-//
-// See mln_open_gl_context_ownership in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenGLContextOwnership uint32
-
-const (
-	// The session's context shares objects with your share_context.
-	OpenGLContextOwnershipShared OpenGLContextOwnership = OpenGLContextOwnership(C.MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED)
-	// The session's context shares objects with no other context.
-	OpenGLContextOwnershipDedicated OpenGLContextOwnership = OpenGLContextOwnership(C.MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED)
-)
-
-func (value OpenGLContextOwnership) String() string {
-	switch value {
-	case 0:
-		return "OpenGLContextOwnershipShared"
-	case 1:
-		return "OpenGLContextOwnershipDedicated"
-	}
-	return fmt.Sprintf("OpenGLContextOwnership(%d)", value)
-}
-
 // OpenGLContextProviderFlag corresponds to mln_open_gl_context_provider_flag.
 // An OpenGL context platform, as a bit in a set.
 //
@@ -765,6 +854,33 @@ func (value RenderAbandonDisposition) String() string {
 		return "RenderAbandonDispositionQuarantined"
 	}
 	return fmt.Sprintf("RenderAbandonDisposition(%d)", value)
+}
+
+// RenderBackend corresponds to mln_render_backend. A render backend.
+//
+// See mln_render_backend in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type RenderBackend uint32
+
+const (
+	RenderBackendMetal  RenderBackend = RenderBackend(C.MLN_RENDER_BACKEND_METAL)
+	RenderBackendVulkan RenderBackend = RenderBackend(C.MLN_RENDER_BACKEND_VULKAN)
+	RenderBackendOpenGL RenderBackend = RenderBackend(C.MLN_RENDER_BACKEND_OPEN_GL)
+	RenderBackendWebGPU RenderBackend = RenderBackend(C.MLN_RENDER_BACKEND_WEB_GPU)
+)
+
+func (value RenderBackend) String() string {
+	switch value {
+	case 1:
+		return "RenderBackendMetal"
+	case 2:
+		return "RenderBackendVulkan"
+	case 3:
+		return "RenderBackendOpenGL"
+	case 4:
+		return "RenderBackendWebGPU"
+	}
+	return fmt.Sprintf("RenderBackend(%d)", value)
 }
 
 // RenderBackendFlag corresponds to mln_render_backend_flag. A render backend,
@@ -926,6 +1042,37 @@ func (value RenderSessionState) String() string {
 		return "RenderSessionStateAbandoned"
 	}
 	return fmt.Sprintf("RenderSessionState(%d)", value)
+}
+
+// RenderTargetKindFlag corresponds to mln_render_target_kind_flag. A render
+// target kind, as a bit in a set.
+//
+// See mln_render_target_kind_flag in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type RenderTargetKindFlag uint32
+
+const (
+	RenderTargetKindFlagOffscreen              RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_OFFSCREEN)
+	RenderTargetKindFlagMetalLayer             RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_METAL_LAYER)
+	RenderTargetKindFlagWin32Window            RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_WIN32_WINDOW)
+	RenderTargetKindFlagXlibWindow             RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_XLIB_WINDOW)
+	RenderTargetKindFlagWaylandSurface         RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE)
+	RenderTargetKindFlagAndroidWindow          RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_ANDROID_WINDOW)
+	RenderTargetKindFlagOhosWindow             RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_OHOS_WINDOW)
+	RenderTargetKindFlagVulkanSurface          RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE)
+	RenderTargetKindFlagOpenGLSurface          RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_SURFACE)
+	RenderTargetKindFlagMetalBorrowedTextures  RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_METAL_BORROWED_TEXTURES)
+	RenderTargetKindFlagVulkanBorrowedTextures RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES)
+	RenderTargetKindFlagOpenGLBorrowedTextures RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES)
+	RenderTargetKindFlagWebGPUBorrowedTextures RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES)
+	RenderTargetKindFlagExportedRing           RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING)
+	RenderTargetKindFlagWebCanvas              RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS)
+)
+
+func (value RenderTargetKindFlag) Has(flags RenderTargetKindFlag) bool { return value&flags == flags }
+
+func (value RenderTargetKindFlag) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderTargetKindFlagOffscreen"}, {2, "RenderTargetKindFlagMetalLayer"}, {4, "RenderTargetKindFlagWin32Window"}, {8, "RenderTargetKindFlagXlibWindow"}, {16, "RenderTargetKindFlagWaylandSurface"}, {32, "RenderTargetKindFlagAndroidWindow"}, {64, "RenderTargetKindFlagOhosWindow"}, {512, "RenderTargetKindFlagVulkanSurface"}, {1024, "RenderTargetKindFlagOpenGLSurface"}, {2048, "RenderTargetKindFlagMetalBorrowedTextures"}, {4096, "RenderTargetKindFlagVulkanBorrowedTextures"}, {8192, "RenderTargetKindFlagOpenGLBorrowedTextures"}, {16384, "RenderTargetKindFlagWebGPUBorrowedTextures"}, {32768, "RenderTargetKindFlagExportedRing"}, {65536, "RenderTargetKindFlagWebCanvas"}})
 }
 
 // ResourceErrorReason corresponds to mln_resource_error_reason. Why a resource
@@ -1157,41 +1304,40 @@ func (value ResourceUsage) String() string {
 type RuntimeEventFlag uint64
 
 const (
-	RuntimeEventFlagNone                                RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_NONE)
-	RuntimeEventFlagMapCameraWillChange                 RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE)
-	RuntimeEventFlagMapCameraIsChanging                 RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_IS_CHANGING)
-	RuntimeEventFlagMapCameraDidChange                  RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE)
-	RuntimeEventFlagMapStyleLoaded                      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED)
-	RuntimeEventFlagMapLoadingStarted                   RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_STARTED)
-	RuntimeEventFlagMapLoadingFinished                  RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FINISHED)
-	RuntimeEventFlagMapLoadingFailed                    RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED)
-	RuntimeEventFlagMapIdle                             RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_IDLE)
-	RuntimeEventFlagMapRenderError                      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_ERROR)
-	RuntimeEventFlagMapRenderFrameStarted               RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_STARTED)
-	RuntimeEventFlagMapRenderFrameFinished              RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_FINISHED)
-	RuntimeEventFlagMapRenderMapStarted                 RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_STARTED)
-	RuntimeEventFlagMapRenderMapFinished                RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_FINISHED)
-	RuntimeEventFlagMapStyleImageMissing                RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_IMAGE_MISSING)
-	RuntimeEventFlagMapTileAction                       RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION)
-	RuntimeEventFlagMapSourceChanged                    RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED)
-	RuntimeEventFlagOfflineRegionStatusChanged          RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED)
-	RuntimeEventFlagOfflineRegionResponseError          RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR)
-	RuntimeEventFlagOfflineRegionTileCountLimitExceeded RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	RuntimeEventFlagMapGlyphsRequested                  RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED)
-	RuntimeEventFlagMapGlyphsLoaded                     RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED)
-	RuntimeEventFlagMapGlyphsError                      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR)
-	RuntimeEventFlagMapSpriteRequested                  RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED)
-	RuntimeEventFlagMapSpriteLoaded                     RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED)
-	RuntimeEventFlagMapSpriteError                      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR)
-	RuntimeEventFlagAllMapEvents                        RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS)
-	RuntimeEventFlagAllRuntimeEvents                    RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS)
-	RuntimeEventFlagAll                                 RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL)
+	RuntimeEventFlagNone                       RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_NONE)
+	RuntimeEventFlagMapCameraWillChange        RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_WILL_CHANGE)
+	RuntimeEventFlagMapCameraIsChanging        RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_IS_CHANGING)
+	RuntimeEventFlagMapCameraDidChange         RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_CAMERA_DID_CHANGE)
+	RuntimeEventFlagMapStyleLoaded             RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_LOADED)
+	RuntimeEventFlagMapLoadingStarted          RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_STARTED)
+	RuntimeEventFlagMapLoadingFinished         RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FINISHED)
+	RuntimeEventFlagMapLoadingFailed           RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_LOADING_FAILED)
+	RuntimeEventFlagMapIdle                    RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_IDLE)
+	RuntimeEventFlagMapRenderError             RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_ERROR)
+	RuntimeEventFlagMapRenderFrameStarted      RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_STARTED)
+	RuntimeEventFlagMapRenderFrameFinished     RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_FRAME_FINISHED)
+	RuntimeEventFlagMapRenderMapStarted        RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_STARTED)
+	RuntimeEventFlagMapRenderMapFinished       RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_RENDER_MAP_FINISHED)
+	RuntimeEventFlagMapStyleImageMissing       RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_STYLE_IMAGE_MISSING)
+	RuntimeEventFlagMapTileAction              RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION)
+	RuntimeEventFlagMapSourceChanged           RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED)
+	RuntimeEventFlagOfflineRegionStatusChanged RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED)
+	RuntimeEventFlagOfflineRegionResponseError RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR)
+	RuntimeEventFlagMapGlyphsRequested         RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED)
+	RuntimeEventFlagMapGlyphsLoaded            RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED)
+	RuntimeEventFlagMapGlyphsError             RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR)
+	RuntimeEventFlagMapSpriteRequested         RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED)
+	RuntimeEventFlagMapSpriteLoaded            RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED)
+	RuntimeEventFlagMapSpriteError             RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR)
+	RuntimeEventFlagAllMapEvents               RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS)
+	RuntimeEventFlagAllRuntimeEvents           RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS)
+	RuntimeEventFlagAll                        RuntimeEventFlag = RuntimeEventFlag(C.MLN_RUNTIME_EVENT_FLAG_ALL)
 )
 
 func (value RuntimeEventFlag) Has(flags RuntimeEventFlag) bool { return value&flags == flags }
 
 func (value RuntimeEventFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{2, "RuntimeEventFlagMapCameraWillChange"}, {4, "RuntimeEventFlagMapCameraIsChanging"}, {8, "RuntimeEventFlagMapCameraDidChange"}, {16, "RuntimeEventFlagMapStyleLoaded"}, {32, "RuntimeEventFlagMapLoadingStarted"}, {64, "RuntimeEventFlagMapLoadingFinished"}, {128, "RuntimeEventFlagMapLoadingFailed"}, {256, "RuntimeEventFlagMapIdle"}, {512, "RuntimeEventFlagMapRenderError"}, {1024, "RuntimeEventFlagMapRenderFrameStarted"}, {2048, "RuntimeEventFlagMapRenderFrameFinished"}, {4096, "RuntimeEventFlagMapRenderMapStarted"}, {8192, "RuntimeEventFlagMapRenderMapFinished"}, {16384, "RuntimeEventFlagMapStyleImageMissing"}, {32768, "RuntimeEventFlagMapTileAction"}, {65536, "RuntimeEventFlagMapSourceChanged"}, {131072, "RuntimeEventFlagOfflineRegionStatusChanged"}, {262144, "RuntimeEventFlagOfflineRegionResponseError"}, {524288, "RuntimeEventFlagOfflineRegionTileCountLimitExceeded"}, {1048576, "RuntimeEventFlagMapGlyphsRequested"}, {2097152, "RuntimeEventFlagMapGlyphsLoaded"}, {4194304, "RuntimeEventFlagMapGlyphsError"}, {8388608, "RuntimeEventFlagMapSpriteRequested"}, {16777216, "RuntimeEventFlagMapSpriteLoaded"}, {33554432, "RuntimeEventFlagMapSpriteError"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{2, "RuntimeEventFlagMapCameraWillChange"}, {4, "RuntimeEventFlagMapCameraIsChanging"}, {8, "RuntimeEventFlagMapCameraDidChange"}, {16, "RuntimeEventFlagMapStyleLoaded"}, {32, "RuntimeEventFlagMapLoadingStarted"}, {64, "RuntimeEventFlagMapLoadingFinished"}, {128, "RuntimeEventFlagMapLoadingFailed"}, {256, "RuntimeEventFlagMapIdle"}, {512, "RuntimeEventFlagMapRenderError"}, {1024, "RuntimeEventFlagMapRenderFrameStarted"}, {2048, "RuntimeEventFlagMapRenderFrameFinished"}, {4096, "RuntimeEventFlagMapRenderMapStarted"}, {8192, "RuntimeEventFlagMapRenderMapFinished"}, {16384, "RuntimeEventFlagMapStyleImageMissing"}, {32768, "RuntimeEventFlagMapTileAction"}, {65536, "RuntimeEventFlagMapSourceChanged"}, {131072, "RuntimeEventFlagOfflineRegionStatusChanged"}, {262144, "RuntimeEventFlagOfflineRegionResponseError"}, {524288, "RuntimeEventFlagMapGlyphsRequested"}, {1048576, "RuntimeEventFlagMapGlyphsLoaded"}, {2097152, "RuntimeEventFlagMapGlyphsError"}, {4194304, "RuntimeEventFlagMapSpriteRequested"}, {8388608, "RuntimeEventFlagMapSpriteLoaded"}, {16777216, "RuntimeEventFlagMapSpriteError"}})
 }
 
 // RuntimeEventSourceType corresponds to mln_runtime_event_source_type. The kind
@@ -1256,16 +1402,12 @@ const (
 	RuntimeEventTypeOfflineRegionStatusChanged RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
 	// A resource that the region needs failed to download.
 	RuntimeEventTypeOfflineRegionResponseError RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
-	// The region's download became inactive because the cache file's offline
-	// regions hold as many tiles from MapLibre's demo tile server as the limit
-	// allows. Only tiles of sources with a maplibre:// URL count toward the limit.
-	RuntimeEventTypeOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	RuntimeEventTypeMapGlyphsRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED)
-	RuntimeEventTypeMapGlyphsLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED)
-	RuntimeEventTypeMapGlyphsError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR)
-	RuntimeEventTypeMapSpriteRequested                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED)
-	RuntimeEventTypeMapSpriteLoaded                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED)
-	RuntimeEventTypeMapSpriteError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR)
+	RuntimeEventTypeMapGlyphsRequested         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED)
+	RuntimeEventTypeMapGlyphsLoaded            RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED)
+	RuntimeEventTypeMapGlyphsError             RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR)
+	RuntimeEventTypeMapSpriteRequested         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED)
+	RuntimeEventTypeMapSpriteLoaded            RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED)
+	RuntimeEventTypeMapSpriteError             RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR)
 )
 
 func (value RuntimeEventType) String() string {
@@ -1307,18 +1449,16 @@ func (value RuntimeEventType) String() string {
 	case 18:
 		return "RuntimeEventTypeOfflineRegionResponseError"
 	case 19:
-		return "RuntimeEventTypeOfflineRegionTileCountLimitExceeded"
-	case 20:
 		return "RuntimeEventTypeMapGlyphsRequested"
-	case 21:
+	case 20:
 		return "RuntimeEventTypeMapGlyphsLoaded"
-	case 22:
+	case 21:
 		return "RuntimeEventTypeMapGlyphsError"
-	case 23:
+	case 22:
 		return "RuntimeEventTypeMapSpriteRequested"
-	case 24:
+	case 23:
 		return "RuntimeEventTypeMapSpriteLoaded"
-	case 25:
+	case 24:
 		return "RuntimeEventTypeMapSpriteError"
 	}
 	return fmt.Sprintf("RuntimeEventType(%d)", value)
@@ -1739,11 +1879,11 @@ func (value ViewportMode) String() string {
 // on your side before you read it. You don't need to release it back.
 //
 // See mln_vulkan_image_owner in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type VulkanImageOwner uint32
 
 const (
-	// The image stays with the queue family of graphics_queue_family_index.
+	// The image stays with the queue family of the device's queue.
 	VulkanImageOwnerGraphicsQueue VulkanImageOwner = VulkanImageOwner(C.MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE)
 	// Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL.
 	VulkanImageOwnerExternal VulkanImageOwner = VulkanImageOwner(C.MLN_VULKAN_IMAGE_OWNER_EXTERNAL)
@@ -1762,6 +1902,87 @@ func (value VulkanImageOwner) String() string {
 	}
 	return fmt.Sprintf("VulkanImageOwner(%d)", value)
 }
+
+// CustomLayerPrerenderParametersEncoder corresponds to
+// mln_custom_layer_encoder_data. The GPU commands of a frame outside the map's
+// render pass, by the backend that the session renders with.
+//
+// An OpenGL session has no variant: its context is current, and it draws
+// through no object that the callback needs.
+//
+// See mln_custom_layer_encoder_data in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type CustomLayerPrerenderParametersEncoder interface {
+	bindingTag() uint32
+	isCustomLayerPrerenderParametersEncoder()
+}
+
+func (UnknownVariant) isCustomLayerPrerenderParametersEncoder() {}
+
+type CustomLayerPrerenderParametersEncoderMetalVariant struct{ Value MetalCustomLayerEncoder }
+
+func (CustomLayerPrerenderParametersEncoderMetalVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_METAL)
+}
+
+func (CustomLayerPrerenderParametersEncoderMetalVariant) isCustomLayerPrerenderParametersEncoder() {}
+
+type CustomLayerPrerenderParametersEncoderVulkanVariant struct{ Value VulkanCustomLayerEncoder }
+
+func (CustomLayerPrerenderParametersEncoderVulkanVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_VULKAN)
+}
+
+func (CustomLayerPrerenderParametersEncoderVulkanVariant) isCustomLayerPrerenderParametersEncoder() {}
+
+type CustomLayerPrerenderParametersEncoderWebGPUVariant struct{ Value WebGPUCustomLayerEncoder }
+
+func (CustomLayerPrerenderParametersEncoderWebGPUVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_WEB_GPU)
+}
+
+func (CustomLayerPrerenderParametersEncoderWebGPUVariant) isCustomLayerPrerenderParametersEncoder() {}
+
+// CustomLayerRenderParametersPass corresponds to mln_custom_layer_pass_data.
+// The map's render pass at a custom layer's place in the style, by the backend
+// that the session renders with.
+//
+// See mln_custom_layer_pass_data in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type CustomLayerRenderParametersPass interface {
+	bindingTag() uint32
+	isCustomLayerRenderParametersPass()
+}
+
+func (UnknownVariant) isCustomLayerRenderParametersPass() {}
+
+type CustomLayerRenderParametersPassMetalVariant struct{ Value MetalCustomLayerPass }
+
+func (CustomLayerRenderParametersPassMetalVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_METAL)
+}
+func (CustomLayerRenderParametersPassMetalVariant) isCustomLayerRenderParametersPass() {}
+
+type CustomLayerRenderParametersPassVulkanVariant struct{ Value VulkanCustomLayerPass }
+
+func (CustomLayerRenderParametersPassVulkanVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_VULKAN)
+}
+func (CustomLayerRenderParametersPassVulkanVariant) isCustomLayerRenderParametersPass() {}
+
+type CustomLayerRenderParametersPassOpenGLVariant struct{ Value OpenGLCustomLayerPass }
+
+func (CustomLayerRenderParametersPassOpenGLVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_OPEN_GL)
+}
+func (CustomLayerRenderParametersPassOpenGLVariant) isCustomLayerRenderParametersPass() {}
+
+type CustomLayerRenderParametersPassWebGPUVariant struct{ Value WebGPUCustomLayerPass }
+
+func (CustomLayerRenderParametersPassWebGPUVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_WEB_GPU)
+}
+func (CustomLayerRenderParametersPassWebGPUVariant) isCustomLayerRenderParametersPass() {}
 
 // FeatureID corresponds to mln_feature_id. The ID of a feature in a source, as
 // the source's data gives it.
@@ -1828,37 +2049,163 @@ func (OfflineRegionDefinitionGeometryVariant) bindingTag() uint32 {
 }
 func (OfflineRegionDefinitionGeometryVariant) isOfflineRegionDefinition() {}
 
-// OpenGLContextDescriptorData corresponds to
-// mln_open_gl_context_descriptor_data. The WGL, EGL, or WebGL part of an OpenGL
-// context descriptor.
+// OpenGLContextDescriptor corresponds to mln_open_gl_context_descriptor. Your
+// OpenGL context, for NewGPUDevice(): the root of the share group that the
+// device's sessions join.
 //
-// See mln_open_gl_context_descriptor_data in the C API reference:
+// See mln_open_gl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenGLContextDescriptorData interface {
+type OpenGLContextDescriptor interface {
 	bindingTag() uint32
-	isOpenGLContextDescriptorData()
+	isOpenGLContextDescriptor()
 }
 
-type OpenGLContextDescriptorDataWGLVariant struct{ Value WGLContextDescriptor }
+type OpenGLContextDescriptorWGLVariant struct{ Value WGLContextDescriptor }
 
-func (OpenGLContextDescriptorDataWGLVariant) bindingTag() uint32 {
+func (OpenGLContextDescriptorWGLVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPEN_GL_CONTEXT_PLATFORM_WGL)
 }
-func (OpenGLContextDescriptorDataWGLVariant) isOpenGLContextDescriptorData() {}
+func (OpenGLContextDescriptorWGLVariant) isOpenGLContextDescriptor() {}
 
-type OpenGLContextDescriptorDataEGLVariant struct{ Value EGLContextDescriptor }
+type OpenGLContextDescriptorEGLVariant struct{ Value EGLContextDescriptor }
 
-func (OpenGLContextDescriptorDataEGLVariant) bindingTag() uint32 {
+func (OpenGLContextDescriptorEGLVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPEN_GL_CONTEXT_PLATFORM_EGL)
 }
-func (OpenGLContextDescriptorDataEGLVariant) isOpenGLContextDescriptorData() {}
+func (OpenGLContextDescriptorEGLVariant) isOpenGLContextDescriptor() {}
 
-type OpenGLContextDescriptorDataWebGLVariant struct{ Value WebGLContextDescriptor }
+type OpenGLContextDescriptorWebGLVariant struct{ Value WebGLContextDescriptor }
 
-func (OpenGLContextDescriptorDataWebGLVariant) bindingTag() uint32 {
+func (OpenGLContextDescriptorWebGLVariant) bindingTag() uint32 {
 	return uint32(C.MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL)
 }
-func (OpenGLContextDescriptorDataWebGLVariant) isOpenGLContextDescriptorData() {}
+func (OpenGLContextDescriptorWebGLVariant) isOpenGLContextDescriptor() {}
+
+// RenderTarget corresponds to mln_render_target. What a render session renders
+// into: one kind of target, and its descriptor.
+//
+// Every target has a size in logical pixels, which sets the map's size. The
+// session renders it at the map's scale factor. A borrowed or exported ring
+// hands each frame to you: acquire it with RenderSessionHandle.AcquireFrame(),
+// and release it with your GPU's synchronization once you have read it.
+//
+// The session uses the objects that the descriptor names until a replacement or
+// release of the target completes, a detach or release of the session
+// completes, or an abandon of it returns, except as a kind's descriptor says. A
+// window target presents without waiting for the display, so demand at most one
+// frame per display refresh.
+//
+// See mln_render_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type RenderTarget interface {
+	bindingTag() uint32
+	isRenderTarget()
+}
+
+type RenderTargetOffscreenVariant struct{ Value OffscreenTarget }
+
+func (RenderTargetOffscreenVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_OFFSCREEN)
+}
+func (RenderTargetOffscreenVariant) isRenderTarget() {}
+
+type RenderTargetMetalLayerVariant struct{ Value MetalLayerTarget }
+
+func (RenderTargetMetalLayerVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_METAL_LAYER)
+}
+func (RenderTargetMetalLayerVariant) isRenderTarget() {}
+
+type RenderTargetWin32WindowVariant struct{ Value Win32WindowTarget }
+
+func (RenderTargetWin32WindowVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_WIN32_WINDOW)
+}
+func (RenderTargetWin32WindowVariant) isRenderTarget() {}
+
+type RenderTargetXlibWindowVariant struct{ Value XlibWindowTarget }
+
+func (RenderTargetXlibWindowVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_XLIB_WINDOW)
+}
+func (RenderTargetXlibWindowVariant) isRenderTarget() {}
+
+type RenderTargetWaylandSurfaceVariant struct{ Value WaylandSurfaceTarget }
+
+func (RenderTargetWaylandSurfaceVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE)
+}
+func (RenderTargetWaylandSurfaceVariant) isRenderTarget() {}
+
+type RenderTargetAndroidWindowVariant struct{ Value AndroidWindowTarget }
+
+func (RenderTargetAndroidWindowVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_ANDROID_WINDOW)
+}
+func (RenderTargetAndroidWindowVariant) isRenderTarget() {}
+
+type RenderTargetOhosWindowVariant struct{ Value OhosWindowTarget }
+
+func (RenderTargetOhosWindowVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_OHOS_WINDOW)
+}
+func (RenderTargetOhosWindowVariant) isRenderTarget() {}
+
+type RenderTargetVulkanSurfaceVariant struct{ Value VulkanSurfaceTarget }
+
+func (RenderTargetVulkanSurfaceVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_VULKAN_SURFACE)
+}
+func (RenderTargetVulkanSurfaceVariant) isRenderTarget() {}
+
+type RenderTargetOpenGLSurfaceVariant struct{ Value OpenGLSurfaceTarget }
+
+func (RenderTargetOpenGLSurfaceVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE)
+}
+func (RenderTargetOpenGLSurfaceVariant) isRenderTarget() {}
+
+type RenderTargetMetalBorrowedTexturesVariant struct{ Value MetalBorrowedTexturesTarget }
+
+func (RenderTargetMetalBorrowedTexturesVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES)
+}
+func (RenderTargetMetalBorrowedTexturesVariant) isRenderTarget() {}
+
+type RenderTargetVulkanBorrowedTexturesVariant struct{ Value VulkanBorrowedTexturesTarget }
+
+func (RenderTargetVulkanBorrowedTexturesVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES)
+}
+func (RenderTargetVulkanBorrowedTexturesVariant) isRenderTarget() {}
+
+type RenderTargetOpenGLBorrowedTexturesVariant struct{ Value OpenGLBorrowedTexturesTarget }
+
+func (RenderTargetOpenGLBorrowedTexturesVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES)
+}
+func (RenderTargetOpenGLBorrowedTexturesVariant) isRenderTarget() {}
+
+type RenderTargetWebGPUBorrowedTexturesVariant struct{ Value WebGPUBorrowedTexturesTarget }
+
+func (RenderTargetWebGPUBorrowedTexturesVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES)
+}
+func (RenderTargetWebGPUBorrowedTexturesVariant) isRenderTarget() {}
+
+type RenderTargetExportedRingVariant struct{ Value ExportedRingTarget }
+
+func (RenderTargetExportedRingVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_EXPORTED_RING)
+}
+func (RenderTargetExportedRingVariant) isRenderTarget() {}
+
+type RenderTargetWebCanvasVariant struct{ Value WebCanvasTarget }
+
+func (RenderTargetWebCanvasVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_WEB_CANVAS)
+}
+func (RenderTargetWebCanvasVariant) isRenderTarget() {}
 
 // RenderedQueryGeometry corresponds to mln_rendered_query_geometry. The screen
 // area that a rendered feature query covers.
@@ -1963,15 +2310,6 @@ func (RuntimeEventPayloadOfflineRegionResponseErrorVariant) bindingTag() uint32 
 }
 func (RuntimeEventPayloadOfflineRegionResponseErrorVariant) isRuntimeEventPayload() {}
 
-type RuntimeEventPayloadOfflineRegionTileCountLimitVariant struct {
-	Value RuntimeEventOfflineRegionTileCountLimit
-}
-
-func (RuntimeEventPayloadOfflineRegionTileCountLimitVariant) bindingTag() uint32 {
-	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
-}
-func (RuntimeEventPayloadOfflineRegionTileCountLimitVariant) isRuntimeEventPayload() {}
-
 type RuntimeEventPayloadGlyphsVariant struct{ Value RuntimeEventGlyphs }
 
 func (RuntimeEventPayloadGlyphsVariant) bindingTag() uint32 {
@@ -2016,10 +2354,10 @@ func nativeAnchoredMomentum(input AnchoredMomentum, arena *bindingArena) C.mln_a
 }
 
 // AndroidHardwareBufferFrame corresponds to mln_android_hardware_buffer_frame.
-// The Android hardware buffer of an acquired frame.
+// The Android hardware buffer of an exported ring's acquired frame.
 //
 // See mln_android_hardware_buffer_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type AndroidHardwareBufferFrame struct {
 	Width       uint32
 	Height      uint32
@@ -2040,89 +2378,30 @@ func copyAndroidHardwareBufferFrame(raw C.mln_android_hardware_buffer_frame) And
 	return result
 }
 
-// AndroidHardwareBufferRingDescriptor corresponds to
-// mln_android_hardware_buffer_ring_descriptor. A ring of Android hardware
-// buffers that the library allocates, for
-// MapHandle.AttachAndroidHardwareBufferRing().
+// AndroidWindowTarget corresponds to mln_android_window_target. An Android
+// window to present to.
 //
-// Each buffer has the map's size in pixels, logical_size times the map's scale
-// factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its usage is
-// AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
-// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of usage.
+// The session takes its own reference to the window, so you can release yours
+// once the call returns. When the platform destroys the window, such as in
+// SurfaceHolder.Callback.surfaceDestroyed, release the target with
+// RenderSessionHandle.ReleaseTarget(), or give the session another window with
+// RenderSessionHandle.SetTarget(), without waiting for that to complete. A
+// frame to the destroyed window finishes with RenderResultTargetNotReady, or
+// with RenderResultRendered if the window went away while the frame was
+// presenting.
 //
-// See mln_android_hardware_buffer_ring_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-type AndroidHardwareBufferRingDescriptor struct {
+// See mln_android_window_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type AndroidWindowTarget struct {
 	LogicalSize LogicalSize
-	// How many buffers the ring has, from 1 to 8.
-	BufferCount uint32
-	// More AHARDWAREBUFFER_USAGE_* bits that your reads need, such as
-	// AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
-	Usage uint64
-}
-
-func nativeAndroidHardwareBufferRingDescriptor(input AndroidHardwareBufferRingDescriptor, arena *bindingArena) C.mln_android_hardware_buffer_ring_descriptor {
-	raw := C.mln_android_hardware_buffer_ring_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.buffer_count = C.uint32_t(input.BufferCount)
-	raw.usage = C.uint64_t(input.Usage)
-	return raw
-}
-
-// AndroidSurfaceDescriptor corresponds to mln_android_surface_descriptor. An
-// Android window to present to, for MapHandle.AttachAndroidSurface().
-//
-// Name the window by window, or by jni_env and surface. The session takes its
-// own reference to the window, so you can release yours once the call returns.
-//
-// See mln_android_surface_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-type AndroidSurfaceDescriptor struct {
-	LogicalSize LogicalSize
-	// Your ANativeWindow*, or null to name the window by surface.
+	// Your ANativeWindow*.
 	Window uintptr
-	// The calling thread's JNIEnv*, with surface.
-	JniEnv uintptr
-	// An android.view.Surface, with jni_env.
-	Surface uintptr
 }
 
-func nativeAndroidSurfaceDescriptor(input AndroidSurfaceDescriptor, arena *bindingArena) C.mln_android_surface_descriptor {
-	raw := C.mln_android_surface_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeAndroidWindowTarget(input AndroidWindowTarget, arena *bindingArena) C.mln_android_window_target {
+	raw := C.mln_android_window_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
-	raw.jni_env = unsafe.Pointer(C.binding_address(C.uintptr_t(input.JniEnv)))
-	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
-	return raw
-}
-
-// AndroidSurfaceReplacement corresponds to mln_android_surface_replacement. A
-// new Android window for RenderSessionHandle.SetAndroidSurfaceTarget().
-//
-// Name the window by window, or by jni_env and surface. The session takes its
-// own reference to the window, so you can release yours once the call returns.
-//
-// See mln_android_surface_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-type AndroidSurfaceReplacement struct {
-	LogicalSize LogicalSize
-	// Your ANativeWindow*, or null to name the window by surface.
-	Window uintptr
-	// The calling thread's JNIEnv*, with surface.
-	JniEnv uintptr
-	// An android.view.Surface, with jni_env.
-	Surface uintptr
-}
-
-func nativeAndroidSurfaceReplacement(input AndroidSurfaceReplacement, arena *bindingArena) C.mln_android_surface_replacement {
-	raw := C.mln_android_surface_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
-	raw.jni_env = unsafe.Pointer(C.binding_address(C.uintptr_t(input.JniEnv)))
-	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	return raw
 }
 
@@ -2612,6 +2891,172 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 	return raw
 }
 
+// CustomLayerFrame corresponds to mln_custom_layer_frame. The frame that a
+// custom layer draws into, as its callbacks get it.
+//
+// The view and the frame projection are the ones that the frame draws the map
+// with, so they are never newer than the frame, unlike the map's camera.
+//
+// See mln_custom_layer_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type CustomLayerFrame struct {
+	// The camera, extent, and scale factor that the frame shows.
+	View MapView
+	// Where the frame draws the map, and the depth that it writes there.
+	FrameProjection FrameProjection
+	// The width of the frame's attachments, in physical pixels.
+	Width uint32
+	// The height of the frame's attachments, in physical pixels.
+	Height uint32
+}
+
+func copyCustomLayerFrame(raw C.mln_custom_layer_frame) CustomLayerFrame {
+	var result CustomLayerFrame
+	result.View = copyMapView(raw.view)
+	result.FrameProjection = copyFrameProjection(raw.frame_projection)
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	return result
+}
+
+// CustomLayerHost corresponds to mln_custom_layer_host. The callbacks of a
+// custom layer, which draws with your own GPU commands in the map's frame.
+//
+// A session runs the callbacks only when it can hand you its commands as one of
+// CustomLayerRenderParametersPass's variants, so a session on another backend,
+// such as WebGPU outside a browser, doesn't draw the layer. Nor does a browser
+// WebGPU session yet: the library's WebGPU (wgpu) exposes no command encoder or
+// render pass to hand you. Leave unset the callbacks that you don't need.
+//
+// Runs on the thread that runs the session's graphics work: a library thread,
+// or yours with RenderDriverKindCallerGraphicsThread. It can't call the
+// library.
+//
+// It can't call the library.
+//
+// See mln_custom_layer_host in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type CustomLayerHost struct {
+	Prerender    func(parameters CustomLayerPrerenderParameters)
+	Render       func(parameters CustomLayerRenderParameters)
+	Deinitialize func()
+	ContextLost  func()
+	native       *bindingNativeRegistration
+}
+
+// NewNativeCustomLayerHost returns a CustomLayerHost from C values that native
+// code in the host supplies: prerender, render, deinitialize, contextLost,
+// userData, and releaseUserData are the members of the C struct that
+// CustomLayerHost presents, which the binding copies unchanged. The first call
+// that carries the CustomLayerHost consumes it. Native code releases userData
+// if it accepts the call, and otherwise the binding calls releaseUserData. A
+// later call returns StatusInvalidState.
+func NewNativeCustomLayerHost(prerender, render, deinitialize, contextLost, userData, releaseUserData uintptr) CustomLayerHost {
+	return CustomLayerHost{native: bindingNewNativeRegistration(userData, releaseUserData, prerender, render, deinitialize, contextLost)}
+}
+
+func nativeCustomLayerHost(input CustomLayerHost, arena *bindingArena) C.mln_custom_layer_host {
+	raw := C.mln_custom_layer_host{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input.native != nil {
+		registration := arena.native(input.native)
+		if input.Prerender != nil || input.Render != nil || input.Deinitialize != nil || input.ContextLost != nil {
+			arena.fail("CustomLayerHost carries both a native registration and a func")
+		}
+		raw.prerender = C.mln_custom_layer_prerender_callback(C.binding_address(C.uintptr_t(registration.callbacks[0])))
+		raw.render = C.mln_custom_layer_render_callback(C.binding_address(C.uintptr_t(registration.callbacks[1])))
+		raw.deinitialize = C.mln_custom_layer_session_end_callback(C.binding_address(C.uintptr_t(registration.callbacks[2])))
+		raw.context_lost = C.mln_custom_layer_session_end_callback(C.binding_address(C.uintptr_t(registration.callbacks[3])))
+		raw.user_data = C.binding_address(C.uintptr_t(registration.userData))
+		raw.release_user_data = C.mln_user_data_release(C.binding_address(C.uintptr_t(registration.release)))
+	} else if input.Prerender != nil || input.Render != nil || input.Deinitialize != nil || input.ContextLost != nil {
+		raw.user_data = arena.register(input)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
+		if input.Prerender != nil {
+			raw.prerender = C.mln_custom_layer_prerender_callback(C.binding_mln_custom_layer_host_prerender)
+		}
+		if input.Render != nil {
+			raw.render = C.mln_custom_layer_render_callback(C.binding_mln_custom_layer_host_render)
+		}
+		if input.Deinitialize != nil {
+			raw.deinitialize = C.mln_custom_layer_session_end_callback(C.binding_mln_custom_layer_host_deinitialize)
+		}
+		if input.ContextLost != nil {
+			raw.context_lost = C.mln_custom_layer_session_end_callback(C.binding_mln_custom_layer_host_context_lost)
+		}
+	}
+	return raw
+}
+
+// CustomLayerPrerenderParameters corresponds to
+// mln_custom_layer_prerender_parameters. What a custom layer's prerender
+// callback gets.
+//
+// See mln_custom_layer_prerender_parameters in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type CustomLayerPrerenderParameters struct {
+	Encoder CustomLayerPrerenderParametersEncoder
+	Frame   CustomLayerFrame
+}
+
+func copyCustomLayerPrerenderParameters(raw C.mln_custom_layer_prerender_parameters) CustomLayerPrerenderParameters {
+	var result CustomLayerPrerenderParameters
+	result.Encoder = func() CustomLayerPrerenderParametersEncoder {
+		switch raw.backend {
+		case C.MLN_RENDER_BACKEND_METAL:
+			return CustomLayerPrerenderParametersEncoderMetalVariant{Value: copyMetalCustomLayerEncoder(bindingUnionLoad[C.mln_metal_custom_layer_encoder](raw.encoder[:]))}
+		case C.MLN_RENDER_BACKEND_VULKAN:
+			return CustomLayerPrerenderParametersEncoderVulkanVariant{Value: copyVulkanCustomLayerEncoder(bindingUnionLoad[C.mln_vulkan_custom_layer_encoder](raw.encoder[:]))}
+		case C.MLN_RENDER_BACKEND_WEB_GPU:
+			return CustomLayerPrerenderParametersEncoderWebGPUVariant{Value: copyWebGPUCustomLayerEncoder(bindingUnionLoad[C.mln_web_gpu_custom_layer_encoder](raw.encoder[:]))}
+		case C.MLN_RENDER_BACKEND_OPEN_GL:
+			return nil
+		}
+		return UnknownVariant{Tag: uint32(raw.backend)}
+	}()
+	result.Frame = copyCustomLayerFrame(raw.frame)
+	return result
+}
+
+// CustomLayerRenderParameters corresponds to
+// mln_custom_layer_render_parameters. What a custom layer's render callback
+// gets.
+//
+// See mln_custom_layer_render_parameters in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type CustomLayerRenderParameters struct {
+	Pass  CustomLayerRenderParametersPass
+	Frame CustomLayerFrame
+	// The depth that a 2D layer at the layer's place in the style writes, as
+	// FrameProjection describes, between frame.frame_projection.far_depth and 1.
+	//
+	// The map draws the opaque fragments of its 2D layers before the render
+	// callback runs, those above the custom layer too. A fragment that you draw at
+	// this depth, tested with less-or-equal, stays under those above that wrote
+	// depth.
+	LayerDepth float64
+}
+
+func copyCustomLayerRenderParameters(raw C.mln_custom_layer_render_parameters) CustomLayerRenderParameters {
+	var result CustomLayerRenderParameters
+	result.Pass = func() CustomLayerRenderParametersPass {
+		switch raw.backend {
+		case C.MLN_RENDER_BACKEND_METAL:
+			return CustomLayerRenderParametersPassMetalVariant{Value: copyMetalCustomLayerPass(bindingUnionLoad[C.mln_metal_custom_layer_pass](raw.pass[:]))}
+		case C.MLN_RENDER_BACKEND_VULKAN:
+			return CustomLayerRenderParametersPassVulkanVariant{Value: copyVulkanCustomLayerPass(bindingUnionLoad[C.mln_vulkan_custom_layer_pass](raw.pass[:]))}
+		case C.MLN_RENDER_BACKEND_OPEN_GL:
+			return CustomLayerRenderParametersPassOpenGLVariant{Value: copyOpenGLCustomLayerPass(bindingUnionLoad[C.mln_open_gl_custom_layer_pass](raw.pass[:]))}
+		case C.MLN_RENDER_BACKEND_WEB_GPU:
+			return CustomLayerRenderParametersPassWebGPUVariant{Value: copyWebGPUCustomLayerPass(bindingUnionLoad[C.mln_web_gpu_custom_layer_pass](raw.pass[:]))}
+		}
+		return UnknownVariant{Tag: uint32(raw.backend)}
+	}()
+	result.Frame = copyCustomLayerFrame(raw.frame)
+	result.LayerDepth = float64(raw.layer_depth)
+	return result
+}
+
 // CustomVectorSourceOptions corresponds to mln_custom_vector_source_options.
 // The callbacks and options of a custom vector source.
 //
@@ -2649,7 +3094,7 @@ func nativeCustomVectorSourceOptions(input CustomVectorSourceOptions, arena *bin
 // that you can import.
 //
 // See mln_dma_buf_format in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type DmaBufFormat struct {
 	// A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
 	Fourcc uint32
@@ -2664,11 +3109,11 @@ func nativeDmaBufFormat(input DmaBufFormat, arena *bindingArena) C.mln_dma_buf_f
 	return raw
 }
 
-// DmaBufFrame corresponds to mln_dma_buf_frame. The dmabuf of an acquired
-// frame.
+// DmaBufFrame corresponds to mln_dma_buf_frame. The dmabuf of an exported
+// ring's acquired frame.
 //
 // See mln_dma_buf_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type DmaBufFrame struct {
 	Width       uint32
 	Height      uint32
@@ -2707,7 +3152,7 @@ func copyDmaBufFrame(raw C.mln_dma_buf_frame) DmaBufFrame {
 // keeps its data.
 //
 // See mln_dma_buf_plane in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type DmaBufPlane struct {
 	// The file descriptor of the dmabuf that holds the plane. The planes of a
 	// buffer often share one.
@@ -2726,47 +3171,11 @@ func copyDmaBufPlane(raw C.mln_dma_buf_plane) DmaBufPlane {
 	return result
 }
 
-// DmaBufRingDescriptor corresponds to mln_dma_buf_ring_descriptor. A ring of
-// dmabufs that the library allocates, for MapHandle.AttachDmaBufRing().
-//
-// Each buffer has the map's size in pixels and a format and modifier from
-// formats. The library renders only DRM_FORMAT_ABGR8888 and
-// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its format
-// has, such as a plane of compression metadata, and the library takes any such
-// modifier that its GPU can render into and share.
-//
-// See mln_dma_buf_ring_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html
-type DmaBufRingDescriptor struct {
-	LogicalSize LogicalSize
-	// How many buffers the ring has, from 1 to 8.
-	BufferCount uint32
-	// The formats and modifiers that your reader imports, most preferred first,
-	// such as those that eglQueryDmaBufModifiersEXT() reports.
-	Formats []DmaBufFormat
-}
-
-func nativeDmaBufRingDescriptor(input DmaBufRingDescriptor, arena *bindingArena) C.mln_dma_buf_ring_descriptor {
-	raw := C.mln_dma_buf_ring_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.buffer_count = C.uint32_t(input.BufferCount)
-	{
-		raw.formats = (*C.mln_dma_buf_format)(arena.array(len(input.Formats), unsafe.Sizeof(*raw.formats)))
-		items := unsafe.Slice(raw.formats, len(input.Formats))
-		raw.format_count = bindingCountLike(raw.format_count, len(input.Formats))
-		for i, item := range input.Formats {
-			items[i] = nativeDmaBufFormat(item, arena)
-		}
-	}
-	return raw
-}
-
 // DxgiSharedTextureFrame corresponds to mln_dxgi_shared_texture_frame. The DXGI
-// shared texture of an acquired frame.
+// shared texture of an exported ring's acquired frame.
 //
 // See mln_dxgi_shared_texture_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type DxgiSharedTextureFrame struct {
 	Width       uint32
 	Height      uint32
@@ -2788,30 +3197,6 @@ func copyDxgiSharedTextureFrame(raw C.mln_dxgi_shared_texture_frame) DxgiSharedT
 	result.Format = uint32(raw.format)
 	result.Handle = uintptr(unsafe.Pointer(raw.handle))
 	return result
-}
-
-// DxgiSharedTextureRingDescriptor corresponds to
-// mln_dxgi_shared_texture_ring_descriptor. A ring of DXGI shared textures that
-// the library allocates, for MapHandle.AttachDxgiSharedTextureRing().
-//
-// Each texture is a D3D11 2D texture with the map's size in pixels and the
-// format DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a render
-// target, and is shared through an NT handle.
-//
-// See mln_dxgi_shared_texture_ring_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
-type DxgiSharedTextureRingDescriptor struct {
-	LogicalSize LogicalSize
-	// How many textures the ring has, from 1 to 8.
-	TextureCount uint32
-}
-
-func nativeDxgiSharedTextureRingDescriptor(input DxgiSharedTextureRingDescriptor, arena *bindingArena) C.mln_dxgi_shared_texture_ring_descriptor {
-	raw := C.mln_dxgi_shared_texture_ring_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.texture_count = C.uint32_t(input.TextureCount)
-	return raw
 }
 
 // EdgeInsets corresponds to mln_edge_insets. Distances in logical pixels from
@@ -2844,20 +3229,21 @@ func nativeEdgeInsets(input EdgeInsets, arena *bindingArena) C.mln_edge_insets {
 	return raw
 }
 
-// EGLContextDescriptor corresponds to mln_egl_context_descriptor. The EGL
-// objects that a render session makes its OpenGL context from.
+// EGLContextDescriptor corresponds to mln_egl_context_descriptor. Your EGL
+// context, which each session's context shares objects with.
+//
+// Each session makes its context on display with config and the client API and
+// version of share_context.
 //
 // See mln_egl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type EGLContextDescriptor struct {
-	// An EGLDisplay.
+	// An EGLDisplay, which you initialized.
 	Display uintptr
-	// An EGLConfig.
+	// The EGLConfig of share_context.
 	Config uintptr
-	// Your EGLContext, for a shared context.
+	// Your EGLContext.
 	ShareContext uintptr
-	// The API of a dedicated context. A shared context uses the API of yours.
-	ClientAPI OpenGLClientAPI
 	// Your eglGetProcAddress, or null to use the system's.
 	GetProcAddress uintptr
 }
@@ -2867,8 +3253,97 @@ func nativeEGLContextDescriptor(input EGLContextDescriptor, arena *bindingArena)
 	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
 	raw.config = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Config)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
-	raw.client_api = C.mln_open_gl_client_api(input.ClientAPI)
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))
+	return raw
+}
+
+// ExportedRingTarget corresponds to mln_exported_ring_target. A ring of
+// textures that the session allocates on its device and shares with you, in one
+// of the ways that you can import.
+//
+// Each texture has the size in pixels of logical_size at the map's scale
+// factor. RenderSessionHandle.Resize() gives the ring textures of the new size,
+// and a frame that you hold keeps its texture of the old size until you release
+// or discard it.
+//
+// The ring shares its textures in the first kind of export_kinds that the
+// device exports, in this order, and RenderSessionCapabilities.ExportKind
+// reports it:
+//
+//   - GPUExportKindIoSurface: IOSurfaces of the pixel format
+//     kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm.
+//     Get each frame's surface with AcquiredFrameHandle.WithIoSurface().
+//   - GPUExportKindAndroidHardwareBuffer: hardware buffers of the format
+//     AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage
+//     AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+//     AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+//     android_hardware_buffer_usage. Get each frame's buffer with
+//     AcquiredFrameHandle.WithAndroidHardwareBuffer().
+//   - GPUExportKindDxgiSharedHandle: D3D11 textures of the format
+//     DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
+//     resources and render targets. Open them on a D3D11 or D3D12 device of the
+//     same adapter, which you pick with GPUDeviceOptions.AdapterLuid. Get each
+//     frame's texture with AcquiredFrameHandle.WithDxgiSharedTexture().
+//   - GPUExportKindDmaBuf: dmabufs of a format and modifier from
+//     dma_buf_formats. Get each frame's buffer with
+//     AcquiredFrameHandle.WithDmaBuf().
+//   - GPUExportKindOpaqueFd: the memory of Vulkan images, which only a Vulkan
+//     device or an OpenGL context with GL_EXT_memory_object_fd on the same GPU
+//     and driver imports. To pick the GPU, create the device with
+//     GPUDeviceOptions.AdapterUuid set to your context's GL_DEVICE_UUID_EXT.
+//     Get each frame's memory with AcquiredFrameHandle.WithOpaqueFd().
+//
+// GPUDeviceCapabilities.ExportKinds reports the kinds that a device exports.
+// Attach with RenderDriverKindCoreWorker. Without a device, the session renders
+// on the first of the platform's backends whose device exports one of
+// export_kinds.
+//
+// Each frame hands over with GPUSyncKindCPUComplete or with the sync kind that
+// crosses APIs on its platform: GPUSyncKindMetalSharedEvent for an IOSurface,
+// and GPUSyncKindSyncFd for the others, where the device has them. For a reader
+// that waits on neither, such as a Wayland compositor without explicit
+// synchronization or Flutter's copyPixelBuffer, leave them out of
+// RenderSessionAttachOptions.ProducerSyncKinds, so that each frame finishes
+// before you acquire it, and release each frame only once the reader is done
+// with its texture. Give the ring 3 textures, so the session can render while
+// you hold two frames.
+//
+// See mln_exported_ring_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type ExportedRingTarget struct {
+	LogicalSize LogicalSize
+	// How many textures the ring has, from 1 to TextureRingMaxDepth.
+	TextureCount uint32
+	// The ways of sharing a texture that you can import.
+	ExportKinds GPUExportKindFlag
+	// The dmabuf formats and modifiers that you import, most preferred first, such
+	// as those that eglQueryDmaBufModifiersEXT() reports. A ring exports dmabufs
+	// only of one of them. The library renders only DRM_FORMAT_ABGR8888 and
+	// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its format
+	// has, such as a plane of compression metadata, and the library takes any such
+	// modifier that its GPU can render into and share. The library takes no
+	// implicit modifier: it skips DRM_FORMAT_MOD_INVALID, so a list of only that
+	// one gets no dmabuf.
+	DmaBufFormats []DmaBufFormat
+	// More AHARDWAREBUFFER_USAGE_* bits that your reads of a hardware buffer need,
+	// such as AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+	AndroidHardwareBufferUsage uint64
+}
+
+func nativeExportedRingTarget(input ExportedRingTarget, arena *bindingArena) C.mln_exported_ring_target {
+	raw := C.mln_exported_ring_target{}
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.texture_count = C.uint32_t(input.TextureCount)
+	raw.export_kinds = C.mln_gpu_export_kind_flags(input.ExportKinds)
+	{
+		raw.dma_buf_formats = (*C.mln_dma_buf_format)(arena.array(len(input.DmaBufFormats), unsafe.Sizeof(*raw.dma_buf_formats)))
+		items := unsafe.Slice(raw.dma_buf_formats, len(input.DmaBufFormats))
+		raw.dma_buf_format_count = bindingCountLike(raw.dma_buf_format_count, len(input.DmaBufFormats))
+		for i, item := range input.DmaBufFormats {
+			items[i] = nativeDmaBufFormat(item, arena)
+		}
+	}
+	raw.android_hardware_buffer_usage = C.uint64_t(input.AndroidHardwareBufferUsage)
 	return raw
 }
 
@@ -2943,7 +3418,7 @@ func nativeFrameDemand(input FrameDemand, arena *bindingArena) C.mln_frame_deman
 }
 
 // FramePacerOptions corresponds to mln_frame_pacer_options. Options for
-// creating a frame pacer.
+// creating a frame pacer, or for FramePacerHandle.SetOptions().
 //
 // See mln_frame_pacer_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -2952,6 +3427,9 @@ type FramePacerOptions struct {
 	// pacer skips display refreshes to stay within it. By default, it can demand
 	// frames at every refresh.
 	MaximumFramesPerSecond *uint32
+	// Removes the frame rate limit, so the pacer can demand frames at every display
+	// refresh, as it does by default.
+	UnlimitedFramesPerSecond bool
 }
 
 func nativeFramePacerOptions(input FramePacerOptions, arena *bindingArena) C.mln_frame_pacer_options {
@@ -2959,7 +3437,75 @@ func nativeFramePacerOptions(input FramePacerOptions, arena *bindingArena) C.mln
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND, &raw.maximum_frames_per_second, input.MaximumFramesPerSecond, arena, bindingNumber[uint32, C.uint32_t])
+	if input.UnlimitedFramesPerSecond {
+		raw.fields |= C.MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND
+	}
 	return raw
+}
+
+// FrameProjection corresponds to mln_frame_projection. Where a frame drew the
+// map, and the depth that it wrote there.
+//
+// World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at 180°
+// east, and on past both into the copies of the world beside the first. y runs
+// from 0 at the north edge of the Mercator world, about 85.05° north, to 1 at
+// its south edge. z is the altitude in meters above sea level, at the scale of
+// the heights of the map's 3D layers, and the map draws its ground at 0.
+//
+// matrix takes a world point to the clip coordinates where the frame drew it,
+// with the camera's padding, roll, field of view, and center altitude, and the
+// map's viewport and projection mode. Clip y points up, as the map draws with
+// OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so negate it
+// there too. At high zooms, single precision can't tell nearby world points
+// apart: subtract an origin near your geometry from its coordinates in double
+// precision, and fold the origin into the matrix, before you convert to float.
+//
+// Clip z follows clip_depth_range, the convention of the device's graphics API.
+// With the API's default depth range of 0 to 1, a fragment that you draw
+// through matrix gets the depth that the map's 3D layers, such as fill
+// extrusions, wrote at the same place: 0 at near_distance from the camera, up
+// to far_depth at far_distance. Depth-tested against the frame's depth, your
+// fragments hide behind the map's 3D layers where those stand in front of them.
+//
+// The frame's depth starts at 1. The map's 3D layers write the depth of each of
+// their fragments. A 2D layer below every 3D layer of the style that draws
+// opaque fragments, such as an opaque fill, writes one depth over all of them,
+// wherever they are: the higher the layer, the lower its depth, and every one
+// between far_depth and 1. Backgrounds, translucent fragments, and the 2D
+// layers above a 3D layer, such as labels, write no depth. So what you draw
+// through matrix, even on the ground, lies in front of every 2D layer.
+//
+// While globe is true, the frame drew the map onto a globe, and its 2D layers
+// wrote no depth. matrix then is the map's Mercator one, which doesn't place
+// points on the globe.
+//
+// See mln_frame_projection in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type FrameProjection struct {
+	Matrix         Mat4
+	ClipDepthRange ClipDepthRange
+	// The distance from the camera to the plane where the depth that you get
+	// through matrix is 0, along the camera's view. Like far_distance, it is in
+	// pixels of the map at the camera's zoom, where the world is 512 × 2^zoom
+	// pixels wide.
+	NearDistance float64
+	// The distance to the plane where the depth is far_depth.
+	FarDistance float64
+	// The depth at far_distance, below 1.
+	FarDepth float64
+	// Whether the frame drew the map as a globe, alone or blending into Mercator.
+	Globe bool
+}
+
+func copyFrameProjection(raw C.mln_frame_projection) FrameProjection {
+	var result FrameProjection
+	result.Matrix = copyMat4(raw.matrix)
+	result.ClipDepthRange = ClipDepthRange(raw.clip_depth_range)
+	result.NearDistance = float64(raw.near_distance)
+	result.FarDistance = float64(raw.far_distance)
+	result.FarDepth = float64(raw.far_depth)
+	result.Globe = bool(raw.globe)
+	return result
 }
 
 // FreeCamera corresponds to mln_free_camera. A map camera's whole position and
@@ -3093,6 +3639,110 @@ func nativeGestureMomentum(input GestureMomentum, arena *bindingArena) C.mln_ges
 	raw.bearing = nativeAnchoredMomentum(input.Bearing, arena)
 	raw.pitch = nativeAnchoredMomentum(input.Pitch, arena)
 	return raw
+}
+
+// GPUDeviceCapabilities corresponds to mln_gpu_device_capabilities. What a GPU
+// device can do.
+//
+// See mln_gpu_device_capabilities in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+type GPUDeviceCapabilities struct {
+	Backend RenderBackend
+	// The kinds of RenderTarget that sessions on the device render to.
+	TargetKinds RenderTargetKindFlag
+	// The ways that the device can share the textures of an exported ring. A kind
+	// is here only once the device has exported a texture of it, so a driver that
+	// offers an extension but can't allocate the memory reports no kind of it.
+	ExportKinds GPUExportKindFlag
+	// The kinds of GPUSync that the device can signal and wait on.
+	SyncKinds GPUSyncKindFlag
+	// The formats of the depth textures that a borrowed ring takes.
+	DepthStencilFormats DepthStencilFormatFlag
+	// The kinds of export_kinds whose rings also share each frame's depth texture,
+	// with RenderSessionAttachOptions.KeepDepth. An IOSurface or a dmabuf holds no
+	// depth format, so only GPUExportKindOpaqueFd can be here.
+	DepthExportKinds GPUExportKindFlag
+}
+
+func copyGPUDeviceCapabilities(raw C.mln_gpu_device_capabilities) GPUDeviceCapabilities {
+	var result GPUDeviceCapabilities
+	result.Backend = RenderBackend(raw.backend)
+	result.TargetKinds = RenderTargetKindFlag(raw.target_kinds)
+	result.ExportKinds = GPUExportKindFlag(raw.export_kinds)
+	result.SyncKinds = GPUSyncKindFlag(raw.sync_kinds)
+	result.DepthStencilFormats = DepthStencilFormatFlag(raw.depth_stencil_formats)
+	result.DepthExportKinds = GPUExportKindFlag(raw.depth_export_kinds)
+	return result
+}
+
+// GPUDeviceOptions corresponds to mln_gpu_device_options. Options for
+// NewGPUDevice().
+//
+// Name the GPU by at most one of adapter_index, adapter_uuid, and adapter_luid.
+// Without one, the device prefers a discrete GPU.
+//
+// See mln_gpu_device_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+type GPUDeviceOptions struct {
+	// The backend that the device renders with. By default, the platform's own:
+	// Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has no
+	// Vulkan driver, and in a browser the build's one backend: WebGPU or OpenGL
+	// (WebGL2).
+	Backend *RenderBackend
+	// The GPU to use, as an index into the backend's list of GPUs.
+	AdapterIndex *uint32
+	// The 16-byte UUID of the GPU to use: Vulkan's
+	// VkPhysicalDeviceIDProperties.deviceUUID, or OpenGL's GL_DEVICE_UUID_EXT.
+	AdapterUuid *[]byte
+	// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
+	// Vulkan reports as VkPhysicalDeviceIDProperties.deviceLUID, and on Apple
+	// platforms, its MTLDevice.registryID, in the platform's byte order.
+	AdapterLuid *[]byte
+	// The OpenGL API that an OpenGL device renders with. An EGL device defaults to
+	// OpenGLClientAPIGLES, and takes OpenGLClientAPIGL too on Linux and FreeBSD. A
+	// WGL device takes only OpenGLClientAPIGL, its default, and a WebGL device only
+	// OpenGLClientAPIGLES, its default.
+	OpenGLClientAPI *OpenGLClientAPI
+	// Whether the sessions of an EGL device take turns in one OpenGL context
+	// instead of having one each.
+	OpenGLSingleContext *bool
+	// Your lock on a Vulkan device's queue, when you submit to the queue that
+	// GPUDeviceHandle.VulkanContext() reports. Only a Vulkan device takes one.
+	QueueLock QueueLock
+}
+
+func nativeGPUDeviceOptions(input GPUDeviceOptions, arena *bindingArena) C.mln_gpu_device_options {
+	raw := C.mln_gpu_device_options{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_GPU_DEVICE_OPTION_BACKEND, &raw.backend, input.Backend, arena, bindingNumber[RenderBackend, C.mln_render_backend])
+	bindingMasked(&raw.fields, C.MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, input.AdapterIndex, arena, bindingNumber[uint32, C.uint32_t])
+	if input.AdapterUuid != nil {
+		raw.adapter_uuid = C.mln_buffer_view{data: arena.bytes((*input.AdapterUuid)), size: C.size_t(len((*input.AdapterUuid)))}
+		raw.fields |= C.MLN_GPU_DEVICE_OPTION_ADAPTER_UUID
+	}
+	if input.AdapterLuid != nil {
+		raw.adapter_luid = C.mln_buffer_view{data: arena.bytes((*input.AdapterLuid)), size: C.size_t(len((*input.AdapterLuid)))}
+		raw.fields |= C.MLN_GPU_DEVICE_OPTION_ADAPTER_LUID
+	}
+	bindingMasked(&raw.fields, C.MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API, &raw.open_gl_client_api, input.OpenGLClientAPI, arena, bindingNumber[OpenGLClientAPI, C.mln_open_gl_client_api])
+	bindingMasked(&raw.fields, C.MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT, &raw.open_gl_single_context, input.OpenGLSingleContext, arena, bindingBool[bool, C.bool])
+	raw.queue_lock = nativeQueueLock(input.QueueLock, arena)
+	return raw
+}
+
+// GPUDeviceVulkanContextResult corresponds to
+// mln_gpu_device_vulkan_context_result. The Vulkan objects of a device, as
+// GPUDeviceHandle.VulkanContext() reports them.
+//
+// See mln_gpu_device_vulkan_context_result in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+type GPUDeviceVulkanContextResult struct{ Context VulkanContextDescriptor }
+
+func copyGPUDeviceVulkanContextResult(raw C.mln_gpu_device_vulkan_context_result) GPUDeviceVulkanContextResult {
+	var result GPUDeviceVulkanContextResult
+	result.Context = copyVulkanContextDescriptor(raw.context)
+	return result
 }
 
 // GPUSync corresponds to mln_gpu_sync. A point in GPU work that the other side
@@ -3278,10 +3928,10 @@ func nativeImageStretch(input ImageStretch, arena *bindingArena) C.mln_image_str
 }
 
 // IoSurfaceFrame corresponds to mln_io_surface_frame. The IOSurface of an
-// acquired frame.
+// exported ring's acquired frame.
 //
 // See mln_io_surface_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type IoSurfaceFrame struct {
 	Width       uint32
 	Height      uint32
@@ -3300,33 +3950,6 @@ func copyIoSurfaceFrame(raw C.mln_io_surface_frame) IoSurfaceFrame {
 	result.Slot = uint32(raw.slot)
 	result.Surface = uintptr(unsafe.Pointer(raw.surface))
 	return result
-}
-
-// IoSurfaceRingDescriptor corresponds to mln_io_surface_ring_descriptor. A ring
-// of IOSurfaces that the library allocates, for
-// MapHandle.AttachIoSurfaceRing().
-//
-// Each surface has the map's size in pixels, logical_size times the map's scale
-// factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal names
-// MTLPixelFormatBGRA8Unorm.
-//
-// See mln_io_surface_ring_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html
-type IoSurfaceRingDescriptor struct {
-	LogicalSize LogicalSize
-	// How many surfaces the ring has, from 1 to 8.
-	BufferCount uint32
-	// The MTLDevice to render with. A null device picks the system's default.
-	Context MetalContextDescriptor
-}
-
-func nativeIoSurfaceRingDescriptor(input IoSurfaceRingDescriptor, arena *bindingArena) C.mln_io_surface_ring_descriptor {
-	raw := C.mln_io_surface_ring_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.buffer_count = C.uint32_t(input.BufferCount)
-	raw.context = nativeMetalContextDescriptor(input.Context, arena)
-	return raw
 }
 
 // LatLng corresponds to mln_lat_lng. A geographic coordinate, in degrees.
@@ -3457,8 +4080,9 @@ func nativeLogicalSize(input LogicalSize, arena *bindingArena) C.mln_logical_siz
 // See mln_map_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapOptions struct {
-	// The map's first size, and its scale factor. The scale factor stays fixed for
-	// the map's life, and every render session of the map renders at it.
+	// The map's first size, and its scale factor. Render sessions of the map render
+	// at its scale factor. MapHandle.Resize() changes both, or
+	// RenderSessionHandle.Resize() while a render session is attached.
 	InitialExtent LogicalExtent
 	MapMode       MapMode
 	// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
@@ -3703,11 +4327,34 @@ func nativeMapViewportOptions(input MapViewportOptions, arena *bindingArena) C.m
 	return raw
 }
 
+// Mat4 corresponds to mln_mat4. A 4×4 matrix, by its columns: it takes a vector
+// to x times the vector's x, plus y times its y, z times its z, and w times its
+// w. In memory it is 16 doubles in column-major order, as OpenGL, Metal,
+// Vulkan, and WebGPU shaders take a matrix.
+//
+// See mln_mat4 in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type Mat4 struct {
+	X Vec4
+	Y Vec4
+	Z Vec4
+	W Vec4
+}
+
+func copyMat4(raw C.mln_mat4) Mat4 {
+	var result Mat4
+	result.X = copyVec4(raw.x)
+	result.Y = copyVec4(raw.y)
+	result.Z = copyVec4(raw.z)
+	result.W = copyVec4(raw.w)
+	return result
+}
+
 // MetalBorrowedTexture corresponds to mln_metal_borrowed_texture. A Metal
 // texture of a borrowed ring.
 //
 // See mln_metal_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type MetalBorrowedTexture struct {
 	// Your MTLTexture.
 	Texture uintptr
@@ -3719,35 +4366,36 @@ func nativeMetalBorrowedTexture(input MetalBorrowedTexture, arena *bindingArena)
 	return raw
 }
 
-// MetalBorrowedTextureDescriptor corresponds to
-// mln_metal_borrowed_texture_descriptor. A ring of your Metal textures, for
-// MapHandle.AttachMetalBorrowedTexture().
+// MetalBorrowedTexturesTarget corresponds to
+// mln_metal_borrowed_textures_target. A ring of your Metal textures to render
+// into, on the Metal device that you attach on.
 //
-// logical_size sets the map's size. physical_width and physical_height give the
-// textures' size in pixels, which is usually logical_size times the map's scale
-// factor. The textures must all have that size, one device, one pixel format,
-// one sample, and MTLTextureUsageRenderTarget. The ring holds up to
-// TextureRingMaxDepth distinct textures.
+// physical_width and physical_height give the textures' size in pixels, which
+// is usually logical_size times the map's scale factor. The textures must all
+// have that size, the device's MTLDevice, one pixel format, one sample, and
+// MTLTextureUsageRenderTarget. The ring holds up to TextureRingMaxDepth
+// distinct textures.
 //
-// The session uses the textures until a replacement or release of the target
-// completes, a detach or release of the session completes, or an abandon of it
-// returns.
+// Give the ring depth_textures to draw into each frame depth-tested against the
+// map, as FrameProjection says: one for each of textures, at the same index, or
+// none. Each frame clears the one at its slot, renders the map's depth and
+// stencil into it, and stores them. They must have the size of textures, one
+// pixel format of GPUDeviceCapabilities.DepthStencilFormats, one sample,
+// MTLTextureUsageRenderTarget, and a storage mode other than
+// MTLStorageModeMemoryless.
 //
-// See mln_metal_borrowed_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type MetalBorrowedTextureDescriptor struct {
+// See mln_metal_borrowed_textures_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type MetalBorrowedTexturesTarget struct {
 	LogicalSize    LogicalSize
 	PhysicalWidth  uint32
 	PhysicalHeight uint32
 	Textures       []MetalBorrowedTexture
-	// Your MTLCommandQueue on the textures' device, or null for a queue of the
-	// session's own. With your queue, frames can use GPUSyncKindQueueOrder.
-	CommandQueue uintptr
+	DepthTextures  []MetalBorrowedTexture
 }
 
-func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, arena *bindingArena) C.mln_metal_borrowed_texture_descriptor {
-	raw := C.mln_metal_borrowed_texture_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeMetalBorrowedTexturesTarget(input MetalBorrowedTexturesTarget, arena *bindingArena) C.mln_metal_borrowed_textures_target {
+	raw := C.mln_metal_borrowed_textures_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
@@ -3759,104 +4407,110 @@ func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, 
 			items[i] = nativeMetalBorrowedTexture(item, arena)
 		}
 	}
+	{
+		raw.depth_textures = (*C.mln_metal_borrowed_texture)(arena.array(len(input.DepthTextures), unsafe.Sizeof(*raw.depth_textures)))
+		items := unsafe.Slice(raw.depth_textures, len(input.DepthTextures))
+		raw.depth_texture_count = bindingCountLike(raw.depth_texture_count, len(input.DepthTextures))
+		for i, item := range input.DepthTextures {
+			items[i] = nativeMetalBorrowedTexture(item, arena)
+		}
+	}
+	return raw
+}
+
+// MetalCustomLayerEncoder corresponds to mln_metal_custom_layer_encoder. The
+// frame's Metal command buffer, outside the map's render pass.
+//
+// End each encoder that you make on command_buffer before the callback returns,
+// and don't commit the buffer.
+//
+// See mln_metal_custom_layer_encoder in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type MetalCustomLayerEncoder struct {
+	// The frame's MTLCommandBuffer, with no encoder open.
+	CommandBuffer uintptr
+}
+
+func copyMetalCustomLayerEncoder(raw C.mln_metal_custom_layer_encoder) MetalCustomLayerEncoder {
+	var result MetalCustomLayerEncoder
+	result.CommandBuffer = uintptr(unsafe.Pointer(raw.command_buffer))
+	return result
+}
+
+// MetalCustomLayerPass corresponds to mln_metal_custom_layer_pass. The map's
+// Metal render pass, at a custom layer's place in the style.
+//
+// Set your own pipeline state, depth-stencil state, buffers, textures, and
+// samplers on encoder, and any other state that your draws need. After the
+// callback returns, the map sets the state that its own draws need again. Don't
+// end encoder.
+//
+// See mln_metal_custom_layer_pass in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type MetalCustomLayerPass struct {
+	// The pass's MTLRenderCommandEncoder.
+	Encoder uintptr
+	// The MTLCommandBuffer that encoder encodes into. Don't commit it.
+	CommandBuffer uintptr
+	// The MTLPixelFormat of the pass's color attachment.
+	ColorFormat uint64
+	// The MTLPixelFormat of the pass's depth attachment, or MTLPixelFormatInvalid
+	// when it has none.
+	DepthFormat uint64
+	// The MTLPixelFormat of the pass's stencil attachment, or MTLPixelFormatInvalid
+	// when it has none.
+	StencilFormat uint64
+	// The sample count of the pass's attachments.
+	SampleCount uint32
+}
+
+func copyMetalCustomLayerPass(raw C.mln_metal_custom_layer_pass) MetalCustomLayerPass {
+	var result MetalCustomLayerPass
+	result.Encoder = uintptr(unsafe.Pointer(raw.encoder))
+	result.CommandBuffer = uintptr(unsafe.Pointer(raw.command_buffer))
+	result.ColorFormat = uint64(raw.color_format)
+	result.DepthFormat = uint64(raw.depth_format)
+	result.StencilFormat = uint64(raw.stencil_format)
+	result.SampleCount = uint32(raw.sample_count)
+	return result
+}
+
+// MetalDeviceDescriptor corresponds to mln_metal_device_descriptor. Your Metal
+// device and command queue, for NewGPUDevice().
+//
+// See mln_metal_device_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+type MetalDeviceDescriptor struct {
+	// Your MTLDevice.
+	Device uintptr
+	// Your MTLCommandQueue on device, or null for a queue of the library's. With
+	// your queue, borrowed rings can use GPUSyncKindQueueOrder.
+	CommandQueue uintptr
+}
+
+func nativeMetalDeviceDescriptor(input MetalDeviceDescriptor, arena *bindingArena) C.mln_metal_device_descriptor {
+	raw := C.mln_metal_device_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
 	raw.command_queue = unsafe.Pointer(C.binding_address(C.uintptr_t(input.CommandQueue)))
 	return raw
 }
 
-// MetalBorrowedTextureReplacement corresponds to
-// mln_metal_borrowed_texture_replacement. New Metal textures for a borrowed
-// ring, for RenderSessionHandle.SetMetalBorrowedTextureTarget().
+// MetalLayerTarget corresponds to mln_metal_layer_target. A CAMetalLayer to
+// present to.
 //
-// The members and the textures follow the rules of
-// MetalBorrowedTextureDescriptor. The ring keeps its depth, device, and command
-// queue, so give it as many textures as it attached with, on the same device.
+// The session sets the layer's device, pixel format, and drawable size.
 //
-// See mln_metal_borrowed_texture_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type MetalBorrowedTextureReplacement struct {
-	LogicalSize    LogicalSize
-	PhysicalWidth  uint32
-	PhysicalHeight uint32
-	Textures       []MetalBorrowedTexture
-}
-
-func nativeMetalBorrowedTextureReplacement(input MetalBorrowedTextureReplacement, arena *bindingArena) C.mln_metal_borrowed_texture_replacement {
-	raw := C.mln_metal_borrowed_texture_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.physical_width = C.uint32_t(input.PhysicalWidth)
-	raw.physical_height = C.uint32_t(input.PhysicalHeight)
-	{
-		raw.textures = (*C.mln_metal_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
-		items := unsafe.Slice(raw.textures, len(input.Textures))
-		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
-		for i, item := range input.Textures {
-			items[i] = nativeMetalBorrowedTexture(item, arena)
-		}
-	}
-	return raw
-}
-
-// MetalContextDescriptor corresponds to mln_metal_context_descriptor. The Metal
-// device that a render session uses.
-//
-// See mln_metal_context_descriptor in the C API reference:
+// See mln_metal_layer_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type MetalContextDescriptor struct {
-	// An MTLDevice.
-	Device uintptr
-}
-
-func nativeMetalContextDescriptor(input MetalContextDescriptor, arena *bindingArena) C.mln_metal_context_descriptor {
-	raw := C.mln_metal_context_descriptor{}
-	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
-	return raw
-}
-
-// MetalSurfaceDescriptor corresponds to mln_metal_surface_descriptor. A Metal
-// layer to render to, for MapHandle.AttachMetalSurface().
-//
-// The session sets the layer's device, pixel format, and drawable size. It uses
-// the layer until a replacement or release of the target completes, a detach or
-// release of the session completes, or an abandon of it returns.
-//
-// See mln_metal_surface_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-type MetalSurfaceDescriptor struct {
+type MetalLayerTarget struct {
 	LogicalSize LogicalSize
-	// The MTLDevice to render with. A null device picks the system's default.
-	Context MetalContextDescriptor
-	// Your CAMetalLayer.
+	// Your CAMetalLayer*.
 	Layer uintptr
 }
 
-func nativeMetalSurfaceDescriptor(input MetalSurfaceDescriptor, arena *bindingArena) C.mln_metal_surface_descriptor {
-	raw := C.mln_metal_surface_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.context = nativeMetalContextDescriptor(input.Context, arena)
-	raw.layer = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Layer)))
-	return raw
-}
-
-// MetalSurfaceReplacement corresponds to mln_metal_surface_replacement. A new
-// Metal layer for RenderSessionHandle.SetMetalSurfaceTarget().
-//
-// The session renders to it with the device that it attached with. It uses the
-// layer until a replacement or release of the target completes, a detach or
-// release of the session completes, or an abandon of it returns.
-//
-// See mln_metal_surface_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-type MetalSurfaceReplacement struct {
-	LogicalSize LogicalSize
-	// Your CAMetalLayer.
-	Layer uintptr
-}
-
-func nativeMetalSurfaceReplacement(input MetalSurfaceReplacement, arena *bindingArena) C.mln_metal_surface_replacement {
-	raw := C.mln_metal_surface_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeMetalLayerTarget(input MetalLayerTarget, arena *bindingArena) C.mln_metal_layer_target {
+	raw := C.mln_metal_layer_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.layer = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Layer)))
 	return raw
@@ -3864,6 +4518,10 @@ func nativeMetalSurfaceReplacement(input MetalSurfaceReplacement, arena *binding
 
 // MetalTextureFrame corresponds to mln_metal_texture_frame. The Metal texture
 // of an acquired frame.
+//
+// The depth members are set when the frame has a depth texture: one of a
+// borrowed ring's depth_textures, or an exported ring's with
+// RenderSessionAttachOptions.KeepDepth. Otherwise they are zero.
 //
 // See mln_metal_texture_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -3879,6 +4537,10 @@ type MetalTextureFrame struct {
 	Device uintptr
 	// The texture's MTLPixelFormat.
 	PixelFormat uint64
+	// The MTLTexture that holds the frame's depth and stencil.
+	DepthTexture uintptr
+	// The depth texture's MTLPixelFormat.
+	DepthPixelFormat uint64
 }
 
 func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
@@ -3890,6 +4552,8 @@ func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
 	result.Texture = uintptr(unsafe.Pointer(raw.texture))
 	result.Device = uintptr(unsafe.Pointer(raw.device))
 	result.PixelFormat = uint64(raw.pixel_format)
+	result.DepthTexture = uintptr(unsafe.Pointer(raw.depth_texture))
+	result.DepthPixelFormat = uint64(raw.depth_pixel_format)
 	return result
 }
 
@@ -4145,108 +4809,115 @@ func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefi
 	return raw
 }
 
-// OffscreenDescriptor corresponds to mln_offscreen_descriptor. The image that
-// MapHandle.AttachOffscreen() renders. The session renders it at the map's
-// scale factor.
+// OffscreenTarget corresponds to mln_offscreen_target. An image that the
+// session allocates, renders at the map's scale factor, and reads back with
+// RenderSessionHandle.ReadTexture().
 //
-// See mln_offscreen_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
-type OffscreenDescriptor struct{ LogicalSize LogicalSize }
+// See mln_offscreen_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type OffscreenTarget struct{ LogicalSize LogicalSize }
 
-func nativeOffscreenDescriptor(input OffscreenDescriptor, arena *bindingArena) C.mln_offscreen_descriptor {
-	raw := C.mln_offscreen_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeOffscreenTarget(input OffscreenTarget, arena *bindingArena) C.mln_offscreen_target {
+	raw := C.mln_offscreen_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	return raw
 }
 
-// OffscreenDeviceOptions corresponds to mln_offscreen_device_options. Options
-// for NewOffscreenDevice().
+// OhosWindowTarget corresponds to mln_ohos_window_target. An OpenHarmony window
+// to present to.
 //
-// See mln_offscreen_device_options in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
-type OffscreenDeviceOptions struct {
-	// The GPU to use, as an index into the platform's list of GPUs.
-	AdapterIndex *uint32
-	// Whether the device's sessions take turns in one OpenGL context instead of
-	// having one each. Only an EGL device reads it.
-	SingleContext *bool
-	// The OpenGL API that the device's sessions render with. An EGL device defaults
-	// to OpenGLClientAPIGLES, and takes OpenGLClientAPIGL too on Linux and FreeBSD.
-	// A WGL device takes only OpenGLClientAPIGL, its default, and a WebGL device
-	// only OpenGLClientAPIGLES, its default. Other devices take neither.
-	ClientAPI *OpenGLClientAPI
-}
-
-func nativeOffscreenDeviceOptions(input OffscreenDeviceOptions, arena *bindingArena) C.mln_offscreen_device_options {
-	raw := C.mln_offscreen_device_options{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX, &raw.adapter_index, input.AdapterIndex, arena, bindingNumber[uint32, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT, &raw.single_context, input.SingleContext, arena, bindingBool[bool, C.bool])
-	bindingMasked(&raw.fields, C.MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API, &raw.client_api, input.ClientAPI, arena, bindingNumber[OpenGLClientAPI, C.mln_open_gl_client_api])
-	return raw
-}
-
-// OhosSurfaceDescriptor corresponds to mln_ohos_surface_descriptor. An
-// OpenHarmony window to present to, for MapHandle.AttachOhosSurface().
+// The session takes its own reference to the window, so you can release yours
+// once the call returns. When the platform destroys the window, such as in an
+// XComponent's onSurfaceDestroyed callback, release the target or give the
+// session another window without waiting, as for an Android window.
 //
-// Name the window by window or by surface_id. The session takes its own
-// reference to the window, so you can release yours once the call returns.
-//
-// See mln_ohos_surface_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html
-type OhosSurfaceDescriptor struct {
+// See mln_ohos_window_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type OhosWindowTarget struct {
 	LogicalSize LogicalSize
-	// Your OHNativeWindow*, or null to name the window by surface_id.
+	// Your OHNativeWindow*.
 	Window uintptr
-	// The surface ID of a surface in this process, such as the one that
-	// XComponentController.getXComponentSurfaceId() reports, or 0 to name the
-	// window by window.
-	SurfaceID uint64
 }
 
-func nativeOhosSurfaceDescriptor(input OhosSurfaceDescriptor, arena *bindingArena) C.mln_ohos_surface_descriptor {
-	raw := C.mln_ohos_surface_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeOhosWindowTarget(input OhosWindowTarget, arena *bindingArena) C.mln_ohos_window_target {
+	raw := C.mln_ohos_window_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
-	raw.surface_id = C.uint64_t(input.SurfaceID)
 	return raw
 }
 
-// OhosSurfaceReplacement corresponds to mln_ohos_surface_replacement. A new
-// OpenHarmony window for RenderSessionHandle.SetOhosSurfaceTarget().
+// OpaqueFdFrame corresponds to mln_opaque_fd_frame. The memory of an exported
+// ring's acquired frame, as an opaque file descriptor.
 //
-// Name the window by window or by surface_id. The session takes its own
-// reference to the window, so you can release yours once the call returns.
+// The memory holds a 2D Vulkan image of format, with one mip level, one layer,
+// optimal tiling, and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+// VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a
+// Vulkan image that imports it has too. In OpenGL, import it with
+// glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the texture
+// with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
+// glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
+// VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
 //
-// See mln_ohos_surface_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html
-type OhosSurfaceReplacement struct {
-	LogicalSize LogicalSize
-	// Your OHNativeWindow*, or null to name the window by surface_id.
-	Window uintptr
-	// The surface ID of a surface in this process, such as the one that
-	// XComponentController.getXComponentSurfaceId() reports, or 0 to name the
-	// window by window.
-	SurfaceID uint64
+// With RenderSessionAttachOptions.KeepDepth, on a device whose
+// GPUDeviceCapabilities.DepthExportKinds has GPUExportKindOpaqueFd, the depth
+// members share the memory of the frame's depth image in the same way.
+// Otherwise depth_fd is -1 and the others are zero. The depth image is 2D, of
+// depth_format, with one mip level, one layer, optimal tiling, and the usage
+// VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_USAGE_SAMPLED_BIT, and
+// VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame leaves it in
+// VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL. In OpenGL,
+// make its texture with the internal format that DepthStencilFormatFlag names
+// for depth_format.
+//
+// See mln_opaque_fd_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type OpaqueFdFrame struct {
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	// The texture's index in the ring.
+	Slot uint32
+	// The file descriptor of the image's memory.
+	Fd int32
+	// The size of the memory in bytes.
+	AllocationSize uint64
+	// Whether the memory is the image's own, which an import says, such as with
+	// GL_DEDICATED_MEMORY_OBJECT_EXT.
+	Dedicated bool
+	// The image's VkFormat: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8.
+	Format uint32
+	// The file descriptor of the depth image's memory.
+	DepthFd int32
+	// The size of the depth image's memory in bytes.
+	DepthAllocationSize uint64
+	// Whether the memory is the depth image's own.
+	DepthDedicated bool
+	// The depth image's VkFormat.
+	DepthFormat uint32
 }
 
-func nativeOhosSurfaceReplacement(input OhosSurfaceReplacement, arena *bindingArena) C.mln_ohos_surface_replacement {
-	raw := C.mln_ohos_surface_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
-	raw.surface_id = C.uint64_t(input.SurfaceID)
-	return raw
+func copyOpaqueFdFrame(raw C.mln_opaque_fd_frame) OpaqueFdFrame {
+	var result OpaqueFdFrame
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.Slot = uint32(raw.slot)
+	result.Fd = int32(raw.fd)
+	result.AllocationSize = uint64(raw.allocation_size)
+	result.Dedicated = bool(raw.dedicated)
+	result.Format = uint32(raw.format)
+	result.DepthFd = int32(raw.depth_fd)
+	result.DepthAllocationSize = uint64(raw.depth_allocation_size)
+	result.DepthDedicated = bool(raw.depth_dedicated)
+	result.DepthFormat = uint32(raw.depth_format)
+	return result
 }
 
 // OpenGLBorrowedTexture corresponds to mln_open_gl_borrowed_texture. An OpenGL
 // texture of a borrowed ring.
 //
 // See mln_open_gl_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type OpenGLBorrowedTexture struct {
 	// Your texture name.
 	Texture uint32
@@ -4258,39 +4929,39 @@ func nativeOpenGLBorrowedTexture(input OpenGLBorrowedTexture, arena *bindingAren
 	return raw
 }
 
-// OpenGLBorrowedTextureDescriptor corresponds to
-// mln_open_gl_borrowed_texture_descriptor. A ring of your OpenGL textures, for
-// MapHandle.AttachOpenGLBorrowedTexture().
+// OpenGLBorrowedTexturesTarget corresponds to
+// mln_open_gl_borrowed_textures_target. A ring of your OpenGL textures to
+// render into, on an OpenGL device that NewGPUDevice() made from your context.
 //
-// logical_size sets the map's size. physical_width and physical_height give the
-// textures' size in pixels, which is usually logical_size times the map's scale
-// factor. The context must use OpenGLContextOwnershipShared. Each texture must
-// be in your context's share group, with storage of that size. The ring holds
+// physical_width and physical_height give the textures' size in pixels, which
+// is usually logical_size times the map's scale factor. Each texture must be in
+// your context's share group, with RGBA8 storage of that size. The ring holds
 // up to TextureRingMaxDepth distinct textures.
 //
-// The session uses the textures until a replacement or release of the target
-// completes, a detach or release of the session completes, or an abandon of it
-// returns.
+// Give the ring depth_textures to draw into each frame depth-tested against the
+// map, as FrameProjection says: one for each of textures, at the same index, or
+// none. Each frame clears the one at its slot, and renders the map's depth and
+// stencil into it. They must be GL_TEXTURE_2D textures in the share group, with
+// storage of the size of textures in a format of
+// GPUDeviceCapabilities.DepthStencilFormats.
 //
-// See mln_open_gl_borrowed_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type OpenGLBorrowedTextureDescriptor struct {
+// See mln_open_gl_borrowed_textures_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type OpenGLBorrowedTexturesTarget struct {
 	LogicalSize    LogicalSize
 	PhysicalWidth  uint32
 	PhysicalHeight uint32
-	Context        OpenGLContextDescriptor
 	Textures       []OpenGLBorrowedTexture
 	// The textures' target. It must be GL_TEXTURE_2D.
-	Target uint32
+	Target        uint32
+	DepthTextures []OpenGLBorrowedTexture
 }
 
-func nativeOpenGLBorrowedTextureDescriptor(input OpenGLBorrowedTextureDescriptor, arena *bindingArena) C.mln_open_gl_borrowed_texture_descriptor {
-	raw := C.mln_open_gl_borrowed_texture_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeOpenGLBorrowedTexturesTarget(input OpenGLBorrowedTexturesTarget, arena *bindingArena) C.mln_open_gl_borrowed_textures_target {
+	raw := C.mln_open_gl_borrowed_textures_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
-	raw.context = nativeOpenGLContextDescriptor(input.Context, arena)
 	{
 		raw.textures = (*C.mln_open_gl_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
 		items := unsafe.Slice(raw.textures, len(input.Textures))
@@ -4300,70 +4971,29 @@ func nativeOpenGLBorrowedTextureDescriptor(input OpenGLBorrowedTextureDescriptor
 		}
 	}
 	raw.target = C.uint32_t(input.Target)
-	return raw
-}
-
-// OpenGLBorrowedTextureReplacement corresponds to
-// mln_open_gl_borrowed_texture_replacement. New OpenGL textures for a borrowed
-// ring, for RenderSessionHandle.SetOpenGLBorrowedTextureTarget().
-//
-// The members and the textures follow the rules of
-// OpenGLBorrowedTextureDescriptor. The ring keeps its depth, context, and
-// texture target, so give it as many textures as it attached with, in the same
-// share group.
-//
-// See mln_open_gl_borrowed_texture_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type OpenGLBorrowedTextureReplacement struct {
-	LogicalSize    LogicalSize
-	PhysicalWidth  uint32
-	PhysicalHeight uint32
-	Textures       []OpenGLBorrowedTexture
-}
-
-func nativeOpenGLBorrowedTextureReplacement(input OpenGLBorrowedTextureReplacement, arena *bindingArena) C.mln_open_gl_borrowed_texture_replacement {
-	raw := C.mln_open_gl_borrowed_texture_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.physical_width = C.uint32_t(input.PhysicalWidth)
-	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	{
-		raw.textures = (*C.mln_open_gl_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
-		items := unsafe.Slice(raw.textures, len(input.Textures))
-		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
-		for i, item := range input.Textures {
+		raw.depth_textures = (*C.mln_open_gl_borrowed_texture)(arena.array(len(input.DepthTextures), unsafe.Sizeof(*raw.depth_textures)))
+		items := unsafe.Slice(raw.depth_textures, len(input.DepthTextures))
+		raw.depth_texture_count = bindingCountLike(raw.depth_texture_count, len(input.DepthTextures))
+		for i, item := range input.DepthTextures {
 			items[i] = nativeOpenGLBorrowedTexture(item, arena)
 		}
 	}
 	return raw
 }
 
-// OpenGLContextDescriptor corresponds to mln_open_gl_context_descriptor. How a
-// render session gets the OpenGL context that it renders with.
-//
-// Keep the objects that it names alive until a detach or release of the session
-// completes, or an abandon of it returns.
-//
-// See mln_open_gl_context_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type OpenGLContextDescriptor struct {
-	Ownership OpenGLContextOwnership
-	Data      OpenGLContextDescriptorData
-}
-
 func nativeOpenGLContextDescriptor(input OpenGLContextDescriptor, arena *bindingArena) C.mln_open_gl_context_descriptor {
 	raw := C.mln_open_gl_context_descriptor{}
-	raw.ownership = C.mln_open_gl_context_ownership(input.Ownership)
-	if input.Data == nil {
+	if input == nil {
 		arena.fail("missing union variant")
 	}
-	raw.platform = C.mln_open_gl_context_platform(input.Data.bindingTag())
-	switch variant := input.Data.(type) {
-	case OpenGLContextDescriptorDataWGLVariant:
+	raw.platform = C.mln_open_gl_context_platform(input.bindingTag())
+	switch variant := input.(type) {
+	case OpenGLContextDescriptorWGLVariant:
 		bindingUnionStore(raw.data[:], nativeWGLContextDescriptor(variant.Value, arena))
-	case OpenGLContextDescriptorDataEGLVariant:
+	case OpenGLContextDescriptorEGLVariant:
 		bindingUnionStore(raw.data[:], nativeEGLContextDescriptor(variant.Value, arena))
-	case OpenGLContextDescriptorDataWebGLVariant:
+	case OpenGLContextDescriptorWebGLVariant:
 		bindingUnionStore(raw.data[:], nativeWebGLContextDescriptor(variant.Value, arena))
 	default:
 		arena.fail("unknown input union variant")
@@ -4371,50 +5001,51 @@ func nativeOpenGLContextDescriptor(input OpenGLContextDescriptor, arena *binding
 	return raw
 }
 
-// OpenGLSurfaceDescriptor corresponds to mln_open_gl_surface_descriptor. An
-// OpenGL surface to present to, for MapHandle.AttachOpenGLSurface().
+// OpenGLCustomLayerPass corresponds to mln_open_gl_custom_layer_pass. The map's
+// OpenGL framebuffer, at a custom layer's place in the style.
 //
-// The session uses the surface until a replacement or release of the target
-// completes, a detach or release of the session completes, or an abandon of it
-// returns.
+// The session's context is current, with framebuffer bound and the viewport
+// covering it. You can change the program, the vertex array, the buffers bound
+// to each target, the framebuffer, the viewport, the active texture unit and
+// the textures bound to each unit, the uniform buffer bindings, and the
+// scissor, depth, stencil, blend, color mask, cull face, and line width state.
+// After the callback returns, the map sets again what its own draws need of
+// these. The vertex array bound when the callback starts is 0, so bind your own
+// before you set vertex attributes. Leave any other state as you found it, such
+// as the sampler objects bound to texture units, the pixel pack and unpack
+// buffers and parameters, polygon offset, and rasterizer discard. Don't clear
+// or invalidate the framebuffer's attachments.
 //
-// See mln_open_gl_surface_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-type OpenGLSurfaceDescriptor struct {
+// See mln_open_gl_custom_layer_pass in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type OpenGLCustomLayerPass struct {
+	// The framebuffer that the map draws into, or 0 for the default one.
+	Framebuffer uint32
+}
+
+func copyOpenGLCustomLayerPass(raw C.mln_open_gl_custom_layer_pass) OpenGLCustomLayerPass {
+	var result OpenGLCustomLayerPass
+	result.Framebuffer = uint32(raw.framebuffer)
+	return result
+}
+
+// OpenGLSurfaceTarget corresponds to mln_open_gl_surface_target. Your OpenGL
+// surface to present to, with the context that NewGPUDevice() wrapped.
+//
+// The session makes its context current on the surface for each frame, and
+// swaps the surface's buffers to present.
+//
+// See mln_open_gl_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type OpenGLSurfaceTarget struct {
 	LogicalSize LogicalSize
-	Context     OpenGLContextDescriptor
-	// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
+	// Your EGLSurface on the context's display, with its config, or your HDC with
+	// the context's pixel format.
 	Surface uintptr
 }
 
-func nativeOpenGLSurfaceDescriptor(input OpenGLSurfaceDescriptor, arena *bindingArena) C.mln_open_gl_surface_descriptor {
-	raw := C.mln_open_gl_surface_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.context = nativeOpenGLContextDescriptor(input.Context, arena)
-	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
-	return raw
-}
-
-// OpenGLSurfaceReplacement corresponds to mln_open_gl_surface_replacement. A
-// new OpenGL surface for RenderSessionHandle.SetOpenGLSurfaceTarget().
-//
-// The session presents to it with the context that it attached with. It uses
-// the surface until a replacement or release of the target completes, a detach
-// or release of the session completes, or an abandon of it returns.
-//
-// See mln_open_gl_surface_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-type OpenGLSurfaceReplacement struct {
-	LogicalSize LogicalSize
-	// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
-	// leave it null.
-	Surface uintptr
-}
-
-func nativeOpenGLSurfaceReplacement(input OpenGLSurfaceReplacement, arena *bindingArena) C.mln_open_gl_surface_replacement {
-	raw := C.mln_open_gl_surface_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeOpenGLSurfaceTarget(input OpenGLSurfaceTarget, arena *bindingArena) C.mln_open_gl_surface_target {
+	raw := C.mln_open_gl_surface_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	return raw
@@ -4422,6 +5053,9 @@ func nativeOpenGLSurfaceReplacement(input OpenGLSurfaceReplacement, arena *bindi
 
 // OpenGLTextureFrame corresponds to mln_open_gl_texture_frame. The OpenGL
 // texture of an acquired frame.
+//
+// The depth members are set when the frame has a depth texture, as for
+// MetalTextureFrame. Otherwise they are zero.
 //
 // See mln_open_gl_texture_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -4433,6 +5067,11 @@ type OpenGLTextureFrame struct {
 	Slot    uint32
 	Texture uint32
 	Target  uint32
+	// The GL_TEXTURE_2D texture that holds the frame's depth and stencil.
+	DepthTexture uint32
+	// The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero for
+	// a borrowed ring's.
+	DepthInternalFormat uint32
 }
 
 func copyOpenGLTextureFrame(raw C.mln_open_gl_texture_frame) OpenGLTextureFrame {
@@ -4443,6 +5082,8 @@ func copyOpenGLTextureFrame(raw C.mln_open_gl_texture_frame) OpenGLTextureFrame 
 	result.Slot = uint32(raw.slot)
 	result.Texture = uint32(raw.texture)
 	result.Target = uint32(raw.target)
+	result.DepthTexture = uint32(raw.depth_texture)
+	result.DepthInternalFormat = uint32(raw.depth_internal_format)
 	return result
 }
 
@@ -4628,11 +5269,14 @@ func nativeQuaternion(input Quaternion, arena *bindingArena) C.mln_quaternion {
 }
 
 // QueueLock corresponds to mln_queue_lock. Your lock on a Vulkan queue that you
-// and a render session both submit to.
+// and the render sessions of a GPU device all submit to.
 //
-// The session holds the lock only while it submits or presents to the queue.
-// Set both lock and unlock, or neither when you don't submit to the queue
-// yourself.
+// A session holds the lock only while it submits or presents to the queue, or
+// submits the empty batch that drains its work from the queue. It never holds
+// the lock while it waits. Set both lock and unlock, or neither when you don't
+// submit to the queue yourself.
+//
+// Don't hold the lock while you call the library.
 //
 // It can run on a library thread, and it can't call the library.
 //
@@ -4712,7 +5356,10 @@ type RenderFrameResult struct {
 	NeedsRepaint        bool
 	// The camera and extent that a rendered frame shows.
 	View MapView
-	Mode RenderMode
+	// Where a rendered frame drew the map, for drawing into its frame with depth.
+	// All zero for a demand that rendered nothing.
+	FrameProjection FrameProjection
+	Mode            RenderMode
 }
 
 func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
@@ -4724,6 +5371,7 @@ func copyRenderFrameResult(raw C.mln_render_frame_result) RenderFrameResult {
 	result.FrameGeneration = uint64(raw.frame_generation)
 	result.NeedsRepaint = bool(raw.needs_repaint)
 	result.View = copyMapView(raw.view)
+	result.FrameProjection = copyFrameProjection(raw.frame_projection)
 	result.Mode = RenderMode(raw.mode)
 	return result
 }
@@ -4737,13 +5385,18 @@ type RenderSessionAttachOptions struct {
 	// The thread that runs the session's graphics work, which depends on the
 	// target:
 	//
-	//   - RenderDriverKindCallerGraphicsThread for a shared or dedicated EGL or WGL
-	//     context, an existing WebGL context, or a browser's WebGPU device.
-	//   - RenderDriverKindCoreWorker for a transferred WebGL canvas, an Android,
-	//     OpenHarmony, or Win32 window, a Wayland surface, a ring of Android
-	//     hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces, or an
-	//     offscreen session.
-	//   - Either one for another Metal or Vulkan target.
+	//   - RenderDriverKindCallerGraphicsThread for a borrowed ring of WebGPU
+	//     textures.
+	//   - RenderDriverKindCoreWorker for an offscreen target, a window, or an
+	//     exported ring.
+	//   - Either one for a web canvas. In a browser both run on the thread that
+	//     loaded the library: RenderDriverKindCoreWorker in the library's own
+	//     tasks, and RenderDriverKindCallerGraphicsThread when you service the
+	//     session.
+	//   - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
+	//     borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
+	//     these on RenderDriverKindCoreWorker only, and fails an attach with
+	//     RenderDriverKindCallerGraphicsThread then.
 	//
 	// An attach with another driver fails with StatusUnsupported.
 	Driver RenderDriverKind
@@ -4763,8 +5416,16 @@ type RenderSessionAttachOptions struct {
 	// for RenderSessionHandle.ServiceDriverWork(). It isn't called again until a
 	// service runs.
 	DriverWorkWake Wake
-	// Your lock on the Vulkan queue, when you submit to it yourself.
-	QueueLock QueueLock
+	// Whether an exported ring keeps the depth and stencil of each frame for you,
+	// so that you can draw into the frame depth-tested against the map, as
+	// FrameProjection says. The getter of the device's API, such as
+	// AcquiredFrameHandle.WithVulkanTexture(), gets a frame's depth texture on the
+	// device, and AcquiredFrameHandle.WithOpaqueFd() shares it across APIs when
+	// GPUDeviceCapabilities.DepthExportKinds has the ring's kind. Keeping depth
+	// costs memory bandwidth, most on tile-based GPUs. A borrowed ring keeps depth
+	// in the textures that you give it instead, and the other targets keep none, so
+	// an attach to them with keep_depth fails with StatusUnsupported.
+	KeepDepth bool
 }
 
 func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *bindingArena) C.mln_render_session_attach_options {
@@ -4775,7 +5436,7 @@ func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *b
 	raw.frame_wake = nativeWake(input.FrameWake, arena)
 	raw.redraw_wake = nativeWake(input.RedrawWake, arena)
 	raw.driver_work_wake = nativeWake(input.DriverWorkWake, arena)
-	raw.queue_lock = nativeQueueLock(input.QueueLock, arena)
+	raw.keep_depth = C.bool(input.KeepDepth)
 	return raw
 }
 
@@ -4794,6 +5455,9 @@ type RenderSessionCapabilities struct {
 	// The kinds of GPUSync that AcquiredFrameHandle.Release() accepts. They depend
 	// on the target and on what the device supports.
 	ConsumerSyncKinds GPUSyncKindFlag
+	// How an exported ring shares its textures, which says which getter gets an
+	// acquired frame's texture, or GPUExportKindNone for another target.
+	ExportKind GPUExportKind
 }
 
 func copyRenderSessionCapabilities(raw C.mln_render_session_capabilities) RenderSessionCapabilities {
@@ -4803,6 +5467,7 @@ func copyRenderSessionCapabilities(raw C.mln_render_session_capabilities) Render
 	result.Flags = RenderSessionCapabilityFlag(raw.flags)
 	result.ProducerSyncKind = GPUSyncKind(raw.producer_sync_kind)
 	result.ConsumerSyncKinds = GPUSyncKindFlag(raw.consumer_sync_kinds)
+	result.ExportKind = GPUExportKind(raw.export_kind)
 	return result
 }
 
@@ -4838,6 +5503,50 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 	result.FailureStatus = Status(raw.failure_status)
 	result.HasTarget = bool(raw.has_target)
 	return result
+}
+
+func nativeRenderTarget(input RenderTarget, arena *bindingArena) C.mln_render_target {
+	raw := C.mln_render_target{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input == nil {
+		arena.fail("missing union variant")
+	}
+	raw.kind = C.mln_render_target_kind(input.bindingTag())
+	switch variant := input.(type) {
+	case RenderTargetOffscreenVariant:
+		bindingUnionStore(raw.data[:], nativeOffscreenTarget(variant.Value, arena))
+	case RenderTargetMetalLayerVariant:
+		bindingUnionStore(raw.data[:], nativeMetalLayerTarget(variant.Value, arena))
+	case RenderTargetWin32WindowVariant:
+		bindingUnionStore(raw.data[:], nativeWin32WindowTarget(variant.Value, arena))
+	case RenderTargetXlibWindowVariant:
+		bindingUnionStore(raw.data[:], nativeXlibWindowTarget(variant.Value, arena))
+	case RenderTargetWaylandSurfaceVariant:
+		bindingUnionStore(raw.data[:], nativeWaylandSurfaceTarget(variant.Value, arena))
+	case RenderTargetAndroidWindowVariant:
+		bindingUnionStore(raw.data[:], nativeAndroidWindowTarget(variant.Value, arena))
+	case RenderTargetOhosWindowVariant:
+		bindingUnionStore(raw.data[:], nativeOhosWindowTarget(variant.Value, arena))
+	case RenderTargetVulkanSurfaceVariant:
+		bindingUnionStore(raw.data[:], nativeVulkanSurfaceTarget(variant.Value, arena))
+	case RenderTargetOpenGLSurfaceVariant:
+		bindingUnionStore(raw.data[:], nativeOpenGLSurfaceTarget(variant.Value, arena))
+	case RenderTargetMetalBorrowedTexturesVariant:
+		bindingUnionStore(raw.data[:], nativeMetalBorrowedTexturesTarget(variant.Value, arena))
+	case RenderTargetVulkanBorrowedTexturesVariant:
+		bindingUnionStore(raw.data[:], nativeVulkanBorrowedTexturesTarget(variant.Value, arena))
+	case RenderTargetOpenGLBorrowedTexturesVariant:
+		bindingUnionStore(raw.data[:], nativeOpenGLBorrowedTexturesTarget(variant.Value, arena))
+	case RenderTargetWebGPUBorrowedTexturesVariant:
+		bindingUnionStore(raw.data[:], nativeWebGPUBorrowedTexturesTarget(variant.Value, arena))
+	case RenderTargetExportedRingVariant:
+		bindingUnionStore(raw.data[:], nativeExportedRingTarget(variant.Value, arena))
+	case RenderTargetWebCanvasVariant:
+		bindingUnionStore(raw.data[:], nativeWebCanvasTarget(variant.Value, arena))
+	default:
+		arena.fail("unknown input union variant")
+	}
+	return raw
 }
 
 // RenderedFeature corresponds to mln_rendered_feature. A feature that a
@@ -5259,8 +5968,6 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 			return RuntimeEventPayloadOfflineRegionStatusVariant{Value: copyRuntimeEventOfflineRegionStatus(bindingUnionLoad[C.mln_runtime_event_offline_region_status](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR:
 			return RuntimeEventPayloadOfflineRegionResponseErrorVariant{Value: copyRuntimeEventOfflineRegionResponseError(bindingUnionLoad[C.mln_runtime_event_offline_region_response_error](raw.payload[:]))}
-		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
-			return RuntimeEventPayloadOfflineRegionTileCountLimitVariant{Value: copyRuntimeEventOfflineRegionTileCountLimit(bindingUnionLoad[C.mln_runtime_event_offline_region_tile_count_limit](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS:
 			return RuntimeEventPayloadGlyphsVariant{Value: copyRuntimeEventGlyphs(bindingUnionLoad[C.mln_runtime_event_glyphs](raw.payload[:]))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_SPRITE:
@@ -5389,26 +6096,6 @@ func copyRuntimeEventOfflineRegionStatus(raw C.mln_runtime_event_offline_region_
 	var result RuntimeEventOfflineRegionStatus
 	result.RegionID = int64(raw.region_id)
 	result.Status = copyOfflineRegionStatus(raw.status)
-	return result
-}
-
-// RuntimeEventOfflineRegionTileCountLimit corresponds to
-// mln_runtime_event_offline_region_tile_count_limit. The details of
-// RuntimeEventTypeOfflineRegionTileCountLimitExceeded.
-//
-// See mln_runtime_event_offline_region_tile_count_limit in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventOfflineRegionTileCountLimit struct {
-	RegionID int64
-	// The number of demo server tiles that the cache file's offline regions may
-	// hold together.
-	Limit uint64
-}
-
-func copyRuntimeEventOfflineRegionTileCountLimit(raw C.mln_runtime_event_offline_region_tile_count_limit) RuntimeEventOfflineRegionTileCountLimit {
-	var result RuntimeEventOfflineRegionTileCountLimit
-	result.RegionID = int64(raw.region_id)
-	result.Limit = uint64(raw.limit)
 	return result
 }
 
@@ -6112,11 +6799,32 @@ func nativeVec3(input Vec3, arena *bindingArena) C.mln_vec3 {
 	return raw
 }
 
+// Vec4 corresponds to mln_vec4. A vector in four dimensions, such as a point in
+// homogeneous coordinates.
+//
+// See mln_vec4 in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type Vec4 struct {
+	X float64
+	Y float64
+	Z float64
+	W float64
+}
+
+func copyVec4(raw C.mln_vec4) Vec4 {
+	var result Vec4
+	result.X = float64(raw.x)
+	result.Y = float64(raw.y)
+	result.Z = float64(raw.z)
+	result.W = float64(raw.w)
+	return result
+}
+
 // VulkanBorrowedTexture corresponds to mln_vulkan_borrowed_texture. A Vulkan
 // image of a borrowed ring.
 //
 // See mln_vulkan_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type VulkanBorrowedTexture struct {
 	// Your VkImage.
 	Image uint64
@@ -6131,42 +6839,47 @@ func nativeVulkanBorrowedTexture(input VulkanBorrowedTexture, arena *bindingAren
 	return raw
 }
 
-// VulkanBorrowedTextureDescriptor corresponds to
-// mln_vulkan_borrowed_texture_descriptor. A ring of your Vulkan images, for
-// MapHandle.AttachVulkanBorrowedTexture().
+// VulkanBorrowedTexturesTarget corresponds to
+// mln_vulkan_borrowed_textures_target. A ring of your Vulkan images to render
+// into, on the Vulkan device that you attach on.
 //
-// logical_size sets the map's size. physical_width and physical_height give the
-// images' size in pixels, which is usually logical_size times the map's scale
-// factor. Each image must have that size, format, and
-// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
-// ring holds up to TextureRingMaxDepth distinct images.
+// physical_width and physical_height give the images' size in pixels, which is
+// usually logical_size times the map's scale factor. Each image must have that
+// size, format, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the
+// device's VkDevice. The ring holds up to TextureRingMaxDepth distinct images.
 //
-// The session uses the images until a replacement or release of the target
-// completes, a detach or release of the session completes, or an abandon of it
-// returns.
+// Give the ring depth_textures to draw into each frame depth-tested against the
+// map, as FrameProjection says: one for each of textures, at the same index, or
+// none. Each frame clears the one at its slot, renders the map's depth and
+// stencil into it, stores them, and leaves it in depth_final_layout, with owner
+// as for the color image. They must have the size of textures, depth_format,
+// one sample, and VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, and their views
+// both the depth and the stencil aspect.
 //
-// See mln_vulkan_borrowed_texture_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type VulkanBorrowedTextureDescriptor struct {
+// See mln_vulkan_borrowed_textures_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type VulkanBorrowedTexturesTarget struct {
 	LogicalSize    LogicalSize
 	PhysicalWidth  uint32
 	PhysicalHeight uint32
-	Context        VulkanContextDescriptor
 	Textures       []VulkanBorrowedTexture
 	// The images' VkFormat.
 	Format uint32
 	// The VkImageLayout that each frame leaves its image in.
-	FinalLayout uint32
-	Owner       VulkanImageOwner
+	FinalLayout   uint32
+	Owner         VulkanImageOwner
+	DepthTextures []VulkanBorrowedTexture
+	// The depth images' VkFormat, of GPUDeviceCapabilities.DepthStencilFormats.
+	DepthFormat uint32
+	// The VkImageLayout that each frame leaves its depth image in.
+	DepthFinalLayout uint32
 }
 
-func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor, arena *bindingArena) C.mln_vulkan_borrowed_texture_descriptor {
-	raw := C.mln_vulkan_borrowed_texture_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeVulkanBorrowedTexturesTarget(input VulkanBorrowedTexturesTarget, arena *bindingArena) C.mln_vulkan_borrowed_textures_target {
+	raw := C.mln_vulkan_borrowed_textures_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
-	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
 	{
 		raw.textures = (*C.mln_vulkan_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
 		items := unsafe.Slice(raw.textures, len(input.Textures))
@@ -6178,41 +6891,16 @@ func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor
 	raw.format = C.uint32_t(input.Format)
 	raw.final_layout = C.uint32_t(input.FinalLayout)
 	raw.owner = C.mln_vulkan_image_owner(input.Owner)
-	return raw
-}
-
-// VulkanBorrowedTextureReplacement corresponds to
-// mln_vulkan_borrowed_texture_replacement. New Vulkan images for a borrowed
-// ring, for RenderSessionHandle.SetVulkanBorrowedTextureTarget().
-//
-// The members and the images follow the rules of
-// VulkanBorrowedTextureDescriptor. The ring keeps its depth, context, format,
-// final_layout, and owner, so give it as many images as it attached with, in
-// that format, on the same device.
-//
-// See mln_vulkan_borrowed_texture_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type VulkanBorrowedTextureReplacement struct {
-	LogicalSize    LogicalSize
-	PhysicalWidth  uint32
-	PhysicalHeight uint32
-	Textures       []VulkanBorrowedTexture
-}
-
-func nativeVulkanBorrowedTextureReplacement(input VulkanBorrowedTextureReplacement, arena *bindingArena) C.mln_vulkan_borrowed_texture_replacement {
-	raw := C.mln_vulkan_borrowed_texture_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.physical_width = C.uint32_t(input.PhysicalWidth)
-	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	{
-		raw.textures = (*C.mln_vulkan_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
-		items := unsafe.Slice(raw.textures, len(input.Textures))
-		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
-		for i, item := range input.Textures {
+		raw.depth_textures = (*C.mln_vulkan_borrowed_texture)(arena.array(len(input.DepthTextures), unsafe.Sizeof(*raw.depth_textures)))
+		items := unsafe.Slice(raw.depth_textures, len(input.DepthTextures))
+		raw.depth_texture_count = bindingCountLike(raw.depth_texture_count, len(input.DepthTextures))
+		for i, item := range input.DepthTextures {
 			items[i] = nativeVulkanBorrowedTexture(item, arena)
 		}
 	}
+	raw.depth_format = C.uint32_t(input.DepthFormat)
+	raw.depth_final_layout = C.uint32_t(input.DepthFinalLayout)
 	return raw
 }
 
@@ -6232,7 +6920,7 @@ type VulkanContextDescriptor struct {
 	// A VkDevice.
 	Device uintptr
 	// A VkQueue from graphics_queue_family_index that supports graphics. If you
-	// submit to it too, set RenderSessionAttachOptions.QueueLock.
+	// submit to it too, give the device your QueueLock.
 	GraphicsQueue            uintptr
 	GraphicsQueueFamilyIndex uint32
 	// Your vkGetInstanceProcAddr, or null to use the Vulkan loader's.
@@ -6265,100 +6953,129 @@ func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *binding
 	return raw
 }
 
-// VulkanDeviceContextResult corresponds to mln_vulkan_device_context_result. A
-// Vulkan device's context, as VulkanDeviceHandle.Context() reports it.
+// VulkanCustomLayerEncoder corresponds to mln_vulkan_custom_layer_encoder. The
+// frame's Vulkan command buffer, outside the map's render pass.
 //
-// See mln_vulkan_device_context_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
-type VulkanDeviceContextResult struct{ Context VulkanContextDescriptor }
+// Record work such as copies, compute dispatches, and render passes of your
+// own, with the barriers that it needs. The map's render pass loads its
+// attachments after a barrier of its own, but it doesn't wait for writes to
+// your images: give those the barriers that your later reads need. Don't end or
+// submit command_buffer.
+//
+// See mln_vulkan_custom_layer_encoder in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type VulkanCustomLayerEncoder struct {
+	// The device that the session renders on. Make the objects that your commands
+	// use on context.device. Don't submit to context.graphics_queue from a
+	// callback.
+	Context VulkanContextDescriptor
+	// The frame's VkCommandBuffer, recording outside a render pass.
+	CommandBuffer uintptr
+}
 
-func copyVulkanDeviceContextResult(raw C.mln_vulkan_device_context_result) VulkanDeviceContextResult {
-	var result VulkanDeviceContextResult
+func copyVulkanCustomLayerEncoder(raw C.mln_vulkan_custom_layer_encoder) VulkanCustomLayerEncoder {
+	var result VulkanCustomLayerEncoder
 	result.Context = copyVulkanContextDescriptor(raw.context)
+	result.CommandBuffer = uintptr(unsafe.Pointer(raw.command_buffer))
 	return result
 }
 
-// VulkanDeviceOptions corresponds to mln_vulkan_device_options. Options for
-// NewVulkanDevice().
+// VulkanCustomLayerPass corresponds to mln_vulkan_custom_layer_pass. The map's
+// Vulkan render pass, at a custom layer's place in the style.
 //
-// See mln_vulkan_device_options in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
-type VulkanDeviceOptions struct {
-	// Whether the device can present to a window. The instance then enables
-	// VK_KHR_surface and the platform's surface extensions, and the device enables
-	// VK_KHR_swapchain. Defaults to false.
-	Presentation *bool
-	// The 16-byte deviceUUID of the GPU to use, as VkPhysicalDeviceIDProperties
-	// reports it.
-	DeviceUuid *[]byte
-	// The 8-byte deviceLUID of the GPU to use, as VkPhysicalDeviceIDProperties
-	// reports it. On Windows, this is the GPU's DXGI adapter LUID.
-	DeviceLuid *[]byte
+// Record draws into command_buffer, with pipelines that you make for
+// render_pass, subpass, and sample_count. Bind your own pipeline, descriptor
+// sets, vertex and index buffers, and push constants, and set the dynamic state
+// that your pipelines have, such as the viewport and scissor. After the
+// callback returns, the map binds and sets again what its own draws need. Your
+// pipeline layouts can differ from the map's. Record nothing that a render pass
+// can't hold, and don't end the render pass.
+//
+// See mln_vulkan_custom_layer_pass in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type VulkanCustomLayerPass struct {
+	// The device that the session renders on. Make the objects that your commands
+	// use on context.device. Don't submit to context.graphics_queue from a
+	// callback.
+	Context VulkanContextDescriptor
+	// The frame's VkCommandBuffer, recording inside render_pass.
+	CommandBuffer uintptr
+	// The VkRenderPass that command_buffer records in.
+	RenderPass uint64
+	// The index of the subpass that command_buffer records in.
+	Subpass uint32
+	// The VkSampleCountFlagBits of the render pass's attachments.
+	SampleCount uint32
+	// The VkFormat of the render pass's color attachment.
+	ColorFormat uint32
+	// The VkFormat of the render pass's depth-stencil attachment, or
+	// VK_FORMAT_UNDEFINED when it has none.
+	DepthStencilFormat uint32
 }
 
-func nativeVulkanDeviceOptions(input VulkanDeviceOptions, arena *bindingArena) C.mln_vulkan_device_options {
-	raw := C.mln_vulkan_device_options{}
+func copyVulkanCustomLayerPass(raw C.mln_vulkan_custom_layer_pass) VulkanCustomLayerPass {
+	var result VulkanCustomLayerPass
+	result.Context = copyVulkanContextDescriptor(raw.context)
+	result.CommandBuffer = uintptr(unsafe.Pointer(raw.command_buffer))
+	result.RenderPass = uint64(raw.render_pass)
+	result.Subpass = uint32(raw.subpass)
+	result.SampleCount = uint32(raw.sample_count)
+	result.ColorFormat = uint32(raw.color_format)
+	result.DepthStencilFormat = uint32(raw.depth_stencil_format)
+	return result
+}
+
+// VulkanDeviceDescriptor corresponds to mln_vulkan_device_descriptor. Your
+// Vulkan device and queue, for NewGPUDevice().
+//
+// See mln_vulkan_device_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+type VulkanDeviceDescriptor struct {
+	Context VulkanContextDescriptor
+	// Your lock on context.graphics_queue, when you submit to it yourself. Give
+	// every device that wraps the queue the same lock.
+	QueueLock QueueLock
+	// The names of the device extensions that you enabled on context.device, such
+	// as "VK_KHR_external_semaphore_fd". Vulkan offers no way to ask a device which
+	// extensions it has, so the device offers the export kinds and
+	// GPUSyncKindSyncFd only when the extensions that they need are listed here,
+	// and none of them when the list is empty.
+	EnabledExtensions []string
+}
+
+func nativeVulkanDeviceDescriptor(input VulkanDeviceDescriptor, arena *bindingArena) C.mln_vulkan_device_descriptor {
+	raw := C.mln_vulkan_device_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_VULKAN_DEVICE_OPTION_PRESENTATION, &raw.presentation, input.Presentation, arena, bindingBool[bool, C.bool])
-	if input.DeviceUuid != nil {
-		raw.device_uuid = C.mln_buffer_view{data: arena.bytes((*input.DeviceUuid)), size: C.size_t(len((*input.DeviceUuid)))}
-		raw.fields |= C.MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID
-	}
-	if input.DeviceLuid != nil {
-		raw.device_luid = C.mln_buffer_view{data: arena.bytes((*input.DeviceLuid)), size: C.size_t(len((*input.DeviceLuid)))}
-		raw.fields |= C.MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID
-	}
-	return raw
-}
-
-// VulkanSurfaceDescriptor corresponds to mln_vulkan_surface_descriptor. A
-// Vulkan surface to present to, for MapHandle.AttachVulkanSurface().
-//
-// The device must have VK_KHR_swapchain enabled, and the queue family of
-// graphics_queue_family_index must support presenting to the surface. The
-// session creates the swapchain. It uses the surface until a replacement or
-// release of the target completes, a detach or release of the session
-// completes, or an abandon of it returns.
-//
-// See mln_vulkan_surface_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-type VulkanSurfaceDescriptor struct {
-	LogicalSize LogicalSize
-	Context     VulkanContextDescriptor
-	// Your VkSurfaceKHR.
-	Surface uint64
-}
-
-func nativeVulkanSurfaceDescriptor(input VulkanSurfaceDescriptor, arena *bindingArena) C.mln_vulkan_surface_descriptor {
-	raw := C.mln_vulkan_surface_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
-	raw.surface = C.mln_vulkan_non_dispatchable_handle(input.Surface)
+	raw.queue_lock = nativeQueueLock(input.QueueLock, arena)
+	{
+		raw.enabled_extensions = (*C.mln_buffer_view)(arena.array(len(input.EnabledExtensions), unsafe.Sizeof(*raw.enabled_extensions)))
+		items := unsafe.Slice(raw.enabled_extensions, len(input.EnabledExtensions))
+		raw.enabled_extension_count = bindingCountLike(raw.enabled_extension_count, len(input.EnabledExtensions))
+		for i, item := range input.EnabledExtensions {
+			items[i] = C.mln_buffer_view{data: arena.bytes([]byte(item)), size: C.size_t(len(item))}
+		}
+	}
 	return raw
 }
 
-// VulkanSurfaceReplacement corresponds to mln_vulkan_surface_replacement. A new
-// Vulkan surface for RenderSessionHandle.SetVulkanSurfaceTarget().
+// VulkanSurfaceTarget corresponds to mln_vulkan_surface_target. Your Vulkan
+// surface to present to.
 //
-// The session presents to it with the context that it attached with, so the
-// queue family of that context's graphics_queue_family_index must support
-// presenting to the surface. It uses the surface until a replacement or release
-// of the target completes, a detach or release of the session completes, or an
-// abandon of it returns.
+// Make it with the instance of the Vulkan device that you attach on. The
+// device's queue family must support presenting to the surface. The session
+// creates the swapchain, and destroys it but not the surface.
 //
-// See mln_vulkan_surface_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-type VulkanSurfaceReplacement struct {
+// See mln_vulkan_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type VulkanSurfaceTarget struct {
 	LogicalSize LogicalSize
 	// Your VkSurfaceKHR.
 	Surface uint64
 }
 
-func nativeVulkanSurfaceReplacement(input VulkanSurfaceReplacement, arena *bindingArena) C.mln_vulkan_surface_replacement {
-	raw := C.mln_vulkan_surface_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeVulkanSurfaceTarget(input VulkanSurfaceTarget, arena *bindingArena) C.mln_vulkan_surface_target {
+	raw := C.mln_vulkan_surface_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.surface = C.mln_vulkan_non_dispatchable_handle(input.Surface)
 	return raw
@@ -6366,6 +7083,9 @@ func nativeVulkanSurfaceReplacement(input VulkanSurfaceReplacement, arena *bindi
 
 // VulkanTextureFrame corresponds to mln_vulkan_texture_frame. The Vulkan image
 // of an acquired frame.
+//
+// The depth members are set when the frame has a depth image, as for
+// MetalTextureFrame. Otherwise they are zero.
 //
 // See mln_vulkan_texture_frame in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -6385,6 +7105,14 @@ type VulkanTextureFrame struct {
 	Format uint32
 	// The VkImageLayout that the frame left the image in.
 	Layout uint32
+	// The VkImage that holds the frame's depth and stencil.
+	DepthImage uint64
+	// A VkImageView of the depth image's depth and stencil aspects.
+	DepthImageView uint64
+	// The depth image's VkFormat.
+	DepthFormat uint32
+	// The VkImageLayout that the frame left the depth image in.
+	DepthLayout uint32
 }
 
 func copyVulkanTextureFrame(raw C.mln_vulkan_texture_frame) VulkanTextureFrame {
@@ -6398,6 +7126,10 @@ func copyVulkanTextureFrame(raw C.mln_vulkan_texture_frame) VulkanTextureFrame {
 	result.Device = uintptr(unsafe.Pointer(raw.device))
 	result.Format = uint32(raw.format)
 	result.Layout = uint32(raw.layout)
+	result.DepthImage = uint64(raw.depth_image)
+	result.DepthImageView = uint64(raw.depth_image_view)
+	result.DepthFormat = uint32(raw.depth_format)
+	result.DepthLayout = uint32(raw.depth_layout)
 	return result
 }
 
@@ -6445,12 +7177,15 @@ func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	return raw
 }
 
-// WaylandSurfaceDescriptor corresponds to mln_wayland_surface_descriptor. A
-// Wayland surface to present to, for MapHandle.AttachWaylandSurface().
+// WaylandSurfaceTarget corresponds to mln_wayland_surface_target. A Wayland
+// surface to present to.
 //
-// See mln_wayland_surface_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html
-type WaylandSurfaceDescriptor struct {
+// Keep the display connected until the session's detach completes. On an OpenGL
+// device, if you also use EGL on the display, initialize it before you attach.
+//
+// See mln_wayland_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type WaylandSurfaceTarget struct {
 	LogicalSize LogicalSize
 	// Your wl_display*.
 	Display uintptr
@@ -6458,31 +7193,42 @@ type WaylandSurfaceDescriptor struct {
 	Surface uintptr
 }
 
-func nativeWaylandSurfaceDescriptor(input WaylandSurfaceDescriptor, arena *bindingArena) C.mln_wayland_surface_descriptor {
-	raw := C.mln_wayland_surface_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeWaylandSurfaceTarget(input WaylandSurfaceTarget, arena *bindingArena) C.mln_wayland_surface_target {
+	raw := C.mln_wayland_surface_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
 	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	return raw
 }
 
-// WaylandSurfaceReplacement corresponds to mln_wayland_surface_replacement. A
-// new Wayland surface for RenderSessionHandle.SetWaylandSurfaceTarget().
+// WebCanvasTarget corresponds to mln_web_canvas_target. A canvas to present to.
 //
-// See mln_wayland_surface_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html
-type WaylandSurfaceReplacement struct {
+// The session makes the canvas's "webgpu" or "webgl2" context with the device's
+// backend, and sets the canvas's size to logical_size at the map's scale
+// factor. Attached without a device, it renders with the build's backend: a
+// WebGPU build asks the browser for a device, and attaches once it has one. For
+// an OpenGL device that wraps your WebGL2 context, the canvas must be the
+// context's own.
+//
+// See mln_web_canvas_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type WebCanvasTarget struct {
 	LogicalSize LogicalSize
-	// Your wl_surface*, on the display that the session attached with.
-	Surface uintptr
+	// An OffscreenCanvas, such as one from
+	// HTMLCanvasElement.transferControlToOffscreen() that you posted to the
+	// library's Web Worker, or an HTMLCanvasElement when the library runs on the
+	// page's thread.
+	Canvas uint32
+	// For a WebGPU device, the GPUTextureFormat to configure the canvas with, such
+	// as bgra8unorm. Empty for a format that the device's adapter prefers.
+	Format string
 }
 
-func nativeWaylandSurfaceReplacement(input WaylandSurfaceReplacement, arena *bindingArena) C.mln_wayland_surface_replacement {
-	raw := C.mln_wayland_surface_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeWebCanvasTarget(input WebCanvasTarget, arena *bindingArena) C.mln_web_canvas_target {
+	raw := C.mln_web_canvas_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
+	raw.canvas = C.mln_web_object(input.Canvas)
+	raw.format = C.mln_buffer_view{data: arena.bytes([]byte(input.Format)), size: C.size_t(len(input.Format))}
 	return raw
 }
 
@@ -6502,15 +7248,144 @@ func nativeWebGLContextDescriptor(input WebGLContextDescriptor, arena *bindingAr
 	return raw
 }
 
-// WGLContextDescriptor corresponds to mln_wgl_context_descriptor. The WGL
-// objects that a render session makes its OpenGL context from.
+// WebGPUBorrowedTexture corresponds to mln_web_gpu_borrowed_texture. A WebGPU
+// texture of a borrowed ring.
+//
+// See mln_web_gpu_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type WebGPUBorrowedTexture struct {
+	// Your GPUTexture.
+	Texture uint32
+}
+
+func nativeWebGPUBorrowedTexture(input WebGPUBorrowedTexture, arena *bindingArena) C.mln_web_gpu_borrowed_texture {
+	raw := C.mln_web_gpu_borrowed_texture{}
+	raw.texture = C.mln_web_object(input.Texture)
+	return raw
+}
+
+// WebGPUBorrowedTexturesTarget corresponds to
+// mln_web_gpu_borrowed_textures_target. A ring of your WebGPU textures to
+// render into, on a WebGPU device that wraps yours.
+//
+// physical_width and physical_height give the textures' size in pixels, which
+// is usually logical_size times the map's scale factor. Each texture must be 2D
+// with that size, format, one layer, one mip level, one sample, and
+// GPUTextureUsage.RENDER_ATTACHMENT. The ring holds up to TextureRingMaxDepth
+// distinct textures.
+//
+// Give the ring depth_textures to draw into each frame depth-tested against the
+// map, as FrameProjection says: one for each of textures, at the same index, or
+// none. Each frame clears the one at its slot, renders the map's depth and
+// stencil into it, and stores them. They must be 2D with the size of textures,
+// depth_format, one layer, one mip level, one sample, and
+// GPUTextureUsage.RENDER_ATTACHMENT.
+//
+// See mln_web_gpu_borrowed_textures_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type WebGPUBorrowedTexturesTarget struct {
+	LogicalSize    LogicalSize
+	PhysicalWidth  uint32
+	PhysicalHeight uint32
+	Textures       []WebGPUBorrowedTexture
+	// The textures' GPUTextureFormat, such as rgba8unorm.
+	Format        string
+	DepthTextures []WebGPUBorrowedTexture
+	// The depth textures' GPUTextureFormat, of
+	// GPUDeviceCapabilities.DepthStencilFormats.
+	DepthFormat string
+}
+
+func nativeWebGPUBorrowedTexturesTarget(input WebGPUBorrowedTexturesTarget, arena *bindingArena) C.mln_web_gpu_borrowed_textures_target {
+	raw := C.mln_web_gpu_borrowed_textures_target{}
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.physical_width = C.uint32_t(input.PhysicalWidth)
+	raw.physical_height = C.uint32_t(input.PhysicalHeight)
+	{
+		raw.textures = (*C.mln_web_gpu_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
+		items := unsafe.Slice(raw.textures, len(input.Textures))
+		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
+		for i, item := range input.Textures {
+			items[i] = nativeWebGPUBorrowedTexture(item, arena)
+		}
+	}
+	raw.format = C.mln_buffer_view{data: arena.bytes([]byte(input.Format)), size: C.size_t(len(input.Format))}
+	{
+		raw.depth_textures = (*C.mln_web_gpu_borrowed_texture)(arena.array(len(input.DepthTextures), unsafe.Sizeof(*raw.depth_textures)))
+		items := unsafe.Slice(raw.depth_textures, len(input.DepthTextures))
+		raw.depth_texture_count = bindingCountLike(raw.depth_texture_count, len(input.DepthTextures))
+		for i, item := range input.DepthTextures {
+			items[i] = nativeWebGPUBorrowedTexture(item, arena)
+		}
+	}
+	raw.depth_format = C.mln_buffer_view{data: arena.bytes([]byte(input.DepthFormat)), size: C.size_t(len(input.DepthFormat))}
+	return raw
+}
+
+// WebGPUCustomLayerEncoder corresponds to mln_web_gpu_custom_layer_encoder. The
+// frame's WebGPU command encoder, outside the map's render pass.
+//
+// End each pass that you begin on encoder before the callback returns, and
+// don't finish the encoder.
+//
+// See mln_web_gpu_custom_layer_encoder in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type WebGPUCustomLayerEncoder struct {
+	// The GPUDevice that the session renders on.
+	Device uint32
+	// The frame's GPUCommandEncoder, with no pass open.
+	Encoder uint32
+}
+
+func copyWebGPUCustomLayerEncoder(raw C.mln_web_gpu_custom_layer_encoder) WebGPUCustomLayerEncoder {
+	var result WebGPUCustomLayerEncoder
+	result.Device = uint32(raw.device)
+	result.Encoder = uint32(raw.encoder)
+	return result
+}
+
+// WebGPUCustomLayerPass corresponds to mln_web_gpu_custom_layer_pass. The map's
+// WebGPU render pass, at a custom layer's place in the style.
+//
+// Set your own pipeline, bind groups, vertex and index buffers, viewport,
+// scissor rectangle, and stencil reference on encoder. After the callback
+// returns, the map sets again what its own draws need. Don't end encoder.
+//
+// See mln_web_gpu_custom_layer_pass in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type WebGPUCustomLayerPass struct {
+	// The GPUDevice that the session renders on.
+	Device uint32
+	// The pass's GPURenderPassEncoder.
+	Encoder uint32
+	// The GPUTextureFormat of the pass's color attachment.
+	ColorFormat string
+	// The GPUTextureFormat of the pass's depth-stencil attachment, or empty when it
+	// has none.
+	DepthStencilFormat string
+	// The sample count of the pass's attachments.
+	SampleCount uint32
+}
+
+func copyWebGPUCustomLayerPass(raw C.mln_web_gpu_custom_layer_pass) WebGPUCustomLayerPass {
+	var result WebGPUCustomLayerPass
+	result.Device = uint32(raw.device)
+	result.Encoder = uint32(raw.encoder)
+	result.ColorFormat = bindingString(raw.color_format.data, uint64(raw.color_format.size))
+	result.DepthStencilFormat = bindingString(raw.depth_stencil_format.data, uint64(raw.depth_stencil_format.size))
+	result.SampleCount = uint32(raw.sample_count)
+	return result
+}
+
+// WGLContextDescriptor corresponds to mln_wgl_context_descriptor. Your WGL
+// context, which each session's context shares objects with.
 //
 // See mln_wgl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type WGLContextDescriptor struct {
-	// An HDC.
+	// An HDC with the pixel format of share_context.
 	DeviceContext uintptr
-	// Your HGLRC, for a shared context.
+	// Your HGLRC.
 	ShareContext uintptr
 	// Your wglGetProcAddress, or null to use the system's.
 	GetProcAddress uintptr
@@ -6524,41 +7399,48 @@ func nativeWGLContextDescriptor(input WGLContextDescriptor, arena *bindingArena)
 	return raw
 }
 
-// Win32WindowDescriptor corresponds to mln_win32_window_descriptor. A Win32
-// window to present to, for MapHandle.AttachWin32Window().
+// Win32WindowTarget corresponds to mln_win32_window_target. A Win32 window to
+// present to.
 //
-// See mln_win32_window_descriptor in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
-type Win32WindowDescriptor struct {
+// On an OpenGL device, the session sets the window's pixel format, so don't set
+// one yourself. While the window is minimized, frame demands finish with
+// RenderResultTargetNotReady.
+//
+// See mln_win32_window_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type Win32WindowTarget struct {
 	LogicalSize LogicalSize
 	// Your HWND.
 	Window uintptr
 }
 
-func nativeWin32WindowDescriptor(input Win32WindowDescriptor, arena *bindingArena) C.mln_win32_window_descriptor {
-	raw := C.mln_win32_window_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeWin32WindowTarget(input Win32WindowTarget, arena *bindingArena) C.mln_win32_window_target {
+	raw := C.mln_win32_window_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
 	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
 	return raw
 }
 
-// Win32WindowReplacement corresponds to mln_win32_window_replacement. A new
-// Win32 window for RenderSessionHandle.SetWin32WindowTarget().
+// XlibWindowTarget corresponds to mln_xlib_window_target. An X11 window to
+// present to, through Xlib.
 //
-// See mln_win32_window_replacement in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html
-type Win32WindowReplacement struct {
+// Keep the display connected until the session's detach completes.
+//
+// See mln_xlib_window_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type XlibWindowTarget struct {
 	LogicalSize LogicalSize
-	// Your HWND.
-	Window uintptr
+	// Your Display*.
+	Display uintptr
+	// Your Window, on display.
+	Window uint64
 }
 
-func nativeWin32WindowReplacement(input Win32WindowReplacement, arena *bindingArena) C.mln_win32_window_replacement {
-	raw := C.mln_win32_window_replacement{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+func nativeXlibWindowTarget(input XlibWindowTarget, arena *bindingArena) C.mln_xlib_window_target {
+	raw := C.mln_xlib_window_target{}
 	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
-	raw.window = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Window)))
+	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
+	raw.window = C.uint64_t(input.Window)
 	return raw
 }
 
@@ -6689,6 +7571,60 @@ func (view MetalTextureFrameView) UnsafeDevice() (uintptr, error) {
 
 func (view MetalTextureFrameView) PixelFormat() uint64 { return view.value.PixelFormat }
 
+func (view MetalTextureFrameView) UnsafeDepthTexture() (uintptr, error) {
+	return bindingCall(func() uintptr {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.DepthTexture
+	})
+}
+
+func (view MetalTextureFrameView) DepthPixelFormat() uint64 { return view.value.DepthPixelFormat }
+
+type OpaqueFdFrameView struct {
+	value OpaqueFdFrame
+	scope *bindingScope
+}
+
+func (view OpaqueFdFrameView) Width() uint32 { return view.value.Width }
+
+func (view OpaqueFdFrameView) Height() uint32 { return view.value.Height }
+
+func (view OpaqueFdFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
+
+func (view OpaqueFdFrameView) Slot() uint32 { return view.value.Slot }
+
+func (view OpaqueFdFrameView) Fd() (int32, error) {
+	return bindingCall(func() int32 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Fd
+	})
+}
+
+func (view OpaqueFdFrameView) AllocationSize() uint64 { return view.value.AllocationSize }
+
+func (view OpaqueFdFrameView) Dedicated() bool { return view.value.Dedicated }
+
+func (view OpaqueFdFrameView) Format() uint32 { return view.value.Format }
+
+func (view OpaqueFdFrameView) DepthFd() (int32, error) {
+	return bindingCall(func() int32 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.DepthFd
+	})
+}
+
+func (view OpaqueFdFrameView) DepthAllocationSize() uint64 { return view.value.DepthAllocationSize }
+
+func (view OpaqueFdFrameView) DepthDedicated() bool { return view.value.DepthDedicated }
+
+func (view OpaqueFdFrameView) DepthFormat() uint32 { return view.value.DepthFormat }
+
 type OpenGLTextureFrameView struct {
 	value OpenGLTextureFrame
 	scope *bindingScope
@@ -6712,6 +7648,19 @@ func (view OpenGLTextureFrameView) Texture() (uint32, error) {
 }
 
 func (view OpenGLTextureFrameView) Target() uint32 { return view.value.Target }
+
+func (view OpenGLTextureFrameView) DepthTexture() (uint32, error) {
+	return bindingCall(func() uint32 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.DepthTexture
+	})
+}
+
+func (view OpenGLTextureFrameView) DepthInternalFormat() uint32 {
+	return view.value.DepthInternalFormat
+}
 
 type GPUSyncView struct {
 	value GPUSync
@@ -6775,6 +7724,28 @@ func (view VulkanTextureFrameView) Format() uint32 { return view.value.Format }
 
 func (view VulkanTextureFrameView) Layout() uint32 { return view.value.Layout }
 
+func (view VulkanTextureFrameView) DepthImage() (uint64, error) {
+	return bindingCall(func() uint64 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.DepthImage
+	})
+}
+
+func (view VulkanTextureFrameView) DepthImageView() (uint64, error) {
+	return bindingCall(func() uint64 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.DepthImageView
+	})
+}
+
+func (view VulkanTextureFrameView) DepthFormat() uint32 { return view.value.DepthFormat }
+
+func (view VulkanTextureFrameView) DepthLayout() uint32 { return view.value.DepthLayout }
+
 const (
 	// DiagnosticMessageCapacity corresponds to MLN_DIAGNOSTIC_MESSAGE_CAPACITY. The
 	// size of a diagnostic message in bytes, with its terminator.
@@ -6783,8 +7754,9 @@ const (
 	// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 	DiagnosticMessageCapacity uint32 = 4096
 	// FrameDemandTokenStillImage corresponds to MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE.
-	// The token of the frame results that a session adds when it renders an image
-	// for MapHandle.RequestStillImage(). Your own demands can't use it.
+	// The token of the frame results of the demand that a session holds for an
+	// image of MapHandle.RequestStillImage(), which says how that demand runs. Your
+	// own demands can't use it.
 	//
 	// See MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE in the C API reference:
 	// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -6868,6 +7840,38 @@ func (handle *FramePacerHandle) String() string {
 	return bindingDescribe("FramePacerHandle", handle.owner())
 }
 
+// GPUDeviceHandle corresponds to mln_gpu_device. A GPU, and the queue that
+// render sessions on it share.
+//
+// See mln_gpu_device in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
+type GPUDeviceHandle struct{ *bindingOwner }
+
+func adoptGPUDeviceHandle(raw uint64, parent any) *GPUDeviceHandle {
+	owner := &GPUDeviceHandle{bindingAdopt(raw, parent, "GPUDeviceHandle", func(raw uint64) { C.mln_gpu_device_release(C.mln_gpu_device(raw)) })}
+	return owner
+}
+
+func (handle *GPUDeviceHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
+// ID returns the native handle value. It stays readable after the handle
+// is released.
+func (handle *GPUDeviceHandle) ID() uint64 { return handle.owner().id() }
+
+// IsClosed reports whether the binding has accepted a release, dispose, or
+// discard of the handle. A nil handle is closed.
+func (handle *GPUDeviceHandle) IsClosed() bool { return handle.owner().isClosed() }
+
+// String formats the handle as GPUDeviceHandle(id=0x<hex>, closed=<true|false>).
+func (handle *GPUDeviceHandle) String() string {
+	return bindingDescribe("GPUDeviceHandle", handle.owner())
+}
+
 // MapHandle corresponds to mln_map. A map, with its style and camera.
 //
 // See mln_map in the C API reference:
@@ -6928,38 +7932,6 @@ func (handle *MapProjectionHandle) IsClosed() bool { return handle.owner().isClo
 // String formats the handle as MapProjectionHandle(id=0x<hex>, closed=<true|false>).
 func (handle *MapProjectionHandle) String() string {
 	return bindingDescribe("MapProjectionHandle", handle.owner())
-}
-
-// OffscreenDeviceHandle corresponds to mln_offscreen_device. A GPU device that
-// the library creates to render maps offscreen.
-//
-// See mln_offscreen_device in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type OffscreenDeviceHandle struct{ *bindingOwner }
-
-func adoptOffscreenDeviceHandle(raw uint64, parent any) *OffscreenDeviceHandle {
-	owner := &OffscreenDeviceHandle{bindingAdopt(raw, parent, "OffscreenDeviceHandle", func(raw uint64) { C.mln_offscreen_device_release(C.mln_offscreen_device(raw)) })}
-	return owner
-}
-
-func (handle *OffscreenDeviceHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
-// ID returns the native handle value. It stays readable after the handle
-// is released.
-func (handle *OffscreenDeviceHandle) ID() uint64 { return handle.owner().id() }
-
-// IsClosed reports whether the binding has accepted a release, dispose, or
-// discard of the handle. A nil handle is closed.
-func (handle *OffscreenDeviceHandle) IsClosed() bool { return handle.owner().isClosed() }
-
-// String formats the handle as OffscreenDeviceHandle(id=0x<hex>, closed=<true|false>).
-func (handle *OffscreenDeviceHandle) String() string {
-	return bindingDescribe("OffscreenDeviceHandle", handle.owner())
 }
 
 // RenderSessionHandle corresponds to mln_render_session. A render session draws
@@ -7121,38 +8093,6 @@ func (handle *StyleExpressionHandle) String() string {
 	return bindingDescribe("StyleExpressionHandle", handle.owner())
 }
 
-// VulkanDeviceHandle corresponds to mln_vulkan_device. A Vulkan instance,
-// device, and queue that the library creates and owns.
-//
-// See mln_vulkan_device in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type VulkanDeviceHandle struct{ *bindingOwner }
-
-func adoptVulkanDeviceHandle(raw uint64, parent any) *VulkanDeviceHandle {
-	owner := &VulkanDeviceHandle{bindingAdopt(raw, parent, "VulkanDeviceHandle", func(raw uint64) { C.mln_vulkan_device_release(C.mln_vulkan_device(raw)) })}
-	return owner
-}
-
-func (handle *VulkanDeviceHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
-// ID returns the native handle value. It stays readable after the handle
-// is released.
-func (handle *VulkanDeviceHandle) ID() uint64 { return handle.owner().id() }
-
-// IsClosed reports whether the binding has accepted a release, dispose, or
-// discard of the handle. A nil handle is closed.
-func (handle *VulkanDeviceHandle) IsClosed() bool { return handle.owner().isClosed() }
-
-// String formats the handle as VulkanDeviceHandle(id=0x<hex>, closed=<true|false>).
-func (handle *VulkanDeviceHandle) String() string {
-	return bindingDescribe("VulkanDeviceHandle", handle.owner())
-}
-
 type MapHandleDiscarding struct{ owner *MapHandle }
 
 func (receiver *MapHandle) Discarding() MapHandleDiscarding { return MapHandleDiscarding{receiver} }
@@ -7173,7 +8113,10 @@ func (receiver *RuntimeHandle) Discarding() RuntimeHandleDiscarding {
 // it.
 //
 // Because your GPU may still read the frame's texture, the session never
-// renders into that texture again.
+// renders into that texture again, even when RenderSessionHandle.SetTarget()
+// gives it the texture again, until RenderSessionHandle.ReleaseTarget()
+// releases the ring. A view that is open on the frame keeps the frame's sync
+// objects in place until it ends.
 //
 // See mln_acquired_frame_discard in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7184,6 +8127,14 @@ func (receiver *AcquiredFrameHandle) Discard() error {
 }
 
 // WithOpenGLTexture gets the OpenGL texture of an acquired frame.
+//
+// It gets a borrowed ring's texture, or an exported ring's on an OpenGL device:
+// the texture of the dmabuf that AcquiredFrameHandle.WithDmaBuf() gets, and the
+// frame's depth texture with RenderSessionAttachOptions.KeepDepth, in the
+// device's share group. An exported ring's textures hold the frame upside down
+// from OpenGL's rows, top row first, as a dmabuf's readers take it, so negate
+// clip y to draw into them. Wait for AcquiredFrameHandle.WithProducerSync()
+// before you use them.
 //
 // See mln_acquired_frame_get_open_gl_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -7241,6 +8192,12 @@ func (receiver *AcquiredFrameHandle) Result() (RenderFrameResult, error) {
 
 // WithVulkanTexture gets the Vulkan image of an acquired frame.
 //
+// It gets a borrowed ring's image, or an exported ring's on a Vulkan device:
+// the image whose memory the ring shares, and the frame's depth image with
+// RenderSessionAttachOptions.KeepDepth. An exported ring's frame releases them
+// to VK_QUEUE_FAMILY_EXTERNAL, so acquire them from there. Wait for
+// AcquiredFrameHandle.WithProducerSync() before you use them.
+//
 // See mln_acquired_frame_get_vulkan_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 //
@@ -7262,11 +8219,11 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextu
 // Release gives an acquired frame back to the session once you're done reading
 // it.
 //
-// consumerCompletion says when your GPU work that reads the texture finishes.
-// Pass GPUSyncKindCPUComplete when that work has already finished. The session
-// waits for that point before it renders into the texture again. If that wait
-// fails, such as for an OpenGL fence outside the session's share group, the
-// session fails.
+// consumerCompletion says when your GPU work on the texture, and on its depth
+// texture, finishes. Pass GPUSyncKindCPUComplete when that work has already
+// finished. The session waits for that point before it renders into the
+// textures again. If that wait fails, such as for an OpenGL fence outside the
+// session's share group, the session fails.
 //
 // See mln_acquired_frame_release in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7318,6 +8275,46 @@ func CameraForTile(tile CanonicalTileID, logicalSize LogicalSize) (CameraOptions
 	})
 }
 
+// NewFramePacer creates a frame pacer that follows the platform's display.
+//
+// On iOS, macOS, and tvOS, the pacer follows the display through a
+// CADisplayLink. You can call it on any thread, and the pacer needs no run loop
+// of yours. On macOS, it follows the main display, the one with the menu bar.
+// With FramePacerOptions.MaximumFramesPerSecond, the pacer also asks the system
+// for that refresh rate. On iPhone, a rate above 60 needs
+// CADisableMinimumFrameDurationOnPhone in the app's Info.plist.
+//
+// On Android, the pacer follows the display through the calling thread's
+// AChoreographer. Call it on a thread with an ALooper, such as the app's main
+// thread, and keep that thread running its looper while sessions use the pacer.
+// AChoreographer can stop while the phone's display is off, even while a
+// Surface on another display, such as an Android Auto projection, still shows
+// the map. The pacer then keeps demanding frames from a timer on the looper,
+// within the frame rate limit, until vsyncs arrive again.
+//
+// On OpenHarmony, the pacer follows the display through OH_NativeVSync. You can
+// call it on any thread, and the pacer needs no event loop of yours.
+//
+// See mln_frame_pacer_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+//
+// Errors:
+//   - StatusUnsupported on the other platforms, such as visionOS, Linux, and
+//     Windows, where the library has no source of display refreshes.
+//   - StatusInvalidState on Android when the calling thread has no ALooper.
+//   - StatusNativeError on iOS, macOS, and tvOS when the system has no display
+//     to follow, and on OpenHarmony when the system can't report the display's
+//     refreshes to the process.
+func NewFramePacer(options *FramePacerOptions) (*FramePacerHandle, error) {
+	var outPacer C.mln_frame_pacer
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_frame_pacer_create(bindingStoreOptional(options, arena, nativeFramePacerOptions), &outPacer, diagnostic))
+	}, func(arena *bindingArena) *FramePacerHandle {
+		adopted := adoptFramePacerHandle(uint64(outPacer), nil)
+		return adopted
+	})
+}
+
 // Release releases a frame pacer.
 //
 // Render sessions that use the pacer stay paced until you release them or set
@@ -7331,6 +8328,173 @@ func (receiver *FramePacerHandle) Release() error {
 		return struct{}{}
 	})
 	return err
+}
+
+// SetOptions changes a frame pacer's settings.
+//
+// Settings that options doesn't set keep their current values. To remove the
+// frame rate limit, set FramePacerOptions.UnlimitedFramesPerSecond. You can
+// call it on any thread.
+//
+// The sessions that the pacer serves follow the new settings from the next
+// display refresh, including a refresh that they already wait for. The pacer
+// counts a new limit from the last frames it demanded, so a higher limit can
+// demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
+// the system for the new limit's refresh rate, or for the display's own rate
+// once the limit is removed.
+//
+// See mln_frame_pacer_set_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+//
+// Errors:
+//   - StatusInvalidState when you released pacer, even while sessions still use
+//     it.
+func (receiver *FramePacerHandle) SetOptions(options FramePacerOptions) error {
+	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_frame_pacer_set_options(C.mln_frame_pacer(raw), bindingStore(nativeFramePacerOptions(options, arena), arena), diagnostic))
+	})
+}
+
+// NewGPUDevice creates a GPU device that the library owns, for render sessions
+// to share.
+//
+// The sessions on a device share its GPU and queue: one VkDevice and queue, one
+// MTLDevice and command queue, or one OpenGL share group. MapHandle.Attach()
+// creates a device of its own when it gets none. Create one to share it among
+// the sessions of many maps, or to pick the backend or the GPU. A Vulkan device
+// enables the presentation, timeline semaphore, external memory, and external
+// semaphore extensions that its GPU offers.
+//
+// See mln_gpu_device_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+//
+// Errors:
+//   - StatusUnsupported when this build or platform lacks backend, when the
+//     device can't render with open_gl_client_api, when a device that doesn't
+//     render with Vulkan gets a queue_lock, or in a browser for every backend:
+//     WebGPU makes devices asynchronously, and a WebGL2 context needs a canvas.
+//     Attach without a device, which the session makes itself, or wrap your
+//     WebGL2 context.
+//   - StatusNotFound when no GPU matches adapter_index, adapter_uuid, or
+//     adapter_luid.
+//   - StatusNativeError when the platform can't create the device.
+func NewGPUDevice(options *GPUDeviceOptions) (*GPUDeviceHandle, error) {
+	var outDevice C.mln_gpu_device
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gpu_device_create(bindingStoreOptional(options, arena, nativeGPUDeviceOptions), &outDevice, diagnostic))
+	}, func(arena *bindingArena) *GPUDeviceHandle {
+		adopted := adoptGPUDeviceHandle(uint64(outDevice), nil)
+		arena.accept(adopted.bindingOwner)
+		return adopted
+	})
+}
+
+// Capabilities reads what the device can do.
+//
+// Check export_kinds before you attach an exported ring, to choose between the
+// ring and a way of your own to show the map.
+//
+// See mln_gpu_device_get_capabilities in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+func (receiver *GPUDeviceHandle) Capabilities() (GPUDeviceCapabilities, error) {
+	var outCapabilities C.mln_gpu_device_capabilities
+	outCapabilities.size = C.uint32_t(unsafe.Sizeof(outCapabilities))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gpu_device_get_capabilities(C.mln_gpu_device(raw), &outCapabilities, diagnostic))
+	}, func(arena *bindingArena) GPUDeviceCapabilities {
+		return copyGPUDeviceCapabilities(outCapabilities)
+	})
+}
+
+// VulkanContext gets the Vulkan instance, device, and graphics queue of a
+// Vulkan device.
+//
+// Use them to make the images of a borrowed ring, or a surface, that sessions
+// on the device render to. The sessions on the device share its graphics queue.
+// To submit to the queue yourself, create the device with
+// GPUDeviceOptions.QueueLock.
+//
+// See mln_gpu_device_get_vulkan_context in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+//
+// Errors:
+//   - StatusUnsupported when the device doesn't render with Vulkan.
+func (receiver *GPUDeviceHandle) VulkanContext() (GPUDeviceVulkanContextResult, error) {
+	var outResult C.mln_gpu_device_vulkan_context_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gpu_device_get_vulkan_context(C.mln_gpu_device(raw), &outResult, diagnostic))
+	}, func(arena *bindingArena) GPUDeviceVulkanContextResult {
+		return copyGPUDeviceVulkanContextResult(outResult)
+	})
+}
+
+// Release releases a GPU device.
+//
+// Render sessions on the device keep using it until they detach, or their
+// release finishes.
+//
+// See mln_gpu_device_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+func (receiver *GPUDeviceHandle) Release() error {
+	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
+		C.mln_gpu_device_release(C.mln_gpu_device(raw))
+		return struct{}{}
+	})
+	return err
+}
+
+// NewGPUDevice makes an OpenGL device whose share group is your context's.
+//
+// Each session on the device makes a context of its own that shares objects
+// with yours, so that it can render into your textures and present to your
+// surfaces. A device that the library creates is a share group of its own.
+//
+// WebGL has no share groups: a WebGL device is your context. Its sessions
+// present to a web canvas target whose canvas is the context's own, and take
+// turns in the context. The library resets the context's state that it tracks
+// at the start of each frame, and leaves it undefined after.
+//
+// See mln_gpu_device_wrap_open_gl in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+//
+// Errors:
+//   - StatusUnsupported when OpenGLSupportedContextProviderMask() lacks the
+//     context's platform.
+//   - StatusNativeError when the platform rejects the context.
+func NewGPUDevice(context OpenGLContextDescriptor) (*GPUDeviceHandle, error) {
+	var outDevice C.mln_gpu_device
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gpu_device_wrap_open_gl(bindingStore(nativeOpenGLContextDescriptor(context, arena), arena), &outDevice, diagnostic))
+	}, func(arena *bindingArena) *GPUDeviceHandle {
+		adopted := adoptGPUDeviceHandle(uint64(outDevice), nil)
+		return adopted
+	})
+}
+
+// NewGPUDevice wraps your Vulkan device and queue, so that sessions render on
+// them.
+//
+// Sessions on the device render into your images, present to your surfaces, and
+// submit to your queue, under your queue lock when you give one. Sessions of
+// several devices that wrap one queue never submit to it at once.
+//
+// See mln_gpu_device_wrap_vulkan in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+//
+// Errors:
+//   - StatusUnsupported when SupportedRenderBackendMask() lacks
+//     RenderBackendFlagVulkan.
+//   - StatusNativeError when the library can't load the device's functions.
+func NewGPUDevice(descriptor VulkanDeviceDescriptor) (*GPUDeviceHandle, error) {
+	var outDevice C.mln_gpu_device
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gpu_device_wrap_vulkan(bindingStore(nativeVulkanDeviceDescriptor(descriptor, arena), arena), &outDevice, diagnostic))
+	}, func(arena *bindingArena) *GPUDeviceHandle {
+		adopted := adoptGPUDeviceHandle(uint64(outDevice), nil)
+		arena.accept(adopted.bindingOwner)
+		return adopted
+	})
 }
 
 // SetHeader sets a header on the request that an HTTP header transform callback
@@ -7441,6 +8605,34 @@ func LogicalExtentPhysicalSize(extent LogicalExtent) (width uint32, height uint3
 func (receiver *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), bindingView(sourceID, arena), bindingStore(nativeCustomGeometrySourceOptions(options, arena), arena), completion, diagnostic))
+	}, completionCommand)
+}
+
+// AddCustomLayer adds a layer that draws with your own GPU commands, through
+// host.
+//
+// The layer goes below the layer named beforeLayerID, or above every layer when
+// beforeLayerID is empty. Its type is custom, and it takes the visibility,
+// minzoom, and maxzoom properties, but no paint properties.
+// MapHandle.RemoveStyleLayer() removes it.
+//
+// Runs on the thread that runs the session's graphics work: a library thread,
+// or yours with RenderDriverKindCallerGraphicsThread. It can't call the
+// library.
+//
+// It can't call the library.
+//
+// See mln_map_add_custom_layer in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+//
+// Errors:
+//   - StatusNotFound when the style has no layer named beforeLayerID.
+//   - StatusAlreadyExists when the style already has a layer named layerID.
+//   - StatusInvalidState while the style isn't loaded, as
+//     MapHandle.SetStyleURL() describes.
+func (receiver *MapHandle) AddCustomLayer(layerID string, beforeLayerID string, host CustomLayerHost) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_custom_layer(C.mln_map(raw), bindingView(layerID, arena), bindingView(beforeLayerID, arena), bindingStore(nativeCustomLayerHost(host, arena), arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7574,134 +8766,35 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 	}, completionCommand)
 }
 
-// AttachOffscreen attaches a render session that renders the map offscreen.
-//
-// Read each image's pixels with RenderSessionHandle.ReadTexture().
+// Attach attaches a render session that renders the map into target.
 //
 // The session renders on device. When device is null, the session creates a
 // device with the default options, and releases it when the session ends.
 //
-// See mln_map_attach_offscreen in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
+// See mln_map_attach in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - StatusInvalidState when the map already has a render session.
+//   - StatusInvalidArgument when a borrowed ring has depth textures, but not
+//     one for each of its textures.
+//   - StatusInvalidState when the map already has a render session, or a window
+//     is minimized or has no client area.
+//   - StatusUnsupported when the device's GPUDeviceCapabilities.TargetKinds
+//     lacks the target's kind, or, for a null device, when no backend of this
+//     build renders to it, when options sets keep_depth for a target other than
+//     an exported ring, or when a borrowed ring's depth format isn't one of the
+//     device's GPUDeviceCapabilities.DepthStencilFormats.
+//   - StatusInvalidState when a window was minimized or had no client area when
+//     the attach ran.
+//   - StatusUnsupported when the GPU or the graphics driver can't present to
+//     the window.
 //   - StatusNativeError when device is null and the platform can't create a
-//     device.
-func (receiver *MapHandle) AttachOffscreen(descriptor OffscreenDescriptor, options RenderSessionAttachOptions, device *OffscreenDeviceHandle) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
+//     device, or when the library can't create its graphics context or present
+//     to the window.
+func (receiver *MapHandle) Attach(target RenderTarget, device *GPUDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
 	var outSession C.mln_render_session
 	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_offscreen(C.mln_map(raw), bindingStore(nativeOffscreenDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), C.mln_offscreen_device(arena.leaseOptional(device.owner())), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachOpenGLBorrowedTexture creates a session that renders the map into a
-// ring of your OpenGL textures.
-//
-// See mln_map_attach_open_gl_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-//
-// Errors:
-//   - StatusUnsupported when OpenGLSupportedContextProviderMask() lacks the
-//     context's platform, or when the target supports none of the
-//     producer_sync_kinds in options.
-func (receiver *MapHandle) AttachOpenGLBorrowedTexture(descriptor OpenGLBorrowedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_open_gl_borrowed_texture(C.mln_map(raw), bindingStore(nativeOpenGLBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachOpenGLSurface creates a session that renders the map to an OpenGL
-// surface.
-//
-// See mln_map_attach_open_gl_surface in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-//
-// Errors:
-//   - StatusUnsupported when OpenGLSupportedContextProviderMask() lacks the
-//     context's platform.
-func (receiver *MapHandle) AttachOpenGLSurface(descriptor OpenGLSurfaceDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_open_gl_surface(C.mln_map(raw), bindingStore(nativeOpenGLSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachVulkanBorrowedTexture creates a session that renders the map into a
-// ring of your Vulkan images.
-//
-// See mln_map_attach_vulkan_borrowed_texture in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-//
-// Errors:
-//   - StatusUnsupported when SupportedRenderBackendMask() lacks
-//     RenderBackendFlagVulkan, or when the target supports none of the
-//     producer_sync_kinds in options.
-func (receiver *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowedTextureDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_vulkan_borrowed_texture(C.mln_map(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachVulkanSurface creates a session that renders the map to a Vulkan
-// surface.
-//
-// See mln_map_attach_vulkan_surface in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-//
-// Errors:
-//   - StatusUnsupported when SupportedRenderBackendMask() lacks
-//     RenderBackendFlagVulkan.
-func (receiver *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_vulkan_surface(C.mln_map(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+		return int32(C.mln_map_attach(C.mln_map(raw), bindingStore(nativeRenderTarget(target, arena), arena), C.mln_gpu_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
 	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
 		session *RenderSessionHandle
 		ready   *Future[struct{}]
@@ -8501,7 +9594,19 @@ func (receiver *MapHandle) RequestRepaint() (*Future[CommandCompletion], error) 
 // RequestStillImage renders a still image of a static or tile map.
 //
 // The map's render session draws the image once every resource that the image
-// needs has loaded.
+// needs has loaded. While the image waits, the session holds a demand of its
+// own for it, whose frame result carries FrameDemandTokenStillImage:
+//
+//   - It waits for the map to load what the image needs, and while every
+//     texture of a borrowed ring holds a frame.
+//   - It finishes with the image's frame, and the image completes once that
+//     frame's result is queued. Frames of your own demands complete no image.
+//   - Your demands never replace it, nor it them.
+//   - RenderSessionHandle.Barrier() ends it with RenderResultNoUpdate, and a
+//     detach or RenderSessionHandle.ReleaseTarget() ends it with
+//     RenderResultTargetNotReady. The image gets a new demand once the barrier
+//     runs, the session has a target again, or the next session attaches.
+//   - An image that fails ends its demand with RenderResultNoUpdate.
 //
 // See mln_map_request_still_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -8516,10 +9621,11 @@ func (receiver *MapHandle) RequestStillImage() (*Future[struct{}], error) {
 	}, completionUnit)
 }
 
-// Resize sets the map's size.
+// Resize sets the map's size and scale factor.
 //
-// A map with a render session takes its size from the session, so resize the
-// session with RenderSessionHandle.Resize() instead.
+// The map keeps its loaded tiles. A map with a render session takes its size
+// and scale factor from the session, so resize the session with
+// RenderSessionHandle.Resize() instead.
 //
 // See mln_map_resize in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -8528,9 +9634,9 @@ func (receiver *MapHandle) RequestStillImage() (*Future[struct{}], error) {
 //   - StatusInvalidState when the map has a render session.
 //   - StatusInvalidState when a render session attached to the map before the
 //     resize applied.
-func (receiver *MapHandle) Resize(logicalSize LogicalSize) (*Future[CommandCompletion], error) {
+func (receiver *MapHandle) Resize(extent LogicalExtent) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_resize(C.mln_map(raw), nativeLogicalSize(logicalSize, arena), completion, diagnostic))
+		return int32(C.mln_map_resize(C.mln_map(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -9071,45 +10177,6 @@ func SetNetworkStatus(status NetworkStatus) error {
 	})
 }
 
-// NewOffscreenDevice creates a GPU device for rendering maps offscreen.
-//
-// MapHandle.AttachOffscreen() creates a device of its own when it gets none.
-// Create one to share it among the sessions on many maps, or to pick a GPU.
-//
-// In a browser WebGPU build, attach without a device instead.
-//
-// See mln_offscreen_device_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
-//
-// Errors:
-//   - StatusUnsupported in a browser WebGPU build, or when the device can't
-//     render with client_api.
-//   - StatusNativeError when adapter_index names no GPU, or the platform can't
-//     create the device.
-func NewOffscreenDevice(options *OffscreenDeviceOptions) (*OffscreenDeviceHandle, error) {
-	var outDevice C.mln_offscreen_device
-	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_offscreen_device_create(bindingStoreOptional(options, arena, nativeOffscreenDeviceOptions), &outDevice, diagnostic))
-	}, func(arena *bindingArena) *OffscreenDeviceHandle {
-		adopted := adoptOffscreenDeviceHandle(uint64(outDevice), nil)
-		return adopted
-	})
-}
-
-// Release releases an offscreen device.
-//
-// Render sessions on the device keep working until they detach.
-//
-// See mln_offscreen_device_release in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html
-func (receiver *OffscreenDeviceHandle) Release() error {
-	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_offscreen_device_release(C.mln_offscreen_device(raw))
-		return struct{}{}
-	})
-	return err
-}
-
 // OpenGLSupportedContextProviderMask reports the OpenGL context platforms that
 // this build of the library has.
 //
@@ -9144,6 +10211,12 @@ func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 //
 // Abandon keeps the session's OpenGL and WebGPU objects until the process
 // exits, and reports how many it kept. Detach the session instead to free them.
+//
+// A session lets go of your graphics objects later when you call this on the
+// thread that runs its graphics work: from a callback that the session runs
+// there, once the callback returns, and for a session driven by
+// RenderDriverKindCallerGraphicsThread, at your next
+// RenderSessionHandle.ServiceDriverWork() for it.
 //
 // See mln_render_session_abandon in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -9235,6 +10308,7 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
+//   - StatusInvalidArgument when demand.token is FrameDemandTokenStillImage.
 //   - StatusTargetLost or StatusNativeError, as
 //     RenderSessionSnapshot.FailureStatus reports, when the session has failed.
 //   - StatusInvalidState when you detached, abandoned, released, or disposed
@@ -9519,16 +10593,23 @@ func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
 // still pending, and later ones until you give the session a new target, finish
 // with RenderResultTargetNotReady. Once the release completes, you can destroy
 // the old target. An Android or OpenHarmony window can go away sooner, as
-// MapHandle.AttachAndroidSurface() and MapHandle.AttachOhosSurface() say.
+// AndroidWindowTarget and OhosWindowTarget say.
+//
+// For a borrowed ring, a completed release also means that the session has
+// stopped waiting on the consumer sync that you released its frames with, so
+// you can reuse or destroy the textures. The session waits about a second at
+// most for that sync, and logs a warning when the wait runs out. It checks the
+// sync without blocking a thread: keep servicing a session driven by
+// RenderDriverKindCallerGraphicsThread until the release completes. The session
+// keeps nothing of the released textures: a texture that a later target gives
+// it again is a new one, even one that you discarded a frame of.
 //
 // See mln_render_session_release_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - StatusUnsupported when the session renders offscreen or into Android
-//     hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
-//     allocates.
-//   - StatusUnsupported when the target is a WebGL canvas.
+//   - StatusUnsupported when the session renders offscreen or into an exported
+//     ring.
 //   - StatusTargetLost when the session loses its target before the release
 //     runs.
 func (receiver *RenderSessionHandle) ReleaseTarget() (*Future[struct{}], error) {
@@ -9537,11 +10618,16 @@ func (receiver *RenderSessionHandle) ReleaseTarget() (*Future[struct{}], error) 
 	}, completionUnit)
 }
 
-// Resize resizes the session's target and its map.
+// Resize resizes the session's target and its map, and sets the map's scale
+// factor.
 //
-// The session renders at the map's scale factor. Release every acquired frame
-// first. You can call it once the attach call returns. While the attach runs,
-// the resize waits for it to complete.
+// Use it when the window changes size, or moves to a display with another scale
+// factor. The map keeps its loaded tiles, and draws its next frame at the new
+// size and scale factor. You can call it once the attach call returns. While
+// the attach runs, the resize waits for it to complete.
+//
+// An exported ring gets textures of the new size. The frames that you hold keep
+// their textures, of the old size, until you release or discard them.
 //
 // See mln_render_session_resize in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -9549,14 +10635,13 @@ func (receiver *RenderSessionHandle) ReleaseTarget() (*Future[struct{}], error) 
 // Errors:
 //   - StatusUnsupported when the session renders into a borrowed ring. Give it
 //     new textures of the new size instead.
-//   - StatusInvalidState while you hold one of the session's acquired frames,
-//     or when the session failed, or you detached, abandoned, released, or
-//     disposed it.
+//   - StatusInvalidState when the session failed, or you detached, abandoned,
+//     released, or disposed it.
 //   - StatusTargetLost when the session loses its target before the resize
 //     applies.
-func (receiver *RenderSessionHandle) Resize(logicalSize LogicalSize) (*Future[CommandCompletion], error) {
+func (receiver *RenderSessionHandle) Resize(extent LogicalExtent) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalSize(logicalSize, arena), completion, diagnostic))
+		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -9601,69 +10686,45 @@ func (receiver *RenderSessionHandle) SetFramePacer(pacer *FramePacerHandle) erro
 	})
 }
 
-// SetOpenGLBorrowedTextureTarget replaces the OpenGL textures that a borrowed
-// ring renders into.
+// SetTarget replaces the window, surface, or borrowed ring that the session
+// renders to, and resizes the map to it.
 //
-// Use it to resize the ring, or to give the session textures again after
-// RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. Once
-// the replacement completes, the session no longer uses the old textures.
+// Use it to give the session a target again after
+// RenderSessionHandle.ReleaseTarget(), to move it to another window or surface,
+// or to give a borrowed ring new textures, such as of a new size. The session
+// renders to target with the device that it attached with. Once the replacement
+// completes, the session no longer uses the old target. A borrowed ring takes
+// only a ring of the kind it attached with, with as many textures, with depth
+// textures only when it attached with them, and with the same formats, final
+// layouts, and owner. Release every acquired frame of a borrowed ring first.
+// Once the replacement completes, the session has also stopped waiting on the
+// consumer sync of the textures that the new ring doesn't have, as
+// RenderSessionHandle.ReleaseTarget() says, so you can reuse or destroy them.
 //
-// See mln_render_session_set_open_gl_borrowed_texture_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) SetOpenGLBorrowedTextureTarget(replacement OpenGLBorrowedTextureReplacement) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_open_gl_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeOpenGLBorrowedTextureReplacement(replacement, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-// SetOpenGLSurfaceTarget replaces the OpenGL surface that the session presents
-// to.
-//
-// Use it to give the session a surface again after
-// RenderSessionHandle.ReleaseTarget(), to move it to another surface, or to
-// resize it. Once the replacement completes, the session no longer uses the old
-// surface.
-//
-// See mln_render_session_set_open_gl_surface_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) SetOpenGLSurfaceTarget(replacement OpenGLSurfaceReplacement) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_open_gl_surface_target(C.mln_render_session(raw), bindingStore(nativeOpenGLSurfaceReplacement(replacement, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-// SetVulkanBorrowedTextureTarget replaces the Vulkan images that a borrowed
-// ring renders into.
-//
-// Use it to resize the ring, or to give the session images again after
-// RenderSessionHandle.ReleaseTarget(). Release every acquired frame first. Once
-// the replacement completes, the session no longer uses the old images.
-//
-// See mln_render_session_set_vulkan_borrowed_texture_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) SetVulkanBorrowedTextureTarget(replacement VulkanBorrowedTextureReplacement) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_vulkan_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeVulkanBorrowedTextureReplacement(replacement, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-// SetVulkanSurfaceTarget replaces the Vulkan surface that the session presents
-// to.
-//
-// Use it to give the session a surface again after
-// RenderSessionHandle.ReleaseTarget(), to move it to another surface, or to
-// resize it. Once the replacement completes, the session no longer uses the old
-// surface.
-//
-// See mln_render_session_set_vulkan_surface_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+// See mln_render_session_set_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
-//   - StatusUnsupported when the new surface needs a different color format or
-//     pre-rotation support than the old one. Attach a new session instead.
-func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(replacement VulkanSurfaceReplacement) (*Future[struct{}], error) {
+//   - StatusInvalidArgument when a borrowed ring gets more or fewer textures
+//     than it attached with, or depth textures but not one for each texture.
+//   - StatusInvalidState when a window is minimized or has no client area, or
+//     while you hold one of a borrowed ring's acquired frames.
+//   - StatusUnsupported when the session renders offscreen or into an exported
+//     ring, when target is offscreen or an exported ring, when a session that
+//     presents gets a borrowed ring or a borrowed ring gets anything else, or
+//     when no backend of this build renders to the target's kind. An exported
+//     ring takes a new size from RenderSessionHandle.Resize() instead.
+//   - StatusInvalidState when a window was minimized or had no client area when
+//     the replacement ran.
+//   - StatusUnsupported when the session's device can't render to target, the
+//     new target needs a different color format or pre-rotation support than
+//     the old one, or a borrowed ring's new textures differ from the old ones
+//     in their formats, final layouts, or owner, or in having depth textures.
+//     Attach a new session instead.
+//   - StatusNativeError when the library can't render to the new target.
+func (receiver *RenderSessionHandle) SetTarget(target RenderTarget) (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_vulkan_surface_target(C.mln_render_session(raw), bindingStore(nativeVulkanSurfaceReplacement(replacement, arena), arena), completion, diagnostic))
+		return int32(C.mln_render_session_set_target(C.mln_render_session(raw), bindingStore(nativeRenderTarget(target, arena), arena), completion, diagnostic))
 	}, completionUnit)
 }
 
@@ -9993,8 +11054,6 @@ func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo
 // Errors:
 //   - StatusInvalidArgument when sideDatabasePath isn't a readable database
 //     file.
-//   - StatusNativeError when the merge would exceed the tile limit that
-//     RuntimeEventTypeOfflineRegionTileCountLimitExceeded describes.
 func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_merge_offline_regions(C.mln_runtime(raw), bindingView(sideDatabasePath, arena), completion, diagnostic))
@@ -10222,68 +11281,6 @@ func SupportedRenderBackendMask() RenderBackendFlag {
 	return RenderBackendFlag(C.mln_supported_render_backend_mask())
 }
 
-// NewVulkanDevice creates a Vulkan instance, device, and graphics queue for
-// render sessions.
-//
-// Attach sessions with the context from VulkanDeviceHandle.Context(), in place
-// of a device of your own. Without device_uuid or device_luid, it prefers a
-// discrete GPU. The device enables the external memory and semaphore extensions
-// that the GPU offers.
-//
-// See mln_vulkan_device_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
-//
-// Errors:
-//   - StatusUnsupported when SupportedRenderBackendMask() lacks
-//     RenderBackendFlagVulkan, or when presentation is true and the Vulkan
-//     loader or the GPU can't present.
-//   - StatusNotFound when no GPU matches device_uuid and device_luid.
-//   - StatusNativeError when there is no Vulkan loader, no GPU has a graphics
-//     queue, or Vulkan can't create the instance or the device.
-func NewVulkanDevice(options *VulkanDeviceOptions) (*VulkanDeviceHandle, error) {
-	var outDevice C.mln_vulkan_device
-	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_vulkan_device_create(bindingStoreOptional(options, arena, nativeVulkanDeviceOptions), &outDevice, diagnostic))
-	}, func(arena *bindingArena) *VulkanDeviceHandle {
-		adopted := adoptVulkanDeviceHandle(uint64(outDevice), nil)
-		return adopted
-	})
-}
-
-// Context gets the context to attach render sessions to the device with.
-//
-// Pass it as the context of MapHandle.AttachVulkanSurface() or
-// MapHandle.AttachVulkanBorrowedTexture(). The sessions on the device share its
-// graphics queue. To submit to the queue yourself, set
-// RenderSessionAttachOptions.QueueLock on each session.
-//
-// See mln_vulkan_device_get_context in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
-func (receiver *VulkanDeviceHandle) Context() (VulkanDeviceContextResult, error) {
-	var outResult C.mln_vulkan_device_context_result
-	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
-	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_vulkan_device_get_context(C.mln_vulkan_device(raw), &outResult, diagnostic))
-	}, func(arena *bindingArena) VulkanDeviceContextResult {
-		return copyVulkanDeviceContextResult(outResult)
-	})
-}
-
-// Release releases a Vulkan device.
-//
-// Render sessions that attached with the device's context keep using it until
-// they detach or their release finishes.
-//
-// See mln_vulkan_device_release in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html
-func (receiver *VulkanDeviceHandle) Release() error {
-	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_vulkan_device_release(C.mln_vulkan_device(raw))
-		return struct{}{}
-	})
-	return err
-}
-
 // Dispose releases the map in any state, and finishes in the background.
 //
 // Use it from destructors and finalizers. Otherwise, use MapHandle.Release().
@@ -10328,6 +11325,13 @@ func (view MapHandleDiscarding) AddCustomGeometrySource(sourceID string, options
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), bindingView(sourceID, arena), bindingStore(nativeCustomGeometrySourceOptions(options, arena), arena), completion, diagnostic))
+	})
+}
+
+func (view MapHandleDiscarding) AddCustomLayer(layerID string, beforeLayerID string, host CustomLayerHost) error {
+	receiver := view.owner
+	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_custom_layer(C.mln_map(raw), bindingView(layerID, arena), bindingView(beforeLayerID, arena), bindingStore(nativeCustomLayerHost(host, arena), arena), completion, diagnostic))
 	})
 }
 
@@ -10499,10 +11503,10 @@ func (view MapHandleDiscarding) RequestRepaint() error {
 	})
 }
 
-func (view MapHandleDiscarding) Resize(logicalSize LogicalSize) error {
+func (view MapHandleDiscarding) Resize(extent LogicalExtent) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_resize(C.mln_map(raw), nativeLogicalSize(logicalSize, arena), completion, diagnostic))
+		return int32(C.mln_map_resize(C.mln_map(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
 	})
 }
 
@@ -10716,10 +11720,10 @@ func (view MapHandleDiscarding) UpdateCamera(update CameraUpdate) error {
 	})
 }
 
-func (view RenderSessionHandleDiscarding) Resize(logicalSize LogicalSize) error {
+func (view RenderSessionHandleDiscarding) Resize(extent LogicalExtent) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalSize(logicalSize, arena), completion, diagnostic))
+		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
 	})
 }
 
@@ -10779,6 +11783,36 @@ func (view RuntimeHandleDiscarding) SetResourceTransform(transform ResourceTrans
 	})
 }
 
+//export mlnGo_mln_queue_lock_lock
+func mlnGo_mln_queue_lock_lock(native_user_data unsafe.Pointer) {
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_queue_lock_callback", failure)
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[QueueLock](native_user_data)
+	if !ok || callbacks.Lock == nil {
+		return
+	}
+	callbacks.Lock()
+	return
+}
+
+//export mlnGo_mln_queue_lock_unlock
+func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_queue_lock_callback", failure)
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[QueueLock](native_user_data)
+	if !ok || callbacks.Unlock == nil {
+		return
+	}
+	callbacks.Unlock()
+	return
+}
+
 //export mlnGo_mln_log_handler_callback
 func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.mln_log_severity, native_event C.mln_log_event, native_code C.int64_t, native_message C.mln_buffer_view) {
 	defer func() {
@@ -10821,6 +11855,66 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 		return
 	}
 	callbacks.CancelTile(borrowMapHandle(uint64(native__map)), bindingString(native_source_id.data, uint64(native_source_id.size)), copyCanonicalTileID(native_tile_id))
+	return
+}
+
+//export mlnGo_mln_custom_layer_host_prerender
+func mlnGo_mln_custom_layer_host_prerender(native_user_data unsafe.Pointer, native_parameters *C.mln_custom_layer_prerender_parameters) {
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_custom_layer_prerender_callback", failure)
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[CustomLayerHost](native_user_data)
+	if !ok || callbacks.Prerender == nil {
+		return
+	}
+	callbacks.Prerender(copyCustomLayerPrerenderParameters((*native_parameters)))
+	return
+}
+
+//export mlnGo_mln_custom_layer_host_render
+func mlnGo_mln_custom_layer_host_render(native_user_data unsafe.Pointer, native_parameters *C.mln_custom_layer_render_parameters) {
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_custom_layer_render_callback", failure)
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[CustomLayerHost](native_user_data)
+	if !ok || callbacks.Render == nil {
+		return
+	}
+	callbacks.Render(copyCustomLayerRenderParameters((*native_parameters)))
+	return
+}
+
+//export mlnGo_mln_custom_layer_host_deinitialize
+func mlnGo_mln_custom_layer_host_deinitialize(native_user_data unsafe.Pointer) {
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_custom_layer_session_end_callback", failure)
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[CustomLayerHost](native_user_data)
+	if !ok || callbacks.Deinitialize == nil {
+		return
+	}
+	callbacks.Deinitialize()
+	return
+}
+
+//export mlnGo_mln_custom_layer_host_context_lost
+func mlnGo_mln_custom_layer_host_context_lost(native_user_data unsafe.Pointer) {
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_custom_layer_session_end_callback", failure)
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[CustomLayerHost](native_user_data)
+	if !ok || callbacks.ContextLost == nil {
+		return
+	}
+	callbacks.ContextLost()
 	return
 }
 
@@ -10881,36 +11975,6 @@ func mlnGo_mln_wake_callback(native_user_data unsafe.Pointer) {
 		return
 	}
 	callbacks.Callback()
-	return
-}
-
-//export mlnGo_mln_queue_lock_lock
-func mlnGo_mln_queue_lock_lock(native_user_data unsafe.Pointer) {
-	defer func() {
-		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_queue_lock_callback", failure)
-		}
-	}()
-	callbacks, ok := bindingCallbackValue[QueueLock](native_user_data)
-	if !ok || callbacks.Lock == nil {
-		return
-	}
-	callbacks.Lock()
-	return
-}
-
-//export mlnGo_mln_queue_lock_unlock
-func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
-	defer func() {
-		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_queue_lock_callback", failure)
-		}
-	}()
-	callbacks, ok := bindingCallbackValue[QueueLock](native_user_data)
-	if !ok || callbacks.Unlock == nil {
-		return
-	}
-	callbacks.Unlock()
 	return
 }
 

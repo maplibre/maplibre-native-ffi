@@ -48,6 +48,18 @@ G_GNUC_INTERNAL MaplibreNativeFfiAnchoredMomentum*
 maplibre_native_ffi_anchored_momentum_copy(
   const MaplibreNativeFfiAnchoredMomentum* self
 );
+G_GNUC_INTERNAL void maplibre_native_ffi_logical_size_to_native(
+  const MaplibreNativeFfiLogicalSize* self, mln_logical_size* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_android_window_target_to_native(
+  const MaplibreNativeFfiAndroidWindowTarget* self,
+  mln_android_window_target* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiAndroidWindowTarget*
+maplibre_native_ffi_android_window_target_copy(
+  const MaplibreNativeFfiAndroidWindowTarget* self
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_camera_transition_handler_to_native(
   const MaplibreNativeFfiCameraTransitionHandler* self,
   mln_camera_transition_handler* out, MaplibreNativeFfiCall* call
@@ -185,6 +197,148 @@ maplibre_native_ffi_custom_geometry_source_options_to_native(
   const MaplibreNativeFfiCustomGeometrySourceOptions* self,
   mln_custom_geometry_source_options* out, MaplibreNativeFfiCall* call
 );
+G_GNUC_INTERNAL MaplibreNativeFfiMetalCustomLayerEncoder*
+maplibre_native_ffi_metal_custom_layer_encoder_from_native(
+  const mln_metal_custom_layer_encoder* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_context_descriptor_to_native(
+  const MaplibreNativeFfiVulkanContextDescriptor* self,
+  mln_vulkan_context_descriptor* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiVulkanContextDescriptor*
+maplibre_native_ffi_vulkan_context_descriptor_from_native(
+  const mln_vulkan_context_descriptor* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiVulkanContextDescriptor*
+maplibre_native_ffi_vulkan_context_descriptor_copy(
+  const MaplibreNativeFfiVulkanContextDescriptor* self
+);
+G_GNUC_INTERNAL MaplibreNativeFfiVulkanCustomLayerEncoder*
+maplibre_native_ffi_vulkan_custom_layer_encoder_from_native(
+  const mln_vulkan_custom_layer_encoder* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiWebGpuCustomLayerEncoder*
+maplibre_native_ffi_web_gpu_custom_layer_encoder_from_native(
+  const mln_web_gpu_custom_layer_encoder* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_web_gpu_custom_layer_encoder_read(
+  MaplibreNativeFfiWebGpuCustomLayerEncoder* out,
+  const mln_web_gpu_custom_layer_encoder* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiCustomLayerEncoderData*
+maplibre_native_ffi_custom_layer_encoder_data_from_native(
+  gint64 tag, const mln_custom_layer_encoder_data* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_logical_extent_to_native(
+  const MaplibreNativeFfiLogicalExtent* self, mln_logical_extent* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiLogicalExtent*
+maplibre_native_ffi_logical_extent_from_native(const mln_logical_extent* in);
+G_GNUC_INTERNAL void maplibre_native_ffi_logical_extent_read(
+  MaplibreNativeFfiLogicalExtent* out, const mln_logical_extent* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_projection_mode_to_native(
+  const MaplibreNativeFfiProjectionMode* self, mln_projection_mode* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiProjectionMode*
+maplibre_native_ffi_projection_mode_from_native(const mln_projection_mode* in);
+G_GNUC_INTERNAL void maplibre_native_ffi_projection_mode_read(
+  MaplibreNativeFfiProjectionMode* out, const mln_projection_mode* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_map_viewport_to_native(
+  const MaplibreNativeFfiMapViewport* self, mln_map_viewport* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMapViewport*
+maplibre_native_ffi_map_viewport_from_native(const mln_map_viewport* in);
+G_GNUC_INTERNAL void maplibre_native_ffi_map_viewport_read(
+  MaplibreNativeFfiMapViewport* out, const mln_map_viewport* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_projection_definition_to_native(
+  const MaplibreNativeFfiProjectionDefinition* self,
+  mln_projection_definition* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiProjectionDefinition*
+maplibre_native_ffi_projection_definition_from_native(
+  const mln_projection_definition* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_projection_definition_read(
+  MaplibreNativeFfiProjectionDefinition* out,
+  const mln_projection_definition* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_map_view_to_native(
+  const MaplibreNativeFfiMapView* self, mln_map_view* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMapView*
+maplibre_native_ffi_map_view_from_native(const mln_map_view* in);
+G_GNUC_INTERNAL void maplibre_native_ffi_map_view_read(
+  MaplibreNativeFfiMapView* out, const mln_map_view* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiVec4* maplibre_native_ffi_vec4_from_native(
+  const mln_vec4* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_vec4_read(
+  MaplibreNativeFfiVec4* out, const mln_vec4* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMat4* maplibre_native_ffi_mat4_from_native(
+  const mln_mat4* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_mat4_read(
+  MaplibreNativeFfiMat4* out, const mln_mat4* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiFrameProjection*
+maplibre_native_ffi_frame_projection_from_native(
+  const mln_frame_projection* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_frame_projection_read(
+  MaplibreNativeFfiFrameProjection* out, const mln_frame_projection* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiCustomLayerFrame*
+maplibre_native_ffi_custom_layer_frame_from_native(
+  const mln_custom_layer_frame* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_custom_layer_frame_read(
+  MaplibreNativeFfiCustomLayerFrame* out, const mln_custom_layer_frame* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_custom_layer_host_to_native(
+  const MaplibreNativeFfiCustomLayerHost* self, mln_custom_layer_host* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMetalCustomLayerPass*
+maplibre_native_ffi_metal_custom_layer_pass_from_native(
+  const mln_metal_custom_layer_pass* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiVulkanCustomLayerPass*
+maplibre_native_ffi_vulkan_custom_layer_pass_from_native(
+  const mln_vulkan_custom_layer_pass* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiOpenGlCustomLayerPass*
+maplibre_native_ffi_open_gl_custom_layer_pass_from_native(
+  const mln_open_gl_custom_layer_pass* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_open_gl_custom_layer_pass_read(
+  MaplibreNativeFfiOpenGlCustomLayerPass* out,
+  const mln_open_gl_custom_layer_pass* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiWebGpuCustomLayerPass*
+maplibre_native_ffi_web_gpu_custom_layer_pass_from_native(
+  const mln_web_gpu_custom_layer_pass* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiCustomLayerPassData*
+maplibre_native_ffi_custom_layer_pass_data_from_native(
+  gint64 tag, const mln_custom_layer_pass_data* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiCustomLayerPrerenderParameters*
+maplibre_native_ffi_custom_layer_prerender_parameters_from_native(
+  const mln_custom_layer_prerender_parameters* in
+);
+G_GNUC_INTERNAL MaplibreNativeFfiCustomLayerRenderParameters*
+maplibre_native_ffi_custom_layer_render_parameters_from_native(
+  const mln_custom_layer_render_parameters* in
+);
 G_GNUC_INTERNAL void maplibre_native_ffi_custom_vector_source_options_to_native(
   const MaplibreNativeFfiCustomVectorSourceOptions* self,
   mln_custom_vector_source_options* out, MaplibreNativeFfiCall* call
@@ -204,14 +358,6 @@ G_GNUC_INTERNAL gpointer
 maplibre_native_ffi_dma_buf_plane_copy_func(gconstpointer self, gpointer data);
 G_GNUC_INTERNAL MaplibreNativeFfiDmaBufFrame*
 maplibre_native_ffi_dma_buf_frame_from_native(const mln_dma_buf_frame* in);
-G_GNUC_INTERNAL void maplibre_native_ffi_logical_size_to_native(
-  const MaplibreNativeFfiLogicalSize* self, mln_logical_size* out,
-  MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_dma_buf_ring_descriptor_to_native(
-  const MaplibreNativeFfiDmaBufRingDescriptor* self,
-  mln_dma_buf_ring_descriptor* out, MaplibreNativeFfiCall* call
-);
 G_GNUC_INTERNAL void maplibre_native_ffi_egl_context_descriptor_to_native(
   const MaplibreNativeFfiEglContextDescriptor* self,
   mln_egl_context_descriptor* out, MaplibreNativeFfiCall* call
@@ -219,6 +365,14 @@ G_GNUC_INTERNAL void maplibre_native_ffi_egl_context_descriptor_to_native(
 G_GNUC_INTERNAL MaplibreNativeFfiEglContextDescriptor*
 maplibre_native_ffi_egl_context_descriptor_copy(
   const MaplibreNativeFfiEglContextDescriptor* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_exported_ring_target_to_native(
+  const MaplibreNativeFfiExportedRingTarget* self,
+  mln_exported_ring_target* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiExportedRingTarget*
+maplibre_native_ffi_exported_ring_target_copy(
+  const MaplibreNativeFfiExportedRingTarget* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_feature_id_to_native(
   const MaplibreNativeFfiFeatureId* self, mln_feature_id* out,
@@ -274,6 +428,26 @@ maplibre_native_ffi_geo_json_source_options_from_native(
 G_GNUC_INTERNAL MaplibreNativeFfiGeoJsonSourceOptions*
 maplibre_native_ffi_geo_json_source_options_copy(
   const MaplibreNativeFfiGeoJsonSourceOptions* self
+);
+G_GNUC_INTERNAL MaplibreNativeFfiGpuDeviceCapabilities*
+maplibre_native_ffi_gpu_device_capabilities_from_native(
+  const mln_gpu_device_capabilities* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_gpu_device_capabilities_read(
+  MaplibreNativeFfiGpuDeviceCapabilities* out,
+  const mln_gpu_device_capabilities* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_queue_lock_to_native(
+  const MaplibreNativeFfiQueueLock* self, mln_queue_lock* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_gpu_device_options_to_native(
+  const MaplibreNativeFfiGpuDeviceOptions* self, mln_gpu_device_options* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiGpuDeviceVulkanContextResult*
+maplibre_native_ffi_gpu_device_vulkan_context_result_from_native(
+  const mln_gpu_device_vulkan_context_result* in
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_gpu_sync_to_native(
   const MaplibreNativeFfiGpuSync* self, mln_gpu_sync* out,
@@ -331,30 +505,9 @@ G_GNUC_INTERNAL MaplibreNativeFfiIoSurfaceFrame*
 maplibre_native_ffi_io_surface_frame_from_native(
   const mln_io_surface_frame* in
 );
-G_GNUC_INTERNAL void maplibre_native_ffi_metal_context_descriptor_to_native(
-  const MaplibreNativeFfiMetalContextDescriptor* self,
-  mln_metal_context_descriptor* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiMetalContextDescriptor*
-maplibre_native_ffi_metal_context_descriptor_copy(
-  const MaplibreNativeFfiMetalContextDescriptor* self
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_io_surface_ring_descriptor_to_native(
-  const MaplibreNativeFfiIoSurfaceRingDescriptor* self,
-  mln_io_surface_ring_descriptor* out, MaplibreNativeFfiCall* call
-);
 G_GNUC_INTERNAL void maplibre_native_ffi_log_handler_to_native(
   const MaplibreNativeFfiLogHandler* self, mln_log_handler* out,
   MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_logical_extent_to_native(
-  const MaplibreNativeFfiLogicalExtent* self, mln_logical_extent* out,
-  MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiLogicalExtent*
-maplibre_native_ffi_logical_extent_from_native(const mln_logical_extent* in);
-G_GNUC_INTERNAL void maplibre_native_ffi_logical_extent_read(
-  MaplibreNativeFfiLogicalExtent* out, const mln_logical_extent* in
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_map_options_to_native(
   const MaplibreNativeFfiMapOptions* self, mln_map_options* out,
@@ -374,45 +527,6 @@ maplibre_native_ffi_map_tile_settings_from_native(
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_map_tile_settings_read(
   MaplibreNativeFfiMapTileSettings* out, const mln_map_tile_settings* in
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_projection_mode_to_native(
-  const MaplibreNativeFfiProjectionMode* self, mln_projection_mode* out,
-  MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiProjectionMode*
-maplibre_native_ffi_projection_mode_from_native(const mln_projection_mode* in);
-G_GNUC_INTERNAL void maplibre_native_ffi_projection_mode_read(
-  MaplibreNativeFfiProjectionMode* out, const mln_projection_mode* in
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_map_viewport_to_native(
-  const MaplibreNativeFfiMapViewport* self, mln_map_viewport* out,
-  MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiMapViewport*
-maplibre_native_ffi_map_viewport_from_native(const mln_map_viewport* in);
-G_GNUC_INTERNAL void maplibre_native_ffi_map_viewport_read(
-  MaplibreNativeFfiMapViewport* out, const mln_map_viewport* in
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_projection_definition_to_native(
-  const MaplibreNativeFfiProjectionDefinition* self,
-  mln_projection_definition* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiProjectionDefinition*
-maplibre_native_ffi_projection_definition_from_native(
-  const mln_projection_definition* in
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_projection_definition_read(
-  MaplibreNativeFfiProjectionDefinition* out,
-  const mln_projection_definition* in
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_map_view_to_native(
-  const MaplibreNativeFfiMapView* self, mln_map_view* out,
-  MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiMapView*
-maplibre_native_ffi_map_view_from_native(const mln_map_view* in);
-G_GNUC_INTERNAL void maplibre_native_ffi_map_view_read(
-  MaplibreNativeFfiMapView* out, const mln_map_view* in
 );
 G_GNUC_INTERNAL MaplibreNativeFfiMapSnapshot*
 maplibre_native_ffi_map_snapshot_from_native(const mln_map_snapshot* in);
@@ -439,22 +553,25 @@ maplibre_native_ffi_metal_borrowed_texture_copy(
   const MaplibreNativeFfiMetalBorrowedTexture* self
 );
 G_GNUC_INTERNAL void
-maplibre_native_ffi_metal_borrowed_texture_descriptor_to_native(
-  const MaplibreNativeFfiMetalBorrowedTextureDescriptor* self,
-  mln_metal_borrowed_texture_descriptor* out, MaplibreNativeFfiCall* call
+maplibre_native_ffi_metal_borrowed_textures_target_to_native(
+  const MaplibreNativeFfiMetalBorrowedTexturesTarget* self,
+  mln_metal_borrowed_textures_target* out, MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL void
-maplibre_native_ffi_metal_borrowed_texture_replacement_to_native(
-  const MaplibreNativeFfiMetalBorrowedTextureReplacement* self,
-  mln_metal_borrowed_texture_replacement* out, MaplibreNativeFfiCall* call
+G_GNUC_INTERNAL MaplibreNativeFfiMetalBorrowedTexturesTarget*
+maplibre_native_ffi_metal_borrowed_textures_target_copy(
+  const MaplibreNativeFfiMetalBorrowedTexturesTarget* self
 );
-G_GNUC_INTERNAL void maplibre_native_ffi_metal_surface_descriptor_to_native(
-  const MaplibreNativeFfiMetalSurfaceDescriptor* self,
-  mln_metal_surface_descriptor* out, MaplibreNativeFfiCall* call
+G_GNUC_INTERNAL void maplibre_native_ffi_metal_device_descriptor_to_native(
+  const MaplibreNativeFfiMetalDeviceDescriptor* self,
+  mln_metal_device_descriptor* out, MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL void maplibre_native_ffi_metal_surface_replacement_to_native(
-  const MaplibreNativeFfiMetalSurfaceReplacement* self,
-  mln_metal_surface_replacement* out, MaplibreNativeFfiCall* call
+G_GNUC_INTERNAL void maplibre_native_ffi_metal_layer_target_to_native(
+  const MaplibreNativeFfiMetalLayerTarget* self, mln_metal_layer_target* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiMetalLayerTarget*
+maplibre_native_ffi_metal_layer_target_copy(
+  const MaplibreNativeFfiMetalLayerTarget* self
 );
 G_GNUC_INTERNAL MaplibreNativeFfiMetalTextureFrame*
 maplibre_native_ffi_metal_texture_frame_from_native(
@@ -505,13 +622,22 @@ maplibre_native_ffi_offline_region_status_from_native(
 G_GNUC_INTERNAL void maplibre_native_ffi_offline_region_status_read(
   MaplibreNativeFfiOfflineRegionStatus* out, const mln_offline_region_status* in
 );
-G_GNUC_INTERNAL void maplibre_native_ffi_offscreen_descriptor_to_native(
-  const MaplibreNativeFfiOffscreenDescriptor* self,
-  mln_offscreen_descriptor* out, MaplibreNativeFfiCall* call
+G_GNUC_INTERNAL void maplibre_native_ffi_offscreen_target_to_native(
+  const MaplibreNativeFfiOffscreenTarget* self, mln_offscreen_target* out,
+  MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL void maplibre_native_ffi_offscreen_device_options_to_native(
-  const MaplibreNativeFfiOffscreenDeviceOptions* self,
-  mln_offscreen_device_options* out, MaplibreNativeFfiCall* call
+G_GNUC_INTERNAL void maplibre_native_ffi_ohos_window_target_to_native(
+  const MaplibreNativeFfiOhosWindowTarget* self, mln_ohos_window_target* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiOhosWindowTarget*
+maplibre_native_ffi_ohos_window_target_copy(
+  const MaplibreNativeFfiOhosWindowTarget* self
+);
+G_GNUC_INTERNAL MaplibreNativeFfiOpaqueFdFrame*
+maplibre_native_ffi_opaque_fd_frame_from_native(const mln_opaque_fd_frame* in);
+G_GNUC_INTERNAL void maplibre_native_ffi_opaque_fd_frame_read(
+  MaplibreNativeFfiOpaqueFdFrame* out, const mln_opaque_fd_frame* in
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_open_gl_borrowed_texture_to_native(
   const MaplibreNativeFfiOpenGlBorrowedTexture* self,
@@ -519,6 +645,15 @@ G_GNUC_INTERNAL void maplibre_native_ffi_open_gl_borrowed_texture_to_native(
 );
 G_GNUC_INTERNAL gpointer maplibre_native_ffi_open_gl_borrowed_texture_copy_func(
   gconstpointer self, gpointer data
+);
+G_GNUC_INTERNAL void
+maplibre_native_ffi_open_gl_borrowed_textures_target_to_native(
+  const MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self,
+  mln_open_gl_borrowed_textures_target* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiOpenGlBorrowedTexturesTarget*
+maplibre_native_ffi_open_gl_borrowed_textures_target_copy(
+  const MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self
 );
 G_GNUC_INTERNAL void maplibre_native_ffi_wgl_context_descriptor_to_native(
   const MaplibreNativeFfiWglContextDescriptor* self,
@@ -532,37 +667,17 @@ G_GNUC_INTERNAL void maplibre_native_ffi_web_gl_context_descriptor_to_native(
   const MaplibreNativeFfiWebGlContextDescriptor* self,
   mln_web_gl_context_descriptor* out, MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL void
-maplibre_native_ffi_open_gl_context_descriptor_data_to_native(
-  const MaplibreNativeFfiOpenGlContextDescriptorData* self,
-  mln_open_gl_context_platform* out_tag,
-  mln_open_gl_context_descriptor_data* out, MaplibreNativeFfiCall* call
-);
 G_GNUC_INTERNAL void maplibre_native_ffi_open_gl_context_descriptor_to_native(
   const MaplibreNativeFfiOpenGlContextDescriptor* self,
   mln_open_gl_context_descriptor* out, MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL MaplibreNativeFfiOpenGlContextDescriptor*
-maplibre_native_ffi_open_gl_context_descriptor_copy(
-  const MaplibreNativeFfiOpenGlContextDescriptor* self
+G_GNUC_INTERNAL void maplibre_native_ffi_open_gl_surface_target_to_native(
+  const MaplibreNativeFfiOpenGlSurfaceTarget* self,
+  mln_open_gl_surface_target* out, MaplibreNativeFfiCall* call
 );
-G_GNUC_INTERNAL void
-maplibre_native_ffi_open_gl_borrowed_texture_descriptor_to_native(
-  const MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self,
-  mln_open_gl_borrowed_texture_descriptor* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void
-maplibre_native_ffi_open_gl_borrowed_texture_replacement_to_native(
-  const MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self,
-  mln_open_gl_borrowed_texture_replacement* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_open_gl_surface_descriptor_to_native(
-  const MaplibreNativeFfiOpenGlSurfaceDescriptor* self,
-  mln_open_gl_surface_descriptor* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_open_gl_surface_replacement_to_native(
-  const MaplibreNativeFfiOpenGlSurfaceReplacement* self,
-  mln_open_gl_surface_replacement* out, MaplibreNativeFfiCall* call
+G_GNUC_INTERNAL MaplibreNativeFfiOpenGlSurfaceTarget*
+maplibre_native_ffi_open_gl_surface_target_copy(
+  const MaplibreNativeFfiOpenGlSurfaceTarget* self
 );
 G_GNUC_INTERNAL MaplibreNativeFfiOpenGlTextureFrame*
 maplibre_native_ffi_open_gl_texture_frame_from_native(
@@ -589,10 +704,6 @@ G_GNUC_INTERNAL void maplibre_native_ffi_projected_meters_read(
 G_GNUC_INTERNAL void maplibre_native_ffi_projection_mode_options_to_native(
   const MaplibreNativeFfiProjectionModeOptions* self,
   mln_projection_mode_options* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_queue_lock_to_native(
-  const MaplibreNativeFfiQueueLock* self, mln_queue_lock* out,
-  MaplibreNativeFfiCall* call
 );
 G_GNUC_INTERNAL MaplibreNativeFfiRenderAbandonResult*
 maplibre_native_ffi_render_abandon_result_from_native(
@@ -631,6 +742,78 @@ maplibre_native_ffi_render_session_snapshot_from_native(
 G_GNUC_INTERNAL void maplibre_native_ffi_render_session_snapshot_read(
   MaplibreNativeFfiRenderSessionSnapshot* out,
   const mln_render_session_snapshot* in
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_win32_window_target_to_native(
+  const MaplibreNativeFfiWin32WindowTarget* self, mln_win32_window_target* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiWin32WindowTarget*
+maplibre_native_ffi_win32_window_target_copy(
+  const MaplibreNativeFfiWin32WindowTarget* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_xlib_window_target_to_native(
+  const MaplibreNativeFfiXlibWindowTarget* self, mln_xlib_window_target* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiXlibWindowTarget*
+maplibre_native_ffi_xlib_window_target_copy(
+  const MaplibreNativeFfiXlibWindowTarget* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_wayland_surface_target_to_native(
+  const MaplibreNativeFfiWaylandSurfaceTarget* self,
+  mln_wayland_surface_target* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiWaylandSurfaceTarget*
+maplibre_native_ffi_wayland_surface_target_copy(
+  const MaplibreNativeFfiWaylandSurfaceTarget* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_surface_target_to_native(
+  const MaplibreNativeFfiVulkanSurfaceTarget* self,
+  mln_vulkan_surface_target* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_borrowed_texture_to_native(
+  const MaplibreNativeFfiVulkanBorrowedTexture* self,
+  mln_vulkan_borrowed_texture* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL gpointer maplibre_native_ffi_vulkan_borrowed_texture_copy_func(
+  gconstpointer self, gpointer data
+);
+G_GNUC_INTERNAL void
+maplibre_native_ffi_vulkan_borrowed_textures_target_to_native(
+  const MaplibreNativeFfiVulkanBorrowedTexturesTarget* self,
+  mln_vulkan_borrowed_textures_target* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiVulkanBorrowedTexturesTarget*
+maplibre_native_ffi_vulkan_borrowed_textures_target_copy(
+  const MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_web_gpu_borrowed_texture_to_native(
+  const MaplibreNativeFfiWebGpuBorrowedTexture* self,
+  mln_web_gpu_borrowed_texture* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL gpointer maplibre_native_ffi_web_gpu_borrowed_texture_copy_func(
+  gconstpointer self, gpointer data
+);
+G_GNUC_INTERNAL void
+maplibre_native_ffi_web_gpu_borrowed_textures_target_to_native(
+  const MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self,
+  mln_web_gpu_borrowed_textures_target* out, MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiWebGpuBorrowedTexturesTarget*
+maplibre_native_ffi_web_gpu_borrowed_textures_target_copy(
+  const MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_web_canvas_target_to_native(
+  const MaplibreNativeFfiWebCanvasTarget* self, mln_web_canvas_target* out,
+  MaplibreNativeFfiCall* call
+);
+G_GNUC_INTERNAL MaplibreNativeFfiWebCanvasTarget*
+maplibre_native_ffi_web_canvas_target_copy(
+  const MaplibreNativeFfiWebCanvasTarget* self
+);
+G_GNUC_INTERNAL void maplibre_native_ffi_render_target_to_native(
+  const MaplibreNativeFfiRenderTarget* self, mln_render_target* out,
+  MaplibreNativeFfiCall* call
 );
 G_GNUC_INTERNAL MaplibreNativeFfiRenderedFeature*
 maplibre_native_ffi_rendered_feature_from_native(
@@ -783,15 +966,6 @@ maplibre_native_ffi_runtime_event_offline_region_response_error_read(
   MaplibreNativeFfiRuntimeEventOfflineRegionResponseError* out,
   const mln_runtime_event_offline_region_response_error* in
 );
-G_GNUC_INTERNAL MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit*
-maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_from_native(
-  const mln_runtime_event_offline_region_tile_count_limit* in
-);
-G_GNUC_INTERNAL void
-maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_read(
-  MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit* out,
-  const mln_runtime_event_offline_region_tile_count_limit* in
-);
 G_GNUC_INTERNAL MaplibreNativeFfiRuntimeEventGlyphs*
 maplibre_native_ffi_runtime_event_glyphs_from_native(
   const mln_runtime_event_glyphs* in
@@ -878,62 +1052,13 @@ G_GNUC_INTERNAL MaplibreNativeFfiTextureReadbackResult*
 maplibre_native_ffi_texture_readback_result_from_native(
   const mln_texture_readback_result* in
 );
-G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_borrowed_texture_to_native(
-  const MaplibreNativeFfiVulkanBorrowedTexture* self,
-  mln_vulkan_borrowed_texture* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL gpointer maplibre_native_ffi_vulkan_borrowed_texture_copy_func(
-  gconstpointer self, gpointer data
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_context_descriptor_to_native(
-  const MaplibreNativeFfiVulkanContextDescriptor* self,
-  mln_vulkan_context_descriptor* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiVulkanContextDescriptor*
-maplibre_native_ffi_vulkan_context_descriptor_from_native(
-  const mln_vulkan_context_descriptor* in
-);
-G_GNUC_INTERNAL MaplibreNativeFfiVulkanContextDescriptor*
-maplibre_native_ffi_vulkan_context_descriptor_copy(
-  const MaplibreNativeFfiVulkanContextDescriptor* self
-);
-G_GNUC_INTERNAL void
-maplibre_native_ffi_vulkan_borrowed_texture_descriptor_to_native(
-  const MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self,
-  mln_vulkan_borrowed_texture_descriptor* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void
-maplibre_native_ffi_vulkan_borrowed_texture_replacement_to_native(
-  const MaplibreNativeFfiVulkanBorrowedTextureReplacement* self,
-  mln_vulkan_borrowed_texture_replacement* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL MaplibreNativeFfiVulkanDeviceContextResult*
-maplibre_native_ffi_vulkan_device_context_result_from_native(
-  const mln_vulkan_device_context_result* in
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_device_options_to_native(
-  const MaplibreNativeFfiVulkanDeviceOptions* self,
-  mln_vulkan_device_options* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_surface_descriptor_to_native(
-  const MaplibreNativeFfiVulkanSurfaceDescriptor* self,
-  mln_vulkan_surface_descriptor* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_surface_replacement_to_native(
-  const MaplibreNativeFfiVulkanSurfaceReplacement* self,
-  mln_vulkan_surface_replacement* out, MaplibreNativeFfiCall* call
+G_GNUC_INTERNAL void maplibre_native_ffi_vulkan_device_descriptor_to_native(
+  const MaplibreNativeFfiVulkanDeviceDescriptor* self,
+  mln_vulkan_device_descriptor* out, MaplibreNativeFfiCall* call
 );
 G_GNUC_INTERNAL MaplibreNativeFfiVulkanTextureFrame*
 maplibre_native_ffi_vulkan_texture_frame_from_native(
   const mln_vulkan_texture_frame* in
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_wayland_surface_descriptor_to_native(
-  const MaplibreNativeFfiWaylandSurfaceDescriptor* self,
-  mln_wayland_surface_descriptor* out, MaplibreNativeFfiCall* call
-);
-G_GNUC_INTERNAL void maplibre_native_ffi_wayland_surface_replacement_to_native(
-  const MaplibreNativeFfiWaylandSurfaceReplacement* self,
-  mln_wayland_surface_replacement* out, MaplibreNativeFfiCall* call
 );
 
 G_END_DECLS
