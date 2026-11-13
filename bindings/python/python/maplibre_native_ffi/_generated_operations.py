@@ -3104,8 +3104,16 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """Creates a runtime.
 
         A runtime holds maps and the resource loading, cache, and offline
-        regions that they share. In a browser, create runtimes on a Web
-        Worker, not on the main thread.
+        regions that they share.
+
+        In a browser, the library runs on the thread that loaded its module
+        and never blocks it: commands, render sessions, completions, wakes
+        and callbacks all run on that thread, in tasks of the library's own
+        after the call that started them returns. Wait for a completion with
+        a callback, or yield to the event loop; a blocking wait can't end.
+        Load the module on a dedicated Web Worker, so that the map's work
+        doesn't delay the page. On the page's thread it works too, but every
+        frame and style parse runs there.
 
         See `mln_runtime_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -3114,6 +3122,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
 
         - `Status.INVALID_ARGUMENT` when the cache database file that
           `options` names can't be opened or created.
+        - `Status.UNSUPPORTED` in a browser for a cache path: the browser
+          caches the runtime's requests.
         """
         return _adopt_value(
             _native._RuntimeHandle.create(options), "RuntimeHandle", None

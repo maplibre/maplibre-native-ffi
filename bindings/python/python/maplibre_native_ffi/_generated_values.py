@@ -1092,17 +1092,6 @@ class VulkanImageOwner(UnknownIntEnum):
     FOREIGN = 2
 
 
-class WebGlContextKind(UnknownIntEnum):
-    """How a render session gets its WebGL context.
-
-    See `mln_web_gl_context_kind` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-    """
-
-    EXISTING = 0
-    TRANSFERRED_CANVAS = 1
-
-
 @dataclass(frozen=True, slots=True)
 class AnchoredMomentum:
     """How a gesture's zoom, bearing, or pitch keeps changing after release.
@@ -5840,27 +5829,18 @@ class WaylandSurfaceReplacement:
 
 @dataclass(frozen=True, slots=True)
 class WebGlContextDescriptor:
-    """The WebGL context or canvas that a render session uses.
+    """The WebGL2 context that an OpenGL device wraps.
 
     See `mln_web_gl_context_descriptor` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
     """
 
-    kind: WebGlContextKind = WebGlContextKind.EXISTING
-
-    context: int = 0
-    """Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context."""
-
-    canvas_selector: str = ""
-    """The canvas's CSS selector, for a transferred canvas."""
+    context: int
+    """Your `WebGL2RenderingContext`."""
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(
-            kind=WebGlContextKind(raw["kind"]),
-            context=raw["context"],
-            canvas_selector=raw["canvas_selector"],
-        )
+        return cls(context=raw["context"])
 
 
 @dataclass(frozen=True, slots=True)

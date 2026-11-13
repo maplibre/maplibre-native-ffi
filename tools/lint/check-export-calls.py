@@ -8,6 +8,10 @@ tests/uncalled-exports.txt. The check fails when an exported function is
 uncalled and not listed, and when a listed function is called, no longer
 exported, or listed twice, so the list only shrinks.
 
+The suite runs only in native builds, so the check skips the functions that a
+header binds for the browser alone (`platforms=web`). mln-rs's browser check
+calls those.
+
 `--prune` rewrites the list without the names that the check would reject. It
 never adds a name.
 """
@@ -35,6 +39,10 @@ STRING_LITERAL = re.compile(r'"(?:[^"\\\n]|\\.)*"')
 # return type may span lines, and nothing between MLN_API and the name holds a
 # parenthesis, brace, or semicolon.
 DECLARATION = re.compile(r"\bMLN_API\b[^;{}()]*?\b(mln_\w+)\s*\(")
+WEB_ONLY = re.compile(
+    r'MLN_BINDING\("(?:[^"]*;)?platforms=web(?:;[^"]*)?"\)\s*'
+    r"MLN_API\b[^;{}()]*?\b(mln_\w+)\s*\("
+)
 API_MARKER = re.compile(r"\bMLN_API\b")
 IDENTIFIER = re.compile(r"\bmln_\w+\b")
 ANY_IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
@@ -65,8 +73,10 @@ def split_preprocessor(text: str) -> tuple[str, list[str]]:
     return "\n".join(code), directives
 
 
-def exported_functions() -> dict[str, str]:
-    """Maps each MLN_API function name to the header that declares it."""
+def exported_functions(*, include_web_only: bool = False) -> dict[str, str]:
+    """Maps each MLN_API function name to the header that declares it. The
+    functions that only the browser build binds count only with
+    `include_web_only`."""
     functions: dict[str, str] = {}
     for header in sorted(HEADERS.rglob("*.h")):
         # The MLN_API definitions themselves are preprocessor lines.
@@ -80,8 +90,10 @@ def exported_functions() -> dict[str, str]:
                 f"error: {header.relative_to(ROOT).as_posix()} has {markers} "
                 f"MLN_API markers but {len(names)} parsed declarations"
             )
+        web_only = set(WEB_ONLY.findall(text))
         for name in names:
-            functions[name] = header.name
+            if include_web_only or name not in web_only:
+                functions[name] = header.name
     if not functions:
         raise SystemExit(f"error: found no MLN_API declarations under {HEADERS}")
     return functions

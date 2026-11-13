@@ -44,7 +44,7 @@ public class CreateAMapTest {
   @Test(timeout = SnippetFixture.TEST_TIMEOUT_MS)
   public void createAMap() {
     // #region runtime
-    RuntimeHandle runtime = RuntimeHandle.create(null).join();
+    RuntimeHandle runtime = RuntimeHandle.create(null);
     // #endregion runtime
     SnippetFixture.keepOffTheNetwork(runtime);
 

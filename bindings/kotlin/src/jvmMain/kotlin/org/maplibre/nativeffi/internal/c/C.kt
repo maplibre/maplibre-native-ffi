@@ -1435,6 +1435,9 @@ internal actual object C {
   private val mln_vulkan_device_get_context =
     Ffm.downcall("mln_vulkan_device_get_context", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_vulkan_device_release = Ffm.downcall("mln_vulkan_device_release", null, JAVA_LONG)
+  private val mln_web_alloc = Ffm.downcall("mln_web_alloc", JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_web_free = Ffm.downcall("mln_web_free", null, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_web_object_release = Ffm.downcall("mln_web_object_release", null, JAVA_INT)
 
   actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
     mln_acquired_frame_discard.invokeExact(frame, outDiagnostic) as Int
@@ -3604,6 +3607,17 @@ internal actual object C {
 
   actual fun mln_vulkan_device_release(device: Long) {
     mln_vulkan_device_release.invoke(device)
+  }
+
+  actual fun mln_web_alloc(size: Long, align: Long): Long =
+    mln_web_alloc.invokeExact(size, align) as Long
+
+  actual fun mln_web_free(pointer: Long, size: Long, align: Long) {
+    mln_web_free.invoke(pointer, size, align)
+  }
+
+  actual fun mln_web_object_release(`object`: Int) {
+    mln_web_object_release.invoke(`object`)
   }
 }
 

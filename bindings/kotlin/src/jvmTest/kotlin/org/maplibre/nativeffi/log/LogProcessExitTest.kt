@@ -61,7 +61,7 @@ object LogProcessExitProbe {
     if (callbackState == "live") {
       // The runtime keeps its provider and wake, and the map a loaded style, as the process exits.
       runSuspendTest {
-        val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+        val runtime = RuntimeHandle.create(RuntimeOptions())
         runtime.discarding.setResourceProvider(denyingProvider())
         val map = runtime.createMap(smallMapOptions())
         map.ready.await()
@@ -70,7 +70,7 @@ object LogProcessExitProbe {
       }
     } else {
       runSuspendTest {
-        RuntimeHandle.create(RuntimeOptions()).await().useReleasing { runtime ->
+        RuntimeHandle.create(RuntimeOptions()).useReleasing { runtime ->
           val map = runtime.createMap(smallMapOptions())
           map.useReleasing {
             map.ready.await()

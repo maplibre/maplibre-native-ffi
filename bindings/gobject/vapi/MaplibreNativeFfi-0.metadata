@@ -52,6 +52,7 @@ UnitBezier struct
 Vec3 struct
 VulkanBorrowedTexture struct
 VulkanSurfaceReplacement struct
+WebGlContextDescriptor struct
 CommandCompletion struct
 AnchoredMomentum.anchor#property no_accessor_method
 AnimationOptions.easing#property no_accessor_method

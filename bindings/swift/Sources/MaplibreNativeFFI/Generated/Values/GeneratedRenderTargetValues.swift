@@ -230,7 +230,7 @@ public struct OpenGlContextDescriptor: Equatable, Hashable, Sendable {
     self.data = data
   }
 
-  func nativeValue(arena: NativeInputArena) throws
+  func nativeValue(arena _: NativeInputArena) throws
     -> mln_open_gl_context_descriptor
   {
     var raw = mln_open_gl_context_descriptor()
@@ -241,8 +241,8 @@ public struct OpenGlContextDescriptor: Equatable, Hashable, Sendable {
     case let .egl(item): raw.platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL; raw
       .data.egl = item.nativeValue()
     case let .webGl(item): raw
-      .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL; raw.data
-      .web_gl = try item.nativeValue(arena: arena)
+      .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_WEB_GL; raw.data.web_gl = item
+      .nativeValue()
     }
     return raw
   }
@@ -585,61 +585,25 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// The WebGL context or canvas that a render session uses.
+/// The WebGL2 context that an OpenGL device wraps.
 ///
 /// See `mln_web_gl_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WebGlContextDescriptor: Equatable, Hashable, Sendable {
-  public var kind: WebGlContextKind
-  /// Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
-  public var context: Int32
-  /// The canvas's CSS selector, for a transferred canvas.
-  public var canvasSelector: String
-  public init(
-    kind: WebGlContextKind = .init(rawValue: 0),
-    context: Int32 = 0,
-    canvasSelector: String = ""
-  ) {
-    self.kind = kind
+  /// Your `WebGL2RenderingContext`.
+  public var context: UInt32
+  public init(context: UInt32) {
     self.context = context
-    self.canvasSelector = canvasSelector
   }
 
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_web_gl_context_descriptor
-  {
+  init(raw: mln_web_gl_context_descriptor) {
+    context = raw.context
+  }
+
+  func nativeValue() -> mln_web_gl_context_descriptor {
     var raw = mln_web_gl_context_descriptor()
-    raw.kind = mln_web_gl_context_kind(rawValue: kind.rawValue)
     raw.context = context
-    raw.canvas_selector = arena.view(canvasSelector)
     return raw
-  }
-}
-
-/// How a render session gets its WebGL context.
-///
-/// See `mln_web_gl_context_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct WebGlContextKind: RawRepresentable, CustomStringConvertible,
-  NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// The session uses a context that you created with
-  /// `emscripten_webgl_create_context()`.
-  public static let existing: WebGlContextKind = .init(rawValue: 0)
-  /// The library transfers the canvas that `canvas_selector` names to a worker
-  /// and creates the context there.
-  public static let transferredCanvas: WebGlContextKind = .init(rawValue: 1)
-  public var description: String {
-    switch rawValue {
-    case 0: return "existing"
-    case 1: return "transferredCanvas"
-    default: return "WebGlContextKind(\(rawValue))"
-    }
   }
 }
 

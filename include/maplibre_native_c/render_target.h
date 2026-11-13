@@ -13,6 +13,7 @@
 #include "base.h"
 #include "map.h"
 #include "wake.h"
+#include "web.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -169,13 +170,13 @@ typedef enum MLN_BINDING(
   /**
    * 24-bit normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
    * MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
-   * WGPUTextureFormat_Depth24PlusStencil8.
+   * WGPUTextureFormat_Depth24PlusStencil8 (`depth24plus-stencil8`).
    */
   MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8 = 1U << 0U,
   /**
    * 32-bit float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
    * MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
-   * WGPUTextureFormat_Depth32FloatStencil8.
+   * WGPUTextureFormat_Depth32FloatStencil8 (`depth32float-stencil8`).
    */
   MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8 = 1U << 1U,
 } mln_depth_stencil_format_flag;
@@ -190,10 +191,14 @@ typedef struct mln_render_session_attach_options {
    * The thread that runs the session's graphics work, which depends on the
    * target:
    *
-   * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for a WebGPU surface, or a
-   *   borrowed ring of WebGPU textures.
-   * - MLN_RENDER_DRIVER_CORE_WORKER for an offscreen target, a window, an HTML
-   *   canvas, or an exported ring.
+   * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for a borrowed ring of WebGPU
+   *   textures.
+   * - MLN_RENDER_DRIVER_CORE_WORKER for an offscreen target, a window, or an
+   *   exported ring.
+   * - Either one for a web canvas. In a browser both run on the thread that
+   *   loaded the library: MLN_RENDER_DRIVER_CORE_WORKER in the library's own
+   *   tasks, and MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD when you service the
+   *   session.
    * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
    *   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
    *   these on MLN_RENDER_DRIVER_CORE_WORKER only, and fails an attach with
@@ -307,12 +312,8 @@ typedef struct mln_vulkan_context_descriptor {
 
 /** The WebGPU device that a render session uses. */
 typedef struct mln_web_gpu_context_descriptor {
-  /** A `WGPUInstance`, or null. */
-  void* instance;
-  /** A `WGPUDevice`. */
-  void* device MLN_BINDING("required=true");
-  /** A `WGPUQueue`, or null to use the device's queue. */
-  void* queue;
+  /** Your `GPUDevice`. Sessions submit to its `queue`. */
+  mln_web_object device MLN_BINDING("required=true");
 } mln_web_gpu_context_descriptor;
 
 /** An OpenGL context platform, as a bit in a set. */
@@ -369,27 +370,10 @@ typedef struct mln_egl_context_descriptor {
   void* get_proc_address;
 } mln_egl_context_descriptor;
 
-/** How a render session gets its WebGL context. */
-typedef enum mln_web_gl_context_kind : uint32_t {
-  /**
-   * The session uses a context that you created with
-   * `emscripten_webgl_create_context()`.
-   */
-  MLN_WEB_GL_CONTEXT_EXISTING = 0U,
-  /**
-   * The library transfers the canvas that `canvas_selector` names to a worker
-   * and creates the context there.
-   */
-  MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1U,
-} mln_web_gl_context_kind;
-
-/** The WebGL context or canvas that a render session uses. */
+/** The WebGL2 context that an OpenGL device wraps. */
 typedef struct mln_web_gl_context_descriptor {
-  mln_web_gl_context_kind kind;
-  /** Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context. */
-  int32_t context MLN_BINDING("native_object=true");
-  /** The canvas's CSS selector, for a transferred canvas. */
-  mln_buffer_view canvas_selector;
+  /** Your `WebGL2RenderingContext`. */
+  mln_web_object context MLN_BINDING("required=true");
 } mln_web_gl_context_descriptor;
 
 /** The WGL, EGL, or WebGL part of an OpenGL context descriptor. */
@@ -427,10 +411,6 @@ typedef enum mln_render_target_kind : uint32_t {
   MLN_RENDER_TARGET_KIND_ANDROID_WINDOW = 6u,
   /** An OpenHarmony `OHNativeWindow`. */
   MLN_RENDER_TARGET_KIND_OHOS_WINDOW = 7u,
-  /** A WebGPU surface on the device that you wrapped. */
-  MLN_RENDER_TARGET_KIND_WEB_GPU_SURFACE = 8u,
-  /** An HTML canvas in the page. */
-  MLN_RENDER_TARGET_KIND_HTML_CANVAS = 9u,
   /** A `VkSurfaceKHR` on the instance of a Vulkan device. */
   MLN_RENDER_TARGET_KIND_VULKAN_SURFACE = 10u,
   /** An `EGLSurface` or `HDC` for the context that an OpenGL device wraps. */
@@ -445,6 +425,8 @@ typedef enum mln_render_target_kind : uint32_t {
   MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES = 15u,
   /** A ring of textures that the session allocates and shares with you. */
   MLN_RENDER_TARGET_KIND_EXPORTED_RING = 16u,
+  /** A canvas to present to, with the device's backend. */
+  MLN_RENDER_TARGET_KIND_WEB_CANVAS = 17u,
 } mln_render_target_kind;
 
 /** A render target kind, as a bit in a set. */
@@ -458,8 +440,6 @@ typedef enum MLN_BINDING(
   MLN_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE = 1u << 4u,
   MLN_RENDER_TARGET_KIND_FLAG_ANDROID_WINDOW = 1u << 5u,
   MLN_RENDER_TARGET_KIND_FLAG_OHOS_WINDOW = 1u << 6u,
-  MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_SURFACE = 1u << 7u,
-  MLN_RENDER_TARGET_KIND_FLAG_HTML_CANVAS = 1u << 8u,
   MLN_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE = 1u << 9u,
   MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_SURFACE = 1u << 10u,
   MLN_RENDER_TARGET_KIND_FLAG_METAL_BORROWED_TEXTURES = 1u << 11u,
@@ -467,6 +447,7 @@ typedef enum MLN_BINDING(
   MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES = 1u << 13u,
   MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 1u << 14u,
   MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 1u << 15u,
+  MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS = 1u << 16u,
 } mln_render_target_kind_flag;
 
 /** A set of mln_render_target_kind_flag bits. */
@@ -565,30 +546,31 @@ typedef struct mln_ohos_window_target {
 } mln_ohos_window_target;
 
 /**
- * A WebGPU surface to present to, which the session configures.
+ * A canvas to present to.
  *
- * Make it with the instance of the device that mln_gpu_device_wrap_web_gpu()
- * wrapped, and attach on that device.
+ * The session makes the canvas's "webgpu" or "webgl2" context with the
+ * device's backend, and sets the canvas's size to `logical_size` at the map's
+ * scale factor. Attached without a device, it renders with the build's
+ * backend: a WebGPU build asks the browser for a device, and attaches once it
+ * has one. For an OpenGL device that wraps your WebGL2 context, the canvas must
+ * be the context's own.
  */
-typedef struct mln_web_gpu_surface_target {
+typedef struct mln_web_canvas_target {
   mln_logical_size logical_size MLN_BINDING("required=true");
-  /** Your `WGPUSurface`. */
-  void* surface MLN_BINDING("required=true");
-  /** The `WGPUTextureFormat` to configure the surface with. */
-  uint32_t format MLN_BINDING("required=true");
-} mln_web_gpu_surface_target;
-
-/**
- * An HTML canvas to present to.
- *
- * The library transfers the canvas to a worker, and makes its context there
- * with the device's backend.
- */
-typedef struct mln_html_canvas_target {
-  mln_logical_size logical_size MLN_BINDING("required=true");
-  /** The canvas's CSS selector, such as `#map`. */
-  mln_buffer_view selector MLN_BINDING("required=true");
-} mln_html_canvas_target;
+  /**
+   * An `OffscreenCanvas`, such as one from
+   * `HTMLCanvasElement.transferControlToOffscreen()` that you posted to the
+   * library's Web Worker, or an `HTMLCanvasElement` when the library runs on
+   * the page's thread.
+   */
+  mln_web_object canvas MLN_BINDING("required=true");
+  /**
+   * For a WebGPU device, the `GPUTextureFormat` to configure the canvas with,
+   * such as `bgra8unorm`. Empty for a format that the device's adapter
+   * prefers.
+   */
+  mln_buffer_view format;
+} mln_web_canvas_target;
 
 /**
  * Your Vulkan surface to present to.
@@ -761,10 +743,8 @@ typedef struct mln_open_gl_borrowed_textures_target {
 
 /** A WebGPU texture of a borrowed ring. */
 typedef struct mln_web_gpu_borrowed_texture {
-  /** Your `WGPUTexture`. */
-  void* texture MLN_BINDING("required=true");
-  /** A `WGPUTextureView` of `texture`. */
-  void* texture_view MLN_BINDING("required=true");
+  /** Your `GPUTexture`. */
+  mln_web_object texture MLN_BINDING("required=true");
 } mln_web_gpu_borrowed_texture;
 
 /**
@@ -774,7 +754,7 @@ typedef struct mln_web_gpu_borrowed_texture {
  * `physical_width` and `physical_height` give the textures' size in pixels,
  * which is usually `logical_size` times the map's scale factor. Each texture
  * must be 2D with that size, `format`, one layer, one mip level, one sample,
- * and `WGPUTextureUsage_RenderAttachment`. The ring holds up to
+ * and `GPUTextureUsage.RENDER_ATTACHMENT`. The ring holds up to
  * MLN_TEXTURE_RING_MAX_DEPTH distinct textures.
  *
  * Give the ring `depth_textures` to draw into each frame depth-tested against
@@ -782,8 +762,10 @@ typedef struct mln_web_gpu_borrowed_texture {
  * same index, or none. Each frame clears the one at its slot, renders the
  * map's depth and stencil into it, and stores them. They must be 2D with the
  * size of `textures`, `depth_format`, one layer, one mip level, one sample, and
- * `WGPUTextureUsage_RenderAttachment`, and their views both the depth and the
- * stencil aspect.
+ * `GPUTextureUsage.RENDER_ATTACHMENT`.
+ *
+ * The ring renders on a device from mln_gpu_device_wrap_web_gpu(), which no
+ * build has yet: an attach with it fails with MLN_STATUS_UNSUPPORTED.
  */
 typedef struct mln_web_gpu_borrowed_textures_target {
   mln_logical_size logical_size MLN_BINDING("required=true");
@@ -792,16 +774,16 @@ typedef struct mln_web_gpu_borrowed_textures_target {
   const mln_web_gpu_borrowed_texture* textures
     MLN_BINDING("length=texture_count;required=true");
   size_t texture_count;
-  /** The textures' `WGPUTextureFormat`. */
-  uint32_t format MLN_BINDING("required=true");
+  /** The textures' `GPUTextureFormat`, such as `rgba8unorm`. */
+  mln_buffer_view format MLN_BINDING("required=true");
   const mln_web_gpu_borrowed_texture* depth_textures
     MLN_BINDING("length=depth_texture_count");
   size_t depth_texture_count;
   /**
-   * The depth textures' `WGPUTextureFormat`, of
+   * The depth textures' `GPUTextureFormat`, of
    * mln_gpu_device_capabilities.depth_stencil_formats.
    */
-  uint32_t depth_format;
+  mln_buffer_view depth_format;
 } mln_web_gpu_borrowed_textures_target;
 
 /** A DRM format and modifier that you can import. */
@@ -912,10 +894,6 @@ typedef union mln_render_target_data {
   );
   mln_ohos_window_target ohos_window
     MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_OHOS_WINDOW;platforms=ohos");
-  mln_web_gpu_surface_target web_gpu_surface
-    MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_WEB_GPU_SURFACE;platforms=web");
-  mln_html_canvas_target html_canvas
-    MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_HTML_CANVAS;platforms=web");
   mln_vulkan_surface_target vulkan_surface MLN_BINDING(
     "variant=MLN_RENDER_TARGET_KIND_VULKAN_SURFACE;"
     "platforms=android,freebsd,linux,macos,ohos,windows"
@@ -937,6 +915,8 @@ typedef union mln_render_target_data {
   );
   mln_exported_ring_target exported_ring
     MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_EXPORTED_RING");
+  mln_web_canvas_target web_canvas
+    MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_WEB_CANVAS;platforms=web");
 } mln_render_target_data;
 
 /**

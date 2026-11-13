@@ -1763,32 +1763,6 @@ func (value VulkanImageOwner) String() string {
 	return fmt.Sprintf("VulkanImageOwner(%d)", value)
 }
 
-// WebGLContextKind corresponds to mln_web_gl_context_kind. How a render session
-// gets its WebGL context.
-//
-// See mln_web_gl_context_kind in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type WebGLContextKind uint32
-
-const (
-	// The session uses a context that you created with
-	// emscripten_webgl_create_context().
-	WebGLContextKindExisting WebGLContextKind = WebGLContextKind(C.MLN_WEB_GL_CONTEXT_EXISTING)
-	// The library transfers the canvas that canvas_selector names to a worker and
-	// creates the context there.
-	WebGLContextKindTransferredCanvas WebGLContextKind = WebGLContextKind(C.MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS)
-)
-
-func (value WebGLContextKind) String() string {
-	switch value {
-	case 0:
-		return "WebGLContextKindExisting"
-	case 1:
-		return "WebGLContextKindTransferredCanvas"
-	}
-	return fmt.Sprintf("WebGLContextKind(%d)", value)
-}
-
 // FeatureID corresponds to mln_feature_id. The ID of a feature in a source, as
 // the source's data gives it.
 //
@@ -6513,23 +6487,18 @@ func nativeWaylandSurfaceReplacement(input WaylandSurfaceReplacement, arena *bin
 }
 
 // WebGLContextDescriptor corresponds to mln_web_gl_context_descriptor. The
-// WebGL context or canvas that a render session uses.
+// WebGL2 context that an OpenGL device wraps.
 //
 // See mln_web_gl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type WebGLContextDescriptor struct {
-	Kind WebGLContextKind
-	// Your EMSCRIPTEN_WEBGL_CONTEXT_HANDLE, for an existing context.
-	Context int32
-	// The canvas's CSS selector, for a transferred canvas.
-	CanvasSelector string
+	// Your WebGL2RenderingContext.
+	Context uint32
 }
 
 func nativeWebGLContextDescriptor(input WebGLContextDescriptor, arena *bindingArena) C.mln_web_gl_context_descriptor {
 	raw := C.mln_web_gl_context_descriptor{}
-	raw.kind = C.mln_web_gl_context_kind(input.Kind)
-	raw.context = C.int32_t(input.Context)
-	raw.canvas_selector = C.mln_buffer_view{data: arena.bytes([]byte(input.CanvasSelector)), size: C.size_t(len(input.CanvasSelector))}
+	raw.context = C.mln_web_object(input.Context)
 	return raw
 }
 
@@ -9866,8 +9835,15 @@ func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[CommandCompleti
 // NewRuntime creates a runtime.
 //
 // A runtime holds maps and the resource loading, cache, and offline regions
-// that they share. In a browser, create runtimes on a Web Worker, not on the
-// main thread.
+// that they share.
+//
+// In a browser, the library runs on the thread that loaded its module and never
+// blocks it: commands, render sessions, completions, wakes and callbacks all
+// run on that thread, in tasks of the library's own after the call that started
+// them returns. Wait for a completion with a callback, or yield to the event
+// loop; a blocking wait can't end. Load the module on a dedicated Web Worker,
+// so that the map's work doesn't delay the page. On the page's thread it works
+// too, but every frame and style parse runs there.
 //
 // See mln_runtime_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
@@ -9875,6 +9851,8 @@ func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[CommandCompleti
 // Errors:
 //   - StatusInvalidArgument when the cache database file that options names
 //     can't be opened or created.
+//   - StatusUnsupported in a browser for a cache path: the browser caches the
+//     runtime's requests.
 func NewRuntime(options *RuntimeOptions) (*RuntimeHandle, error) {
 	var outRuntime C.mln_runtime
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {

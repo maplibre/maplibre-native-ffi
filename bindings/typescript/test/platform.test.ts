@@ -82,7 +82,7 @@ test(
       join(root, "load.ts"),
       [
         'import { RuntimeHandle } from "./first/src/index.ts";',
-        "const runtime = await RuntimeHandle.create();",
+        "const runtime = RuntimeHandle.create();",
         "try {",
         '  await import("./second/src/index.ts");',
         '  console.log("the second copy loaded");',

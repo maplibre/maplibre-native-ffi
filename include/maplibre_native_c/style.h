@@ -1029,10 +1029,10 @@ typedef struct mln_vulkan_custom_layer_encoder {
  * don't finish the encoder.
  */
 typedef struct mln_web_gpu_custom_layer_encoder {
-  /** The `WGPUDevice` that the session renders on. */
-  void* device;
-  /** The frame's `WGPUCommandEncoder`, with no pass open. */
-  void* encoder;
+  /** The `GPUDevice` that the session renders on. */
+  mln_web_object device;
+  /** The frame's `GPUCommandEncoder`, with no pass open. */
+  mln_web_object encoder;
 } mln_web_gpu_custom_layer_encoder;
 
 /**
@@ -1155,17 +1155,17 @@ typedef struct mln_open_gl_custom_layer_pass {
  * returns, the map sets again what its own draws need. Don't end `encoder`.
  */
 typedef struct mln_web_gpu_custom_layer_pass {
-  /** The `WGPUDevice` that the session renders on. */
-  void* device;
-  /** The pass's `WGPURenderPassEncoder`. */
-  void* encoder;
-  /** The `WGPUTextureFormat` of the pass's color attachment. */
-  uint32_t color_format;
+  /** The `GPUDevice` that the session renders on. */
+  mln_web_object device;
+  /** The pass's `GPURenderPassEncoder`. */
+  mln_web_object encoder;
+  /** The `GPUTextureFormat` of the pass's color attachment. */
+  mln_buffer_view color_format;
   /**
-   * The `WGPUTextureFormat` of the pass's depth-stencil attachment, or
-   * `WGPUTextureFormat_Undefined` when it has none.
+   * The `GPUTextureFormat` of the pass's depth-stencil attachment, or empty
+   * when it has none.
    */
-  uint32_t depth_stencil_format;
+  mln_buffer_view depth_stencil_format;
   /** The sample count of the pass's attachments. */
   uint32_t sample_count;
 } mln_web_gpu_custom_layer_pass;
@@ -1196,8 +1196,8 @@ typedef struct mln_custom_layer_render_parameters {
   mln_custom_layer_frame frame;
   /**
    * The depth that a 2D layer at the layer's place in the style writes, as
-   * mln_frame_projection describes, between `frame.frame_projection.far_depth` and
-   * 1.
+   * mln_frame_projection describes, between `frame.frame_projection.far_depth`
+   * and 1.
    *
    * The map draws the opaque fragments of its 2D layers before the render
    * callback runs, those above the custom layer too. A fragment that you draw
@@ -1234,8 +1234,8 @@ typedef void (*mln_custom_layer_prerender_callback)(
  * The map draws its layers below the custom layer before the callback, and
  * those above it after, except for the opaque fragments of 2D layers, which it
  * draws before either, as mln_custom_layer_render_parameters.layer_depth
- * describes. Draw through `frame.frame_projection.matrix` to depth-test against the
- * map's 3D layers.
+ * describes. Draw through `frame.frame_projection.matrix` to depth-test against
+ * the map's 3D layers.
  *
  * Threads:
  * Runs on the thread that runs the session's graphics work, as
@@ -1276,7 +1276,9 @@ typedef void (*mln_custom_layer_session_end_callback)(void* user_data);
  *
  * A session runs the callbacks only when it can hand you its commands as one
  * of mln_custom_layer_pass_data's variants, so a session on another backend,
- * such as WebGPU outside a browser, doesn't draw the layer. Leave unset the
+ * such as WebGPU outside a browser, doesn't draw the layer. Nor does a browser
+ * WebGPU session yet: the library's WebGPU (wgpu) exposes no command encoder
+ * or render pass to hand you. Leave unset the
  * callbacks that you don't need.
  */
 typedef struct mln_custom_layer_host {

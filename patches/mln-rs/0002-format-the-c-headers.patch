@@ -1,0 +1,64 @@
+Format the C headers as maplibre-native-ffi's include/ is formatted.
+
+include/ is the source of truth for the C API, and the configure step fails
+while this copy differs from it. maplibre-native-ffi's formatter sorts the
+includes of render_target.h and rewraps two comments in style.h and the
+declaration of mln_web_free in web.h, which the copy here doesn't do yet.
+
+diff --git a/crates/mln_c/include/maplibre_native_c/render_target.h b/crates/mln_c/include/maplibre_native_c/render_target.h
+index 69e6dad..413a614 100644
+--- a/crates/mln_c/include/maplibre_native_c/render_target.h
++++ b/crates/mln_c/include/maplibre_native_c/render_target.h
+@@ -11,9 +11,9 @@
+ #include <stdint.h>
+ 
+ #include "base.h"
+-#include "web.h"
+ #include "map.h"
+ #include "wake.h"
++#include "web.h"
+ 
+ #ifdef __cplusplus
+ extern "C" {
+diff --git a/crates/mln_c/include/maplibre_native_c/style.h b/crates/mln_c/include/maplibre_native_c/style.h
+index dcf1935..fc574d0 100644
+--- a/crates/mln_c/include/maplibre_native_c/style.h
++++ b/crates/mln_c/include/maplibre_native_c/style.h
+@@ -1196,8 +1196,8 @@ typedef struct mln_custom_layer_render_parameters {
+   mln_custom_layer_frame frame;
+   /**
+    * The depth that a 2D layer at the layer's place in the style writes, as
+-   * mln_frame_projection describes, between `frame.frame_projection.far_depth` and
+-   * 1.
++   * mln_frame_projection describes, between `frame.frame_projection.far_depth`
++   * and 1.
+    *
+    * The map draws the opaque fragments of its 2D layers before the render
+    * callback runs, those above the custom layer too. A fragment that you draw
+@@ -1234,8 +1234,8 @@ typedef void (*mln_custom_layer_prerender_callback)(
+  * The map draws its layers below the custom layer before the callback, and
+  * those above it after, except for the opaque fragments of 2D layers, which it
+  * draws before either, as mln_custom_layer_render_parameters.layer_depth
+- * describes. Draw through `frame.frame_projection.matrix` to depth-test against the
+- * map's 3D layers.
++ * describes. Draw through `frame.frame_projection.matrix` to depth-test against
++ * the map's 3D layers.
+  *
+  * Threads:
+  * Runs on the thread that runs the session's graphics work, as
+diff --git a/crates/mln_c/include/maplibre_native_c/web.h b/crates/mln_c/include/maplibre_native_c/web.h
+index ffce1af..ab49b75 100644
+--- a/crates/mln_c/include/maplibre_native_c/web.h
++++ b/crates/mln_c/include/maplibre_native_c/web.h
+@@ -56,8 +56,9 @@ MLN_API void* mln_web_alloc(size_t size, size_t align) MLN_NOEXCEPT;
+  * Freeing null does nothing.
+  */
+ MLN_BINDING("platforms=web")
+-MLN_API void mln_web_free(void* pointer, size_t size, size_t align)
+-  MLN_NOEXCEPT;
++MLN_API void mln_web_free(
++  void* pointer, size_t size, size_t align
++) MLN_NOEXCEPT;
+ 
+ #ifdef __cplusplus
+ }

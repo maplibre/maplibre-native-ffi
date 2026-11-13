@@ -824,7 +824,6 @@ mln_status close_child(child value, mln_diagnostic *out_diagnostic);
 mln_status abandon_child(child value, mln_diagnostic *out_diagnostic);
 void release_request(request value);
 BIND("consumes=always") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
-BIND("blocks=thread_start") mln_status start(root *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=lifecycle") mln_status attach(
   root parent, child *owner BIND("direction=out"),
   const mln_completion *done, mln_diagnostic *out_diagnostic);
@@ -839,7 +838,7 @@ mln_status jump(root value, double zoom, mln_diagnostic *out_diagnostic);
         )
         operations = (*model.operations, *model.runtime_operations)
         shapes = {operation.name: operation.shape for operation in operations}
-        # A drain and a thread start also create owners, a lifecycle release
+        # A drain also creates owners, a lifecycle release
         # also completes, and a discard is also its handle's cleanup.
         self.assertEqual(
             shapes,
@@ -852,7 +851,6 @@ mln_status jump(root value, double zoom, mln_diagnostic *out_diagnostic);
                 "mln_probe_reading_batch_release": "release",
                 "release_root": "release_async",
                 "answer": "answer",
-                "start": "thread_start",
                 "attach": "attach",
                 "refresh": "command",
                 "zoom": "query",

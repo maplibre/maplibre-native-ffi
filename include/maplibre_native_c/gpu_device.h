@@ -46,8 +46,8 @@ typedef struct mln_gpu_device_options {
   /**
    * The backend that the device renders with. By default, the platform's own:
    * Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has
-   * no Vulkan driver, and WebGPU in a browser, or WebGL where the browser has
-   * no WebGPU.
+   * no Vulkan driver, and in a browser the build's one backend: WebGPU or
+   * OpenGL (WebGL2).
    */
   mln_render_backend backend
     MLN_BINDING("mask=fields;bit=MLN_GPU_DEVICE_OPTION_BACKEND");
@@ -187,8 +187,10 @@ typedef struct mln_gpu_device_vulkan_context_result {
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when this build or platform lacks `backend`, when
  *   the device can't render with `open_gl_client_api`, when a device that
- *   doesn't render with Vulkan gets a `queue_lock`, or in a browser WebGPU
- *   build, where you attach without a device or wrap the page's.
+ *   doesn't render with Vulkan gets a `queue_lock`, or in a browser for every
+ *   backend: WebGPU makes devices asynchronously, and a WebGL2 context needs a
+ *   canvas. Attach without a device, which the session makes itself, or wrap
+ *   your WebGL2 context.
  * - MLN_STATUS_NOT_FOUND when no GPU matches `adapter_index`, `adapter_uuid`,
  *   or `adapter_luid`.
  * - MLN_STATUS_NATIVE_ERROR when the platform can't create the device.
@@ -248,6 +250,11 @@ MLN_API mln_status mln_gpu_device_wrap_metal(
  * with yours, so that it can render into your textures and present to your
  * surfaces. A device that the library creates is a share group of its own.
  *
+ * WebGL has no share groups: a WebGL device is your context. Its sessions
+ * present to a web canvas target whose canvas is the context's own, and take
+ * turns in the context. The library resets the context's state that it tracks
+ * at the start of each frame, and leaves it undefined after.
+ *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when mln_open_gl_supported_context_provider_mask()
  *   lacks the context's platform.
@@ -264,17 +271,14 @@ MLN_API mln_status mln_gpu_device_wrap_open_gl(
 ) MLN_NOEXCEPT;
 
 /**
- * Wraps your WebGPU device, so that sessions render on it and present to the
- * surfaces you make with its instance.
- *
- * Sessions on the device run on MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
+ * Wraps your WebGPU device, so that sessions render on it, into your textures
+ * and your canvases.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED outside a browser WebGPU build.
- *
- * Lifetimes:
- * Keep the objects that `context` names alive until every session on the
- * device detaches or is released, or is abandoned.
+ * - MLN_STATUS_UNSUPPORTED in every build: the library's WebGPU (wgpu) can't
+ *   wrap a `GPUDevice` yet (https://github.com/louwers/mln-rs/issues/263).
+ *   Attach a web canvas target without a device, and the session asks the
+ *   browser for one.
  */
 MLN_BINDING("platforms=web")
 MLN_API mln_status mln_gpu_device_wrap_web_gpu(

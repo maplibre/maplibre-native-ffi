@@ -94,7 +94,7 @@ const char* mln_ts_index_path(
 );
 /** Zeroed memory that lives until the call ends, or NULL with a throw. */
 void* mln_ts_allocate(mln_ts_call* call, size_t size);
-/** Frees call memory that a call handed off, as mln_ts_start_thread does. */
+/** Frees a list of call memory. */
 void mln_ts_free_allocations(mln_ts_allocation* allocations);
 /**
  * Runs reject(data) when the call ends, unless native code accepted it. When
@@ -223,23 +223,6 @@ bool mln_ts_read_native_registration(
 bool mln_ts_read_completion(
   mln_ts_call* call, napi_value settle, bool discardable,
   mln_ts_decoder decoder, mln_completion* storage, const mln_completion** out
-);
-
-/** Runs a call that waits for a thread to start, and writes its new handle. */
-typedef mln_status (*mln_ts_thread_run)(
-  const void* arguments, uint64_t* out_handle, mln_diagnostic* diagnostic
-);
-/**
- * Starts run with a copy of the size bytes at arguments on a detached thread,
- * and returns at once. The thread takes the call's memory, which the copied
- * arguments point into. When run returns, the realm calls the function settle
- * with its status, its handle, and its diagnostic. When the realm has ended by
- * then, the thread disposes a created handle with dispose. Returns false with
- * a throw when the thread could not start.
- */
-bool mln_ts_start_thread(
-  mln_ts_call* call, napi_value settle, mln_ts_thread_run run,
-  void (*dispose)(uint64_t handle), const void* arguments, size_t size
 );
 
 // C to JavaScript. Each returns NULL after a failed Node-API call.

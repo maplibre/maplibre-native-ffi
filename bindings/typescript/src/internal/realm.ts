@@ -117,7 +117,7 @@ export function unhold(): void {
 }
 
 /**
- * Holds the event loop for one completion or thread start, and returns what
+ * Holds the event loop for one completion, and returns what
  * ends the hold, which only its first call does.
  */
 export function awaitNative(): () => void {

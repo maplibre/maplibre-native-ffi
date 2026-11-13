@@ -138,7 +138,6 @@
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderSessionCapabilityFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/VulkanContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/WebGlContextDescriptor.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/RenderTarget/WebGlContextKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/WglContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/CacheDatabaseOperation.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/CameraChangeMode.g.cs linguist-generated=true

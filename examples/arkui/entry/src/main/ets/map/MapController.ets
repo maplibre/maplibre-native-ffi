@@ -109,7 +109,7 @@ export class MapController {
 
   private async startMap(): Promise<void> {
     this.showStatus('Loading the library…');
-    const runtime = await RuntimeHandle.create();
+    const runtime = RuntimeHandle.create();
     if (this.disposed) {
       runtime.dispose();
       return;

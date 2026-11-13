@@ -95,20 +95,16 @@ typedef struct mln_web_gpu_texture_frame {
   double scale_factor;
   /** The texture's index in the descriptor's `textures`. */
   uint32_t slot;
-  /** The WGPUTexture. */
-  void* texture MLN_BINDING("lifetime=owner");
-  /** The WGPUTextureView. */
-  void* texture_view MLN_BINDING("lifetime=owner");
-  /** The texture's WGPUDevice. */
-  void* device MLN_BINDING("lifetime=owner");
-  /** The texture's WGPUTextureFormat. */
-  uint32_t format;
-  /** The WGPUTexture that holds the frame's depth and stencil. */
-  void* depth_texture MLN_BINDING("lifetime=owner");
-  /** A WGPUTextureView of the depth texture. */
-  void* depth_texture_view MLN_BINDING("lifetime=owner");
-  /** The depth texture's WGPUTextureFormat. */
-  uint32_t depth_format;
+  /** The `GPUTexture`. */
+  mln_web_object texture MLN_BINDING("lifetime=owner");
+  /** The texture's `GPUDevice`. */
+  mln_web_object device MLN_BINDING("lifetime=owner");
+  /** The texture's `GPUTextureFormat`. */
+  mln_buffer_view format MLN_BINDING("lifetime=owner");
+  /** The `GPUTexture` that holds the frame's depth and stencil. */
+  mln_web_object depth_texture MLN_BINDING("lifetime=owner");
+  /** The depth texture's `GPUTextureFormat`. */
+  mln_buffer_view depth_format MLN_BINDING("lifetime=owner");
 } mln_web_gpu_texture_frame;
 
 /**
@@ -383,8 +379,9 @@ MLN_API mln_status mln_acquired_frame_get_open_gl_texture(
  *   or disposed it.
  *
  * Lifetimes:
- * The texture, view, and device in `out_frame` stay valid until you release or
- * discard the frame, or the session is abandoned or disposed. A view from
+ * The handles and formats in `out_frame` stay valid until you release or
+ * discard the frame, or the session is abandoned or disposed. Don't release
+ * the handles. A view from
  * mln_acquired_frame_view_begin() keeps them valid until
  * mln_acquired_frame_view_end().
  */

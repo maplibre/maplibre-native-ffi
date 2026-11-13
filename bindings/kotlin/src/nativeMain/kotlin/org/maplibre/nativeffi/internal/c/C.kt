@@ -2618,4 +2618,19 @@ internal actual object C {
   actual fun mln_vulkan_device_release(device: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_vulkan_device_release(device.toULong())
   }
+
+  actual fun mln_web_alloc(size: Long, align: Long): Long =
+    org.maplibre.nativeffi.internal.cinterop.mln_web_alloc(size.convert(), align.convert()).toLong()
+
+  actual fun mln_web_free(pointer: Long, size: Long, align: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_web_free(
+      pointer.toCPointer<CPointed>(),
+      size.convert(),
+      align.convert(),
+    )
+  }
+
+  actual fun mln_web_object_release(`object`: Int) {
+    org.maplibre.nativeffi.internal.cinterop.mln_web_object_release(`object`.toUInt())
+  }
 }

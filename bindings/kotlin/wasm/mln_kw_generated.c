@@ -1862,35 +1862,12 @@ int32_t mln_kw_mln_runtime_clear_resource_transform(
   );
 }
 
-typedef struct mln_kw_mln_runtime_create_arguments {
-  uintptr_t options;
-  uintptr_t out_runtime;
-  uintptr_t out_diagnostic;
-} mln_kw_mln_runtime_create_arguments;
-_Static_assert(
-  sizeof(mln_kw_mln_runtime_create_arguments) <=
-    MLN_KW_THREAD_START_ARGUMENTS_SIZE,
-  "mln_runtime_create arguments"
-);
-
-static int32_t mln_kw_mln_runtime_create_run(const void* arguments) {
-  const mln_kw_mln_runtime_create_arguments* call = arguments;
-  return (int32_t)mln_runtime_create(
-    (const mln_runtime_options*)call->options, (mln_runtime*)call->out_runtime,
-    (mln_diagnostic*)call->out_diagnostic
-  );
-}
-
 int32_t mln_kw_mln_runtime_create(
-  uintptr_t start, uintptr_t options, uintptr_t out_runtime,
-  uintptr_t out_diagnostic
+  uintptr_t options, uintptr_t out_runtime, uintptr_t out_diagnostic
 ) {
-  mln_kw_mln_runtime_create_arguments arguments = {
-    options, out_runtime, out_diagnostic
-  };
-  return mln_kw_start_thread(
-    (mln_kw_thread_start*)start, mln_kw_mln_runtime_create_run, &arguments,
-    sizeof arguments
+  return (int32_t)mln_runtime_create(
+    (const mln_runtime_options*)options, (mln_runtime*)out_runtime,
+    (mln_diagnostic*)out_diagnostic
   );
 }
 
@@ -2142,6 +2119,18 @@ int32_t mln_kw_mln_vulkan_device_get_context(
 
 void mln_kw_mln_vulkan_device_release(int64_t device) {
   mln_vulkan_device_release((mln_vulkan_device)device);
+}
+
+uintptr_t mln_kw_mln_web_alloc(uint32_t size, uint32_t align) {
+  return (uintptr_t)mln_web_alloc((size_t)size, (size_t)align);
+}
+
+void mln_kw_mln_web_free(uintptr_t pointer, uint32_t size, uint32_t align) {
+  mln_web_free((void*)pointer, (size_t)size, (size_t)align);
+}
+
+void mln_kw_mln_web_object_release(int32_t object) {
+  mln_web_object_release((mln_web_object)object);
 }
 
 static void mln_kw_upcall_completion(

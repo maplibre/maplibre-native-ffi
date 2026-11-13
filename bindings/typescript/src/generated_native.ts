@@ -103,7 +103,7 @@ import type {
   Win32WindowDescriptor,
   Win32WindowReplacement,
 } from "./generated_values.ts";
-import type { NativeCompletion, NativeThreadStart } from "./internal/addon.ts";
+import type { NativeCompletion } from "./internal/addon.ts";
 
 /** The addon function of each generated operation, by C function name. */
 export interface NativeOperations {
@@ -904,10 +904,7 @@ export interface NativeOperations {
     runtime: bigint,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_runtime_create(
-    options: RuntimeOptions | undefined,
-    start: NativeThreadStart,
-  ): void;
+  mln_runtime_create(options: RuntimeOptions | undefined): bigint;
   mln_runtime_create_map(
     runtime: bigint,
     options: MapOptions,
@@ -1019,6 +1016,9 @@ export interface NativeOperations {
   mln_vulkan_device_create(options: VulkanDeviceOptions | undefined): bigint;
   mln_vulkan_device_get_context(device: bigint): VulkanDeviceContextResult;
   mln_vulkan_device_release(device: bigint, token: object | undefined): void;
+  mln_web_alloc(size: bigint, align: bigint): bigint;
+  mln_web_free(pointer: bigint, size: bigint, align: bigint): void;
+  mln_web_object_release(object: number): void;
   mln_acquired_frame_view_begin(handle: bigint): bigint;
   mln_acquired_frame_view_end(scope: bigint): void;
 }

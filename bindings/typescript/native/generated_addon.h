@@ -23,6 +23,7 @@
 #include "maplibre_native_c/surface.h"
 #include "maplibre_native_c/texture.h"
 #include "maplibre_native_c/vulkan.h"
+#include "maplibre_native_c/web.h"
 #include "runtime.h"
 
 /** The realm's callback adapters, by the callback type that each

@@ -598,36 +598,36 @@ internal fun NativeArena.putWebGpuBorrowedTextureDescriptor(
   target: Long,
   value: WebGpuBorrowedTextureDescriptor,
 ) {
-  writeU32(target, w(44, 72).toUInt())
+  writeU32(target, w(40, 56).toUInt())
   putLogicalSize(target + 4, value.logicalSize)
   writeU32(target + 12, value.physicalWidth)
   writeU32(target + 16, value.physicalHeight)
-  putWebGpuContextDescriptor(target + w(20, 24), value.context)
+  putWebGpuContextDescriptor(target + 20, value.context)
   writeAddress(
-    target + w(32, 48),
-    array(value.textures, w(8, 16), w(4, 8)) { at, item -> putWebGpuBorrowedTexture(at, item) },
+    target + 24,
+    array(value.textures, 4, 4) { at, item -> putWebGpuBorrowedTexture(at, item) },
   )
-  writeSize(target + w(36, 56), value.textures.size.toULong())
-  writeU32(target + w(40, 64), value.format)
+  writeSize(target + w(28, 32), value.textures.size.toULong())
+  putView(target + w(32, 40), value.format)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeWebGpuBorrowedTextureDescriptor(
   value: WebGpuBorrowedTextureDescriptor,
-): Long = allocate(w(44, 72), w(4, 8)).also { putWebGpuBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(40, 56), w(4, 8)).also { putWebGpuBorrowedTextureDescriptor(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putWebGpuSurfaceDescriptor(target: Long, value: WebGpuSurfaceDescriptor) {
-  writeU32(target, w(32, 56).toUInt())
+  writeU32(target, w(28, 40).toUInt())
   putLogicalSize(target + 4, value.logicalSize)
-  putWebGpuContextDescriptor(target + w(12, 16), value.context)
-  writeAddress(target + w(24, 40), value.surface.address)
-  writeU32(target + w(28, 48), value.format)
+  putWebGpuContextDescriptor(target + 12, value.context)
+  writeU32(target + 16, value.canvas)
+  putView(target + w(20, 24), value.format)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeWebGpuSurfaceDescriptor(value: WebGpuSurfaceDescriptor): Long =
-  allocate(w(32, 56), w(4, 8)).also { putWebGpuSurfaceDescriptor(it, value) }
+  allocate(w(28, 40), w(4, 8)).also { putWebGpuSurfaceDescriptor(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putWin32WindowDescriptor(target: Long, value: Win32WindowDescriptor) {
@@ -1205,7 +1205,7 @@ internal fun NativeArena.putWebGpuBorrowedTextureReplacement(
   writeU32(target + 16, value.physicalHeight)
   writeAddress(
     target + w(20, 24),
-    array(value.textures, w(8, 16), w(4, 8)) { at, item -> putWebGpuBorrowedTexture(at, item) },
+    array(value.textures, 4, 4) { at, item -> putWebGpuBorrowedTexture(at, item) },
   )
   writeSize(target + w(24, 32), value.textures.size.toULong())
 }
@@ -1220,14 +1220,14 @@ internal fun NativeArena.putWebGpuSurfaceReplacement(
   target: Long,
   value: WebGpuSurfaceReplacement,
 ) {
-  writeU32(target, w(16, 24).toUInt())
+  writeU32(target, 16.toUInt())
   putLogicalSize(target + 4, value.logicalSize)
-  writeAddress(target + w(12, 16), value.surface.address)
+  writeU32(target + 12, value.canvas)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeWebGpuSurfaceReplacement(value: WebGpuSurfaceReplacement): Long =
-  allocate(w(16, 24), w(4, 8)).also { putWebGpuSurfaceReplacement(it, value) }
+  allocate(16, 4).also { putWebGpuSurfaceReplacement(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putWin32WindowReplacement(target: Long, value: Win32WindowReplacement) {
@@ -1596,19 +1596,9 @@ internal fun readWebGpuTextureFrame(source: Long, scope: ViewScope? = null): Web
       height = readU32(source + 8),
       scaleFactor = readF64(source + w(16, 16, 12)),
       slot = readU32(source + w(24, 24, 20)),
-      texture =
-        readAddress(source + w(28, 32, 24)).let {
-          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
-        },
-      textureView =
-        readAddress(source + w(32, 40, 28)).let {
-          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
-        },
-      device =
-        readAddress(source + w(36, 48, 32)).let {
-          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
-        },
-      format = readU32(source + w(40, 56, 36)),
+      texture = readU32(source + w(28, 28, 24)),
+      device = readU32(source + w(32, 32, 28)),
+      format = readViewString(source + w(36, 40, 32)),
     )
     .also { it.bindingScope = scope }
 
@@ -2071,24 +2061,21 @@ internal fun NativeArena.writeVulkanBorrowedTexture(value: VulkanBorrowedTexture
 
 @JvmSynthetic
 internal fun NativeArena.putWebGpuContextDescriptor(target: Long, value: WebGpuContextDescriptor) {
-  writeAddress(target, value.instance.address)
-  writeAddress(target + w(4, 8), value.device.address)
-  writeAddress(target + w(8, 16), value.queue.address)
+  writeU32(target, value.device)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeWebGpuContextDescriptor(value: WebGpuContextDescriptor): Long =
-  allocate(w(12, 24), w(4, 8)).also { putWebGpuContextDescriptor(it, value) }
+  allocate(4, 4).also { putWebGpuContextDescriptor(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putWebGpuBorrowedTexture(target: Long, value: WebGpuBorrowedTexture) {
-  writeAddress(target, value.texture.address)
-  writeAddress(target + w(4, 8), value.textureView.address)
+  writeU32(target, value.texture)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeWebGpuBorrowedTexture(value: WebGpuBorrowedTexture): Long =
-  allocate(w(8, 16), w(4, 8)).also { putWebGpuBorrowedTexture(it, value) }
+  allocate(4, 4).also { putWebGpuBorrowedTexture(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
@@ -2538,14 +2525,12 @@ internal fun NativeArena.writeEglContextDescriptor(value: EglContextDescriptor):
 
 @JvmSynthetic
 internal fun NativeArena.putWebGlContextDescriptor(target: Long, value: WebGlContextDescriptor) {
-  writeU32(target, value.kind.rawValue)
-  writeI32(target + 4, value.context)
-  putView(target + 8, value.canvasSelector)
+  writeU32(target, value.context)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeWebGlContextDescriptor(value: WebGlContextDescriptor): Long =
-  allocate(w(16, 24), w(4, 8)).also { putWebGlContextDescriptor(it, value) }
+  allocate(4, 4).also { putWebGlContextDescriptor(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putUrlQueryParameter(target: Long, value: UrlQueryParameter) {

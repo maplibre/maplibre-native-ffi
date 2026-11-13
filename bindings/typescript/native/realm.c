@@ -24,12 +24,6 @@
 #include "mutex.h"
 #include "runtime.h"
 
-#ifdef _WIN32
-#include <process.h>
-#else
-#include <pthread.h>
-#endif
-
 #ifdef __APPLE__
 #include <dlfcn.h>
 #endif
@@ -41,7 +35,6 @@
 typedef enum mln_ts_message_kind {
   MLN_TS_MESSAGE_DISPATCH,
   MLN_TS_MESSAGE_LEAK,
-  MLN_TS_MESSAGE_THREAD_START,
 } mln_ts_message_kind;
 
 /**
@@ -77,20 +70,6 @@ typedef struct mln_ts_leak {
   uint64_t handle;
   char name[64];
 } mln_ts_leak;
-
-typedef struct mln_ts_thread_start {
-  mln_ts_message_kind kind;
-  mln_ts_shim* shim;
-  napi_ref settle;
-  mln_ts_thread_run run;
-  void (*dispose)(uint64_t handle);
-  // The call memory that the copied arguments point into.
-  mln_ts_allocation* allocations;
-  mln_status status;
-  uint64_t handle;
-  mln_diagnostic diagnostic;
-  max_align_t arguments[];
-} mln_ts_thread_start;
 
 struct mln_ts_realm {
   napi_env env;
@@ -203,94 +182,6 @@ static void queue_wake(void* user_data) { shim_post(user_data, NULL); }
 
 static void queue_wake_release(void* user_data) { shim_release(user_data); }
 
-/**
- * Disposes what a thread start created for a realm that cannot take it. The
- * realm's environment is gone, and its settle reference with it.
- */
-static void thread_start_abandon(mln_ts_thread_start* start) {
-  if (start->status == MLN_STATUS_OK && start->handle != 0) {
-    start->dispose(start->handle);
-  }
-  free(start);
-}
-
-#ifdef _WIN32
-static unsigned __stdcall thread_start_main(void* argument) {
-#else
-static void* thread_start_main(void* argument) {
-#endif
-  mln_ts_thread_start* start = argument;
-  start->diagnostic.size = sizeof start->diagnostic;
-  start->diagnostic.message[0] = '\0';
-  start->status =
-    start->run(start->arguments, &start->handle, &start->diagnostic);
-  mln_ts_free_allocations(start->allocations);
-  start->allocations = NULL;
-  // The realm may free the start as soon as the post lands.
-  mln_ts_shim* shim = start->shim;
-  if (!shim_post(shim, start)) {
-    thread_start_abandon(start);
-  }
-  shim_release(shim);
-#ifdef _WIN32
-  return 0;
-#else
-  return NULL;
-#endif
-}
-
-bool mln_ts_start_thread(
-  mln_ts_call* call, napi_value settle, mln_ts_thread_run run,
-  void (*dispose)(uint64_t handle), const void* arguments, size_t size
-) {
-  if (!mln_ts_read_function(call, settle, "start")) {
-    return false;
-  }
-  mln_ts_thread_start* start = calloc(1, sizeof *start + size);
-  if (
-    start == NULL ||
-    napi_create_reference(call->env, settle, 1, &start->settle) != napi_ok
-  ) {
-    free(start);
-    napi_throw_error(call->env, NULL, "thread start allocation failed");
-    return false;
-  }
-  memcpy(start->arguments, arguments, size);
-  start->kind = MLN_TS_MESSAGE_THREAD_START;
-  start->shim = shim_retain(call->realm->shim);
-  start->run = run;
-  start->dispose = dispose;
-  start->allocations = call->allocations;
-  call->allocations = NULL;
-  // Nothing joins the thread, so a browser page that never blocks can start
-  // it. It runs once a pool worker takes it.
-#ifdef _WIN32
-  uintptr_t thread = _beginthreadex(NULL, 0, thread_start_main, start, 0, NULL);
-  int result = thread == 0;
-  if (thread != 0) {
-    CloseHandle((HANDLE)thread);
-  }
-#else
-  pthread_attr_t attributes;
-  pthread_attr_init(&attributes);
-  pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
-  pthread_t thread;
-  int result = pthread_create(&thread, &attributes, thread_start_main, start);
-  pthread_attr_destroy(&attributes);
-#endif
-  if (result != 0) {
-    call->allocations = start->allocations;
-    shim_release(start->shim);
-    napi_delete_reference(call->env, start->settle);
-    free(start);
-    mln_ts_throw_status(
-      call->env, MLN_STATUS_NATIVE_ERROR, "the call's thread did not start"
-    );
-    return false;
-  }
-  return true;
-}
-
 static void surface_exception(napi_env env) {
   bool pending = false;
   if (napi_is_exception_pending(env, &pending) == napi_ok && pending) {
@@ -310,30 +201,10 @@ static bool call_realm(
          napi_call_function(env, global, target, argc, argv, result) == napi_ok;
 }
 
-static void thread_start_settle(napi_env env, mln_ts_thread_start* start) {
-  napi_value settle = reference_value(env, start->settle);
-  napi_value global;
-  napi_value argv[3] = {
-    mln_ts_number(env, start->status), mln_ts_u64(env, start->handle),
-    mln_ts_text(
-      env, start->diagnostic.message, strlen(start->diagnostic.message)
-    )
-  };
-  napi_delete_reference(env, start->settle);
-  // The TypeScript half owns the handle from here.
-  free(start);
-  if (
-    settle == NULL || napi_get_global(env, &global) != napi_ok ||
-    napi_call_function(env, global, settle, 3, argv, NULL) != napi_ok
-  ) {
-    surface_exception(env);
-  }
-}
-
 /**
  * Receives one message on the realm's JavaScript thread. A host that tears the
  * function down passes no environment: the realm then dispatches nothing, a
- * leak report is only freed, and a thread start disposes what it created.
+ * leak report is only freed.
  */
 static void receive(
   napi_env env, napi_value callback, void* context, void* data
@@ -344,11 +215,7 @@ static void receive(
     data != NULL ? *(mln_ts_message_kind*)data : MLN_TS_MESSAGE_DISPATCH;
   napi_handle_scope scope;
   if (env == NULL || napi_open_handle_scope(env, &scope) != napi_ok) {
-    if (kind == MLN_TS_MESSAGE_THREAD_START) {
-      thread_start_abandon(data);
-    } else {
-      free(data);
-    }
+    free(data);
     return;
   }
   switch (kind) {
@@ -371,9 +238,6 @@ static void receive(
       free(leak);
       break;
     }
-    case MLN_TS_MESSAGE_THREAD_START:
-      thread_start_settle(env, data);
-      break;
   }
   napi_close_handle_scope(env, scope);
 }

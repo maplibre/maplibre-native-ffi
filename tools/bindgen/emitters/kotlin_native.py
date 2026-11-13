@@ -214,8 +214,6 @@ class Signature:
     parameters: tuple[Parameter, ...]
     result: Primitive | Record | None
     result_ctype: CType
-    # What the call waits for before it returns, from `blocks=`.
-    blocks: str | None = None
 
     @property
     def wrapper(self):
@@ -319,7 +317,6 @@ class NativeShims:
             tuple(parameters),
             result,
             function.return_type,
-            function.metadata.get("blocks"),
         )
 
     def kotlin_parameters(self, signature):
@@ -793,25 +790,16 @@ class NativeShims:
         """The wasm shim: the Kotlin externs, the C wrappers they call, the export
         list, the upcall stubs that the browser module serves, and the
         trampolines behind them.
-
-        A function whose header records `blocks=thread_start` cannot run on the
-        page, which cannot wait for a thread to start. Its wrapper copies the
-        arguments into the thread start that `ThreadStart` staged, starts the call
-        on a pthread, and returns at once; the page later receives the call's
-        status.
         """
         externs, functions, wrappers, exports = [], [], [], []
         for s in self.signatures:
-            names = [f"p{index}" for index in range(len(s.parameters) + bool(s.blocks))]
+            names = [f"p{index}" for index in range(len(s.parameters))]
             carriers = [self.wasm_kind(p.kind) for p in s.parameters]
             extern_types = [WASM[kind.name][0] for kind in carriers]
             arguments = [
                 WASM[kind.name][2].format(p.name)
                 for p, kind in zip(s.parameters, carriers, strict=True)
             ]
-            if s.blocks:
-                extern_types.insert(0, "Int")
-                arguments.insert(0, "ThreadStart.staged()")
             result = (
                 None if s.result is None or isinstance(s.result, Record) else s.result
             )
@@ -855,7 +843,6 @@ class NativeShims:
             HEADER
             + "@file:OptIn(ExperimentalWasmJsInterop::class)\n\n"
             + f"package {PACKAGE}\n\n"
-            + "import org.maplibre.nativeffi.internal.call.ThreadStart\n\n"
             + "/** The C wrapper behind each C function, in the module that `loadWasmModule` loads. */\n"
             + "internal actual object C {\n"
             + "\n".join(functions)
@@ -989,28 +976,6 @@ class NativeShims:
             for p, kind in zip(s.parameters, carriers, strict=True)
         ]
         c_result = "void" if result is None else WASM[result.name][1]
-        if s.blocks:
-            arguments = f"{s.wrapper}_arguments"
-            fields = "".join(f"  {parameter};\n" for parameter in parameters)
-            casts = [
-                self.wasm_cast(p, f"call->{p.c_name}")
-                for p in s.parameters
-                if not p.returned
-            ]
-            return (
-                f"typedef struct {arguments} {{\n{fields}}} {arguments};\n"
-                f"_Static_assert(sizeof({arguments}) <= MLN_KW_THREAD_START_ARGUMENTS_SIZE, "
-                f'"{s.function} arguments");\n\n'
-                f"static int32_t {s.wrapper}_run(const void* arguments) {{\n"
-                f"  const {arguments}* call = arguments;\n"
-                f"  return (int32_t){s.function}({', '.join(casts)});\n}}\n\n"
-                f"int32_t {s.wrapper}({', '.join(['uintptr_t start', *parameters])}) {{\n"
-                f"  {arguments} arguments = {{"
-                + ", ".join(p.c_name for p in s.parameters)
-                + "};\n"
-                f"  return mln_kw_start_thread((mln_kw_thread_start*)start, {s.wrapper}_run, "
-                "&arguments, sizeof arguments);\n}"
-            )
         casts = [self.wasm_cast(p, p.c_name) for p in s.parameters if not p.returned]
         call = f"{s.function}({', '.join(casts)})"
         if isinstance(s.result, Record):

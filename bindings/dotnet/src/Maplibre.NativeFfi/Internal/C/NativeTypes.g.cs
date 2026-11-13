@@ -1626,15 +1626,12 @@ internal unsafe struct mln_wayland_surface_replacement
 
 internal unsafe struct mln_web_gl_context_descriptor
 {
-    public mln_web_gl_context_kind kind;
-    public int context;
-    public mln_buffer_view canvas_selector;
+    public uint context;
 }
 
 internal unsafe struct mln_web_gpu_borrowed_texture
 {
-    public void* texture;
-    public void* texture_view;
+    public uint texture;
 }
 
 internal unsafe struct mln_web_gpu_borrowed_texture_descriptor
@@ -1646,7 +1643,7 @@ internal unsafe struct mln_web_gpu_borrowed_texture_descriptor
     public mln_web_gpu_context_descriptor context;
     public mln_web_gpu_borrowed_texture* textures;
     public nuint texture_count;
-    public uint format;
+    public mln_buffer_view format;
 }
 
 internal unsafe struct mln_web_gpu_borrowed_texture_replacement
@@ -1661,9 +1658,7 @@ internal unsafe struct mln_web_gpu_borrowed_texture_replacement
 
 internal unsafe struct mln_web_gpu_context_descriptor
 {
-    public void* instance;
-    public void* device;
-    public void* queue;
+    public uint device;
 }
 
 internal unsafe struct mln_web_gpu_surface_descriptor
@@ -1671,15 +1666,15 @@ internal unsafe struct mln_web_gpu_surface_descriptor
     public uint size;
     public mln_logical_size logical_size;
     public mln_web_gpu_context_descriptor context;
-    public void* surface;
-    public uint format;
+    public uint canvas;
+    public mln_buffer_view format;
 }
 
 internal unsafe struct mln_web_gpu_surface_replacement
 {
     public uint size;
     public mln_logical_size logical_size;
-    public void* surface;
+    public uint canvas;
 }
 
 internal unsafe struct mln_web_gpu_texture_frame
@@ -1689,10 +1684,9 @@ internal unsafe struct mln_web_gpu_texture_frame
     public uint height;
     public double scale_factor;
     public uint slot;
-    public void* texture;
-    public void* texture_view;
-    public void* device;
-    public uint format;
+    public uint texture;
+    public uint device;
+    public mln_buffer_view format;
 }
 
 internal unsafe struct mln_wgl_context_descriptor
@@ -2504,10 +2498,4 @@ internal enum mln_vulkan_image_owner : uint
     MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0,
     MLN_VULKAN_IMAGE_OWNER_EXTERNAL = 1,
     MLN_VULKAN_IMAGE_OWNER_FOREIGN = 2,
-}
-
-internal enum mln_web_gl_context_kind : uint
-{
-    MLN_WEB_GL_CONTEXT_EXISTING = 0,
-    MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1,
 }

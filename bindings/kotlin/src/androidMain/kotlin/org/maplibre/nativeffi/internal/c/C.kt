@@ -1625,4 +1625,10 @@ internal actual object C {
   ): Int
 
   @JvmStatic actual external fun mln_vulkan_device_release(device: Long): Unit
+
+  @JvmStatic actual external fun mln_web_alloc(size: Long, align: Long): Long
+
+  @JvmStatic actual external fun mln_web_free(pointer: Long, size: Long, align: Long): Unit
+
+  @JvmStatic actual external fun mln_web_object_release(`object`: Int): Unit
 }

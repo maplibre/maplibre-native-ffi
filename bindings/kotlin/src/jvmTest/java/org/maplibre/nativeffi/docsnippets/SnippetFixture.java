@@ -73,7 +73,7 @@ final class SnippetFixture implements AutoCloseable {
    * mode} that is ready.
    */
   static SnippetFixture withMap(MapMode mode) {
-    RuntimeHandle runtime = RuntimeHandle.create(null).join();
+    RuntimeHandle runtime = RuntimeHandle.create(null);
     keepOffTheNetwork(runtime);
     MapHandle map =
         runtime.createMap(

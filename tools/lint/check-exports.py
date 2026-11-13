@@ -47,7 +47,7 @@ def declared_functions() -> set[str]:
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return set(module.exported_functions())
+    return set(module.exported_functions(include_web_only=True))
 
 
 def run(command: list[str]) -> str:

@@ -115,7 +115,7 @@ export class MapController {
 
   async #start(epoch: number): Promise<void> {
     this.#showStatus("Loading the library…");
-    const runtime = await RuntimeHandle.create();
+    const runtime = RuntimeHandle.create();
     if (epoch !== this.#epoch) return runtime.dispose();
     this.#runtime = runtime;
 
