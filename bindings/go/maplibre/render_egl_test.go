@@ -7,6 +7,10 @@ import "maplibre.org/maplibre-native-ffi/bindings/go/internal/testsupport"
 const (
 	buildBackend    = RenderBackendFlagOpenGL
 	graphicsBackend = testsupport.BackendEGL
+	// The backend of a device that the tests make without the test graphics:
+	// the library builds every backend, so a device left to choose may pick
+	// another one.
+	deviceBackend = RenderBackendOpenGL
 	// Only a Vulkan device takes a queue lock.
 	queueLockSupported = false
 )

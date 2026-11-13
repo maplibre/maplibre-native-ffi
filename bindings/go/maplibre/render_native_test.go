@@ -53,7 +53,8 @@ func TestNativeQueueLockReachesTheDevice(t *testing.T) {
 	r := newGraphicsFixture(t)
 	lock := newNativeRecorderForTest(nil)
 	if !queueLockSupported {
-		if _, err := NewGPUDevice(&GPUDeviceOptions{QueueLock: lock.queueLock()}); !errors.Is(err, StatusUnsupported) {
+		backend := deviceBackend
+		if _, err := NewGPUDevice(&GPUDeviceOptions{Backend: &backend, QueueLock: lock.queueLock()}); !errors.Is(err, StatusUnsupported) {
 			t.Fatalf("a device with a queue lock = %v, want StatusUnsupported", err)
 		}
 		if releases := lock.releases.Load(); releases != 1 {
