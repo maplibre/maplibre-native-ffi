@@ -149,12 +149,6 @@ status = "not-investigated"
 reason = "The browser package is a wasm-bindgen module that JavaScript loads. A Zig program in the browser would need Zig's linker to link mln-rs-c as a Rust library that wasm-bindgen then processes."
 
 [[entry]]
-bindings = ["typescript"]
-platforms = ["web"]
-status = "path-known"
-reason = "TODO(part 2 of the move off Emscripten): the binding's browser module still builds its Node-API code with Emscripten, which the library no longer builds for. It moves onto the browser package's raw C exports next."
-
-[[entry]]
 bindings = ["python"]
 platforms = ["ios"]
 status = "not-investigated"
