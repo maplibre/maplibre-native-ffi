@@ -39,11 +39,15 @@ type Context struct {
 	VulkanQueueFamilyIndex    uint32
 	VulkanGetInstanceProcAddr uintptr
 	VulkanGetDeviceProcAddr   uintptr
-	EGLDisplay                uintptr
-	EGLConfig                 uintptr
-	EGLContext                uintptr
-	WGLDeviceContext          uintptr
-	WGLContext                uintptr
+	// VulkanDeviceExtensions names the extensions that VulkanDevice enabled.
+	VulkanDeviceExtensions []string
+	EGLDisplay             uintptr
+	EGLConfig              uintptr
+	EGLContext             uintptr
+	WGLDeviceContext       uintptr
+	WGLContext             uintptr
+	// GetProcAddress is eglGetProcAddress or wglGetProcAddress.
+	GetProcAddress uintptr
 }
 
 // Graphics is a device or context that stands in for the host's. The handles
@@ -72,6 +76,12 @@ func NewGraphics(backend Backend) (*Graphics, error) {
 		C.mln_test_graphics_destroy(handle)
 		return nil, err
 	}
+	extensions := make([]string, context.vulkan_device_extension_count)
+	if len(extensions) > 0 {
+		for index, name := range unsafe.Slice(context.vulkan_device_extensions, len(extensions)) {
+			extensions[index] = C.GoString(name)
+		}
+	}
 	return &Graphics{
 		handle: handle,
 		Context: Context{
@@ -84,11 +94,13 @@ func NewGraphics(backend Backend) (*Graphics, error) {
 			VulkanQueueFamilyIndex:    uint32(context.vulkan_queue_family_index),
 			VulkanGetInstanceProcAddr: uintptr(unsafe.Pointer(context.vulkan_get_instance_proc_addr)),
 			VulkanGetDeviceProcAddr:   uintptr(unsafe.Pointer(context.vulkan_get_device_proc_addr)),
+			VulkanDeviceExtensions:    extensions,
 			EGLDisplay:                uintptr(unsafe.Pointer(context.egl_display)),
 			EGLConfig:                 uintptr(unsafe.Pointer(context.egl_config)),
 			EGLContext:                uintptr(unsafe.Pointer(context.egl_context)),
 			WGLDeviceContext:          uintptr(unsafe.Pointer(context.wgl_device_context)),
 			WGLContext:                uintptr(unsafe.Pointer(context.wgl_context)),
+			GetProcAddress:            uintptr(unsafe.Pointer(context.get_proc_address)),
 		},
 	}, nil
 }

@@ -7,14 +7,24 @@ import "maplibre.org/maplibre-native-ffi/bindings/go/internal/testsupport"
 const (
 	buildBackend    = RenderBackendFlagOpenGL
 	graphicsBackend = testsupport.BackendWGL
-	// Only Vulkan sessions take a queue lock.
+	// Only a Vulkan device takes a queue lock.
 	queueLockSupported = false
 )
 
-// A shared WGL context takes the caller driver, which runs on the thread the
-// fixture made that context current on.
+// wrapDevice makes an OpenGL device in the share group of the test graphics'
+// WGL context. Only a Vulkan device takes a queue lock.
+func wrapDevice(context testsupport.Context, _ QueueLock) (*GPUDeviceHandle, error) {
+	return WrapOpenGLGPUDevice(OpenGLContextDescriptorWGLVariant{Value: WGLContextDescriptor{
+		DeviceContext:  context.WGLDeviceContext,
+		ShareContext:   context.WGLContext,
+		GetProcAddress: context.GetProcAddress,
+	}})
+}
+
+// A session on the shared WGL context takes the caller driver, which runs on
+// the thread the fixture made that context current on.
 func attachBorrowedTexture(
-	m *MapHandle, context testsupport.Context, size LogicalSize, textures []*testsupport.Texture,
+	m *MapHandle, device *GPUDeviceHandle, size LogicalSize, textures []*testsupport.Texture,
 	options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
 	ring := make([]OpenGLBorrowedTexture, len(textures))
@@ -22,20 +32,13 @@ func attachBorrowedTexture(
 		ring[index] = OpenGLBorrowedTexture{Texture: texture.Info.OpenGLTexture}
 	}
 	info := textures[0].Info
-	return m.AttachOpenGLBorrowedTexture(OpenGLBorrowedTextureDescriptor{
+	return m.Attach(RenderTargetOpenGLBorrowedTexturesVariant{Value: OpenGLBorrowedTexturesTarget{
 		LogicalSize:    size,
 		PhysicalWidth:  info.Width,
 		PhysicalHeight: info.Height,
 		Textures:       ring,
 		Target:         info.OpenGLTarget,
-		Context: OpenGLContextDescriptor{
-			Ownership: OpenGLContextOwnershipShared,
-			Data: OpenGLContextDescriptorDataWGLVariant{Value: WGLContextDescriptor{
-				DeviceContext: context.WGLDeviceContext,
-				ShareContext:  context.WGLContext,
-			}},
-		},
-	}, options)
+	}}, device, options)
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {

@@ -63,10 +63,12 @@ func onFrameWake() {
 // #endregion frame-wake
 
 // #region resize
-func onWindowResized(width, height uint32) error {
-	// The window's new size in logical pixels.
-	return session.Discarding().Resize(maplibre.LogicalSize{
-		Width: width, Height: height,
+// Runs when the window changes size, or moves to a display with
+// another scale factor.
+func onWindowResized(width, height uint32, scaleFactor float64) error {
+	// The window's new size in logical pixels, and its scale factor.
+	return session.Discarding().Resize(maplibre.LogicalExtent{
+		Width: width, Height: height, ScaleFactor: scaleFactor,
 	})
 }
 
@@ -99,13 +101,16 @@ func surfaceLost(ctx context.Context) error {
 	return nil
 }
 
-func surfaceRestored(ctx context.Context, newSurface uint64) error {
+func surfaceRestored(ctx context.Context, display, newSurface uintptr) error {
 	// #region lost-surface
-	replacement := maplibre.VulkanSurfaceReplacement{
-		LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
-		Surface:     newSurface,
+	replacement := maplibre.RenderTargetWaylandSurfaceVariant{
+		Value: maplibre.WaylandSurfaceTarget{
+			LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
+			Display:     display,
+			Surface:     newSurface,
+		},
 	}
-	restored, err := session.SetVulkanSurfaceTarget(replacement)
+	restored, err := session.SetTarget(replacement)
 	if err != nil {
 		return err
 	}
@@ -116,17 +121,17 @@ func surfaceRestored(ctx context.Context, newSurface uint64) error {
 	return nil
 }
 
-func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.VulkanContextDescriptor, windowSurface uint64) error {
+func renderToWindow(ctx context.Context, m *maplibre.MapHandle, display, windowSurface uintptr) error {
 	// #region attach
-	surface := maplibre.VulkanSurfaceDescriptor{
-		// The window's size in logical pixels. The map's scale factor
-		// turns it into pixels.
-		LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
-		// Your VkInstance, VkPhysicalDevice,
-		// VkDevice, and graphics VkQueue.
-		Context: vulkan,
-		// Your VkSurfaceKHR.
-		Surface: windowSurface,
+	surface := maplibre.RenderTargetWaylandSurfaceVariant{
+		Value: maplibre.WaylandSurfaceTarget{
+			// The window's size in logical pixels. The map's scale factor
+			// turns it into pixels.
+			LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
+			// Your wl_display and wl_surface.
+			Display: display,
+			Surface: windowSurface,
+		},
 	}
 	options := maplibre.RenderSessionAttachOptions{
 		Driver:     maplibre.RenderDriverKindCoreWorker,
@@ -134,7 +139,9 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 		FrameWake:  maplibre.Wake{Callback: onFrameWake},
 	}
 
-	attached, ready, err := m.AttachVulkanSurface(surface, options)
+	// With no device, the session creates one on the platform's own
+	// backend.
+	attached, ready, err := m.Attach(surface, nil, options)
 	if err != nil {
 		return err
 	}
@@ -144,7 +151,7 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 	}
 	// #endregion attach
 
-	if err := onWindowResized(1024, 768); err != nil {
+	if err := onWindowResized(1024, 768, 2); err != nil {
 		return err
 	}
 
@@ -166,14 +173,14 @@ func renderToWindow(ctx context.Context, m *maplibre.MapHandle, vulkan maplibre.
 		return err
 	}
 
-	destroySurface() // For example, with vkDestroySurfaceKHR.
+	destroySurface() // For example, with wl_surface_destroy.
 	return nil
 }
 
 // An example without an output comment compiles but never runs.
 func Example_window() {
 	ctx := context.Background()
-	_ = renderToWindow(ctx, nil, maplibre.VulkanContextDescriptor{}, 0)
+	_ = renderToWindow(ctx, nil, 0, 0)
 	_ = surfaceLost(ctx)
-	_ = surfaceRestored(ctx, 0)
+	_ = surfaceRestored(ctx, 0, 0)
 }

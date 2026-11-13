@@ -36,16 +36,18 @@ func images(ctx context.Context, runtime *maplibre.RuntimeHandle) error {
 	// #endregion style
 
 	// #region attach
-	session, attached, err := m.AttachOffscreen(
-		maplibre.OffscreenDescriptor{
-			LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
+	session, attached, err := m.Attach(
+		maplibre.RenderTargetOffscreenVariant{
+			Value: maplibre.OffscreenTarget{
+				LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
+			},
 		},
+		// With no device, the session creates its own.
+		nil,
 		// The library renders on its own thread.
 		maplibre.RenderSessionAttachOptions{
 			Driver: maplibre.RenderDriverKindCoreWorker,
 		},
-		// With no device, the session creates its own.
-		nil,
 	)
 	if err != nil {
 		return err
