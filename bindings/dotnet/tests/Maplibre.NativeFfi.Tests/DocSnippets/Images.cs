@@ -32,8 +32,12 @@ internal static class Images
         // #endregion style
 
         // #region attach
-        var session = map.AttachOffscreen(
-            new OffscreenDescriptor(new LogicalSize(800, 600)),
+        // With no device, the session creates its own.
+        var session = map.Attach(
+            new RenderTarget.Offscreen(
+                new OffscreenTarget(new LogicalSize(800, 600))
+            ),
+            null,
             // The library renders on its own thread.
             new RenderSessionAttachOptions
             {

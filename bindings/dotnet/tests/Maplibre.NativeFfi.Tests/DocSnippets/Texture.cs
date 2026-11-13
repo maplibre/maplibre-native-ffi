@@ -59,53 +59,74 @@ internal static class Texture
         {
             Driver = RenderDriverKind.CoreWorker,
             FrameWake = new Wake(OnFrameWake),
-            // Only if your renderer also
-            // submits to the graphics queue.
-            QueueLock = new QueueLock(LockQueue, UnlockQueue),
         };
         // #endregion attach-options
 
         // #region attach-borrowed
-        var ring = new VulkanBorrowedTextureDescriptor
-        {
-            // The map's size in logical pixels.
-            LogicalSize = new LogicalSize(800, 600),
-            // The size of your textures in device pixels.
-            PhysicalWidth = 1600,
-            PhysicalHeight = 1200,
-            Context = vulkan,
-            // Your VkImage and VkImageView
-            // for each texture of the ring.
-            Textures =
-            [
-                new VulkanBorrowedTexture(images[0], views[0]),
-                new VulkanBorrowedTexture(images[1], views[1]),
-            ],
-            // VK_FORMAT_R8G8B8A8_UNORM
-            Format = 37,
-            // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            FinalLayout = 5,
-        };
+        // Your VkDevice and graphics queue.
+        using var device = GpuDeviceHandle.WrapVulkan(
+            new VulkanDeviceDescriptor
+            {
+                Context = vulkan,
+                // Only if your renderer also
+                // submits to the graphics queue.
+                QueueLock = new QueueLock(LockQueue, UnlockQueue),
+                // The device extensions that you
+                // enabled on your VkDevice.
+                EnabledExtensions =
+                [
+                    "VK_KHR_swapchain",
+                    "VK_KHR_external_semaphore_fd",
+                ],
+            }
+        );
 
-        session = map.AttachVulkanBorrowedTexture(ring, options);
+        var ring = new RenderTarget.VulkanBorrowedTextures(
+            new VulkanBorrowedTexturesTarget
+            {
+                // The map's size in logical pixels.
+                LogicalSize = new LogicalSize(800, 600),
+                // The size of your textures in device pixels.
+                PhysicalWidth = 1600,
+                PhysicalHeight = 1200,
+                // Your VkImage and VkImageView
+                // for each texture of the ring.
+                Textures =
+                [
+                    new VulkanBorrowedTexture(images[0], views[0]),
+                    new VulkanBorrowedTexture(images[1], views[1]),
+                ],
+                // VK_FORMAT_R8G8B8A8_UNORM
+                Format = 37,
+                // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                FinalLayout = 5,
+            }
+        );
+
+        // The session keeps the device until it detaches.
+        session = map.Attach(ring, device, options);
         await session.Ready;
         // #endregion attach-borrowed
 
         // #region resize-borrowed
-        var resized = new VulkanBorrowedTextureReplacement
-        {
-            LogicalSize = new LogicalSize(1024, 768),
-            PhysicalWidth = 2048,
-            PhysicalHeight = 1536,
-            // Your new textures, at the new size.
-            Textures =
-            [
-                new VulkanBorrowedTexture(newImages[0], newViews[0]),
-                new VulkanBorrowedTexture(newImages[1], newViews[1]),
-            ],
-        };
+        var resized = new RenderTarget.VulkanBorrowedTextures(
+            new VulkanBorrowedTexturesTarget
+            {
+                LogicalSize = new LogicalSize(1024, 768),
+                PhysicalWidth = 2048,
+                PhysicalHeight = 1536,
+                // Your new textures, at the new size.
+                Textures =
+                [
+                    new VulkanBorrowedTexture(newImages[0], newViews[0]),
+                    new VulkanBorrowedTexture(newImages[1], newViews[1]),
+                ],
+                Format = 37,
+                FinalLayout = 5,
+            }
+        );
 
-        await session.SetVulkanBorrowedTextureTargetAsync(resized);
+        await session.SetTargetAsync(resized);
         // vkDestroyImageView and vkDestroyImage
         DestroyTextures(images, views);
         // #endregion resize-borrowed

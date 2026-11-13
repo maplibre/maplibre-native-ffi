@@ -60,10 +60,19 @@ internal static class Window
     // #endregion frame-wake
 
     // #region resize
-    private static void OnWindowResized(uint width, uint height)
+    // Runs when the window changes size, or moves
+    // to a display with another scale factor.
+    private static void OnWindowResized(
+        uint width,
+        uint height,
+        double scaleFactor
+    )
     {
-        // The window's new size in logical pixels.
-        session.Discarding.Resize(new LogicalSize(width, height));
+        // The window's new size in logical pixels,
+        // and its scale factor.
+        session.Discarding.Resize(
+            new LogicalExtent(width, height, scaleFactor)
+        );
     }
 
     // #endregion resize
@@ -86,39 +95,48 @@ internal static class Window
         // #endregion lost-surface
     }
 
-    internal static async Task SurfaceRestored(ulong newSurface)
+    internal static async Task SurfaceRestored(
+        NativePointer display,
+        NativePointer newSurface
+    )
     {
         // #region lost-surface
-        await session.SetVulkanSurfaceTargetAsync(
-            new VulkanSurfaceReplacement
-            {
-                LogicalSize = new LogicalSize(800, 600),
-                Surface = newSurface,
-            }
+        await session.SetTargetAsync(
+            new RenderTarget.WaylandSurface(
+                new WaylandSurfaceTarget
+                {
+                    LogicalSize = new LogicalSize(800, 600),
+                    Display = display,
+                    Surface = newSurface,
+                }
+            )
         );
         // #endregion lost-surface
     }
 
     internal static async Task Run(
         MapHandle map,
-        VulkanContextDescriptor vulkan,
-        ulong windowSurface
+        NativePointer display,
+        NativePointer windowSurface
     )
     {
         // #region attach
-        session = map.AttachVulkanSurface(
-            new VulkanSurfaceDescriptor
-            {
-                // The window's size in logical
-                // pixels. The map's scale factor
-                // turns it into pixels.
-                LogicalSize = new LogicalSize(800, 600),
-                // Your VkInstance, VkPhysicalDevice,
-                // VkDevice, and graphics VkQueue.
-                Context = vulkan,
-                // Your VkSurfaceKHR.
-                Surface = windowSurface,
-            },
+        // With no device, the session creates one
+        // on the platform's own backend.
+        session = map.Attach(
+            new RenderTarget.WaylandSurface(
+                new WaylandSurfaceTarget
+                {
+                    // The window's size in logical
+                    // pixels. The map's scale factor
+                    // turns it into pixels.
+                    LogicalSize = new LogicalSize(800, 600),
+                    // Your wl_display and wl_surface.
+                    Display = display,
+                    Surface = windowSurface,
+                }
+            ),
+            null,
             new RenderSessionAttachOptions
             {
                 Driver = RenderDriverKind.CoreWorker,
@@ -129,7 +147,7 @@ internal static class Window
         await session.Ready;
         // #endregion attach
 
-        OnWindowResized(1024, 768);
+        OnWindowResized(1024, 768, 2);
 
         // #region service
         var graphicsThreadOptions = new RenderSessionAttachOptions
@@ -143,6 +161,6 @@ internal static class Window
         _ = graphicsThreadOptions;
 
         await session.ReleaseAsync();
-        DestroySurface(); // For example, with vkDestroySurfaceKHR.
+        DestroySurface(); // For example, with wl_surface_destroy.
     }
 }
