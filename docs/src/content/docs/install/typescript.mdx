@@ -9,36 +9,35 @@ sidebar:
 ## Install
 
 The TypeScript binding runs on Node.js, Bun, Deno, in browsers, in React Native
-and other Hermes hosts, and on OpenHarmony. Each runtime takes one backend
-package, which holds the native library for your
-[backend](/maplibre-native-ffi/install/#choose-a-backend). Install from npm, or
-from OHPM on OpenHarmony, as the section for your runtime shows.
+and other Hermes hosts, and on OpenHarmony. Each runtime takes a runtime
+package, which holds the native library with every
+[backend](/maplibre-native-ffi/install/#choose-a-backend) of your platform, or
+in a browser, the module of one backend. Install from npm, or from OHPM on
+OpenHarmony, as the section for your runtime shows.
 
 ## Node.js, Bun, and Deno
 
-Add the binding and one backend package from
-[npm](https://www.npmjs.com/package/@maplibre/native-ffi):
-`@maplibre/native-ffi-opengl`, `-metal`, or `-vulkan`. It needs Node.js 24.11,
-Bun 1.4.3, Deno 2.9.7, or later.
+Add the binding and its runtime package from
+[npm](https://www.npmjs.com/package/@maplibre/native-ffi). It needs Node.js
+24.11, Bun 1.4.3, Deno 2.9.7, or later.
 
 ```bash frame="terminal"
-npm install @maplibre/native-ffi @maplibre/native-ffi-vulkan
+npm install @maplibre/native-ffi @maplibre/native-ffi-runtime
 ```
 
 Deno imports the binding as `npm:@maplibre/native-ffi`, and needs
 `--allow-ffi --allow-read --allow-env`.
 
-The backend packages use MSVC on Windows. For MinGW on x64, install
-`@maplibre/native-ffi-opengl-mingw` or `@maplibre/native-ffi-vulkan-mingw`
-instead.
+The runtime package uses MSVC on Windows. For MinGW on x64, install
+`@maplibre/native-ffi-runtime-mingw` instead.
 
 ## Browser
 
-Add the binding and `@maplibre/native-ffi-opengl`, which renders with WebGL 2,
-or `@maplibre/native-ffi-webgpu`, which renders with WebGPU. Serve the files of
-the backend's `-wasm32` package as static files, together, such as from Vite's
-`public` directory: the module loads its tile workers' script and its font
-shaper by URLs relative to its own. Load it before any other call, on a Web
+Add the binding and `@maplibre/native-ffi-runtime-webgpu`, which renders with
+WebGPU, or `@maplibre/native-ffi-runtime-webgl`, which renders with WebGL 2.
+Serve the files of the runtime package as static files, together, such as from
+Vite's `public` directory: the module loads its tile workers' script and its
+font shaper by URLs relative to its own. Load it before any other call, on a Web
 Worker:
 
 ```ts title="map-worker.ts"
@@ -56,8 +55,8 @@ The page must meet the [web requirements](/maplibre-native-ffi/install/#web).
 ## React Native
 
 Add `@maplibre/native-ffi-react-native` from npm. It needs React Native's new
-architecture, and carries the native library: OpenGL ES on Android and Metal on
-iOS.
+architecture, and carries the native library: Vulkan and OpenGL ES on Android,
+and Metal on iOS.
 
 ```bash frame="terminal"
 npm install @maplibre/native-ffi-react-native
@@ -95,15 +94,14 @@ host also calls `mln_android_init` before it creates a runtime.
 
 ## OpenHarmony
 
-Add the binding and one backend package from
-[OHPM](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi):
+Add the binding and its runtime package, which carries Vulkan and OpenGL ES,
+from [OHPM](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi):
 
 ```bash frame="terminal"
-ohpm install @maplibre/native-ffi @maplibre/native-ffi-opengl
+ohpm install @maplibre/native-ffi @maplibre/native-ffi-runtime
 ```
 
-For Vulkan, replace `@maplibre/native-ffi-opengl` with
-`@maplibre/native-ffi-vulkan`. Keep both packages on the same version.
+Keep both packages on the same version.
 
 ```ts title="Index.ets"
 import { RuntimeHandle } from "@maplibre/native-ffi";
@@ -117,13 +115,13 @@ npm has no snapshots. To try `main`, pack the packages for your preset in a
 checkout of this repository, then install the tarballs:
 
 ```bash frame="terminal"
-mise run //bindings/typescript:pack linux-gnu-x64-vulkan
+mise run //bindings/typescript:pack linux-gnu-x64
 npm install path/to/maplibre-native-ffi/bindings/typescript/build/npm/*.tgz
 ```
 
 For OpenHarmony, pack and install both HARs instead:
 
 ```bash frame="terminal"
-mise -E ohos run //bindings/typescript:pack-ohpm ohos-arm64-egl
+mise -E ohos run //bindings/typescript:pack-ohpm ohos-arm64
 ohpm install path/to/maplibre-native-ffi/bindings/typescript/build/ohpm/*.har
 ```

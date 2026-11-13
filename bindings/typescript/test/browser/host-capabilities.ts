@@ -1,6 +1,10 @@
 // How the suite reaches each host capability in a browser page, which the
 // browser bundle uses in place of test/support/host-capabilities.ts.
 
+import {
+  RenderBackendFlag,
+  supportedRenderBackendMask,
+} from "../../src/browser.ts";
 import { native } from "../../src/internal/addon.ts";
 import { WebObject } from "../../src/internal/web_objects.ts";
 import type {
@@ -244,6 +248,11 @@ export const capabilities: Capabilities = {
   beforeLoad: () =>
     (globalThis as { mlnTsBeforeLoad?: unknown }).mlnTsBeforeLoad,
   testGraphics: () => testGraphics,
+  // A browser module carries one backend, which the suite tests.
+  testBackend: () =>
+    (supportedRenderBackendMask() & RenderBackendFlag.webGpu) !== 0
+      ? "webgpu"
+      : "opengl",
   webCanvas,
   // Nothing holds a page open, so no timer needs to let go.
   unrefTimer: () => {},

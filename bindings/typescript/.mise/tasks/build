@@ -23,8 +23,8 @@ case "$usage_preset" in
     # Only .config/mise.linux.toml defines the floor, and this task renders on every
     # host.
     case "$usage_preset" in
-      *-riscv64-*) floor=$MLN_FFI_GLIBC_FLOOR_RISCV64 ;;
-      *-loongarch64-*) floor=$MLN_FFI_GLIBC_FLOOR_LOONGARCH64 ;;
+      *-riscv64) floor=$MLN_FFI_GLIBC_FLOOR_RISCV64 ;;
+      *-loongarch64) floor=$MLN_FFI_GLIBC_FLOOR_LOONGARCH64 ;;
       *) floor=$MLN_FFI_GLIBC_FLOOR ;;
     esac
     "$MISE_MONOREPO_ROOT/tools/lint/check-glibc-floor.sh" "$floor" "$addon"

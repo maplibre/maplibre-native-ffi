@@ -110,9 +110,9 @@ test(
 );
 
 test(
-  "loading refuses no backend package and refuses several",
+  "loading refuses no runtime package and refuses several",
   async () => {
-    // A copy of the sources resolves backend packages from a node_modules of
+    // A copy of the sources resolves runtime packages from a node_modules of
     // its own, so the case controls which ones are installed.
     const root = mkdtempSync(join(tmpdir(), "maplibre-native-ffi-"));
     teardown(() => rmSync(root, { recursive: true, force: true }));
@@ -144,41 +144,24 @@ test(
 
     assert.match(
       await load(),
-      /^no MapLibre Native backend package is installed; install one of /m,
+      /^no MapLibre Native runtime package is installed; install one of /m,
     );
-    for (const backend of ["opengl", "vulkan"]) {
-      const name = `@maplibre/native-ffi-${backend}`;
+    for (const runtime of ["runtime", "runtime-mingw"]) {
+      const name = `@maplibre/native-ffi-${runtime}`;
       const directory = join(root, "node_modules", name);
       mkdirSync(directory, { recursive: true });
       writeFileSync(join(directory, "package.json"), JSON.stringify({ name }));
     }
     assert.match(
       await load(),
-      /^@maplibre\/native-ffi-opengl and @maplibre\/native-ffi-vulkan are installed; install exactly one backend package$/m,
+      /^@maplibre\/native-ffi-runtime and @maplibre\/native-ffi-runtime-mingw are installed; install exactly one runtime package$/m,
     );
-    rmSync(join(root, "node_modules", "@maplibre/native-ffi-vulkan"), {
-      recursive: true,
-    });
-    const mingw = join(
-      root,
-      "node_modules",
-      "@maplibre/native-ffi-opengl-mingw",
-    );
-    mkdirSync(mingw, { recursive: true });
-    writeFileSync(
-      join(mingw, "package.json"),
-      JSON.stringify({ name: "@maplibre/native-ffi-opengl-mingw" }),
-    );
-    assert.match(
-      await load(),
-      /^@maplibre\/native-ffi-opengl and @maplibre\/native-ffi-opengl-mingw are installed; install exactly one backend package$/m,
-    );
-    rmSync(join(root, "node_modules", "@maplibre/native-ffi-opengl"), {
+    rmSync(join(root, "node_modules", "@maplibre/native-ffi-runtime"), {
       recursive: true,
     });
     assert.match(
       await load(),
-      /^@maplibre\/native-ffi-opengl-mingw has no addon for /m,
+      /^@maplibre\/native-ffi-runtime-mingw has no addon for /m,
     );
   },
   { needs: ["childProcess"] },

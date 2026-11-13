@@ -2,19 +2,25 @@
 //
 //   node scripts/pack.ts [--version <version>] [--xcframework <directory> [--sign-apple-sdk]] [--android <directory>] <out dir> <preset>...
 //
-// A desktop user installs the facade, @maplibre/native-ffi, and one backend package,
-// such as @maplibre/native-ffi-vulkan. A backend package holds no code. It
-// pins one addon package per platform through optionalDependencies, and each
-// desktop addon package declares the platform it serves, so a package manager
-// installs only the addon for the host. A browser addon package carries the
-// browser module of a web preset, which no host platform selects, so it
-// installs wherever its backend package does. Each addon package carries what
-// the build task installed for its preset, with the licenses of the native
-// library that it embeds.
+// A desktop user installs the facade, @maplibre/native-ffi, and one runtime
+// package: @maplibre/native-ffi-runtime, or @maplibre/native-ffi-runtime-mingw
+// for a MinGW host on Windows. A desktop runtime package holds no code. It pins
+// one addon package per platform through optionalDependencies, and each addon
+// package declares the platform it serves, so a package manager installs only
+// the addon for the host. The addon embeds the platform's native library with
+// every backend it has.
+//
+// A browser user installs the facade and the runtime package of one backend,
+// @maplibre/native-ffi-runtime-webgl or @maplibre/native-ffi-runtime-webgpu,
+// which carries that web preset's browser module, since a page downloads one
+// backend's module.
+//
+// Each package that carries a build carries what the build task installed for
+// its preset, with the licenses of the native library that it embeds.
 //
 // A React Native app installs @maplibre/native-ffi-react-native, which depends
 // on the facade. It carries the binding's native sources, which the app's build
-// compiles, with the XCFramework that --xcframework names and the Android EGL
+// compiles, with the XCFramework that --xcframework names and the Android
 // libraries in the native archives under the directory that --android names.
 //
 // Every package takes the same version, 0.0.0 unless --version names one, and
@@ -70,15 +76,13 @@ const platforms: Record<string, { os: string; libc?: string }> = {
   windows: { os: "win32" },
   mingw: { os: "win32" },
 };
-const titles: Record<string, string> = {
-  opengl: "OpenGL",
-  metal: "Metal",
-  vulkan: "Vulkan",
-  webgpu: "WebGPU",
-  "opengl-mingw": "OpenGL (MinGW)",
-  "vulkan-mingw": "Vulkan (MinGW)",
+// The description of each runtime package.
+const runtimes: Record<string, string> = {
+  runtime: `The native runtime of ${source.name}: the Node-API addon for each platform, with every backend of the platform.`,
+  "runtime-mingw": `The native runtime of ${source.name} for MinGW hosts on Windows: the Node-API addon for each platform, with every backend of the platform.`,
+  "runtime-webgl": `The WebGL browser module of ${source.name}.`,
+  "runtime-webgpu": `The WebGPU browser module of ${source.name}.`,
 };
-// WebGL is the OpenGL backend with the browser's context provider.
 // The Android ABI of each architecture that the presets name.
 const androidAbis: Record<string, string> = {
   arm: "armeabi-v7a",
@@ -86,18 +90,11 @@ const androidAbis: Record<string, string> = {
   x86: "x86",
   x64: "x86_64",
 };
-const backends: Record<string, string> = {
-  egl: "opengl",
-  wgl: "opengl",
-  metal: "metal",
-  vulkan: "vulkan",
-  webgl: "opengl",
-  webgpu: "webgpu",
-};
 
 interface Addon {
   readonly preset: string;
-  readonly backend: string;
+  /** The runtime package that installs this addon, or that this browser module is. */
+  readonly runtime: string;
   readonly name: string;
   /** The platform that a desktop addon serves; a browser module has none. */
   readonly platform:
@@ -109,13 +106,13 @@ interface Addon {
 function addonOf(preset: string): Addon {
   const browser = /^web-wasm32-(webgl|webgpu)$/.exec(preset);
   if (browser !== null) {
-    const backend = backends[browser[1]!]!;
+    const runtime = `runtime-${browser[1]!}`;
     // The wasm-bindgen package, whose tile worker script is under snippets/,
     // and mln-rs's shaper module, which loads from beside it.
     return {
       preset,
-      backend,
-      name: `${source.name}-${backend}-wasm32`,
+      runtime,
+      name: `${source.name}-${runtime}`,
       platform: undefined,
       files: [
         "maplibre_native_ffi.js",
@@ -127,7 +124,7 @@ function addonOf(preset: string): Addon {
     };
   }
   const match =
-    /^(linux-gnu|linux-musl|macos|freebsd|windows|mingw)-(x64|arm64|riscv64|loongarch64)-(egl|wgl|metal|vulkan)$/.exec(
+    /^(linux-gnu|linux-musl|macos|freebsd|windows|mingw)-(x64|arm64|riscv64|loongarch64)$/.exec(
       preset,
     );
   if (match === null) {
@@ -136,14 +133,13 @@ function addonOf(preset: string): Addon {
     );
   }
   const { os, libc } = platforms[match[1]!]!;
-  const mingw = match[1] === "mingw";
-  const backend = `${backends[match[3]!]!}${mingw ? "-mingw" : ""}`;
+  const runtime = match[1] === "mingw" ? "runtime-mingw" : "runtime";
   const cpu = match[2] === "loongarch64" ? "loong64" : match[2]!;
   const suffix = libc === undefined ? "" : libc === "musl" ? "-musl" : "-gnu";
   return {
     preset,
-    backend,
-    name: `${source.name}-${backend}-${os}-${cpu}${suffix}`,
+    runtime,
+    name: `${source.name}-${runtime}-${os}-${cpu}${suffix}`,
     platform: { os, cpu, ...(libc === undefined ? {} : { libc }) },
     // The addon links the shared C library, which loads from beside it, as do
     // the C++ runtime DLLs that a Windows build carries.
@@ -275,7 +271,7 @@ for (const addon of addons) {
       ...shared,
       description:
         platform === undefined
-          ? `The ${addon.preset} browser module of ${source.name}.`
+          ? runtimes[addon.runtime]
           : `The ${addon.preset} Node-API addon of ${source.name}.`,
       ...(platform && {
         os: [platform.os],
@@ -288,16 +284,19 @@ for (const addon of addons) {
   );
 }
 
-for (const backend of new Set(addons.map((addon) => addon.backend))) {
-  const directory = join(staging, backend);
+// A browser module is its runtime package, and a desktop runtime package pins
+// the addons of its platforms.
+const desktopAddons = addons.filter((addon) => addon.platform !== undefined);
+for (const runtime of new Set(desktopAddons.map((addon) => addon.runtime))) {
+  const directory = join(staging, runtime);
   mkdirSync(directory, { recursive: true });
   pack(directory, {
-    name: `${source.name}-${backend}`,
+    name: `${source.name}-${runtime}`,
     ...shared,
-    description: `The ${titles[backend]} backend of ${source.name}: the native module for each platform.`,
+    description: runtimes[runtime],
     optionalDependencies: Object.fromEntries(
-      addons
-        .filter((addon) => addon.backend === backend)
+      desktopAddons
+        .filter((addon) => addon.runtime === runtime)
         .map((addon) => [addon.name, version]),
     ),
     files: [],
@@ -339,11 +338,14 @@ const facade = join(staging, "facade");
 cpSync(dist, join(facade, "dist"), { recursive: true });
 cpSync(join(binding, "README.md"), join(facade, "README.md"));
 copyNativeSources(facade);
-// The facade loads whichever backend package the application installed. The
+// The facade loads whichever runtime package the application installed. The
 // peer pins keep that package at the facade's version, and let a strict
 // layout such as pnpm's link it where the facade can resolve it.
-const backendPeers = Object.fromEntries(
-  Object.keys(titles).map((backend) => [`${source.name}-${backend}`, version]),
+const runtimePeers = Object.fromEntries(
+  Object.keys(runtimes).map((runtime) => [
+    `${source.name}-${runtime}`,
+    version,
+  ]),
 );
 pack(
   facade,
@@ -368,9 +370,9 @@ pack(
       },
     },
     engines: source.engines,
-    peerDependencies: backendPeers,
+    peerDependencies: runtimePeers,
     peerDependenciesMeta: Object.fromEntries(
-      Object.keys(backendPeers).map((name) => [name, { optional: true }]),
+      Object.keys(runtimePeers).map((name) => [name, { optional: true }]),
     ),
     files: ["dist", "native"],
   },
@@ -446,14 +448,14 @@ function packReactNative(): void {
     );
   }
   if (values.android) {
-    // The native archives of the Android EGL presets, as the release publishes
+    // The native archives of the Android presets, as the release publishes
     // them.
     const archives = readdirSync(resolve(values.android), {
       recursive: true,
       withFileTypes: true,
     }).flatMap((entry) => {
       const match =
-        /^maplibre-native-c-android-(arm|arm64|x86|x64)-egl\.tar\.gz$/.exec(
+        /^maplibre-native-c-android-(arm|arm64|x86|x64)\.tar\.gz$/.exec(
           entry.name,
         );
       return entry.isFile() && match !== null
@@ -461,13 +463,13 @@ function packReactNative(): void {
         : [];
     });
     if (archives.length === 0) {
-      throw new Error(`${values.android} holds no Android EGL native archive`);
+      throw new Error(`${values.android} holds no Android native archive`);
     }
     for (const { arch, path } of archives) {
       const extracted = join(staging, "android-archives", arch);
       mkdirSync(extracted, { recursive: true });
       execFileSync("tar", ["-xzf", path, "-C", extracted]);
-      const prefix = join(extracted, `maplibre-native-c-android-${arch}-egl`);
+      const prefix = join(extracted, `maplibre-native-c-android-${arch}`);
       cpSync(
         join(prefix, "lib/libmaplibre-native-c.so"),
         join(

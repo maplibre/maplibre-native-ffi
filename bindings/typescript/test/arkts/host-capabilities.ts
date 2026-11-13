@@ -139,6 +139,8 @@ export const capabilities: Capabilities = {
   forcedGc: () => ArkTools.forceFullGC(),
   borrowedTextures: true,
   testGraphics: () => testGraphics,
+  // The runner takes the backend from `aa test -s backend`.
+  testBackend: () => process.env.MLN_FFI_TEST_BACKEND,
   // An application process does not end when its event loop empties, so no
   // timer holds it.
   unrefTimer: () => {},

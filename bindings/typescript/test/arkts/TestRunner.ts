@@ -20,6 +20,7 @@ export default class OpenHarmonyTestRunner {
     const parameter = (name: string) =>
       parameters.parameters[`-s ${name}`] ?? parameters.parameters[name];
     process.env.MAPLIBRE_NATIVE_FFI_ORIGIN = parameter("origin");
+    process.env.MLN_FFI_TEST_BACKEND = parameter("backend");
     const order = scheduled();
     delegator.printSync(`harness registered ${order.length} cases`);
     Hypium.hypiumTest(delegator, parameters, () => {
