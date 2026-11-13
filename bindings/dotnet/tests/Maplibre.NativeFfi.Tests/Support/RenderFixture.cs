@@ -61,7 +61,7 @@ internal sealed class RenderFixture : IDisposable
             {
                 Graphics = TestGraphics.Create(graphics);
                 // An OpenGL host drives a shared-context session from the thread its context is
-                // current on, the way Rust and Kotlin attach on WGL and EGL.
+                // current on, the way Kotlin attaches on WGL and EGL.
                 if (graphics is TestGraphicsBackend.Egl or TestGraphicsBackend.Wgl)
                     Graphics.MakeCurrent();
                 for (var index = 0; index < RingDepth; index++)

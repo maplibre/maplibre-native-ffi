@@ -527,9 +527,6 @@ pub type mln_vulkan_image_owner = u32;
 pub const MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE: mln_vulkan_image_owner = 0;
 pub const MLN_VULKAN_IMAGE_OWNER_EXTERNAL: mln_vulkan_image_owner = 1;
 pub const MLN_VULKAN_IMAGE_OWNER_FOREIGN: mln_vulkan_image_owner = 2;
-pub type mln_web_gl_context_kind = u32;
-pub const MLN_WEB_GL_CONTEXT_EXISTING: mln_web_gl_context_kind = 0;
-pub const MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS: mln_web_gl_context_kind = 1;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_anchored_momentum {
@@ -2043,15 +2040,12 @@ pub struct mln_wayland_surface_replacement {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_web_gl_context_descriptor {
-    pub kind: mln_web_gl_context_kind,
-    pub context: i32,
-    pub canvas_selector: mln_buffer_view,
+    pub context: mln_web_object,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_web_gpu_borrowed_texture {
-    pub texture: *mut std::ffi::c_void,
-    pub texture_view: *mut std::ffi::c_void,
+    pub texture: mln_web_object,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2063,7 +2057,7 @@ pub struct mln_web_gpu_borrowed_texture_descriptor {
     pub context: mln_web_gpu_context_descriptor,
     pub textures: *const mln_web_gpu_borrowed_texture,
     pub texture_count: usize,
-    pub format: u32,
+    pub format: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2078,9 +2072,7 @@ pub struct mln_web_gpu_borrowed_texture_replacement {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_web_gpu_context_descriptor {
-    pub instance: *mut std::ffi::c_void,
-    pub device: *mut std::ffi::c_void,
-    pub queue: *mut std::ffi::c_void,
+    pub device: mln_web_object,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2088,15 +2080,15 @@ pub struct mln_web_gpu_surface_descriptor {
     pub size: u32,
     pub logical_size: mln_logical_size,
     pub context: mln_web_gpu_context_descriptor,
-    pub surface: *mut std::ffi::c_void,
-    pub format: u32,
+    pub canvas: mln_web_object,
+    pub format: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_web_gpu_surface_replacement {
     pub size: u32,
     pub logical_size: mln_logical_size,
-    pub surface: *mut std::ffi::c_void,
+    pub canvas: mln_web_object,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2106,10 +2098,9 @@ pub struct mln_web_gpu_texture_frame {
     pub height: u32,
     pub scale_factor: f64,
     pub slot: u32,
-    pub texture: *mut std::ffi::c_void,
-    pub texture_view: *mut std::ffi::c_void,
-    pub device: *mut std::ffi::c_void,
-    pub format: u32,
+    pub texture: mln_web_object,
+    pub device: mln_web_object,
+    pub format: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2277,6 +2268,7 @@ pub struct mln_vulkan_device(pub u64);
 pub type mln_vulkan_device_option_fields = u32;
 pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
+pub type mln_web_object = u32;
 native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
@@ -3589,4 +3581,7 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_vulkan_device_release(device: mln_vulkan_device);
+    pub fn mln_web_alloc(size: usize, align: usize) -> *mut std::ffi::c_void;
+    pub fn mln_web_free(pointer: *mut std::ffi::c_void, size: usize, align: usize);
+    pub fn mln_web_object_release(object: mln_web_object);
 }

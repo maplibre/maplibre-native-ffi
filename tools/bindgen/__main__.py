@@ -27,7 +27,6 @@ LANGUAGES = (
     "gobject",
     "kotlin",
     "python",
-    "rust",
     "swift",
     "typescript",
     "zig",

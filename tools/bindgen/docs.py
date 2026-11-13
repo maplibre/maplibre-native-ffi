@@ -604,8 +604,7 @@ def line_comment(
     marker: str = "///",
     errors: str = "Errors:",
 ) -> str:
-    """A Markdown doc comment of `marker` lines, as Rust, Swift, Dart, and Zig
-    use. Rust heads its errors `# Errors`, as rustdoc expects."""
+    """A Markdown doc comment of `marker` lines, as Swift, Dart, and Zig use."""
     lines = markdown_lines(
         doc, WIDTH - len(indent) - len(marker) - 1, symbol, errors=errors
     )

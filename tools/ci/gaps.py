@@ -64,7 +64,6 @@ BINDING_LABELS = {
     "kotlin-jvm": "Kotlin (JAR)",
     "kotlin-native": "Kotlin (KLIB)",
     "python": "Python",
-    "rust": "Rust",
     "swift": "Swift",
     "typescript": "TypeScript",
     "zig": "Zig",

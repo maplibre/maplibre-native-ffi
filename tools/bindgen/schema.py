@@ -92,8 +92,8 @@ PLATFORMS = (
 #
 # native_object=true marks an integer that names a host graphics object, such as
 # a VkImage or an OpenGL texture name. Native code uses the object it names as
-# it would a pointer, so a binding treats it as one: Rust marks an operation
-# that takes one as unsafe.
+# it would a pointer, so a binding that marks pointer use as unsafe treats it as
+# one.
 ANNOTATION_VALUES = {
     "execution": EXECUTIONS - {"immediate"},
     "shape": frozenset({"array"}),

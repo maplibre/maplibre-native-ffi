@@ -7,8 +7,40 @@ pub mod string;
 
 use std::mem::MaybeUninit;
 
-pub use maplibre_native_ffi::{Error, Result, Status};
-use maplibre_native_ffi_sys as sys;
+use maplibre_native_ffi_python_sys as sys;
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// A failure that native or the extension reports.
+#[derive(Debug)]
+pub enum Error {
+    /// A native status and the diagnostic that native copied for it.
+    Status {
+        status: sys::mln_status,
+        diagnostic: String,
+    },
+    AbiVersionMismatch {
+        expected: u32,
+        actual: u32,
+    },
+}
+
+impl Error {
+    pub fn new(status: sys::mln_status, diagnostic: impl Into<String>) -> Self {
+        Self::Status {
+            status,
+            diagnostic: diagnostic.into(),
+        }
+    }
+
+    pub fn invalid_argument(diagnostic: impl Into<String>) -> Self {
+        Self::new(sys::MLN_STATUS_INVALID_ARGUMENT, diagnostic)
+    }
+
+    pub fn abi_version_mismatch(expected: u32, actual: u32) -> Self {
+        Self::AbiVersionMismatch { expected, actual }
+    }
+}
 
 pub fn validate_abi_version() -> Result<()> {
     // SAFETY: mln_c_version takes no arguments and returns the process-global C
@@ -53,5 +85,5 @@ pub fn check(call: impl FnOnce(*mut sys::mln_diagnostic) -> sys::mln_status) -> 
     // SAFETY: the first length bytes are initialized, as read above.
     let diagnostic =
         String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(message, length) });
-    Err(Error::from_status_and_diagnostic(status, diagnostic))
+    Err(Error::new(status, diagnostic))
 }

@@ -1,4 +1,6 @@
-use super::{Error, Result, Status};
+use maplibre_native_ffi_python_sys as sys;
+
+use super::{Error, Result};
 
 /// Reads `count` records that native lays out `stride` bytes apart.
 ///
@@ -22,7 +24,7 @@ pub unsafe fn strided_records<T: Copy>(
             || count > isize::MAX as usize / stride)
     {
         return Err(Error::new(
-            Status::NativeError,
+            sys::MLN_STATUS_NATIVE_ERROR,
             "invalid native record stride",
         ));
     }

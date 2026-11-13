@@ -76,7 +76,6 @@ mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_di
             "gobject",
             "kotlin",
             "python",
-            "rust",
             "swift",
             "zig",
         ):

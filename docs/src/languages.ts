@@ -81,13 +81,6 @@ export const languages: Language[] = [
     logo: devicon("python/python-original"),
   },
   {
-    id: "rust",
-    label: "Rust",
-    lang: "rust",
-    title: "main.rs",
-    logo: devicon("rust/rust-original"),
-  },
-  {
     id: "swift",
     label: "Swift",
     lang: "swift",
