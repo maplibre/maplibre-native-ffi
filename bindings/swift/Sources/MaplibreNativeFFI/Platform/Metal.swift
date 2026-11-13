@@ -2,15 +2,19 @@
   import Metal
 
   // Typed forms of the Metal objects that records carry as pointers. An input
-  // keeps its object alive while the record exists, which covers the attach
-  // or target call that retains it; an output borrows the object that native
-  // lends until the frame's release.
+  // keeps its object alive while the record exists, which covers the call that
+  // retains it; an output borrows the object that native lends until the
+  // frame's release.
 
-  public extension MetalContextDescriptor {
-    /// A context on `device`. An attach that needs the device retains it
-    /// before it returns.
-    init(device: any MTLDevice) {
-      self.init(device: NativePointer(retaining: device))
+  public extension MetalDeviceDescriptor {
+    /// Your device, and optionally your command queue on it, for
+    /// ``GpuDeviceHandle/wrapMetal(descriptor:)``. The wrapped device retains
+    /// both before the call returns.
+    init(device: any MTLDevice, commandQueue: (any MTLCommandQueue)? = nil) {
+      self.init(
+        device: NativePointer(retaining: device),
+        commandQueue: commandQueue.map { NativePointer(retaining: $0) } ?? .null
+      )
     }
   }
 
@@ -37,31 +41,28 @@
     var mtlPixelFormat: MTLPixelFormat {
       MTLPixelFormat(rawValue: UInt(pixelFormat))!
     }
+
+    /// The texture that holds the frame's depth and stencil, valid until the
+    /// frame's release, or nil when the frame has none.
+    var mtlDepthTexture: (any MTLTexture)? {
+      get throws { try depthTexture.unretainedObject() as? any MTLTexture }
+    }
+
+    /// The depth texture's pixel format, or `.invalid` when the frame has
+    /// none.
+    var mtlDepthPixelFormat: MTLPixelFormat {
+      MTLPixelFormat(rawValue: UInt(depthPixelFormat)) ?? .invalid
+    }
   }
 #endif
 
 #if canImport(QuartzCore) && canImport(Metal)
   import QuartzCore
 
-  public extension MetalSurfaceDescriptor {
-    /// A surface that draws into `layer`, which an accepted attach retains
-    /// before it returns.
-    init(
-      logicalSize: LogicalSize,
-      context: MetalContextDescriptor = .init(),
-      layer: CAMetalLayer
-    ) {
-      self.init(
-        logicalSize: logicalSize,
-        context: context,
-        layer: NativePointer(retaining: layer)
-      )
-    }
-  }
-
-  public extension MetalSurfaceReplacement {
-    /// A replacement that draws into `layer`, which an accepted target
-    /// replacement retains before it returns.
+  public extension MetalLayerTarget {
+    /// A target that presents to `layer`. The target keeps the layer alive
+    /// through the attach or target replacement that takes it; keep it alive
+    /// yourself while the session presents to it.
     init(logicalSize: LogicalSize, layer: CAMetalLayer) {
       self.init(
         logicalSize: logicalSize,
