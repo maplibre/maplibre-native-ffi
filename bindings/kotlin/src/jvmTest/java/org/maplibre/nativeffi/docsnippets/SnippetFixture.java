@@ -10,10 +10,11 @@ import org.maplibre.nativeffi.LogicalSize;
 import org.maplibre.nativeffi.MapHandle;
 import org.maplibre.nativeffi.MapMode;
 import org.maplibre.nativeffi.MapOptions;
-import org.maplibre.nativeffi.OffscreenDescriptor;
+import org.maplibre.nativeffi.OffscreenTarget;
 import org.maplibre.nativeffi.RenderDriverKind;
 import org.maplibre.nativeffi.RenderSessionAttachOptions;
 import org.maplibre.nativeffi.RenderSessionHandle;
+import org.maplibre.nativeffi.RenderTarget;
 import org.maplibre.nativeffi.ResourceErrorReason;
 import org.maplibre.nativeffi.ResourceProvider;
 import org.maplibre.nativeffi.ResourceResponse;
@@ -89,11 +90,12 @@ final class SnippetFixture implements AutoCloseable {
    */
   RenderSessionHandle attachOffscreen() {
     RenderSessionHandle session =
-        map.attachOffscreen(
-            new OffscreenDescriptor(LogicalSize.of(64, 64)),
+        map.attach(
+            new RenderTarget.Offscreen(
+                new OffscreenTarget(LogicalSize.of(64, 64))),
+            null,
             RenderSessionAttachOptions.of(
-                RenderDriverKind.CORE_WORKER),
-            null);
+                RenderDriverKind.CORE_WORKER));
     session.getReady().join();
     return session;
   }

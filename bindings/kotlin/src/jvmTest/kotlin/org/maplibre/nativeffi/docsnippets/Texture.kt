@@ -4,6 +4,7 @@
 package org.maplibre.nativeffi.docsnippets
 
 import java.util.concurrent.locks.Lock
+import org.maplibre.nativeffi.GpuDeviceHandle
 import org.maplibre.nativeffi.GpuSync
 import org.maplibre.nativeffi.GpuSyncKind
 import org.maplibre.nativeffi.LogicalSize
@@ -12,14 +13,14 @@ import org.maplibre.nativeffi.QueueLock
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RenderSessionHandle
+import org.maplibre.nativeffi.RenderTarget
 import org.maplibre.nativeffi.VulkanBorrowedTexture
-import org.maplibre.nativeffi.VulkanBorrowedTextureDescriptor
-import org.maplibre.nativeffi.VulkanBorrowedTextureReplacement
+import org.maplibre.nativeffi.VulkanBorrowedTexturesTarget
 import org.maplibre.nativeffi.VulkanContextDescriptor
+import org.maplibre.nativeffi.VulkanDeviceDescriptor
 import org.maplibre.nativeffi.Wake
-import org.maplibre.nativeffi.attachVulkanBorrowedTexture
-import org.maplibre.nativeffi.setVulkanBorrowedTextureTarget
 import org.maplibre.nativeffi.withVulkanTexture
+import org.maplibre.nativeffi.wrapVulkan
 
 private lateinit var session: RenderSessionHandle
 
@@ -61,24 +62,37 @@ private suspend fun renderToTexture(
     RenderSessionAttachOptions(
       driver = RenderDriverKind.CORE_WORKER,
       frameWake = Wake(::onFrameWake),
-      // Only if your renderer also submits to the graphics queue.
-      queueLock =
-        QueueLock(
-          lock = { queueMutex.lock() },
-          unlock = { queueMutex.unlock() },
-        ),
     )
   // #endregion attach-options
 
   // #region attach-borrowed
+  // Your VkDevice and graphics queue.
+  val device =
+    GpuDeviceHandle.wrapVulkan(
+      VulkanDeviceDescriptor(
+        context = vulkan,
+        // Only if your renderer also submits to the graphics queue.
+        queueLock =
+          QueueLock(
+            lock = { queueMutex.lock() },
+            unlock = { queueMutex.unlock() },
+          ),
+        // The device extensions that you enabled on your VkDevice.
+        enabledExtensions =
+          listOf(
+            "VK_KHR_swapchain",
+            "VK_KHR_external_semaphore_fd",
+          ),
+      ),
+    )
+
   val ring =
-    VulkanBorrowedTextureDescriptor(
+    VulkanBorrowedTexturesTarget(
       // The map's size in logical pixels.
       logicalSize = LogicalSize(width = 800u, height = 600u),
       // The size of your textures in device pixels.
       physicalWidth = 1600u,
       physicalHeight = 1200u,
-      context = vulkan,
       // Your VkImage and VkImageView for each texture of the ring.
       textures =
         listOf(
@@ -95,7 +109,14 @@ private suspend fun renderToTexture(
       finalLayout = 5u, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     )
 
-  session = map.attachVulkanBorrowedTexture(ring, options)
+  session =
+    map.attach(
+      RenderTarget.VulkanBorrowedTextures(ring),
+      device,
+      options,
+    )
+  // The session keeps the device until it detaches.
+  device.release()
   session.ready.await()
   // #endregion attach-borrowed
 
@@ -103,7 +124,7 @@ private suspend fun renderToTexture(
 
   // #region resize-borrowed
   val resized =
-    VulkanBorrowedTextureReplacement(
+    ring.copy(
       logicalSize = LogicalSize(width = 1024u, height = 768u),
       physicalWidth = 2048u,
       physicalHeight = 1536u,
@@ -121,7 +142,9 @@ private suspend fun renderToTexture(
         ),
     )
 
-  session.setVulkanBorrowedTextureTarget(resized).await()
+  session
+    .setTarget(RenderTarget.VulkanBorrowedTextures(resized))
+    .await()
   // vkDestroyImageView and vkDestroyImage
   destroyTextures(images, views)
   // #endregion resize-borrowed
