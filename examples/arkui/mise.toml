@@ -5,8 +5,8 @@
 [tasks.build]
 description = "Build the C library and the TypeScript binding's OHPM HARs for an OpenHarmony preset, then build and sign the ArkUI example's HAP against them."
 usage = '''
-arg "[preset]" default="ohos-x64-egl" {
-  choices "ohos-arm64-egl" "ohos-arm64-vulkan" "ohos-x64-egl" "ohos-x64-vulkan"
+arg "[preset]" default="ohos-x64" {
+  choices "ohos-arm64" "ohos-x64"
 }
 '''
 # The OpenHarmony SDK packs and signs a HAP with Java tools.
@@ -18,15 +18,11 @@ depends = [
 ]
 run = '''
 case "$usage_preset" in
-  ohos-arm64-*) abi=arm64-v8a ;;
-  ohos-x64-*) abi=x86_64 ;;
-esac
-case "$usage_preset" in
-  *-egl) backend=opengl ;;
-  *-vulkan) backend=vulkan ;;
+  ohos-arm64) abi=arm64-v8a ;;
+  ohos-x64) abi=x86_64 ;;
 esac
 hars="$MISE_MONOREPO_ROOT/bindings/typescript/build/ohpm"
-scripts/build-hap.sh "$abi" "$hars/native-ffi-0.0.0.har" "$hars/native-ffi-$backend-0.0.0.har"
+scripts/build-hap.sh "$abi" "$hars/native-ffi-0.0.0.har" "$hars/native-ffi-runtime-0.0.0.har"
 '''
 
 [tasks.run]
@@ -35,7 +31,7 @@ usage = '''
 flag "--device <key>" help="The hdc connect key of the device, which defaults to this worktree's emulator"
 '''
 tools = { "core:java" = "{{vars.java_version}}" }
-depends = [{ task = "build", args = ["ohos-x64-egl"] }]
+depends = [{ task = "build", args = ["ohos-x64"] }]
 run = '''
 device=${usage_device:-$("$MISE_MONOREPO_ROOT/tools/devices/ohos-key")}
 hdc -t "$device" install -r build/x86_64/entry-default-signed.hap

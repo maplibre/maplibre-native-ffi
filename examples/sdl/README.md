@@ -12,14 +12,15 @@ From the repository root, build the native library and the app, and run it:
 mise run //examples/sdl:run
 ```
 
-The task builds this machine's default preset. Pass another one, such as
-`linux-gnu-x64-egl`, to run an OpenGL build.
+The task builds this machine's default preset, whose library carries every
+render backend of the platform: Vulkan and OpenGL on Linux, FreeBSD, and
+Windows, and Metal on macOS.
 
 To build the Windows preset with the MSVC SDK on Linux and run the app under
 Wine, as the development overview describes:
 
 ```bash
-mise -E msvc run //examples/sdl:run windows-x64-vulkan
+mise -E msvc run //examples/sdl:run windows-x64
 ```
 
 Under Wine, loading tiles and glyphs over HTTPS stalls in Wine's TLS, so the map
@@ -45,10 +46,11 @@ the display's pixel density.
 `Map.attach` and a `RenderTarget`: its `wl_surface` as a `wayland_surface`, its
 X11 window as an `xlib_window`, its `HWND` as a `win32_window`, or a
 `CAMetalLayer` from SDL's Metal view as a `metal_layer`. With no GPU device, the
-session creates one on the platform's own backend, and renders on a library
-thread. The wakes and the event handler run on library threads too, so they set
-flags and push an SDL event that wakes the main loop, which acts on them. A
-redraw wake asks for a frame, and a frame wake drains the frame results.
+session creates one on the platform's default backend: Metal on macOS, and
+elsewhere Vulkan, or OpenGL where the system has no Vulkan driver. It renders on
+a library thread. The wakes and the event handler run on library threads too, so
+they set flags and push an SDL event that wakes the main loop, which acts on
+them. A redraw wake asks for a frame, and a frame wake drains the frame results.
 
 `src/pacer.zig` paces the frames to the display, since the library presents
 without waiting for it, and SDL has no frame clock for a window that it doesn't
