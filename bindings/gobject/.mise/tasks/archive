@@ -6,7 +6,7 @@
 set -euo pipefail
 
 preset="${usage_preset?}"
-archive="$MISE_MONOREPO_ROOT/build/packages/gobject/maplibre-native-ffi-gobject-${preset%-*}.tar.gz"
+archive="$MISE_MONOREPO_ROOT/build/packages/gobject/maplibre-native-ffi-gobject-$preset.tar.gz"
 native_archive="$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$preset.tar.gz"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT

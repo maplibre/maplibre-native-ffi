@@ -1,7 +1,8 @@
 // What the GObject library adds to the C API: its errors, completions that
 // finish on the main context that started them, handle objects, boxed values,
 // option objects, callback registrations, and render sessions whose wakes run
-// on the main context.
+// on the main context. Render sessions draw with the backend that
+// MLN_FFI_TEST_BACKEND names, vulkan, opengl, or metal.
 
 #include <maplibre-native-ffi.h>
 #include <mln_test_graphics.h>
@@ -9,6 +10,9 @@
 
 // How long a wait may take before the case fails, instead of hanging.
 enum { timeout_seconds = 60 };
+
+// The render backend under test, which main() reads from MLN_FFI_TEST_BACKEND.
+static MaplibreNativeFfiRenderBackend test_backend;
 
 static const char* const empty_style =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
@@ -470,6 +474,22 @@ static void a_rejected_call_frees_its_registrations(void) {
   g_object_unref(runtime);
 }
 
+/** Creates a device of the backend under test, which the library owns. */
+static MaplibreNativeFfiGpuDevice* create_device(void) {
+  g_autoptr(MaplibreNativeFfiGpuDeviceOptions) options =
+    maplibre_native_ffi_gpu_device_options_new();
+  maplibre_native_ffi_gpu_device_options_set_backend(options, test_backend);
+  g_autoptr(GError) error = NULL;
+  MaplibreNativeFfiGpuDevice* device =
+    maplibre_native_ffi_gpu_device_create(options, &error);
+  g_assert_no_error(error);
+  g_autoptr(MaplibreNativeFfiGpuDeviceCapabilities) capabilities =
+    maplibre_native_ffi_gpu_device_get_capabilities(device, &error);
+  g_assert_no_error(error);
+  g_assert_cmpint(capabilities->backend, ==, test_backend);
+  return device;
+}
+
 #if defined(__linux__)
 static void an_exported_ring_converts_its_dma_buf_formats(void) {
   MaplibreNativeFfiRuntime* runtime = create_runtime();
@@ -493,9 +513,10 @@ static void an_exported_ring_converts_its_dma_buf_formats(void) {
     MAPLIBRE_NATIVE_FFI_TYPE_RENDER_SESSION_ATTACH_OPTIONS, "driver",
     MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER, NULL
   );
+  g_autoptr(MaplibreNativeFfiGpuDevice) device = create_device();
   g_autoptr(GError) error = NULL;
   g_autoptr(MaplibreNativeFfiRenderSession) session =
-    maplibre_native_ffi_map_attach(map, render_target, NULL, options, &error);
+    maplibre_native_ffi_map_attach(map, render_target, device, options, &error);
   g_assert_null(session);
   g_assert_error(
     error, MAPLIBRE_NATIVE_FFI_ERROR, MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED
@@ -618,7 +639,10 @@ static void release_target(Target* target) {
   if (target->graphics != NULL) mln_test_graphics_destroy(target->graphics);
 }
 
-/** Attaches an offscreen image of 32 by 16 on a device of the session's own. */
+/**
+ * Attaches an offscreen image of 32 by 16 on a device of the backend under
+ * test.
+ */
 static void attach_offscreen(Target* target) {
   const MaplibreNativeFfiOffscreenTarget offscreen = {
     .logical_size = {.width = 32, .height = 16}
@@ -627,9 +651,10 @@ static void attach_offscreen(Target* target) {
     maplibre_native_ffi_render_target_new_offscreen(&offscreen);
   g_autoptr(MaplibreNativeFfiRenderSessionAttachOptions) options =
     attach_options(target, MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER);
+  target->device = create_device();
   g_autoptr(GError) error = NULL;
   target->session = maplibre_native_ffi_map_attach(
-    target->map, render_target, NULL, options, &error
+    target->map, render_target, target->device, options, &error
   );
   g_assert_no_error(error);
   wait_until_ready(target);
@@ -756,10 +781,6 @@ static void a_custom_source_answers_through_the_map_it_borrows(void) {
   release_target(&target);
 }
 
-static gboolean backend_supported(MaplibreNativeFfiRenderBackendFlag backend) {
-  return (maplibre_native_ffi_supported_render_backend_mask() & backend) != 0;
-}
-
 static void attach_borrowed(Target* target, uint32_t backend) {
   target->graphics = mln_test_graphics_create(backend);
   g_assert_nonnull(target->graphics);
@@ -848,14 +869,12 @@ static void attach_borrowed(Target* target, uint32_t backend) {
 
 static void a_borrowed_texture_session_lends_its_frames(void) {
   uint32_t backend = 0;
-  if (backend_supported(MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_VULKAN)) {
+  if (test_backend == MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_VULKAN) {
     backend = MLN_TEST_GRAPHICS_BACKEND_VULKAN;
-  } else if (
-    backend_supported(MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_OPEN_GL)
-  ) {
+  } else if (test_backend == MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_OPEN_GL) {
     backend = MLN_TEST_GRAPHICS_BACKEND_EGL;
   } else {
-    g_test_skip("this build renders with neither Vulkan nor EGL");
+    g_test_skip("the suite borrows only Vulkan and EGL textures");
     return;
   }
   Target target = {.thread = g_thread_self()};
@@ -919,8 +938,8 @@ static void a_borrowed_texture_session_lends_its_frames(void) {
 }
 
 static void a_disposed_session_takes_driver_work_until_it_ends(void) {
-  if (!backend_supported(MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_OPEN_GL)) {
-    g_test_skip("this build has no session driven by the caller");
+  if (test_backend != MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_OPEN_GL) {
+    g_test_skip("only an OpenGL session is driven by the caller");
     return;
   }
   Target target = {.thread = g_thread_self()};
@@ -950,8 +969,43 @@ static void a_disposed_session_takes_driver_work_until_it_ends(void) {
   mln_test_graphics_destroy(target.graphics);
 }
 
+/** Reads the backend under test, which the library must carry. */
+static MaplibreNativeFfiRenderBackend read_test_backend(void) {
+  static const struct {
+    const char* name;
+    MaplibreNativeFfiRenderBackend backend;
+    MaplibreNativeFfiRenderBackendFlag flag;
+  } backends[] = {
+    {"metal", MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_METAL,
+     MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_METAL},
+    {"vulkan", MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_VULKAN,
+     MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_VULKAN},
+    {"opengl", MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_OPEN_GL,
+     MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_OPEN_GL},
+  };
+  const char* name = g_getenv("MLN_FFI_TEST_BACKEND");
+  if (name == NULL) {
+    g_error("MLN_FFI_TEST_BACKEND must name the backend under test");
+  }
+  for (gsize index = 0; index < G_N_ELEMENTS(backends); index++) {
+    if (g_strcmp0(name, backends[index].name) != 0) continue;
+    if (!(maplibre_native_ffi_supported_render_backend_mask() &
+          backends[index].flag)) {
+      g_error("the library lacks the %s backend under test", name);
+    }
+    return backends[index].backend;
+  }
+  g_error(
+    "MLN_FFI_TEST_BACKEND names no backend the suite draws with: %s", name
+  );
+}
+
 int main(int argc, char** argv) {
   g_test_init(&argc, &argv, NULL);
+  test_backend = read_test_backend();
+  g_test_message(
+    "Rendering with the %s backend", g_getenv("MLN_FFI_TEST_BACKEND")
+  );
   g_test_add_func(
     "/errors/a-failed-status-is-an-error-of-the-domain",
     a_failed_status_is_an_error_of_the_domain
