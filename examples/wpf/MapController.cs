@@ -232,8 +232,8 @@ internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
         var session = this.session;
         if (session is null)
         {
-            session = map.AttachWin32Window(
-                new Win32WindowDescriptor(size, pointer),
+            session = map.Attach(
+                new RenderTarget.Win32Window(new Win32WindowTarget(size, pointer)),
                 device: null,
                 new RenderSessionAttachOptions
                 {
@@ -247,7 +247,9 @@ internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
         }
         else
         {
-            await session.SetWin32WindowTargetAsync(new Win32WindowReplacement(size, pointer));
+            await session.SetTargetAsync(
+                new RenderTarget.Win32Window(new Win32WindowTarget(size, pointer))
+            );
         }
         targetSize = size;
         // The session may have asked for frames while it attached.
@@ -262,7 +264,7 @@ internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
         targetSize = size;
         try
         {
-            session.Discarding.Resize(size);
+            session.Discarding.Resize(new LogicalExtent(size.Width, size.Height, Scale));
         }
         catch (MaplibreException error)
         {
