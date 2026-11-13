@@ -72,8 +72,8 @@ kotlin {
   macosX64()
   mingwX64()
 
-  // The browser target runs on the page, which never blocks, and calls the Emscripten module that
-  // bindings/kotlin/wasm links. Karma serves that module; see karma.config.d.
+  // The browser target calls the raw C exports of the browser package that a web preset builds, on
+  // the thread that loads it, which never blocks. Karma serves that package; see karma.config.d.
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs { browser { testTask { useKarma { useChromeHeadless() } } } }
 
@@ -456,19 +456,15 @@ tasks.register<Sync>("jvmDeviceTestClasspath") {
   from(test.output.allOutputs) { into("classes") }
 }
 
-// The wasm suite runs in headless Chromium against the browser module that bindings/kotlin/wasm
-// links. The mise test:wasm task passes that module's directory, its render backend, and the
-// Chromium to run. The canary run selects only HarnessCanaryTest, which fails on purpose; every
-// other run leaves it out. On WebGPU, headless Chromium loses every WebGPU device of a page once a
-// WebGPU canvas renders, and later adapter requests resolve to null. CanvasSurfaceTest therefore
-// runs on a page of its own there: the canvas run selects only it, and the main run leaves it out.
+// The wasm suite runs in headless Chromium against the browser package of a web preset. The mise
+// test:wasm task passes the directory that holds the package and the runtime's module object, its
+// render backend, and the Chromium to run. The canary run selects only HarnessCanaryTest, which
+// fails on purpose; every other run leaves it out.
 val wasmModuleDir = providers.gradleProperty("maplibre.wasm.moduleDir")
 val wasmRenderBackend = providers.gradleProperty("maplibre.wasm.renderBackend")
 val wasmChromium = providers.gradleProperty("maplibre.wasm.chromium")
 val wasmCanary =
   providers.gradleProperty("maplibre.wasm.canary").map(String::toBoolean).getOrElse(false)
-val wasmCanvasRun =
-  providers.gradleProperty("maplibre.wasm.canvasRun").map(String::toBoolean).getOrElse(false)
 
 tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
   val moduleDir = wasmModuleDir.orNull?.let(rootProject::file)
@@ -491,12 +487,6 @@ tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
   filter.apply {
     if (wasmCanary) includeTestsMatching("org.maplibre.nativeffi.browser.HarnessCanaryTest")
     else excludeTestsMatching("org.maplibre.nativeffi.browser.HarnessCanaryTest")
-    if (renderBackend == "webgpu" && !wasmCanary) {
-      val canvasTest = "org.maplibre.nativeffi.render.CanvasSurfaceTest"
-      if (wasmCanvasRun) includeTestsMatching(canvasTest) else excludeTestsMatching(canvasTest)
-      // A --tests filter may select tests of only one of the two runs.
-      isFailOnNoMatchingTests = false
-    }
   }
 }
 

@@ -161,8 +161,6 @@ NATIVE_REGISTRATIONS = (
     "src/threadedMain/kotlin/org/maplibre/nativeffi/GeneratedNativeRegistrations.kt"
 )
 JNI = "src/androidMain/jni/mln_jni_generated.c"
-WASM_GLUE = "wasm/mln_kw_generated.c"
-WASM_EXPORTS = "wasm/mln_kw_exports.txt"
 
 OPERATION_IMPORTS = """\
 import kotlin.jvm.JvmName
@@ -688,7 +686,7 @@ def lower(api: Api | BoundApi) -> Lowered:
             files, jni = shims.android()
             outputs[JNI] = jni
         elif platform == "wasm":
-            files, outputs[WASM_GLUE], outputs[WASM_EXPORTS] = shims.wasm()
+            files = shims.wasm()
         else:
             files = getattr(shims, platform)()
         for file, source in files.items():

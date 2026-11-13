@@ -380,42 +380,36 @@ if (backend == MaplibreRuntimeBackend.OPENGL || backend == MaplibreRuntimeBacken
 }
 
 if ("wasmJs" in extensions.getByType<KotlinMultiplatformExtension>().targets.names) {
-  val install = nativeInstall("emscripten-wasm32", runtimeBackend)
+  // The browser package of the web preset, which the runtime's index.mjs imports beside it.
+  val install = nativeInstall("web-wasm32", runtimeBackend)
   val verifyLocalBuild = registerLocalBuildVerification("verifyWasmLocalBuild", install)
-  val moduleDirectory = install.prefix?.resolve("share/maplibre-native-kotlin")
-  val sbom = moduleDirectory?.let {
-    runtimeSbom(
-      "Wasm",
-      "$mavenArtifact-wasm-js",
-      listOf(it.resolve("sbom/maplibre-native-ffi.cdx.json")),
-    )
+  val share = install.prefix?.resolve("share/maplibre-native-c")
+  val packageDirectory = share?.resolve("web")
+  val sbom = share?.let {
+    runtimeSbom("Wasm", "$mavenArtifact-wasm-js", listOf(it.resolve("sbom.cdx.json")))
   }
   extensions.configure<KotlinMultiplatformExtension> {
     sourceSets.getByName("wasmJsMain") {
       resources.srcDir(runtimeInteropDirectory.dir("src/wasmJsMain/resources"))
-      moduleDirectory?.let(resources::srcDir)
+      packageDirectory?.let(resources::srcDir)
     }
   }
   val packageProperties = mapOf("version" to mavenVersion, "backend" to runtimeBackend)
   tasks.named<Copy>("wasmJsProcessResources") {
     dependsOn(verifyLocalBuild)
     sbom?.let { from(it) { into("resources/sbom") } }
-    exclude("sbom/**")
-    exclude("licenses/**")
     filesMatching("package.json") {
       // Different backend versions keep KGP's generated npm packages distinct.
       expand(packageProperties)
     }
     from(rootProject.file("LICENSE")) { into("META-INF") }
-    install.prefix?.let {
-      from(requireNotNull(moduleDirectory).resolve("licenses")) {
-        into("META-INF/licenses/maplibre-native-c")
-      }
+    share?.let {
+      from(it.resolve("licenses")) { into("META-INF/licenses/maplibre-native-c") }
     }
     doFirst {
-      for (name in listOf("maplibre-native-kotlin.mjs", "maplibre-native-kotlin.wasm")) {
-        check(moduleDirectory?.resolve(name)?.isFile == true) {
-          "Missing browser runtime $name; link bindings/kotlin/wasm into $moduleDirectory"
+      for (name in listOf("maplibre_native_c.js", "maplibre_native_c_bg.wasm")) {
+        check(packageDirectory?.resolve(name)?.isFile == true) {
+          "Missing browser package $name in $packageDirectory; build a web preset"
         }
       }
     }

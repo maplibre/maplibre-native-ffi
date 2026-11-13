@@ -540,8 +540,10 @@ def verify_wasm(root: pathlib.Path) -> None:
             names = set(archive.namelist())
             for name in (
                 "package.json",
-                "maplibre-native-kotlin.mjs",
-                "maplibre-native-kotlin.wasm",
+                "index.mjs",
+                "runtime.mjs",
+                "maplibre_native_c.js",
+                "maplibre_native_c_bg.wasm",
                 "META-INF/LICENSE",
                 *(
                     f"META-INF/licenses/maplibre-native-c/{name}"
@@ -553,10 +555,10 @@ def verify_wasm(root: pathlib.Path) -> None:
             package = json.loads(archive.read("package.json"))
             if (
                 package["name"] != "@maplibre/native-ffi-runtime"
-                or package["main"] != "maplibre-native-kotlin.mjs"
+                or package["main"] != "index.mjs"
             ):
                 raise SystemExit(f"{runtime} has invalid browser package metadata")
-            if not archive.read("maplibre-native-kotlin.wasm").startswith(b"\0asm"):
+            if not archive.read("maplibre_native_c_bg.wasm").startswith(b"\0asm"):
                 raise SystemExit(f"{runtime} does not contain a WebAssembly module")
             if any("-test" in name for name in names):
                 raise SystemExit(f"{runtime} contains test fixtures")
