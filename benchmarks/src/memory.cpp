@@ -165,6 +165,7 @@ void maps_on_one_runtime(benchmark::State& state, const std::string& style) {
       const auto generation = completion.render_update_generation;
       auto& session = sessions[index];
       session.borrow_ring(rings[index]);
+      // Unlike the old C API's attach, this one first wraps the host's device.
       session.attach(map);
       session.present_until_full(generation);
     }

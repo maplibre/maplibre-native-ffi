@@ -479,33 +479,33 @@ void Session::start_attach(mln_map map, Completion& completion) {
 void Session::start_offscreen(mln_map map, Completion& completion) {
   caller_driven_ = false;
   last_slot_ = -1;
-  mln_offscreen_device device = MLN_HANDLE_NULL;
+  mln_gpu_device device = MLN_HANDLE_NULL;
   const auto& env = environment();
   if (env.has_offscreen_adapter) {
     // The host's GPU, rather than whichever the library would pick.
-    mln_offscreen_device_options options{};
+    mln_gpu_device_options options{};
     options.size = sizeof(options);
-    options.fields = MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX;
+    options.fields = MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX;
     options.adapter_index = env.offscreen_adapter_index;
-    const auto status = mln_offscreen_device_create(&options, &device, diag());
+    const auto status = mln_gpu_device_create(&options, &device, diag());
     if (status != MLN_STATUS_UNSUPPORTED) {
-      check(status, "mln_offscreen_device_create");
+      check(status, "mln_gpu_device_create");
     }
   }
   if (device == MLN_HANDLE_NULL) {
     unverified_offscreen_gpus.fetch_add(1, std::memory_order_relaxed);
   }
-  mln_offscreen_descriptor descriptor{};
-  descriptor.size = sizeof(descriptor);
-  descriptor.logical_size = {kWidth, kHeight};
+  mln_render_target target{};
+  target.size = sizeof(target);
+  target.kind = MLN_RENDER_TARGET_KIND_OFFSCREEN;
+  target.data.offscreen.logical_size = {kWidth, kHeight};
   const auto options = attach_options(false);
-  const auto status = mln_map_attach_offscreen(
-    map, &descriptor, &options, device, &session_, completion.descriptor(),
-    diag()
+  const auto status = mln_map_attach(
+    map, &target, device, &options, &session_, completion.descriptor(), diag()
   );
   // Sessions keep the device until they detach.
-  if (device != MLN_HANDLE_NULL) mln_offscreen_device_release(device);
-  check(status, "mln_map_attach_offscreen");
+  if (device != MLN_HANDLE_NULL) mln_gpu_device_release(device);
+  check(status, "mln_map_attach");
 }
 
 void Session::attached() {
