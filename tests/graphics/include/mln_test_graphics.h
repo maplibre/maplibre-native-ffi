@@ -71,7 +71,8 @@ typedef struct mln_test_graphics_context {
   void* MLN_TEST_GRAPHICS_NULLABLE vulkan_get_device_proc_addr;
   // Vulkan: the names of the device extensions that vulkan_device enabled, or
   // none when the instance and device are the caller's.
-  const char* const* MLN_TEST_GRAPHICS_NULLABLE vulkan_device_extensions;
+  const char* MLN_TEST_GRAPHICS_NONNULL const* MLN_TEST_GRAPHICS_NULLABLE
+    vulkan_device_extensions;
   uint32_t vulkan_device_extension_count;
   // EGL: EGLDisplay, and an EGLConfig with EGL_PBUFFER_BIT and OpenGL ES 3.
   void* MLN_TEST_GRAPHICS_NULLABLE egl_display;
