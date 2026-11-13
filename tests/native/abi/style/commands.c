@@ -123,7 +123,7 @@ static void missing_style_ids_report_not_found(void) {
     mln_map_add_style_layer_json(
       map,
       MLN_BUFFER_LITERAL(
-        "{\"id\":\"indicator\",\"type\":\"location-indicator\"}"
+        "{\"id\":\"backdrop\",\"type\":\"background\"}"
       ),
       layer, &completion.descriptor, NULL
     )
