@@ -16,7 +16,6 @@ abi/map/still_image.c:host_demands_and_a_still_image_demand_never_replace_each_o
 abi/map/tile_cache.c:a_map_keeps_the_tiles_that_left_the_view_by_default  # likely: a still map loads the tiles that come back into view again
 abi/map/tile_cache.c:a_map_with_the_tile_cache_enabled_keeps_them  # likely: a still map loads the tiles that come back into view again
 abi/plugin/plugin_layer.c:a_registered_layer_type_renders_through_the_c_api  # plugins are stubs: mln_plugin_get_register_function_v1 returns NULL
-abi/projection/projection.c:creation_rejects_invalid_views  # mln-rs projects globe views, which the suite expects to be UNSUPPORTED
 abi/render/invalidation.c:a_frame_shows_feature_state_moved_between_features  # feature state stays in mln_runtime's store and never reaches the renderer
 abi/render/invalidation.c:each_mutation_publishes_a_render_update_only_when_it_changes  # a feature-state change publishes no render update
 abi/render/invalidation.c:each_mutation_reaches_the_pixels_of_an_update_driven_host  # feature state stays in mln_runtime's store and never reaches the renderer
@@ -25,7 +24,6 @@ abi/render/unused_images.c:only_images_set_with_keep_unused_survive_when_unused 
 abi/resources/asset_paths.c:host_string_views_reject_nul_and_null_data_with_a_length  # mln_c accepts a text view with a NUL inside
 abi/resources/offline.c:an_offline_operation_accepted_before_release_still_completes  # a runtime release drops the core before the offline database replies
 abi/runtime/event_payloads.c:a_failed_style_load_names_its_kind  # a first style response without content is skipped, so the load never fails
-abi/style/commands.c:other_root_properties_read_back_as_loaded_and_reject_changes  # a loaded style takes projection and sky changes, which the suite expects refused
 abi/style/feature_state.c:a_removed_source_takes_its_state_with_it  # feature state stays in mln_runtime's store and never reaches the renderer
 abi/style/feature_state.c:a_style_load_clears_every_source_state  # feature state stays in mln_runtime's store and never reaches the renderer
 abi/style/feature_state.c:rendered_features_carry_state_from_the_last_frame  # feature state stays in mln_runtime's store and never reaches the renderer
