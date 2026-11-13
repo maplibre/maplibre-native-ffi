@@ -5,28 +5,29 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.maplibre.nativeffi.AcquiredFrameHandle
 import org.maplibre.nativeffi.EglContextDescriptor
+import org.maplibre.nativeffi.GpuDeviceHandle
 import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MetalBorrowedTexture
-import org.maplibre.nativeffi.MetalBorrowedTextureDescriptor
+import org.maplibre.nativeffi.MetalBorrowedTexturesTarget
+import org.maplibre.nativeffi.MetalDeviceDescriptor
 import org.maplibre.nativeffi.NativePointer
 import org.maplibre.nativeffi.OpenGlBorrowedTexture
-import org.maplibre.nativeffi.OpenGlBorrowedTextureDescriptor
-import org.maplibre.nativeffi.OpenGlClientApi
+import org.maplibre.nativeffi.OpenGlBorrowedTexturesTarget
 import org.maplibre.nativeffi.OpenGlContextDescriptor
-import org.maplibre.nativeffi.OpenGlContextDescriptorData
-import org.maplibre.nativeffi.OpenGlContextOwnership
 import org.maplibre.nativeffi.OpenGlContextProviderFlag
+import org.maplibre.nativeffi.QueueLock
 import org.maplibre.nativeffi.RenderBackendFlag
 import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RenderSessionHandle
+import org.maplibre.nativeffi.RenderTarget
 import org.maplibre.nativeffi.VulkanBorrowedTexture
-import org.maplibre.nativeffi.VulkanBorrowedTextureDescriptor
+import org.maplibre.nativeffi.VulkanBorrowedTexturesTarget
 import org.maplibre.nativeffi.VulkanContextDescriptor
+import org.maplibre.nativeffi.VulkanDeviceDescriptor
 import org.maplibre.nativeffi.WebGlContextDescriptor
 import org.maplibre.nativeffi.WebGpuBorrowedTexture
-import org.maplibre.nativeffi.WebGpuBorrowedTextureDescriptor
-import org.maplibre.nativeffi.WebGpuContextDescriptor
+import org.maplibre.nativeffi.WebGpuBorrowedTexturesTarget
 import org.maplibre.nativeffi.WglContextDescriptor
 import org.maplibre.nativeffi.openGlSupportedContextProviderMask
 import org.maplibre.nativeffi.supportedRenderBackendMask
@@ -142,6 +143,27 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
   }
 }
 
+/**
+ * A canvas of the page's that a session presents to, in a browser, which has no readback. [close]
+ * ends the module's reference to it.
+ */
+internal interface TestCanvas : AutoCloseable {
+  /** The canvas's `mln_web_object` handle, for a web canvas target. */
+  val handle: UInt
+
+  /** The RGBA bytes of the canvas's center pixel, as [capture] last read it, or null before. */
+  val centerPixel: List<Int>?
+
+  /** Reads the canvas's center pixel. Call it in the task that presented the frame. */
+  fun capture()
+}
+
+/**
+ * Creates a [TestCanvas] of [width] x [height] in a browser, or returns null elsewhere, where a
+ * session on a device of its own renders offscreen and reads back.
+ */
+internal expect fun createTestCanvas(width: Int, height: Int): TestCanvas?
+
 /** The dispatcher of the one thread that every render test drives its graphics from. */
 internal expect val testGraphicsThread: CoroutineDispatcher
 
@@ -156,6 +178,13 @@ internal object TestGraphics {
     get() = testGraphicsThread
 
   val backend: TestBackend by lazy { TestBackend.ofBuild() }
+
+  /**
+   * Whether sessions render into textures that the test graphics create. mln-rs's browser build
+   * renders into canvases only.
+   */
+  val borrowsTextures: Boolean
+    get() = backend != TestBackend.WEBGL && backend != TestBackend.WEBGPU
 
   private class Shared(val graphics: Long, val context: TestGraphicsContext)
 
@@ -202,31 +231,26 @@ internal object TestGraphics {
   }
 
   /**
-   * Submits an attach of a borrowed ring of [textures], from [createTextures], on the build's
-   * backend. Call it on [thread], where the build's OpenGL context is current.
+   * Wraps the build's device, or its OpenGL context, in a GPU device that a borrowed ring of
+   * [createTextures]' textures renders on. A Vulkan device takes [queueLock], the lock on the queue
+   * that the test graphics submit to. Release the device once the sessions that attach on it have
+   * attached: each session keeps its device until it ends.
    */
-  suspend fun attachBorrowedTexture(
-    map: MapHandle,
-    textures: List<TestTexture>,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
+  suspend fun wrapDevice(queueLock: QueueLock = QueueLock()): GpuDeviceHandle {
     val context = context()
-    val texture = textures.first()
-    val logicalSize = LogicalSize(texture.width, texture.height)
-    val openGlContext =
+    val openGl =
       when (backend) {
         TestBackend.EGL ->
-          OpenGlContextDescriptorData.Egl(
+          OpenGlContextDescriptor.Egl(
             EglContextDescriptor(
               pointer(context.eglDisplay),
               pointer(context.eglConfig),
               pointer(context.eglContext),
-              OpenGlClientApi.GLES,
               NativePointer.NULL_POINTER,
             ),
           )
         TestBackend.WGL ->
-          OpenGlContextDescriptorData.Wgl(
+          OpenGlContextDescriptor.Wgl(
             WglContextDescriptor(
               pointer(context.wglDeviceContext),
               pointer(context.wglContext),
@@ -234,25 +258,76 @@ internal object TestGraphics {
             ),
           )
         TestBackend.WEBGL ->
-          OpenGlContextDescriptorData.WebGl(
-            WebGlContextDescriptor(context.webGlContext),
-          )
+          OpenGlContextDescriptor.WebGl(WebGlContextDescriptor(context.webGlContext))
         TestBackend.METAL,
         TestBackend.VULKAN,
-        TestBackend.WEBGPU -> return attachBackendBorrowedTexture(map, textures, context, options)
+        TestBackend.WEBGPU -> return wrapBackendDevice(context, queueLock)
       }
-    return map.attachOpenGlBorrowedTexture(
-      OpenGlBorrowedTextureDescriptor(
-        logicalSize,
-        physicalWidth = texture.width,
-        physicalHeight = texture.height,
-        context = OpenGlContextDescriptor(OpenGlContextOwnership.SHARED, openGlContext),
-        textures = textures.map { OpenGlBorrowedTexture(it.openGlTexture) },
-        target = texture.openGlTarget,
-      ),
-      options,
-    )
+    return GpuDeviceHandle.wrapOpenGl(openGl)
   }
+
+  /** The borrowed ring of [textures], from [createTextures], on the build's backend. */
+  fun borrowedTarget(textures: List<TestTexture>): RenderTarget {
+    val texture = textures.first()
+    val logicalSize = LogicalSize(texture.width, texture.height)
+    return when (backend) {
+      TestBackend.EGL,
+      TestBackend.WGL,
+      TestBackend.WEBGL ->
+        RenderTarget.OpenGlBorrowedTextures(
+          OpenGlBorrowedTexturesTarget(
+            logicalSize,
+            physicalWidth = texture.width,
+            physicalHeight = texture.height,
+            textures = textures.map { OpenGlBorrowedTexture(it.openGlTexture) },
+            target = texture.openGlTarget,
+          ),
+        )
+      TestBackend.METAL ->
+        RenderTarget.MetalBorrowedTextures(
+          MetalBorrowedTexturesTarget(
+            logicalSize,
+            physicalWidth = texture.width,
+            physicalHeight = texture.height,
+            textures = textures.map { MetalBorrowedTexture(pointer(it.metalTexture)) },
+          ),
+        )
+      TestBackend.VULKAN ->
+        RenderTarget.VulkanBorrowedTextures(
+          VulkanBorrowedTexturesTarget(
+            logicalSize,
+            physicalWidth = texture.width,
+            physicalHeight = texture.height,
+            textures = textures.map { VulkanBorrowedTexture(it.vulkanImage, it.vulkanImageView) },
+            format = texture.format,
+            finalLayout = texture.vulkanFinalLayout,
+          ),
+        )
+      TestBackend.WEBGPU ->
+        RenderTarget.WebGpuBorrowedTextures(
+          WebGpuBorrowedTexturesTarget(
+            logicalSize,
+            physicalWidth = texture.width,
+            physicalHeight = texture.height,
+            textures = textures.map { WebGpuBorrowedTexture(it.webGpuTexture) },
+            format = texture.webGpuFormat,
+          ),
+        )
+    }
+  }
+
+  /**
+   * Submits an attach of a borrowed ring of [textures], from [createTextures], on a device from
+   * [wrapDevice] with [queueLock], which the session alone keeps. Call it on [thread], where the
+   * build's OpenGL context is current.
+   */
+  suspend fun attachBorrowedTexture(
+    map: MapHandle,
+    textures: List<TestTexture>,
+    options: RenderSessionAttachOptions,
+    queueLock: QueueLock = QueueLock(),
+  ): RenderSessionHandle =
+    wrapDevice(queueLock).use { device -> map.attach(borrowedTarget(textures), device, options) }
 
   /** Reads the size of the backend texture behind [frame] through its typed view. */
   fun frameTextureSize(frame: AcquiredFrameHandle): Pair<UInt, UInt> =
@@ -265,70 +340,37 @@ internal object TestGraphics {
       TestBackend.WEBGPU -> backendTextureSize(frame)
     }
 
-  fun metalBorrowedTexture(textures: List<TestTexture>): MetalBorrowedTextureDescriptor {
-    val texture = textures.first()
-    return MetalBorrowedTextureDescriptor(
-      LogicalSize(texture.width, texture.height),
-      physicalWidth = texture.width,
-      physicalHeight = texture.height,
-      textures = textures.map { MetalBorrowedTexture(pointer(it.metalTexture)) },
-      commandQueue = NativePointer.NULL_POINTER,
+  /** The Vulkan device of [context], for `GpuDeviceHandle.wrapVulkan`, with [queueLock]. */
+  fun vulkanDevice(context: TestGraphicsContext, queueLock: QueueLock): VulkanDeviceDescriptor =
+    VulkanDeviceDescriptor(
+      VulkanContextDescriptor(
+        pointer(context.vulkanInstance),
+        pointer(context.vulkanPhysicalDevice),
+        pointer(context.vulkanDevice),
+        pointer(context.vulkanQueue),
+        context.vulkanQueueFamilyIndex,
+        pointer(context.vulkanGetInstanceProcAddr),
+        pointer(context.vulkanGetDeviceProcAddr),
+      ),
+      queueLock,
     )
-  }
 
-  fun vulkanBorrowedTexture(
-    textures: List<TestTexture>,
-    context: TestGraphicsContext,
-  ): VulkanBorrowedTextureDescriptor {
-    val texture = textures.first()
-    return VulkanBorrowedTextureDescriptor(
-      LogicalSize(texture.width, texture.height),
-      physicalWidth = texture.width,
-      physicalHeight = texture.height,
-      context =
-        VulkanContextDescriptor(
-          pointer(context.vulkanInstance),
-          pointer(context.vulkanPhysicalDevice),
-          pointer(context.vulkanDevice),
-          pointer(context.vulkanQueue),
-          context.vulkanQueueFamilyIndex,
-          pointer(context.vulkanGetInstanceProcAddr),
-          pointer(context.vulkanGetDeviceProcAddr),
-        ),
-      textures = textures.map { VulkanBorrowedTexture(it.vulkanImage, it.vulkanImageView) },
-      format = texture.format,
-      finalLayout = texture.vulkanFinalLayout,
-    )
-  }
-
-  fun webGpuBorrowedTexture(
-    textures: List<TestTexture>,
-    context: TestGraphicsContext,
-  ): WebGpuBorrowedTextureDescriptor {
-    val texture = textures.first()
-    return WebGpuBorrowedTextureDescriptor(
-      LogicalSize(texture.width, texture.height),
-      physicalWidth = texture.width,
-      physicalHeight = texture.height,
-      context = WebGpuContextDescriptor(context.webGpuDevice),
-      textures = textures.map { WebGpuBorrowedTexture(it.webGpuTexture) },
-      format = texture.webGpuFormat,
-    )
-  }
+  /** The Metal device of [context], for `GpuDeviceHandle.wrapMetal`, with its own queue. */
+  fun metalDevice(context: TestGraphicsContext): MetalDeviceDescriptor =
+    MetalDeviceDescriptor(pointer(context.metalDevice), NativePointer.NULL_POINTER)
 
   private fun pointer(address: Long): NativePointer = NativePointer.ofAddress(address)
 }
 
 /**
- * Submits a borrowed-texture attach on a backend whose attach only some targets declare. Each
- * target attaches the backends that its source sets declare and rejects the others.
+ * Wraps the device of [context] on a backend whose wrap only some targets declare: Metal, Vulkan
+ * with [queueLock], or WebGPU. Each target wraps the backends that its source sets declare and
+ * rejects the others.
  */
-internal expect fun TestGraphics.attachBackendBorrowedTexture(
-  map: MapHandle,
-  textures: List<TestTexture>,
+internal expect fun TestGraphics.wrapBackendDevice(
   context: TestGraphicsContext,
-  options: RenderSessionAttachOptions,
-): RenderSessionHandle
+  queueLock: QueueLock,
+): GpuDeviceHandle
 
 /** Reads the texture size of [frame] on a backend whose view only some targets declare. */
 internal expect fun TestGraphics.backendTextureSize(frame: AcquiredFrameHandle): Pair<UInt, UInt>
