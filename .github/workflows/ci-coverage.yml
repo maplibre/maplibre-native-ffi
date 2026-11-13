@@ -529,7 +529,7 @@ jobs:
         run: >-
           mise exec --no-deps -- python3 tools/release/test_vcpkg.py
           build/packages/native/vcpkg-input "$RUNNER_TEMP/vcpkg"
-          --triplet x64-linux --backend opengl
+          --triplet x64-linux
   conan-recipes:
     name: package / conan
     runs-on: blacksmith-4vcpu-ubuntu-2404
