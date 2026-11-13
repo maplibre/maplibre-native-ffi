@@ -1,4 +1,4 @@
-# The exit programs that fail under the Linux OpenGL with EGL presets on top of
-# egl.txt. tests/native/exit/transition_release_at_exit.c is empty on Windows,
-# where it passes, so each system that fails it lists it.
+# The exit programs that fail under the Linux OpenGL with EGL presets, which
+# fail no ABI suite case. tests/native/exit/transition_release_at_exit.c is
+# empty on Windows, where it passes, so each system that fails it lists it.
 exit/transition_release_at_exit.c  # a transition's release callback can still start after the library's exit handler ran
