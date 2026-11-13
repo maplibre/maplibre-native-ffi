@@ -9,7 +9,7 @@ set -euo pipefail
 preset=${1:?usage: run-qemu-test.sh <preset> [executable [arguments...]]}
 shift
 if [[ $# -eq 0 ]]; then
-  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests"
+  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests_${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the backend under test}"
 fi
 
 case "$preset" in
@@ -21,8 +21,8 @@ case "$preset" in
     ;;
 esac
 case "$preset" in
-  *-riscv64-*) architecture=riscv64 ;;
-  *-loongarch64-*) architecture=loongarch64 ;;
+  *-riscv64) architecture=riscv64 ;;
+  *-loongarch64) architecture=loongarch64 ;;
   *)
     echo "Unsupported QEMU test preset: $preset" >&2
     exit 2

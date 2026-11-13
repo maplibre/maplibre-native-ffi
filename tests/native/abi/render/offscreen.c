@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/map.h"
 #include "support/test_support.h"
 
@@ -363,7 +364,7 @@ static void expect_attach_status(
 
 static mln_gpu_device create_device(void) {
   mln_gpu_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_gpu_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
+  device = mln_test_create_device();
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, device);
   return device;
 }

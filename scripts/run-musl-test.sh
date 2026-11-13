@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Runs a musl test executable inside Alpine, where the dynamic loader and
 # graphics implementation share the ABI that the executable targets. The
-# executable gets MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
+# container gets the drivers of MLN_FFI_TEST_BACKEND, vulkan or opengl, and
+# the executable gets MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
 set -euo pipefail
 
 preset=${1:?usage: run-musl-test.sh <preset> [executable [arguments...]]}
 container_image=${MLN_FFI_MUSL_TEST_IMAGE:-alpine:3.22}
+backend=${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the backend under test}
 shift
 if [[ $# -eq 0 ]]; then
-  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests"
+  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests_$backend"
 fi
 
 if [[ "$1" == */* && ! -x "$1" ]]; then
@@ -29,11 +31,10 @@ else
   exit 2
 fi
 
-case "$preset" in
-  *-egl) backend=egl ;;
-  *-vulkan) backend=vulkan ;;
+case "$backend" in
+  opengl | vulkan) ;;
   *)
-    echo "Unsupported musl test preset: $preset" >&2
+    echo "Unsupported musl test backend: $backend" >&2
     exit 2
     ;;
 esac
@@ -46,7 +47,7 @@ esac
   "$container_image" \
   sh -euc '
     case "$1" in
-      egl) apk add --no-cache mesa-dri-gallium mesa-egl mesa-gles ;;
+      opengl) apk add --no-cache mesa-dri-gallium mesa-egl mesa-gles ;;
       vulkan) apk add --no-cache mesa-vulkan-swrast vulkan-loader ;;
     esac
     # The Wayland cases run a compositor of their own on libwayland-server.
@@ -56,6 +57,7 @@ esac
     # by the timeout scale.
     export MLN_TEST_TIMEOUT_SCALE="$3"
     export MLN_FFI_TEST_FIXTURE_DIR="$2/tests/native/fixtures"
+    export MLN_FFI_TEST_BACKEND="$1"
     timeout_seconds=$4
     shift 4
     exec timeout "$timeout_seconds" "$@"

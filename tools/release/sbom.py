@@ -252,11 +252,14 @@ def native(
         "BSD-2-Clause",
         "https://github.com/maplibre/maplibre-native-ffi",
     )
-    root["bom-ref"] = f"native:{artifact['platform']['id']}:{artifact['backend']}"
+    root["bom-ref"] = f"native:{artifact['name']}"
     root["group"] = "org.maplibre.nativeffi"
     root["properties"] = [
         {"name": "maplibre:platform", "value": artifact["platform"]["id"]},
-        {"name": "maplibre:backend", "value": artifact["backend"]},
+        *(
+            {"name": "maplibre:backend", "value": backend}
+            for backend in artifact["backends"]
+        ),
         {"name": "maplibre:source-commit", "value": artifact["commit"]},
     ]
     components = []

@@ -15,6 +15,15 @@
 
 set(MLN_BENCH_FIXTURE_DIR "" CACHE PATH "Prepared benchmark fixtures")
 set(MLN_BENCH_GOOGLE_BENCHMARK_DIR "" CACHE PATH "Google Benchmark's source")
+set(MLN_BENCH_BACKEND ""
+    CACHE
+      STRING
+      "Render backend that the harness drives; empty takes the default backend")
+if(MLN_BENCH_BACKEND)
+  set(bench_backend "${MLN_BENCH_BACKEND}")
+else()
+  set(bench_backend "${MLN_FFI_DEFAULT_RENDER_BACKEND}")
+endif()
 
 get_filename_component(bench_dir "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
@@ -32,12 +41,12 @@ if(NOT DEFINED MLN_BENCH_LIBRARY)
   if(TARGET mln_test_graphics_objects)
     set(MLN_BENCH_TEST_GRAPHICS mln_test_graphics_objects)
   endif()
-  # A preset whose backend isn't Vulkan names no Vulkan headers, which the
-  # host graphics still compile against.
+  # A backend other than Vulkan names no Vulkan headers, which the host
+  # graphics still compile against.
   set(MLN_BENCH_GRAPHICS_INCLUDE_DIRS "")
-  if(TARGET mln_ffi_render_dependencies)
-    get_target_property(MLN_BENCH_GRAPHICS_INCLUDE_DIRS
-                        mln_ffi_render_dependencies MLN_FFI_INCLUDE_DIRS)
+  if(TARGET mln_ffi_render_dependencies_${bench_backend})
+    mln_ffi_render_dependency_property(MLN_BENCH_GRAPHICS_INCLUDE_DIRS
+                                       ${bench_backend} MLN_FFI_INCLUDE_DIRS)
   endif()
   if(NOT MLN_BENCH_GRAPHICS_INCLUDE_DIRS)
     set(MLN_BENCH_GRAPHICS_INCLUDE_DIRS
@@ -100,16 +109,16 @@ if(NOT WIN32)
   target_link_libraries(mln_ffi_bench PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 endif()
 
-if(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+if(bench_backend STREQUAL "vulkan")
   target_compile_definitions(mln_ffi_bench PRIVATE BENCH_BACKEND_VULKAN=1)
   target_include_directories(
     mln_ffi_bench
     SYSTEM
     PRIVATE ${MLN_BENCH_GRAPHICS_INCLUDE_DIRS})
-elseif(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+elseif(bench_backend STREQUAL "metal")
   target_compile_definitions(mln_ffi_bench PRIVATE BENCH_BACKEND_METAL=1)
   target_link_libraries(mln_ffi_bench PRIVATE "-framework Foundation" objc)
-elseif(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+elseif(bench_backend STREQUAL "webgpu")
   target_compile_definitions(mln_ffi_bench PRIVATE BENCH_BACKEND_WEBGPU=1)
 elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
   target_compile_definitions(
@@ -139,8 +148,9 @@ endif()
 # get.
 set(environment)
 set(modifications)
-if(COMMAND mln_native_test_environment AND TARGET mln_ffi_render_dependencies)
-  mln_native_test_environment(environment modifications)
+if(COMMAND mln_native_test_environment
+   AND TARGET mln_ffi_render_dependencies_${bench_backend})
+  mln_native_test_environment(environment modifications ${bench_backend})
 endif()
 list(FILTER environment EXCLUDE REGEX "^MLN_FFI_TEST_FIXTURE_DIR=")
 set(environment_json "")
@@ -158,7 +168,7 @@ file(
   CONTENT
     "{
   \"executable\": \"$<TARGET_FILE:mln_ffi_bench>\",
-  \"render_backend\": \"${MLN_FFI_RENDER_BACKEND}\",
+  \"render_backend\": \"${bench_backend}\",
   \"environment\": [${environment_json}]
 }
 ")

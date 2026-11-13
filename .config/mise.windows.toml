@@ -4,7 +4,7 @@
 shell = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 
 [vars]
-host_native_preset = "windows-{{ arch() }}-vulkan"
+host_native_preset = "windows-{{ arch() }}"
 
 [env]
 # cgo links the C DLL with MSYS2's GNU-style Clang, even for MSVC presets.

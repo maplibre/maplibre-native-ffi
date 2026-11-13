@@ -514,6 +514,21 @@ static bool find_cpu_device(uint8_t out_uuid[VK_UUID_SIZE]) {
 }
 #endif
 
+mln_gpu_device mln_test_create_device(void) {
+  mln_gpu_device_options options = {.size = sizeof(options)};
+  options.fields = MLN_GPU_DEVICE_OPTION_BACKEND;
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  options.backend = MLN_RENDER_BACKEND_METAL;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  options.backend = MLN_RENDER_BACKEND_VULKAN;
+#else
+  options.backend = MLN_RENDER_BACKEND_OPEN_GL;
+#endif
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_gpu_device_create(&options, &device, MLN_TEST_DIAGNOSTIC));
+  return device;
+}
+
 mln_gpu_device mln_test_create_presenting_device(void) {
   mln_gpu_device_options options = {.size = sizeof(options)};
   options.fields = MLN_GPU_DEVICE_OPTION_BACKEND;

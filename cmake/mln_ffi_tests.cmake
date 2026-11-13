@@ -1,6 +1,12 @@
 # Builds the native suites under tests/native and registers how each target
 # runs them. tests/native/support/test_support.h states how a test file is laid
 # out and the rules that cases follow.
+#
+# The suites are compiled once for each backend in MLN_FFI_TEST_BACKENDS, as
+# mln_native_abi_tests_<backend>, and every one links the same library. Each
+# registered test carries its backend as a CTest label and as
+# MLN_FFI_TEST_BACKEND in its environment, so `ctest -L <backend>` runs one
+# backend's suites.
 
 include(mln_ffi_test_graphics)
 
@@ -38,9 +44,9 @@ set(MLN_NATIVE_FILE_TAGS
     windows
     icu)
 
-function(mln_native_active_file_tags out_var)
-  set(tags ${MLN_FFI_RENDER_BACKEND})
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+function(mln_native_active_file_tags out_var backend)
+  set(tags ${backend})
+  if(backend STREQUAL "opengl")
     list(APPEND tags ${MLN_FFI_OPENGL_CONTEXT_PROVIDER})
   endif()
   if(ANDROID)
@@ -90,10 +96,10 @@ function(mln_native_file_selected relative active_tags out_var)
   endif()
 endfunction()
 
-# Collects the ABI suite's test files for this target, in registry order, and
-# the group symbol each one defines.
-function(mln_native_collect_abi_tests out_sources out_symbols)
-  mln_native_active_file_tags(active_tags)
+# Collects the ABI suite's test files for this target and a backend, in
+# registry order, and the group symbol each one defines.
+function(mln_native_collect_abi_tests out_sources out_symbols backend)
+  mln_native_active_file_tags(active_tags ${backend})
   file(GLOB_RECURSE all_sources RELATIVE "${MLN_NATIVE_TESTS_DIR}/abi"
        CONFIGURE_DEPENDS "${MLN_NATIVE_TESTS_DIR}/abi/*.c")
   foreach(relative IN LISTS all_sources)
@@ -133,10 +139,15 @@ endfunction()
 function(mln_native_write_registry registry_dir sources symbols)
   set(registry "")
   foreach(relative symbol IN ZIP_LISTS sources symbols)
-    set_property(
-      SOURCE "${MLN_NATIVE_TESTS_DIR}/${relative}"
-      APPEND
-      PROPERTY COMPILE_DEFINITIONS "MLN_TEST_GROUP_NAME=${symbol}")
+    # Every backend's suite compiles the file, with the same group name.
+    set(source "${MLN_NATIVE_TESTS_DIR}/${relative}")
+    get_source_file_property(definitions "${source}" COMPILE_DEFINITIONS)
+    if(NOT "MLN_TEST_GROUP_NAME=${symbol}" IN_LIST definitions)
+      set_property(
+        SOURCE "${source}"
+        APPEND
+        PROPERTY COMPILE_DEFINITIONS "MLN_TEST_GROUP_NAME=${symbol}")
+    endif()
     string(APPEND registry
            "MLN_TEST_REGISTRY_ENTRY(${symbol}, \"tests/native/${relative}\")\n")
   endforeach()
@@ -169,12 +180,10 @@ function(mln_native_fetch_unity)
   endif()
 endfunction()
 
-function(mln_native_test_environment out_environment out_modifications)
-  get_target_property(dependency_runtime_dirs mln_ffi_render_dependencies
-                      MLN_FFI_RUNTIME_DIRS)
-  if("${dependency_runtime_dirs}" MATCHES "-NOTFOUND$")
-    set(dependency_runtime_dirs "")
-  endif()
+# The environment of a backend's tests.
+function(mln_native_test_environment out_environment out_modifications backend)
+  mln_ffi_render_dependency_property(dependency_runtime_dirs ${backend}
+                                     MLN_FFI_RUNTIME_DIRS)
   set(modifications)
   get_target_property(test_library_path_variable mln_ffi_platform_dependencies
                       MLN_FFI_TEST_LIBRARY_PATH_VARIABLE)
@@ -189,24 +198,19 @@ function(mln_native_test_environment out_environment out_modifications)
   # The directory arrives at run time, which keeps the checkout path out of the
   # compiled objects: an object carrying it would send a second checkout reading
   # fixtures out of the tree that happened to compile it first.
-  set(environment "MLN_FFI_TEST_FIXTURE_DIR=${MLN_NATIVE_TESTS_DIR}/fixtures")
+  set(environment "MLN_FFI_TEST_FIXTURE_DIR=${MLN_NATIVE_TESTS_DIR}/fixtures"
+      "MLN_FFI_TEST_BACKEND=${backend}")
   set(${out_environment} ${environment} PARENT_SCOPE)
   set(${out_modifications} ${modifications} PARENT_SCOPE)
 endfunction()
 
-function(mln_native_configure_suite target registry_dir)
-  get_target_property(dependency_include_dirs mln_ffi_render_dependencies
-                      MLN_FFI_INCLUDE_DIRS)
+function(mln_native_configure_suite target registry_dir backend)
+  mln_ffi_render_dependency_property(dependency_include_dirs ${backend}
+                                     MLN_FFI_INCLUDE_DIRS)
   # Libraries the harness links for the graphics API it drives itself, which
   # the C API resolves at runtime rather than linking.
-  get_target_property(dependency_test_libraries mln_ffi_render_dependencies
-                      MLN_FFI_TEST_LINK_LIBRARIES)
-  if("${dependency_include_dirs}" MATCHES "-NOTFOUND$")
-    set(dependency_include_dirs "")
-  endif()
-  if("${dependency_test_libraries}" MATCHES "-NOTFOUND$")
-    set(dependency_test_libraries "")
-  endif()
+  mln_ffi_render_dependency_property(dependency_test_libraries ${backend}
+                                     MLN_FFI_TEST_LINK_LIBRARIES)
 
   set(support_dir "${MLN_NATIVE_TESTS_DIR}/support")
   target_sources(
@@ -254,7 +258,8 @@ function(mln_native_configure_suite target registry_dir)
   target_link_libraries(
     ${target}
     PRIVATE
-      unity::framework MLN_FFI::RenderDependencies ${dependency_test_libraries})
+      unity::framework mln_ffi_render_dependencies_${backend}
+      ${dependency_test_libraries})
   target_include_directories(
     ${target}
     PRIVATE
@@ -285,16 +290,16 @@ function(mln_native_configure_suite target registry_dir)
     target_compile_options(${target} PRIVATE /we4505)
   endif()
 
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+  if(backend STREQUAL "metal")
     target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_BACKEND_METAL=1)
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+  elseif(backend STREQUAL "opengl")
     target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_BACKEND_OPENGL=1)
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
       target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_OPENGL_WGL=1)
     else()
       target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_OPENGL_EGL=1)
     endif()
-  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+  elseif(backend STREQUAL "vulkan")
     target_compile_definitions(${target} PRIVATE MLN_FFI_TEST_BACKEND_VULKAN=1)
   endif()
 
@@ -317,7 +322,7 @@ function(mln_native_configure_suite target registry_dir)
   # The Metal test support defines an Objective-C class, which the iOS and
   # tvOS test app links against the runtime and Foundation directly. The
   # IOSurface cases lock surfaces to read them.
-  if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+  if(APPLE AND backend STREQUAL "metal")
     target_link_libraries(
       ${target}
       PRIVATE "-framework Foundation" "-framework IOSurface" objc)
@@ -332,16 +337,17 @@ endfunction()
 
 # The ABI suite includes public headers only and links the shipped library,
 # the shared one where the platform builds it, so it exercises the export
-# boundary hosts link against.
-function(mln_native_add_abi_suite out_sources)
-  mln_native_collect_abi_tests(sources symbols)
-  set(registry_dir "${CMAKE_CURRENT_BINARY_DIR}/tests/native/abi")
+# boundary hosts link against. Each backend's suite is its own executable.
+function(mln_native_add_abi_suite out_sources backend)
+  mln_native_collect_abi_tests(sources symbols ${backend})
+  set(registry_dir "${CMAKE_CURRENT_BINARY_DIR}/tests/native/abi/${backend}")
   mln_native_write_registry("${registry_dir}" "${sources}" "${symbols}")
   list(TRANSFORM sources PREPEND "${MLN_NATIVE_TESTS_DIR}/" OUTPUT_VARIABLE
        test_sources)
-  add_executable(mln_native_abi_tests ${test_sources})
-  mln_native_configure_suite(mln_native_abi_tests "${registry_dir}")
-  target_link_libraries(mln_native_abi_tests PRIVATE maplibre_native_c)
+  set(target mln_native_abi_tests_${backend})
+  add_executable(${target} ${test_sources})
+  mln_native_configure_suite(${target} "${registry_dir}" ${backend})
+  target_link_libraries(${target} PRIVATE maplibre_native_c)
   set(${out_sources} ${sources} PARENT_SCOPE)
 endfunction()
 
@@ -394,9 +400,10 @@ endfunction()
 # Each exit program makes its calls and returns from main at once, so the
 # process exit that follows is the check. They link the shipped library, as
 # the ABI suite does, and a program whose name ends in a backend tag builds
-# only on matching presets, as a suite file does.
-function(mln_native_add_exit_tests out_tests)
-  mln_native_active_file_tags(active_tags)
+# only for a matching backend, as a suite file does. A program without one
+# builds once and runs with each backend's tests.
+function(mln_native_add_exit_tests out_tests backend)
+  mln_native_active_file_tags(active_tags ${backend})
   file(GLOB programs RELATIVE "${MLN_NATIVE_TESTS_DIR}/exit" CONFIGURE_DEPENDS
        "${MLN_NATIVE_TESTS_DIR}/exit/*.c")
   if(NOT WIN32)
@@ -410,6 +417,13 @@ function(mln_native_add_exit_tests out_tests)
     endif()
     get_filename_component(stem "${program}" NAME_WE)
     set(target "mln_native_exit_${stem}")
+    set(test_name "native-exit/${backend}/${stem}")
+    if(TARGET ${target})
+      add_test(NAME ${test_name} COMMAND ${target})
+      mln_native_bound_test(${test_name} ${target} 60)
+      list(APPEND tests ${test_name})
+      continue()
+    endif()
     add_executable(${target} "${MLN_NATIVE_TESTS_DIR}/exit/${program}")
     set_target_properties(
       ${target}
@@ -421,9 +435,9 @@ function(mln_native_add_exit_tests out_tests)
     if(TARGET mln_test_graphics_objects)
       target_link_libraries(${target} PRIVATE mln_test_graphics_objects)
     endif()
-    add_test(NAME "native-exit/${stem}" COMMAND ${target})
-    mln_native_bound_test("native-exit/${stem}" ${target} 60)
-    list(APPEND tests "native-exit/${stem}")
+    add_test(NAME ${test_name} COMMAND ${target})
+    mln_native_bound_test(${test_name} ${target} 60)
+    list(APPEND tests ${test_name})
   endforeach()
   set(${out_tests} ${tests} PARENT_SCOPE)
 endfunction()
@@ -448,22 +462,31 @@ function(mln_ffi_add_native_tests)
   endif()
 
   mln_native_fetch_unity()
-  mln_native_add_abi_suite(abi_sources)
   mln_native_add_doc_snippets()
+  foreach(backend IN LISTS MLN_FFI_TEST_BACKENDS)
+    mln_native_add_backend_tests(${backend})
+  endforeach()
+endfunction()
+
+# Builds and registers one backend's suites.
+function(mln_native_add_backend_tests backend)
+  mln_native_add_abi_suite(abi_sources ${backend})
+  set(abi_target mln_native_abi_tests_${backend})
 
   # Each registered test gets the same environment, so a new entry cannot miss
   # the fixture directory or the loader path.
-  mln_native_test_environment(test_environment test_modifications)
+  mln_native_test_environment(test_environment test_modifications ${backend})
   set(registered_tests)
   mln_native_runs_off_host(off_host)
   if(off_host)
     # Off the host, each suite runs as one entry, since a simulator spawns and
     # an emulator receives one process per run.
-    add_test(NAME native-abi COMMAND mln_native_abi_tests)
-    mln_native_bound_test(native-abi mln_native_abi_tests 300)
-    list(APPEND registered_tests native-abi)
+    set(test_name "native-abi/${backend}")
+    add_test(NAME ${test_name} COMMAND ${abi_target})
+    mln_native_bound_test(${test_name} ${abi_target} 300)
+    list(APPEND registered_tests ${test_name})
     if(NOT CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$")
-      mln_native_add_exit_tests(exit_tests)
+      mln_native_add_exit_tests(exit_tests ${backend})
       list(APPEND registered_tests ${exit_tests})
     endif()
   else()
@@ -473,17 +496,19 @@ function(mln_ffi_add_native_tests)
       string(REGEX MATCH "^[a-z]+" suite "${relative}")
       string(REGEX REPLACE "^[a-z]+/(.*)\\.[a-z]+$" "\\1" test_path
              "${relative}")
-      set(test_name "native-${suite}/${test_path}")
+      set(test_name "native-${suite}/${backend}/${test_path}")
       add_test(
         NAME ${test_name}
-        COMMAND mln_native_${suite}_tests -f "/${relative}")
-      mln_native_bound_test(${test_name} mln_native_${suite}_tests 120)
+        COMMAND mln_native_${suite}_tests_${backend} -f "/${relative}")
+      mln_native_bound_test(${test_name} mln_native_${suite}_tests_${backend}
+                            120)
       list(APPEND registered_tests ${test_name})
     endforeach()
-    mln_native_add_exit_tests(exit_tests)
+    mln_native_add_exit_tests(exit_tests ${backend})
     list(APPEND registered_tests ${exit_tests})
   endif()
   foreach(test_name IN LISTS registered_tests)
+    set_property(TEST ${test_name} PROPERTY LABELS ${backend})
     set_property(
       TEST ${test_name}
       APPEND

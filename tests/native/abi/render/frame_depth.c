@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/style.h"
 #include "support/test_support.h"
 
@@ -151,7 +152,7 @@ static void a_frame_projection_places_points_where_the_frame_drew_them(void) {
 
 static void a_device_reports_the_depth_that_its_rings_keep(void) {
   mln_gpu_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_gpu_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
+  device = mln_test_create_device();
   mln_gpu_device_capabilities capabilities = {.size = sizeof(capabilities)};
   MLN_TEST_OK(mln_gpu_device_get_capabilities(device, &capabilities, NULL));
   const mln_render_target_kind_flags borrowed =

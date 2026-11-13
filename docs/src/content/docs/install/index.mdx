@@ -19,12 +19,17 @@ architectures, and backends each language supports.
 
 ## Choose a backend
 
-The library renders with one graphics backend, which you choose when you install
-it. Apple platforms have one, Metal. Elsewhere, where a package has a default,
-it's OpenGL on Android and OpenHarmony, WebGPU in browsers, and Vulkan on other
-platforms. Choose OpenGL in emulators and virtual machines, which often lack
-Vulkan, and choose the backend your application already uses if it draws its own
-graphics.
+A native package carries every graphics backend of its platform: Metal on Apple
+platforms, and Vulkan and OpenGL elsewhere. A render session draws with the
+backend of the GPU device that it attaches with. Create a device to choose one,
+or attach without a device, and the session creates one on the platform's
+default: Metal on Apple platforms, and elsewhere Vulkan, or OpenGL where the
+system has no Vulkan driver. Choose OpenGL in emulators and virtual machines,
+whose Vulkan drivers are often missing or broken, and choose the backend your
+application already uses if it draws its own graphics.
+
+In a browser, a package carries one backend, so that a page downloads only the
+one it draws with: WebGPU, the default, or WebGL 2.
 
 ## Web
 

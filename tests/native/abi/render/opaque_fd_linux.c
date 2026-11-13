@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 
 enum {
@@ -17,11 +18,11 @@ enum {
   vulkan_rgba8 = 37,
 };
 
-// The library's default device, and whether it exports opaque file
+// A device of the suite's backend, and whether it exports opaque file
 // descriptors.
 static mln_gpu_device create_device(bool* out_exports) {
   mln_gpu_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_gpu_device_create(NULL, &device, MLN_TEST_DIAGNOSTIC));
+  device = mln_test_create_device();
   mln_gpu_device_capabilities capabilities = {
     .size = sizeof(mln_gpu_device_capabilities)
   };

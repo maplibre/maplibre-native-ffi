@@ -29,18 +29,20 @@ winget install --exact --id Microsoft.VisualStudio.2022.BuildTools --override "-
 
 ## Everyday commands
 
-`mise run test` builds the native library for this machine and runs its C tests.
-`mise run //bindings/<lang>:test` tests one binding against that build. Pass a
-preset name to build for another target, such as `linux-gnu-x64-vulkan` or
-`macos-arm64-metal`. `CMakePresets.json` lists them.
+`mise run test` builds the native library for this machine and runs its C tests
+for each render backend that it carries. `mise run //bindings/<lang>:test` tests
+one binding against that build, with the platform's default backend. Pass a
+preset name to build for another target, such as `linux-gnu-x64` or
+`macos-arm64`, and a backend after it to test that one, such as
+`mise run test linux-gnu-x64 opengl`. `CMakePresets.json` lists the presets.
 
 The library is [mln-rs](https://github.com/louwers/mln-rs), the Rust port of
 MapLibre Native, which the `third_party/mln-rs` submodule vendors. A preset's
 build runs Cargo on mln-rs's `mln-rs-c` package for the preset's Rust target,
-into `build/cargo`, which every preset shares. mln-rs builds every render
-backend that a target supports, so a preset's backend picks the backend that its
-tests drive and that its artifact descriptor names. A release build takes a few
-minutes, most of it in link-time optimization.
+into `build/cargo`, which every preset shares, with the Cargo features of every
+render backend that the platform's package carries: Vulkan and OpenGL off Apple
+platforms, and Metal on them. A release build takes a few minutes, most of it in
+link-time optimization.
 
 After you change a header, run `mise run bindings:generate`. `include/` is the
 source of truth for the C API, and mln-rs keeps a copy in
@@ -63,9 +65,10 @@ for each Android preset.
 
 ### The browser
 
-The `web-wasm32-webgpu` and `web-wasm32-webgl` presets build mln-rs's browser
-package, a wasm-bindgen module for `wasm32-unknown-unknown` with one backend,
-with mln-rs's own `just c-web` recipe. Their tools come with `-E web`:
+The `web-wasm32-webgpu` and `web-wasm32-webgl` presets each build mln-rs's
+browser package with one backend, so that a page downloads only the one it draws
+with: a wasm-bindgen module for `wasm32-unknown-unknown`, built with mln-rs's
+own `just c-web` recipe. Their tools come with `-E web`:
 `mise -E web run build web-wasm32-webgpu` installs the package under
 `share/maplibre-native-c/web`. The package has no C to link, so the C suites
 don't run for it: `mise -E web run test <preset>` runs mln-rs's browser check
@@ -95,9 +98,9 @@ The Windows presets build on Linux. `mise -E msvc install` downloads the MSVC
 runtime and the Windows SDK, and accepts
 [Microsoft's license](https://go.microsoft.com/fwlink/?LinkId=2086102) for them.
 Install Proton Experimental from Steam, then run tests with
-`mise -E msvc run test windows-x64-vulkan`. Proton's launcher gives the prefix
-the fonts, ICU, and DXVK that .NET and WPF need. To use another Wine, set `WINE`
-to its executable. Wine isn't Windows: when results differ, Windows CI is right.
+`mise -E msvc run test windows-x64`. Proton's launcher gives the prefix the
+fonts, ICU, and DXVK that .NET and WPF need. To use another Wine, set `WINE` to
+its executable. Wine isn't Windows: when results differ, Windows CI is right.
 
 ### MinGW
 
@@ -109,7 +112,7 @@ pacman -S --needed mingw-w64-x86_64-clang mingw-w64-x86_64-llvm mingw-w64-x86_64
 ```
 
 Then run tasks from PowerShell with `-E msys2`, such as
-`mise -E msys2 run test mingw-x64-wgl`. Set `MLN_FFI_MSYS2_ROOT` if the MINGW64
+`mise -E msys2 run test mingw-x64`. Set `MLN_FFI_MSYS2_ROOT` if the MINGW64
 prefix isn't `C:/msys64/mingw64`.
 
 ### FreeBSD
@@ -201,7 +204,7 @@ repository root, since the testbox copies the current directory.
 ```bash
 blacksmith auth login
 blacksmith testbox warmup .github/workflows/blacksmith-testbox-linux-x64.yml --job linux-x64 --ref <branch>
-blacksmith testbox run --id <id> "mise run test linux-gnu-x64-egl"
+blacksmith testbox run --id <id> "mise run test linux-gnu-x64 opengl"
 ```
 
 Builds fail on the testbox unless you prefix them with

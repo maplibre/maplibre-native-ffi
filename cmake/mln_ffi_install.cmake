@@ -99,6 +99,25 @@ function(mln_ffi_install_apple_dsym binary installed component)
     COMPONENT "${component}")
 endfunction()
 
+# Sets the artifact descriptor's backend fields: MLN_FFI_RENDER_BACKENDS_JSON,
+# the backends that the library carries as JSON strings, and
+# MLN_FFI_OPENGL_CONTEXT_PROVIDER_JSON, the OpenGL context provider as a JSON
+# string, or null for a build without OpenGL.
+macro(mln_ffi_artifact_backend_json)
+  set(MLN_FFI_RENDER_BACKENDS_JSON "")
+  foreach(backend IN LISTS MLN_FFI_RENDER_BACKENDS)
+    if(MLN_FFI_RENDER_BACKENDS_JSON)
+      string(APPEND MLN_FFI_RENDER_BACKENDS_JSON ", ")
+    endif()
+    string(APPEND MLN_FFI_RENDER_BACKENDS_JSON "\"${backend}\"")
+  endforeach()
+  set(MLN_FFI_OPENGL_CONTEXT_PROVIDER_JSON null)
+  if(MLN_FFI_OPENGL_CONTEXT_PROVIDER)
+    set(MLN_FFI_OPENGL_CONTEXT_PROVIDER_JSON
+        "\"${MLN_FFI_OPENGL_CONTEXT_PROVIDER}\"")
+  endif()
+endmacro()
+
 function(mln_ffi_install_c_api_library target)
   set(MLN_FFI_NATIVE_COMPONENT native)
   mln_ffi_install_zig_libc()
@@ -116,6 +135,7 @@ function(mln_ffi_install_c_api_library target)
     set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
   endif()
   mln_ffi_c_version(MLN_FFI_SCHEMA_VERSION)
+  mln_ffi_artifact_backend_json()
   set(MLN_FFI_ANDROID_JSON null)
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     string(REGEX REPLACE "^android-" "" android_api "${ANDROID_PLATFORM}")
@@ -185,7 +205,7 @@ function(mln_ffi_install_c_api_library target)
     FILES "${static}"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-  if(APPLE AND shared AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+  if(APPLE AND shared)
     mln_ffi_install_c_api_framework(${target} "${shared}"
                                     "${MLN_FFI_NATIVE_COMPONENT}")
   endif()
