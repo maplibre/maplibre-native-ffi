@@ -95,10 +95,10 @@ private func attachOffscreenSession(
   let session: RenderSessionHandle
   do {
     try await fixture.map.setStyleJson(style)
-    session = try fixture.map.attachOffscreen(
-      descriptor: OffscreenDescriptor(
+    session = try fixture.map.attach(
+      target: .offscreen(OffscreenTarget(
         logicalSize: LogicalSize(width: 32, height: 32)
-      ),
+      )),
       options: RenderSessionAttachOptions(
         driver: .coreWorker,
         frameWake: pulsingFrameWake
@@ -152,12 +152,12 @@ private func withBorrowedTextureSession<Result>(
 }
 
 /// Attaches a session to `fixture`'s map that renders into a borrowed ring of
-/// `ringDepth` textures, and returns it without waiting for the attach. A
-/// Metal or Vulkan session drives itself on a core worker unless
-/// `callerDriven` is set. An OpenGL session shares the fixture's context, so
-/// it is always caller-driven. A caller-driven session comes with a host
-/// render thread, which holds any context current and which the caller
-/// starts servicing the session.
+/// `ringDepth` textures, on a device that wraps the fixture's, and returns it
+/// without waiting for the attach. A Metal or Vulkan session drives itself on a
+/// core worker unless `callerDriven` is set. An OpenGL session shares the
+/// fixture's context, so it is always caller-driven. A caller-driven session
+/// comes with a host render thread, which holds any context current and which
+/// the caller starts servicing the session.
 private func attachBorrowedTexture(
   fixture: MapFixture,
   ringDepth: Int = 1,
@@ -354,10 +354,10 @@ private func attachBorrowedTexture(
     #expect(try await rendered.session.awaitRenderedFrame() != nil)
     try await rendered.session.release()
     // Native code refuses an attach while the map still has a session.
-    let next = try rendered.fixture.map.attachOffscreen(
-      descriptor: OffscreenDescriptor(
+    let next = try rendered.fixture.map.attach(
+      target: .offscreen(OffscreenTarget(
         logicalSize: LogicalSize(width: 32, height: 32)
-      ),
+      )),
       options: RenderSessionAttachOptions(driver: .coreWorker)
     )
     defer { try? next.dispose() }
