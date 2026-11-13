@@ -25,8 +25,8 @@ generates from its introspection data. An app outside this repository builds the
 same way against an installed library.
 
 `src/map-view.vala` is a widget that holds the map. It attaches a render session
-to a ring of three dmabufs that the library allocates, with
-`attach_dma_buf_ring`, in the formats that `gdk_display_get_dmabuf_formats()`
+with `Map.attach` to an exported ring target: a ring of three dmabufs that the
+library allocates, in the formats that `gdk_display_get_dmabuf_formats()`
 reports. The session renders on a library thread, in the EGL and Vulkan builds
 alike, and needs no GL context of GTK's. A redraw wake asks for a frame, and the
 widget's frame clock demands it at the next tick. A frame wake drains the frame
@@ -44,15 +44,16 @@ widget gives the frame back with a sync file from
 only after the GPU reads that the kernel tracks on it, such as the compositor's,
 finish.
 
-The session resizes only while it lends no frames, so a resize takes the frames
-back early, once no demand is pending, and the textures keep showing the old
-buffers through duplicated file descriptors until a frame of the new size
-arrives. While the widget is hidden, it keeps its session and demands no frames.
-Nor does it demand any while the compositor doesn't show the window, as when the
-window is minimized or the screen is locked, because the frame clock stops. When
-it leaves its window, it releases the session and keeps the map, and attaches a
-new session when it shows again. A move to a display of another scale takes a
-new map, as the map renders at one scale factor for its life.
+When the widget changes size or its surface changes scale, it resizes the
+session with the new size and scale factor. The session resizes only while it
+lends no frames, so a resize takes the frames back early, once no demand is
+pending, and the textures keep showing the old buffers through duplicated file
+descriptors until a frame of the new size arrives. While the widget is hidden,
+it keeps its session and demands no frames. Nor does it demand any while the
+compositor doesn't show the window, as when the window is minimized or the
+screen is locked, because the frame clock stops. When it leaves its window, it
+releases the session and keeps the map, and attaches a new session when it shows
+again.
 
 `src/gestures.vala` turns pointer, touch, and key input into camera changes. A
 drag, a pinch, or a touchpad scroll ends with its release velocities, so the map

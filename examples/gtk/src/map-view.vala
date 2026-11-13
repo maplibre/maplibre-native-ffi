@@ -109,10 +109,10 @@ namespace Example {
 		private Map? maplibre_map;
 		private RenderSession? session;
 		private uint session_number;
+		// The map's scale factor, which a resize of its session changes.
 		private double map_scale_factor;
-		private LogicalSize session_size;
+		private LogicalExtent session_extent;
 		private bool sync_file;
-		private CameraOptions camera = initial_camera ();
 		private bool failed;
 
 		// The frames that textures still show.
@@ -289,45 +289,39 @@ namespace Example {
 				return;
 			}
 
-			// A map renders at one scale factor for its life, so a move to a
-			// display of another density takes a new map and session. The new
-			// map keeps the camera.
-			if (maplibre_map != null && map_scale_factor != surface_scale) {
-				camera = maplibre_map.get_snapshot ().view.camera.to_options ();
-				yield release_session ();
-				yield release_map ();
-			}
-
+			LogicalExtent extent = {
+				width: size.width, height: size.height, scale_factor: surface_scale
+			};
 			if (maplibre_map == null) {
-				yield create_map (size, surface_scale);
+				yield create_map (extent);
 				return;
 			}
 			if (session == null) {
-				yield attach (size);
-			} else if (session_size.width != size.width || session_size.height != size.height) {
-				yield resize_session (size);
+				yield attach (extent);
+			} else if (session_extent.width != extent.width
+				|| session_extent.height != extent.height
+				|| session_extent.scale_factor != extent.scale_factor) {
+				yield resize_session (extent);
 			}
 		}
 
-		private async void create_map (LogicalSize size, double scale) throws GLib.Error {
+		private async void create_map (LogicalExtent extent) throws GLib.Error {
 			if (runtime == null) {
 				start_runtime ();
 			}
 			var options = new MapOptions () {
-				initial_extent = {
-					width: size.width, height: size.height, scale_factor: scale
-				},
+				initial_extent = extent,
 				map_mode = MapMode.CONTINUOUS,
 				event_mask = RuntimeEventFlag.MAP_STYLE_LOADED
 					| RuntimeEventFlag.MAP_LOADING_FAILED
 					| RuntimeEventFlag.MAP_RENDER_ERROR,
 			};
 			maplibre_map = runtime.create_map (options);
-			map_scale_factor = scale;
+			map_scale_factor = extent.scale_factor;
 			yield maplibre_map.ready_async ();
 			maplibre_map.update_camera_async.begin (new CameraUpdate () {
 				mode = CameraUpdateMode.JUMP,
-				camera = camera,
+				camera = initial_camera (),
 			});
 			maplibre_map.set_style_url_async.begin (STYLE_URL);
 			show_status ("Loading the style…");
@@ -375,15 +369,16 @@ namespace Example {
 
 		// Attaches a session that renders into a ring of dmabufs in formats
 		// that this display imports.
-		private async void attach (LogicalSize size) throws GLib.Error {
-			var descriptor = new DmaBufRingDescriptor () {
-				logical_size = size,
+		private async void attach (LogicalExtent extent) throws GLib.Error {
+			var ring = new ExportedRingTarget () {
+				logical_size = { width: extent.width, height: extent.height },
 				// The session renders into one buffer while GTK holds two:
 				// the frame it shows, and the one the compositor hasn't let
 				// go of yet.
-				buffer_count = 3,
+				texture_count = 3,
+				export_kinds = GpuExportKindFlag.DMA_BUF,
 			};
-			descriptor.set_formats (dma_buf_formats (display));
+			ring.set_dma_buf_formats (dma_buf_formats (display));
 
 			var number = ++session_number;
 			var options = new RenderSessionAttachOptions () {
@@ -395,11 +390,24 @@ namespace Example {
 				frame_wake = session_wake (this, number, true),
 			};
 
-			session = maplibre_map.attach_dma_buf_ring (descriptor, null, options);
-			session_size = size;
+			// With no device, the session renders on the first of the
+			// platform's backends that exports dmabufs.
+			session = maplibre_map.attach (
+				new RenderTarget.exported_ring (ring), null, options
+			);
+			session_extent = {
+				width: extent.width, height: extent.height, scale_factor: map_scale_factor
+			};
 			yield session.ready_async ();
 			var capabilities = session.get_capabilities ();
 			sync_file = GpuSyncKindFlag.SYNC_FD in capabilities.consumer_sync_kinds;
+
+			// The session renders at the map's scale factor, which a move to
+			// a display of another scale left behind.
+			if (map_scale_factor != extent.scale_factor) {
+				yield resize_session (extent);
+				return;
+			}
 
 			// The first frame draws whether or not the map changed.
 			force_pending = true;
@@ -444,7 +452,7 @@ namespace Example {
 		// before then, once the session renders nothing into the ring. The
 		// resize gives the ring new buffers, and the textures keep showing
 		// the old ones until a frame of the new size replaces them.
-		private async void resize_session (LogicalSize size) throws GLib.Error {
+		private async void resize_session (LogicalExtent extent) throws GLib.Error {
 			resizing = true;
 			stop_ticking ();
 			try {
@@ -453,8 +461,9 @@ namespace Example {
 					yield;
 				}
 				release_held_frames ();
-				yield session.resize_async (size);
-				session_size = size;
+				yield session.resize_async (extent);
+				session_extent = extent;
+				map_scale_factor = extent.scale_factor;
 			} finally {
 				resizing = false;
 			}
