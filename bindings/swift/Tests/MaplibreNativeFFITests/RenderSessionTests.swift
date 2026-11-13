@@ -130,6 +130,7 @@ private func attachOffscreenSession(
 private func withBorrowedTextureSession<Result>(
   style: String = emptyStyle,
   ringDepth: Int = 1,
+  queueLock: QueueLock = QueueLock(),
   _ body: (AttachedSession) async throws -> Result
 ) async throws -> Result {
   let fixture = try await MapFixture.make()
@@ -138,7 +139,8 @@ private func withBorrowedTextureSession<Result>(
     try await fixture.map.setStyleJson(style)
     attached = try await attachBorrowedTexture(
       fixture: fixture,
-      ringDepth: ringDepth
+      ringDepth: ringDepth,
+      queueLock: queueLock
     )
   } catch {
     await fixture.release()
@@ -152,16 +154,17 @@ private func withBorrowedTextureSession<Result>(
 }
 
 /// Attaches a session to `fixture`'s map that renders into a borrowed ring of
-/// `ringDepth` textures, on a device that wraps the fixture's, and returns it
-/// without waiting for the attach. A Metal or Vulkan session drives itself on a
-/// core worker unless `callerDriven` is set. An OpenGL session shares the
-/// fixture's context, so it is always caller-driven. A caller-driven session
-/// comes with a host render thread, which holds any context current and which
-/// the caller starts servicing the session.
+/// `ringDepth` textures, on a device that wraps the fixture's with `queueLock`,
+/// and returns it without waiting for the attach. A Metal or Vulkan session
+/// drives itself on a core worker unless `callerDriven` is set. An OpenGL
+/// session shares the fixture's context, so it is always caller-driven. A
+/// caller-driven session comes with a host render thread, which holds any
+/// context current and which the caller starts servicing the session.
 private func attachBorrowedTexture(
   fixture: MapFixture,
   ringDepth: Int = 1,
-  callerDriven: Bool = false
+  callerDriven: Bool = false,
+  queueLock: QueueLock = QueueLock()
 ) async throws -> AttachedSession {
   let graphics = try TestGraphics()
   let textures = try graphics.createTextures(count: ringDepth)
@@ -177,7 +180,8 @@ private func attachBorrowedTexture(
         driver: thread == nil ? .coreWorker : .callerGraphicsThread,
         frameWake: pulsingFrameWake,
         driverWorkWake: thread?.driverWorkWake ?? Wake()
-      )
+      ),
+      queueLock: queueLock
     )
     return AttachedSession(
       fixture: fixture,
@@ -402,4 +406,76 @@ private func attachBorrowedTexture(
     thread.stop()
     try await session.release()
   }
+}
+
+/// Keeps a value alive until the last reference to it goes, then records that
+/// it went.
+private final class ReleaseProbe: Sendable {
+  let released: LockedBox<Bool>
+
+  init(_ released: LockedBox<Bool>) {
+    self.released = released
+  }
+
+  deinit { released.update { $0 = true } }
+}
+
+/// A queue lock that records its calls in `calls`, and sets `released` once
+/// native code and the binding let go of it. It excludes as a host's lock
+/// does, with a semaphore, since an unlock may come on another thread than
+/// its lock.
+private func recordingQueueLock(
+  calls: LockedBox<[String]>,
+  released: LockedBox<Bool>
+) -> QueueLock {
+  let probe = ReleaseProbe(released)
+  let queue = DispatchSemaphore(value: 1)
+  return QueueLock(
+    lock: {
+      withExtendedLifetime(probe) {
+        queue.wait()
+        calls.update { $0.append("lock") }
+      }
+    },
+    unlock: {
+      calls.update { $0.append("unlock") }
+      queue.signal()
+    }
+  )
+}
+
+/// A Vulkan device takes the host's lock on its queue: its session holds the
+/// lock around its queue calls, and the device lets go of the lock once the
+/// session has ended. A device of another backend refuses one, and the
+/// binding still lets go of it.
+@Test func aVulkanDevicesSessionHoldsItsQueueLock() async throws {
+  let calls = LockedBox<[String]>([])
+  let released = LockedBox(false)
+  guard try TestGraphics().backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN else {
+    await expectMaplibreError(.unsupported) {
+      try GpuDeviceHandle.create(options: GpuDeviceOptions(
+        queueLock: recordingQueueLock(calls: calls, released: released)
+      ))
+    }
+    await awaitCondition("the refused queue lock's release") {
+      released.value
+    }
+    #expect(calls.value.isEmpty)
+    return
+  }
+  try await withBorrowedTextureSession(
+    style: redStyle,
+    queueLock: recordingQueueLock(calls: calls, released: released)
+  ) { rendered in
+    try await rendered.session.awaitRenderedFrame()
+    await awaitCondition("an unlock") { calls.value.contains("unlock") }
+    #expect(calls.value.first == "lock")
+    #expect(!released.value)
+  }
+  await awaitCondition("the queue lock's release") { released.value }
+  let recorded = calls.value
+  #expect(recorded.count.isMultiple(of: 2))
+  #expect(stride(from: 0, to: recorded.count, by: 2).allSatisfy {
+    recorded[$0] == "lock" && recorded[$0 + 1] == "unlock"
+  })
 }
