@@ -75,8 +75,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
 typedef uint32_t mln_frame_demand_flags;
 
 /**
- * The token of the frame results that a session adds when it renders an image
- * for mln_map_request_still_image(). Your own demands can't use it.
+ * The token of the frame results of the demand that a session holds for an
+ * image of mln_map_request_still_image(), which says how that demand runs.
+ * Your own demands can't use it.
  */
 #define MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE UINT64_MAX
 
@@ -295,6 +296,8 @@ MLN_API mln_status mln_render_session_get_failure(
  * the same flags.
  *
  * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when `demand.token` is
+ *   MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE.
  * - MLN_STATUS_TARGET_LOST or MLN_STATUS_NATIVE_ERROR, as
  *   mln_render_session_snapshot.failure_status reports, when the session has
  *   failed.

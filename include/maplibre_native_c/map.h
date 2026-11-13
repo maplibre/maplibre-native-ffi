@@ -1534,7 +1534,20 @@ MLN_API mln_status mln_map_remove_feature_state(
  * Renders a still image of a static or tile map.
  *
  * The map's render session draws the image once every resource that the image
- * needs has loaded.
+ * needs has loaded. While the image waits, the session holds a demand of its
+ * own for it, whose frame result carries MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE:
+ *
+ * - It waits for the map to load what the image needs, and while every
+ *   texture of a borrowed ring holds a frame.
+ * - It finishes with the image's frame, and the image completes once that
+ *   frame's result is queued. Frames of your own demands complete no image.
+ * - Your demands never replace it, nor it them.
+ * - mln_render_session_barrier() ends it with MLN_RENDER_RESULT_NO_UPDATE, and
+ *   a detach or mln_render_session_release_target() ends it with
+ *   MLN_RENDER_RESULT_TARGET_NOT_READY. The image gets a new demand once the
+ *   barrier runs, the session has a target again, or the next session
+ *   attaches.
+ * - An image that fails ends its demand with MLN_RENDER_RESULT_NO_UPDATE.
  *
  * Completes with:
  * - MLN_STATUS_CANCELLED when the map is released before the image is done.
