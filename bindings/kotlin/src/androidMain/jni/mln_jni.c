@@ -2,6 +2,7 @@
 #include <android/api-level.h>
 #include <android/hardware_buffer.h>
 #include <android/log.h>
+#include <android/native_window_jni.h>
 #include <dlfcn.h>
 #include <maplibre_native_c.h>
 #include <pthread.h>
@@ -334,9 +335,8 @@ static jlong mln_jni_upcall_stub(JNIEnv* env, jclass type, jstring name) {
   return stub;
 }
 
-// The C calls that take Java references, which stay valid only during the JNI
-// call: mln_android_init's Context, and the Surface that names an Android
-// surface's window.
+// mln_android_init takes a Context, a Java reference that stays valid only
+// during the JNI call.
 static jint mln_jni_android_init(
   JNIEnv* env, jclass type, jobject context, jlong diagnostic
 ) {
@@ -346,39 +346,21 @@ static jint mln_jni_android_init(
   );
 }
 
-static jint mln_jni_map_attach_android_surface(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jobject surface,
-  jlong device, jlong options, jlong out_session, jlong completion,
-  jlong diagnostic
+// Returns a reference of the caller's own to the ANativeWindow behind a
+// Surface, or 0 when the Surface has no window.
+static jlong mln_jni_native_window_from_surface(
+  JNIEnv* env, jclass type, jobject surface
 ) {
   (void)type;
-  mln_android_surface_descriptor* named =
-    MLN_JNI_POINTER(mln_android_surface_descriptor*, descriptor);
-  named->jni_env = env;
-  named->surface = surface;
-  return (jint)mln_map_attach_android_surface(
-    (mln_map)map, named, (mln_vulkan_device)device,
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, diagnostic)
-  );
+  return MLN_JNI_ADDRESS(ANativeWindow_fromSurface(env, surface));
 }
 
-static jint mln_jni_render_session_set_android_surface_target(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jobject surface,
-  jlong completion, jlong diagnostic
+static void mln_jni_native_window_release(
+  JNIEnv* env, jclass type, jlong window
 ) {
+  (void)env;
   (void)type;
-  mln_android_surface_replacement* named =
-    MLN_JNI_POINTER(mln_android_surface_replacement*, replacement);
-  named->jni_env = env;
-  named->surface = surface;
-  return (jint)mln_render_session_set_android_surface_target(
-    (mln_render_session)session, named,
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, diagnostic)
-  );
+  ANativeWindow_release(MLN_JNI_POINTER(ANativeWindow*, window));
 }
 
 // AHardwareBuffer_toHardwareBuffer needs API level 26, above the shim's
@@ -420,10 +402,9 @@ static void mln_jni_call_user_data_release(
 static const JNINativeMethod mln_jni_runtime_methods[] = {
   {"upcallStub", "(Ljava/lang/String;)J", (void*)mln_jni_upcall_stub},
   {"androidInit", "(Ljava/lang/Object;J)I", (void*)mln_jni_android_init},
-  {"mapAttachAndroidSurface", "(JJLjava/lang/Object;JJJJJ)I",
-   (void*)mln_jni_map_attach_android_surface},
-  {"renderSessionSetAndroidSurfaceTarget", "(JJLjava/lang/Object;JJ)I",
-   (void*)mln_jni_render_session_set_android_surface_target},
+  {"nativeWindowFromSurface", "(Ljava/lang/Object;)J",
+   (void*)mln_jni_native_window_from_surface},
+  {"nativeWindowRelease", "(J)V", (void*)mln_jni_native_window_release},
   {"hardwareBuffer", "(J)Ljava/lang/Object;", (void*)mln_jni_hardware_buffer},
   {"callUserDataRelease", "(JJ)V", (void*)mln_jni_call_user_data_release},
 };

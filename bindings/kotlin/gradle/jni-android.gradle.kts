@@ -126,6 +126,7 @@ androidTargets.forEach { target ->
         jniSources.file("mln_jni_generated.c").asFile,
         "-L${installDir.resolve("lib")}",
         "-lmaplibre-native-c",
+        "-landroid",
         "-llog",
         // Android 15 devices may use 16 KB pages.
         "-Wl,-z,max-page-size=16384",
