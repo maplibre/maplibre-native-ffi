@@ -10,11 +10,9 @@ rootProject.name = "maplibre-native-ffi"
 
 include(":bindings:kotlin")
 
-include(":bindings:kotlin:runtimes:metal")
+include(":bindings:kotlin:runtimes:native")
 
-include(":bindings:kotlin:runtimes:opengl")
-
-include(":bindings:kotlin:runtimes:vulkan")
+include(":bindings:kotlin:runtimes:webgl")
 
 include(":bindings:kotlin:runtimes:webgpu")
 

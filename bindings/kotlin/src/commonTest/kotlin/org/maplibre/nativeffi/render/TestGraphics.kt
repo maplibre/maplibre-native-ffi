@@ -32,6 +32,7 @@ import org.maplibre.nativeffi.WebGpuBorrowedTexturesTarget
 import org.maplibre.nativeffi.WglContextDescriptor
 import org.maplibre.nativeffi.openGlSupportedContextProviderMask
 import org.maplibre.nativeffi.supportedRenderBackendMask
+import org.maplibre.nativeffi.testBackendName
 
 /**
  * The handles of a test graphics context, as addresses. Only its backend's fields are set. A WebGL
@@ -135,23 +136,54 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
       }
 
   companion object {
-    /** The one backend the loaded library renders with. */
-    fun ofBuild(): TestBackend {
+    /**
+     * The backend under test: the one that [testBackendName] names, which the loaded library must
+     * carry, or where nothing names one, the one backend that the library carries.
+     */
+    fun underTest(): TestBackend {
       val backends = supportedRenderBackendMask()
-      return when {
-        RenderBackendFlag.METAL in backends -> METAL
-        RenderBackendFlag.VULKAN in backends -> VULKAN
-        RenderBackendFlag.WEB_GPU in backends -> WEBGPU
-        RenderBackendFlag.OPEN_GL in backends -> {
-          val providers = openGlSupportedContextProviderMask()
-          when {
-            OpenGlContextProviderFlag.WGL in providers -> WGL
-            OpenGlContextProviderFlag.WEB_GL in providers -> WEBGL
-            else -> EGL
-          }
+      val opengl = {
+        val providers = openGlSupportedContextProviderMask()
+        when {
+          OpenGlContextProviderFlag.WGL in providers -> WGL
+          OpenGlContextProviderFlag.WEB_GL in providers -> WEBGL
+          else -> EGL
         }
-        else -> error("the loaded library renders with no backend the tests drive: $backends")
       }
+      val backend =
+        when (val named = testBackendName()) {
+          "metal" -> METAL
+          "vulkan" -> VULKAN
+          "webgpu" -> WEBGPU
+          "opengl" -> opengl()
+          null -> {
+            val carried =
+              listOf(
+                  RenderBackendFlag.METAL to { METAL },
+                  RenderBackendFlag.VULKAN to { VULKAN },
+                  RenderBackendFlag.WEB_GPU to { WEBGPU },
+                  RenderBackendFlag.OPEN_GL to opengl,
+                )
+                .filter { (flag, _) -> flag in backends }
+            check(carried.size == 1) {
+              "the loaded library renders with $backends; MLN_FFI_TEST_BACKEND must name the " +
+                "backend under test"
+            }
+            carried.single().second()
+          }
+          else -> error("no tests drive the $named backend")
+        }
+      check(
+        when (backend.renderBackend) {
+          RenderBackend.METAL -> RenderBackendFlag.METAL
+          RenderBackend.VULKAN -> RenderBackendFlag.VULKAN
+          RenderBackend.WEB_GPU -> RenderBackendFlag.WEB_GPU
+          else -> RenderBackendFlag.OPEN_GL
+        } in backends,
+      ) {
+        "the loaded library lacks the backend under test, $backend: $backends"
+      }
+      return backend
     }
   }
 }
@@ -190,7 +222,7 @@ internal object TestGraphics {
   val thread: CoroutineDispatcher
     get() = testGraphicsThread
 
-  val backend: TestBackend by lazy { TestBackend.ofBuild() }
+  val backend: TestBackend by lazy { TestBackend.underTest() }
 
   /**
    * Whether sessions render into textures that the test graphics create. mln-rs's browser build

@@ -12,6 +12,8 @@ import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
+import org.maplibre.nativeffi.GpuDeviceHandle
+import org.maplibre.nativeffi.GpuDeviceOptions
 import org.maplibre.nativeffi.GpuSync
 import org.maplibre.nativeffi.GpuSyncKind
 import org.maplibre.nativeffi.LogicalSize
@@ -245,7 +247,7 @@ internal suspend fun <T> withOffscreenSession(
     try {
       withRenderSession(
         RenderDriverKind.CORE_WORKER,
-        attach = { options -> map.attach(ownTarget(width, height, canvas), options = options) },
+        attach = { options -> map.attachOwn(ownTarget(width, height, canvas), options, canvas) },
         onFrameWake = {
           canvas?.capture()
           onFrameWake()
@@ -271,13 +273,29 @@ internal fun ownTarget(width: Int, height: Int, canvas: TestCanvas?): RenderTarg
   }
 }
 
+/**
+ * Submits an attach of [target] on a device of its own: one of the backend under test, which a
+ * library of several backends would not pick by default, or in a browser, where [canvas] is the
+ * target and the module carries one backend, the device that the session creates.
+ */
+internal fun MapHandle.attachOwn(
+  target: RenderTarget,
+  options: RenderSessionAttachOptions,
+  canvas: TestCanvas?,
+): RenderSessionHandle {
+  if (canvas != null) return attach(target, options = options)
+  // The session keeps the device until it ends.
+  return GpuDeviceHandle.create(GpuDeviceOptions(backend = TestGraphics.backend.renderBackend))
+    .use { device -> attach(target, device, options) }
+}
+
 /** Submits an attach of a [width] x [height] offscreen session on a device of its own. */
 internal fun attachOffscreenSession(
   map: MapHandle,
   width: Int,
   height: Int,
   options: RenderSessionAttachOptions,
-): RenderSessionHandle = map.attach(ownTarget(width, height, canvas = null), options = options)
+): RenderSessionHandle = map.attachOwn(ownTarget(width, height, canvas = null), options, null)
 
 /**
  * Runs [block] against a session of this map that [attach] submits on [TestGraphics.thread] with

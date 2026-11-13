@@ -778,7 +778,7 @@ jobs:
           mise run --no-deps install-native-package macos-arm64
           build/packages/native/dist/maplibre-native-c-macos-arm64.tar.gz
       - run: mise run //examples/swiftui:build-macos
-  # The Compose example builds the Kotlin binding and its OpenGL runtime from
+  # The Compose example builds the Kotlin binding and its native runtime from
   # this checkout against the archive that a target job built and tested. It
   # doesn't run the app.
   compose-android:

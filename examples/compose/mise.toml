@@ -12,7 +12,7 @@ arg "[arch]" default="arm64" {
 '''
 tools = { "core:java" = "{{vars.java_version}}" }
 dir = "../.."
-depends = [{ task = "//:build", args = ["android-{{usage.arch}}-egl"] }]
+depends = [{ task = "//:build", args = ["android-{{usage.arch}}"] }]
 run = '''
 case "$usage_arch" in
   arm) abi=armeabi-v7a ;;
@@ -35,7 +35,7 @@ arg "[arch]" default="arm64" {
 '''
 tools = { "core:java" = "{{vars.java_version}}" }
 dir = "../.."
-depends = [{ task = "//:build", args = ["android-{{usage.arch}}-egl"] }]
+depends = [{ task = "//:build", args = ["android-{{usage.arch}}"] }]
 run = '''
 case "$usage_arch" in
   arm) abi=armeabi-v7a ;;

@@ -6,10 +6,6 @@ import org.maplibre.nativeffi.gradle.catalogVersionInt
 import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
 val host = HostPlatform.current()
-val backend =
-  AndroidTarget.parseBackend(
-    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
-  )
 val targets =
   AndroidTarget.parseAbis(
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),

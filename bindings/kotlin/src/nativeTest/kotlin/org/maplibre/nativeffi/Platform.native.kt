@@ -16,6 +16,8 @@ import kotlinx.cinterop.get
 import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.staticCFunction
+import kotlinx.cinterop.toKString
+import platform.posix.getenv
 import platform.posix.pthread_create
 import platform.posix.pthread_join
 import platform.posix.pthread_tVar
@@ -73,3 +75,6 @@ internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
   setUnhandledExceptionHook { error -> if (!sink(error)) previous?.invoke(error) }
   return { setUnhandledExceptionHook(previous) }
 }
+
+internal actual fun testBackendName(): String? =
+  getenv("MLN_FFI_TEST_BACKEND")?.toKString()?.takeIf(String::isNotEmpty)

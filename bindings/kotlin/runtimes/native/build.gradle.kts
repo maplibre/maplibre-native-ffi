@@ -1,6 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.maplibre.nativeffi.gradle.AndroidTarget
-import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
+import org.maplibre.nativeffi.gradle.MaplibreRuntime
 import org.maplibre.nativeffi.gradle.configureMaplibreRuntime
 
 plugins {
@@ -25,9 +25,15 @@ kotlin {
   androidNativeX64()
   linuxArm64()
   linuxX64()
+  iosArm64()
+  iosSimulatorArm64()
+  tvosArm64()
+  tvosSimulatorArm64()
+  macosArm64()
+  macosX64()
 
   android {
-    namespace = "org.maplibre.nativeffi.runtime.vulkan"
+    namespace = "org.maplibre.nativeffi.runtime"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
   }
@@ -37,10 +43,10 @@ androidComponents {
   onVariants { variant ->
     androidTargets.forEach { target ->
       variant.sources.jniLibs?.addStaticSourceDirectory(
-        packagedAndroidRuntimeLibs.get().dir("vulkan/${target.cargoTarget}").asFile.absolutePath,
+        packagedAndroidRuntimeLibs.get().dir(target.cargoTarget).asFile.absolutePath,
       )
     }
   }
 }
 
-configureMaplibreRuntime(MaplibreRuntimeBackend.VULKAN)
+configureMaplibreRuntime(MaplibreRuntime.NATIVE)

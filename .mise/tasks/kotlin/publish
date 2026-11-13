@@ -56,19 +56,14 @@ publish() {
   # the repository default.
   publication_tasks=()
   add_publications :bindings:kotlin Android "${android_native[@]}" "${linux[@]}"
-  add_publications :bindings:kotlin:runtimes:opengl Android "${android_native[@]}" "${linux[@]}"
-  add_publications :bindings:kotlin:runtimes:vulkan "${android_native[@]}" "${linux[@]}"
+  add_publications :bindings:kotlin:runtimes:native Android "${android_native[@]}" "${linux[@]}"
   ./gradlew "$@" -Pkotlin.native.enableKlibsCrossCompilation=true "${publication_tasks[@]}"
-  # One run packages the Android libraries of one backend.
-  ./gradlew "$@" -Pmaplibre.android.backend=vulkan \
-    ":bindings:kotlin:runtimes:vulkan:publishAndroidPublicationTo${repository}"
 
   publication_tasks=()
   add_publications :bindings:kotlin KotlinMultiplatform Jvm WasmJs "${apple[@]}"
-  add_publications :bindings:kotlin:runtimes:opengl KotlinMultiplatform Jvm WasmJs
+  add_publications :bindings:kotlin:runtimes:native KotlinMultiplatform Jvm "${apple[@]}"
+  add_publications :bindings:kotlin:runtimes:webgl KotlinMultiplatform WasmJs
   add_publications :bindings:kotlin:runtimes:webgpu KotlinMultiplatform WasmJs
-  add_publications :bindings:kotlin:runtimes:vulkan KotlinMultiplatform Jvm
-  add_publications :bindings:kotlin:runtimes:metal KotlinMultiplatform Jvm "${apple[@]}"
   ./gradlew "$@" "${publication_tasks[@]}"
 }
 
