@@ -5,35 +5,47 @@
 package org.maplibre.nativeffi
 
 import org.maplibre.nativeffi.internal.JvmSynthetic
-import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.NativeCall
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.memory.*
 
-@JvmSynthetic internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
+@JvmSynthetic
+internal fun NativeArena.putGpuSync(target: Long, value: GpuSync) {
   writeU32(target, 24.toUInt())
   writeU32(target + 4, value.kind.rawValue)
   writeU64(target + 8, value.handle)
   writeU64(target + 16, value.value)
 }
-@JvmSynthetic internal fun NativeArena.writeGpuSync(value: GpuSync): Long = allocate(24, w(8, 8, 4)).also { putGpuSync(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putCanonicalTileId(target: Long, value: CanonicalTileId) {
+@JvmSynthetic
+internal fun NativeArena.writeGpuSync(value: GpuSync): Long =
+  allocate(24, w(8, 8, 4)).also { putGpuSync(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putCanonicalTileId(target: Long, value: CanonicalTileId) {
   writeU32(target, value.z)
   writeU32(target + 4, value.x)
   writeU32(target + 8, value.y)
 }
-@JvmSynthetic internal fun NativeArena.writeCanonicalTileId(value: CanonicalTileId): Long = allocate(12, 4).also { putCanonicalTileId(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putLogicalSize(target: Long, value: LogicalSize) {
+@JvmSynthetic
+internal fun NativeArena.writeCanonicalTileId(value: CanonicalTileId): Long =
+  allocate(12, 4).also { putCanonicalTileId(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putLogicalSize(target: Long, value: LogicalSize) {
   writeU32(target, value.width)
   writeU32(target + 4, value.height)
 }
-@JvmSynthetic internal fun NativeArena.writeLogicalSize(value: LogicalSize): Long = allocate(8, 4).also { putLogicalSize(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putFramePacerOptions(target: Long, value: FramePacerOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeLogicalSize(value: LogicalSize): Long =
+  allocate(8, 4).also { putLogicalSize(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putFramePacerOptions(target: Long, value: FramePacerOptions) {
   writeU32(target, 12.toUInt())
   var fields = 0u
   if (value.unlimitedFramesPerSecond) fields = fields or 2u
@@ -43,9 +55,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeFramePacerOptions(value: FramePacerOptions): Long = allocate(12, 4).also { putFramePacerOptions(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putGpuDeviceOptions(target: Long, value: GpuDeviceOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeFramePacerOptions(value: FramePacerOptions): Long =
+  allocate(12, 4).also { putFramePacerOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putGpuDeviceOptions(target: Long, value: GpuDeviceOptions) {
   writeU32(target, w(56, 88).toUInt())
   var fields = 0u
   value.backend?.let {
@@ -75,45 +91,85 @@ import org.maplibre.nativeffi.internal.memory.*
   putQueueLock(target + w(40, 56), value.queueLock)
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeCall.writeGpuDeviceOptions(value: GpuDeviceOptions): Long = allocate(w(56, 88), w(4, 8)).also { putGpuDeviceOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMetalDeviceDescriptor(target: Long, value: MetalDeviceDescriptor) {
+@JvmSynthetic
+internal fun NativeCall.writeGpuDeviceOptions(value: GpuDeviceOptions): Long =
+  allocate(w(56, 88), w(4, 8)).also { putGpuDeviceOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMetalDeviceDescriptor(target: Long, value: MetalDeviceDescriptor) {
   writeU32(target, w(12, 24).toUInt())
   writeAddress(target + w(4, 8), value.device.address)
   writeAddress(target + w(8, 16), value.commandQueue.address)
 }
-@JvmSynthetic internal fun NativeArena.writeMetalDeviceDescriptor(value: MetalDeviceDescriptor): Long = allocate(w(12, 24), w(4, 8)).also { putMetalDeviceDescriptor(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOpenGlContextDescriptor(target: Long, value: OpenGlContextDescriptor) {
+@JvmSynthetic
+internal fun NativeArena.writeMetalDeviceDescriptor(value: MetalDeviceDescriptor): Long =
+  allocate(w(12, 24), w(4, 8)).also { putMetalDeviceDescriptor(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOpenGlContextDescriptor(target: Long, value: OpenGlContextDescriptor) {
   when (val variant = value) {
-    is OpenGlContextDescriptor.Wgl -> { writeU32(target, 1u); putWglContextDescriptor(target + w(4, 8), variant.value) }
-    is OpenGlContextDescriptor.Egl -> { writeU32(target, 2u); putEglContextDescriptor(target + w(4, 8), variant.value) }
-    is OpenGlContextDescriptor.WebGl -> { writeU32(target, 3u); putWebGlContextDescriptor(target + w(4, 8), variant.value) }
+    is OpenGlContextDescriptor.Wgl -> {
+      writeU32(target, 1u)
+      putWglContextDescriptor(target + w(4, 8), variant.value)
+    }
+    is OpenGlContextDescriptor.Egl -> {
+      writeU32(target, 2u)
+      putEglContextDescriptor(target + w(4, 8), variant.value)
+    }
+    is OpenGlContextDescriptor.WebGl -> {
+      writeU32(target, 3u)
+      putWebGlContextDescriptor(target + w(4, 8), variant.value)
+    }
   }
 }
-@JvmSynthetic internal fun NativeArena.writeOpenGlContextDescriptor(value: OpenGlContextDescriptor): Long = allocate(w(20, 40), w(4, 8)).also { putOpenGlContextDescriptor(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putVulkanDeviceDescriptor(target: Long, value: VulkanDeviceDescriptor) {
+@JvmSynthetic
+internal fun NativeArena.writeOpenGlContextDescriptor(value: OpenGlContextDescriptor): Long =
+  allocate(w(20, 40), w(4, 8)).also { putOpenGlContextDescriptor(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putVulkanDeviceDescriptor(target: Long, value: VulkanDeviceDescriptor) {
   writeU32(target, w(56, 112).toUInt())
   putVulkanContextDescriptor(target + w(4, 8), value.context)
   putQueueLock(target + w(32, 64), value.queueLock)
-  writeAddress(target + w(48, 96), array(value.enabledExtensions, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item -> putView(at, item) })
+  writeAddress(
+    target + w(48, 96),
+    array(value.enabledExtensions, 2 * NativeMemory.addressSize, NativeMemory.addressSize) {
+      at,
+      item ->
+      putView(at, item)
+    },
+  )
   writeSize(target + w(52, 104), value.enabledExtensions.size.toULong())
 }
-@JvmSynthetic internal fun NativeCall.writeVulkanDeviceDescriptor(value: VulkanDeviceDescriptor): Long = allocate(w(56, 112), w(4, 8)).also { putVulkanDeviceDescriptor(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putWebGpuContextDescriptor(target: Long, value: WebGpuContextDescriptor) {
+@JvmSynthetic
+internal fun NativeCall.writeVulkanDeviceDescriptor(value: VulkanDeviceDescriptor): Long =
+  allocate(w(56, 112), w(4, 8)).also { putVulkanDeviceDescriptor(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putWebGpuContextDescriptor(target: Long, value: WebGpuContextDescriptor) {
   writeU32(target, value.device)
 }
-@JvmSynthetic internal fun NativeArena.writeWebGpuContextDescriptor(value: WebGpuContextDescriptor): Long = allocate(4, 4).also { putWebGpuContextDescriptor(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters) {
+@JvmSynthetic
+internal fun NativeArena.writeWebGpuContextDescriptor(value: WebGpuContextDescriptor): Long =
+  allocate(4, 4).also { putWebGpuContextDescriptor(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters) {
   writeF64(target, value.northing)
   writeF64(target + 8, value.easting)
 }
-@JvmSynthetic internal fun NativeArena.writeProjectedMeters(value: ProjectedMeters): Long = allocate(16, w(8, 8, 4)).also { putProjectedMeters(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
+@JvmSynthetic
+internal fun NativeArena.writeProjectedMeters(value: ProjectedMeters): Long =
+  allocate(16, w(8, 8, 4)).also { putProjectedMeters(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
   writeU32(target, w(32, 48, 28).toUInt())
   writeU32(target + w(24, 40), value.platformSeverities.rawValue)
   writeAddress(target + w(8, 16), registrations.register(value))
@@ -121,16 +177,24 @@ import org.maplibre.nativeffi.internal.memory.*
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
   writeI64(target + w(16, 32), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeLogHandler(value: LogHandler): Long = allocate(w(32, 48, 28), w(8, 8, 4)).also { putLogHandler(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putLogicalExtent(target: Long, value: LogicalExtent) {
+@JvmSynthetic
+internal fun NativeCall.writeLogHandler(value: LogHandler): Long =
+  allocate(w(32, 48, 28), w(8, 8, 4)).also { putLogHandler(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putLogicalExtent(target: Long, value: LogicalExtent) {
   writeU32(target, value.width)
   writeU32(target + 4, value.height)
   writeF64(target + 8, value.scaleFactor)
 }
-@JvmSynthetic internal fun NativeArena.writeLogicalExtent(value: LogicalExtent): Long = allocate(16, w(8, 8, 4)).also { putLogicalExtent(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMapView(target: Long, value: MapView) {
+@JvmSynthetic
+internal fun NativeArena.writeLogicalExtent(value: LogicalExtent): Long =
+  allocate(16, w(8, 8, 4)).also { putLogicalExtent(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMapView(target: Long, value: MapView) {
   writeU32(target, w(208, 208, 196).toUInt())
   putCamera(target + w(8, 8, 4), value.camera)
   putLogicalExtent(target + w(104, 104, 100), value.extent)
@@ -138,22 +202,34 @@ import org.maplibre.nativeffi.internal.memory.*
   putMapViewport(target + w(144, 144, 136), value.viewport)
   putProjectionDefinition(target + w(192, 192, 180), value.projection)
 }
-@JvmSynthetic internal fun NativeArena.writeMapView(value: MapView): Long = allocate(w(208, 208, 196), w(8, 8, 4)).also { putMapView(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putLatLng(target: Long, value: LatLng) {
+@JvmSynthetic
+internal fun NativeArena.writeMapView(value: MapView): Long =
+  allocate(w(208, 208, 196), w(8, 8, 4)).also { putMapView(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putLatLng(target: Long, value: LatLng) {
   writeF64(target, value.latitude)
   writeF64(target + 8, value.longitude)
 }
-@JvmSynthetic internal fun NativeArena.writeLatLng(value: LatLng): Long = allocate(16, w(8, 8, 4)).also { putLatLng(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putRuntimeOptions(target: Long, value: RuntimeOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeLatLng(value: LatLng): Long =
+  allocate(16, w(8, 8, 4)).also { putLatLng(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putRuntimeOptions(target: Long, value: RuntimeOptions) {
   writeU32(target, w(20, 40).toUInt())
   putView(target + w(4, 8), value.assetPath)
   putView(target + w(12, 24), value.cachePath)
 }
-@JvmSynthetic internal fun NativeArena.writeRuntimeOptions(value: RuntimeOptions): Long = allocate(w(20, 40), w(4, 8)).also { putRuntimeOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putStyleExpressionOptions(target: Long, value: StyleExpressionOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeRuntimeOptions(value: RuntimeOptions): Long =
+  allocate(w(20, 40), w(4, 8)).also { putRuntimeOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putStyleExpressionOptions(target: Long, value: StyleExpressionOptions) {
   writeU32(target, 20.toUInt())
   var fields = 0u
   value.expectedType?.let {
@@ -162,28 +238,63 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeStyleExpressionOptions(value: StyleExpressionOptions): Long = allocate(20, 4).also { putStyleExpressionOptions(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putCustomGeometrySourceOptions(target: Long, value: CustomGeometrySourceOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeStyleExpressionOptions(value: StyleExpressionOptions): Long =
+  allocate(20, 4).also { putStyleExpressionOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putCustomGeometrySourceOptions(
+  target: Long,
+  value: CustomGeometrySourceOptions,
+) {
   var fields = 0u
   writeU32(target, w(72, 88, 68).toUInt())
-  value.minZoom?.let { fields = fields or 1u; writeF64(target + w(24, 32, 20), it) }
-  value.maxZoom?.let { fields = fields or 2u; writeF64(target + w(32, 40, 28), it) }
-  value.tolerance?.let { fields = fields or 4u; writeF64(target + w(40, 48, 36), it) }
-  value.tileSize?.let { fields = fields or 8u; writeU32(target + w(48, 56, 44), it) }
-  value.buffer?.let { fields = fields or 16u; writeU32(target + w(52, 60, 48), it) }
-  value.clip?.let { fields = fields or 32u; writeBool(target + w(56, 64, 52), it) }
-  value.wrap?.let { fields = fields or 64u; writeBool(target + w(57, 65, 53), it) }
+  value.minZoom?.let {
+    fields = fields or 1u
+    writeF64(target + w(24, 32, 20), it)
+  }
+  value.maxZoom?.let {
+    fields = fields or 2u
+    writeF64(target + w(32, 40, 28), it)
+  }
+  value.tolerance?.let {
+    fields = fields or 4u
+    writeF64(target + w(40, 48, 36), it)
+  }
+  value.tileSize?.let {
+    fields = fields or 8u
+    writeU32(target + w(48, 56, 44), it)
+  }
+  value.buffer?.let {
+    fields = fields or 16u
+    writeU32(target + w(52, 60, 48), it)
+  }
+  value.clip?.let {
+    fields = fields or 32u
+    writeBool(target + w(56, 64, 52), it)
+  }
+  value.wrap?.let {
+    fields = fields or 64u
+    writeBool(target + w(57, 65, 53), it)
+  }
   writeU32(target + 4, fields)
   writeAddress(target + w(16, 24), registrations.register(value))
   writeAddress(target + 8, UpcallStubs.customGeometrySourceOptionsFetchTile)
-  writeAddress(target + w(12, 16), if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile)
+  writeAddress(
+    target + w(12, 16),
+    if (value.cancelTile == null) 0L else UpcallStubs.customGeometrySourceOptionsCancelTile,
+  )
   writeAddress(target + w(60, 72, 56), UpcallStubs.releaseRoot)
   writeI64(target + w(64, 80, 60), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeCustomGeometrySourceOptions(value: CustomGeometrySourceOptions): Long = allocate(w(72, 88, 68), w(8, 8, 4)).also { putCustomGeometrySourceOptions(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putCustomLayerHost(target: Long, value: CustomLayerHost) {
+@JvmSynthetic
+internal fun NativeCall.writeCustomGeometrySourceOptions(value: CustomGeometrySourceOptions): Long =
+  allocate(w(72, 88, 68), w(8, 8, 4)).also { putCustomGeometrySourceOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putCustomLayerHost(target: Long, value: CustomLayerHost) {
   writeU32(target, w(28, 56).toUInt())
   val native = value.bindingNative
   if (native != null) {
@@ -196,31 +307,69 @@ import org.maplibre.nativeffi.internal.memory.*
     writeAddress(target + w(24, 48), native.releaseUserData)
     return
   }
-  if (value.prerender == null && value.render == null && value.deinitialize == null && value.contextLost == null) return
+  if (
+    value.prerender == null &&
+      value.render == null &&
+      value.deinitialize == null &&
+      value.contextLost == null
+  )
+    return
   writeAddress(target + w(20, 40), registrations.register(value))
-  writeAddress(target + w(4, 8), if (value.prerender == null) 0L else UpcallStubs.customLayerHostPrerender)
-  writeAddress(target + w(8, 16), if (value.render == null) 0L else UpcallStubs.customLayerHostRender)
-  writeAddress(target + w(12, 24), if (value.deinitialize == null) 0L else UpcallStubs.customLayerHostDeinitialize)
-  writeAddress(target + w(16, 32), if (value.contextLost == null) 0L else UpcallStubs.customLayerHostContextLost)
+  writeAddress(
+    target + w(4, 8),
+    if (value.prerender == null) 0L else UpcallStubs.customLayerHostPrerender,
+  )
+  writeAddress(
+    target + w(8, 16),
+    if (value.render == null) 0L else UpcallStubs.customLayerHostRender,
+  )
+  writeAddress(
+    target + w(12, 24),
+    if (value.deinitialize == null) 0L else UpcallStubs.customLayerHostDeinitialize,
+  )
+  writeAddress(
+    target + w(16, 32),
+    if (value.contextLost == null) 0L else UpcallStubs.customLayerHostContextLost,
+  )
   writeAddress(target + w(24, 48), UpcallStubs.releaseRoot)
 }
-@JvmSynthetic internal fun NativeCall.writeCustomLayerHost(value: CustomLayerHost): Long = allocate(w(28, 56), w(4, 8)).also { putCustomLayerHost(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putCustomVectorSourceOptions(target: Long, value: CustomVectorSourceOptions) {
+@JvmSynthetic
+internal fun NativeCall.writeCustomLayerHost(value: CustomLayerHost): Long =
+  allocate(w(28, 56), w(4, 8)).also { putCustomLayerHost(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putCustomVectorSourceOptions(
+  target: Long,
+  value: CustomVectorSourceOptions,
+) {
   var fields = 0u
   writeU32(target, w(56, 64, 48).toUInt())
-  value.minZoom?.let { fields = fields or 1u; writeF64(target + w(24, 32, 20), it) }
-  value.maxZoom?.let { fields = fields or 2u; writeF64(target + w(32, 40, 28), it) }
+  value.minZoom?.let {
+    fields = fields or 1u
+    writeF64(target + w(24, 32, 20), it)
+  }
+  value.maxZoom?.let {
+    fields = fields or 2u
+    writeF64(target + w(32, 40, 28), it)
+  }
   writeU32(target + 4, fields)
   writeAddress(target + w(16, 24), registrations.register(value))
   writeAddress(target + 8, UpcallStubs.customVectorSourceOptionsFetchTile)
-  writeAddress(target + w(12, 16), if (value.cancelTile == null) 0L else UpcallStubs.customVectorSourceOptionsCancelTile)
+  writeAddress(
+    target + w(12, 16),
+    if (value.cancelTile == null) 0L else UpcallStubs.customVectorSourceOptionsCancelTile,
+  )
   writeAddress(target + w(40, 48, 36), UpcallStubs.releaseRoot)
   writeI64(target + w(48, 56, 40), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeCustomVectorSourceOptions(value: CustomVectorSourceOptions): Long = allocate(w(56, 64, 48), w(8, 8, 4)).also { putCustomVectorSourceOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSourceOptions) {
+@JvmSynthetic
+internal fun NativeCall.writeCustomVectorSourceOptions(value: CustomVectorSourceOptions): Long =
+  allocate(w(56, 64, 48), w(8, 8, 4)).also { putCustomVectorSourceOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGeoJsonSourceOptions(target: Long, value: GeoJsonSourceOptions) {
   writeU32(target, w(72, 80, 68).toUInt())
   var fields = 0u
   value.minZoom?.let {
@@ -262,9 +411,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeGeoJsonSourceOptions(value: GeoJsonSourceOptions): Long = allocate(w(72, 80, 68), w(8, 8, 4)).also { putGeoJsonSourceOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putPremultipliedRgba8Image(target: Long, value: PremultipliedRgba8Image) {
+@JvmSynthetic
+internal fun NativeArena.writeGeoJsonSourceOptions(value: GeoJsonSourceOptions): Long =
+  allocate(w(72, 80, 68), w(8, 8, 4)).also { putGeoJsonSourceOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putPremultipliedRgba8Image(target: Long, value: PremultipliedRgba8Image) {
   writeU32(target, w(24, 32).toUInt())
   writeU32(target + 4, value.width)
   writeU32(target + 8, value.height)
@@ -272,9 +425,13 @@ import org.maplibre.nativeffi.internal.memory.*
   writeAddress(target + 16, bytes(value.pixels))
   writeSize(target + w(20, 24), value.pixels.size.toULong())
 }
-@JvmSynthetic internal fun NativeArena.writePremultipliedRgba8Image(value: PremultipliedRgba8Image): Long = allocate(w(24, 32), w(4, 8)).also { putPremultipliedRgba8Image(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
+@JvmSynthetic
+internal fun NativeArena.writePremultipliedRgba8Image(value: PremultipliedRgba8Image): Long =
+  allocate(w(24, 32), w(4, 8)).also { putPremultipliedRgba8Image(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
   writeU32(target, w(800, 808, 764).toUInt())
   var fields = 0u
   value.offset?.let {
@@ -305,31 +462,87 @@ import org.maplibre.nativeffi.internal.memory.*
   writeU32(target + w(792, 800, 756), value.gesturePhase.rawValue)
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long = allocate(w(800, 808, 764), w(8, 8, 4)).also { putCameraDelta(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putRenderTarget(target: Long, value: RenderTarget) {
+@JvmSynthetic
+internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
+  allocate(w(800, 808, 764), w(8, 8, 4)).also { putCameraDelta(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putRenderTarget(target: Long, value: RenderTarget) {
   writeU32(target, w(64, 88, 60).toUInt())
   when (val variant = value) {
-    is RenderTarget.Offscreen -> { writeU32(target + 4, 1u); putOffscreenTarget(target + 8, variant.value) }
-    is RenderTarget.MetalLayer -> { writeU32(target + 4, 2u); putMetalLayerTarget(target + 8, variant.value) }
-    is RenderTarget.Win32Window -> { writeU32(target + 4, 3u); putWin32WindowTarget(target + 8, variant.value) }
-    is RenderTarget.XlibWindow -> { writeU32(target + 4, 4u); putXlibWindowTarget(target + 8, variant.value) }
-    is RenderTarget.WaylandSurface -> { writeU32(target + 4, 5u); putWaylandSurfaceTarget(target + 8, variant.value) }
-    is RenderTarget.AndroidWindow -> { writeU32(target + 4, 6u); putAndroidWindowTarget(target + 8, variant.value) }
-    is RenderTarget.OhosWindow -> { writeU32(target + 4, 7u); putOhosWindowTarget(target + 8, variant.value) }
-    is RenderTarget.VulkanSurface -> { writeU32(target + 4, 10u); putVulkanSurfaceTarget(target + 8, variant.value) }
-    is RenderTarget.OpenGlSurface -> { writeU32(target + 4, 11u); putOpenGlSurfaceTarget(target + 8, variant.value) }
-    is RenderTarget.MetalBorrowedTextures -> { writeU32(target + 4, 12u); putMetalBorrowedTexturesTarget(target + 8, variant.value) }
-    is RenderTarget.VulkanBorrowedTextures -> { writeU32(target + 4, 13u); putVulkanBorrowedTexturesTarget(target + 8, variant.value) }
-    is RenderTarget.OpenGlBorrowedTextures -> { writeU32(target + 4, 14u); putOpenGlBorrowedTexturesTarget(target + 8, variant.value) }
-    is RenderTarget.WebGpuBorrowedTextures -> { writeU32(target + 4, 15u); putWebGpuBorrowedTexturesTarget(target + 8, variant.value) }
-    is RenderTarget.ExportedRing -> { writeU32(target + 4, 16u); putExportedRingTarget(target + 8, variant.value) }
-    is RenderTarget.WebCanvas -> { writeU32(target + 4, 17u); putWebCanvasTarget(target + 8, variant.value) }
+    is RenderTarget.Offscreen -> {
+      writeU32(target + 4, 1u)
+      putOffscreenTarget(target + 8, variant.value)
+    }
+    is RenderTarget.MetalLayer -> {
+      writeU32(target + 4, 2u)
+      putMetalLayerTarget(target + 8, variant.value)
+    }
+    is RenderTarget.Win32Window -> {
+      writeU32(target + 4, 3u)
+      putWin32WindowTarget(target + 8, variant.value)
+    }
+    is RenderTarget.XlibWindow -> {
+      writeU32(target + 4, 4u)
+      putXlibWindowTarget(target + 8, variant.value)
+    }
+    is RenderTarget.WaylandSurface -> {
+      writeU32(target + 4, 5u)
+      putWaylandSurfaceTarget(target + 8, variant.value)
+    }
+    is RenderTarget.AndroidWindow -> {
+      writeU32(target + 4, 6u)
+      putAndroidWindowTarget(target + 8, variant.value)
+    }
+    is RenderTarget.OhosWindow -> {
+      writeU32(target + 4, 7u)
+      putOhosWindowTarget(target + 8, variant.value)
+    }
+    is RenderTarget.VulkanSurface -> {
+      writeU32(target + 4, 10u)
+      putVulkanSurfaceTarget(target + 8, variant.value)
+    }
+    is RenderTarget.OpenGlSurface -> {
+      writeU32(target + 4, 11u)
+      putOpenGlSurfaceTarget(target + 8, variant.value)
+    }
+    is RenderTarget.MetalBorrowedTextures -> {
+      writeU32(target + 4, 12u)
+      putMetalBorrowedTexturesTarget(target + 8, variant.value)
+    }
+    is RenderTarget.VulkanBorrowedTextures -> {
+      writeU32(target + 4, 13u)
+      putVulkanBorrowedTexturesTarget(target + 8, variant.value)
+    }
+    is RenderTarget.OpenGlBorrowedTextures -> {
+      writeU32(target + 4, 14u)
+      putOpenGlBorrowedTexturesTarget(target + 8, variant.value)
+    }
+    is RenderTarget.WebGpuBorrowedTextures -> {
+      writeU32(target + 4, 15u)
+      putWebGpuBorrowedTexturesTarget(target + 8, variant.value)
+    }
+    is RenderTarget.ExportedRing -> {
+      writeU32(target + 4, 16u)
+      putExportedRingTarget(target + 8, variant.value)
+    }
+    is RenderTarget.WebCanvas -> {
+      writeU32(target + 4, 17u)
+      putWebCanvasTarget(target + 8, variant.value)
+    }
   }
 }
-@JvmSynthetic internal fun NativeArena.writeRenderTarget(value: RenderTarget): Long = allocate(w(64, 88, 60), w(8, 8, 4)).also { putRenderTarget(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putRenderSessionAttachOptions(target: Long, value: RenderSessionAttachOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeRenderTarget(value: RenderTarget): Long =
+  allocate(w(64, 88, 60), w(8, 8, 4)).also { putRenderTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putRenderSessionAttachOptions(
+  target: Long,
+  value: RenderSessionAttachOptions,
+) {
   writeU32(target, w(96, 120, 76).toUInt())
   writeU32(target + 4, value.driver.rawValue)
   writeU32(target + 8, value.producerSyncKinds.rawValue)
@@ -338,9 +551,13 @@ import org.maplibre.nativeffi.internal.memory.*
   putWake(target + w(64, 80, 52), value.driverWorkWake)
   writeBool(target + w(88, 112, 72), value.keepDepth)
 }
-@JvmSynthetic internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long = allocate(w(96, 120, 76), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putCameraFitOptions(target: Long, value: CameraFitOptions) {
+@JvmSynthetic
+internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
+  allocate(w(96, 120, 76), w(8, 8, 4)).also { putRenderSessionAttachOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putCameraFitOptions(target: Long, value: CameraFitOptions) {
   writeU32(target, 56.toUInt())
   var fields = 0u
   value.padding?.let {
@@ -357,23 +574,35 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeCameraFitOptions(value: CameraFitOptions): Long = allocate(56, w(8, 8, 4)).also { putCameraFitOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putLatLngBounds(target: Long, value: LatLngBounds) {
+@JvmSynthetic
+internal fun NativeArena.writeCameraFitOptions(value: CameraFitOptions): Long =
+  allocate(56, w(8, 8, 4)).also { putCameraFitOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putLatLngBounds(target: Long, value: LatLngBounds) {
   putLatLng(target, value.southwest)
   putLatLng(target + 16, value.northeast)
 }
-@JvmSynthetic internal fun NativeArena.writeLatLngBounds(value: LatLngBounds): Long = allocate(32, w(8, 8, 4)).also { putLatLngBounds(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putCameraFitUpdate(target: Long, value: CameraFitUpdate) {
+@JvmSynthetic
+internal fun NativeArena.writeLatLngBounds(value: LatLngBounds): Long =
+  allocate(32, w(8, 8, 4)).also { putLatLngBounds(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putCameraFitUpdate(target: Long, value: CameraFitUpdate) {
   writeU32(target, w(168, 176, 160).toUInt())
   writeU32(target + 4, value.mode.rawValue)
   putCameraFitOptions(target + 8, value.fit)
   putAnimationOptions(target + 64, value.animation)
 }
-@JvmSynthetic internal fun NativeCall.writeCameraFitUpdate(value: CameraFitUpdate): Long = allocate(w(168, 176, 160), w(8, 8, 4)).also { putCameraFitUpdate(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putFeatureStateSelector(target: Long, value: FeatureStateSelector) {
+@JvmSynthetic
+internal fun NativeCall.writeCameraFitUpdate(value: CameraFitUpdate): Long =
+  allocate(w(168, 176, 160), w(8, 8, 4)).also { putCameraFitUpdate(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putFeatureStateSelector(target: Long, value: FeatureStateSelector) {
   writeU32(target, w(48, 80, 44).toUInt())
   var fields = 0u
   putView(target + 8, value.sourceId)
@@ -385,9 +614,13 @@ import org.maplibre.nativeffi.internal.memory.*
   putView(target + w(40, 64, 36), value.stateKey)
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeFeatureStateSelector(value: FeatureStateSelector): Long = allocate(w(48, 80, 44), w(8, 8, 4)).also { putFeatureStateSelector(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putCameraOptions(target: Long, value: CameraOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeFeatureStateSelector(value: FeatureStateSelector): Long =
+  allocate(w(48, 80, 44), w(8, 8, 4)).also { putFeatureStateSelector(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putCameraOptions(target: Long, value: CameraOptions) {
   writeU32(target, 120.toUInt())
   var fields = 0u
   value.center?.let {
@@ -428,9 +661,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeCameraOptions(value: CameraOptions): Long = allocate(120, w(8, 8, 4)).also { putCameraOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putBoundOptions(target: Long, value: BoundOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeCameraOptions(value: CameraOptions): Long =
+  allocate(120, w(8, 8, 4)).also { putCameraOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putBoundOptions(target: Long, value: BoundOptions) {
   writeU32(target, 72.toUInt())
   var fields = 0u
   if (value.unbounded) fields = fields or 32u
@@ -456,9 +693,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeBoundOptions(value: BoundOptions): Long = allocate(72, w(8, 8, 4)).also { putBoundOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putFreeCameraOptions(target: Long, value: FreeCameraOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeBoundOptions(value: BoundOptions): Long =
+  allocate(72, w(8, 8, 4)).also { putBoundOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putFreeCameraOptions(target: Long, value: FreeCameraOptions) {
   writeU32(target, 64.toUInt())
   var fields = 0u
   value.position?.let {
@@ -471,9 +712,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeFreeCameraOptions(value: FreeCameraOptions): Long = allocate(64, w(8, 8, 4)).also { putFreeCameraOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putProjectionModeOptions(target: Long, value: ProjectionModeOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeFreeCameraOptions(value: FreeCameraOptions): Long =
+  allocate(64, w(8, 8, 4)).also { putFreeCameraOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putProjectionModeOptions(target: Long, value: ProjectionModeOptions) {
   writeU32(target, w(32, 32, 28).toUInt())
   var fields = 0u
   value.axonometric?.let {
@@ -490,9 +735,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeProjectionModeOptions(value: ProjectionModeOptions): Long = allocate(w(32, 32, 28), w(8, 8, 4)).also { putProjectionModeOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putStyleImageOptions(target: Long, value: StyleImageOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeProjectionModeOptions(value: ProjectionModeOptions): Long =
+  allocate(w(32, 32, 28), w(8, 8, 4)).also { putProjectionModeOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putStyleImageOptions(target: Long, value: StyleImageOptions) {
   writeU32(target, w(56, 72).toUInt())
   var fields = 0u
   value.stretchX?.let {
@@ -531,9 +780,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeStyleImageOptions(value: StyleImageOptions): Long = allocate(w(56, 72), w(4, 8)).also { putStyleImageOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putStyleTransitionOptions(target: Long, value: StyleTransitionOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeStyleImageOptions(value: StyleImageOptions): Long =
+  allocate(w(56, 72), w(4, 8)).also { putStyleImageOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putStyleTransitionOptions(target: Long, value: StyleTransitionOptions) {
   writeU32(target, w(32, 32, 28).toUInt())
   var fields = 0u
   value.durationMs?.let {
@@ -550,9 +803,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeStyleTransitionOptions(value: StyleTransitionOptions): Long = allocate(w(32, 32, 28), w(8, 8, 4)).also { putStyleTransitionOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMapTileOptions(target: Long, value: MapTileOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeStyleTransitionOptions(value: StyleTransitionOptions): Long =
+  allocate(w(32, 32, 28), w(8, 8, 4)).also { putStyleTransitionOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMapTileOptions(target: Long, value: MapTileOptions) {
   writeU32(target, w(56, 56, 48).toUInt())
   var fields = 0u
   value.prefetchZoomDelta?.let {
@@ -581,9 +838,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeMapTileOptions(value: MapTileOptions): Long = allocate(w(56, 56, 48), w(8, 8, 4)).also { putMapTileOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMapViewportOptions(target: Long, value: MapViewportOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeMapTileOptions(value: MapTileOptions): Long =
+  allocate(w(56, 56, 48), w(8, 8, 4)).also { putMapTileOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMapViewportOptions(target: Long, value: MapViewportOptions) {
   writeU32(target, w(56, 56, 52).toUInt())
   var fields = 0u
   value.northOrientation?.let {
@@ -604,67 +865,121 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeMapViewportOptions(value: MapViewportOptions): Long = allocate(w(56, 56, 52), w(8, 8, 4)).also { putMapViewportOptions(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putCameraUpdate(target: Long, value: CameraUpdate) {
+@JvmSynthetic
+internal fun NativeArena.writeMapViewportOptions(value: MapViewportOptions): Long =
+  allocate(w(56, 56, 52), w(8, 8, 4)).also { putMapViewportOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putCameraUpdate(target: Long, value: CameraUpdate) {
   writeU32(target, w(240, 248, 232).toUInt())
   writeU32(target + 4, value.mode.rawValue)
   putCameraOptions(target + 8, value.camera)
   putAnimationOptions(target + 128, value.animation)
   writeU32(target + w(232, 240, 224), value.gesturePhase.rawValue)
 }
-@JvmSynthetic internal fun NativeCall.writeCameraUpdate(value: CameraUpdate): Long = allocate(w(240, 248, 232), w(8, 8, 4)).also { putCameraUpdate(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putScreenPoint(target: Long, value: ScreenPoint) {
+@JvmSynthetic
+internal fun NativeCall.writeCameraUpdate(value: CameraUpdate): Long =
+  allocate(w(240, 248, 232), w(8, 8, 4)).also { putCameraUpdate(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putScreenPoint(target: Long, value: ScreenPoint) {
   writeF64(target, value.x)
   writeF64(target + 8, value.y)
 }
-@JvmSynthetic internal fun NativeArena.writeScreenPoint(value: ScreenPoint): Long = allocate(16, w(8, 8, 4)).also { putScreenPoint(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putFrameDemand(target: Long, value: FrameDemand) {
+@JvmSynthetic
+internal fun NativeArena.writeScreenPoint(value: ScreenPoint): Long =
+  allocate(16, w(8, 8, 4)).also { putScreenPoint(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putFrameDemand(target: Long, value: FrameDemand) {
   writeU32(target, 16.toUInt())
   writeU32(target + 4, value.flags.rawValue)
   writeU64(target + 8, value.token)
 }
-@JvmSynthetic internal fun NativeArena.writeFrameDemand(value: FrameDemand): Long = allocate(16, w(8, 8, 4)).also { putFrameDemand(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putRenderedQueryGeometry(target: Long, value: RenderedQueryGeometry) {
+@JvmSynthetic
+internal fun NativeArena.writeFrameDemand(value: FrameDemand): Long =
+  allocate(16, w(8, 8, 4)).also { putFrameDemand(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putRenderedQueryGeometry(target: Long, value: RenderedQueryGeometry) {
   writeU32(target, 40.toUInt())
   when (val variant = value) {
-    is RenderedQueryGeometry.Point -> { writeU32(target + 4, 1u); putScreenPoint(target + 8, variant.value) }
-    is RenderedQueryGeometry.Box -> { writeU32(target + 4, 2u); putScreenBox(target + 8, variant.value) }
-    is RenderedQueryGeometry.LineString -> { writeU32(target + 4, 3u); putScreenLineString(target + 8, variant.value) }
+    is RenderedQueryGeometry.Point -> {
+      writeU32(target + 4, 1u)
+      putScreenPoint(target + 8, variant.value)
+    }
+    is RenderedQueryGeometry.Box -> {
+      writeU32(target + 4, 2u)
+      putScreenBox(target + 8, variant.value)
+    }
+    is RenderedQueryGeometry.LineString -> {
+      writeU32(target + 4, 3u)
+      putScreenLineString(target + 8, variant.value)
+    }
   }
 }
-@JvmSynthetic internal fun NativeArena.writeRenderedQueryGeometry(value: RenderedQueryGeometry): Long = allocate(40, w(8, 8, 4)).also { putRenderedQueryGeometry(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putRenderedFeatureQueryOptions(target: Long, value: RenderedFeatureQueryOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeRenderedQueryGeometry(value: RenderedQueryGeometry): Long =
+  allocate(40, w(8, 8, 4)).also { putRenderedQueryGeometry(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putRenderedFeatureQueryOptions(
+  target: Long,
+  value: RenderedFeatureQueryOptions,
+) {
   writeU32(target, w(24, 40).toUInt())
   var fields = 0u
   value.layerIds?.let {
     fields = fields or 1u
-    writeAddress(target + 8, array(it, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item -> putView(at, item) })
+    writeAddress(
+      target + 8,
+      array(it, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item ->
+        putView(at, item)
+      },
+    )
     writeSize(target + w(12, 16), it.size.toULong())
   }
   putView(target + w(16, 24), value.filter)
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeRenderedFeatureQueryOptions(value: RenderedFeatureQueryOptions): Long = allocate(w(24, 40), w(4, 8)).also { putRenderedFeatureQueryOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putSourceFeatureQueryOptions(target: Long, value: SourceFeatureQueryOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeRenderedFeatureQueryOptions(
+  value: RenderedFeatureQueryOptions,
+): Long = allocate(w(24, 40), w(4, 8)).also { putRenderedFeatureQueryOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putSourceFeatureQueryOptions(
+  target: Long,
+  value: SourceFeatureQueryOptions,
+) {
   writeU32(target, w(24, 40).toUInt())
   var fields = 0u
   value.sourceLayerIds?.let {
     fields = fields or 1u
-    writeAddress(target + 8, array(it, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item -> putView(at, item) })
+    writeAddress(
+      target + 8,
+      array(it, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item ->
+        putView(at, item)
+      },
+    )
     writeSize(target + w(12, 16), it.size.toULong())
   }
   putView(target + w(16, 24), value.filter)
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeSourceFeatureQueryOptions(value: SourceFeatureQueryOptions): Long = allocate(w(24, 40), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
+@JvmSynthetic
+internal fun NativeArena.writeSourceFeatureQueryOptions(value: SourceFeatureQueryOptions): Long =
+  allocate(w(24, 40), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
   writeU32(target, w(72, 96, 68).toUInt())
   var fields = 0u
   writeU32(target + 8, value.status.rawValue)
@@ -688,18 +1003,30 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeResourceResponse(value: ResourceResponse): Long = allocate(w(72, 96, 68), w(8, 8, 4)).also { putResourceResponse(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putResourceRequestCancelHandler(target: Long, value: ResourceRequestCancelHandler) {
+@JvmSynthetic
+internal fun NativeArena.writeResourceResponse(value: ResourceResponse): Long =
+  allocate(w(72, 96, 68), w(8, 8, 4)).also { putResourceResponse(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putResourceRequestCancelHandler(
+  target: Long,
+  value: ResourceRequestCancelHandler,
+) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
   writeI64(target + w(16, 32), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeResourceRequestCancelHandler(value: ResourceRequestCancelHandler): Long = allocate(w(24, 40), w(8, 8, 4)).also { putResourceRequestCancelHandler(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putResourceTransformError(target: Long, value: ResourceTransformError) {
+@JvmSynthetic
+internal fun NativeCall.writeResourceRequestCancelHandler(
+  value: ResourceRequestCancelHandler,
+): Long = allocate(w(24, 40), w(8, 8, 4)).also { putResourceRequestCancelHandler(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putResourceTransformError(target: Long, value: ResourceTransformError) {
   writeU32(target, w(32, 40, 28).toUInt())
   var fields = 0u
   writeU32(target + 8, value.reason.rawValue)
@@ -710,9 +1037,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeResourceTransformError(value: ResourceTransformError): Long = allocate(w(32, 40, 28), w(8, 8, 4)).also { putResourceTransformError(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeResourceTransformError(value: ResourceTransformError): Long =
+  allocate(w(32, 40, 28), w(8, 8, 4)).also { putResourceTransformError(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
   writeU32(target, w(56, 64, 52).toUInt())
   var fields = 0u
   putLogicalExtent(target + 8, value.initialExtent)
@@ -729,41 +1060,70 @@ import org.maplibre.nativeffi.internal.memory.*
   putView(target + w(44, 48), value.fallbackFontFaces)
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeMapOptions(value: MapOptions): Long = allocate(w(56, 64, 52), w(8, 8, 4)).also { putMapOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: OfflineRegionDefinition) {
+@JvmSynthetic
+internal fun NativeArena.writeMapOptions(value: MapOptions): Long =
+  allocate(w(56, 64, 52), w(8, 8, 4)).also { putMapOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: OfflineRegionDefinition) {
   writeU32(target, w(72, 80).toUInt())
   when (val variant = value) {
-    is OfflineRegionDefinition.TilePyramid -> { writeU32(target + 4, 1u); putOfflineTilePyramidRegionDefinition(target + 8, variant.value) }
-    is OfflineRegionDefinition.Geometry -> { writeU32(target + 4, 2u); putOfflineGeometryRegionDefinition(target + 8, variant.value) }
-    is OfflineRegionDefinition.Unknown -> throw IllegalArgumentException("unknown native union variants cannot be submitted")
+    is OfflineRegionDefinition.TilePyramid -> {
+      writeU32(target + 4, 1u)
+      putOfflineTilePyramidRegionDefinition(target + 8, variant.value)
+    }
+    is OfflineRegionDefinition.Geometry -> {
+      writeU32(target + 4, 2u)
+      putOfflineGeometryRegionDefinition(target + 8, variant.value)
+    }
+    is OfflineRegionDefinition.Unknown ->
+      throw IllegalArgumentException("unknown native union variants cannot be submitted")
   }
 }
-@JvmSynthetic internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefinition): Long = allocate(w(72, 80), w(8, 8, 4)).also { putOfflineRegionDefinition(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putRuntimeEventHandler(target: Long, value: RuntimeEventHandler) {
+@JvmSynthetic
+internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefinition): Long =
+  allocate(w(72, 80), w(8, 8, 4)).also { putOfflineRegionDefinition(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putRuntimeEventHandler(target: Long, value: RuntimeEventHandler) {
   writeU32(target, w(24, 40).toUInt())
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.runtimeEventHandlerCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
   writeI64(target + w(16, 32), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeRuntimeEventHandler(value: RuntimeEventHandler): Long = allocate(w(24, 40), w(8, 8, 4)).also { putRuntimeEventHandler(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
+@JvmSynthetic
+internal fun NativeCall.writeRuntimeEventHandler(value: RuntimeEventHandler): Long =
+  allocate(w(24, 40), w(8, 8, 4)).also { putRuntimeEventHandler(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
   writeU32(target, w(32, 56).toUInt())
-  writeAddress(target + w(24, 40), array(value.routes, w(20, 32), w(4, 8)) { at, item -> putResourceRoute(at, item) })
+  writeAddress(
+    target + w(24, 40),
+    array(value.routes, w(20, 32), w(4, 8)) { at, item -> putResourceRoute(at, item) },
+  )
   writeSize(target + w(28, 48), value.routes.size.toULong())
   writeAddress(target + w(8, 16), registrations.register(value))
   writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
   writeI64(target + w(16, 32), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long = allocate(w(32, 56), w(8, 8, 4)).also { putResourceProvider(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
+@JvmSynthetic
+internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
+  allocate(w(32, 56), w(8, 8, 4)).also { putResourceProvider(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
   writeU32(target, w(32, 56).toUInt())
-  writeAddress(target + w(24, 40), array(value.rules, w(28, 48), w(4, 8)) { at, item -> putResourceTransformRule(at, item) })
+  writeAddress(
+    target + w(24, 40),
+    array(value.rules, w(28, 48), w(4, 8)) { at, item -> putResourceTransformRule(at, item) },
+  )
   writeSize(target + w(28, 48), value.rules.size.toULong())
   if (value.callback == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
@@ -771,9 +1131,13 @@ import org.maplibre.nativeffi.internal.memory.*
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
   writeI64(target + w(16, 32), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long = allocate(w(32, 56), w(8, 8, 4)).also { putResourceTransform(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putStyleExpressionInputs(target: Long, value: StyleExpressionInputs) {
+@JvmSynthetic
+internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
+  allocate(w(32, 56), w(8, 8, 4)).also { putResourceTransform(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putStyleExpressionInputs(target: Long, value: StyleExpressionInputs) {
   writeU32(target, w(72, 104, 68).toUInt())
   var fields = 0u
   value.zoom?.let {
@@ -791,105 +1155,458 @@ import org.maplibre.nativeffi.internal.memory.*
     fields = fields or 8u
     putCanonicalTileId(target + w(48, 72), it)
   }
-  writeAddress(target + w(60, 88), array(value.availableImages, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item -> putView(at, item) })
+  writeAddress(
+    target + w(60, 88),
+    array(value.availableImages, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item
+      ->
+      putView(at, item)
+    },
+  )
   writeSize(target + w(64, 96), value.availableImages.size.toULong())
   writeU32(target + 4, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeStyleExpressionInputs(value: StyleExpressionInputs): Long = allocate(w(72, 104, 68), w(8, 8, 4)).also { putStyleExpressionInputs(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
+@JvmSynthetic
+internal fun NativeArena.writeStyleExpressionInputs(value: StyleExpressionInputs): Long =
+  allocate(w(72, 104, 68), w(8, 8, 4)).also { putStyleExpressionInputs(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putHttpHeaderRule(target: Long, value: HttpHeaderRule) {
   writeU32(target, w(28, 48).toUInt())
   writeU32(target + 4, value.kinds.rawValue)
   writeU32(target + 8, value.flags.rawValue)
   putView(target + w(12, 16), value.url)
-  writeAddress(target + w(20, 32), array(value.headers, w(16, 32), w(4, 8)) { at, item -> putHttpHeader(at, item) })
+  writeAddress(
+    target + w(20, 32),
+    array(value.headers, w(16, 32), w(4, 8)) { at, item -> putHttpHeader(at, item) },
+  )
   writeSize(target + w(24, 40), value.headers.size.toULong())
 }
-@JvmSynthetic internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long = allocate(w(28, 48), w(4, 8)).also { putHttpHeaderRule(it, value) }
 
-@JvmSynthetic internal fun readAndroidHardwareBufferFrame(source: Long, scope: ViewScope? = null): AndroidHardwareBufferFrame = AndroidHardwareBufferFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), buffer = readAddress(source + w(28, 32, 24)).let { if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it) }).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun NativeArena.writeHttpHeaderRule(value: HttpHeaderRule): Long =
+  allocate(w(28, 48), w(4, 8)).also { putHttpHeaderRule(it, value) }
 
-@JvmSynthetic internal fun readDmaBufFrame(source: Long, scope: ViewScope? = null): DmaBufFrame = DmaBufFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), fourcc = readU32(source + w(28, 28, 24)), modifier = readU64(source + w(32, 32, 28)), planes = readArray(readAddress(source + w(40, 40, 36)), readSize(source + w(44, 48, 40)), 12.toLong()) { item -> readDmaBufPlane(item) }).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readAndroidHardwareBufferFrame(
+  source: Long,
+  scope: ViewScope? = null,
+): AndroidHardwareBufferFrame =
+  AndroidHardwareBufferFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      buffer =
+        readAddress(source + w(28, 32, 24)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readDxgiSharedTextureFrame(source: Long, scope: ViewScope? = null): DxgiSharedTextureFrame = DxgiSharedTextureFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), format = readU32(source + w(28, 28, 24)), handle = readAddress(source + w(32, 32, 28)).let { if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it) }).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readDmaBufFrame(source: Long, scope: ViewScope? = null): DmaBufFrame =
+  DmaBufFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      fourcc = readU32(source + w(28, 28, 24)),
+      modifier = readU64(source + w(32, 32, 28)),
+      planes =
+        readArray(
+          readAddress(source + w(40, 40, 36)),
+          readSize(source + w(44, 48, 40)),
+          12.toLong(),
+        ) { item ->
+          readDmaBufPlane(item)
+        },
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readIoSurfaceFrame(source: Long, scope: ViewScope? = null): IoSurfaceFrame = IoSurfaceFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), surface = readAddress(source + w(28, 32, 24)).let { if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it) }).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readDxgiSharedTextureFrame(
+  source: Long,
+  scope: ViewScope? = null,
+): DxgiSharedTextureFrame =
+  DxgiSharedTextureFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      format = readU32(source + w(28, 28, 24)),
+      handle =
+        readAddress(source + w(32, 32, 28)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame = MetalTextureFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), texture = readAddress(source + w(28, 32, 24)).let { if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it) }, device = readAddress(source + w(32, 40, 28)).let { if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it) }, pixelFormat = readU64(source + w(40, 48, 32)), depthTexture = readAddress(source + w(48, 56, 40)).let { if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it) }, depthPixelFormat = readU64(source + w(56, 64, 44))).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readIoSurfaceFrame(source: Long, scope: ViewScope? = null): IoSurfaceFrame =
+  IoSurfaceFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      surface =
+        readAddress(source + w(28, 32, 24)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readOpaqueFdFrame(source: Long, scope: ViewScope? = null): OpaqueFdFrame = OpaqueFdFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), fd = readI32(source + w(28, 28, 24)), allocationSize = readU64(source + w(32, 32, 28)), dedicated = readBool(source + w(40, 40, 36)), format = readU32(source + w(44, 44, 40)), depthFd = readI32(source + w(48, 48, 44)), depthAllocationSize = readU64(source + w(56, 56, 48)), depthDedicated = readBool(source + w(64, 64, 56)), depthFormat = readU32(source + w(68, 68, 60))).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
+  MetalTextureFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      texture =
+        readAddress(source + w(28, 32, 24)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      device =
+        readAddress(source + w(32, 40, 28)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      pixelFormat = readU64(source + w(40, 48, 32)),
+      depthTexture =
+        readAddress(source + w(48, 56, 40)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      depthPixelFormat = readU64(source + w(56, 64, 44)),
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readOpenGlTextureFrame(source: Long, scope: ViewScope? = null): OpenGlTextureFrame = OpenGlTextureFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), texture = readU32(source + w(28, 28, 24)), target = readU32(source + w(32, 32, 28)), depthTexture = readU32(source + w(36, 36, 32)), depthInternalFormat = readU32(source + w(40, 40, 36))).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readOpaqueFdFrame(source: Long, scope: ViewScope? = null): OpaqueFdFrame =
+  OpaqueFdFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      fd = readI32(source + w(28, 28, 24)),
+      allocationSize = readU64(source + w(32, 32, 28)),
+      dedicated = readBool(source + w(40, 40, 36)),
+      format = readU32(source + w(44, 44, 40)),
+      depthFd = readI32(source + w(48, 48, 44)),
+      depthAllocationSize = readU64(source + w(56, 56, 48)),
+      depthDedicated = readBool(source + w(64, 64, 56)),
+      depthFormat = readU32(source + w(68, 68, 60)),
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readGpuSync(source: Long, scope: ViewScope? = null): GpuSync = GpuSync(kind = GpuSyncKind.of(readU32(source + 4)), handle = readU64(source + 8), value = readU64(source + 16)).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readOpenGlTextureFrame(source: Long, scope: ViewScope? = null): OpenGlTextureFrame =
+  OpenGlTextureFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      texture = readU32(source + w(28, 28, 24)),
+      target = readU32(source + w(32, 32, 28)),
+      depthTexture = readU32(source + w(36, 36, 32)),
+      depthInternalFormat = readU32(source + w(40, 40, 36)),
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readRenderFrameResult(source: Long): RenderFrameResult = RenderFrameResult(disposition = RenderResult.of(readU32(source + 4)), token = readU64(source + 8), mapUpdateGeneration = readU64(source + 16), generation = readU64(source + 24), frameGeneration = readU64(source + 32), needsRepaint = readBool(source + 40), view = readMapView(source + w(48, 48, 44)), frameProjection = readFrameProjection(source + w(256, 256, 240)), mode = RenderMode.of(readU32(source + w(424, 424, 400))))
+@JvmSynthetic
+internal fun readGpuSync(source: Long, scope: ViewScope? = null): GpuSync =
+  GpuSync(
+      kind = GpuSyncKind.of(readU32(source + 4)),
+      handle = readU64(source + 8),
+      value = readU64(source + 16),
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readVulkanTextureFrame(source: Long, scope: ViewScope? = null): VulkanTextureFrame = VulkanTextureFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), image = readU64(source + w(32, 32, 24)), imageView = readU64(source + w(40, 40, 32)), device = readAddress(source + w(48, 48, 40)).let { if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it) }, format = readU32(source + w(52, 56, 44)), layout = readU32(source + w(56, 60, 48)), depthImage = readU64(source + w(64, 64, 52)), depthImageView = readU64(source + w(72, 72, 60)), depthFormat = readU32(source + w(80, 80, 68)), depthLayout = readU32(source + w(84, 84, 72))).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readRenderFrameResult(source: Long): RenderFrameResult =
+  RenderFrameResult(
+    disposition = RenderResult.of(readU32(source + 4)),
+    token = readU64(source + 8),
+    mapUpdateGeneration = readU64(source + 16),
+    generation = readU64(source + 24),
+    frameGeneration = readU64(source + 32),
+    needsRepaint = readBool(source + 40),
+    view = readMapView(source + w(48, 48, 44)),
+    frameProjection = readFrameProjection(source + w(256, 256, 240)),
+    mode = RenderMode.of(readU32(source + w(424, 424, 400))),
+  )
 
-@JvmSynthetic internal fun readWebGpuTextureFrame(source: Long, scope: ViewScope? = null): WebGpuTextureFrame = WebGpuTextureFrame(width = readU32(source + 4), height = readU32(source + 8), scaleFactor = readF64(source + w(16, 16, 12)), slot = readU32(source + w(24, 24, 20)), texture = readU32(source + w(28, 28, 24)), device = readU32(source + w(32, 32, 28)), format = readViewString(source + w(36, 40, 32)), depthTexture = readU32(source + w(44, 56, 40)), depthFormat = readViewString(source + w(48, 64, 44))).also { it.bindingScope = scope }
+@JvmSynthetic
+internal fun readVulkanTextureFrame(source: Long, scope: ViewScope? = null): VulkanTextureFrame =
+  VulkanTextureFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      image = readU64(source + w(32, 32, 24)),
+      imageView = readU64(source + w(40, 40, 32)),
+      device =
+        readAddress(source + w(48, 48, 40)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      format = readU32(source + w(52, 56, 44)),
+      layout = readU32(source + w(56, 60, 48)),
+      depthImage = readU64(source + w(64, 64, 52)),
+      depthImageView = readU64(source + w(72, 72, 60)),
+      depthFormat = readU32(source + w(80, 80, 68)),
+      depthLayout = readU32(source + w(84, 84, 72)),
+    )
+    .also { it.bindingScope = scope }
 
-@JvmSynthetic internal fun readCameraOptions(source: Long): CameraOptions {
+@JvmSynthetic
+internal fun readWebGpuTextureFrame(source: Long, scope: ViewScope? = null): WebGpuTextureFrame =
+  WebGpuTextureFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      texture = readU32(source + w(28, 28, 24)),
+      device = readU32(source + w(32, 32, 28)),
+      format = readViewString(source + w(36, 40, 32)),
+      depthTexture = readU32(source + w(44, 56, 40)),
+      depthFormat = readViewString(source + w(48, 64, 44)),
+    )
+    .also { it.bindingScope = scope }
+
+@JvmSynthetic
+internal fun readCameraOptions(source: Long): CameraOptions {
   val fields = readU32(source + 4)
-  return CameraOptions(center = if ((fields and 1u) != 0u) readLatLng(source + 8) else null, centerAltitude = if ((fields and 16u) != 0u) readF64(source + 24) else null, padding = if ((fields and 32u) != 0u) readEdgeInsets(source + 32) else null, anchor = if ((fields and 64u) != 0u) readScreenPoint(source + 64) else null, zoom = if ((fields and 2u) != 0u) readF64(source + 80) else null, bearing = if ((fields and 4u) != 0u) readF64(source + 88) else null, pitch = if ((fields and 8u) != 0u) readF64(source + 96) else null, roll = if ((fields and 128u) != 0u) readF64(source + 104) else null, fieldOfView = if ((fields and 256u) != 0u) readF64(source + 112) else null)
+  return CameraOptions(
+    center = if ((fields and 1u) != 0u) readLatLng(source + 8) else null,
+    centerAltitude = if ((fields and 16u) != 0u) readF64(source + 24) else null,
+    padding = if ((fields and 32u) != 0u) readEdgeInsets(source + 32) else null,
+    anchor = if ((fields and 64u) != 0u) readScreenPoint(source + 64) else null,
+    zoom = if ((fields and 2u) != 0u) readF64(source + 80) else null,
+    bearing = if ((fields and 4u) != 0u) readF64(source + 88) else null,
+    pitch = if ((fields and 8u) != 0u) readF64(source + 96) else null,
+    roll = if ((fields and 128u) != 0u) readF64(source + 104) else null,
+    fieldOfView = if ((fields and 256u) != 0u) readF64(source + 112) else null,
+  )
 }
 
-@JvmSynthetic internal fun readLatLng(source: Long): LatLng = LatLng(latitude = readF64(source), longitude = readF64(source + 8))
+@JvmSynthetic
+internal fun readLatLng(source: Long): LatLng =
+  LatLng(latitude = readF64(source), longitude = readF64(source + 8))
 
-@JvmSynthetic internal fun readProjectedMeters(source: Long): ProjectedMeters = ProjectedMeters(northing = readF64(source), easting = readF64(source + 8))
+@JvmSynthetic
+internal fun readProjectedMeters(source: Long): ProjectedMeters =
+  ProjectedMeters(northing = readF64(source), easting = readF64(source + 8))
 
-@JvmSynthetic internal fun readGpuDeviceCapabilities(source: Long): GpuDeviceCapabilities = GpuDeviceCapabilities(backend = RenderBackend.of(readU32(source + 4)), targetKinds = RenderTargetKindFlag.of(readU32(source + 8)), exportKinds = GpuExportKindFlag.of(readU32(source + 12)), syncKinds = GpuSyncKindFlag.of(readU32(source + 16)), depthStencilFormats = DepthStencilFormatFlag.of(readU32(source + 20)), depthExportKinds = GpuExportKindFlag.of(readU32(source + 24)))
+@JvmSynthetic
+internal fun readGpuDeviceCapabilities(source: Long): GpuDeviceCapabilities =
+  GpuDeviceCapabilities(
+    backend = RenderBackend.of(readU32(source + 4)),
+    targetKinds = RenderTargetKindFlag.of(readU32(source + 8)),
+    exportKinds = GpuExportKindFlag.of(readU32(source + 12)),
+    syncKinds = GpuSyncKindFlag.of(readU32(source + 16)),
+    depthStencilFormats = DepthStencilFormatFlag.of(readU32(source + 20)),
+    depthExportKinds = GpuExportKindFlag.of(readU32(source + 24)),
+  )
 
-@JvmSynthetic internal fun readGpuDeviceVulkanContextResult(source: Long): GpuDeviceVulkanContextResult = GpuDeviceVulkanContextResult(context = readVulkanContextDescriptor(source + w(4, 8)))
+@JvmSynthetic
+internal fun readGpuDeviceVulkanContextResult(source: Long): GpuDeviceVulkanContextResult =
+  GpuDeviceVulkanContextResult(context = readVulkanContextDescriptor(source + w(4, 8)))
 
-@JvmSynthetic internal fun readCameraQueryResult(source: Long): CameraQueryResult = CameraQueryResult(generation = readU64(source), camera = readCamera(source + 8))
+@JvmSynthetic
+internal fun readCameraQueryResult(source: Long): CameraQueryResult =
+  CameraQueryResult(generation = readU64(source), camera = readCamera(source + 8))
 
-@JvmSynthetic internal fun readMapSnapshot(source: Long): MapSnapshot = MapSnapshot(debugFlags = MapDebugFlag.of(readU32(source + 4)), generation = readU64(source + 8), fullyLoaded = readBool(source + 16), renderingStatsViewEnabled = readBool(source + 17), gestureInProgress = readBool(source + 18), transitionInProgress = readBool(source + 19), eventMask = RuntimeEventFlag.of(readU64(source + w(24, 24, 20))), latestRenderUpdateGeneration = readU64(source + w(32, 32, 28)), tile = readMapTileSettings(source + w(40, 40, 36)), bounds = readCameraBounds(source + w(88, 88, 76)), freeCamera = readFreeCamera(source + w(160, 160, 144)), view = readMapView(source + w(216, 216, 200)), globeRendering = readBool(source + w(424, 424, 396)), globeFreeBearingEnabled = readBool(source + w(425, 425, 397)))
+@JvmSynthetic
+internal fun readMapSnapshot(source: Long): MapSnapshot =
+  MapSnapshot(
+    debugFlags = MapDebugFlag.of(readU32(source + 4)),
+    generation = readU64(source + 8),
+    fullyLoaded = readBool(source + 16),
+    renderingStatsViewEnabled = readBool(source + 17),
+    gestureInProgress = readBool(source + 18),
+    transitionInProgress = readBool(source + 19),
+    eventMask = RuntimeEventFlag.of(readU64(source + w(24, 24, 20))),
+    latestRenderUpdateGeneration = readU64(source + w(32, 32, 28)),
+    tile = readMapTileSettings(source + w(40, 40, 36)),
+    bounds = readCameraBounds(source + w(88, 88, 76)),
+    freeCamera = readFreeCamera(source + w(160, 160, 144)),
+    view = readMapView(source + w(216, 216, 200)),
+    globeRendering = readBool(source + w(424, 424, 396)),
+    globeFreeBearingEnabled = readBool(source + w(425, 425, 397)),
+  )
 
-@JvmSynthetic internal fun readStyleImageInfo(source: Long): StyleImageInfo {
+@JvmSynthetic
+internal fun readStyleImageInfo(source: Long): StyleImageInfo {
   val fields = readU32(source + 8)
-  return StyleImageInfo(width = readU32(source), height = readU32(source + 4), pixels = readView(source + w(12, 16)), stretchX = readArray(readAddress(source + w(20, 32)), readSize(source + w(24, 40)), 8.toLong()) { item -> readImageStretch(item) }, stretchY = readArray(readAddress(source + w(28, 48)), readSize(source + w(32, 56)), 8.toLong()) { item -> readImageStretch(item) }, content = if ((fields and 1u) != 0u) readImageContent(source + w(36, 64)) else null, textFitWidth = if ((fields and 2u) != 0u) StyleImageTextFit.of(readU32(source + w(52, 80))) else null, textFitHeight = if ((fields and 4u) != 0u) StyleImageTextFit.of(readU32(source + w(56, 84))) else null, pixelRatio = readF32(source + w(60, 88)), sdf = readBool(source + w(64, 92)), keepUnused = readBool(source + w(65, 93)))
+  return StyleImageInfo(
+    width = readU32(source),
+    height = readU32(source + 4),
+    pixels = readView(source + w(12, 16)),
+    stretchX =
+      readArray(readAddress(source + w(20, 32)), readSize(source + w(24, 40)), 8.toLong()) { item ->
+        readImageStretch(item)
+      },
+    stretchY =
+      readArray(readAddress(source + w(28, 48)), readSize(source + w(32, 56)), 8.toLong()) { item ->
+        readImageStretch(item)
+      },
+    content = if ((fields and 1u) != 0u) readImageContent(source + w(36, 64)) else null,
+    textFitWidth =
+      if ((fields and 2u) != 0u) StyleImageTextFit.of(readU32(source + w(52, 80))) else null,
+    textFitHeight =
+      if ((fields and 4u) != 0u) StyleImageTextFit.of(readU32(source + w(56, 84))) else null,
+    pixelRatio = readF32(source + w(60, 88)),
+    sdf = readBool(source + w(64, 92)),
+    keepUnused = readBool(source + w(65, 93)),
+  )
 }
 
-@JvmSynthetic internal fun readStyleLayerInfo(source: Long): StyleLayerInfo = StyleLayerInfo(id = readViewString(source), type = readViewString(source + w(8, 16)), sourceId = readViewString(source + w(16, 32)), sourceLayer = readViewString(source + w(24, 48)), minZoom = readF64(source + w(32, 64)), maxZoom = readF64(source + w(40, 72)), visibility = StyleLayerVisibility.of(readU32(source + w(48, 80))))
+@JvmSynthetic
+internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
+  StyleLayerInfo(
+    id = readViewString(source),
+    type = readViewString(source + w(8, 16)),
+    sourceId = readViewString(source + w(16, 32)),
+    sourceLayer = readViewString(source + w(24, 48)),
+    minZoom = readF64(source + w(32, 64)),
+    maxZoom = readF64(source + w(40, 72)),
+    visibility = StyleLayerVisibility.of(readU32(source + w(48, 80))),
+  )
 
-@JvmSynthetic internal fun readStyleSourceInfo(source: Long): StyleSourceInfo {
+@JvmSynthetic
+internal fun readStyleSourceInfo(source: Long): StyleSourceInfo {
   val fields = readU32(source + w(12, 20))
-  return StyleSourceInfo(id = readViewString(source), type = StyleSourceType.of(readU32(source + w(8, 16))), isVolatile = readBool(source + w(16, 24)), attribution = readViewString(source + w(20, 32)), url = readViewString(source + w(28, 48)), tileJson = if ((fields and 1u) != 0u) readStyleSourceTileInfo(source + w(40, 64, 36)) else null, bounds = if ((fields and 2u) != 0u) readLatLngBounds(source + w(72, 104, 64)) else null, tileSize = if ((fields and 4u) != 0u) readU32(source + w(104, 136, 96)) else null, vectorEncoding = if ((fields and 8u) != 0u) StyleVectorTileEncoding.of(readU32(source + w(108, 140, 100))) else null, rasterEncoding = if ((fields and 16u) != 0u) StyleRasterDemEncoding.of(readU32(source + w(112, 144, 104))) else null, geoJson = if ((fields and 32u) != 0u) readGeoJsonSourceOptions(source + w(120, 152, 108)) else null)
+  return StyleSourceInfo(
+    id = readViewString(source),
+    type = StyleSourceType.of(readU32(source + w(8, 16))),
+    isVolatile = readBool(source + w(16, 24)),
+    attribution = readViewString(source + w(20, 32)),
+    url = readViewString(source + w(28, 48)),
+    tileJson = if ((fields and 1u) != 0u) readStyleSourceTileInfo(source + w(40, 64, 36)) else null,
+    bounds = if ((fields and 2u) != 0u) readLatLngBounds(source + w(72, 104, 64)) else null,
+    tileSize = if ((fields and 4u) != 0u) readU32(source + w(104, 136, 96)) else null,
+    vectorEncoding =
+      if ((fields and 8u) != 0u) StyleVectorTileEncoding.of(readU32(source + w(108, 140, 100)))
+      else null,
+    rasterEncoding =
+      if ((fields and 16u) != 0u) StyleRasterDemEncoding.of(readU32(source + w(112, 144, 104)))
+      else null,
+    geoJson =
+      if ((fields and 32u) != 0u) readGeoJsonSourceOptions(source + w(120, 152, 108)) else null,
+  )
 }
 
-@JvmSynthetic internal fun readStyleTransitionOptions(source: Long): StyleTransitionOptions {
+@JvmSynthetic
+internal fun readStyleTransitionOptions(source: Long): StyleTransitionOptions {
   val fields = readU32(source + 4)
-  return StyleTransitionOptions(durationMs = if ((fields and 1u) != 0u) readF64(source + 8) else null, delayMs = if ((fields and 2u) != 0u) readF64(source + 16) else null, enablePlacementTransitions = if ((fields and 4u) != 0u) readBool(source + 24) else null)
+  return StyleTransitionOptions(
+    durationMs = if ((fields and 1u) != 0u) readF64(source + 8) else null,
+    delayMs = if ((fields and 2u) != 0u) readF64(source + 16) else null,
+    enablePlacementTransitions = if ((fields and 4u) != 0u) readBool(source + 24) else null,
+  )
 }
 
-@JvmSynthetic internal fun readLatLngBounds(source: Long): LatLngBounds = LatLngBounds(southwest = readLatLng(source), northeast = readLatLng(source + 16))
+@JvmSynthetic
+internal fun readLatLngBounds(source: Long): LatLngBounds =
+  LatLngBounds(southwest = readLatLng(source), northeast = readLatLng(source + 16))
 
-@JvmSynthetic internal fun readMapProjectionCameraResult(source: Long): MapProjectionCameraResult = MapProjectionCameraResult(camera = readCamera(source + w(8, 8, 4)))
+@JvmSynthetic
+internal fun readMapProjectionCameraResult(source: Long): MapProjectionCameraResult =
+  MapProjectionCameraResult(camera = readCamera(source + w(8, 8, 4)))
 
-@JvmSynthetic internal fun readScreenPoint(source: Long): ScreenPoint = ScreenPoint(x = readF64(source), y = readF64(source + 8))
+@JvmSynthetic
+internal fun readScreenPoint(source: Long): ScreenPoint =
+  ScreenPoint(x = readF64(source), y = readF64(source + 8))
 
-@JvmSynthetic internal fun readRenderAbandonResult(source: Long): RenderAbandonResult = RenderAbandonResult(disposition = RenderAbandonDisposition.of(readU32(source + 4)), quarantinedResourceCount = readU32(source + 8))
+@JvmSynthetic
+internal fun readRenderAbandonResult(source: Long): RenderAbandonResult =
+  RenderAbandonResult(
+    disposition = RenderAbandonDisposition.of(readU32(source + 4)),
+    quarantinedResourceCount = readU32(source + 8),
+  )
 
-@JvmSynthetic internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> = readStrided(readAddress(source + 8), readSize(source + w(12, 16)), readU32(source + 4).toULong(), w(432, 432, 404)) { item -> readRenderFrameResult(item) }
+@JvmSynthetic
+internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> =
+  readStrided(
+    readAddress(source + 8),
+    readSize(source + w(12, 16)),
+    readU32(source + 4).toULong(),
+    w(432, 432, 404),
+  ) { item ->
+    readRenderFrameResult(item)
+  }
 
-@JvmSynthetic internal fun readRenderSessionCapabilities(source: Long): RenderSessionCapabilities = RenderSessionCapabilities(driver = RenderDriverKind.of(readU32(source + 4)), textureRingDepth = readU32(source + 8), flags = RenderSessionCapabilityFlag.of(readU32(source + 12)), producerSyncKind = GpuSyncKind.of(readU32(source + 16)), consumerSyncKinds = GpuSyncKindFlag.of(readU32(source + 20)), exportKind = GpuExportKind.of(readU32(source + 24)))
+@JvmSynthetic
+internal fun readRenderSessionCapabilities(source: Long): RenderSessionCapabilities =
+  RenderSessionCapabilities(
+    driver = RenderDriverKind.of(readU32(source + 4)),
+    textureRingDepth = readU32(source + 8),
+    flags = RenderSessionCapabilityFlag.of(readU32(source + 12)),
+    producerSyncKind = GpuSyncKind.of(readU32(source + 16)),
+    consumerSyncKinds = GpuSyncKindFlag.of(readU32(source + 20)),
+    exportKind = GpuExportKind.of(readU32(source + 24)),
+  )
 
-@JvmSynthetic internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot = RenderSessionSnapshot(state = RenderSessionState.of(readU32(source + 4)), extent = readLogicalExtent(source + 8), generation = readU64(source + 24), frameGeneration = readU64(source + 32), acquiredFrameCount = readU32(source + 40), failureStatus = Status.of(readI32(source + 44)), hasTarget = readBool(source + 48))
+@JvmSynthetic
+internal fun readRenderSessionSnapshot(source: Long): RenderSessionSnapshot =
+  RenderSessionSnapshot(
+    state = RenderSessionState.of(readU32(source + 4)),
+    extent = readLogicalExtent(source + 8),
+    generation = readU64(source + 24),
+    frameGeneration = readU64(source + 32),
+    acquiredFrameCount = readU32(source + 40),
+    failureStatus = Status.of(readI32(source + 44)),
+    hasTarget = readBool(source + 48),
+  )
 
-@JvmSynthetic internal fun readRenderedFeature(source: Long): RenderedFeature = RenderedFeature(feature = readViewString(source), layerId = readViewString(source + w(8, 16)), sourceId = readViewString(source + w(16, 32)), sourceLayerId = readViewString(source + w(24, 48)), state = readViewString(source + w(32, 64)))
+@JvmSynthetic
+internal fun readRenderedFeature(source: Long): RenderedFeature =
+  RenderedFeature(
+    feature = readViewString(source),
+    layerId = readViewString(source + w(8, 16)),
+    sourceId = readViewString(source + w(16, 32)),
+    sourceLayerId = readViewString(source + w(24, 48)),
+    state = readViewString(source + w(32, 64)),
+  )
 
-@JvmSynthetic internal fun readSourceFeature(source: Long): SourceFeature = SourceFeature(feature = readViewString(source), sourceLayerId = readViewString(source + w(8, 16)))
+@JvmSynthetic
+internal fun readSourceFeature(source: Long): SourceFeature =
+  SourceFeature(feature = readViewString(source), sourceLayerId = readViewString(source + w(8, 16)))
 
-@JvmSynthetic internal fun readTextureReadbackResult(source: Long): TextureReadbackResult = TextureReadbackResult(data = readView(source), info = readTextureImageInfo(source + w(8, 16)))
+@JvmSynthetic
+internal fun readTextureReadbackResult(source: Long): TextureReadbackResult =
+  TextureReadbackResult(data = readView(source), info = readTextureImageInfo(source + w(8, 16)))
 
-@JvmSynthetic internal fun readOfflineRegionInfo(source: Long): OfflineRegionInfo = OfflineRegionInfo(id = readI64(source), definition = readOfflineRegionDefinition(source + 8), metadata = readBytes(readAddress(source + w(80, 88)), readSize(source + w(84, 96))))
+@JvmSynthetic
+internal fun readOfflineRegionInfo(source: Long): OfflineRegionInfo =
+  OfflineRegionInfo(
+    id = readI64(source),
+    definition = readOfflineRegionDefinition(source + 8),
+    metadata = readBytes(readAddress(source + w(80, 88)), readSize(source + w(84, 96))),
+  )
 
-@JvmSynthetic internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus = OfflineRegionStatus(downloadState = OfflineRegionDownloadState.of(readU32(source)), completedResourceCount = readU64(source + w(8, 8, 4)), completedResourceSize = readU64(source + w(16, 16, 12)), completedTileCount = readU64(source + w(24, 24, 20)), requiredTileCount = readU64(source + w(32, 32, 28)), completedTileSize = readU64(source + w(40, 40, 36)), requiredResourceCount = readU64(source + w(48, 48, 44)), requiredResourceCountIsPrecise = readBool(source + w(56, 56, 52)), complete = readBool(source + w(57, 57, 53)))
+@JvmSynthetic
+internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
+  OfflineRegionStatus(
+    downloadState = OfflineRegionDownloadState.of(readU32(source)),
+    completedResourceCount = readU64(source + w(8, 8, 4)),
+    completedResourceSize = readU64(source + w(16, 16, 12)),
+    completedTileCount = readU64(source + w(24, 24, 20)),
+    requiredTileCount = readU64(source + w(32, 32, 28)),
+    completedTileSize = readU64(source + w(40, 40, 36)),
+    requiredResourceCount = readU64(source + w(48, 48, 44)),
+    requiredResourceCountIsPrecise = readBool(source + w(56, 56, 52)),
+    complete = readBool(source + w(57, 57, 53)),
+  )
 
-@JvmSynthetic internal fun readStyleExpressionInfo(source: Long): StyleExpressionInfo = StyleExpressionInfo(isFeatureConstant = readBool(source + 4), isZoomConstant = readBool(source + 5))
+@JvmSynthetic
+internal fun readStyleExpressionInfo(source: Long): StyleExpressionInfo =
+  StyleExpressionInfo(
+    isFeatureConstant = readBool(source + 4),
+    isZoomConstant = readBool(source + 5),
+  )
 
-@JvmSynthetic internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
+@JvmSynthetic
+internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
   val native = value.bindingNative
   if (native != null) {
     registrations.native(native)
@@ -905,29 +1622,45 @@ import org.maplibre.nativeffi.internal.memory.*
   writeAddress(target + w(4, 8), if (value.unlock == null) 0L else UpcallStubs.queueLockUnlock)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
-@JvmSynthetic internal fun NativeCall.writeQueueLock(value: QueueLock): Long = allocate(w(16, 32), w(4, 8)).also { putQueueLock(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putWglContextDescriptor(target: Long, value: WglContextDescriptor) {
+@JvmSynthetic
+internal fun NativeCall.writeQueueLock(value: QueueLock): Long =
+  allocate(w(16, 32), w(4, 8)).also { putQueueLock(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putWglContextDescriptor(target: Long, value: WglContextDescriptor) {
   writeAddress(target, value.deviceContext.address)
   writeAddress(target + w(4, 8), value.shareContext.address)
   writeAddress(target + w(8, 16), value.getProcAddress.address)
 }
-@JvmSynthetic internal fun NativeArena.writeWglContextDescriptor(value: WglContextDescriptor): Long = allocate(w(12, 24), w(4, 8)).also { putWglContextDescriptor(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putEglContextDescriptor(target: Long, value: EglContextDescriptor) {
+@JvmSynthetic
+internal fun NativeArena.writeWglContextDescriptor(value: WglContextDescriptor): Long =
+  allocate(w(12, 24), w(4, 8)).also { putWglContextDescriptor(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putEglContextDescriptor(target: Long, value: EglContextDescriptor) {
   writeAddress(target, value.display.address)
   writeAddress(target + w(4, 8), value.config.address)
   writeAddress(target + w(8, 16), value.shareContext.address)
   writeAddress(target + w(12, 24), value.getProcAddress.address)
 }
-@JvmSynthetic internal fun NativeArena.writeEglContextDescriptor(value: EglContextDescriptor): Long = allocate(w(16, 32), w(4, 8)).also { putEglContextDescriptor(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putWebGlContextDescriptor(target: Long, value: WebGlContextDescriptor) {
+@JvmSynthetic
+internal fun NativeArena.writeEglContextDescriptor(value: EglContextDescriptor): Long =
+  allocate(w(16, 32), w(4, 8)).also { putEglContextDescriptor(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putWebGlContextDescriptor(target: Long, value: WebGlContextDescriptor) {
   writeU32(target, value.context)
 }
-@JvmSynthetic internal fun NativeArena.writeWebGlContextDescriptor(value: WebGlContextDescriptor): Long = allocate(4, 4).also { putWebGlContextDescriptor(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putVulkanContextDescriptor(target: Long, value: VulkanContextDescriptor) {
+@JvmSynthetic
+internal fun NativeArena.writeWebGlContextDescriptor(value: WebGlContextDescriptor): Long =
+  allocate(4, 4).also { putWebGlContextDescriptor(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putVulkanContextDescriptor(target: Long, value: VulkanContextDescriptor) {
   writeAddress(target, value.instance.address)
   writeAddress(target + w(4, 8), value.physicalDevice.address)
   writeAddress(target + w(8, 16), value.device.address)
@@ -936,9 +1669,13 @@ import org.maplibre.nativeffi.internal.memory.*
   writeAddress(target + w(20, 40), value.getInstanceProcAddr.address)
   writeAddress(target + w(24, 48), value.getDeviceProcAddr.address)
 }
-@JvmSynthetic internal fun NativeArena.writeVulkanContextDescriptor(value: VulkanContextDescriptor): Long = allocate(w(28, 56), w(4, 8)).also { putVulkanContextDescriptor(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putCamera(target: Long, value: Camera) {
+@JvmSynthetic
+internal fun NativeArena.writeVulkanContextDescriptor(value: VulkanContextDescriptor): Long =
+  allocate(w(28, 56), w(4, 8)).also { putVulkanContextDescriptor(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putCamera(target: Long, value: Camera) {
   putLatLng(target, value.center)
   writeF64(target + 16, value.centerAltitude)
   putEdgeInsets(target + 24, value.padding)
@@ -948,46 +1685,70 @@ import org.maplibre.nativeffi.internal.memory.*
   writeF64(target + 80, value.roll)
   writeF64(target + 88, value.fieldOfView)
 }
-@JvmSynthetic internal fun NativeArena.writeCamera(value: Camera): Long = allocate(96, w(8, 8, 4)).also { putCamera(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putProjectionMode(target: Long, value: ProjectionMode) {
+@JvmSynthetic
+internal fun NativeArena.writeCamera(value: Camera): Long =
+  allocate(96, w(8, 8, 4)).also { putCamera(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putProjectionMode(target: Long, value: ProjectionMode) {
   writeBool(target, value.axonometric)
   writeF64(target + w(8, 8, 4), value.xSkew)
   writeF64(target + w(16, 16, 12), value.ySkew)
 }
-@JvmSynthetic internal fun NativeArena.writeProjectionMode(value: ProjectionMode): Long = allocate(w(24, 24, 20), w(8, 8, 4)).also { putProjectionMode(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMapViewport(target: Long, value: MapViewport) {
+@JvmSynthetic
+internal fun NativeArena.writeProjectionMode(value: ProjectionMode): Long =
+  allocate(w(24, 24, 20), w(8, 8, 4)).also { putProjectionMode(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMapViewport(target: Long, value: MapViewport) {
   writeU32(target, value.northOrientation.rawValue)
   writeU32(target + 4, value.constrainMode.rawValue)
   writeU32(target + 8, value.viewportMode.rawValue)
   putEdgeInsets(target + w(16, 16, 12), value.frustumOffset)
 }
-@JvmSynthetic internal fun NativeArena.writeMapViewport(value: MapViewport): Long = allocate(w(48, 48, 44), w(8, 8, 4)).also { putMapViewport(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putProjectionDefinition(target: Long, value: ProjectionDefinition) {
+@JvmSynthetic
+internal fun NativeArena.writeMapViewport(value: MapViewport): Long =
+  allocate(w(48, 48, 44), w(8, 8, 4)).also { putMapViewport(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putProjectionDefinition(target: Long, value: ProjectionDefinition) {
   writeU32(target, value.from.rawValue)
   writeU32(target + 4, value.to.rawValue)
   writeF64(target + 8, value.transition)
 }
-@JvmSynthetic internal fun NativeArena.writeProjectionDefinition(value: ProjectionDefinition): Long = allocate(16, w(8, 8, 4)).also { putProjectionDefinition(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putStyleExpressionType(target: Long, value: StyleExpressionType) {
+@JvmSynthetic
+internal fun NativeArena.writeProjectionDefinition(value: ProjectionDefinition): Long =
+  allocate(16, w(8, 8, 4)).also { putProjectionDefinition(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putStyleExpressionType(target: Long, value: StyleExpressionType) {
   writeU32(target, value.kind.rawValue)
   writeU32(target + 4, value.itemKind.rawValue)
   writeU32(target + 8, value.itemCount)
 }
-@JvmSynthetic internal fun NativeArena.writeStyleExpressionType(value: StyleExpressionType): Long = allocate(12, 4).also { putStyleExpressionType(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putGestureMomentum(target: Long, value: GestureMomentum) {
+@JvmSynthetic
+internal fun NativeArena.writeStyleExpressionType(value: StyleExpressionType): Long =
+  allocate(12, 4).also { putStyleExpressionType(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGestureMomentum(target: Long, value: GestureMomentum) {
   putPanMomentum(target, value.pan)
   putAnchoredMomentum(target + w(120, 120, 116), value.zoom)
   putAnchoredMomentum(target + w(288, 288, 276), value.bearing)
   putAnchoredMomentum(target + w(456, 456, 436), value.pitch)
 }
-@JvmSynthetic internal fun NativeArena.writeGestureMomentum(value: GestureMomentum): Long = allocate(w(624, 624, 596), w(8, 8, 4)).also { putGestureMomentum(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
+@JvmSynthetic
+internal fun NativeArena.writeGestureMomentum(value: GestureMomentum): Long =
+  allocate(w(624, 624, 596), w(8, 8, 4)).also { putGestureMomentum(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
   var fields = 0u
   value.durationMs?.let {
     fields = fields or 1u
@@ -1016,133 +1777,240 @@ import org.maplibre.nativeffi.internal.memory.*
   putCameraTransitionHandler(target + w(80, 80, 76), value.endHandler)
   writeU32(target, fields)
 }
-@JvmSynthetic internal fun NativeCall.writeAnimationOptions(value: AnimationOptions): Long = allocate(w(104, 112, 96), w(8, 8, 4)).also { putAnimationOptions(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOffscreenTarget(target: Long, value: OffscreenTarget) {
+@JvmSynthetic
+internal fun NativeCall.writeAnimationOptions(value: AnimationOptions): Long =
+  allocate(w(104, 112, 96), w(8, 8, 4)).also { putAnimationOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOffscreenTarget(target: Long, value: OffscreenTarget) {
   putLogicalSize(target, value.logicalSize)
 }
-@JvmSynthetic internal fun NativeArena.writeOffscreenTarget(value: OffscreenTarget): Long = allocate(8, 4).also { putOffscreenTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMetalLayerTarget(target: Long, value: MetalLayerTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeOffscreenTarget(value: OffscreenTarget): Long =
+  allocate(8, 4).also { putOffscreenTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMetalLayerTarget(target: Long, value: MetalLayerTarget) {
   putLogicalSize(target, value.logicalSize)
   writeAddress(target + 8, value.layer.address)
 }
-@JvmSynthetic internal fun NativeArena.writeMetalLayerTarget(value: MetalLayerTarget): Long = allocate(w(12, 16), w(4, 8)).also { putMetalLayerTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putWin32WindowTarget(target: Long, value: Win32WindowTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeMetalLayerTarget(value: MetalLayerTarget): Long =
+  allocate(w(12, 16), w(4, 8)).also { putMetalLayerTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putWin32WindowTarget(target: Long, value: Win32WindowTarget) {
   putLogicalSize(target, value.logicalSize)
   writeAddress(target + 8, value.window.address)
 }
-@JvmSynthetic internal fun NativeArena.writeWin32WindowTarget(value: Win32WindowTarget): Long = allocate(w(12, 16), w(4, 8)).also { putWin32WindowTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putXlibWindowTarget(target: Long, value: XlibWindowTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeWin32WindowTarget(value: Win32WindowTarget): Long =
+  allocate(w(12, 16), w(4, 8)).also { putWin32WindowTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putXlibWindowTarget(target: Long, value: XlibWindowTarget) {
   putLogicalSize(target, value.logicalSize)
   writeAddress(target + 8, value.display.address)
   writeU64(target + w(16, 16, 12), value.window)
 }
-@JvmSynthetic internal fun NativeArena.writeXlibWindowTarget(value: XlibWindowTarget): Long = allocate(w(24, 24, 20), w(8, 8, 4)).also { putXlibWindowTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putWaylandSurfaceTarget(target: Long, value: WaylandSurfaceTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeXlibWindowTarget(value: XlibWindowTarget): Long =
+  allocate(w(24, 24, 20), w(8, 8, 4)).also { putXlibWindowTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putWaylandSurfaceTarget(target: Long, value: WaylandSurfaceTarget) {
   putLogicalSize(target, value.logicalSize)
   writeAddress(target + 8, value.display.address)
   writeAddress(target + w(12, 16), value.surface.address)
 }
-@JvmSynthetic internal fun NativeArena.writeWaylandSurfaceTarget(value: WaylandSurfaceTarget): Long = allocate(w(16, 24), w(4, 8)).also { putWaylandSurfaceTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putAndroidWindowTarget(target: Long, value: AndroidWindowTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeWaylandSurfaceTarget(value: WaylandSurfaceTarget): Long =
+  allocate(w(16, 24), w(4, 8)).also { putWaylandSurfaceTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putAndroidWindowTarget(target: Long, value: AndroidWindowTarget) {
   putLogicalSize(target, value.logicalSize)
   writeAddress(target + 8, value.window.address)
 }
-@JvmSynthetic internal fun NativeArena.writeAndroidWindowTarget(value: AndroidWindowTarget): Long = allocate(w(12, 16), w(4, 8)).also { putAndroidWindowTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOhosWindowTarget(target: Long, value: OhosWindowTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeAndroidWindowTarget(value: AndroidWindowTarget): Long =
+  allocate(w(12, 16), w(4, 8)).also { putAndroidWindowTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOhosWindowTarget(target: Long, value: OhosWindowTarget) {
   putLogicalSize(target, value.logicalSize)
   writeAddress(target + 8, value.window.address)
 }
-@JvmSynthetic internal fun NativeArena.writeOhosWindowTarget(value: OhosWindowTarget): Long = allocate(w(12, 16), w(4, 8)).also { putOhosWindowTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putVulkanSurfaceTarget(target: Long, value: VulkanSurfaceTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeOhosWindowTarget(value: OhosWindowTarget): Long =
+  allocate(w(12, 16), w(4, 8)).also { putOhosWindowTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putVulkanSurfaceTarget(target: Long, value: VulkanSurfaceTarget) {
   putLogicalSize(target, value.logicalSize)
   writeU64(target + 8, value.surface)
 }
-@JvmSynthetic internal fun NativeArena.writeVulkanSurfaceTarget(value: VulkanSurfaceTarget): Long = allocate(16, w(8, 8, 4)).also { putVulkanSurfaceTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOpenGlSurfaceTarget(target: Long, value: OpenGlSurfaceTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeVulkanSurfaceTarget(value: VulkanSurfaceTarget): Long =
+  allocate(16, w(8, 8, 4)).also { putVulkanSurfaceTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOpenGlSurfaceTarget(target: Long, value: OpenGlSurfaceTarget) {
   putLogicalSize(target, value.logicalSize)
   writeAddress(target + 8, value.surface.address)
 }
-@JvmSynthetic internal fun NativeArena.writeOpenGlSurfaceTarget(value: OpenGlSurfaceTarget): Long = allocate(w(12, 16), w(4, 8)).also { putOpenGlSurfaceTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMetalBorrowedTexturesTarget(target: Long, value: MetalBorrowedTexturesTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeOpenGlSurfaceTarget(value: OpenGlSurfaceTarget): Long =
+  allocate(w(12, 16), w(4, 8)).also { putOpenGlSurfaceTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMetalBorrowedTexturesTarget(
+  target: Long,
+  value: MetalBorrowedTexturesTarget,
+) {
   putLogicalSize(target, value.logicalSize)
   writeU32(target + 8, value.physicalWidth)
   writeU32(target + 12, value.physicalHeight)
-  writeAddress(target + 16, array(value.textures, w(4, 8), w(4, 8)) { at, item -> putMetalBorrowedTexture(at, item) })
+  writeAddress(
+    target + 16,
+    array(value.textures, w(4, 8), w(4, 8)) { at, item -> putMetalBorrowedTexture(at, item) },
+  )
   writeSize(target + w(20, 24), value.textures.size.toULong())
-  writeAddress(target + w(24, 32), array(value.depthTextures, w(4, 8), w(4, 8)) { at, item -> putMetalBorrowedTexture(at, item) })
+  writeAddress(
+    target + w(24, 32),
+    array(value.depthTextures, w(4, 8), w(4, 8)) { at, item -> putMetalBorrowedTexture(at, item) },
+  )
   writeSize(target + w(28, 40), value.depthTextures.size.toULong())
 }
-@JvmSynthetic internal fun NativeArena.writeMetalBorrowedTexturesTarget(value: MetalBorrowedTexturesTarget): Long = allocate(w(32, 48), w(4, 8)).also { putMetalBorrowedTexturesTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putVulkanBorrowedTexturesTarget(target: Long, value: VulkanBorrowedTexturesTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeMetalBorrowedTexturesTarget(
+  value: MetalBorrowedTexturesTarget,
+): Long = allocate(w(32, 48), w(4, 8)).also { putMetalBorrowedTexturesTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putVulkanBorrowedTexturesTarget(
+  target: Long,
+  value: VulkanBorrowedTexturesTarget,
+) {
   putLogicalSize(target, value.logicalSize)
   writeU32(target + 8, value.physicalWidth)
   writeU32(target + 12, value.physicalHeight)
-  writeAddress(target + 16, array(value.textures, 16, w(8, 8, 4)) { at, item -> putVulkanBorrowedTexture(at, item) })
+  writeAddress(
+    target + 16,
+    array(value.textures, 16, w(8, 8, 4)) { at, item -> putVulkanBorrowedTexture(at, item) },
+  )
   writeSize(target + w(20, 24), value.textures.size.toULong())
   writeU32(target + w(24, 32), value.format)
   writeU32(target + w(28, 36), value.finalLayout)
   writeU32(target + w(32, 40), value.owner.rawValue)
-  writeAddress(target + w(36, 48), array(value.depthTextures, 16, w(8, 8, 4)) { at, item -> putVulkanBorrowedTexture(at, item) })
+  writeAddress(
+    target + w(36, 48),
+    array(value.depthTextures, 16, w(8, 8, 4)) { at, item -> putVulkanBorrowedTexture(at, item) },
+  )
   writeSize(target + w(40, 56), value.depthTextures.size.toULong())
   writeU32(target + w(44, 64), value.depthFormat)
   writeU32(target + w(48, 68), value.depthFinalLayout)
 }
-@JvmSynthetic internal fun NativeArena.writeVulkanBorrowedTexturesTarget(value: VulkanBorrowedTexturesTarget): Long = allocate(w(52, 72), w(4, 8)).also { putVulkanBorrowedTexturesTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOpenGlBorrowedTexturesTarget(target: Long, value: OpenGlBorrowedTexturesTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeVulkanBorrowedTexturesTarget(
+  value: VulkanBorrowedTexturesTarget,
+): Long = allocate(w(52, 72), w(4, 8)).also { putVulkanBorrowedTexturesTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOpenGlBorrowedTexturesTarget(
+  target: Long,
+  value: OpenGlBorrowedTexturesTarget,
+) {
   putLogicalSize(target, value.logicalSize)
   writeU32(target + 8, value.physicalWidth)
   writeU32(target + 12, value.physicalHeight)
-  writeAddress(target + 16, array(value.textures, 4, 4) { at, item -> putOpenGlBorrowedTexture(at, item) })
+  writeAddress(
+    target + 16,
+    array(value.textures, 4, 4) { at, item -> putOpenGlBorrowedTexture(at, item) },
+  )
   writeSize(target + w(20, 24), value.textures.size.toULong())
   writeU32(target + w(24, 32), value.target)
-  writeAddress(target + w(28, 40), array(value.depthTextures, 4, 4) { at, item -> putOpenGlBorrowedTexture(at, item) })
+  writeAddress(
+    target + w(28, 40),
+    array(value.depthTextures, 4, 4) { at, item -> putOpenGlBorrowedTexture(at, item) },
+  )
   writeSize(target + w(32, 48), value.depthTextures.size.toULong())
 }
-@JvmSynthetic internal fun NativeArena.writeOpenGlBorrowedTexturesTarget(value: OpenGlBorrowedTexturesTarget): Long = allocate(w(36, 56), w(4, 8)).also { putOpenGlBorrowedTexturesTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putWebGpuBorrowedTexturesTarget(target: Long, value: WebGpuBorrowedTexturesTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeOpenGlBorrowedTexturesTarget(
+  value: OpenGlBorrowedTexturesTarget,
+): Long = allocate(w(36, 56), w(4, 8)).also { putOpenGlBorrowedTexturesTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putWebGpuBorrowedTexturesTarget(
+  target: Long,
+  value: WebGpuBorrowedTexturesTarget,
+) {
   putLogicalSize(target, value.logicalSize)
   writeU32(target + 8, value.physicalWidth)
   writeU32(target + 12, value.physicalHeight)
-  writeAddress(target + 16, array(value.textures, 4, 4) { at, item -> putWebGpuBorrowedTexture(at, item) })
+  writeAddress(
+    target + 16,
+    array(value.textures, 4, 4) { at, item -> putWebGpuBorrowedTexture(at, item) },
+  )
   writeSize(target + w(20, 24), value.textures.size.toULong())
   putView(target + w(24, 32), value.format)
-  writeAddress(target + w(32, 48), array(value.depthTextures, 4, 4) { at, item -> putWebGpuBorrowedTexture(at, item) })
+  writeAddress(
+    target + w(32, 48),
+    array(value.depthTextures, 4, 4) { at, item -> putWebGpuBorrowedTexture(at, item) },
+  )
   writeSize(target + w(36, 56), value.depthTextures.size.toULong())
   putView(target + w(40, 64), value.depthFormat)
 }
-@JvmSynthetic internal fun NativeArena.writeWebGpuBorrowedTexturesTarget(value: WebGpuBorrowedTexturesTarget): Long = allocate(w(48, 80), w(4, 8)).also { putWebGpuBorrowedTexturesTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putExportedRingTarget(target: Long, value: ExportedRingTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeWebGpuBorrowedTexturesTarget(
+  value: WebGpuBorrowedTexturesTarget,
+): Long = allocate(w(48, 80), w(4, 8)).also { putWebGpuBorrowedTexturesTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putExportedRingTarget(target: Long, value: ExportedRingTarget) {
   putLogicalSize(target, value.logicalSize)
   writeU32(target + 8, value.textureCount)
   writeU32(target + 12, value.exportKinds.rawValue)
-  writeAddress(target + 16, array(value.dmaBufFormats, w(16, 16, 12), w(8, 8, 4)) { at, item -> putDmaBufFormat(at, item) })
+  writeAddress(
+    target + 16,
+    array(value.dmaBufFormats, w(16, 16, 12), w(8, 8, 4)) { at, item -> putDmaBufFormat(at, item) },
+  )
   writeSize(target + w(20, 24), value.dmaBufFormats.size.toULong())
   writeU64(target + w(24, 32), value.androidHardwareBufferUsage)
 }
-@JvmSynthetic internal fun NativeArena.writeExportedRingTarget(value: ExportedRingTarget): Long = allocate(w(32, 40), w(8, 8, 4)).also { putExportedRingTarget(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putWebCanvasTarget(target: Long, value: WebCanvasTarget) {
+@JvmSynthetic
+internal fun NativeArena.writeExportedRingTarget(value: ExportedRingTarget): Long =
+  allocate(w(32, 40), w(8, 8, 4)).also { putExportedRingTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putWebCanvasTarget(target: Long, value: WebCanvasTarget) {
   putLogicalSize(target, value.logicalSize)
   writeU32(target + 8, value.canvas)
   putView(target + w(12, 16), value.format)
 }
-@JvmSynthetic internal fun NativeArena.writeWebCanvasTarget(value: WebCanvasTarget): Long = allocate(w(20, 32), w(4, 8)).also { putWebCanvasTarget(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putWake(target: Long, value: Wake) {
+@JvmSynthetic
+internal fun NativeArena.writeWebCanvasTarget(value: WebCanvasTarget): Long =
+  allocate(w(20, 32), w(4, 8)).also { putWebCanvasTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putWake(target: Long, value: Wake) {
   val native = value.bindingNative
   if (native != null) {
     registrations.native(native)
@@ -1157,68 +2025,119 @@ import org.maplibre.nativeffi.internal.memory.*
   writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
   writeI64(target + w(16, 24, 12), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeWake(value: Wake): Long = allocate(w(24, 32, 20), w(8, 8, 4)).also { putWake(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
+@JvmSynthetic
+internal fun NativeCall.writeWake(value: Wake): Long =
+  allocate(w(24, 32, 20), w(8, 8, 4)).also { putWake(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
   writeF64(target, value.top)
   writeF64(target + 8, value.left)
   writeF64(target + 16, value.bottom)
   writeF64(target + 24, value.right)
 }
-@JvmSynthetic internal fun NativeArena.writeEdgeInsets(value: EdgeInsets): Long = allocate(32, w(8, 8, 4)).also { putEdgeInsets(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putFeatureId(target: Long, value: FeatureId) {
+@JvmSynthetic
+internal fun NativeArena.writeEdgeInsets(value: EdgeInsets): Long =
+  allocate(32, w(8, 8, 4)).also { putEdgeInsets(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putFeatureId(target: Long, value: FeatureId) {
   when (val variant = value) {
-    is FeatureId.StringValue -> { writeU32(target, 1u); putView(target + w(8, 8, 4), variant.value) }
-    is FeatureId.UintValue -> { writeU32(target, 2u); writeU64(target + w(8, 8, 4), variant.value) }
-    is FeatureId.IntValue -> { writeU32(target, 3u); writeI64(target + w(8, 8, 4), variant.value) }
-    is FeatureId.DoubleValue -> { writeU32(target, 4u); writeF64(target + w(8, 8, 4), variant.value) }
+    is FeatureId.StringValue -> {
+      writeU32(target, 1u)
+      putView(target + w(8, 8, 4), variant.value)
+    }
+    is FeatureId.UintValue -> {
+      writeU32(target, 2u)
+      writeU64(target + w(8, 8, 4), variant.value)
+    }
+    is FeatureId.IntValue -> {
+      writeU32(target, 3u)
+      writeI64(target + w(8, 8, 4), variant.value)
+    }
+    is FeatureId.DoubleValue -> {
+      writeU32(target, 4u)
+      writeF64(target + w(8, 8, 4), variant.value)
+    }
   }
 }
-@JvmSynthetic internal fun NativeArena.writeFeatureId(value: FeatureId): Long = allocate(w(16, 24, 12), w(8, 8, 4)).also { putFeatureId(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putVec3(target: Long, value: Vec3) {
+@JvmSynthetic
+internal fun NativeArena.writeFeatureId(value: FeatureId): Long =
+  allocate(w(16, 24, 12), w(8, 8, 4)).also { putFeatureId(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putVec3(target: Long, value: Vec3) {
   writeF64(target, value.x)
   writeF64(target + 8, value.y)
   writeF64(target + 16, value.z)
 }
-@JvmSynthetic internal fun NativeArena.writeVec3(value: Vec3): Long = allocate(24, w(8, 8, 4)).also { putVec3(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putQuaternion(target: Long, value: Quaternion) {
+@JvmSynthetic
+internal fun NativeArena.writeVec3(value: Vec3): Long =
+  allocate(24, w(8, 8, 4)).also { putVec3(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putQuaternion(target: Long, value: Quaternion) {
   writeF64(target, value.x)
   writeF64(target + 8, value.y)
   writeF64(target + 16, value.z)
   writeF64(target + 24, value.w)
 }
-@JvmSynthetic internal fun NativeArena.writeQuaternion(value: Quaternion): Long = allocate(32, w(8, 8, 4)).also { putQuaternion(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putImageStretch(target: Long, value: ImageStretch) {
+@JvmSynthetic
+internal fun NativeArena.writeQuaternion(value: Quaternion): Long =
+  allocate(32, w(8, 8, 4)).also { putQuaternion(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putImageStretch(target: Long, value: ImageStretch) {
   writeF32(target, value.from)
   writeF32(target + 4, value.to)
 }
-@JvmSynthetic internal fun NativeArena.writeImageStretch(value: ImageStretch): Long = allocate(8, 4).also { putImageStretch(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putImageContent(target: Long, value: ImageContent) {
+@JvmSynthetic
+internal fun NativeArena.writeImageStretch(value: ImageStretch): Long =
+  allocate(8, 4).also { putImageStretch(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putImageContent(target: Long, value: ImageContent) {
   writeF32(target, value.left)
   writeF32(target + 4, value.top)
   writeF32(target + 8, value.right)
   writeF32(target + 12, value.bottom)
 }
-@JvmSynthetic internal fun NativeArena.writeImageContent(value: ImageContent): Long = allocate(16, 4).also { putImageContent(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putScreenBox(target: Long, value: ScreenBox) {
+@JvmSynthetic
+internal fun NativeArena.writeImageContent(value: ImageContent): Long =
+  allocate(16, 4).also { putImageContent(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putScreenBox(target: Long, value: ScreenBox) {
   putScreenPoint(target, value.min)
   putScreenPoint(target + 16, value.max)
 }
-@JvmSynthetic internal fun NativeArena.writeScreenBox(value: ScreenBox): Long = allocate(32, w(8, 8, 4)).also { putScreenBox(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putScreenLineString(target: Long, value: ScreenLineString) {
+@JvmSynthetic
+internal fun NativeArena.writeScreenBox(value: ScreenBox): Long =
+  allocate(32, w(8, 8, 4)).also { putScreenBox(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putScreenLineString(target: Long, value: ScreenLineString) {
   writeAddress(target, array(value.points, 16, w(8, 8, 4)) { at, item -> putScreenPoint(at, item) })
   writeSize(target + w(4, 8), value.points.size.toULong())
 }
-@JvmSynthetic internal fun NativeArena.writeScreenLineString(value: ScreenLineString): Long = allocate(w(8, 16), w(4, 8)).also { putScreenLineString(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOfflineTilePyramidRegionDefinition(target: Long, value: OfflineTilePyramidRegionDefinition) {
+@JvmSynthetic
+internal fun NativeArena.writeScreenLineString(value: ScreenLineString): Long =
+  allocate(w(8, 16), w(4, 8)).also { putScreenLineString(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOfflineTilePyramidRegionDefinition(
+  target: Long,
+  value: OfflineTilePyramidRegionDefinition,
+) {
   putView(target, value.styleUrl)
   putLatLngBounds(target + w(8, 16), value.bounds)
   writeF64(target + w(40, 48), value.minZoom)
@@ -1226,9 +2145,17 @@ import org.maplibre.nativeffi.internal.memory.*
   writeF32(target + w(56, 64), value.pixelRatio)
   writeBool(target + w(60, 68), value.includeIdeographs)
 }
-@JvmSynthetic internal fun NativeArena.writeOfflineTilePyramidRegionDefinition(value: OfflineTilePyramidRegionDefinition): Long = allocate(w(64, 72), w(8, 8, 4)).also { putOfflineTilePyramidRegionDefinition(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOfflineGeometryRegionDefinition(target: Long, value: OfflineGeometryRegionDefinition) {
+@JvmSynthetic
+internal fun NativeArena.writeOfflineTilePyramidRegionDefinition(
+  value: OfflineTilePyramidRegionDefinition,
+): Long = allocate(w(64, 72), w(8, 8, 4)).also { putOfflineTilePyramidRegionDefinition(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOfflineGeometryRegionDefinition(
+  target: Long,
+  value: OfflineGeometryRegionDefinition,
+) {
   putView(target, value.styleUrl)
   putView(target + w(8, 16), value.geometry)
   writeF64(target + w(16, 32), value.minZoom)
@@ -1236,81 +2163,288 @@ import org.maplibre.nativeffi.internal.memory.*
   writeF32(target + w(32, 48), value.pixelRatio)
   writeBool(target + w(36, 52), value.includeIdeographs)
 }
-@JvmSynthetic internal fun NativeArena.writeOfflineGeometryRegionDefinition(value: OfflineGeometryRegionDefinition): Long = allocate(w(40, 56), w(8, 8, 4)).also { putOfflineGeometryRegionDefinition(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
+@JvmSynthetic
+internal fun NativeArena.writeOfflineGeometryRegionDefinition(
+  value: OfflineGeometryRegionDefinition,
+): Long = allocate(w(40, 56), w(8, 8, 4)).also { putOfflineGeometryRegionDefinition(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putResourceRoute(target: Long, value: ResourceRoute) {
   writeU32(target, w(20, 32).toUInt())
   writeU32(target + 4, value.kinds.rawValue)
   writeU32(target + 8, value.flags.rawValue)
   putView(target + w(12, 16), value.url)
 }
-@JvmSynthetic internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long = allocate(w(20, 32), w(4, 8)).also { putResourceRoute(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putResourceTransformRule(target: Long, value: ResourceTransformRule) {
+@JvmSynthetic
+internal fun NativeArena.writeResourceRoute(value: ResourceRoute): Long =
+  allocate(w(20, 32), w(4, 8)).also { putResourceRoute(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putResourceTransformRule(target: Long, value: ResourceTransformRule) {
   writeU32(target, w(28, 48).toUInt())
   writeU32(target + 4, value.kinds.rawValue)
   writeU32(target + 8, value.flags.rawValue)
   putView(target + w(12, 16), value.url)
-  writeAddress(target + w(20, 32), array(value.parameters, w(16, 32), w(4, 8)) { at, item -> putUrlQueryParameter(at, item) })
+  writeAddress(
+    target + w(20, 32),
+    array(value.parameters, w(16, 32), w(4, 8)) { at, item -> putUrlQueryParameter(at, item) },
+  )
   writeSize(target + w(24, 40), value.parameters.size.toULong())
 }
-@JvmSynthetic internal fun NativeArena.writeResourceTransformRule(value: ResourceTransformRule): Long = allocate(w(28, 48), w(4, 8)).also { putResourceTransformRule(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
+@JvmSynthetic
+internal fun NativeArena.writeResourceTransformRule(value: ResourceTransformRule): Long =
+  allocate(w(28, 48), w(4, 8)).also { putResourceTransformRule(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putHttpHeader(target: Long, value: HttpHeader) {
   putView(target, value.name)
   putView(target + w(8, 16), value.value)
 }
-@JvmSynthetic internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long = allocate(w(16, 32), w(4, 8)).also { putHttpHeader(it, value) }
 
-@JvmSynthetic internal fun readCanonicalTileId(source: Long): CanonicalTileId = CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
+@JvmSynthetic
+internal fun NativeArena.writeHttpHeader(value: HttpHeader): Long =
+  allocate(w(16, 32), w(4, 8)).also { putHttpHeader(it, value) }
 
-@JvmSynthetic internal fun readCustomLayerPrerenderParameters(source: Long): CustomLayerPrerenderParameters = CustomLayerPrerenderParameters(encoder = readU32(source + 4).let { tag -> when (tag) { 1u -> CustomLayerPrerenderParametersEncoder.Metal(readMetalCustomLayerEncoder(source + 8)); 2u -> CustomLayerPrerenderParametersEncoder.Vulkan(readVulkanCustomLayerEncoder(source + 8)); 4u -> CustomLayerPrerenderParametersEncoder.WebGpu(readWebGpuCustomLayerEncoder(source + 8)); 3u -> CustomLayerPrerenderParametersEncoder.None; else -> CustomLayerPrerenderParametersEncoder.Unknown(tag, NativeMemory.getBytes(source + 8, w(32, 64))) } }, frame = readCustomLayerFrame(source + w(40, 72)))
+@JvmSynthetic
+internal fun readCanonicalTileId(source: Long): CanonicalTileId =
+  CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
 
-@JvmSynthetic internal fun readCustomLayerRenderParameters(source: Long): CustomLayerRenderParameters = CustomLayerRenderParameters(pass = readU32(source + 4).let { tag -> when (tag) { 1u -> CustomLayerRenderParametersPass.Metal(readMetalCustomLayerPass(source + 8)); 2u -> CustomLayerRenderParametersPass.Vulkan(readVulkanCustomLayerPass(source + 8)); 3u -> CustomLayerRenderParametersPass.OpenGl(readOpenGlCustomLayerPass(source + 8)); 4u -> CustomLayerRenderParametersPass.WebGpu(readWebGpuCustomLayerPass(source + 8)); else -> CustomLayerRenderParametersPass.Unknown(tag, NativeMemory.getBytes(source + 8, w(56, 88))) } }, frame = readCustomLayerFrame(source + w(64, 96)), layerDepth = readF64(source + w(448, 480, 428)))
+@JvmSynthetic
+internal fun readCustomLayerPrerenderParameters(source: Long): CustomLayerPrerenderParameters =
+  CustomLayerPrerenderParameters(
+    encoder =
+      readU32(source + 4).let { tag ->
+        when (tag) {
+          1u -> CustomLayerPrerenderParametersEncoder.Metal(readMetalCustomLayerEncoder(source + 8))
+          2u ->
+            CustomLayerPrerenderParametersEncoder.Vulkan(readVulkanCustomLayerEncoder(source + 8))
+          4u ->
+            CustomLayerPrerenderParametersEncoder.WebGpu(readWebGpuCustomLayerEncoder(source + 8))
+          3u -> CustomLayerPrerenderParametersEncoder.None
+          else ->
+            CustomLayerPrerenderParametersEncoder.Unknown(
+              tag,
+              NativeMemory.getBytes(source + 8, w(32, 64)),
+            )
+        }
+      },
+    frame = readCustomLayerFrame(source + w(40, 72)),
+  )
 
-@JvmSynthetic internal fun readEventBatchView(source: Long): List<RuntimeEvent> = readStrided(readAddress(source + 8), readSize(source + w(12, 16)), readU32(source + 4).toULong(), w(112, 120, 100)) { item -> readRuntimeEvent(item) }
+@JvmSynthetic
+internal fun readCustomLayerRenderParameters(source: Long): CustomLayerRenderParameters =
+  CustomLayerRenderParameters(
+    pass =
+      readU32(source + 4).let { tag ->
+        when (tag) {
+          1u -> CustomLayerRenderParametersPass.Metal(readMetalCustomLayerPass(source + 8))
+          2u -> CustomLayerRenderParametersPass.Vulkan(readVulkanCustomLayerPass(source + 8))
+          3u -> CustomLayerRenderParametersPass.OpenGl(readOpenGlCustomLayerPass(source + 8))
+          4u -> CustomLayerRenderParametersPass.WebGpu(readWebGpuCustomLayerPass(source + 8))
+          else ->
+            CustomLayerRenderParametersPass.Unknown(
+              tag,
+              NativeMemory.getBytes(source + 8, w(56, 88)),
+            )
+        }
+      },
+    frame = readCustomLayerFrame(source + w(64, 96)),
+    layerDepth = readF64(source + w(448, 480, 428)),
+  )
 
-@JvmSynthetic internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
+@JvmSynthetic
+internal fun readEventBatchView(source: Long): List<RuntimeEvent> =
+  readStrided(
+    readAddress(source + 8),
+    readSize(source + w(12, 16)),
+    readU32(source + 4).toULong(),
+    w(112, 120, 100),
+  ) { item ->
+    readRuntimeEvent(item)
+  }
+
+@JvmSynthetic
+internal fun readResourceRequestInfo(source: Long): ResourceRequestInfo {
   val fields = readU32(source + 4)
-  return ResourceRequestInfo(requestedUrl = readViewString(source + 8), resolvedUrl = readViewString(source + w(16, 24)), kind = ResourceKind.of(readU32(source + w(24, 40))), loadingMethod = ResourceLoadingMethod.of(readU32(source + w(28, 44))), priority = ResourcePriority.of(readU32(source + w(32, 48))), usage = ResourceUsage.of(readU32(source + w(36, 52))), storagePolicy = ResourceStoragePolicy.of(readU32(source + w(40, 56))), range = if ((fields and 1u) != 0u) readResourceRange(source + w(48, 64, 44)) else null, priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(64, 80, 60)) else null, priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(72, 88, 68)) else null, priorEtag = readViewString(source + w(80, 96, 76)), priorData = readBytes(readAddress(source + w(88, 112, 84)), readSize(source + w(92, 120, 88))))
+  return ResourceRequestInfo(
+    requestedUrl = readViewString(source + 8),
+    resolvedUrl = readViewString(source + w(16, 24)),
+    kind = ResourceKind.of(readU32(source + w(24, 40))),
+    loadingMethod = ResourceLoadingMethod.of(readU32(source + w(28, 44))),
+    priority = ResourcePriority.of(readU32(source + w(32, 48))),
+    usage = ResourceUsage.of(readU32(source + w(36, 52))),
+    storagePolicy = ResourceStoragePolicy.of(readU32(source + w(40, 56))),
+    range = if ((fields and 1u) != 0u) readResourceRange(source + w(48, 64, 44)) else null,
+    priorModifiedUnixMs = if ((fields and 2u) != 0u) readI64(source + w(64, 80, 60)) else null,
+    priorExpiresUnixMs = if ((fields and 4u) != 0u) readI64(source + w(72, 88, 68)) else null,
+    priorEtag = readViewString(source + w(80, 96, 76)),
+    priorData = readBytes(readAddress(source + w(88, 112, 84)), readSize(source + w(92, 120, 88))),
+  )
 }
 
-@JvmSynthetic internal fun readDmaBufPlane(source: Long): DmaBufPlane = DmaBufPlane(fd = readI32(source), offset = readU32(source + 4), stride = readU32(source + 8))
+@JvmSynthetic
+internal fun readDmaBufPlane(source: Long): DmaBufPlane =
+  DmaBufPlane(fd = readI32(source), offset = readU32(source + 4), stride = readU32(source + 8))
 
-@JvmSynthetic internal fun readMapView(source: Long): MapView = MapView(camera = readCamera(source + w(8, 8, 4)), extent = readLogicalExtent(source + w(104, 104, 100)), projectionMode = readProjectionMode(source + w(120, 120, 116)), viewport = readMapViewport(source + w(144, 144, 136)), projection = readProjectionDefinition(source + w(192, 192, 180)))
+@JvmSynthetic
+internal fun readMapView(source: Long): MapView =
+  MapView(
+    camera = readCamera(source + w(8, 8, 4)),
+    extent = readLogicalExtent(source + w(104, 104, 100)),
+    projectionMode = readProjectionMode(source + w(120, 120, 116)),
+    viewport = readMapViewport(source + w(144, 144, 136)),
+    projection = readProjectionDefinition(source + w(192, 192, 180)),
+  )
 
-@JvmSynthetic internal fun readFrameProjection(source: Long): FrameProjection = FrameProjection(matrix = readMat4(source), clipDepthRange = ClipDepthRange.of(readU32(source + 128)), nearDistance = readF64(source + w(136, 136, 132)), farDistance = readF64(source + w(144, 144, 140)), farDepth = readF64(source + w(152, 152, 148)), globe = readBool(source + w(160, 160, 156)))
+@JvmSynthetic
+internal fun readFrameProjection(source: Long): FrameProjection =
+  FrameProjection(
+    matrix = readMat4(source),
+    clipDepthRange = ClipDepthRange.of(readU32(source + 128)),
+    nearDistance = readF64(source + w(136, 136, 132)),
+    farDistance = readF64(source + w(144, 144, 140)),
+    farDepth = readF64(source + w(152, 152, 148)),
+    globe = readBool(source + w(160, 160, 156)),
+  )
 
-@JvmSynthetic internal fun readEdgeInsets(source: Long): EdgeInsets = EdgeInsets(top = readF64(source), left = readF64(source + 8), bottom = readF64(source + 16), right = readF64(source + 24))
+@JvmSynthetic
+internal fun readEdgeInsets(source: Long): EdgeInsets =
+  EdgeInsets(
+    top = readF64(source),
+    left = readF64(source + 8),
+    bottom = readF64(source + 16),
+    right = readF64(source + 24),
+  )
 
-@JvmSynthetic internal fun readVulkanContextDescriptor(source: Long): VulkanContextDescriptor = VulkanContextDescriptor(instance = NativePointer.ofAddress(readAddress(source)), physicalDevice = NativePointer.ofAddress(readAddress(source + w(4, 8))), device = NativePointer.ofAddress(readAddress(source + w(8, 16))), graphicsQueue = NativePointer.ofAddress(readAddress(source + w(12, 24))), graphicsQueueFamilyIndex = readU32(source + w(16, 32)), getInstanceProcAddr = NativePointer.ofAddress(readAddress(source + w(20, 40))), getDeviceProcAddr = NativePointer.ofAddress(readAddress(source + w(24, 48))))
+@JvmSynthetic
+internal fun readVulkanContextDescriptor(source: Long): VulkanContextDescriptor =
+  VulkanContextDescriptor(
+    instance = NativePointer.ofAddress(readAddress(source)),
+    physicalDevice = NativePointer.ofAddress(readAddress(source + w(4, 8))),
+    device = NativePointer.ofAddress(readAddress(source + w(8, 16))),
+    graphicsQueue = NativePointer.ofAddress(readAddress(source + w(12, 24))),
+    graphicsQueueFamilyIndex = readU32(source + w(16, 32)),
+    getInstanceProcAddr = NativePointer.ofAddress(readAddress(source + w(20, 40))),
+    getDeviceProcAddr = NativePointer.ofAddress(readAddress(source + w(24, 48))),
+  )
 
-@JvmSynthetic internal fun readCamera(source: Long): Camera = Camera(center = readLatLng(source), centerAltitude = readF64(source + 16), padding = readEdgeInsets(source + 24), zoom = readF64(source + 56), bearing = readF64(source + 64), pitch = readF64(source + 72), roll = readF64(source + 80), fieldOfView = readF64(source + 88))
+@JvmSynthetic
+internal fun readCamera(source: Long): Camera =
+  Camera(
+    center = readLatLng(source),
+    centerAltitude = readF64(source + 16),
+    padding = readEdgeInsets(source + 24),
+    zoom = readF64(source + 56),
+    bearing = readF64(source + 64),
+    pitch = readF64(source + 72),
+    roll = readF64(source + 80),
+    fieldOfView = readF64(source + 88),
+  )
 
-@JvmSynthetic internal fun readMapTileSettings(source: Long): MapTileSettings = MapTileSettings(prefetchZoomDelta = readU32(source), lodMinRadius = readF64(source + w(8, 8, 4)), lodScale = readF64(source + w(16, 16, 12)), lodPitchThreshold = readF64(source + w(24, 24, 20)), lodZoomShift = readF64(source + w(32, 32, 28)), lodMode = TileLodMode.of(readU32(source + w(40, 40, 36))))
+@JvmSynthetic
+internal fun readMapTileSettings(source: Long): MapTileSettings =
+  MapTileSettings(
+    prefetchZoomDelta = readU32(source),
+    lodMinRadius = readF64(source + w(8, 8, 4)),
+    lodScale = readF64(source + w(16, 16, 12)),
+    lodPitchThreshold = readF64(source + w(24, 24, 20)),
+    lodZoomShift = readF64(source + w(32, 32, 28)),
+    lodMode = TileLodMode.of(readU32(source + w(40, 40, 36))),
+  )
 
-@JvmSynthetic internal fun readCameraBounds(source: Long): CameraBounds = CameraBounds(bounds = readLatLngBounds(source), unbounded = readBool(source + 32), minZoom = readF64(source + w(40, 40, 36)), maxZoom = readF64(source + w(48, 48, 44)), minPitch = readF64(source + w(56, 56, 52)), maxPitch = readF64(source + w(64, 64, 60)))
+@JvmSynthetic
+internal fun readCameraBounds(source: Long): CameraBounds =
+  CameraBounds(
+    bounds = readLatLngBounds(source),
+    unbounded = readBool(source + 32),
+    minZoom = readF64(source + w(40, 40, 36)),
+    maxZoom = readF64(source + w(48, 48, 44)),
+    minPitch = readF64(source + w(56, 56, 52)),
+    maxPitch = readF64(source + w(64, 64, 60)),
+  )
 
-@JvmSynthetic internal fun readFreeCamera(source: Long): FreeCamera = FreeCamera(position = readVec3(source), orientation = readQuaternion(source + 24))
+@JvmSynthetic
+internal fun readFreeCamera(source: Long): FreeCamera =
+  FreeCamera(position = readVec3(source), orientation = readQuaternion(source + 24))
 
-@JvmSynthetic internal fun readImageStretch(source: Long): ImageStretch = ImageStretch(from = readF32(source), to = readF32(source + 4))
+@JvmSynthetic
+internal fun readImageStretch(source: Long): ImageStretch =
+  ImageStretch(from = readF32(source), to = readF32(source + 4))
 
-@JvmSynthetic internal fun readImageContent(source: Long): ImageContent = ImageContent(left = readF32(source), top = readF32(source + 4), right = readF32(source + 8), bottom = readF32(source + 12))
+@JvmSynthetic
+internal fun readImageContent(source: Long): ImageContent =
+  ImageContent(
+    left = readF32(source),
+    top = readF32(source + 4),
+    right = readF32(source + 8),
+    bottom = readF32(source + 12),
+  )
 
-@JvmSynthetic internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo = StyleSourceTileInfo(tileUrls = readArray(readAddress(source), readSize(source + w(4, 8)), 2 * NativeMemory.addressSize.toLong()) { item -> readViewString(item) }, minZoom = readF64(source + w(8, 16)), maxZoom = readF64(source + w(16, 24)), scheme = StyleTileScheme.of(readU32(source + w(24, 32))))
+@JvmSynthetic
+internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
+  StyleSourceTileInfo(
+    tileUrls =
+      readArray(
+        readAddress(source),
+        readSize(source + w(4, 8)),
+        2 * NativeMemory.addressSize.toLong(),
+      ) { item ->
+        readViewString(item)
+      },
+    minZoom = readF64(source + w(8, 16)),
+    maxZoom = readF64(source + w(16, 24)),
+    scheme = StyleTileScheme.of(readU32(source + w(24, 32))),
+  )
 
-@JvmSynthetic internal fun readGeoJsonSourceOptions(source: Long): GeoJsonSourceOptions {
+@JvmSynthetic
+internal fun readGeoJsonSourceOptions(source: Long): GeoJsonSourceOptions {
   val fields = readU32(source + 4)
-  return GeoJsonSourceOptions(minZoom = if ((fields and 1u) != 0u) readF64(source + 8) else null, maxZoom = if ((fields and 2u) != 0u) readF64(source + 16) else null, tolerance = if ((fields and 4u) != 0u) readF64(source + 24) else null, clusterMaxZoom = if ((fields and 8u) != 0u) readF64(source + 32) else null, clusterProperties = readViewString(source + 40), buffer = if ((fields and 16u) != 0u) readU32(source + w(48, 56)) else null, clusterRadius = if ((fields and 32u) != 0u) readU32(source + w(52, 60)) else null, clusterMinPoints = if ((fields and 64u) != 0u) readU64(source + w(56, 64)) else null, lineMetrics = if ((fields and 128u) != 0u) readBool(source + w(64, 72)) else null, cluster = if ((fields and 256u) != 0u) readBool(source + w(65, 73)) else null)
+  return GeoJsonSourceOptions(
+    minZoom = if ((fields and 1u) != 0u) readF64(source + 8) else null,
+    maxZoom = if ((fields and 2u) != 0u) readF64(source + 16) else null,
+    tolerance = if ((fields and 4u) != 0u) readF64(source + 24) else null,
+    clusterMaxZoom = if ((fields and 8u) != 0u) readF64(source + 32) else null,
+    clusterProperties = readViewString(source + 40),
+    buffer = if ((fields and 16u) != 0u) readU32(source + w(48, 56)) else null,
+    clusterRadius = if ((fields and 32u) != 0u) readU32(source + w(52, 60)) else null,
+    clusterMinPoints = if ((fields and 64u) != 0u) readU64(source + w(56, 64)) else null,
+    lineMetrics = if ((fields and 128u) != 0u) readBool(source + w(64, 72)) else null,
+    cluster = if ((fields and 256u) != 0u) readBool(source + w(65, 73)) else null,
+  )
 }
 
-@JvmSynthetic internal fun readLogicalExtent(source: Long): LogicalExtent = LogicalExtent(width = readU32(source), height = readU32(source + 4), scaleFactor = readF64(source + 8))
+@JvmSynthetic
+internal fun readLogicalExtent(source: Long): LogicalExtent =
+  LogicalExtent(
+    width = readU32(source),
+    height = readU32(source + 4),
+    scaleFactor = readF64(source + 8),
+  )
 
-@JvmSynthetic internal fun readTextureImageInfo(source: Long): TextureImageInfo = TextureImageInfo(width = readU32(source), height = readU32(source + 4), stride = readU32(source + 8), byteLength = readSize(source + w(12, 16)))
+@JvmSynthetic
+internal fun readTextureImageInfo(source: Long): TextureImageInfo =
+  TextureImageInfo(
+    width = readU32(source),
+    height = readU32(source + 4),
+    stride = readU32(source + 8),
+    byteLength = readSize(source + w(12, 16)),
+  )
 
-@JvmSynthetic internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition = readU32(source + 4).let { tag -> when (tag) { 1u -> OfflineRegionDefinition.TilePyramid(readOfflineTilePyramidRegionDefinition(source + 8)); 2u -> OfflineRegionDefinition.Geometry(readOfflineGeometryRegionDefinition(source + 8)); else -> OfflineRegionDefinition.Unknown(tag, NativeMemory.getBytes(source + 8, w(64, 72))) } }
+@JvmSynthetic
+internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition =
+  readU32(source + 4).let { tag ->
+    when (tag) {
+      1u -> OfflineRegionDefinition.TilePyramid(readOfflineTilePyramidRegionDefinition(source + 8))
+      2u -> OfflineRegionDefinition.Geometry(readOfflineGeometryRegionDefinition(source + 8))
+      else -> OfflineRegionDefinition.Unknown(tag, NativeMemory.getBytes(source + 8, w(64, 72)))
+    }
+  }
 
-@JvmSynthetic internal fun NativeArena.putPanMomentum(target: Long, value: PanMomentum) {
+@JvmSynthetic
+internal fun NativeArena.putPanMomentum(target: Long, value: PanMomentum) {
   var fields = 0u
   value.velocity?.let {
     fields = fields or 1u
@@ -1319,9 +2453,13 @@ import org.maplibre.nativeffi.internal.memory.*
   putMomentumDecay(target + w(24, 24, 20), value.decay)
   writeU32(target, fields)
 }
-@JvmSynthetic internal fun NativeArena.writePanMomentum(value: PanMomentum): Long = allocate(w(120, 120, 116), w(8, 8, 4)).also { putPanMomentum(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putAnchoredMomentum(target: Long, value: AnchoredMomentum) {
+@JvmSynthetic
+internal fun NativeArena.writePanMomentum(value: PanMomentum): Long =
+  allocate(w(120, 120, 116), w(8, 8, 4)).also { putPanMomentum(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putAnchoredMomentum(target: Long, value: AnchoredMomentum) {
   var fields = 0u
   value.velocity?.let {
     fields = fields or 1u
@@ -1338,95 +2476,271 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeAnchoredMomentum(value: AnchoredMomentum): Long = allocate(w(168, 168, 160), w(8, 8, 4)).also { putAnchoredMomentum(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
+@JvmSynthetic
+internal fun NativeArena.writeAnchoredMomentum(value: AnchoredMomentum): Long =
+  allocate(w(168, 168, 160), w(8, 8, 4)).also { putAnchoredMomentum(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
   writeF64(target, value.x1)
   writeF64(target + 8, value.y1)
   writeF64(target + 16, value.x2)
   writeF64(target + 24, value.y2)
 }
-@JvmSynthetic internal fun NativeArena.writeUnitBezier(value: UnitBezier): Long = allocate(32, w(8, 8, 4)).also { putUnitBezier(it, value) }
 
-@JvmSynthetic internal fun NativeCall.putCameraTransitionHandler(target: Long, value: CameraTransitionHandler) {
+@JvmSynthetic
+internal fun NativeArena.writeUnitBezier(value: UnitBezier): Long =
+  allocate(32, w(8, 8, 4)).also { putUnitBezier(it, value) }
+
+@JvmSynthetic
+internal fun NativeCall.putCameraTransitionHandler(target: Long, value: CameraTransitionHandler) {
   if (value.callback == null) return
   writeAddress(target + w(4, 8), registrations.register(value))
   writeAddress(target, UpcallStubs.cameraTransitionHandlerCallback)
   writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
   writeI64(target + w(16, 24, 12), HostDelivery.queue)
 }
-@JvmSynthetic internal fun NativeCall.writeCameraTransitionHandler(value: CameraTransitionHandler): Long = allocate(w(24, 32, 20), w(8, 8, 4)).also { putCameraTransitionHandler(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
+@JvmSynthetic
+internal fun NativeCall.writeCameraTransitionHandler(value: CameraTransitionHandler): Long =
+  allocate(w(24, 32, 20), w(8, 8, 4)).also { putCameraTransitionHandler(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
   writeAddress(target, value.texture.address)
 }
-@JvmSynthetic internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture): Long = allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putVulkanBorrowedTexture(target: Long, value: VulkanBorrowedTexture) {
+@JvmSynthetic
+internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture): Long =
+  allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putVulkanBorrowedTexture(target: Long, value: VulkanBorrowedTexture) {
   writeU64(target, value.image)
   writeU64(target + 8, value.imageView)
 }
-@JvmSynthetic internal fun NativeArena.writeVulkanBorrowedTexture(value: VulkanBorrowedTexture): Long = allocate(16, w(8, 8, 4)).also { putVulkanBorrowedTexture(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putOpenGlBorrowedTexture(target: Long, value: OpenGlBorrowedTexture) {
+@JvmSynthetic
+internal fun NativeArena.writeVulkanBorrowedTexture(value: VulkanBorrowedTexture): Long =
+  allocate(16, w(8, 8, 4)).also { putVulkanBorrowedTexture(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putOpenGlBorrowedTexture(target: Long, value: OpenGlBorrowedTexture) {
   writeU32(target, value.texture)
 }
-@JvmSynthetic internal fun NativeArena.writeOpenGlBorrowedTexture(value: OpenGlBorrowedTexture): Long = allocate(4, 4).also { putOpenGlBorrowedTexture(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putWebGpuBorrowedTexture(target: Long, value: WebGpuBorrowedTexture) {
+@JvmSynthetic
+internal fun NativeArena.writeOpenGlBorrowedTexture(value: OpenGlBorrowedTexture): Long =
+  allocate(4, 4).also { putOpenGlBorrowedTexture(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putWebGpuBorrowedTexture(target: Long, value: WebGpuBorrowedTexture) {
   writeU32(target, value.texture)
 }
-@JvmSynthetic internal fun NativeArena.writeWebGpuBorrowedTexture(value: WebGpuBorrowedTexture): Long = allocate(4, 4).also { putWebGpuBorrowedTexture(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putDmaBufFormat(target: Long, value: DmaBufFormat) {
+@JvmSynthetic
+internal fun NativeArena.writeWebGpuBorrowedTexture(value: WebGpuBorrowedTexture): Long =
+  allocate(4, 4).also { putWebGpuBorrowedTexture(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putDmaBufFormat(target: Long, value: DmaBufFormat) {
   writeU32(target, value.fourcc)
   writeU64(target + w(8, 8, 4), value.modifier)
 }
-@JvmSynthetic internal fun NativeArena.writeDmaBufFormat(value: DmaBufFormat): Long = allocate(w(16, 16, 12), w(8, 8, 4)).also { putDmaBufFormat(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putUrlQueryParameter(target: Long, value: UrlQueryParameter) {
+@JvmSynthetic
+internal fun NativeArena.writeDmaBufFormat(value: DmaBufFormat): Long =
+  allocate(w(16, 16, 12), w(8, 8, 4)).also { putDmaBufFormat(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putUrlQueryParameter(target: Long, value: UrlQueryParameter) {
   putView(target, value.name)
   putView(target + w(8, 16), value.value)
 }
-@JvmSynthetic internal fun NativeArena.writeUrlQueryParameter(value: UrlQueryParameter): Long = allocate(w(16, 32), w(4, 8)).also { putUrlQueryParameter(it, value) }
 
-@JvmSynthetic internal fun readMetalCustomLayerEncoder(source: Long): MetalCustomLayerEncoder = MetalCustomLayerEncoder(commandBuffer = NativePointer.ofAddress(readAddress(source)))
+@JvmSynthetic
+internal fun NativeArena.writeUrlQueryParameter(value: UrlQueryParameter): Long =
+  allocate(w(16, 32), w(4, 8)).also { putUrlQueryParameter(it, value) }
 
-@JvmSynthetic internal fun readVulkanCustomLayerEncoder(source: Long): VulkanCustomLayerEncoder = VulkanCustomLayerEncoder(context = readVulkanContextDescriptor(source), commandBuffer = NativePointer.ofAddress(readAddress(source + w(28, 56))))
+@JvmSynthetic
+internal fun readMetalCustomLayerEncoder(source: Long): MetalCustomLayerEncoder =
+  MetalCustomLayerEncoder(commandBuffer = NativePointer.ofAddress(readAddress(source)))
 
-@JvmSynthetic internal fun readWebGpuCustomLayerEncoder(source: Long): WebGpuCustomLayerEncoder = WebGpuCustomLayerEncoder(device = readU32(source), encoder = readU32(source + 4))
+@JvmSynthetic
+internal fun readVulkanCustomLayerEncoder(source: Long): VulkanCustomLayerEncoder =
+  VulkanCustomLayerEncoder(
+    context = readVulkanContextDescriptor(source),
+    commandBuffer = NativePointer.ofAddress(readAddress(source + w(28, 56))),
+  )
 
-@JvmSynthetic internal fun readCustomLayerFrame(source: Long): CustomLayerFrame = CustomLayerFrame(view = readMapView(source), frameProjection = readFrameProjection(source + w(208, 208, 196)), width = readU32(source + w(376, 376, 356)), height = readU32(source + w(380, 380, 360)))
+@JvmSynthetic
+internal fun readWebGpuCustomLayerEncoder(source: Long): WebGpuCustomLayerEncoder =
+  WebGpuCustomLayerEncoder(device = readU32(source), encoder = readU32(source + 4))
 
-@JvmSynthetic internal fun readMetalCustomLayerPass(source: Long): MetalCustomLayerPass = MetalCustomLayerPass(encoder = NativePointer.ofAddress(readAddress(source)), commandBuffer = NativePointer.ofAddress(readAddress(source + w(4, 8))), colorFormat = readU64(source + w(8, 16)), depthFormat = readU64(source + w(16, 24)), stencilFormat = readU64(source + w(24, 32)), sampleCount = readU32(source + w(32, 40)))
+@JvmSynthetic
+internal fun readCustomLayerFrame(source: Long): CustomLayerFrame =
+  CustomLayerFrame(
+    view = readMapView(source),
+    frameProjection = readFrameProjection(source + w(208, 208, 196)),
+    width = readU32(source + w(376, 376, 356)),
+    height = readU32(source + w(380, 380, 360)),
+  )
 
-@JvmSynthetic internal fun readVulkanCustomLayerPass(source: Long): VulkanCustomLayerPass = VulkanCustomLayerPass(context = readVulkanContextDescriptor(source), commandBuffer = NativePointer.ofAddress(readAddress(source + w(28, 56))), renderPass = readU64(source + w(32, 64)), subpass = readU32(source + w(40, 72)), sampleCount = readU32(source + w(44, 76)), colorFormat = readU32(source + w(48, 80)), depthStencilFormat = readU32(source + w(52, 84)))
+@JvmSynthetic
+internal fun readMetalCustomLayerPass(source: Long): MetalCustomLayerPass =
+  MetalCustomLayerPass(
+    encoder = NativePointer.ofAddress(readAddress(source)),
+    commandBuffer = NativePointer.ofAddress(readAddress(source + w(4, 8))),
+    colorFormat = readU64(source + w(8, 16)),
+    depthFormat = readU64(source + w(16, 24)),
+    stencilFormat = readU64(source + w(24, 32)),
+    sampleCount = readU32(source + w(32, 40)),
+  )
 
-@JvmSynthetic internal fun readOpenGlCustomLayerPass(source: Long): OpenGlCustomLayerPass = OpenGlCustomLayerPass(framebuffer = readU32(source))
+@JvmSynthetic
+internal fun readVulkanCustomLayerPass(source: Long): VulkanCustomLayerPass =
+  VulkanCustomLayerPass(
+    context = readVulkanContextDescriptor(source),
+    commandBuffer = NativePointer.ofAddress(readAddress(source + w(28, 56))),
+    renderPass = readU64(source + w(32, 64)),
+    subpass = readU32(source + w(40, 72)),
+    sampleCount = readU32(source + w(44, 76)),
+    colorFormat = readU32(source + w(48, 80)),
+    depthStencilFormat = readU32(source + w(52, 84)),
+  )
 
-@JvmSynthetic internal fun readWebGpuCustomLayerPass(source: Long): WebGpuCustomLayerPass = WebGpuCustomLayerPass(device = readU32(source), encoder = readU32(source + 4), colorFormat = readViewString(source + 8), depthStencilFormat = readViewString(source + w(16, 24)), sampleCount = readU32(source + w(24, 40)))
+@JvmSynthetic
+internal fun readOpenGlCustomLayerPass(source: Long): OpenGlCustomLayerPass =
+  OpenGlCustomLayerPass(framebuffer = readU32(source))
 
-@JvmSynthetic internal fun readRuntimeEvent(source: Long): RuntimeEvent = RuntimeEvent(type = RuntimeEventType.of(readU32(source)), sourceType = RuntimeEventSourceType.of(readU32(source + 4)), source = readU64(source + 8), generation = readU64(source + 16), message = readViewString(source + w(28, 32)), payload = readU32(source + 24).let { tag -> when (tag) { 1u -> RuntimeEventPayload.CameraChange(readRuntimeEventCameraChange(source + w(40, 48, 36))); 2u -> RuntimeEventPayload.LoadingFailed(readRuntimeEventLoadingFailed(source + w(40, 48, 36))); 3u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + w(40, 48, 36))); 4u -> RuntimeEventPayload.StyleImage(readRuntimeEventStyleImage(source + w(40, 48, 36))); 5u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + w(40, 48, 36))); 6u -> RuntimeEventPayload.SourceChanged(readRuntimeEventSourceChanged(source + w(40, 48, 36))); 7u -> RuntimeEventPayload.OfflineRegionStatus(readRuntimeEventOfflineRegionStatus(source + w(40, 48, 36))); 8u -> RuntimeEventPayload.OfflineRegionResponseError(readRuntimeEventOfflineRegionResponseError(source + w(40, 48, 36))); 9u -> RuntimeEventPayload.Glyphs(readRuntimeEventGlyphs(source + w(40, 48, 36))); 10u -> RuntimeEventPayload.Sprite(readRuntimeEventSprite(source + w(40, 48, 36))); 0u -> RuntimeEventPayload.None; else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + w(40, 48, 36), w(72, 72, 64))) } })
+@JvmSynthetic
+internal fun readWebGpuCustomLayerPass(source: Long): WebGpuCustomLayerPass =
+  WebGpuCustomLayerPass(
+    device = readU32(source),
+    encoder = readU32(source + 4),
+    colorFormat = readViewString(source + 8),
+    depthStencilFormat = readViewString(source + w(16, 24)),
+    sampleCount = readU32(source + w(24, 40)),
+  )
 
-@JvmSynthetic internal fun readResourceRange(source: Long): ResourceRange = ResourceRange(start = readU64(source), end = readU64(source + 8))
+@JvmSynthetic
+internal fun readRuntimeEvent(source: Long): RuntimeEvent =
+  RuntimeEvent(
+    type = RuntimeEventType.of(readU32(source)),
+    sourceType = RuntimeEventSourceType.of(readU32(source + 4)),
+    source = readU64(source + 8),
+    generation = readU64(source + 16),
+    message = readViewString(source + w(28, 32)),
+    payload =
+      readU32(source + 24).let { tag ->
+        when (tag) {
+          1u ->
+            RuntimeEventPayload.CameraChange(readRuntimeEventCameraChange(source + w(40, 48, 36)))
+          2u ->
+            RuntimeEventPayload.LoadingFailed(readRuntimeEventLoadingFailed(source + w(40, 48, 36)))
+          3u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + w(40, 48, 36)))
+          4u -> RuntimeEventPayload.StyleImage(readRuntimeEventStyleImage(source + w(40, 48, 36)))
+          5u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + w(40, 48, 36)))
+          6u ->
+            RuntimeEventPayload.SourceChanged(readRuntimeEventSourceChanged(source + w(40, 48, 36)))
+          7u ->
+            RuntimeEventPayload.OfflineRegionStatus(
+              readRuntimeEventOfflineRegionStatus(source + w(40, 48, 36)),
+            )
+          8u ->
+            RuntimeEventPayload.OfflineRegionResponseError(
+              readRuntimeEventOfflineRegionResponseError(source + w(40, 48, 36)),
+            )
+          9u -> RuntimeEventPayload.Glyphs(readRuntimeEventGlyphs(source + w(40, 48, 36)))
+          10u -> RuntimeEventPayload.Sprite(readRuntimeEventSprite(source + w(40, 48, 36)))
+          0u -> RuntimeEventPayload.None
+          else ->
+            RuntimeEventPayload.Unknown(
+              tag,
+              NativeMemory.getBytes(source + w(40, 48, 36), w(72, 72, 64)),
+            )
+        }
+      },
+  )
 
-@JvmSynthetic internal fun readProjectionMode(source: Long): ProjectionMode = ProjectionMode(axonometric = readBool(source), xSkew = readF64(source + w(8, 8, 4)), ySkew = readF64(source + w(16, 16, 12)))
+@JvmSynthetic
+internal fun readResourceRange(source: Long): ResourceRange =
+  ResourceRange(start = readU64(source), end = readU64(source + 8))
 
-@JvmSynthetic internal fun readMapViewport(source: Long): MapViewport = MapViewport(northOrientation = NorthOrientation.of(readU32(source)), constrainMode = ConstrainMode.of(readU32(source + 4)), viewportMode = ViewportMode.of(readU32(source + 8)), frustumOffset = readEdgeInsets(source + w(16, 16, 12)))
+@JvmSynthetic
+internal fun readProjectionMode(source: Long): ProjectionMode =
+  ProjectionMode(
+    axonometric = readBool(source),
+    xSkew = readF64(source + w(8, 8, 4)),
+    ySkew = readF64(source + w(16, 16, 12)),
+  )
 
-@JvmSynthetic internal fun readProjectionDefinition(source: Long): ProjectionDefinition = ProjectionDefinition(from = ProjectionType.of(readU32(source)), to = ProjectionType.of(readU32(source + 4)), transition = readF64(source + 8))
+@JvmSynthetic
+internal fun readMapViewport(source: Long): MapViewport =
+  MapViewport(
+    northOrientation = NorthOrientation.of(readU32(source)),
+    constrainMode = ConstrainMode.of(readU32(source + 4)),
+    viewportMode = ViewportMode.of(readU32(source + 8)),
+    frustumOffset = readEdgeInsets(source + w(16, 16, 12)),
+  )
 
-@JvmSynthetic internal fun readMat4(source: Long): Mat4 = Mat4(x = readVec4(source), y = readVec4(source + 32), z = readVec4(source + 64), w = readVec4(source + 96))
+@JvmSynthetic
+internal fun readProjectionDefinition(source: Long): ProjectionDefinition =
+  ProjectionDefinition(
+    from = ProjectionType.of(readU32(source)),
+    to = ProjectionType.of(readU32(source + 4)),
+    transition = readF64(source + 8),
+  )
 
-@JvmSynthetic internal fun readVec3(source: Long): Vec3 = Vec3(x = readF64(source), y = readF64(source + 8), z = readF64(source + 16))
+@JvmSynthetic
+internal fun readMat4(source: Long): Mat4 =
+  Mat4(
+    x = readVec4(source),
+    y = readVec4(source + 32),
+    z = readVec4(source + 64),
+    w = readVec4(source + 96),
+  )
 
-@JvmSynthetic internal fun readQuaternion(source: Long): Quaternion = Quaternion(x = readF64(source), y = readF64(source + 8), z = readF64(source + 16), w = readF64(source + 24))
+@JvmSynthetic
+internal fun readVec3(source: Long): Vec3 =
+  Vec3(x = readF64(source), y = readF64(source + 8), z = readF64(source + 16))
 
-@JvmSynthetic internal fun readOfflineTilePyramidRegionDefinition(source: Long): OfflineTilePyramidRegionDefinition = OfflineTilePyramidRegionDefinition(styleUrl = readViewString(source), bounds = readLatLngBounds(source + w(8, 16)), minZoom = readF64(source + w(40, 48)), maxZoom = readF64(source + w(48, 56)), pixelRatio = readF32(source + w(56, 64)), includeIdeographs = readBool(source + w(60, 68)))
+@JvmSynthetic
+internal fun readQuaternion(source: Long): Quaternion =
+  Quaternion(
+    x = readF64(source),
+    y = readF64(source + 8),
+    z = readF64(source + 16),
+    w = readF64(source + 24),
+  )
 
-@JvmSynthetic internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryRegionDefinition = OfflineGeometryRegionDefinition(styleUrl = readViewString(source), geometry = readViewString(source + w(8, 16)), minZoom = readF64(source + w(16, 32)), maxZoom = readF64(source + w(24, 40)), pixelRatio = readF32(source + w(32, 48)), includeIdeographs = readBool(source + w(36, 52)))
+@JvmSynthetic
+internal fun readOfflineTilePyramidRegionDefinition(
+  source: Long,
+): OfflineTilePyramidRegionDefinition =
+  OfflineTilePyramidRegionDefinition(
+    styleUrl = readViewString(source),
+    bounds = readLatLngBounds(source + w(8, 16)),
+    minZoom = readF64(source + w(40, 48)),
+    maxZoom = readF64(source + w(48, 56)),
+    pixelRatio = readF32(source + w(56, 64)),
+    includeIdeographs = readBool(source + w(60, 68)),
+  )
 
-@JvmSynthetic internal fun NativeArena.putMomentumDecay(target: Long, value: MomentumDecay) {
+@JvmSynthetic
+internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryRegionDefinition =
+  OfflineGeometryRegionDefinition(
+    styleUrl = readViewString(source),
+    geometry = readViewString(source + w(8, 16)),
+    minZoom = readF64(source + w(16, 32)),
+    maxZoom = readF64(source + w(24, 40)),
+    pixelRatio = readF32(source + w(32, 48)),
+    includeIdeographs = readBool(source + w(36, 52)),
+  )
+
+@JvmSynthetic
+internal fun NativeArena.putMomentumDecay(target: Long, value: MomentumDecay) {
   var fields = 0u
   value.model?.let {
     fields = fields or 1u
@@ -1466,9 +2780,13 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeMomentumDecay(value: MomentumDecay): Long = allocate(96, w(8, 8, 4)).also { putMomentumDecay(it, value) }
 
-@JvmSynthetic internal fun NativeArena.putMomentumSnap(target: Long, value: MomentumSnap) {
+@JvmSynthetic
+internal fun NativeArena.writeMomentumDecay(value: MomentumDecay): Long =
+  allocate(96, w(8, 8, 4)).also { putMomentumDecay(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMomentumSnap(target: Long, value: MomentumSnap) {
   var fields = 0u
   value.spacing?.let {
     fields = fields or 1u
@@ -1488,34 +2806,125 @@ import org.maplibre.nativeffi.internal.memory.*
   }
   writeU32(target, fields)
 }
-@JvmSynthetic internal fun NativeArena.writeMomentumSnap(value: MomentumSnap): Long = allocate(w(40, 40, 36), w(8, 8, 4)).also { putMomentumSnap(it, value) }
 
-@JvmSynthetic internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd = CameraTransitionEnd(outcome = CameraTransitionOutcome.of(readU32(source + 4)), generation = readU64(source + 8), velocity = readCameraVelocity(source + 16))
+@JvmSynthetic
+internal fun NativeArena.writeMomentumSnap(value: MomentumSnap): Long =
+  allocate(w(40, 40, 36), w(8, 8, 4)).also { putMomentumSnap(it, value) }
 
-@JvmSynthetic internal fun readRuntimeEventCameraChange(source: Long): RuntimeEventCameraChange = RuntimeEventCameraChange(mode = CameraChangeMode.of(readU32(source)), source = CameraChangeSource.of(readU32(source + 4)))
+@JvmSynthetic
+internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =
+  CameraTransitionEnd(
+    outcome = CameraTransitionOutcome.of(readU32(source + 4)),
+    generation = readU64(source + 8),
+    velocity = readCameraVelocity(source + 16),
+  )
 
-@JvmSynthetic internal fun readRuntimeEventLoadingFailed(source: Long): RuntimeEventLoadingFailed = RuntimeEventLoadingFailed(error = MapLoadError.of(readU32(source)))
+@JvmSynthetic
+internal fun readRuntimeEventCameraChange(source: Long): RuntimeEventCameraChange =
+  RuntimeEventCameraChange(
+    mode = CameraChangeMode.of(readU32(source)),
+    source = CameraChangeSource.of(readU32(source + 4)),
+  )
 
-@JvmSynthetic internal fun readRuntimeEventRenderFrame(source: Long): RuntimeEventRenderFrame = RuntimeEventRenderFrame(mode = RenderMode.of(readU32(source)), needsRepaint = readBool(source + 4), placementChanged = readBool(source + 5), stats = readRenderingStats(source + 8))
+@JvmSynthetic
+internal fun readRuntimeEventLoadingFailed(source: Long): RuntimeEventLoadingFailed =
+  RuntimeEventLoadingFailed(error = MapLoadError.of(readU32(source)))
 
-@JvmSynthetic internal fun readRuntimeEventStyleImage(source: Long): RuntimeEventStyleImage = RuntimeEventStyleImage(imageId = readViewString(source))
+@JvmSynthetic
+internal fun readRuntimeEventRenderFrame(source: Long): RuntimeEventRenderFrame =
+  RuntimeEventRenderFrame(
+    mode = RenderMode.of(readU32(source)),
+    needsRepaint = readBool(source + 4),
+    placementChanged = readBool(source + 5),
+    stats = readRenderingStats(source + 8),
+  )
 
-@JvmSynthetic internal fun readRuntimeEventTileAction(source: Long): RuntimeEventTileAction = RuntimeEventTileAction(sourceId = readViewString(source), operation = TileOperation.of(readU32(source + w(8, 16))), tileId = readTileId(source + w(12, 20)))
+@JvmSynthetic
+internal fun readRuntimeEventStyleImage(source: Long): RuntimeEventStyleImage =
+  RuntimeEventStyleImage(imageId = readViewString(source))
 
-@JvmSynthetic internal fun readRuntimeEventSourceChanged(source: Long): RuntimeEventSourceChanged = RuntimeEventSourceChanged(sourceId = readViewString(source))
+@JvmSynthetic
+internal fun readRuntimeEventTileAction(source: Long): RuntimeEventTileAction =
+  RuntimeEventTileAction(
+    sourceId = readViewString(source),
+    operation = TileOperation.of(readU32(source + w(8, 16))),
+    tileId = readTileId(source + w(12, 20)),
+  )
 
-@JvmSynthetic internal fun readRuntimeEventOfflineRegionStatus(source: Long): RuntimeEventOfflineRegionStatus = RuntimeEventOfflineRegionStatus(regionId = readI64(source), status = readOfflineRegionStatus(source + 8))
+@JvmSynthetic
+internal fun readRuntimeEventSourceChanged(source: Long): RuntimeEventSourceChanged =
+  RuntimeEventSourceChanged(sourceId = readViewString(source))
 
-@JvmSynthetic internal fun readRuntimeEventOfflineRegionResponseError(source: Long): RuntimeEventOfflineRegionResponseError = RuntimeEventOfflineRegionResponseError(regionId = readI64(source), reason = ResourceErrorReason.of(readU32(source + 8)))
+@JvmSynthetic
+internal fun readRuntimeEventOfflineRegionStatus(source: Long): RuntimeEventOfflineRegionStatus =
+  RuntimeEventOfflineRegionStatus(
+    regionId = readI64(source),
+    status = readOfflineRegionStatus(source + 8),
+  )
 
-@JvmSynthetic internal fun readRuntimeEventGlyphs(source: Long): RuntimeEventGlyphs = RuntimeEventGlyphs(fontStack = readArray(readAddress(source), readSize(source + w(4, 8)), 2 * NativeMemory.addressSize.toLong()) { item -> readViewString(item) }, first = readU32(source + w(8, 16)), last = readU32(source + w(12, 20)), fontFace = readBool(source + w(16, 24)))
+@JvmSynthetic
+internal fun readRuntimeEventOfflineRegionResponseError(
+  source: Long,
+): RuntimeEventOfflineRegionResponseError =
+  RuntimeEventOfflineRegionResponseError(
+    regionId = readI64(source),
+    reason = ResourceErrorReason.of(readU32(source + 8)),
+  )
 
-@JvmSynthetic internal fun readRuntimeEventSprite(source: Long): RuntimeEventSprite = RuntimeEventSprite(id = readViewString(source), url = readViewString(source + w(8, 16)))
+@JvmSynthetic
+internal fun readRuntimeEventGlyphs(source: Long): RuntimeEventGlyphs =
+  RuntimeEventGlyphs(
+    fontStack =
+      readArray(
+        readAddress(source),
+        readSize(source + w(4, 8)),
+        2 * NativeMemory.addressSize.toLong(),
+      ) { item ->
+        readViewString(item)
+      },
+    first = readU32(source + w(8, 16)),
+    last = readU32(source + w(12, 20)),
+    fontFace = readBool(source + w(16, 24)),
+  )
 
-@JvmSynthetic internal fun readVec4(source: Long): Vec4 = Vec4(x = readF64(source), y = readF64(source + 8), z = readF64(source + 16), w = readF64(source + 24))
+@JvmSynthetic
+internal fun readRuntimeEventSprite(source: Long): RuntimeEventSprite =
+  RuntimeEventSprite(id = readViewString(source), url = readViewString(source + w(8, 16)))
 
-@JvmSynthetic internal fun readCameraVelocity(source: Long): CameraVelocity = CameraVelocity(pan = readScreenPoint(source), zoom = readF64(source + 16), bearing = readF64(source + 24), pitch = readF64(source + 32))
+@JvmSynthetic
+internal fun readVec4(source: Long): Vec4 =
+  Vec4(
+    x = readF64(source),
+    y = readF64(source + 8),
+    z = readF64(source + 16),
+    w = readF64(source + 24),
+  )
 
-@JvmSynthetic internal fun readRenderingStats(source: Long): RenderingStats = RenderingStats(encodingTimeMs = readF64(source), renderingTimeMs = readF64(source + 8), frameCount = readI64(source + 16), drawCallCount = readI64(source + 24), totalDrawCallCount = readI64(source + 32))
+@JvmSynthetic
+internal fun readCameraVelocity(source: Long): CameraVelocity =
+  CameraVelocity(
+    pan = readScreenPoint(source),
+    zoom = readF64(source + 16),
+    bearing = readF64(source + 24),
+    pitch = readF64(source + 32),
+  )
 
-@JvmSynthetic internal fun readTileId(source: Long): TileId = TileId(overscaledZ = readU32(source), wrap = readI32(source + 4), canonicalZ = readU32(source + 8), canonicalX = readU32(source + 12), canonicalY = readU32(source + 16))
+@JvmSynthetic
+internal fun readRenderingStats(source: Long): RenderingStats =
+  RenderingStats(
+    encodingTimeMs = readF64(source),
+    renderingTimeMs = readF64(source + 8),
+    frameCount = readI64(source + 16),
+    drawCallCount = readI64(source + 24),
+    totalDrawCallCount = readI64(source + 32),
+  )
+
+@JvmSynthetic
+internal fun readTileId(source: Long): TileId =
+  TileId(
+    overscaledZ = readU32(source),
+    wrap = readI32(source + 4),
+    canonicalZ = readU32(source + 8),
+    canonicalX = readU32(source + 12),
+    canonicalY = readU32(source + 16),
+  )
