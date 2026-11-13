@@ -114,9 +114,12 @@ class NativeRegistrationTest {
           host.released.awaitWithin("native to release the queue lock")
           assertTrue(host.calls.load() > 0)
         } else {
-          // Only a Vulkan device takes a queue lock, so native rejects one that reaches it.
+          // Only a Vulkan device takes a queue lock, so native rejects one that reaches it. The
+          // test names the backend, since a library with several may default to Vulkan.
           assertFailsWithStatus(Status.UNSUPPORTED) {
-            GpuDeviceHandle.create(GpuDeviceOptions(queueLock = lock))
+            GpuDeviceHandle.create(
+              GpuDeviceOptions(backend = TestGraphics.backend.renderBackend, queueLock = lock),
+            )
           }
         }
         assertEquals(1, host.releases.load())
