@@ -12,7 +12,8 @@
 # configuration, es2abc merges them and the binding into modules.abc, and
 # tools/ohos/pack-hap packs and signs the HAP. webpack.config.cjs gives
 # ets-loader the API floor, so ArkTS linter errors fail the build as they do in
-# DevEco Studio.
+# DevEco Studio. CMake builds the app's own native module with the SDK's
+# toolchain file.
 set -euo pipefail
 
 usage="usage: build-hap.sh <abi> <facade HAR> <backend HAR>"
@@ -61,6 +62,18 @@ api=$(jq -er .compatibleSdkVersion "$facade/oh-package.json5")
 jq --argjson api "$api" '.app.minAPIVersion = $api | .app.targetAPIVersion = $api' \
   "$example/entry/src/main/module.json" >"$module/module.json"
 bundle=$(jq -er .app.bundleName "$module/module.json")
+
+# The app's native module, which the pages import as libohos_window.so. Its
+# declarations go in oh_modules, as ohpm installs a native module's types.
+cmake -S "$example/entry/src/main/cpp" -B "$work/cpp" -G Ninja -Wno-deprecated \
+  -DCMAKE_TOOLCHAIN_FILE="$OHOS_SDK_NATIVE/build/cmake/ohos.toolchain.cmake" \
+  -DOHOS_ARCH="$abi" -DOHOS_COMPATIBLE_SDK_VERSION="$api" \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build "$work/cpp"
+cp "$work/cpp/libohos_window.so" "$work/libs/$abi/"
+mkdir -p "$work/entry/oh_modules/libohos_window.so"
+cp "$example/entry/src/main/cpp/types/libohos_window/"* \
+  "$work/entry/oh_modules/libohos_window.so/"
 
 # ets-loader reads the project from the environment and a build file, and
 # compiles the pages and abilities into records named <bundle>/entry/ets/<path>.
