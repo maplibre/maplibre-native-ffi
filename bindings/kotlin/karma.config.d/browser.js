@@ -70,11 +70,20 @@ if (!backendFlags) {
     `MLN_KOTLIN_WASM_RENDER_BACKEND names no known backend: ${renderBackend}`,
   );
 }
+// ChromeHeadless adds --disable-gpu, under which Chromium can't back a WebGPU
+// canvas: its first present loses the device. The launcher is Chrome with
+// ChromeHeadless's other flags.
 config.browsers = ["ChromeHeadlessMaplibre"];
 config.customLaunchers = Object.assign({}, config.customLaunchers, {
   ChromeHeadlessMaplibre: {
-    base: "ChromeHeadless",
-    flags: [...backendFlags, "--js-flags=--expose-gc"],
+    base: "Chrome",
+    flags: [
+      "--headless",
+      "--disable-dev-shm-usage",
+      "--remote-debugging-port=9222",
+      ...backendFlags,
+      "--js-flags=--expose-gc",
+    ],
   },
 });
 
