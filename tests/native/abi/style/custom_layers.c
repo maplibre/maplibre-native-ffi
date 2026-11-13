@@ -291,8 +291,8 @@ static void render_gets_the_frame_and_the_layer_depth(void) {
   TEST_ASSERT_EQUAL_UINT32(64, render->frame.view.extent.width);
   TEST_ASSERT_EQUAL_UINT32(64, render->frame.view.extent.height);
   TEST_ASSERT_EQUAL_DOUBLE(1.0, render->frame.view.extent.scale_factor);
-  TEST_ASSERT_FALSE(render->frame.projection.globe);
-  const double far_depth = render->frame.projection.far_depth;
+  TEST_ASSERT_FALSE(render->frame.frame_projection.globe);
+  const double far_depth = render->frame.frame_projection.far_depth;
   TEST_ASSERT_TRUE(far_depth > 0.0 && far_depth < 1.0);
   TEST_ASSERT_TRUE(render->layer_depth > far_depth);
   TEST_ASSERT_TRUE(render->layer_depth <= 1.0);
