@@ -46,8 +46,11 @@ HARNESS = Path(__file__).resolve().parent
 ROOT = HARNESS.parent
 MANIFEST = HARNESS / "fixtures.json"
 BENCH_DIR = ROOT / "build" / "bench"
-ENGINE = ROOT / "third_party" / "maplibre-native"
-GOOGLE_BENCHMARK = ENGINE / "vendor" / "benchmark"
+GOOGLE_BENCHMARK = BENCH_DIR / "google-benchmark"
+# The Google Benchmark commit that the harness builds against, the one that
+# MapLibre Native vendored when the harness came about.
+GOOGLE_BENCHMARK_URL = "https://github.com/google/benchmark.git"
+GOOGLE_BENCHMARK_COMMIT = "344117638c8ff7e239044fd0fa7085839fc03021"
 JSON_BEGIN = "MLN_FFI_BENCH_JSON_BEGIN"
 JSON_END = "MLN_FFI_BENCH_JSON_END"
 IMAGE_BEGIN = "MLN_FFI_BENCH_IMAGE_BEGIN "
@@ -410,14 +413,17 @@ def build_library(side: Side, preset: str) -> None:
 def build_harness(side: Side, preset: str, fixtures: Path) -> None:
     """Builds the harness into the side's build, or against its install, and
     reads how to run it."""
-    # The engine vendors Google Benchmark as a submodule that `mise deps`
-    # leaves out. Every side builds the harness against this checkout's copy.
+    # Every side builds the harness against this checkout's copy of Google
+    # Benchmark, which the first run fetches at its pinned commit.
     if not (GOOGLE_BENCHMARK / "src" / "benchmark.cc").is_file():
+        GOOGLE_BENCHMARK.mkdir(parents=True, exist_ok=True)
+        run(["git", "init", "--quiet"], cwd=GOOGLE_BENCHMARK)
         run(
-            ["git", "-c", "submodule.recurse=false", "submodule", "update"]
-            + ["--init", "--depth", "1", "vendor/benchmark"],
-            cwd=ENGINE,
+            ["git", "fetch", "--quiet", "--depth", "1", GOOGLE_BENCHMARK_URL]
+            + [GOOGLE_BENCHMARK_COMMIT],
+            cwd=GOOGLE_BENCHMARK,
         )
+        run(["git", "checkout", "--quiet", "FETCH_HEAD"], cwd=GOOGLE_BENCHMARK)
     common = [
         f"-DMLN_BENCH_FIXTURE_DIR={fixtures}",
         f"-DMLN_BENCH_GOOGLE_BENCHMARK_DIR={GOOGLE_BENCHMARK}",
@@ -436,7 +442,7 @@ def build_harness(side: Side, preset: str, fixtures: Path) -> None:
             "-DCMAKE_BUILD_TYPE=Release",
             f"-DMLN_BENCH_INSTALL={side.install}",
             "-DMLN_BENCH_VULKAN_INCLUDE_DIR="
-            + str(ENGINE / "vendor" / "Vulkan-Headers" / "include"),
+            + str(ROOT / "third_party" / "Vulkan-Headers" / "include"),
             *common,
         ]
     else:

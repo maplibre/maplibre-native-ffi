@@ -263,8 +263,7 @@ kotlin {
     if (graphicsCompiler != null) {
       val linksDl = name.startsWith("linux")
       val linksGdi = name == "mingwX64"
-      val vulkanHeaders =
-        rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include")
+      val vulkanHeaders = rootProject.file("third_party/Vulkan-Headers/include")
       val objectFile = layout.buildDirectory.file("graphics-test/$name/graphics.o")
       val compileGraphics =
         tasks.register<Exec>("compileTestGraphics${name.replaceFirstChar { it.uppercase() }}") {

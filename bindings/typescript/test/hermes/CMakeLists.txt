@@ -64,7 +64,7 @@ target_include_directories(
     "${MLN_FFI_NATIVE_PREFIX}/include"
     "${MLN_FFI_NODE_API_HEADERS}"
     "${MLN_FFI_ROOT}/tests/graphics/include"
-    "${MLN_FFI_ROOT}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+    "${MLN_FFI_ROOT}/third_party/Vulkan-Headers/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/../support")
 target_compile_options(
   hermes-test
