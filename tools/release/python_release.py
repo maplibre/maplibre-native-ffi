@@ -32,6 +32,7 @@ from sbom import (
 
 BACKENDS = ("opengl", "metal", "vulkan")
 DESCRIPTOR_PATH = pathlib.Path("share/maplibre-native-c/artifact.json")
+NATIVE_DLL = "maplibre-native-c.dll"
 LICENSE = pathlib.Path(__file__).resolve().parents[2] / "LICENSE"
 DEV_SUFFIX = re.compile(r"\.dev[0-9]+\Z")
 
@@ -55,16 +56,23 @@ def prepare(package: pathlib.Path, version: str) -> None:
 def stage_runtime_dlls(
     runtime_root: pathlib.Path, prefix: pathlib.Path, platform: str
 ) -> None:
-    """Put the Visual C++ runtime DLLs beside an MSVC wheel's extension.
+    """Put the DLLs that a Windows wheel's extension loads beside it.
 
-    The extension embeds the MSVC archive, which imports the runtime, and
-    CPython ships only part of it. Windows finds the DLLs in the package
+    On Windows the extension links the native library's DLL rather than its
+    static archive, and an MSVC build also imports the Visual C++ runtime, of
+    which CPython ships only part. Windows finds the DLLs in the package
     directory that the extension loads from.
     """
     (module,) = (runtime_root / "python").iterdir()
     for stale in module.glob("*.dll"):
         stale.unlink()
-    if not platform.startswith("windows-") or platform.startswith("windows-mingw-"):
+    if not platform.startswith("windows-"):
+        return
+    native = prefix / "bin" / NATIVE_DLL
+    if not native.is_file():
+        raise SystemExit(f"{prefix} carries no {NATIVE_DLL}")
+    shutil.copy2(native, module / native.name)
+    if platform.startswith("windows-mingw-"):
         return
     runtime_dlls = [
         *sorted(prefix.glob("bin/vcruntime140*.dll")),
@@ -84,7 +92,7 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     runtime = backend
     if descriptor["platform"]["id"].startswith("windows-mingw-"):
         runtime += "-mingw"
-    # The wheel embeds the native library, so it carries the notices of the
+    # The wheel carries the native library, so it carries the notices of the
     # third-party code in it.
     notices = next(prefix.glob("share/*/licenses"), None)
     if notices is None:

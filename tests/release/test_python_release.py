@@ -81,7 +81,7 @@ class PythonReleaseTest(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "no Python runtime serves"):
             runtime_metadata(self.package, self.prefix)
 
-    def test_an_msvc_runtime_carries_the_visual_cpp_dlls_beside_its_extension(
+    def test_a_windows_runtime_carries_its_dlls_beside_its_extension(
         self,
     ) -> None:
         module = self.package / "runtimes/vulkan/python/maplibre_native_ffi_runtime"
@@ -93,9 +93,17 @@ class PythonReleaseTest(unittest.TestCase):
             (self.prefix / "bin" / name).write_text(name)
 
         stage_runtime_dlls(module.parents[1], self.prefix, "windows-x64")
-        self.assertEqual(sorted(path.name for path in module.glob("*.dll")), [*dlls])
+        self.assertEqual(
+            sorted(path.name for path in module.glob("*.dll")),
+            sorted((*dlls, "maplibre-native-c.dll")),
+        )
 
         stage_runtime_dlls(module.parents[1], self.prefix, "windows-mingw-x64")
+        self.assertEqual(
+            [path.name for path in module.glob("*.dll")], ["maplibre-native-c.dll"]
+        )
+
+        stage_runtime_dlls(module.parents[1], self.prefix, "linux-gnu-x64")
         self.assertEqual(list(module.glob("*.dll")), [])
 
     def test_rejects_a_version_outside_the_release_scheme(self) -> None:
