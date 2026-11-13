@@ -446,8 +446,9 @@ class KotlinLayoutTests(unittest.TestCase):
             real_api()
         )
         values.codecs()
-        # A wake and the queue lock, whose callback native code waits for, take
-        # the host's native functions; each parameter names the field it fills.
+        # A wake, the queue lock, whose callback native code waits for, and the
+        # custom layer host, whose callbacks run on the render thread, take the
+        # host's native functions; each parameter names the field it fills.
         self.assertEqual(
             {
                 value.native: kotlin_callbacks.native_factory(value, values).parameters
@@ -463,6 +464,14 @@ class KotlinLayoutTests(unittest.TestCase):
                 "mln_queue_lock": (
                     ("lock", "lock"),
                     ("unlock", "unlock"),
+                    ("userData", "user_data"),
+                    ("releaseUserData", "release_user_data"),
+                ),
+                "mln_custom_layer_host": (
+                    ("prerender", "prerender"),
+                    ("render", "render"),
+                    ("deinitialize", "deinitialize"),
+                    ("contextLost", "context_lost"),
                     ("userData", "user_data"),
                     ("releaseUserData", "release_user_data"),
                 ),
