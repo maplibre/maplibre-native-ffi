@@ -25,6 +25,7 @@ import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraUpdate
 import org.maplibre.nativeffi.CameraUpdateMode
 import org.maplibre.nativeffi.Completion
+import org.maplibre.nativeffi.FramePacerHandle
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.LogicalSize
@@ -42,7 +43,6 @@ import org.maplibre.nativeffi.RuntimeEventHandler
 import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.RuntimeHandle
 import org.maplibre.nativeffi.Wake
-import org.maplibre.nativeffi.androidFramePacerCreate
 import org.maplibre.nativeffi.attachAndroidSurface
 import org.maplibre.nativeffi.setAndroidSurfaceTarget
 
@@ -64,7 +64,7 @@ class MapController(application: Application) : AndroidViewModel(application) {
   private val density = application.resources.displayMetrics.density
   // Paces frames to the display through the main thread's choreographer. A paced session has no
   // redraw wake: the pacer demands each frame.
-  private val pacer = androidFramePacerCreate()
+  private val pacer = FramePacerHandle.create()
   private var runtime: RuntimeHandle? = null
   private var session: RenderSessionHandle? = null
   private var failed = false
@@ -258,7 +258,7 @@ class MapController(application: Application) : AndroidViewModel(application) {
     if (target == null || size == targetSize) return
     targetSize = size
     try {
-      session.discarding.resize(size)
+      session.discarding.resize(LogicalExtent(size.width, size.height, density.toDouble()))
     } catch (error: MaplibreException) {
       fail(error)
     }
