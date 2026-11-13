@@ -534,7 +534,7 @@ class RustSysTests(unittest.TestCase):
                 self,
                 "-std=c2x",
                 f"-I{ROOT / 'include'}",
-                f"-I{ROOT / 'third_party/maplibre-native/include'}",
+                f"-I{ROOT / 'include'}",
                 str(root / "main.c"),
                 "-o",
                 str(root / "c-layout"),

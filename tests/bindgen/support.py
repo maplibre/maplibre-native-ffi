@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PROTOCOLS = FIXTURES / "protocols.h"
 PROTOCOLS_STUB = FIXTURES / "protocols_stub.c"
-NATIVE_INCLUDE = ROOT / "third_party/maplibre-native/include"
+NATIVE_INCLUDE = ROOT / "include"
 REAL_CLANG_ARGS = (f"-I{NATIVE_INCLUDE}",)
 
 # CI sets this so that a probe whose toolchain is missing fails the job.

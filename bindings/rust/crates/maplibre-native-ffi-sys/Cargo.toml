@@ -18,21 +18,15 @@ license.workspace = true
 links = "maplibre-native-c"
 repository.workspace = true
 
-# MapLibre Native compiles exactly one renderer per build. Enable at most one;
-# the build script picks a platform default when none is set. Only the final
-# binary enables one, so a library that depends on this crate leaves them off.
+# Each native artifact names the render backend that its preset tests, and this
+# picks which artifact links. Enable at most one; the build script picks the
+# platform default when none is set. Only the final binary enables one, so a
+# library that depends on this crate leaves them off.
 [features]
 metal = []
 opengl = []
 vulkan = []
 webgpu = []
-
-# The C library calls into a Rust platform layer on these targets. Its static
-# library carries a second Rust standard library, which collides with the host's
-# unless both are the same build, so Cargo builds the layer instead. The build
-# script names the same targets.
-[target.'cfg(any(all(target_os = "linux", not(target_env = "ohos")), target_os = "freebsd", target_os = "windows", target_os = "emscripten", target_os = "android"))'.dependencies]
-maplibre-native-ffi-platform.workspace = true
 
 [build-dependencies]
 flate2 = "1.1.9"

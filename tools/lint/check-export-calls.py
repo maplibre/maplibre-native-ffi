@@ -2,19 +2,14 @@
 """Check that the C ABI suite calls every exported function by name.
 
 Every function that a public header declares with MLN_API has to appear by name
-in the ABI suite's sources, outside comments and string literals. Those are the
-files under tests/native other than internal/: the internal suite links the
-static library and reaches what no host can, so a call there proves nothing
-about the export. The functions that no ABI test calls yet are listed in
+in the ABI suite's sources, the files under tests/native, outside comments and
+string literals. The functions that no ABI test calls yet are listed in
 tests/uncalled-exports.txt. The check fails when an exported function is
 uncalled and not listed, and when a listed function is called, no longer
 exported, or listed twice, so the list only shrinks.
 
 `--prune` rewrites the list without the names that the check would reject. It
 never adds a name.
-
-Core sources use internal implementations: calling a public entry point
-outside src/c_api imports a DLL symbol on Windows, even in the static archive.
 """
 
 from __future__ import annotations
@@ -28,8 +23,6 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HEADERS = ROOT / "include"
 BASELINE = ROOT / "tests/uncalled-exports.txt"
 SUITE_DIR = ROOT / "tests/native"
-# The internal suite's cases and helpers.
-EXCLUDED_DIRS = ("internal",)
 TEST_SUFFIXES = {".c", ".cpp", ".h", ".hpp", ".m", ".mm"}
 # Adapter and binding support entry points serve hosts and generated bindings
 # rather than map workflows, so the report counts them separately.
@@ -95,15 +88,13 @@ def exported_functions() -> dict[str, str]:
 
 
 def suite_sources(directory: pathlib.Path) -> list[pathlib.Path]:
-    """The ABI suite's source files: everything under directory but internal/."""
+    """The ABI suite's source files: everything under directory."""
     if not directory.is_dir():
         raise SystemExit(f"error: no C test directory: {directory.relative_to(ROOT)}")
     return [
         source
         for source in sorted(directory.rglob("*"))
-        if source.suffix in TEST_SUFFIXES
-        and source.is_file()
-        and source.relative_to(directory).parts[0] not in EXCLUDED_DIRS
+        if source.suffix in TEST_SUFFIXES and source.is_file()
     ]
 
 
@@ -151,30 +142,6 @@ def read_baseline() -> list[str]:
     return names
 
 
-def internal_api_calls(exported: dict[str, str]) -> list[str]:
-    problems = []
-    directory = ROOT / "src"
-    for source in sorted(directory.rglob("*")):
-        if (
-            not source.is_file()
-            or source.suffix not in TEST_SUFFIXES | {".inc"}
-            or source.relative_to(directory).parts[0] == "c_api"
-        ):
-            continue
-        text = STRING_LITERAL.sub(
-            '""', strip_comments(source.read_text(encoding="utf-8"))
-        )
-        # Completion traits use public function addresses as type keys, which
-        # create no DLL reference. Check direct calls here.
-        references = set(re.findall(r"\b(mln_\w+)\s*\(", text)) & exported.keys()
-        for name in sorted(references):
-            problems.append(
-                f"{source.relative_to(ROOT).as_posix()} calls exported {name}; "
-                "call its internal implementation"
-            )
-    return problems
-
-
 def write_baseline(keep: set[str]) -> None:
     """Rewrites the baseline with only the kept names.
 
@@ -203,7 +170,6 @@ def main() -> int:
     args = parser.parse_args()
 
     exported = exported_functions()
-    internal = internal_api_calls(exported)
     called = called_names(suite_sources(SUITE_DIR))
     baseline = read_baseline()
     listed = set(baseline)
@@ -227,15 +193,12 @@ def main() -> int:
         keep = set(uncalled) & listed
         write_baseline(keep)
         print(f"Kept {len(keep)} names in {BASELINE.relative_to(ROOT).as_posix()}.")
-        for problem in internal:
-            print(f"error: {problem}", file=sys.stderr)
         for name in unlisted:
             print(f"error: no ABI test calls {name}", file=sys.stderr)
-        return 1 if unlisted or internal else 0
+        return 1 if unlisted else 0
 
     baseline_path = BASELINE.relative_to(ROOT).as_posix()
     problems = [
-        *internal,
         *(
             f"no ABI test calls {name} ({exported[name]}); call it from a test"
             for name in unlisted

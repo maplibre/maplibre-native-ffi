@@ -35,12 +35,6 @@
 
 #![allow(non_camel_case_types)]
 
-// The build script sets this cfg where Cargo builds the platform layer. Nothing
-// here names that layer, which only the C library calls, so this keeps it on the
-// link line.
-#[cfg(mln_platform_crate)]
-extern crate mln_ffi_platform as _;
-
 mod generated;
 
 pub use generated::*;
