@@ -94,8 +94,9 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self,
     ):
         # Every registration and wake names the realm's delivery queue, or
-        # leaves native rules to answer. No registration needs a callback on a
-        # native thread.
+        # leaves native rules to answer, except the ones whose synchronous
+        # callbacks native code calls on its own thread, which only native
+        # code can supply.
         forms = {
             value.native: async_hosts.form(self.bound, value)
             for value in self.values.used.values()
@@ -106,6 +107,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
             {
                 "mln_camera_transition_handler": "queue",
                 "mln_custom_geometry_source_options": "queue",
+                "mln_custom_layer_host": "native",
                 "mln_custom_vector_source_options": "queue",
                 "mln_http_header_transform": "rules",
                 "mln_log_handler": "queue",
@@ -159,6 +161,14 @@ class TypeScriptEmitterTests(unittest.TestCase):
         self.assertEqual(
             native,
             {
+                "mln_custom_layer_host": [
+                    "prerender",
+                    "render",
+                    "deinitialize",
+                    "context_lost",
+                    "user_data",
+                    "release_user_data",
+                ],
                 "mln_queue_lock": [
                     "lock",
                     "unlock",
@@ -338,7 +348,7 @@ class TypeScriptEmitterTests(unittest.TestCase):
             "  static create(options?: RuntimeOptions): RuntimeHandle {",
             operations,
         )
-        self.assertIn("  resize(logicalSize: LogicalSize): void {", operations)
+        self.assertIn("  resize(extent: LogicalExtent): void {", operations)
 
     def test_a_factory_is_static_and_a_global_names_its_verb_first(self):
         operations = emitted(typescript, self.api)[
