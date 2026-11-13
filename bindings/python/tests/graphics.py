@@ -27,6 +27,8 @@ class Context(ctypes.Structure):
         ("vulkan_queue", ctypes.c_void_p),
         ("vulkan_get_instance_proc_addr", ctypes.c_void_p),
         ("vulkan_get_device_proc_addr", ctypes.c_void_p),
+        ("vulkan_device_extensions", ctypes.POINTER(ctypes.c_char_p)),
+        ("vulkan_device_extension_count", ctypes.c_uint32),
         ("egl_display", ctypes.c_void_p),
         ("egl_config", ctypes.c_void_p),
         ("egl_context", ctypes.c_void_p),
@@ -34,6 +36,14 @@ class Context(ctypes.Structure):
         ("wgl_context", ctypes.c_void_p),
         ("get_proc_address", ctypes.c_void_p),
     )
+
+
+def vulkan_device_extensions(context: Context) -> list[str]:
+    """The names of the device extensions that the context's VkDevice enabled."""
+    return [
+        context.vulkan_device_extensions[index].decode()
+        for index in range(context.vulkan_device_extension_count)
+    ]
 
 
 class TextureInfo(ctypes.Structure):

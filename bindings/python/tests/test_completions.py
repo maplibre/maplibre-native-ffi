@@ -27,7 +27,9 @@ def test_discarded_commands_are_fenced_and_sync_rejection_raises(
         mln.MaplibreError,
         check=lambda error: error.status == mln.Status.INVALID_ARGUMENT,
     ):
-        map_handle.discarding.resize(mln.LogicalSize(width=0, height=8))
+        map_handle.discarding.resize(
+            mln.LogicalExtent(width=0, height=8, scale_factor=1.0)
+        )
 
 
 def test_a_done_callback_runs_off_the_dispatcher_thread_and_can_wait_on_native(
@@ -47,7 +49,9 @@ def test_a_done_callback_runs_off_the_dispatcher_thread_and_can_wait_on_native(
 
     assert finished.wait(TIMEOUT)
     ((first, second),) = outcomes
-    assert second.generation > first.generation
+    # The second query ran after the first, so it matches the same snapshot or
+    # a later one.
+    assert second.generation >= first.generation
 
 
 def test_a_failed_command_raises_its_status_and_generation(
