@@ -33,6 +33,7 @@ from sbom import (
 BACKENDS = ("opengl", "metal", "vulkan")
 DESCRIPTOR_PATH = pathlib.Path("share/maplibre-native-c/artifact.json")
 NATIVE_DLL = "maplibre-native-c.dll"
+MINGW_RUNTIME_DLLS = ("libunwind.dll", "libc++.dll")
 LICENSE = pathlib.Path(__file__).resolve().parents[2] / "LICENSE"
 DEV_SUFFIX = re.compile(r"\.dev[0-9]+\Z")
 
@@ -73,6 +74,13 @@ def stage_runtime_dlls(
         raise SystemExit(f"{prefix} carries no {NATIVE_DLL}")
     shutil.copy2(native, module / native.name)
     if platform.startswith("windows-mingw-"):
+        # An LLVM MinGW build's DLL imports the toolchain's unwinder and C++
+        # runtime, which the native package installs beside it. Windows looks
+        # for them where it found the DLL, not in the wheel's .libs directory.
+        for runtime in MINGW_RUNTIME_DLLS:
+            dll = prefix / "bin" / runtime
+            if dll.is_file():
+                shutil.copy2(dll, module / dll.name)
         return
     runtime_dlls = [
         *sorted(prefix.glob("bin/vcruntime140*.dll")),
