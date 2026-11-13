@@ -69,8 +69,10 @@ Future<void> abandonSession() async {
     ],
   });
   var frames = Completer<void>();
-  final session = map.attachOffscreen(
-    OffscreenDescriptor(logicalSize: LogicalSize(width: 32, height: 32)),
+  final session = map.attach(
+    RenderTarget.offscreen(
+      OffscreenTarget(logicalSize: LogicalSize(width: 32, height: 32)),
+    ),
     RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
       frameWake: Wake(

@@ -2,8 +2,9 @@
 /// `tests/graphics`, loaded from the install prefix the suite runs against.
 ///
 /// A test attaches a borrowed texture in such a context only for what an
-/// offscreen session lacks: acquired frames, and a Vulkan queue lock. Both exist
-/// only on Metal and Vulkan builds, so an OpenGL build opens no context here.
+/// offscreen session lacks: acquired frames, and a device that wraps the host's
+/// Vulkan device with a queue lock. Both exist only on Metal and Vulkan builds,
+/// so an OpenGL build opens no context here.
 library;
 
 import 'dart:ffi';
@@ -29,6 +30,9 @@ final class _Context extends Struct {
   external Pointer<Void> vulkanQueue;
   external Pointer<Void> vulkanGetInstanceProcAddr;
   external Pointer<Void> vulkanGetDeviceProcAddr;
+  external Pointer<Pointer<Utf8>> vulkanDeviceExtensions;
+  @Uint32()
+  external int vulkanDeviceExtensionCount;
   external Pointer<Void> eglDisplay;
   external Pointer<Void> eglConfig;
   external Pointer<Void> eglContext;
@@ -139,7 +143,7 @@ int? _buildBackend() {
 }
 
 /// Whether this build attaches sessions to Vulkan, the one backend whose
-/// sessions take a queue lock.
+/// devices take a queue lock.
 bool get buildAttachesVulkan => _buildBackend() == _backendVulkan;
 
 /// Whether [TestGraphics.open] opens a context on this build.
@@ -182,36 +186,21 @@ final class TestGraphics {
   final _textures = <Pointer<Void>>[];
   var _closed = false;
 
-  /// Attaches a ring of one texture on this device for a core worker, at
-  /// [size] on a map of scale factor 1. [close] destroys the texture, so the
-  /// session must retire first.
-  RenderSessionHandle attachBorrowedTexture(
-    MapHandle map,
-    LogicalSize size,
-    RenderSessionAttachOptions options,
-  ) {
-    final width = size.width;
-    final height = size.height;
-    final texture = _createTexture(width, height);
+  /// Wraps this context's device in a GPU device, which a teardown releases.
+  /// A Vulkan device takes [queueLock], the lock on the queue that the host
+  /// submits to.
+  GpuDeviceHandle wrapDevice({QueueLock? queueLock}) {
     final context = _context.ref;
     NativePointer pointer(Pointer<Void> value) => NativePointer(value.address);
+    final GpuDeviceHandle device;
     switch (context.backend) {
       case _backendMetal:
-        return map.attachMetalBorrowedTexture(
-          MetalBorrowedTextureDescriptor(
-            logicalSize: size,
-            physicalWidth: width,
-            physicalHeight: height,
-            textures: [MetalBorrowedTexture(texture: texture.metalTexture)],
-          ),
-          options,
+        device = GpuDeviceHandle.wrapMetal(
+          MetalDeviceDescriptor(device: pointer(context.metalDevice)),
         );
       case _backendVulkan:
-        return map.attachVulkanBorrowedTexture(
-          VulkanBorrowedTextureDescriptor(
-            logicalSize: size,
-            physicalWidth: width,
-            physicalHeight: height,
+        device = GpuDeviceHandle.wrapVulkan(
+          VulkanDeviceDescriptor(
             context: VulkanContextDescriptor(
               instance: pointer(context.vulkanInstance),
               physicalDevice: pointer(context.vulkanPhysicalDevice),
@@ -221,20 +210,61 @@ final class TestGraphics {
               getInstanceProcAddr: pointer(context.vulkanGetInstanceProcAddr),
               getDeviceProcAddr: pointer(context.vulkanGetDeviceProcAddr),
             ),
-            textures: [
-              VulkanBorrowedTexture(
-                image: texture.vulkanImage,
-                imageView: texture.vulkanImageView,
-              ),
+            queueLock: queueLock,
+            enabledExtensions: [
+              for (var i = 0; i < context.vulkanDeviceExtensionCount; i++)
+                context.vulkanDeviceExtensions[i].toDartString(),
             ],
-            format: texture.format,
-            finalLayout: texture.vulkanFinalLayout,
           ),
-          options,
         );
       default:
-        fail('no borrowed texture for backend ${context.backend}');
+        fail('no GPU device for backend ${context.backend}');
     }
+    addTearDown(device.release);
+    return device;
+  }
+
+  /// Attaches a ring of one texture on this context for a core worker, at
+  /// [size] on a map of scale factor 1, on [device] or else on a device that
+  /// wraps this context's. [close] destroys the texture, so the session must
+  /// retire first.
+  RenderSessionHandle attachBorrowedTexture(
+    MapHandle map,
+    LogicalSize size,
+    RenderSessionAttachOptions options, {
+    GpuDeviceHandle? device,
+  }) {
+    final width = size.width;
+    final height = size.height;
+    final texture = _createTexture(width, height);
+    final backend = _context.ref.backend;
+    final target = switch (backend) {
+      _backendMetal => RenderTarget.metalBorrowedTextures(
+        MetalBorrowedTexturesTarget(
+          logicalSize: size,
+          physicalWidth: width,
+          physicalHeight: height,
+          textures: [MetalBorrowedTexture(texture: texture.metalTexture)],
+        ),
+      ),
+      _backendVulkan => RenderTarget.vulkanBorrowedTextures(
+        VulkanBorrowedTexturesTarget(
+          logicalSize: size,
+          physicalWidth: width,
+          physicalHeight: height,
+          textures: [
+            VulkanBorrowedTexture(
+              image: texture.vulkanImage,
+              imageView: texture.vulkanImageView,
+            ),
+          ],
+          format: texture.format,
+          finalLayout: texture.vulkanFinalLayout,
+        ),
+      ),
+      _ => fail('no borrowed texture for backend $backend'),
+    };
+    return map.attach(target, options, device: device ?? wrapDevice());
   }
 
   /// Creates a texture that [close] destroys, and returns its info.
