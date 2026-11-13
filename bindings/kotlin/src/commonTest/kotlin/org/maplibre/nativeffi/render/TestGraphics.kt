@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.OpenGlBorrowedTexturesTarget
 import org.maplibre.nativeffi.OpenGlContextDescriptor
 import org.maplibre.nativeffi.OpenGlContextProviderFlag
 import org.maplibre.nativeffi.QueueLock
+import org.maplibre.nativeffi.RenderBackend
 import org.maplibre.nativeffi.RenderBackendFlag
 import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RenderSessionHandle
@@ -120,6 +121,18 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
   WEBGL(5u),
   /** WebGPU in the browser, from the browser fixtures, as for [WEBGL]. */
   WEBGPU(6u);
+
+  /** The render backend that a GPU device for this backend's tests asks for. */
+  val renderBackend: RenderBackend
+    get() =
+      when (this) {
+        METAL -> RenderBackend.METAL
+        VULKAN -> RenderBackend.VULKAN
+        EGL,
+        WGL,
+        WEBGL -> RenderBackend.OPEN_GL
+        WEBGPU -> RenderBackend.WEB_GPU
+      }
 
   companion object {
     /** The one backend the loaded library renders with. */
