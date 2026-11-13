@@ -40,10 +40,8 @@ final class MapController {
   @ObservationIgnored private var scaleFactor: Double?
   @ObservationIgnored private var visible = true
 
-  // What the map and session have.
-  @ObservationIgnored private var mapScaleFactor: Double?
-  @ObservationIgnored private var camera = initialCamera
-  @ObservationIgnored private var sessionSize: LogicalSize?
+  // What the session has.
+  @ObservationIgnored private var sessionExtent: LogicalExtent?
   @ObservationIgnored private var hasTarget = false
 
   // Changes to the map and session run one at a time, in order.
@@ -68,7 +66,7 @@ final class MapController {
       self.map = nil
       self.runtime = nil
       self.pacer = nil
-      mapScaleFactor = nil
+      sessionExtent = nil
       hasTarget = false
       try? await session?.release()
       try? map?.dispose()
@@ -129,64 +127,52 @@ final class MapController {
     }
     guard !failed else { return }
 
-    // A map renders at one scale factor for its life, so a move to a display
-    // of another density takes a new map and session. The new map keeps the
-    // camera.
-    if let map, mapScaleFactor != scaleFactor {
-      let current = try map.getSnapshot().view.camera
-      camera = CameraOptions(
-        center: current.center,
-        zoom: current.zoom,
-        bearing: current.bearing,
-        pitch: current.pitch
-      )
-      // Frame wakes that are already queued find no session to drain.
-      let retired = session
-      session = nil
-      try await retired?.release()
-      try map.dispose()
-      self.map = nil
-    }
-
+    let extent = LogicalExtent(
+      width: size.width,
+      height: size.height,
+      scaleFactor: scaleFactor
+    )
     let map: MapHandle
     if let current = self.map {
       map = current
     } else {
-      map = try await createMap(size: size, scaleFactor: scaleFactor)
+      map = try await createMap(extent: extent)
     }
-    guard let session else {
-      try attach(map: map, layer: layer, size: size)
+    guard let session, let sessionExtent else {
+      try attach(map: map, layer: layer, extent: extent)
       return
     }
     if !hasTarget {
-      try await session.setMetalSurfaceTarget(
-        replacement: MetalSurfaceReplacement(logicalSize: size, layer: layer)
-      )
+      try await session.setTarget(.metalLayer(
+        MetalLayerTarget(logicalSize: size, layer: layer)
+      ))
       hasTarget = true
-      sessionSize = size
-    } else if sessionSize != size {
-      try session.discarding.resize(logicalSize: size)
-      sessionSize = size
+      self.sessionExtent = LogicalExtent(
+        width: size.width,
+        height: size.height,
+        scaleFactor: sessionExtent.scaleFactor
+      )
+    }
+    // The session resizes the map with it, and takes a new scale factor when
+    // the view moves to a display of another density.
+    if self.sessionExtent != extent {
+      try session.discarding.resize(extent: extent)
+      self.sessionExtent = extent
     }
   }
 
-  private func createMap(size: LogicalSize,
-                         scaleFactor: Double) async throws -> MapHandle
-  {
+  private func createMap(extent: LogicalExtent) async throws -> MapHandle {
     let runtime = try self.runtime ?? startRuntime()
     let map = try runtime.createMap(options: MapOptions(
-      initialExtent: LogicalExtent(
-        width: size.width,
-        height: size.height,
-        scaleFactor: scaleFactor
-      ),
+      initialExtent: extent,
       mapMode: .continuous,
       eventMask: [.mapStyleLoaded, .mapLoadingFailed, .mapRenderError]
     ))
     self.map = map
-    mapScaleFactor = scaleFactor
     try await map.ready
-    try map.discarding.updateCamera(CameraUpdate(mode: .jump, camera: camera))
+    try map.discarding.updateCamera(
+      CameraUpdate(mode: .jump, camera: initialCamera)
+    )
     try map.discarding.setStyleUrl(styleUrl)
     showStatus("Loading the style…")
     return map
@@ -201,17 +187,22 @@ final class MapController {
         Task { @MainActor [weak self] in self?.handle(events) }
       })
     // The pacer demands each session's frames at the display's refreshes.
-    pacer = try appleFramePacerCreate()
+    pacer = try FramePacerHandle.create()
     return runtime
   }
 
+  /// Attaches a session to the layer, on a device that the session creates.
+  /// The map was created at `extent`, which the session takes.
   private func attach(
     map: MapHandle,
     layer: CAMetalLayer,
-    size: LogicalSize
+    extent: LogicalExtent
   ) throws {
-    let session = try map.attachMetalSurface(
-      descriptor: MetalSurfaceDescriptor(logicalSize: size, layer: layer),
+    let session = try map.attach(
+      target: .metalLayer(MetalLayerTarget(
+        logicalSize: LogicalSize(width: extent.width, height: extent.height),
+        layer: layer
+      )),
       options: RenderSessionAttachOptions(
         driver: .coreWorker,
         // The wake runs on a library thread.
@@ -222,7 +213,7 @@ final class MapController {
     )
     self.session = session
     hasTarget = true
-    sessionSize = size
+    sessionExtent = extent
     try session.setFramePacer(pacer)
   }
 
