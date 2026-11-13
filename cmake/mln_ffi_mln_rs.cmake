@@ -224,6 +224,10 @@ function(mln_ffi_cargo_environment out_environment out_rustc_arguments)
     endif()
     list(APPEND rustc_arguments -C
          "link-arg=-Wl,-install_name,@rpath/lib${MLN_FFI_LIBRARY_NAME}.dylib")
+    # The header room that CMake links its own Apple libraries with, so that
+    # a host can rewrite the install name and dependencies to longer paths,
+    # as Dart's native assets do.
+    list(APPEND rustc_arguments -C link-arg=-Wl,-headerpad_max_install_names)
     # rustc's own linker for Apple targets is cc.
     mln_ffi_write_linker_shim(linker cc)
     list(APPEND environment "CARGO_TARGET_${target_upper}_LINKER=${linker}")
