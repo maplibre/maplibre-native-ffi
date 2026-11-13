@@ -1042,10 +1042,6 @@ MLN_API mln_status mln_runtime_list_offline_regions(
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when `side_database_path` isn't a readable
  *   database file.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the merge would exceed the tile limit that
- *   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED describes.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info;shape=array")
 MLN_API mln_status mln_runtime_merge_offline_regions(
