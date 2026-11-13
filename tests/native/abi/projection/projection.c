@@ -272,10 +272,6 @@ static void creation_rejects_invalid_views(void) {
      MLN_STATUS_INVALID_ARGUMENT, "projection types"},
     {"non-finite projection transition", nan_projection_transition,
      MLN_STATUS_INVALID_ARGUMENT, "projection transition"},
-    // MapLibre Native has no globe to project.
-    {"halfway to the globe", halfway_to_the_globe, MLN_STATUS_UNSUPPORTED,
-     "globe"},
-    {"globe projection", globe_projection, MLN_STATUS_UNSUPPORTED, "globe"},
     {"done leaving the globe", done_leaving_the_globe, MLN_STATUS_OK, NULL},
     {"zeroed projection", zeroed_projection, MLN_STATUS_OK, NULL},
     {"null output", null_output, MLN_STATUS_INVALID_ARGUMENT, "out_projection"},
@@ -286,6 +282,56 @@ static void creation_rejects_invalid_views(void) {
     cases, sizeof(cases) / sizeof(cases[0]), &defaults, sizeof(defaults),
     submit_projection, NULL
   );
+}
+
+// A view whose style projection draws a globe, alone or blending into
+// Mercator, projects when the library can project a globe, and is unsupported
+// when it can't. A globe centered on the null island hides its antipode.
+static void a_globe_view_projects_where_the_library_has_a_globe(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+
+  static const struct {
+    const char* label;
+    void (*mutate)(void* call);
+    bool whole_globe;
+  } views[] = {
+    {"halfway to the globe", halfway_to_the_globe, false},
+    {"globe projection", globe_projection, true},
+  };
+  for (size_t index = 0; index < sizeof(views) / sizeof(views[0]); index += 1) {
+    projection_call call = {.view = snapshot.view};
+    call.view.camera.center = (mln_lat_lng){0.0, 0.0};
+    views[index].mutate(&call);
+    mln_map_projection projection = MLN_HANDLE_NULL;
+    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+    const mln_status status =
+      mln_map_projection_create(&call.view, &projection, &diagnostic);
+    if (status == MLN_STATUS_UNSUPPORTED) {
+      TEST_ASSERT_NOT_NULL_MESSAGE(
+        strstr(diagnostic.message, "globe"), views[index].label
+      );
+      TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, projection);
+      continue;
+    }
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, status, views[index].label);
+    if (views[index].whole_globe) {
+      bool occluded = true;
+      MLN_TEST_OK(mln_map_projection_is_location_occluded(
+        projection, (mln_lat_lng){0.0, 0.0}, &occluded, NULL
+      ));
+      TEST_ASSERT_FALSE(occluded);
+      MLN_TEST_OK(mln_map_projection_is_location_occluded(
+        projection, (mln_lat_lng){0.0, 180.0}, &occluded, NULL
+      ));
+      TEST_ASSERT_TRUE(occluded);
+    }
+    mln_map_projection_release(projection);
+  }
 }
 
 // MapLibre Native draws only Mercator, which hides no location.
@@ -819,6 +865,7 @@ MLN_TEST_GROUP {
   RUN_TEST(projection_outlives_its_source_map_and_runtime);
   RUN_TEST(projection_follows_committed_extent_viewport_and_mode);
   RUN_TEST(creation_rejects_invalid_views);
+  RUN_TEST(a_globe_view_projects_where_the_library_has_a_globe);
   RUN_TEST(a_mercator_view_hides_no_location);
   RUN_TEST(a_view_projection_ignores_the_maps_constraints);
   RUN_TEST(setters_apply_before_return);
