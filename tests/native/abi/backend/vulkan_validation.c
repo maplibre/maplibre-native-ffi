@@ -81,7 +81,7 @@ static void describe_ring(mln_test_target_call* call) {
       // VK_FORMAT_R8G8B8A8_UNORM, left shader-read-only.
       .format = 37,
       .final_layout = 5,
-    };
+  };
 }
 
 static bool vulkan_build(void) {

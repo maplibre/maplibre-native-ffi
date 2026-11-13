@@ -95,7 +95,7 @@ static void describe_ring(mln_test_target_call* call, void* texture) {
       .physical_height = 64,
       .textures = call->textures.metal,
       .texture_count = 1,
-    };
+  };
 }
 
 static bool metal_build(void) {
