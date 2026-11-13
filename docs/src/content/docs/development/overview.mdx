@@ -42,11 +42,6 @@ backend that a target supports, so a preset's backend picks the backend that its
 tests drive and that its artifact descriptor names. A release build takes a few
 minutes, most of it in link-time optimization.
 
-The C tests list the cases that mln-rs doesn't pass yet in
-`tests/native/expected-failures/`, one file per backend. A listed case that
-fails counts as ignored, and one that passes fails the run, so remove a case
-from its list once mln-rs passes it.
-
 After you change a header, run `mise run bindings:generate`. `include/` is the
 source of truth for the C API, and mln-rs keeps a copy in
 `crates/mln_c/include`. Configuring a preset fails while the two differ, so

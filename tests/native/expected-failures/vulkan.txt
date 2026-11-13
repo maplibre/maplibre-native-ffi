@@ -1,8 +1,0 @@
-# The ABI suite's cases and exit programs that fail under the Vulkan presets,
-# because mln-rs doesn't do yet what they test. A case is <file>:<case> and an
-# exit program is its file, relative to tests/native, followed by `  # ` and why
-# it fails. The harness reports a listed case that fails as ignored, CTest
-# expects a listed program to fail, and either fails when what it lists passes,
-# so remove an entry once it passes. cmake/mln_ffi_tests.cmake says which lists
-# a preset reads.
-exit/live_render_session_vulkan.c  # abandoning a live render session at exit doesn't release the host's queue locks
