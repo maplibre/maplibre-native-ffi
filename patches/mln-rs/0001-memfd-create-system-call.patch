@@ -1,0 +1,50 @@
+Call memfd_create through its system call in the dmabuf allocator.
+
+The Linux presets link against glibc 2.17, the oldest release that supports
+x86_64 and AArch64, so that the library loads on old distributions and in
+hosts that link against an old sysroot, such as Kotlin/Native's. glibc added
+its memfd_create wrapper in 2.27, so the wrapper is an undefined symbol that
+links only with --allow-shlib-undefined. The system call works on every glibc
+and musl, and fails with ENOSYS on a kernel without it, as the wrapper does.
+
+diff --git a/crates/mln_gl/src/exported_target/dma_buf.rs b/crates/mln_gl/src/exported_target/dma_buf.rs
+index 3f70cf8..ee17c0d 100644
+--- a/crates/mln_gl/src/exported_target/dma_buf.rs
++++ b/crates/mln_gl/src/exported_target/dma_buf.rs
+@@ -263,7 +263,7 @@ fn udmabuf_allocate(device: &OwnedFd, size: Size) -> Result<Memory, Error> {
+     let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) }.max(4096) as u64;
+     let bytes = (u64::from(stride) * u64::from(size.height)).div_ceil(page) * page;
+     // SAFETY: a new memfd, which the buffer owns.
+-    let memory = unsafe { libc::memfd_create(c"mln-dma-buf".as_ptr(), libc::MFD_ALLOW_SEALING | libc::MFD_CLOEXEC) };
++    let memory = unsafe { memfd_create(c"mln-dma-buf", libc::MFD_ALLOW_SEALING | libc::MFD_CLOEXEC) };
+     if memory < 0 {
+         return Err(Error::native("allocating the dmabuf's memory failed"));
+     }
+@@ -440,3 +440,27 @@ fn render_node(egl: &'static Egl, display: egl::Display) -> Option<std::ffi::CSt
+         (!node.is_null()).then(|| CStr::from_ptr(node).to_owned())
+     }
+ }
++
++/// memfd_create(2). On Linux, the system call rather than glibc's wrapper,
++/// which glibc 2.27 added: the library links against an older glibc, and a
++/// kernel without the call fails it with ENOSYS, as the wrapper does.
++///
++/// # Safety
++///
++/// The caller owns the descriptor that it returns.
++#[cfg(target_os = "linux")]
++unsafe fn memfd_create(name: &std::ffi::CStr, flags: libc::c_uint) -> libc::c_int {
++    // SAFETY: the name is a C string, and the call takes no other memory.
++    unsafe { libc::syscall(libc::SYS_memfd_create, name.as_ptr(), flags) as libc::c_int }
++}
++
++/// memfd_create(2).
++///
++/// # Safety
++///
++/// The caller owns the descriptor that it returns.
++#[cfg(not(target_os = "linux"))]
++unsafe fn memfd_create(name: &std::ffi::CStr, flags: libc::c_uint) -> libc::c_int {
++    // SAFETY: the name is a C string.
++    unsafe { libc::memfd_create(name.as_ptr(), flags) }
++}
