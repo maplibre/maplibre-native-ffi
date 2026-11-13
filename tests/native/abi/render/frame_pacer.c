@@ -1,5 +1,6 @@
-// The frame pacer on platforms without a display for it to follow. The files
-// tagged _apple, _android, and _ohos test the pacers of the platforms with one.
+// The frame pacer's handle check, and its absence on platforms without a
+// display for it to follow. The files tagged _apple, _android, and _ohos test
+// the pacers of the platforms with one.
 
 #include "support/test_support.h"
 
@@ -16,8 +17,8 @@ static void a_platform_without_a_display_source_has_no_frame_pacer(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, pacer);
 }
+#endif
 
-// Without a pacer to change, only the handle check is left to test.
 static void the_null_handle_takes_no_frame_pacer_options(void) {
   mln_frame_pacer_options options = {.size = sizeof(mln_frame_pacer_options)};
   options.fields = MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
@@ -26,11 +27,10 @@ static void the_null_handle_takes_no_frame_pacer_options(void) {
     mln_frame_pacer_set_options(MLN_HANDLE_NULL, &options, MLN_TEST_DIAGNOSTIC)
   );
 }
-#endif
 
 MLN_TEST_GROUP {
 #if defined(NO_DISPLAY_SOURCE)
   RUN_TEST(a_platform_without_a_display_source_has_no_frame_pacer);
-  RUN_TEST(the_null_handle_takes_no_frame_pacer_options);
 #endif
+  RUN_TEST(the_null_handle_takes_no_frame_pacer_options);
 }
