@@ -302,6 +302,14 @@ else if (supports_egl)
 else
     test_graphics.MLN_TEST_GRAPHICS_BACKEND_WGL;
 
+/// The backend under test, which the build selects with `-Dbackend`.
+const render_backend: maplibre.RenderBackend = if (build_options.supports_metal)
+    .metal
+else if (build_options.supports_vulkan)
+    .vulkan
+else
+    .open_gl;
+
 pub const Graphics = struct {
     handle: *test_graphics.mln_test_graphics,
     context: test_graphics.mln_test_graphics_context,
@@ -389,9 +397,10 @@ else
     maplibre.OpenGlBorrowedTexture;
 
 /// A render session on a fixture's map, with the wakes that its waits block
-/// on. An offscreen session renders on a device of its own. A borrowed
-/// session renders into a ring of textures from tests/graphics, on a device
-/// that wraps the graphics object's.
+/// on. An offscreen session renders on a device of its own, of the backend
+/// under test, which a library of several backends would not pick by default.
+/// A borrowed session renders into a ring of textures from tests/graphics, on
+/// a device that wraps the graphics object's.
 pub const TextureSession = struct {
     wakes: Signal = .{},
     graphics: ?Graphics = null,
@@ -414,8 +423,9 @@ pub const TextureSession = struct {
     pub fn attachOffscreen(map: maplibre.Map, extent: maplibre.LogicalExtent) !*TextureSession {
         const self = try testing.allocator.create(TextureSession);
         errdefer testing.allocator.destroy(self);
-        self.* = .{};
-        const attachment = try map.attach(testing.allocator, .{ .offscreen = .{ .logical_size = logicalSize(extent) } }, null, self.attachOptions(.core_worker), null);
+        self.* = .{ .device = try maplibre.GpuDevice.create(.{ .backend = render_backend }, null) };
+        errdefer self.destroyGraphics();
+        const attachment = try map.attach(testing.allocator, .{ .offscreen = .{ .logical_size = logicalSize(extent) } }, self.device, self.attachOptions(.core_worker), null);
         self.session = attachment.session;
         errdefer self.release();
         try self.resolve(attachment.ready);
