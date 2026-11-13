@@ -6,27 +6,78 @@ import Testing
   import Metal
 #endif
 
-/// A device or context from tests/graphics for the backend this build of the
-/// native library provides. A build provides one native backend, so every
-/// render test runs on it rather than being skipped.
-final class TestGraphics: @unchecked Sendable {
-  let backend: Int
-  private let graphics: OpaquePointer
-  private let context: mln_test_graphics_context
+/// The render backend under test: the one that MLN_FFI_TEST_BACKEND names,
+/// vulkan, opengl, or metal, which the loaded library must carry, or where
+/// nothing names one, the one backend that the library carries. A library of
+/// several backends would otherwise render with its default one.
+struct TestBackend: Sendable {
+  let renderBackend: RenderBackend
+  /// The tests/graphics backend, with OpenGL named by its context provider.
+  let graphicsBackend: Int
 
-  init() throws {
-    let backends = supportedRenderBackendMask()
-    backend = if backends.contains(.metal) {
-      MLN_TEST_GRAPHICS_BACKEND_METAL
-    } else if backends.contains(.vulkan) {
-      MLN_TEST_GRAPHICS_BACKEND_VULKAN
+  /// The backend under test, or why there is none.
+  static let underTest = Result { try TestBackend() }
+
+  private init() throws {
+    let carried = supportedRenderBackendMask()
+    let backends: [(
+      name: String,
+      backend: RenderBackend,
+      flag: RenderBackendFlag
+    )] = [
+      ("metal", .metal, .metal),
+      ("vulkan", .vulkan, .vulkan),
+      ("opengl", .openGl, .openGl),
+    ]
+    let named = ProcessInfo.processInfo
+      .environment["MLN_FFI_TEST_BACKEND"] ?? ""
+    let backend: (name: String, backend: RenderBackend, flag: RenderBackendFlag)
+    if named.isEmpty {
+      let candidates = backends.filter { carried.contains($0.flag) }
+      guard candidates.count == 1 else {
+        throw FixtureError(
+          "the library carries backend mask \(carried.rawValue); "
+            + "MLN_FFI_TEST_BACKEND must name the backend under test"
+        )
+      }
+      backend = candidates[0]
     } else {
+      guard let match = backends.first(where: { $0.name == named })
+      else {
+        throw FixtureError("no tests drive the \(named) backend")
+      }
+      guard carried.contains(match.flag) else {
+        throw FixtureError(
+          "the library lacks the \(named) backend under test; "
+            + "it carries backend mask \(carried.rawValue)"
+        )
+      }
+      backend = match
+    }
+    renderBackend = backend.backend
+    graphicsBackend = switch backend.backend {
+    case .metal: MLN_TEST_GRAPHICS_BACKEND_METAL
+    case .vulkan: MLN_TEST_GRAPHICS_BACKEND_VULKAN
+    default:
       #if os(Windows)
         MLN_TEST_GRAPHICS_BACKEND_WGL
       #else
         MLN_TEST_GRAPHICS_BACKEND_EGL
       #endif
     }
+  }
+}
+
+/// A device or context from tests/graphics for the backend under test. A
+/// backend under test whose graphics object cannot be created fails its tests
+/// rather than skipping them.
+final class TestGraphics: @unchecked Sendable {
+  let backend: Int
+  private let graphics: OpaquePointer
+  private let context: mln_test_graphics_context
+
+  init() throws {
+    backend = try TestBackend.underTest.get().graphicsBackend
     guard let graphics = mln_test_graphics_create(UInt32(backend)) else {
       throw FixtureError(String(cString: mln_test_graphics_last_error()))
     }
@@ -140,7 +191,7 @@ final class TestGraphics: @unchecked Sendable {
     }
   }
 
-  /// The borrowed ring of `textures`, for the build's backend.
+  /// The borrowed ring of `textures`, for the backend under test.
   func borrowedRing(_ textures: [TestTexture]) throws -> RenderTarget {
     guard let info = textures.last?.info else {
       throw FixtureError("a borrowed ring needs a texture")
@@ -234,6 +285,23 @@ final class TestGraphics: @unchecked Sendable {
 
   private func pointer(_ address: UnsafeMutableRawPointer?) -> NativePointer {
     NativePointer(bitPattern: UInt(bitPattern: address))
+  }
+}
+
+extension MapHandle {
+  /// Attaches a session to `target` on a device of its own of the backend
+  /// under test, which a library of several backends would not pick by
+  /// default.
+  func attachOwnDevice(
+    target: RenderTarget,
+    options: RenderSessionAttachOptions
+  ) throws -> RenderSessionHandle {
+    let device = try GpuDeviceHandle.create(options: GpuDeviceOptions(
+      backend: TestBackend.underTest.get().renderBackend
+    ))
+    // The session keeps the device until it ends.
+    defer { device.release() }
+    return try attach(target: target, device: device, options: options)
   }
 }
 

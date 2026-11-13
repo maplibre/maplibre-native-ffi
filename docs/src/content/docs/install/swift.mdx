@@ -27,17 +27,11 @@ Then depend on its `MaplibreNativeFFI` product:
 
 ## Choose a backend
 
-The package uses your platform's
-[default backend](/maplibre-native-ffi/install/#choose-a-backend). To choose
-another, enable the `OpenGL` or `Vulkan` trait:
-
-```swift title="Package.swift"
-.package(
-  url: "https://github.com/maplibre/maplibre-native-ffi-distribution",
-  exact: "{{version}}",
-  traits: ["Vulkan"]
-)
-```
+The package links the C library with every
+[backend](/maplibre-native-ffi/install/#choose-a-backend) of your platform. A
+render session draws with the backend of its GPU device: create one with
+`GpuDeviceHandle.create(options: GpuDeviceOptions(backend: .openGl))` to choose
+a backend, or attach without a device to take the platform's default.
 
 ## Android
 

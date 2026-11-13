@@ -756,13 +756,13 @@ ci:
     swiftpm:
       covers: >-
         Assembles the XCFramework from every Apple target's slice, and the
-        artifact bundles from every Linux, Android, and Windows target's
-        archive, so it runs those targets, and writes the Swift package that a
-        release pushes to the distribution repository with them. Then builds and
-        runs a Swift consumer against the package on macOS, builds it for iOS,
-        and runs it on Linux with each backend trait. Only changes to what the
-        XCFramework, the bundles, or the package contains or how they are
-        assembled need it: XCFramework and bundle packaging, the release's
+        artifact bundle from every Linux, Android, and Windows target's archive,
+        so it runs those targets, and writes the Swift package that a release
+        pushes to the distribution repository with them. Then builds and runs a
+        Swift consumer against the package on macOS, builds it for iOS, and runs
+        it on Linux, where it checks that every backend is linked. Only changes
+        to what the XCFramework, the bundle, or the package contains or how they
+        are assembled need it: XCFramework and bundle packaging, the release's
         distribution tool, and the root manifest's platforms and binding target.
         Ordinary Swift binding changes and one target's native packaging don't.
       rules:

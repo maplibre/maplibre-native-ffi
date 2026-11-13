@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-#MISE description="Test the Swift binding against a native preset's install."
-#MISE extends="ffi:preset"
+#MISE description="Test the Swift binding against a native preset's install, with one of its render backends."
+#MISE extends="ffi:test"
 #MISE dir="../.."
 #MISE shell="bash"
 #USAGE arg "[configuration]" default="debug" {
@@ -8,6 +8,7 @@
 #USAGE }
 set -euo pipefail
 
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "$usage_preset"
 source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
 case "$usage_preset" in
@@ -118,7 +119,7 @@ swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift_command=(swift)
 case "$usage_preset" in
   linux-*) swift_args+=(--build-system native) ;;
-  macos-x64-*)
+  macos-x64)
     swift_args+=(--arch x86_64)
     # The test host must load the x64 bundle under Rosetta too.
     swift_command=(arch -x86_64 swift)

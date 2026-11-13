@@ -8,7 +8,7 @@ import Testing
 
 /// A render fixture: a session attached on the map of a map fixture. A
 /// borrowed-texture session also holds a context and textures from
-/// tests/graphics for the build's backend; an offscreen one holds neither.
+/// tests/graphics for the backend under test; an offscreen one holds neither.
 private struct AttachedSession {
   let fixture: MapFixture
   let graphics: TestGraphics?
@@ -86,8 +86,8 @@ private func withOffscreenSession<Result>(
 }
 
 /// Attaches an offscreen session to a map showing `style` and returns it once
-/// the attach completes. The session creates its own device and drives itself
-/// on a core worker.
+/// the attach completes. The session renders on a device of its own and drives
+/// itself on a core worker.
 private func attachOffscreenSession(
   style: String = emptyStyle
 ) async throws -> AttachedSession {
@@ -95,7 +95,7 @@ private func attachOffscreenSession(
   let session: RenderSessionHandle
   do {
     try await fixture.map.setStyleJson(style)
-    session = try fixture.map.attach(
+    session = try fixture.map.attachOwnDevice(
       target: .offscreen(OffscreenTarget(
         logicalSize: LogicalSize(width: 32, height: 32)
       )),
@@ -264,7 +264,8 @@ private func attachBorrowedTexture(
   @Test func aMetalFrameLendsTypedObjects() async throws {
     try await withBorrowedTextureSession { rendered in
       let graphics = try #require(rendered.graphics)
-      // The build's backend decides whether the session renders with Metal.
+      // The backend under test decides whether the session renders with
+      // Metal.
       guard graphics.backend == MLN_TEST_GRAPHICS_BACKEND_METAL
       else { return }
       try await rendered.session.awaitRenderedFrame()
@@ -358,7 +359,7 @@ private func attachBorrowedTexture(
     #expect(try await rendered.session.awaitRenderedFrame() != nil)
     try await rendered.session.release()
     // Native code refuses an attach while the map still has a session.
-    let next = try rendered.fixture.map.attach(
+    let next = try rendered.fixture.map.attachOwnDevice(
       target: .offscreen(OffscreenTarget(
         logicalSize: LogicalSize(width: 32, height: 32)
       )),
@@ -451,9 +452,11 @@ private func recordingQueueLock(
 @Test func aVulkanDevicesSessionHoldsItsQueueLock() async throws {
   let calls = LockedBox<[String]>([])
   let released = LockedBox(false)
-  guard try TestGraphics().backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN else {
+  let backend = try TestBackend.underTest.get().renderBackend
+  guard backend == .vulkan else {
     await expectMaplibreError(.unsupported) {
       try GpuDeviceHandle.create(options: GpuDeviceOptions(
+        backend: backend,
         queueLock: recordingQueueLock(calls: calls, released: released)
       ))
     }

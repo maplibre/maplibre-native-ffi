@@ -2,9 +2,9 @@
 # shellcheck shell=bash
 
 case "$usage_preset" in
-  android-arm-*) swift_android_arch=armv7 ndk_arch=arm-linux-androideabi ;;
-  android-arm64-*) swift_android_arch=aarch64 ndk_arch=aarch64-linux-android ;;
-  android-x64-*) swift_android_arch=x86_64 ndk_arch=x86_64-linux-android ;;
+  android-arm) swift_android_arch=armv7 ndk_arch=arm-linux-androideabi ;;
+  android-arm64) swift_android_arch=aarch64 ndk_arch=aarch64-linux-android ;;
+  android-x64) swift_android_arch=x86_64 ndk_arch=x86_64-linux-android ;;
   *)
     echo "The Swift Android SDK supports android-arm, android-arm64, and android-x64 presets." >&2
     exit 2

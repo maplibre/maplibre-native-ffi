@@ -19,21 +19,21 @@ case "$usage_preset" in
     exec swift build --product MaplibreNativeFFIDeviceTests \
       -Xswiftc -enable-testing "${swift_android_args[@]}"
     ;;
-  ios-arm64-metal)
+  ios-arm64)
     exec swift build \
       --product MaplibreNativeFFI \
       --scratch-path .build/ios \
       --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
       --triple arm64-apple-ios15.0
     ;;
-  tvos-arm64-metal)
+  tvos-arm64)
     exec swift build \
       --product MaplibreNativeFFI \
       --scratch-path .build/tvos \
       --sdk "$(xcrun --sdk appletvos --show-sdk-path)" \
       --triple arm64-apple-tvos15.0
     ;;
-  visionos-arm64-metal)
+  visionos-arm64)
     # SwiftPM's native build system does not recognize visionOS triples.
     exec xcodebuild -quiet \
       -scheme MaplibreNativeFFI \
@@ -54,15 +54,15 @@ case "$usage_preset" in
       --triple arm64-apple-ios15.0-macabi
     ;;
   ios-*)
-    echo "The Swift binding builds for an iOS device with ios-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    echo "The Swift binding builds for an iOS device with ios-arm64; simulator coverage comes from //bindings/swift:test." >&2
     exit 2
     ;;
   tvos-*)
-    echo "The Swift binding builds for a tvOS device with tvos-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    echo "The Swift binding builds for a tvOS device with tvos-arm64; simulator coverage comes from //bindings/swift:test." >&2
     exit 2
     ;;
   visionos-*)
-    echo "The Swift binding builds for a visionOS device with visionos-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    echo "The Swift binding builds for a visionOS device with visionos-arm64; simulator coverage comes from //bindings/swift:test." >&2
     exit 2
     ;;
 esac
@@ -71,6 +71,6 @@ swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 # Swift Build crashes on Linux; see the api task.
 case "$usage_preset" in
   linux-*) swift_args+=(--build-system native) ;;
-  macos-x64-*) swift_args+=(--arch x86_64) ;;
+  macos-x64) swift_args+=(--arch x86_64) ;;
 esac
 swift build --target MaplibreNativeFFI "${swift_args[@]}"
