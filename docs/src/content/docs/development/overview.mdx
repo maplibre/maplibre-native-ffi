@@ -59,22 +59,29 @@ this site. `mise tasks --all` lists everything else.
 
 ## Other targets
 
-### Android, OpenHarmony, and Emscripten
+### Android and OpenHarmony
 
 These SDKs are large, so they're opt-in. Install one with
-`mise -E android install`, `-E ohos`, or `-E emscripten`, and pass the same `-E`
-to every later command, or set `MISE_ENV`. After an NDK update, run
-`mise run clean <preset>` for each Android preset.
+`mise -E android install` or `-E ohos`, and pass the same `-E` to every later
+command, or set `MISE_ENV`. After an NDK update, run `mise run clean <preset>`
+for each Android preset.
 
-The Emscripten presets are disabled for now: mln-rs builds for the browser as
-`wasm32-unknown-unknown`, not as the Emscripten modules that the browser builds
-link. `docs/support-gaps.toml` says why.
+### The browser
+
+The `web-wasm32-webgpu` and `web-wasm32-webgl` presets build mln-rs's browser
+package, a wasm-bindgen module for `wasm32-unknown-unknown` with one backend,
+with mln-rs's own `just c-web` recipe. Their tools come with `-E web`:
+`mise -E web run build web-wasm32-webgpu` installs the package under
+`share/maplibre-native-c/web`. The package has no C to link, so the C suites
+don't run for it: `mise -E web run test <preset>` runs mln-rs's browser check
+against it in headless Chromium, and
+`mise -E web run //bindings/kotlin:test:wasm <preset>` runs the Kotlin/Wasm
+suite. The module runs on the thread that loads it, with no threads of its own
+and no cross-origin isolation, and starts Web Workers for its tile work.
 
 The browser example in `examples/browser`, which the site serves as its live
-demo, loads the TypeScript binding's browser modules. Build them with
-`mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgl`,
-and again for `emscripten-wasm32-webgpu`, then serve the example with
-`mise run //examples/browser:dev`. The release puts it in the site.
+demo, loads the TypeScript binding's browser modules, which still build with
+Emscripten until that binding moves onto the browser package.
 
 ### Emulators and simulators
 
@@ -174,9 +181,9 @@ Test a patch with mln-rs's own tests, which `cargo test` runs from
 the pull request.
 
 To update mln-rs, check out the commit in the submodule, run `mise deps` to
-reapply the patches, and run the C tests. mln-rs runs a copy of the ABI suite
-in `tools/c-abi-test`, which it passes completely, so the lists here hold only
-the exit programs and the platforms that its copy doesn't run.
+reapply the patches, and run the C tests. mln-rs runs a copy of the ABI suite in
+`tools/c-abi-test`, which it passes completely, so the lists here hold only the
+exit programs and the platforms that its copy doesn't run.
 
 ## CI
 

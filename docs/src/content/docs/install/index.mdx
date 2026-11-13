@@ -27,22 +27,18 @@ backend your application already uses if it draws its own graphics.
 
 ## Web
 
-The library runs on several threads, which in a browser share memory, and
-browsers allow shared memory only on a cross-origin isolated page. Serve a page
-that loads the library with these headers, which make it isolated:
+In a browser, the library is a WebAssembly module for one backend, WebGPU or
+WebGL 2, that runs on the thread that loads it and never blocks it. Completions,
+events, and callbacks arrive in tasks of their own after the call that started
+them returns, so await them. Load the library on a dedicated
+[Web Worker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API),
+so that the map's work doesn't delay the page, and draw to an `OffscreenCanvas`
+that the page transfers to it with
+[`transferControlToOffscreen()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen).
+On the page's thread it works too, but every frame and style parse runs there.
 
-```text title="HTTP response headers"
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
-```
-
-Most static hosts let you set them, such as with a
-[`_headers` file](https://developers.cloudflare.com/pages/configuration/headers/)
-on Cloudflare Pages and
-[Netlify](https://docs.netlify.com/manage/routing/headers/), or
-[`vercel.json`](https://vercel.com/docs/project-configuration/vercel-json) on
-Vercel. GitHub Pages can't set headers, but a service worker such as
-[coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) can add them.
+The module starts Web Workers of its own for tile work, and needs no
+cross-origin isolation, so any static host serves it.
 
 ## macOS
 

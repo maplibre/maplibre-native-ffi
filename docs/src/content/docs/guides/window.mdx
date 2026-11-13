@@ -26,13 +26,13 @@ it to the library as an [](api:mln_render_target) of the kind that names it:
   `Window` and its Xlib `Display`
 - Android: the window's `ANativeWindow`
 - OpenHarmony: the `OHNativeWindow` of an `XComponent`
-- A browser: a
+- A browser: an
+  [`OffscreenCanvas`](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas),
+  such as one that the page
+  [transferred](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen)
+  to the library's Web Worker, or a
   [`<canvas>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/canvas)
-  by its selector, which the library
-  [transfers](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen)
-  to a worker, or a
-  [`WGPUSurface`](https://webgpu-native.github.io/webgpu-headers/Surfaces.html)
-  on the WebGPU device that you wrap with [](api:mln_gpu_device_wrap_web_gpu)
+  when the library runs on the page's thread, as an [](api:mln_web_object)
 
 <Aside type="note">
   The snippets below use a Wayland surface. For another platform, describe its
@@ -50,8 +50,8 @@ map's scale factor. You also pass a redraw wake and a frame wake here, covered
 in the next section.
 
 The [](api:mln_render_session_attach_options.driver) picks which thread runs the
-session's graphics work. For a window, that's the library's own thread. A
-WebGPU surface uses your device, so it runs on your graphics thread instead. See
+session's graphics work. For a window, that's the library's own thread. A WebGPU
+surface uses your device, so it runs on your graphics thread instead. See
 [Service driver work](#service-driver-work).
 
 <Snippet page="window" region="attach" />
