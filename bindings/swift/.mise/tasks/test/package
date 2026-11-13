@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Write the Swift package as a release does, with local native assets, then run a consumer against it. On macOS, the assets are the XCFramework, and the consumer also builds for iOS. On Linux, they are the native archives, whose artifact bundles the package takes, and the consumer runs with each backend trait."
+#MISE description="Write the Swift package as a release does, with local native assets, then run a consumer against it. On macOS, the assets are the XCFramework, and the consumer also builds for iOS. On Linux, they are the native archives, whose artifact bundle the package takes, and the consumer checks that it linked every backend of the platform."
 #MISE dir="../.."
 #MISE shell="bash"
 #USAGE arg "[assets]" default="build/packages/native/dist" help="Directory that holds MaplibreNativeC.xcframework.zip on macOS, or the native archives on Linux"
@@ -11,7 +11,7 @@ trap 'rm -rf "$scratch"' EXIT
 assets="$usage_assets"
 if [[ "$(uname -s)" == Linux ]]; then
   source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
-  # The package takes the bundles that a release would build from the same
+  # The package takes the bundle that a release would build from the same
   # archives.
   assets="$scratch/assets"
   mkdir -p "$assets"
@@ -39,9 +39,9 @@ fi
 package="$scratch/maplibre-native-ffi-distribution"
 python3 tools/release/distribution.py "$package" "$assets" --local
 
-# Writes a consumer of the package, with the package's traits given as Swift.
+# Writes a consumer of the package.
 consumer() {
-  local directory="$scratch/consumer$1"
+  local directory="$scratch/consumer"
   mkdir -p "$directory"
   cp -R tests/release/swift-package/. "$directory/"
   cat >"$directory/Package.swift" <<EOF
@@ -51,7 +51,7 @@ import PackageDescription
 let package = Package(
   name: "PackageConsumer",
   platforms: [.macOS("14.3"), .iOS("15.0")],
-  dependencies: [.package(path: "$package"$2)],
+  dependencies: [.package(path: "$package")],
   targets: [
     .executableTarget(
       name: "PackageConsumer",
@@ -66,25 +66,21 @@ EOF
   echo "$directory"
 }
 
+directory="$(consumer)"
 if [[ "$(uname -s)" == Linux ]]; then
-  # The consumer prints the backend mask that the package linked.
-  for case in default:2 OpenGL:4 Vulkan:2; do
-    trait="${case%:*}"
-    traits=""
-    [[ "$trait" == default ]] || traits=", traits: [\"$trait\"]"
-    directory="$(consumer "-$trait" "$traits")"
-    swift build --package-path "$directory" --scratch-path "$scratch/build/$trait"
-    backends="$("$(swift build --package-path "$directory" --scratch-path "$scratch/build/$trait" --show-bin-path)/PackageConsumer")"
-    if [[ "$backends" != "${case#*:}" ]]; then
-      echo "The $trait trait linked backends $backends, not ${case#*:}" >&2
-      exit 1
-    fi
-    echo "The $trait trait linked backends $backends"
-  done
+  # The consumer prints the backend mask that the package linked: Vulkan (2) and
+  # OpenGL (4).
+  swift build --package-path "$directory" --scratch-path "$scratch/build/linux"
+  backends="$("$(swift build --package-path "$directory" --scratch-path "$scratch/build/linux" --show-bin-path)/PackageConsumer")"
+  if [[ "$backends" != 6 ]]; then
+    echo "The package linked backends $backends, not 6" >&2
+    exit 1
+  fi
+  echo "The package linked backends $backends"
   exit 0
 fi
 
-cd "$(consumer "" "")"
+cd "$directory"
 swift run --scratch-path "$scratch/build/macos" PackageConsumer
 swift build \
   --product PackageConsumer \

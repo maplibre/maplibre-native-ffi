@@ -24,7 +24,7 @@ from native_package_release import (
 )
 from release_version import next_release, require_current_month, validate_tag
 from sbom import SBOM_NAME, component, document
-from swift_artifact_bundle import TRIPLES, bundle_name
+from swift_artifact_bundle import ARTIFACT, BUNDLE_NAME, TRIPLES
 from zig_package import PACKAGE_NAME as ZIG_PACKAGE_NAME
 from zig_package import zig_hash
 
@@ -82,7 +82,7 @@ def create_xcframework(path: pathlib.Path) -> None:
             ("macos-arm64", MACOS_PLIST.removesuffix("/Info.plist")),
         ):
             archive.writestr(
-                f"{resources}/{SBOM_NAME}", json.dumps(inventory(platform, "metal"))
+                f"{resources}/{SBOM_NAME}", json.dumps(inventory(platform))
             )
         add_symlink(archive, f"{MACOS_FRAMEWORK}/Headers", "Versions/Current/Headers")
 
@@ -96,21 +96,25 @@ PLATFORM = {
 }
 
 
-def descriptor(preset: str, backend: str = "vulkan") -> dict:
+BACKENDS = ("vulkan", "opengl")
+
+
+def descriptor(preset: str, backends: tuple[str, ...] = BACKENDS) -> dict:
     return {
         "schemaVersion": 0,
         "name": preset,
         "version": "0.1.0",
         "commit": None,
-        "platform": PLATFORM,
-        "backend": backend,
+        "platform": PLATFORM | {"id": preset},
+        "backends": list(backends),
+        "openglContextProvider": "egl" if "opengl" in backends else None,
         "link": {"libraries": ["m"], "frameworks": []},
     }
 
 
-def inventory(platform: str, backend: str) -> dict:
+def inventory(name: str) -> dict:
     root = component("maplibre-native-c", "0.1.0", "BSD-2-Clause")
-    root["bom-ref"] = f"native:{platform}:{backend}"
+    root["bom-ref"] = f"native:{name}"
     root["group"] = "org.maplibre.nativeffi"
     local = component("mln-rs-c", "0.1.0", "BSD-2-Clause")
     local["group"] = "org.maplibre.nativeffi"
@@ -133,7 +137,9 @@ def ar_archive(member: str) -> bytes:
     return b"!<arch>\n" + header.encode() + content + b"\n" * (len(content) % 2)
 
 
-def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> None:
+def create_archive(
+    path: pathlib.Path, preset: str, backends: tuple[str, ...] = BACKENDS
+) -> None:
     root = f"maplibre-native-c-{preset}"
     with tarfile.open(path, "w:gz") as archive:
         add_bytes(
@@ -149,7 +155,7 @@ def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> 
         add_bytes(
             archive,
             f"{root}/share/maplibre-native-c/artifact.json",
-            json.dumps(descriptor(preset, backend)).encode(),
+            json.dumps(descriptor(preset, backends)).encode(),
         )
         add_bytes(archive, f"{root}/lib/libmaplibre-native-c.so", b"binary")
         add_bytes(archive, f"{root}/lib/libmaplibre-native-c.a", ar_archive("c.o"))
@@ -162,7 +168,7 @@ def create_archive(path: pathlib.Path, preset: str, backend: str = "vulkan") -> 
             add_bytes(
                 archive,
                 f"{root}/{relative}/{SBOM_NAME}",
-                json.dumps(inventory(PLATFORM["id"], backend)).encode(),
+                json.dumps(inventory(preset)).encode(),
             )
 
 
@@ -286,7 +292,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         initialize_repository(self.repository)
         self.release_dir = self.repository / "release"
         self.release_dir.mkdir()
-        self.preset = "linux-gnu-x64-vulkan"
+        self.preset = "linux-gnu-x64"
         self.sha = "b" * 40
         self.version = "0.202608.0"
         self.write_presets(self.preset)
@@ -299,14 +305,13 @@ class NativePackageReleaseTest(unittest.TestCase):
     def test_native_package_gaps_match_the_ci_package_planner(self) -> None:
         from tools.ci import gaps, plan
 
-        self.write_presets(self.preset, "linux-gnu-x64-egl")
+        self.write_presets(self.preset, "linux-gnu-arm64")
         entry = gaps.Entry(
             0,
             {
                 "bindings": ("c",),
                 "platforms": ("linux-gnu",),
                 "archs": ("x64",),
-                "backends": ("vulkan",),
                 "operations": ("package",),
             },
             "path-known",
@@ -317,7 +322,7 @@ class NativePackageReleaseTest(unittest.TestCase):
             json.loads((REPOSITORY / "CMakePresets.json").read_text())
         )
         with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
-            self.assertEqual(package_presets(self.repository), ["linux-gnu-x64-egl"])
+            self.assertEqual(package_presets(self.repository), ["linux-gnu-arm64"])
             self.assertNotIn(
                 self.preset,
                 {
@@ -351,18 +356,24 @@ class NativePackageReleaseTest(unittest.TestCase):
         (sources / "maplibre_native_ffi.zig").write_text("// binding\n")
 
     def write_presets(self, *presets: str) -> None:
-        configure = [{"name": "_base", "hidden": True}]
-        configure += [{"name": name, "inherits": "_base"} for name in presets]
+        """Writes the repository's hidden presets and its presets of `presets`."""
+        configure = [
+            preset
+            for preset in json.loads((REPOSITORY / "CMakePresets.json").read_text())[
+                "configurePresets"
+            ]
+            if preset.get("hidden", False) or preset["name"] in presets
+        ]
         (self.repository / "CMakePresets.json").write_text(
             json.dumps({"configurePresets": configure})
         )
 
     def archive(
-        self, preset: str | None = None, backend: str = "vulkan"
+        self, preset: str | None = None, backends: tuple[str, ...] = BACKENDS
     ) -> pathlib.Path:
         preset = preset or self.preset
         archive = self.release_dir / f"maplibre-native-c-{preset}.tar.gz"
-        create_archive(archive, preset, backend)
+        create_archive(archive, preset, backends)
         return archive
 
     def prepare(
@@ -416,13 +427,13 @@ class NativePackageReleaseTest(unittest.TestCase):
                     archive,
                     self.gobject,
                     self.xcframework,
-                    self.release_dir / bundle_name("vulkan"),
+                    self.release_dir / BUNDLE_NAME,
                     self.release_dir / ZIG_PACKAGE_NAME,
                     self.release_dir / ARTIFACTS_NAME,
                     sbom_path(archive),
                     sbom_path(self.gobject),
                     sbom_path(self.xcframework),
-                    sbom_path(self.release_dir / bundle_name("vulkan")),
+                    sbom_path(self.release_dir / BUNDLE_NAME),
                 )
             },
         )
@@ -437,7 +448,7 @@ class NativePackageReleaseTest(unittest.TestCase):
                 "artifacts": [
                     {
                         "platform": "linux-gnu-x64",
-                        "backend": "vulkan",
+                        "backends": list(BACKENDS),
                         "archive": archive.name,
                         "sha256": checksums[archive.name],
                         "sbom": self.sbom_reference(archive, checksums),
@@ -524,11 +535,14 @@ class NativePackageReleaseTest(unittest.TestCase):
 
     def test_a_swift_bundle_merges_each_platforms_archives(self) -> None:
         self.archive()
-        self.archive("linux-gnu-x64-egl", "opengl")
-        self.write_presets(self.preset, "linux-gnu-x64-egl")
+        self.archive("linux-gnu-arm64")
+        create_gobject_archive(
+            self.release_dir / "maplibre-native-ffi-gobject-linux-gnu-arm64.tar.gz"
+        )
+        self.write_presets(self.preset, "linux-gnu-arm64")
         self.prepare()
-        root = "MaplibreNativeCVulkan.artifactbundle"
-        with zipfile.ZipFile(self.release_dir / bundle_name("vulkan")) as bundle:
+        root = f"{ARTIFACT}.artifactbundle"
+        with zipfile.ZipFile(self.release_dir / BUNDLE_NAME) as bundle:
             info = json.loads(bundle.read(f"{root}/info.json"))
             library = bundle.read(f"{root}/linux-gnu-x64/libmaplibre-native-c.a")
             static = bundle.read(f"{root}/include/maplibre_native_c_static.h")
@@ -537,29 +551,31 @@ class NativePackageReleaseTest(unittest.TestCase):
                 bundle.read(f"{root}/linux-gnu-x64/share/artifact.json")
             )
         self.assertEqual(
-            info["artifacts"]["MaplibreNativeCVulkan"]["variants"],
+            info["artifacts"][ARTIFACT]["variants"],
             [
                 {
-                    "path": "linux-gnu-x64/libmaplibre-native-c.a",
-                    "supportedTriples": ["x86_64-unknown-linux-gnu"],
+                    "path": f"{platform}/libmaplibre-native-c.a",
+                    "supportedTriples": [triple],
                     "staticLibraryMetadata": {
                         "headerPaths": ["include"],
                         "moduleMapPath": "include/module.modulemap",
                     },
                 }
+                for platform, triple in (
+                    ("linux-gnu-arm64", "aarch64-unknown-linux-gnu"),
+                    ("linux-gnu-x64", "x86_64-unknown-linux-gnu"),
+                )
             ],
         )
-        self.assertEqual(
-            info["artifacts"]["MaplibreNativeCVulkan"]["version"], self.version
-        )
+        self.assertEqual(info["artifacts"][ARTIFACT]["version"], self.version)
         self.assertIn(b"c.o/", library)
         self.assertIn(b"#define MLN_STATIC", static)
         self.assertEqual(header, b"// header\n")
         self.assertEqual(descriptor["version"], self.version)
-        self.assertTrue((self.release_dir / bundle_name("opengl")).is_file())
+        self.assertEqual(descriptor["backends"], list(BACKENDS))
 
     def test_refuses_an_incomplete_native_release(self) -> None:
-        self.write_presets("linux-gnu-x64-egl", self.preset)
+        self.write_presets("linux-gnu-arm64", self.preset)
         self.archive()
 
         with self.assertRaisesRegex(SystemExit, "missing"):
@@ -606,10 +622,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.assertEqual(library, b"binary")
 
     def test_refuses_a_platform_without_its_default_backend(self) -> None:
-        self.preset = "linux-gnu-x64-egl"
-        self.write_presets(self.preset)
-        self.archive(backend="opengl")
-        self.gobject.unlink()
+        self.archive(backends=("opengl",))
 
         with self.assertRaisesRegex(SystemExit, "default backend, vulkan"):
             self.prepare()
