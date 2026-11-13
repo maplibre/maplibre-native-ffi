@@ -52,6 +52,7 @@ from ._generated_values import (
     MapViewportOptions,
     MetalDeviceDescriptor,
     MetalTextureFrame,
+    NativeCustomLayerHost,
     NetworkStatus,
     OfflineRegionDefinition,
     OfflineRegionDownloadState,

@@ -28,6 +28,7 @@ from .python_values import (
     enum_member,
     enum_type,
     field_name,
+    native_name,
     ok,
     public_name,
     rust_field,
@@ -1130,6 +1131,12 @@ def lower(api: Api | BoundApi) -> Lowered:
         for value in values.records.values()
         if value.union_member
         for variant in value.union_member.value.fields
+    )
+    # A parameter that takes a registration also takes its native form.
+    imported.update(
+        native_name(value)
+        for value in values.records.values()
+        if value.registration and async_hosts.accepts_native(values.api, value)
     )
     imports = "\n".join(
         f"from ._generated_values import {name}" for name in sorted(imported)
