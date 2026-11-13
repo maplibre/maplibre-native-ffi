@@ -116,10 +116,11 @@ sccache = "0.19.0"
 # Swift compiler.
 "github:nicklockwood/SwiftFormat" = { version = "0.64.4", no_app = true, rename_exe = "swiftformat" }
 
-# The native CMake build compiles the Rust platform support library, so Rust is
-# part of the repository-wide native toolchain. `rust-src` is for the Emscripten
-# target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
-# atomics, so that target rebuilds `std` from source. See cmake/mln_ffi_rust.cmake.
+# The native build compiles mln-rs, which implements the C library, with Cargo
+# for each preset's Rust target, so Rust is part of the repository-wide native
+# toolchain. `rust-src` is for the Emscripten target alone: rustup ships no
+# `std` for `wasm32-unknown-emscripten` built with atomics, so that target
+# rebuilds `std` from source. See cmake/mln_ffi_mln_rs.cmake.
 # `llvm-tools` and the toolchain's lld package the Linux and FreeBSD archives for
 # any architecture. See cmake/toolchains/zig.cmake.
 "core:rust" = { version = "1.99.1", profile = "minimal", components = "rustfmt,clippy,rust-src,llvm-tools", targets = "x86_64-apple-darwin,aarch64-apple-tvos,aarch64-apple-tvos-sim,aarch64-apple-visionos,aarch64-apple-visionos-sim,aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-ios-macabi,armv7-linux-androideabi,aarch64-linux-android,i686-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,riscv64gc-unknown-linux-gnu,riscv64gc-unknown-linux-musl,loongarch64-unknown-linux-gnu,loongarch64-unknown-linux-musl,x86_64-unknown-freebsd,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,x86_64-pc-windows-gnu,aarch64-pc-windows-msvc,aarch64-pc-windows-gnullvm,wasm32-unknown-emscripten" }
