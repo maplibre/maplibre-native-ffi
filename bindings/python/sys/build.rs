@@ -1,5 +1,6 @@
 //! Links the MapLibre Native C library from the install prefix that
-//! `MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` names.
+//! `MAPLIBRE_NATIVE_FFI_LOCAL_BUILD` names: its static archive, or on Windows
+//! its DLL.
 
 use std::env;
 use std::error::Error;
@@ -35,10 +36,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         install_dir.join(DESCRIPTOR_PATH).display()
     );
 
-    println!(
-        "cargo:rustc-link-lib=static={}",
-        static_archive(&link_dir, &target_os, &target_env)?
-    );
+    if target_os == "windows" {
+        // The static archive carries its own copy of Rust's standard library.
+        // An ELF archive hides it inside one relocatable object, but a COFF
+        // archive can't, so its copy would meet this extension's own in one
+        // link. The extension links the DLL through its import library
+        // instead, and the wheel carries the DLL beside the extension.
+        println!(
+            "cargo:rustc-link-lib=dylib={}",
+            import_library(&link_dir, &target_env)?
+        );
+        return Ok(());
+    }
+    println!("cargo:rustc-link-lib=static={}", static_archive(&link_dir)?);
     // The archive merges in every dependency it can. What is left is the
     // platform and render backend's system libraries, which CMake records.
     for library in &descriptor.link.libraries {
@@ -126,22 +136,8 @@ fn musl_aliases(out_path: &Path) -> Result<PathBuf, io::Error> {
 }
 
 /// The complete static archive's library name.
-///
-/// MSVC's shared build uses `.lib` for its import library too, so its static
-/// archive carries a `-static` suffix. MinGW uses `.dll.a` for imports and the
-/// usual `.a` for the static archive.
-fn static_archive(
-    link_dir: &Path,
-    target_os: &str,
-    target_env: &str,
-) -> Result<String, Box<dyn Error>> {
-    let (name, file) = if target_os == "windows" && target_env == "msvc" {
-        let name = format!("{LIBRARY_NAME}-static");
-        let file = format!("{name}.lib");
-        (name, file)
-    } else {
-        (LIBRARY_NAME.to_owned(), format!("lib{LIBRARY_NAME}.a"))
-    };
+fn static_archive(link_dir: &Path) -> Result<String, Box<dyn Error>> {
+    let file = format!("lib{LIBRARY_NAME}.a");
     if !link_dir.join(&file).is_file() {
         return Err(format!(
             "missing the complete static archive {file} in {}",
@@ -149,7 +145,24 @@ fn static_archive(
         )
         .into());
     }
-    Ok(name)
+    Ok(LIBRARY_NAME.to_owned())
+}
+
+/// The DLL's import library name: `.lib` for MSVC, `.dll.a` for MinGW.
+fn import_library(link_dir: &Path, target_env: &str) -> Result<String, Box<dyn Error>> {
+    let file = if target_env == "msvc" {
+        format!("{LIBRARY_NAME}.lib")
+    } else {
+        format!("lib{LIBRARY_NAME}.dll.a")
+    };
+    if !link_dir.join(&file).is_file() {
+        return Err(format!(
+            "missing the import library {file} in {}",
+            link_dir.display()
+        )
+        .into());
+    }
+    Ok(LIBRARY_NAME.to_owned())
 }
 
 fn native_library_dir(install_dir: &Path) -> PathBuf {
