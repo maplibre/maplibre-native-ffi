@@ -56,6 +56,14 @@ val minifyAndroidDeviceTests =
   providers.gradleProperty("maplibre.android.testMinify").map(String::toBoolean).getOrElse(false)
 val androidConsumerKeepRules =
   file("src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-jni.pro")
+// HTTPS in the native library verifies certificates through rustls-platform-verifier's Android
+// component, whose version must be the one that mln-rs's Cargo.lock names.
+val rustlsPlatformVerifierVersion =
+  rootProject.file("third_party/mln-rs/Cargo.lock").readLines().let { lines ->
+    val name = lines.indexOfFirst { it.trim() == "name = \"rustls-platform-verifier-android\"" }
+    check(name >= 0) { "rustls-platform-verifier-android is not in third_party/mln-rs/Cargo.lock" }
+    lines[name + 1].trim().removePrefix("version = \"").removeSuffix("\"")
+  }
 
 kotlin {
   androidNativeArm32()
@@ -300,6 +308,10 @@ kotlin {
   sourceSets {
     // Completion.asDeferred() and await() put Deferred and suspension in the public API.
     commonMain.dependencies { api(libs.coroutines) }
+
+    androidMain.dependencies {
+      implementation("org.rustls:rustls-platform-verifier:$rustlsPlatformVerifierVersion")
+    }
 
     named("androidDeviceTest") {
       dependencies {
