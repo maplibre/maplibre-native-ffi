@@ -168,8 +168,9 @@ public extension RuntimeHandle {
 
   /// Adds headers to the runtime's HTTP requests.
   ///
-  /// The transform replaces the one set before. In a browser or on OpenHarmony,
-  /// serve the requests with `RuntimeHandle.setResourceProvider()` instead.
+  /// The transform replaces the one set before. A redirect to another origin
+  /// drops its headers. In a browser, serve the requests with
+  /// `RuntimeHandle.setResourceProvider()` instead.
   ///
   /// Runs on a library thread.
   ///
@@ -178,8 +179,7 @@ public extension RuntimeHandle {
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` when the library runs in a browser or on
-  ///   OpenHarmony.
+  /// - `Status.unsupported` when the library runs in a browser.
   @discardableResult
   func setHttpHeaderTransform(_ bindingArg0: HttpHeaderTransform) async throws
     -> CommandCompletion

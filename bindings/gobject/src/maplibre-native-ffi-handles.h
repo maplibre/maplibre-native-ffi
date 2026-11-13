@@ -5659,8 +5659,8 @@ maplibre_native_ffi_runtime_set_event_handler_finish(
  *
  * Adds headers to the runtime's HTTP requests.
  *
- * The transform replaces the one set before. In a browser or on OpenHarmony,
- * serve the requests with
+ * The transform replaces the one set before. A redirect to another origin drops
+ * its headers. In a browser, serve the requests with
  * `maplibre_native_ffi_runtime_set_resource_provider_async()` instead.
  *
  * See `mln_runtime_set_http_header_transform` in the
@@ -5668,8 +5668,7 @@ maplibre_native_ffi_runtime_set_event_handler_finish(
  *
  * It fails with these errors:
  *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the library runs in a browser
- *   or on OpenHarmony.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the library runs in a browser.
  *
  * Without `callback`, nothing reports whether the call succeeds.
  */

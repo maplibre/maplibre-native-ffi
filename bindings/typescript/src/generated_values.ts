@@ -1325,7 +1325,8 @@ export interface GpuDeviceOptions {
    */
   backend?: RenderBackend;
   /**
-   * The GPU to use, as an index into the backend's list of GPUs.
+   * The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
+   * holds one GPU: the one that its display renders on.
    */
   adapterIndex?: number;
   /**

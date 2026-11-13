@@ -66,7 +66,8 @@ public struct GpuDeviceOptions: Sendable {
   /// no Vulkan driver, and in a browser the build's one backend: WebGPU or
   /// OpenGL (WebGL2).
   public var backend: RenderBackend?
-  /// The GPU to use, as an index into the backend's list of GPUs.
+  /// The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
+  /// holds one GPU: the one that its display renders on.
   public var adapterIndex: UInt32?
   /// The 16-byte UUID of the GPU to use: Vulkan's
   /// `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.

@@ -524,8 +524,8 @@ public sealed unsafe partial class RuntimeHandle
     /// Adds headers to the runtime's HTTP requests.
     /// </summary>
     /// <remarks>
-    /// <para>The transform replaces the one set before. In a browser or on
-    /// OpenHarmony, serve the requests with
+    /// <para>The transform replaces the one set before. A redirect to another
+    /// origin drops its headers. In a browser, serve the requests with
     /// <c>RuntimeHandle.SetResourceProviderAsync()</c> instead.</para>
     /// <para>Runs on a library thread.</para>
     /// <para>See <c>mln_runtime_set_http_header_transform</c> in the <see
@@ -533,7 +533,7 @@ public sealed unsafe partial class RuntimeHandle
     /// <para>Errors:</para>
     /// <list type="bullet">
     /// <item><description><c>Status.Unsupported</c> when the library runs in a
-    /// browser or on OpenHarmony.</description></item>
+    /// browser.</description></item>
     /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetHttpHeaderTransformAsync(HttpHeaderTransform transform)

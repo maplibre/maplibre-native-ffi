@@ -3077,8 +3077,8 @@ class _RuntimeHandleOperations(GeneratedOperations):
     ) -> Future[CommandCompletion]:
         """Adds headers to the runtime's HTTP requests.
 
-        The transform replaces the one set before. In a browser or on
-        OpenHarmony, serve the requests with
+        The transform replaces the one set before. A redirect to another
+        origin drops its headers. In a browser, serve the requests with
         `RuntimeHandle.set_resource_provider()` instead.
 
         See `mln_runtime_set_http_header_transform` in the
@@ -3086,8 +3086,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
 
         Errors:
 
-        - `Status.UNSUPPORTED` when the library runs in a browser or on
-          OpenHarmony.
+        - `Status.UNSUPPORTED` when the library runs in a browser.
         """
         return self._native.set_http_header_transform(transform)
 
@@ -4250,8 +4249,8 @@ class RuntimeHandleDiscarding:
     def set_http_header_transform(self, transform: HttpHeaderTransform) -> None:
         """Adds headers to the runtime's HTTP requests.
 
-        The transform replaces the one set before. In a browser or on
-        OpenHarmony, serve the requests with
+        The transform replaces the one set before. A redirect to another
+        origin drops its headers. In a browser, serve the requests with
         `RuntimeHandle.set_resource_provider()` instead.
 
         See `mln_runtime_set_http_header_transform` in the
@@ -4259,8 +4258,7 @@ class RuntimeHandleDiscarding:
 
         Errors:
 
-        - `Status.UNSUPPORTED` when the library runs in a browser or on
-          OpenHarmony.
+        - `Status.UNSUPPORTED` when the library runs in a browser.
         """
         return self._native._discard_set_http_header_transform(transform)
 

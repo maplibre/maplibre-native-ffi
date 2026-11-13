@@ -3690,7 +3690,8 @@ type GPUDeviceOptions struct {
 	// Vulkan driver, and in a browser the build's one backend: WebGPU or OpenGL
 	// (WebGL2).
 	Backend *RenderBackend
-	// The GPU to use, as an index into the backend's list of GPUs.
+	// The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
+	// holds one GPU: the one that its display renders on.
 	AdapterIndex *uint32
 	// The 16-byte UUID of the GPU to use: Vulkan's
 	// VkPhysicalDeviceIDProperties.deviceUUID. Only a Vulkan device takes one.
@@ -11103,8 +11104,9 @@ func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Fu
 
 // SetHTTPHeaderTransform adds headers to the runtime's HTTP requests.
 //
-// The transform replaces the one set before. In a browser or on OpenHarmony,
-// serve the requests with RuntimeHandle.SetResourceProvider() instead.
+// The transform replaces the one set before. A redirect to another origin drops
+// its headers. In a browser, serve the requests with
+// RuntimeHandle.SetResourceProvider() instead.
 //
 // Runs on a library thread.
 //
@@ -11112,7 +11114,7 @@ func (receiver *RuntimeHandle) SetEventHandler(handler RuntimeEventHandler) (*Fu
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 //
 // Errors:
-//   - StatusUnsupported when the library runs in a browser or on OpenHarmony.
+//   - StatusUnsupported when the library runs in a browser.
 func (receiver *RuntimeHandle) SetHTTPHeaderTransform(transform HTTPHeaderTransform) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(raw), bindingStore(nativeHTTPHeaderTransform(transform, arena), arena), completion, diagnostic))

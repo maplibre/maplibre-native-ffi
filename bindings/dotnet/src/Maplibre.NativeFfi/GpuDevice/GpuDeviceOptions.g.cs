@@ -24,7 +24,8 @@ public sealed record GpuDeviceOptions
     public RenderBackend? Backend { get; init; }
 
     /// <summary>
-    /// The GPU to use, as an index into the backend's list of GPUs.
+    /// The GPU to use, as an index into the backend's list of GPUs. OpenGL's
+    /// list holds one GPU: the one that its display renders on.
     /// </summary>
     public uint? AdapterIndex { get; init; }
 
