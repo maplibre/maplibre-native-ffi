@@ -2050,8 +2050,8 @@ func (OfflineRegionDefinitionGeometryVariant) bindingTag() uint32 {
 func (OfflineRegionDefinitionGeometryVariant) isOfflineRegionDefinition() {}
 
 // OpenGLContextDescriptor corresponds to mln_open_gl_context_descriptor. Your
-// OpenGL context, for NewGPUDevice(): the root of the share group that the
-// device's sessions join.
+// OpenGL context, for WrapOpenGLGPUDevice(): the root of the share group that
+// the device's sessions join.
 //
 // See mln_open_gl_context_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
@@ -4476,7 +4476,7 @@ func copyMetalCustomLayerPass(raw C.mln_metal_custom_layer_pass) MetalCustomLaye
 }
 
 // MetalDeviceDescriptor corresponds to mln_metal_device_descriptor. Your Metal
-// device and command queue, for NewGPUDevice().
+// device and command queue, for WrapMetalGPUDevice().
 //
 // See mln_metal_device_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
@@ -4931,7 +4931,8 @@ func nativeOpenGLBorrowedTexture(input OpenGLBorrowedTexture, arena *bindingAren
 
 // OpenGLBorrowedTexturesTarget corresponds to
 // mln_open_gl_borrowed_textures_target. A ring of your OpenGL textures to
-// render into, on an OpenGL device that NewGPUDevice() made from your context.
+// render into, on an OpenGL device that WrapOpenGLGPUDevice() made from your
+// context.
 //
 // physical_width and physical_height give the textures' size in pixels, which
 // is usually logical_size times the map's scale factor. Each texture must be in
@@ -5030,7 +5031,7 @@ func copyOpenGLCustomLayerPass(raw C.mln_open_gl_custom_layer_pass) OpenGLCustom
 }
 
 // OpenGLSurfaceTarget corresponds to mln_open_gl_surface_target. Your OpenGL
-// surface to present to, with the context that NewGPUDevice() wrapped.
+// surface to present to, with the context that WrapOpenGLGPUDevice() wrapped.
 //
 // The session makes its context current on the surface for each frame, and
 // swaps the surface's buffers to present.
@@ -7026,7 +7027,7 @@ func copyVulkanCustomLayerPass(raw C.mln_vulkan_custom_layer_pass) VulkanCustomL
 }
 
 // VulkanDeviceDescriptor corresponds to mln_vulkan_device_descriptor. Your
-// Vulkan device and queue, for NewGPUDevice().
+// Vulkan device and queue, for WrapVulkanGPUDevice().
 //
 // See mln_vulkan_device_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
@@ -8444,7 +8445,8 @@ func (receiver *GPUDeviceHandle) Release() error {
 	return err
 }
 
-// NewGPUDevice makes an OpenGL device whose share group is your context's.
+// WrapOpenGLGPUDevice makes an OpenGL device whose share group is your
+// context's.
 //
 // Each session on the device makes a context of its own that shares objects
 // with yours, so that it can render into your textures and present to your
@@ -8462,7 +8464,7 @@ func (receiver *GPUDeviceHandle) Release() error {
 //   - StatusUnsupported when OpenGLSupportedContextProviderMask() lacks the
 //     context's platform.
 //   - StatusNativeError when the platform rejects the context.
-func NewGPUDevice(context OpenGLContextDescriptor) (*GPUDeviceHandle, error) {
+func WrapOpenGLGPUDevice(context OpenGLContextDescriptor) (*GPUDeviceHandle, error) {
 	var outDevice C.mln_gpu_device
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_gpu_device_wrap_open_gl(bindingStore(nativeOpenGLContextDescriptor(context, arena), arena), &outDevice, diagnostic))
@@ -8472,8 +8474,8 @@ func NewGPUDevice(context OpenGLContextDescriptor) (*GPUDeviceHandle, error) {
 	})
 }
 
-// NewGPUDevice wraps your Vulkan device and queue, so that sessions render on
-// them.
+// WrapVulkanGPUDevice wraps your Vulkan device and queue, so that sessions
+// render on them.
 //
 // Sessions on the device render into your images, present to your surfaces, and
 // submit to your queue, under your queue lock when you give one. Sessions of
@@ -8486,7 +8488,7 @@ func NewGPUDevice(context OpenGLContextDescriptor) (*GPUDeviceHandle, error) {
 //   - StatusUnsupported when SupportedRenderBackendMask() lacks
 //     RenderBackendFlagVulkan.
 //   - StatusNativeError when the library can't load the device's functions.
-func NewGPUDevice(descriptor VulkanDeviceDescriptor) (*GPUDeviceHandle, error) {
+func WrapVulkanGPUDevice(descriptor VulkanDeviceDescriptor) (*GPUDeviceHandle, error) {
 	var outDevice C.mln_gpu_device
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_gpu_device_wrap_vulkan(bindingStore(nativeVulkanDeviceDescriptor(descriptor, arena), arena), &outDevice, diagnostic))

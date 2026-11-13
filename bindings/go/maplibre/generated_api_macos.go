@@ -65,8 +65,8 @@ func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTexture
 	})
 }
 
-// NewGPUDevice wraps your Metal device and command queue, so that sessions
-// render on them.
+// WrapMetalGPUDevice wraps your Metal device and command queue, so that
+// sessions render on them.
 //
 // See mln_gpu_device_wrap_metal in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
@@ -74,7 +74,7 @@ func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTexture
 // Errors:
 //   - StatusUnsupported when SupportedRenderBackendMask() lacks
 //     RenderBackendFlagMetal.
-func NewGPUDevice(descriptor MetalDeviceDescriptor) (*GPUDeviceHandle, error) {
+func WrapMetalGPUDevice(descriptor MetalDeviceDescriptor) (*GPUDeviceHandle, error) {
 	var outDevice C.mln_gpu_device
 	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_gpu_device_wrap_metal(bindingStore(nativeMetalDeviceDescriptor(descriptor, arena), arena), &outDevice, diagnostic))

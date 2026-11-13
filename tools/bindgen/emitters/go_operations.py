@@ -45,8 +45,11 @@ def declared_name(plan, bound):
     receiver, handle = receiver_of(plan)
     method = method_name(plan, receiver, handle)
     if plan.factory:
-        # Go names a constructor New and the type that it returns.
-        return "New" + name(bound.handles[plan.factory].stem)
+        # Go names a constructor New and the type that it returns. A handle
+        # that other factories also make, such as by wrapping a host object,
+        # names those by their verb and the type.
+        stem = name(bound.handles[plan.factory].stem)
+        return "New" + stem if plan.member == "create" else method + stem
     if plan.view:
         return "With" + name(plan.view.stem)
     if (
