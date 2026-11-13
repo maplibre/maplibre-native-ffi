@@ -75,11 +75,11 @@ case "$libc" in
       tar --extract --ignore-zeros --directory "$staging"
     ;;
   musl)
-    "$container_engine" run --rm alpine:3.23 sh -euc '
+    "$container_engine" run --rm alpine:3.24 sh -euc '
       apk --arch "$1" --root /target --initdb --no-scripts --quiet \
         --keys-dir "/usr/share/apk/keys/$1" \
-        --repository https://dl-cdn.alpinelinux.org/alpine/v3.23/main \
-        --repository https://dl-cdn.alpinelinux.org/alpine/v3.23/community \
+        --repository https://dl-cdn.alpinelinux.org/alpine/v3.24/main \
+        --repository https://dl-cdn.alpinelinux.org/alpine/v3.24/community \
         add alpine-baselayout musl mesa-vulkan-swrast vulkan-loader \
         mesa-dri-gallium mesa-egl mesa-gles wayland-libs-client wayland-libs-egl \
         wayland-libs-server nodejs python3 openjdk25-jre-headless >&2
