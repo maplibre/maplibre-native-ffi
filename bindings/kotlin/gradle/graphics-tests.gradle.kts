@@ -19,7 +19,7 @@ val sdk = extensions.extraProperties["maplibreAndroidSdkDirectory"] as Provider<
 val ndkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
 val apiLevel = catalogVersionInt("android-minSdk")
 val fixture = rootProject.file("tests/graphics")
-val vulkanHeaders = rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include")
+val vulkanHeaders = rootProject.file("third_party/Vulkan-Headers/include")
 val jni = file("src/androidDeviceTest/cpp/graphics_jni.c")
 val output = layout.buildDirectory.dir("generated/jniLibs/graphicsTest")
 

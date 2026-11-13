@@ -36,7 +36,7 @@ let targets: [Target] = [
     exclude: ["README.md"],
     cSettings: [
       .headerSearchPath(
-        "../../third_party/maplibre-native/vendor/Vulkan-Headers/include"
+        "../../third_party/Vulkan-Headers/include"
       ),
     ],
     linkerSettings: [

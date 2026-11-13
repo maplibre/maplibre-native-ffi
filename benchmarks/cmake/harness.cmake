@@ -40,17 +40,16 @@ if(NOT DEFINED MLN_BENCH_LIBRARY)
   if(TARGET mln_test_graphics_objects)
     set(MLN_BENCH_TEST_GRAPHICS mln_test_graphics_objects)
   endif()
-  # Another implementation of the C API, such as maplibre-native-next, may
-  # skip the engine's render dependencies; the Vulkan headers come from the
-  # engine's checkout then.
+  # A preset whose backend isn't Vulkan names no Vulkan headers, which the
+  # host graphics still compile against.
   set(MLN_BENCH_GRAPHICS_INCLUDE_DIRS "")
   if(TARGET mln_ffi_render_dependencies)
     get_target_property(MLN_BENCH_GRAPHICS_INCLUDE_DIRS
                         mln_ffi_render_dependencies MLN_FFI_INCLUDE_DIRS)
   endif()
-  if(NOT MLN_BENCH_GRAPHICS_INCLUDE_DIRS AND DEFINED MLN_FFI_SOURCE_DIR)
+  if(NOT MLN_BENCH_GRAPHICS_INCLUDE_DIRS)
     set(MLN_BENCH_GRAPHICS_INCLUDE_DIRS
-        "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/include")
+        "${bench_dir}/../third_party/Vulkan-Headers/include")
   endif()
 endif()
 
