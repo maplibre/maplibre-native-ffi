@@ -13,7 +13,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import native_capture
 from .compiler import compile_api
 from .frontend import parse_headers
 from .model import Api, ModelError
@@ -21,7 +20,6 @@ from .schema import validate
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = "bindings/generated-files.json"
-PLUGIN_HEADER = "mln/plugin/plugin_api.h"
 LANGUAGES = (
     "dart",
     "dotnet",
@@ -39,13 +37,10 @@ LANGUAGES = (
 def render(api: Api) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
     """The outputs by repository path, and each binding's unsupported
     declarations with their reasons."""
-    from . import native_results
-
     bound = compile_api(api)
     if bound.diagnostics:
         raise ModelError(list(bound.diagnostics))
-    outputs = native_capture.generate(bound)
-    outputs.update(native_results.generate(bound))
+    outputs = {}
     unsupported = {}
     for language in LANGUAGES:
         lowered = importlib.import_module(f".emitters.{language}", __package__).lower(
@@ -91,17 +86,6 @@ def format_files(paths: list[str], root: Path) -> None:
     )
 
 
-def sync_plugin_header(native_include: Path, root: Path = ROOT) -> None:
-    """Copies MapLibre Native's plugin ABI header into include/, which plugin.h
-    includes, so that the C API's headers build without the engine checkout.
-
-    It comes before parsing, which reads the copy.
-    """
-    target = root / "include" / PLUGIN_HEADER
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes((native_include / PLUGIN_HEADER).read_bytes())
-
-
 def previous_outputs(root: Path) -> set[str]:
     manifest = root / MANIFEST
     if not manifest.is_file():
@@ -142,11 +126,6 @@ def main() -> int:
         "--out", type=Path, help="the directory that render writes its snapshot to"
     )
     parser.add_argument("--include", type=Path, default=ROOT / "include")
-    parser.add_argument(
-        "--native-include",
-        type=Path,
-        default=ROOT / "third_party/maplibre-native/include",
-    )
     parser.add_argument("--clang", default="clang")
     parser.add_argument("--clang-arg", action="append", default=[])
     args = parser.parse_args()
@@ -154,12 +133,10 @@ def main() -> int:
         parser.error("--out goes with render, and render requires it")
 
     try:
-        if args.command == "generate":
-            sync_plugin_header(args.native_include)
         api = parse_headers(
             args.include,
             clang=args.clang,
-            clang_args=(f"-I{args.native_include.resolve()}", *args.clang_arg),
+            clang_args=(f"-I{args.include.resolve()}", *args.clang_arg),
         )
         validate(api)
         if args.command == "generate":

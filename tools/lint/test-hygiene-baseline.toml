@@ -4,5 +4,3 @@
 [sleep]
 "tests/native/support/render_webgpu.c" = 2
 
-[network-host]
-"src/platform/rust/src/http_client.rs" = 8

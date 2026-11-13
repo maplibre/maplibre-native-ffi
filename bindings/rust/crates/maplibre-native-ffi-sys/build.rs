@@ -26,7 +26,6 @@ const BACKENDS: [&str; 4] = ["metal", "opengl", "vulkan", "webgpu"];
 const PIN_PATH: &str = "native_release.json";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("cargo:rustc-check-cfg=cfg(mln_platform_crate)");
     // docs.rs builds without network access, and documentation links nothing.
     if env::var_os("DOCS_RS").is_some() {
         return Ok(());
@@ -36,10 +35,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let out_path = PathBuf::from(env::var("OUT_DIR")?);
-    // The crate root keeps the Cargo-built platform layer on the link line.
-    if cargo_builds_platform(&target_os, &target_env) {
-        println!("cargo:rustc-cfg=mln_platform_crate");
-    }
 
     let target = env::var("TARGET")?;
     // Checked ahead of the local build so two enabled backend features fail
@@ -193,7 +188,7 @@ fn read_descriptor(prefix: &Path) -> Result<ArtifactDescriptor, Box<dyn Error>> 
 
 /// Supplies musl's traditional library names without a second implementation.
 /// The complete native archive provides the unified libc interfaces and the
-/// process-wide unwinder that its C++ frames and Rust frames share.
+/// process-wide unwinder.
 fn musl_aliases(out_path: &Path) -> Result<PathBuf, io::Error> {
     let directory = out_path.join("musl-aliases");
     fs::create_dir_all(&directory)?;
@@ -228,17 +223,6 @@ fn static_archive(
         .into());
     }
     Ok(name)
-}
-
-/// Whether Cargo builds the Rust platform layer for the target, as the
-/// manifest's target-specific dependency on `maplibre-native-ffi-platform`
-/// names.
-fn cargo_builds_platform(target_os: &str, target_env: &str) -> bool {
-    match target_os {
-        "linux" => target_env != "ohos",
-        "freebsd" | "windows" | "emscripten" | "android" => true,
-        _ => false,
-    }
 }
 
 fn native_library_dir(install_dir: &Path) -> PathBuf {
