@@ -324,6 +324,11 @@ def build(preset):
 
 
 def run_android(preset, work):
+    # The activity hands the render backend under test to the host, which
+    # inherits no environment from adb.
+    backend = os.environ.get("MLN_FFI_TEST_BACKEND")
+    if not backend:
+        raise RuntimeError("MLN_FFI_TEST_BACKEND must name the backend under test")
     serial = subprocess.check_output(
         [str(ROOT / "tools/devices/android-serial"), preset],
         text=True,
@@ -379,6 +384,9 @@ def run_android(preset, work):
                 "--es",
                 "runId",
                 token,
+                "--es",
+                "backend",
+                backend,
             ],
             check=True,
         )

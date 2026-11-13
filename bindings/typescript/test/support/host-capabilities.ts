@@ -120,6 +120,12 @@ export interface Capabilities {
   readonly beforeLoad?: () => unknown;
   /** Loads the test-only addon over tests/graphics. */
   readonly testGraphics: () => unknown;
+  /**
+   * The render backend under test, such as `vulkan` or `opengl`, which the test
+   * task names in MLN_FFI_TEST_BACKEND, or undefined if it names none. The
+   * suite reads it once its first case needs it.
+   */
+  readonly testBackend: () => string | undefined;
   readonly unrefTimer: (timer: ReturnType<typeof setTimeout>) => void;
 }
 
@@ -344,6 +350,7 @@ export const capabilities: Capabilities = {
     }
     return createRequire(import.meta.url)(path);
   },
+  testBackend: () => process.env.MLN_FFI_TEST_BACKEND,
   unrefTimer:
     host === "deno"
       ? (timer) => Deno!.unrefTimer(timer as unknown as number)

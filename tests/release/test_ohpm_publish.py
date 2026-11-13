@@ -74,7 +74,7 @@ class OhpmPublishTest(unittest.TestCase):
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         self.registry = f"http://127.0.0.1:{server.server_address[1]}/ohpm/"
-        Registry.packages = {"@maplibre/native-ffi-opengl": ["0.202611.0"]}
+        Registry.packages = {"@maplibre/native-ffi": ["0.202611.0"]}
 
         environment = mock.patch.dict(
             os.environ,
@@ -102,8 +102,8 @@ class OhpmPublishTest(unittest.TestCase):
         return self.record.read_text().splitlines() if self.record.exists() else []
 
     def test_publishes_a_new_version_and_skips_a_listed_one(self) -> None:
-        listed = self.har("@maplibre/native-ffi-opengl", "0.202611.0")
-        new = self.har("@maplibre/native-ffi-vulkan", "0.202611.0")
+        listed = self.har("@maplibre/native-ffi", "0.202611.0")
+        new = self.har("@maplibre/native-ffi-runtime", "0.202611.0")
 
         publish(self.ohpm, [listed, new], self.registry)
 
@@ -114,7 +114,7 @@ class OhpmPublishTest(unittest.TestCase):
 
     def test_stops_ohpm_when_it_rejects_the_passphrase(self) -> None:
         os.environ["EXPECTED"] = "another"
-        new = self.har("@maplibre/native-ffi-vulkan", "0.202611.0")
+        new = self.har("@maplibre/native-ffi-runtime", "0.202611.0")
 
         with self.assertRaisesRegex(SystemExit, "rejected the passphrase"):
             publish(self.ohpm, [new], self.registry)

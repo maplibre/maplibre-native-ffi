@@ -20,6 +20,7 @@ import {
   attachVulkanSession,
   backend,
   NativeProbe,
+  renderBackend,
   renderExtent,
   renderSize,
   demandFrame,
@@ -167,15 +168,15 @@ test(
     // Reads a view's width, a plain value, and the texture object it lends.
     type Reader = { width(): number; texture(): unknown };
     const withTexture = <T>(use: (view: Reader) => T): T =>
-      backend === "metal"
+      backend() === "metal"
         ? frame.withMetalTexture((view) =>
             use({ width: () => view.width, texture: () => view.texture }),
           )
-        : backend === "vulkan"
+        : backend() === "vulkan"
           ? frame.withVulkanTexture((view) =>
               use({ width: () => view.width, texture: () => view.image }),
             )
-          : backend === "webgpu"
+          : backend() === "webgpu"
             ? frame.withWebGpuTexture((view) =>
                 use({ width: () => view.width, texture: () => view.texture }),
               )
@@ -289,11 +290,11 @@ test("a native queue lock reaches a session on a Vulkan device", async () => {
     userData: probe.userData,
     releaseUserData: probe.release,
   });
-  if (backend !== "vulkan") {
+  if (backend() !== "vulkan") {
     // Only a Vulkan device takes a queue lock, and the binding releases the
     // context of the call that native code refuses.
     assert.throws(
-      () => GpuDeviceHandle.create({ queueLock }),
+      () => GpuDeviceHandle.create({ backend: renderBackend(), queueLock }),
       failsWith(Status.unsupported),
     );
     await probe.arrival("release");

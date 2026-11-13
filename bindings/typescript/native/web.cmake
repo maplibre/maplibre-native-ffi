@@ -44,9 +44,17 @@ if(NOT MLN_FFI_WEB_BINDGEN_VERSION MATCHES " ${MLN_FFI_WEB_LOCKED}$")
   )
 endif()
 
-# The crate's feature for the backend of the preset's install prefix.
+# The crate's feature for the backend of the preset's install prefix, which a
+# web package carries alone.
 file(READ "${MLN_FFI_NATIVE_PACKAGE}/artifact.json" MLN_FFI_ARTIFACT)
-string(JSON MLN_FFI_RENDER_BACKEND GET "${MLN_FFI_ARTIFACT}" backend)
+string(JSON MLN_FFI_RENDER_BACKENDS LENGTH "${MLN_FFI_ARTIFACT}" backends)
+if(NOT MLN_FFI_RENDER_BACKENDS EQUAL 1)
+  message(
+    FATAL_ERROR
+      "the native build carries ${MLN_FFI_RENDER_BACKENDS} backends, "
+      "and a browser module renders with one")
+endif()
+string(JSON MLN_FFI_RENDER_BACKEND GET "${MLN_FFI_ARTIFACT}" backends 0)
 if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
   set(MLN_FFI_WEB_FEATURE webgpu)
 elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")

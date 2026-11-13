@@ -14,7 +14,7 @@ import {
 
 Importing the package installs the binding in the runtime first, so the app
 needs no native code of its own. The package carries the C library, built with
-OpenGL ES on Android and Metal on iOS.
+Vulkan and OpenGL ES on Android and Metal on iOS.
 
 ## Surfaces
 

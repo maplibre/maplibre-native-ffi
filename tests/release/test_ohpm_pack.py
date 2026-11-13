@@ -13,7 +13,7 @@ from sbom import REPOSITORY, component, document
 
 
 class OhpmPackTest(unittest.TestCase):
-    def test_facade_and_backend_archives(self):
+    def test_facade_and_runtime_archives(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = pathlib.Path(temporary)
             binding = root / "bindings/typescript"
@@ -36,7 +36,7 @@ class OhpmPackTest(unittest.TestCase):
                 '"$MAPLIBRE_NATIVE_FFI_OHPM_BUNDLE/index.d.ts"\n'
             )
             bundler.chmod(0o755)
-            presets = ("ohos-x64-egl", "ohos-x64-vulkan")
+            presets = ("ohos-arm64", "ohos-x64")
             for preset in presets:
                 install = binding / "native/build" / preset / "install"
                 for name in (
@@ -66,7 +66,7 @@ class OhpmPackTest(unittest.TestCase):
                 check=True,
                 capture_output=True,
             )
-            names = ("native-ffi", "native-ffi-opengl", "native-ffi-vulkan")
+            names = ("native-ffi", "native-ffi-runtime")
             self.assertEqual(
                 {p.name for p in output.iterdir()},
                 {f"{name}-0.0.0.har" for name in names},
@@ -101,9 +101,11 @@ class OhpmPackTest(unittest.TestCase):
                             "libmaplibre_native_ffi.so", manifest["dependencies"]
                         )
                     else:
-                        self.assertIn(
-                            "package/libs/x86_64/libmaplibre_native_ffi.so", files
-                        )
+                        # One runtime carries every ABI that the presets name.
+                        for abi in ("arm64-v8a", "x86_64"):
+                            self.assertIn(
+                                f"package/libs/{abi}/libmaplibre_native_ffi.so", files
+                            )
                         self.assertNotIn("package/index.js", files)
                         self.assertNotIn("dependencies", manifest)
-            self.assertEqual(len(module_names), 3)
+            self.assertEqual(len(module_names), 2)

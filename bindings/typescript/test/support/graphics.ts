@@ -12,6 +12,7 @@ import {
   type OpenGlContextDescriptor,
   OpenGlContextProviderFlag,
   openGlSupportedContextProviderMask,
+  RenderBackend,
   RenderBackendFlag,
   RenderDriverKind,
   type QueueLock,
@@ -61,7 +62,7 @@ interface ProbeAddresses {
 
 /**
  * A texture from the test graphics, and the handles that a borrowed texture
- * descriptor names. Only the fields of the build's backend are set.
+ * descriptor names. Only the fields of the backend under test are set.
  */
 interface TestTexture {
   readonly texture: bigint;
@@ -89,9 +90,9 @@ interface GraphicsAddon {
 const addon = capabilities.testGraphics() as GraphicsAddon;
 
 /**
- * The backend that this build renders through, by its test graphics number.
- * The browser's test graphics create a WebGL context or lend the page's WebGPU
- * device for the browser's two.
+ * The test graphics number of each backend, with OpenGL named by its context
+ * provider. The browser's test graphics create a WebGL context or lend the
+ * page's WebGPU device for the browser's two.
  */
 const backends = {
   metal: 1,
@@ -103,49 +104,86 @@ const backends = {
 } as const;
 export type Backend = keyof typeof backends;
 
-function buildBackend(): Backend {
-  const mask = supportedRenderBackendMask();
-  if ((mask & RenderBackendFlag.metal) !== 0) {
-    return "metal";
+/** The library's flag for each backend that a test task can name. */
+const backendFlags: Readonly<Record<string, RenderBackendFlag>> = {
+  metal: RenderBackendFlag.metal,
+  vulkan: RenderBackendFlag.vulkan,
+  opengl: RenderBackendFlag.openGl,
+  webgpu: RenderBackendFlag.webGpu,
+};
+
+/**
+ * The backend under test, which the host names, with OpenGL named by the
+ * library's context provider. A library carries several backends, so a
+ * session draws with this one rather than the library's default.
+ */
+function testBackend(): Backend {
+  const named = capabilities.testBackend();
+  if (!named) {
+    throw new Error("MLN_FFI_TEST_BACKEND must name the backend under test");
   }
-  if ((mask & RenderBackendFlag.vulkan) !== 0) {
-    return "vulkan";
+  const flag = backendFlags[named];
+  if (flag === undefined) {
+    throw new Error(`${named} is no render backend`);
   }
-  if ((mask & RenderBackendFlag.webGpu) !== 0) {
-    return "webgpu";
+  if ((supportedRenderBackendMask() & flag) === 0) {
+    throw new Error(`the library lacks the ${named} backend under test`);
+  }
+  if (named !== "opengl") {
+    return named as Backend;
   }
   const providers = openGlSupportedContextProviderMask();
-  if (
-    (mask & RenderBackendFlag.openGl) !== 0 &&
-    (providers & OpenGlContextProviderFlag.wgl) !== 0
-  ) {
+  if ((providers & OpenGlContextProviderFlag.wgl) !== 0) {
     return "wgl";
   }
-  if (
-    (mask & RenderBackendFlag.openGl) !== 0 &&
-    (providers & OpenGlContextProviderFlag.webGl) !== 0
-  ) {
+  if ((providers & OpenGlContextProviderFlag.webGl) !== 0) {
     return "webgl";
   }
-  if (
-    (mask & RenderBackendFlag.openGl) !== 0 &&
-    (providers & OpenGlContextProviderFlag.egl) !== 0
-  ) {
+  if ((providers & OpenGlContextProviderFlag.egl) !== 0) {
     return "egl";
   }
   throw new Error(
-    `no test graphics backend serves render backend mask ${mask} with OpenGL context provider mask ${providers}`,
+    `no test graphics backend serves OpenGL context provider mask ${providers}`,
   );
 }
 
-export const backend = buildBackend();
+let chosen: Backend | undefined;
+
+/**
+ * The backend under test. The host may learn it only once the suite runs,
+ * so the first case to need it reads it.
+ */
+export function backend(): Backend {
+  chosen ??= testBackend();
+  return chosen;
+}
+
+/** The library's value for the backend under test. */
+export function renderBackend(): RenderBackend {
+  switch (backend()) {
+    case "metal":
+      return RenderBackend.metal;
+    case "vulkan":
+      return RenderBackend.vulkan;
+    case "webgpu":
+      return RenderBackend.webGpu;
+    default:
+      return RenderBackend.openGl;
+  }
+}
+
+/** Whether the backend under test draws with OpenGL. */
+function drawsWithOpenGl(): boolean {
+  const current = backend();
+  return current === "egl" || current === "wgl" || current === "webgl";
+}
 
 /**
  * mln-rs's browser build renders into canvases only, so a browser's sessions
  * present to canvases of the page's, which the host's webCanvas lends, and
  * the page reads their pixels.
  */
-const browser = backend === "webgl" || backend === "webgpu";
+const browser = capabilities.host === "browser";
 
 export const renderSize = 32;
 export const renderLogicalSize = {
@@ -157,9 +195,9 @@ export const renderExtent: LogicalExtent = {
   scaleFactor: 1,
 };
 
-/** Creates the build's graphics object, which a teardown destroys. */
+/** Creates a graphics object of the backend under test, which a teardown destroys. */
 function openGraphics(): GraphicsContext {
-  const context = addon.create(backends[backend]);
+  const context = addon.create(backends[backend()]);
   teardown(() => addon.destroy(context.graphics));
   return context;
 }
@@ -174,11 +212,12 @@ function wrapDevice(
   queueLock?: QueueLock,
 ): GpuDeviceHandle {
   let device: GpuDeviceHandle;
-  if (backend === "webgpu") {
+  const current = backend();
+  if (current === "webgpu") {
     device = GpuDeviceHandle.wrapWebGpu({ device: context.webGpuDevice });
-  } else if (backend === "metal") {
+  } else if (current === "metal") {
     device = GpuDeviceHandle.wrapMetal({ device: context.metalDevice });
-  } else if (backend === "vulkan") {
+  } else if (current === "vulkan") {
     device = GpuDeviceHandle.wrapVulkan({
       context: {
         instance: context.vulkanInstance,
@@ -193,9 +232,9 @@ function wrapDevice(
     });
   } else {
     const openGl: OpenGlContextDescriptor =
-      backend === "webgl"
+      current === "webgl"
         ? { kind: "webGl", value: { context: context.webGlContext } }
-        : backend === "wgl"
+        : current === "wgl"
           ? {
               kind: "wgl",
               value: {
@@ -239,7 +278,8 @@ function attachBorrowedTexture(
     physicalHeight: texture.height,
   };
   let target: RenderTarget;
-  if (backend === "webgpu") {
+  const current = backend();
+  if (current === "webgpu") {
     target = {
       kind: "webGpuBorrowedTextures",
       value: {
@@ -248,12 +288,12 @@ function attachBorrowedTexture(
         format: "rgba8unorm",
       },
     };
-  } else if (backend === "metal") {
+  } else if (current === "metal") {
     target = {
       kind: "metalBorrowedTextures",
       value: { ...ring, textures: [{ texture: texture.metalTexture }] },
     };
-  } else if (backend === "vulkan") {
+  } else if (current === "vulkan") {
     target = {
       kind: "vulkanBorrowedTextures",
       value: {
@@ -300,6 +340,27 @@ function ownTarget(): { target: RenderTarget; canvas?: TestCanvas } {
 }
 
 /**
+ * Attaches `target` on a device of the backend under test, which the session
+ * keeps until it ends. A browser module carries one backend, whose device
+ * the session creates.
+ */
+function attachOwn(
+  map: MapHandle,
+  target: RenderTarget,
+  options: RenderSessionAttachOptions,
+): RenderSessionHandle {
+  if (browser) {
+    return map.attach(target, undefined, options);
+  }
+  const device = GpuDeviceHandle.create({ backend: renderBackend() });
+  try {
+    return map.attach(target, device, options);
+  } finally {
+    device.release();
+  }
+}
+
+/**
  * Attaches an offscreen session, or in a browser a canvas, that a core worker
  * drives, with `options` in place of the defaults, and releases the session
  * in a teardown.
@@ -308,7 +369,7 @@ export function attachSession(
   map: MapHandle,
   options: Partial<RenderSessionAttachOptions>,
 ): RenderSessionHandle {
-  const session = map.attach(ownTarget().target, undefined, {
+  const session = attachOwn(map, ownTarget().target, {
     driver: RenderDriverKind.coreWorker,
     ...options,
   });
@@ -325,8 +386,8 @@ export function attachVulkanSession(
   map: MapHandle,
   queueLock: QueueLock,
 ): RenderSessionHandle {
-  if (backend !== "vulkan") {
-    throw new Error(`a ${backend} build has no Vulkan textures`);
+  if (backend() !== "vulkan") {
+    throw new Error(`a ${backend()} session has no Vulkan textures`);
   }
   const context = openGraphics();
   const device = wrapDevice(context, queueLock);
@@ -354,8 +415,7 @@ export function attachCallerSession(map: MapHandle): RenderSessionHandle {
     return session;
   }
   const context = openGraphics();
-  const openGl = backend === "egl" || backend === "wgl" || backend === "webgl";
-  if (openGl && !addon.makeCurrent(context.graphics)) {
+  if (drawsWithOpenGl() && !addon.makeCurrent(context.graphics)) {
     throw new Error("the test graphics context could not be made current");
   }
   const session = attachBorrowedTexture(context, wrapDevice(context), map, {
@@ -504,7 +564,7 @@ export class TestSession {
     const { target, canvas } = ownTarget();
     let attached: TestSession | undefined;
     const serviced = driver === RenderDriverKind.callerGraphicsThread;
-    const session = map.attach(target, undefined, {
+    const session = attachOwn(map, target, {
       driver,
       frameWake: {
         callback: () => {
@@ -570,10 +630,8 @@ export class TestSession {
     driver: "worker" | "caller" = "worker",
   ): Promise<TestSession> {
     const context = openGraphics();
-    const openGl =
-      backend === "egl" || backend === "wgl" || backend === "webgl";
-    const serviced = driver === "caller" || openGl;
-    if (openGl && !addon.makeCurrent(context.graphics)) {
+    const serviced = driver === "caller" || drawsWithOpenGl();
+    if (drawsWithOpenGl() && !addon.makeCurrent(context.graphics)) {
       throw new Error("the test graphics context could not be made current");
     }
     const wake = new AwaitableWake();

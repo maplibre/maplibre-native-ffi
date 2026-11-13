@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs the suite under Node, Bun, and Deno, or under the one runtime named, for
-# a desktop preset whose addon the binding's build task built.
+# a desktop preset whose addon the binding's build task built. The suite draws
+# with the backend that MLN_FFI_TEST_BACKEND names, which the test task sets.
 #
 #   test-desktop.sh <preset> [node|bun|deno]
 #
@@ -9,8 +10,9 @@
 set -euo pipefail
 
 preset=${1:?usage: test-desktop.sh <preset> [runtime]}
+: "${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the backend under test}"
 case "$preset" in
-  linux-*-riscv64-* | linux-*-loongarch64-*)
+  linux-*-riscv64 | linux-*-loongarch64)
     read -r -a runtimes <<<"${2:-node}"
     if [[ "${runtimes[*]}" != node ]]; then
       echo "error: this architecture runs the suite on the target distribution's Node.js" >&2
@@ -40,7 +42,7 @@ cmake --build "$build" --target maplibre_native_ffi_test_graphics
 export MAPLIBRE_NATIVE_FFI_ADDON="$build/install/maplibre_native_ffi.node"
 export MAPLIBRE_NATIVE_FFI_TEST_GRAPHICS="$build/maplibre_native_ffi_test_graphics.node"
 
-# The loading case installs the packed facade, backend, and addon packages into
+# The loading case installs the packed facade, runtime, and addon packages into
 # a consumer project, whose TypeScript files must check against the packed
 # declarations alone.
 mkdir -p build
@@ -53,9 +55,9 @@ echo '{ "private": true }' > "$consumer/package.json"
 # local addon tarball needs --force when the host and target differ.
 install_args=(--offline --no-audit --no-fund)
 case "$preset" in
-  macos-x64-*) install_args+=(--cpu=x64 --force) ;;
-  *-riscv64-*) install_args+=(--cpu=riscv64 --force) ;;
-  *-loongarch64-*) install_args+=(--cpu=loong64 --force) ;;
+  macos-x64) install_args+=(--cpu=x64 --force) ;;
+  *-riscv64) install_args+=(--cpu=riscv64 --force) ;;
+  *-loongarch64) install_args+=(--cpu=loong64 --force) ;;
 esac
 if [[ "$preset" == freebsd-* ]]; then
   install_args+=(--os=freebsd --force)
@@ -78,7 +80,7 @@ case "$preset" in
       node --expose-gc --test --test-isolation=none --test-timeout=300000 \
       "$PWD/test/run/node.ts"
     ;;
-  linux-*-riscv64-* | linux-*-loongarch64-*)
+  linux-*-riscv64 | linux-*-loongarch64)
     target=${preset#linux-}
     libc=${target%%-*}
     architecture=${target#*-}
@@ -103,7 +105,7 @@ case "$preset" in
       MAPLIBRE_NATIVE_FFI_TEST_CONSUMER="$consumer" \
       sh "$PWD/scripts/test-musl.sh" "$(bun --version)" "${runtimes[@]}"
     ;;
-  macos-x64-*)
+  macos-x64)
     MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
       MISE_ARCH=x64 MISE_NO_HOOKS=1 mise exec --no-deps node bun deno -- \
       scripts/run-desktop.sh "${runtimes[@]}"

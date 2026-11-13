@@ -223,18 +223,19 @@ jobs:
         with:
           name: npm-packages-${{ env.PUBLISH_VERSION }}
           path: build/npm
-      # Addons, then backends, then the facade, then the React Native package,
-      # so every package's pins resolve once it publishes. A version that npm
+      # Addons and browser runtimes, then the desktop runtimes that pin the
+      # addons, then the facade, then the React Native package, so every
+      # package's pins resolve once it publishes. A version that npm
       # already has is skipped, so a rerun after a partial publish resumes where
       # it stopped. npm attests the provenance of each package.
       - name: Publish
         run: |
           set -euo pipefail
 
-          for kind in addon backend facade react-native; do
+          for kind in addon runtime facade react-native; do
             for tarball in build/npm/*.tgz; do
               manifest="$(tar -xOzf "$tarball" package/package.json)"
-              if [[ "$(jq -r 'if .optionalDependencies then "backend" elif .exports then "facade" elif .codegenConfig then "react-native" else "addon" end' <<<"$manifest")" != "$kind" ]]; then
+              if [[ "$(jq -r 'if .optionalDependencies then "runtime" elif .exports then "facade" elif .codegenConfig then "react-native" else "addon" end' <<<"$manifest")" != "$kind" ]]; then
                 continue
               fi
               name="$(jq -r .name <<<"$manifest")"
