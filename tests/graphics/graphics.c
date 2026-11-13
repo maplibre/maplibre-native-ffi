@@ -15,6 +15,9 @@
 #else
 #include <dlfcn.h>
 #endif
+#if defined(__OHOS__)
+#include <unistd.h>
+#endif
 
 #define VK_NO_PROTOTYPES
 #include <vulkan/vulkan_core.h>
@@ -228,6 +231,35 @@ typedef struct android_media_functions {
 } android_media_functions;
 #endif
 
+#if defined(__OHOS__)
+// OpenHarmony's consumer surface, an OH_NativeImage that hands out an
+// OHNativeWindow with no XComponent behind it. Loaded from
+// libnative_image.so, so the declarations here stand in for
+// <native_image/native_image.h>.
+typedef struct ohos_native_image ohos_native_image;
+typedef struct ohos_frame_listener {
+  void* context;
+  void (*on_frame_available)(void* context);
+} ohos_frame_listener;
+
+typedef struct ohos_image_functions {
+  ohos_native_image* (*create)(void);
+  int32_t (*set_default_size)(
+    ohos_native_image* image, int32_t width, int32_t height
+  );
+  int32_t (*set_default_usage)(ohos_native_image* image, uint64_t usage);
+  int32_t (*set_listener)(
+    ohos_native_image* image, ohos_frame_listener listener
+  );
+  void* (*acquire_window)(ohos_native_image* image);
+  int32_t (*acquire_buffer)(
+    ohos_native_image* image, void** buffer, int* fence
+  );
+  int32_t (*release_buffer)(ohos_native_image* image, void* buffer, int fence);
+  void (*destroy)(ohos_native_image** image);
+} ohos_image_functions;
+#endif
+
 struct mln_test_graphics {
   mln_test_graphics_context context;
   void* library;
@@ -246,6 +278,10 @@ struct mln_test_graphics {
 #if defined(__ANDROID__)
   void* media_library;
   android_media_functions media;
+#endif
+#if defined(__OHOS__)
+  void* image_library;
+  ohos_image_functions image;
 #endif
   egl_functions egl;
   void* egl_pbuffer;
@@ -283,6 +319,9 @@ struct mln_test_graphics_surface {
 #if defined(__ANDROID__)
   android_image_reader* image_reader;
   android_image_listener image_listener;
+#endif
+#if defined(__OHOS__)
+  ohos_native_image* consumer;
 #endif
 };
 
@@ -1410,6 +1449,103 @@ static void* android_window_create(
 }
 #endif
 
+#if defined(__OHOS__)
+// NATIVEBUFFER_USAGE_CPU_READ | NATIVEBUFFER_USAGE_HW_RENDER
+static const uint64_t ohos_gpu_usage = (1ULL << 0) | (1ULL << 8);
+
+static bool ohos_image_load(mln_test_graphics* graphics) {
+  if (graphics->image_library != NULL) return true;
+  static const char* const names[] = {"libnative_image.so"};
+  void* library = library_open_first("the native image library", names, 1);
+  if (library == NULL) return false;
+  ohos_image_functions* image = &graphics->image;
+#define MLN_TG_LOAD(field, name)                          \
+  *(void**)&image->field = library_symbol(library, name); \
+  if (image->field == NULL) {                             \
+    set_error("libnative_image.so lacks %s", name);       \
+    return false;                                         \
+  }
+  MLN_TG_LOAD(create, "OH_ConsumerSurface_Create");
+  MLN_TG_LOAD(set_default_size, "OH_ConsumerSurface_SetDefaultSize");
+  MLN_TG_LOAD(set_default_usage, "OH_ConsumerSurface_SetDefaultUsage");
+  MLN_TG_LOAD(set_listener, "OH_NativeImage_SetOnFrameAvailableListener");
+  MLN_TG_LOAD(acquire_window, "OH_NativeImage_AcquireNativeWindow");
+  MLN_TG_LOAD(acquire_buffer, "OH_NativeImage_AcquireNativeWindowBuffer");
+  MLN_TG_LOAD(release_buffer, "OH_NativeImage_ReleaseNativeWindowBuffer");
+  MLN_TG_LOAD(destroy, "OH_NativeImage_Destroy");
+#undef MLN_TG_LOAD
+  graphics->image_library = library;
+  return true;
+}
+
+// Consumes each presented buffer, so the producer never runs out of buffers to
+// dequeue. The consumer calls this on a thread of its own.
+static void ohos_release_presented_buffer(void* context) {
+  const mln_test_graphics_surface* surface = context;
+  const ohos_image_functions* image = &surface->graphics->image;
+  void* buffer = NULL;
+  int fence = -1;
+  if (image->acquire_buffer(surface->consumer, &buffer, &fence) == 0) {
+    if (fence >= 0) close(fence);
+    (void)image->release_buffer(surface->consumer, buffer, -1);
+  }
+}
+
+// A consumer surface's window stands in for an XComponent's: the library's
+// producer presents into its buffer queue, and the listener above consumes
+// each frame.
+static void* ohos_window_create(
+  mln_test_graphics* graphics, mln_test_graphics_surface* surface
+) {
+  if (!ohos_image_load(graphics)) return NULL;
+  const ohos_image_functions* image = &graphics->image;
+  surface->consumer = image->create();
+  if (surface->consumer == NULL) {
+    set_error("OH_ConsumerSurface_Create failed");
+    return NULL;
+  }
+  int32_t status = image->set_default_size(
+    surface->consumer, (int32_t)surface->info.width,
+    (int32_t)surface->info.height
+  );
+  if (status == 0) {
+    status = image->set_default_usage(surface->consumer, ohos_gpu_usage);
+  }
+  if (status == 0) {
+    status = image->set_listener(
+      surface->consumer, (ohos_frame_listener){
+                           .context = surface,
+                           .on_frame_available = ohos_release_presented_buffer,
+                         }
+    );
+  }
+  if (status != 0) {
+    set_error("configuring the consumer surface failed with %d", (int)status);
+    return NULL;
+  }
+  // The consumer owns the window and releases it with the consumer.
+  void* window = image->acquire_window(surface->consumer);
+  if (window == NULL) set_error("OH_NativeImage_AcquireNativeWindow failed");
+  return window;
+}
+#endif
+
+// The window of an Android or OpenHarmony surface, which the fixture hands to
+// the library and never presents to itself: a window takes one producer.
+static void platform_window_destroy(mln_test_graphics_surface* surface) {
+#if defined(__ANDROID__)
+  if (surface->image_reader != NULL) {
+    surface->graphics->media.reader_delete(surface->image_reader);
+  }
+#elif defined(__OHOS__)
+  if (surface->consumer != NULL) {
+    surface->graphics->image.destroy(&surface->consumer);
+  }
+#else
+  (void)surface;
+#endif
+}
+
 // Prefers the platform's own surface kind, which a real window would use, and
 // falls back to VK_EXT_headless_surface.
 static bool vulkan_surface_create(
@@ -1534,12 +1670,6 @@ static void vulkan_surface_destroy(mln_test_graphics_surface* surface) {
 #if defined(MLN_TG_HAS_METAL)
   if (surface->vulkan_layer != NULL) {
     objc_send_void(graphics, surface->vulkan_layer, "release");
-  }
-#endif
-#if defined(__ANDROID__)
-  // After the surface, which holds the reader's window.
-  if (surface->image_reader != NULL) {
-    graphics->media.reader_delete(surface->image_reader);
   }
 #endif
 }
@@ -1948,6 +2078,13 @@ static bool egl_surface_create(
     );
     return false;
   }
+#if defined(__ANDROID__)
+  surface->info.android_window = android_window_create(graphics, surface);
+  if (surface->info.android_window == NULL) return false;
+#elif defined(__OHOS__)
+  surface->info.ohos_window = ohos_window_create(graphics, surface);
+  if (surface->info.ohos_window == NULL) return false;
+#endif
   return true;
 }
 
@@ -2795,6 +2932,8 @@ void mln_test_graphics_surface_destroy(mln_test_graphics_surface* surface) {
     default:
       break;
   }
+  // After the backend's surface, which may hold the window.
+  platform_window_destroy(surface);
   free(surface);
 }
 
