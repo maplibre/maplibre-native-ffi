@@ -79,24 +79,18 @@ class GeneratedShapesTest {
   }
 
   @Test
-  fun hostStringsUseViewsAndNativeLentStringsDecode() = runSuspendTest {
+  fun hostTextWithAnEmbeddedNulIsRejectedAndNativeLentStringsDecode() = runSuspendTest {
     NativeArena().use { arena ->
       assertEquals("native-lent é", readCString(arena.cString("native-lent é")))
     }
     withMap {
-      // Native rejects an embedded NUL in the URL view before a C-string consumer.
+      // Text crosses as a view with an explicit length, and native rejects an embedded NUL rather
+      // than reading the text up to it.
       assertFailsWithStatus(Status.INVALID_ARGUMENT) { map.setStyleUrl("custom://a\u0000b") }
-
-      // A feature ID crosses as an explicit-length view, so "a\u0000b" and "a" are two IDs.
       val withNul = FeatureStateSelector("source", featureId = FeatureId.StringValue("a\u0000b"))
-      map.setFeatureState(withNul, """{"hover":true}""").await()
-      assertEquals("""{"hover":true}""", map.getFeatureState(withNul).awaitWithin("the state"))
-      assertEquals(
-        "{}",
-        map
-          .getFeatureState(FeatureStateSelector("source", featureId = FeatureId.StringValue("a")))
-          .awaitWithin("the truncated ID's state"),
-      )
+      assertFailsWithStatus(Status.INVALID_ARGUMENT) {
+        map.setFeatureState(withNul, """{"hover":true}""")
+      }
     }
   }
 
