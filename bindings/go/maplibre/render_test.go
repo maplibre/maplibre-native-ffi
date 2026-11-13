@@ -30,9 +30,11 @@ type frameView interface {
 // test owns, or with an offscreen session.
 type renderFixture struct {
 	*fixture
-	// graphics and textures are nil for an offscreen session.
+	// graphics, textures, and device are nil for an offscreen session, whose
+	// attach makes a device of its own.
 	graphics *testsupport.Graphics
 	textures []*testsupport.Texture
+	device   *GPUDeviceHandle
 	size     LogicalSize
 	session  *RenderSessionHandle
 	attached *Future[struct{}]
@@ -83,7 +85,26 @@ func newGraphicsFixture(t *testing.T) *renderFixture {
 	r := newMapFixture(t)
 	r.graphics = graphics
 	r.textures = textures
+	r.wrapDevice(t, QueueLock{})
 	return r
+}
+
+// wrapDevice replaces the fixture's device with one that wraps the test
+// graphics' device or context, with lock where the backend takes one. A
+// cleanup releases it, and the sessions on it keep it until they end.
+func (r *renderFixture) wrapDevice(t *testing.T, lock QueueLock) {
+	t.Helper()
+	if r.device != nil {
+		if err := r.device.Release(); err != nil {
+			t.Fatalf("GPUDeviceHandle.Release: %v", err)
+		}
+	}
+	device, err := wrapDevice(r.graphics.Context, lock)
+	if err != nil {
+		t.Fatalf("wrapDevice: %v", err)
+	}
+	t.Cleanup(func() { _ = device.Release() })
+	r.device = device
 }
 
 // newOffscreenFixture starts attaching an offscreen 32x16 session to a map,
@@ -125,9 +146,9 @@ func (r *renderFixture) options() RenderSessionAttachOptions {
 
 func (r *renderFixture) attachSession(options RenderSessionAttachOptions) (*RenderSessionHandle, *Future[struct{}], error) {
 	if r.graphics == nil {
-		return r.m.AttachOffscreen(OffscreenDescriptor{LogicalSize: r.size}, options, nil)
+		return r.m.Attach(RenderTargetOffscreenVariant{Value: OffscreenTarget{LogicalSize: r.size}}, nil, options)
 	}
-	return attachBorrowedTexture(r.m, r.graphics.Context, r.size, r.textures, options)
+	return attachBorrowedTexture(r.m, r.device, r.size, r.textures, options)
 }
 
 func (r *renderFixture) start(t *testing.T, options RenderSessionAttachOptions) {

@@ -44,27 +44,35 @@ func TestNativeWakesServiceASessionAndAreReleasedOnce(t *testing.T) {
 	}
 }
 
-// A native queue lock reaches native code unchanged. A Vulkan session takes
-// the lock around its queue calls, and releases it once after its teardown;
-// any other backend fails the attach with StatusUnsupported, and the binding
-// releases the lock itself.
-func TestNativeQueueLockReachesTheAttach(t *testing.T) {
+// A native queue lock reaches native code unchanged. The sessions of a Vulkan
+// device take the lock around their queue calls, and native code releases it
+// once after the device and its last session end. Any other backend refuses a
+// device with a lock with StatusUnsupported, and the binding releases the lock
+// itself.
+func TestNativeQueueLockReachesTheDevice(t *testing.T) {
 	r := newGraphicsFixture(t)
 	lock := newNativeRecorderForTest(nil)
-	options := r.options()
-	options.QueueLock = lock.queueLock()
 	if !queueLockSupported {
-		if _, _, err := r.attachSession(options); !errors.Is(err, StatusUnsupported) {
-			t.Fatalf("attach with a queue lock = %v, want StatusUnsupported", err)
+		if _, err := NewGPUDevice(&GPUDeviceOptions{QueueLock: lock.queueLock()}); !errors.Is(err, StatusUnsupported) {
+			t.Fatalf("a device with a queue lock = %v, want StatusUnsupported", err)
 		}
 		if releases := lock.releases.Load(); releases != 1 {
 			t.Fatalf("the rejected queue lock was released %d times, want once", releases)
 		}
 		return
 	}
-	r.start(t, options)
+	r.wrapDevice(t, lock.queueLock())
+	r.start(t, r.options())
+	// The session keeps the device, and the device the lock, until the
+	// session ends.
+	if err := r.device.Release(); err != nil {
+		t.Fatalf("GPUDeviceHandle.Release: %v", err)
+	}
 	r.attach(t)
 	r.renderFrame(t)
+	if releases := lock.releases.Load(); releases != 0 {
+		t.Fatal("native code released the queue lock while a session holds it")
+	}
 	r.teardown(t)
 	receive(t, lock.released, "the release of the queue lock")
 	locks, unlocks := lock.called.Load(), lock.unlocked.Load()

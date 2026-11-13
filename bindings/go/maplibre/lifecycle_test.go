@@ -127,7 +127,7 @@ func TestNilAndZeroHandlesAreRejected(t *testing.T) {
 	}
 
 	f := newFixture(t)
-	session, ready, err := f.m.AttachOffscreen(OffscreenDescriptor{}, RenderSessionAttachOptions{}, &OffscreenDeviceHandle{})
+	session, ready, err := f.m.Attach(RenderTargetOffscreenVariant{}, &GPUDeviceHandle{}, RenderSessionAttachOptions{})
 	if session != nil || ready != nil || !errors.Is(err, StatusInvalidArgument) {
 		t.Fatalf("zero input handle: (%v, %v, %v), want nil and StatusInvalidArgument", session, ready, err)
 	}
@@ -138,7 +138,7 @@ func TestNilAndZeroHandlesAreRejected(t *testing.T) {
 // that the runtime holds still receives the map's events.
 func TestChildKeepsItsParentAlive(t *testing.T) {
 	// No fixture: its cleanup would keep the runtime reachable.
-	runtime, err := NewRuntime(&RuntimeOptions{CachePath: ":memory:"})
+	runtime, err := NewRuntime(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

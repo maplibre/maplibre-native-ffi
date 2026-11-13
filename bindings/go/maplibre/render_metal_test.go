@@ -7,12 +7,18 @@ import "maplibre.org/maplibre-native-ffi/bindings/go/internal/testsupport"
 const (
 	buildBackend    = RenderBackendFlagMetal
 	graphicsBackend = testsupport.BackendMetal
-	// Only Vulkan sessions take a queue lock.
+	// Only a Vulkan device takes a queue lock.
 	queueLockSupported = false
 )
 
+// wrapDevice wraps the test graphics' Metal device. Only a Vulkan device takes
+// a queue lock.
+func wrapDevice(context testsupport.Context, _ QueueLock) (*GPUDeviceHandle, error) {
+	return WrapMetalGPUDevice(MetalDeviceDescriptor{Device: context.MetalDevice})
+}
+
 func attachBorrowedTexture(
-	m *MapHandle, _ testsupport.Context, size LogicalSize, textures []*testsupport.Texture,
+	m *MapHandle, device *GPUDeviceHandle, size LogicalSize, textures []*testsupport.Texture,
 	options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
 	ring := make([]MetalBorrowedTexture, len(textures))
@@ -20,12 +26,12 @@ func attachBorrowedTexture(
 		ring[index] = MetalBorrowedTexture{Texture: texture.Info.MetalTexture}
 	}
 	info := textures[0].Info
-	return m.AttachMetalBorrowedTexture(MetalBorrowedTextureDescriptor{
+	return m.Attach(RenderTargetMetalBorrowedTexturesVariant{Value: MetalBorrowedTexturesTarget{
 		LogicalSize:    size,
 		PhysicalWidth:  info.Width,
 		PhysicalHeight: info.Height,
 		Textures:       ring,
-	}, options)
+	}}, device, options)
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {
