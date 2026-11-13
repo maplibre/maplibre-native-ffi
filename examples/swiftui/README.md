@@ -30,6 +30,6 @@ its layer, size, and scale factor. `Sources/MapController.swift` attaches a
 render session to the layer on a library thread, and paces its frames with a
 frame pacer that follows the display. When the app goes to the background, the
 controller releases the session's target and keeps the session, and gives it the
-layer again when the app comes back. A move to a display of another density
-takes a new map, as the map renders at one scale factor for its life. Everything
-else matches the browser example in `examples/browser`.
+layer again when the app comes back. A resize or a move to a display of another
+density resizes the session, which gives the map its new size and scale factor.
+Everything else matches the browser example in `examples/browser`.
