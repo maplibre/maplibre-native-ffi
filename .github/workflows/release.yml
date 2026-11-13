@@ -511,16 +511,10 @@ jobs:
         include:
           - distribution: maplibre-native-ffi
             environment: pypi
-          - distribution: maplibre-native-ffi-runtime-opengl
-            environment: pypi-runtime-opengl
-          - distribution: maplibre-native-ffi-runtime-metal
-            environment: pypi-runtime-metal
-          - distribution: maplibre-native-ffi-runtime-vulkan
-            environment: pypi-runtime-vulkan
-          - distribution: maplibre-native-ffi-runtime-opengl-mingw
-            environment: pypi-runtime-opengl-mingw
-          - distribution: maplibre-native-ffi-runtime-vulkan-mingw
-            environment: pypi-runtime-vulkan-mingw
+          - distribution: maplibre-native-ffi-runtime
+            environment: pypi-runtime
+          - distribution: maplibre-native-ffi-runtime-mingw
+            environment: pypi-runtime-mingw
     environment:
       name: ${{ matrix.environment }}
       url:

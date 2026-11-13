@@ -1,8 +1,7 @@
-"""Offscreen sessions, and borrowed-texture sessions on every backend this
-build carries.
+"""Offscreen sessions, and borrowed-texture sessions on the backend under test.
 
-GPU objects come from tests/graphics. A backend the build supports whose
-graphics object cannot be created fails its tests rather than skipping them.
+GPU objects come from tests/graphics. A backend under test whose graphics object
+cannot be created fails its tests rather than skipping them.
 """
 
 from __future__ import annotations
@@ -41,19 +40,18 @@ SIZE = mln.LogicalSize(WIDTH, HEIGHT)
 
 
 def _backends() -> list[str]:
-    mask = mln.supported_render_backend_mask()
-    backends = []
-    if mask & mln.RenderBackendFlag.METAL:
-        backends.append("metal")
-    if mask & mln.RenderBackendFlag.VULKAN:
-        backends.append("vulkan")
-    if mask & mln.RenderBackendFlag.OPEN_GL:
-        providers = mln.open_gl_supported_context_provider_mask()
-        if providers & mln.OpenGlContextProviderFlag.EGL:
-            backends.append("egl")
-        if providers & mln.OpenGlContextProviderFlag.WGL:
-            backends.append("wgl")
-    return backends
+    """The backend under test, with OpenGL named by its context provider."""
+    backend = graphics.test_backend()
+    flag = {
+        "metal": mln.RenderBackendFlag.METAL,
+        "vulkan": mln.RenderBackendFlag.VULKAN,
+        "opengl": mln.RenderBackendFlag.OPEN_GL,
+    }[backend]
+    if not mln.supported_render_backend_mask() & flag:
+        raise RuntimeError(f"the runtime lacks the {backend} backend under test")
+    if backend == "opengl":
+        return ["wgl" if sys.platform == "win32" else "egl"]
+    return [backend]
 
 
 BACKENDS = _backends()
@@ -174,7 +172,7 @@ class _Target:
 
 
 class Offscreen(_Target):
-    """A map rendering offscreen on a device that its session creates.
+    """A map rendering offscreen on a device of the backend under test.
 
     ``frame_wake`` makes the frame wake from the function that notifies the
     frame wait.
@@ -208,12 +206,20 @@ class Offscreen(_Target):
         self, options: mln.RenderSessionAttachOptions
     ) -> mln.RenderSessionHandle:
         assert self.map is not None
-        # With no device, the session creates its own.
-        return self.map.attach(
-            mln.RenderTargetOffscreenVariant(mln.OffscreenTarget(logical_size=SIZE)),
-            None,
-            options,
+        device = mln.GpuDeviceHandle.create(
+            mln.GpuDeviceOptions(backend=_RENDER_BACKENDS[BACKENDS[0]])
         )
+        try:
+            return self.map.attach(
+                mln.RenderTargetOffscreenVariant(
+                    mln.OffscreenTarget(logical_size=SIZE)
+                ),
+                device,
+                options,
+            )
+        finally:
+            # The session keeps the device until the session ends.
+            device.release()
 
     def render_red(self) -> mln.TextureReadbackResult:
         assert self.map is not None and self.session is not None

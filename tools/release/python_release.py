@@ -30,7 +30,13 @@ from sbom import (
     write_json,
 )
 
-BACKENDS = ("opengl", "metal", "vulkan")
+# The runtime directory under bindings/python/runtimes of each distribution.
+# MinGW's has a distribution of its own, since its wheels take the platform
+# tags of the MSVC ones.
+RUNTIMES = {
+    "native": "maplibre-native-ffi-runtime",
+    "mingw": "maplibre-native-ffi-runtime-mingw",
+}
 DESCRIPTOR_PATH = pathlib.Path("share/maplibre-native-c/artifact.json")
 NATIVE_DLL = "maplibre-native-c.dll"
 MINGW_RUNTIME_DLLS = ("libunwind.dll", "libc++.dll")
@@ -94,12 +100,9 @@ def stage_runtime_dlls(
 
 def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     descriptor = json.loads((prefix / DESCRIPTOR_PATH).read_text())
-    backend = descriptor["backend"]
-    if backend not in BACKENDS:
-        raise SystemExit(f"no Python runtime serves the {backend} backend")
-    runtime = backend
+    runtime = "native"
     if descriptor["platform"]["id"].startswith("windows-mingw-"):
-        runtime += "-mingw"
+        runtime = "mingw"
     # The wheel carries the native library, so it carries the notices of the
     # third-party code in it.
     notices = next(prefix.glob("share/*/licenses"), None)
@@ -152,7 +155,7 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     )
     inventory = json.loads((prefix / "share/maplibre-native-c" / SBOM_NAME).read_text())
     result = package_inventory(
-        f"maplibre-native-ffi-runtime-{runtime}",
+        RUNTIMES[runtime],
         "0.0.0",
         "pypi",
         [without_native_rust(inventory), extension],

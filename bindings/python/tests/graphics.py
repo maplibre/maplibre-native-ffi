@@ -79,6 +79,19 @@ def _library_path() -> Path:
     raise FileNotFoundError(f"{name} is in none of {[str(c) for c in candidates]}")
 
 
+def test_backend() -> str:
+    """The render backend under test, vulkan, opengl, or metal, which the test
+    task names in MLN_FFI_TEST_BACKEND. The Android device run, which passes no
+    environment, writes it beside the library instead."""
+    backend = os.environ.get("MLN_FFI_TEST_BACKEND")
+    device_file = Path(__file__).resolve().parents[1] / "build/graphics/test-backend"
+    if not backend and device_file.is_file():
+        backend = device_file.read_text().strip()
+    if not backend:
+        raise RuntimeError("MLN_FFI_TEST_BACKEND must name the backend under test")
+    return backend
+
+
 @cache
 def _library() -> ctypes.CDLL:
     # Python searches only registered directories for a DLL's dependencies. A

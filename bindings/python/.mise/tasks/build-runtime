@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Build the runtime wheel for a preset's render backend into dist/."
+#MISE description="Build the runtime wheel for a preset into dist/."
 #MISE extends="ffi:preset"
 #MISE shell="bash"
 set -euo pipefail
@@ -11,14 +11,11 @@ fi
 # Zig preserves the glibc floor from cmake/toolchains/zig.cmake; the host linker
 # would bind libm references to the build machine's newer glibc.
 install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-backend=$(jq -r .backend "$install_dir/share/maplibre-native-c/artifact.json")
-if [[ -z "$backend" || ! -d "runtimes/$backend" ]]; then
-  echo "No Python runtime serves the backend of $usage_preset." >&2
-  exit 2
-fi
-runtime=$backend
+# MinGW's runtime has a distribution of its own, since its wheels take the
+# platform tags of the MSVC ones.
+runtime=native
 if [[ "$usage_preset" == mingw-* ]]; then
-  runtime+=-mingw
+  runtime=mingw
 fi
 python3 "$MISE_MONOREPO_ROOT/tools/release/python_release.py" metadata . "$install_dir"
 maturin_flags=()
@@ -29,14 +26,14 @@ case "$usage_preset" in
   # Match the native archive's minimum OS rather than maturin's default.
   macos-*)
     export MACOSX_DEPLOYMENT_TARGET=14.3
-    if [[ "$usage_preset" == macos-x64-* ]]; then
+    if [[ "$usage_preset" == macos-x64 ]]; then
       maturin_flags+=(--target x86_64-apple-darwin)
     fi
     ;;
-  linux-musl-arm64-*) maturin_flags+=(--target aarch64-unknown-linux-musl) ;;
-  linux-musl-x64-*) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
-  linux-gnu-riscv64-*) maturin_flags+=(--target riscv64gc-unknown-linux-gnu) ;;
-  linux-musl-riscv64-*) maturin_flags+=(--target riscv64gc-unknown-linux-musl) ;;
+  linux-musl-arm64) maturin_flags+=(--target aarch64-unknown-linux-musl) ;;
+  linux-musl-x64) maturin_flags+=(--target x86_64-unknown-linux-musl) ;;
+  linux-gnu-riscv64) maturin_flags+=(--target riscv64gc-unknown-linux-gnu) ;;
+  linux-musl-riscv64) maturin_flags+=(--target riscv64gc-unknown-linux-musl) ;;
   mingw-*)
     source "$MISE_MONOREPO_ROOT/tools/env/rust-cross-env.sh" "$usage_preset"
     maturin_flags+=(--target "$cargo_target" --auditwheel repair)
