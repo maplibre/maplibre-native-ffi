@@ -74,10 +74,12 @@ JVM with `--enable-native-access=ALL-UNNAMED`.
 
 ## Wasm
 
-Add the OpenGL runtime to `wasmJsMain` to render with WebGL, or the WebGPU
+Add the OpenGL runtime to `wasmJsMain` to render with WebGL 2, or the WebGPU
 runtime to render with WebGPU. Before you use the binding, call
-`loadWasmModule()` and wait for it. The page must meet the
-[web requirements](/maplibre-native-ffi/install/#web).
+`loadWasmModule()` and wait for it, on the thread that runs your Kotlin: a Web
+Worker, as the [web requirements](/maplibre-native-ffi/install/#web) suggest, or
+the page. Lend the module your canvas and other JavaScript objects as
+`WebObject`s, whose handles the descriptors take.
 
 ## Snapshots
 
