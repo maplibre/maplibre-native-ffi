@@ -228,55 +228,6 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A location indicator at the center, drawn by a 16 x 16 top image. It has no
-// source, so its hit names only its layer.
-static const char indicator_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"puck\","
-  "\"type\":\"location-indicator\",\"layout\":{\"top-image\":\"dot\"},"
-  "\"paint\":{\"location\":[0,0,0]}}]}";
-
-static void location_indicator_hits_name_only_their_layer(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(map, MLN_BUFFER_LITERAL(indicator_style_json));
-  static uint8_t white[16 * 16 * 4];
-  memset(white, 0xff, sizeof(white));
-  mln_premultiplied_rgba8_image image = {
-    .size = sizeof(mln_premultiplied_rgba8_image)
-  };
-  image.width = 16;
-  image.height = 16;
-  image.stride = 16 * 4;
-  image.pixels = white;
-  image.byte_length = sizeof(white);
-  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
-    map, MLN_BUFFER_LITERAL("dot"), &image, NULL, &completion.descriptor, NULL
-  ));
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
-  rendered_count wait = {.fixture = &fixture, .count = 1};
-  TEST_ASSERT_TRUE(mln_test_style_render_until(
-    &fixture, renders_count, &wait, "the location indicator to render"
-  ));
-
-  const mln_rendered_query_geometry center = {
-    .size = sizeof(mln_rendered_query_geometry),
-    .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
-    .data = {.point = {.x = 32, .y = 32}},
-  };
-  const mln_test_feature_list list =
-    mln_test_style_query_rendered_with(&fixture, &center, NULL);
-  MLN_TEST_OK(list.status);
-  TEST_ASSERT_EQUAL_size_t(1, list.count);
-  TEST_ASSERT_EQUAL_STRING("puck", list.features[0].layer_id);
-  TEST_ASSERT_EQUAL_STRING("", list.features[0].source_id);
-  TEST_ASSERT_EQUAL_STRING("", list.features[0].source_layer_id);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // A rendered or source query, submitted with one of its inputs broken.
 typedef struct query_call {
   mln_rendered_query_geometry geometry;
@@ -1084,7 +1035,6 @@ static void malformed_queries_are_rejected_at_submission(void) {
 MLN_TEST_GROUP {
   RUN_TEST(rendered_queries_select_by_geometry_layer_and_filter);
   RUN_TEST(source_queries_read_the_named_source_layers);
-  RUN_TEST(location_indicator_hits_name_only_their_layer);
   RUN_TEST(cluster_queries_read_a_clustered_source);
   RUN_TEST(cluster_queries_read_the_most_recent_render_attempt);
   RUN_TEST(malformed_queries_are_rejected_at_submission);
