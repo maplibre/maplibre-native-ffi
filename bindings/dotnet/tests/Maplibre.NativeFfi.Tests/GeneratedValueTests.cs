@@ -74,13 +74,17 @@ public sealed class GeneratedValueTests
         """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}""";
 
     [Fact]
-    public async Task HostStringsUseViewsAndNativeLentStringsDecode()
+    public async Task HostTextWithAnEmbeddedNulIsRejectedAndNativeLentStringsDecode()
     {
         await using var fixture = await NativeFixture.WithEmptyStyleAsync();
 
-        // A source ID crosses as an explicit-length view, so an embedded NUL is part of the ID.
-        await fixture.Map.AddStyleSourceJsonAsync("before\0after", EmptyGeoJsonSource);
-        Assert.NotNull(await fixture.Map.GetStyleSourceAsync("before\0after"));
+        // A source ID crosses as an explicit-length view, and native code rejects the embedded
+        // NUL rather than reading the ID up to it.
+        var rejection = await Assert.ThrowsAsync<MaplibreException>(() =>
+            fixture.Map.AddStyleSourceJsonAsync("before\0after", EmptyGeoJsonSource)
+        );
+        Assert.Equal(Status.InvalidArgument, rejection.Status);
+        Assert.Contains("embedded NUL", rejection.Diagnostic);
         Assert.Null(await fixture.Map.GetStyleSourceAsync("before"));
 
         // The layer ID comes back as text that native lends for the completion.

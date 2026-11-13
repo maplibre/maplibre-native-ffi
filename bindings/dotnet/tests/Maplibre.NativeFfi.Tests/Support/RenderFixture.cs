@@ -52,7 +52,7 @@ internal sealed class RenderFixture : IDisposable
         }
     }
 
-    private RenderFixture(TestGraphicsBackend? backend, Configure configure)
+    private RenderFixture(TestGraphicsBackend? backend, Configure configure, QueueLock queueLock)
     {
         Backend = backend;
         try
@@ -92,7 +92,8 @@ internal sealed class RenderFixture : IDisposable
                             FrameWake = new Wake(Signal),
                             DriverWorkWake = new Wake(Signal),
                         }
-                )
+                ),
+                queueLock
             );
         }
         catch
@@ -130,15 +131,23 @@ internal sealed class RenderFixture : IDisposable
         TestGraphicsBackend backend,
         Configure configure,
         Action<RenderFixture> test
-    ) => RunOn(backend, configure, test);
+    ) => RunOn(backend, configure, default, test);
+
+    /// <summary>
+    /// Runs a test on a session whose Vulkan device wraps the test graphics' device with
+    /// <paramref name="queueLock" />, which the session alone holds.
+    /// </summary>
+    internal static void RunWithQueueLock(QueueLock queueLock, Action<RenderFixture> test) =>
+        RunOn(TestGraphicsBackend.Vulkan, static (_, options) => options, queueLock, test);
 
     /// <summary>Runs a test on an offscreen session.</summary>
     internal static void RunOffscreen(Action<RenderFixture> test) =>
-        RunOn(null, static (_, options) => options, test);
+        RunOn(null, static (_, options) => options, default, test);
 
     private static void RunOn(
         TestGraphicsBackend? backend,
         Configure configure,
+        QueueLock queueLock,
         Action<RenderFixture> test
     )
     {
@@ -147,7 +156,7 @@ internal sealed class RenderFixture : IDisposable
         {
             try
             {
-                using var fixture = new RenderFixture(backend, configure);
+                using var fixture = new RenderFixture(backend, configure, queueLock);
                 test(fixture);
             }
             catch (Exception error)
@@ -250,7 +259,10 @@ internal sealed class RenderFixture : IDisposable
         {
             // Dispose accepts the session in any state, and a test may already have disposed it.
             if (Session is not null)
+            {
                 Session.Dispose();
+                FinishDisposal();
+            }
         }
         finally
         {
@@ -278,6 +290,33 @@ internal sealed class RenderFixture : IDisposable
         }
     }
 
+    /// <summary>
+    /// Services a disposed caller-driven session until the service no longer accepts it, since
+    /// the session detaches, and lets go of the textures and its registrations, only in a service.
+    /// </summary>
+    private void FinishDisposal()
+    {
+        if (Backend is null)
+            return;
+        var elapsed = Stopwatch.StartNew();
+        while (true)
+        {
+            try
+            {
+                Session.ServiceDriverWork();
+            }
+            catch (MaplibreException error) when (error.Status == Status.InvalidState)
+            {
+                return;
+            }
+            // A disposal that finishes without more driver work has no wake to signal, so the
+            // wait is short and the loop checks again.
+            wake.Wait(TimeSpan.FromMilliseconds(10));
+            if (elapsed.Elapsed > TestWaits.Deadline)
+                throw new TimeoutException("Timed out waiting for the session to retire.");
+        }
+    }
+
     private IReadOnlyList<RenderFrameResult> DrainFrames() => Session.DrainFrameResults();
 
     // Only a caller-driven session has work for the fixture's thread.
@@ -290,23 +329,26 @@ internal sealed class RenderFixture : IDisposable
     /// <summary>
     /// Attaches a session to the fixture's map: on the fixture's textures, or offscreen.
     /// </summary>
-    internal RenderSessionHandle Attach(RenderSessionAttachOptions options)
+    internal RenderSessionHandle Attach(RenderSessionAttachOptions options) =>
+        Attach(options, default);
+
+    private RenderSessionHandle Attach(RenderSessionAttachOptions options, QueueLock queueLock)
     {
         var logicalSize = new LogicalSize(Width, Height);
         if (Graphics is null)
-            return Map.AttachOffscreen(new OffscreenDescriptor(logicalSize), options);
-        var context = Graphics.Context;
+            // With no device, the session creates its own.
+            return Map.Attach(
+                new RenderTarget.Offscreen(new OffscreenTarget(logicalSize)),
+                null,
+                options
+            );
         var infos = textures.Select(texture => texture.Info).ToArray();
         // Every texture of the ring shares the first one's format and size.
         var first = infos[0];
-        return Backend switch
+        RenderTarget target = Backend switch
         {
-            TestGraphicsBackend.Metal
-                when OperatingSystem.IsMacOS()
-                    || OperatingSystem.IsIOS()
-                    || OperatingSystem.IsTvOS()
-                    || OperatingSystem.IsMacCatalyst() => Map.AttachMetalBorrowedTexture(
-                new MetalBorrowedTextureDescriptor
+            TestGraphicsBackend.Metal => new RenderTarget.MetalBorrowedTextures(
+                new MetalBorrowedTexturesTarget
                 {
                     LogicalSize = logicalSize,
                     PhysicalWidth = first.Width,
@@ -317,19 +359,70 @@ internal sealed class RenderFixture : IDisposable
                             Borrow(info.MetalTexture)
                         )),
                     ],
-                },
-                options
+                }
+            ),
+            TestGraphicsBackend.Vulkan => new RenderTarget.VulkanBorrowedTextures(
+                new VulkanBorrowedTexturesTarget
+                {
+                    LogicalSize = logicalSize,
+                    PhysicalWidth = first.Width,
+                    PhysicalHeight = first.Height,
+                    Textures =
+                    [
+                        .. infos.Select(info => new VulkanBorrowedTexture(
+                            info.VulkanImage,
+                            info.VulkanImageView
+                        )),
+                    ],
+                    Format = first.Format,
+                    FinalLayout = first.VulkanFinalLayout,
+                }
+            ),
+            TestGraphicsBackend.Egl or TestGraphicsBackend.Wgl =>
+                new RenderTarget.OpenGlBorrowedTextures(
+                    new OpenGlBorrowedTexturesTarget
+                    {
+                        LogicalSize = logicalSize,
+                        PhysicalWidth = first.Width,
+                        PhysicalHeight = first.Height,
+                        Textures =
+                        [
+                            .. infos.Select(info => new OpenGlBorrowedTexture(
+                                info.OpenGlTexture
+                            )),
+                        ],
+                        Target = first.OpenGlTarget,
+                    }
+                ),
+            _ => throw new ArgumentOutOfRangeException(nameof(Backend)),
+        };
+        // The session keeps the device, and the device its queue lock, until the session ends.
+        using var device = WrapDevice(Graphics.Context, queueLock);
+        return Map.Attach(target, device, options);
+    }
+
+    /// <summary>
+    /// Wraps the test graphics' device, or its OpenGL context, in a GPU device. A Vulkan device
+    /// takes <paramref name="queueLock" />, the lock on the queue that the test graphics submit
+    /// to.
+    /// </summary>
+    private GpuDeviceHandle WrapDevice(TestGraphicsContext context, QueueLock queueLock) =>
+        Backend switch
+        {
+            TestGraphicsBackend.Metal
+                when OperatingSystem.IsMacOS()
+                    || OperatingSystem.IsIOS()
+                    || OperatingSystem.IsTvOS()
+                    || OperatingSystem.IsMacCatalyst() => GpuDeviceHandle.WrapMetal(
+                new MetalDeviceDescriptor { Device = Borrow(context.MetalDevice) }
             ),
             TestGraphicsBackend.Vulkan
                 when OperatingSystem.IsAndroid()
                     || OperatingSystem.IsLinux()
                     || OperatingSystem.IsMacOS()
-                    || OperatingSystem.IsWindows() => Map.AttachVulkanBorrowedTexture(
-                new VulkanBorrowedTextureDescriptor
+                    || OperatingSystem.IsWindows() => GpuDeviceHandle.WrapVulkan(
+                new VulkanDeviceDescriptor
                 {
-                    LogicalSize = logicalSize,
-                    PhysicalWidth = first.Width,
-                    PhysicalHeight = first.Height,
                     Context = new VulkanContextDescriptor
                     {
                         Instance = Borrow(context.VulkanInstance),
@@ -340,70 +433,33 @@ internal sealed class RenderFixture : IDisposable
                         GetInstanceProcAddr = Borrow(context.VulkanGetInstanceProcAddr),
                         GetDeviceProcAddr = Borrow(context.VulkanGetDeviceProcAddr),
                     },
-                    Textures =
-                    [
-                        .. infos.Select(info => new VulkanBorrowedTexture(
-                            info.VulkanImage,
-                            info.VulkanImageView
-                        )),
-                    ],
-                    Format = first.Format,
-                    FinalLayout = first.VulkanFinalLayout,
-                },
-                options
+                    QueueLock = queueLock,
+                    EnabledExtensions = context.VulkanDeviceExtensionNames(),
+                }
             ),
-            TestGraphicsBackend.Egl => Map.AttachOpenGlBorrowedTexture(
-                new OpenGlBorrowedTextureDescriptor
-                {
-                    LogicalSize = logicalSize,
-                    PhysicalWidth = first.Width,
-                    PhysicalHeight = first.Height,
-                    Context = new OpenGlContextDescriptor(
-                        OpenGlContextOwnership.Shared,
-                        new OpenGlContextDescriptor.DataValue.Egl(
-                            new EglContextDescriptor
-                            {
-                                Display = Borrow(context.EglDisplay),
-                                Config = Borrow(context.EglConfig),
-                                ShareContext = Borrow(context.EglContext),
-                            }
-                        )
-                    ),
-                    Textures =
-                    [
-                        .. infos.Select(info => new OpenGlBorrowedTexture(info.OpenGlTexture)),
-                    ],
-                    Target = first.OpenGlTarget,
-                },
-                options
+            TestGraphicsBackend.Egl => GpuDeviceHandle.WrapOpenGl(
+                new OpenGlContextDescriptor.Egl(
+                    new EglContextDescriptor
+                    {
+                        Display = Borrow(context.EglDisplay),
+                        Config = Borrow(context.EglConfig),
+                        ShareContext = Borrow(context.EglContext),
+                        GetProcAddress = Borrow(context.GetProcAddress),
+                    }
+                )
             ),
-            TestGraphicsBackend.Wgl => Map.AttachOpenGlBorrowedTexture(
-                new OpenGlBorrowedTextureDescriptor
-                {
-                    LogicalSize = logicalSize,
-                    PhysicalWidth = first.Width,
-                    PhysicalHeight = first.Height,
-                    Context = new OpenGlContextDescriptor(
-                        OpenGlContextOwnership.Shared,
-                        new OpenGlContextDescriptor.DataValue.Wgl(
-                            new WglContextDescriptor
-                            {
-                                DeviceContext = Borrow(context.WglDeviceContext),
-                                ShareContext = Borrow(context.WglContext),
-                            }
-                        )
-                    ),
-                    Textures =
-                    [
-                        .. infos.Select(info => new OpenGlBorrowedTexture(info.OpenGlTexture)),
-                    ],
-                    Target = first.OpenGlTarget,
-                },
-                options
+            TestGraphicsBackend.Wgl => GpuDeviceHandle.WrapOpenGl(
+                new OpenGlContextDescriptor.Wgl(
+                    new WglContextDescriptor
+                    {
+                        DeviceContext = Borrow(context.WglDeviceContext),
+                        ShareContext = Borrow(context.WglContext),
+                        GetProcAddress = Borrow(context.GetProcAddress),
+                    }
+                )
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(Backend)),
         };
-    }
 
     // The semaphore is never disposed, so a wake or a completion continuation that lands after
     // the fixture has finished still has somewhere to go.

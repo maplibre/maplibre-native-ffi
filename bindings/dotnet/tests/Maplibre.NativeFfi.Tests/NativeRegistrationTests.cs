@@ -78,9 +78,9 @@ public sealed unsafe class NativeRegistrationTests
         driverWork.WaitForRelease();
     }
 
-    // Only a Vulkan target takes a queue lock, and another target fails the attach with native
-    // code's unsupported status. Either way, the context is released once: by native code after the
-    // session retires, or by the binding for the rejected attach.
+    // Only a Vulkan device takes a queue lock, and another device fails its creation with native
+    // code's unsupported status. Either way, the context is released once: by native code after
+    // the session retires, or by the binding for the rejected call.
     [Theory]
     [MemberData(nameof(Backends))]
     public void ANativeQueueLockReachesNativeCodeAndItsContextIsReleasedOnce(
@@ -88,20 +88,25 @@ public sealed unsafe class NativeRegistrationTests
     )
     {
         var host = new Host();
-        RenderFixture.Configure configure = (_, options) =>
-            options with
-            {
-                QueueLock = QueueLock.Native(
-                    Function(&OnLock),
-                    Function(&OnUnlock),
-                    host.Context,
-                    Function(&OnRelease)
-                ),
-            };
+        var queueLock = QueueLock.Native(
+            Function(&OnLock),
+            Function(&OnUnlock),
+            host.Context,
+            Function(&OnRelease)
+        );
         if (backend != TestGraphicsBackend.Vulkan)
         {
             var rejection = Assert.Throws<MaplibreException>(() =>
-                RenderFixture.Run(backend, configure, _ => { })
+                GpuDeviceHandle.Create(
+                    new GpuDeviceOptions
+                    {
+                        Backend =
+                            backend == TestGraphicsBackend.Metal
+                                ? RenderBackend.Metal
+                                : RenderBackend.OpenGl,
+                        QueueLock = queueLock,
+                    }
+                )
             );
             Assert.Equal(Status.Unsupported, rejection.Status);
             Assert.Equal(1, host.Releases);
@@ -109,9 +114,8 @@ public sealed unsafe class NativeRegistrationTests
             host.Free();
             return;
         }
-        RenderFixture.Run(
-            backend,
-            configure,
+        RenderFixture.RunWithQueueLock(
+            queueLock,
             fixture =>
             {
                 fixture.Await(fixture.Session.Ready, "the session to be ready");
