@@ -8,7 +8,9 @@
 
 static atomic_bool finished;
 
-static void on_done(void* user_data, const mln_completion_result* result) {
+static void on_done(
+  void* user_data, const mln_completion_result* result
+) {
   (void)user_data;
   (void)result;
   atomic_store(&finished, true);
@@ -50,13 +52,16 @@ static void draw_frame(void) {
   // #region acquire
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   if (
-    mln_render_session_acquire_frame(session, &frame, NULL) != MLN_STATUS_OK ||
+    mln_render_session_acquire_frame(session, &frame, NULL) !=
+      MLN_STATUS_OK ||
     frame == MLN_HANDLE_NULL
   ) {
     return;  // The session failed, or no new frame is ready yet.
   }
 
-  mln_vulkan_texture_frame texture = {.size = sizeof(mln_vulkan_texture_frame)};
+  mln_vulkan_texture_frame texture = {
+    .size = sizeof(mln_vulkan_texture_frame)
+  };
   mln_acquired_frame_get_vulkan_texture(frame, &texture, NULL);
 
   // Sample the texture, and wait for those reads to finish.
@@ -105,7 +110,8 @@ void mln_doc_texture(
     // Only if your renderer also submits to the graphics queue.
     .queue_lock = {.lock = lock_queue, .unlock = unlock_queue},
     .enabled_extensions = extensions,
-    .enabled_extension_count = sizeof(extensions) / sizeof(extensions[0]),
+    .enabled_extension_count =
+      sizeof(extensions) / sizeof(extensions[0]),
   };
   mln_gpu_device device = MLN_HANDLE_NULL;
   mln_gpu_device_wrap_vulkan(&host, &device, NULL);

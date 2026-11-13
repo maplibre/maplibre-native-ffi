@@ -27,20 +27,19 @@ two textures at the map's size in device pixels, which is its logical size times
 its scale factor.
 
 <Aside type="note">
-  The snippets below use Vulkan. For another backend, use that backend's
-  device, target kind, and call to get each frame's texture. The other steps
-  are the same.
+  The snippets below use Vulkan. For another backend, use that backend's device,
+  target kind, and call to get each frame's texture. The other steps are the
+  same.
 </Aside>
 
 The session renders on a GPU device that shares your textures: wrap your own
 with [](api:mln_gpu_device_wrap_vulkan), [](api:mln_gpu_device_wrap_metal), or
-[](api:mln_gpu_device_wrap_open_gl). On Vulkan, you can instead have the
-library create the device with [](api:mln_gpu_device_create), and create your
-textures on the context from [](api:mln_gpu_device_get_vulkan_context). To
-share the textures with another graphics API on the same GPU, name that GPU by
-its UUID or LUID in the options. If your renderer submits to the same queue as
-the session, give the device your queue lock, and hold it around your own
-submissions.
+[](api:mln_gpu_device_wrap_open_gl). On Vulkan, you can instead have the library
+create the device with [](api:mln_gpu_device_create), and create your textures
+on the context from [](api:mln_gpu_device_get_vulkan_context). To share the
+textures with another graphics API on the same GPU, name that GPU by its UUID or
+LUID in the options. If your renderer submits to the same queue as the session,
+give the device your queue lock, and hold it around your own submissions.
 
 As with a window, use your graphics thread as the driver for OpenGL and WebGPU
 textures, and the library thread otherwise. See
@@ -70,8 +69,8 @@ can import. The session uses the first of these that its device exports:
 - On Windows, D3D11 textures that your D3D11 or D3D12 renderer opens through
   their shared handles. Create the device with your adapter's LUID, and get each
   frame's texture with [](api:mln_acquired_frame_get_dxgi_shared_texture).
-- On Linux and FreeBSD, dmabufs that your compositor or renderer imports, such as
-  through `EGL_EXT_image_dma_buf_import` or `zwp_linux_dmabuf_v1`. List the
+- On Linux and FreeBSD, dmabufs that your compositor or renderer imports, such
+  as through `EGL_EXT_image_dma_buf_import` or `zwp_linux_dmabuf_v1`. List the
   formats and modifiers that your importer takes, get each frame's buffer with
   [](api:mln_acquired_frame_get_dma_buf), and import all of its planes. A
   modifier with compression, such as AMD's DCC, adds a plane to the buffer, and
@@ -85,8 +84,8 @@ can import. The session uses the first of these that its device exports:
 uses. To learn before you attach whether a device exports a kind, read
 [](api:mln_gpu_device_capabilities.export_kinds). To resize the ring, use
 [](api:mln_render_session_resize) instead of replacing it: the frames that you
-hold keep their textures until you release them. Attach with three textures,
-and keep each frame acquired until your reader is done with it.
+hold keep their textures until you release them. Attach with three textures, and
+keep each frame acquired until your reader is done with it.
 
 ## Draw each frame
 

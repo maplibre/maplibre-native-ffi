@@ -121,10 +121,7 @@ static void missing_style_ids_report_not_found(void) {
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "before_layer_id \"absent-layer\" does not exist",
     mln_map_add_style_layer_json(
-      map,
-      MLN_BUFFER_LITERAL(
-        "{\"id\":\"backdrop\",\"type\":\"background\"}"
-      ),
+      map, MLN_BUFFER_LITERAL("{\"id\":\"backdrop\",\"type\":\"background\"}"),
       layer, &completion.descriptor, NULL
     )
   );
