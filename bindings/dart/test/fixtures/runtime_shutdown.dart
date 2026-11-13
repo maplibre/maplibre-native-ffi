@@ -5,6 +5,7 @@ import 'dart:isolate';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
+import '../support/backend.dart';
 import '../support/fixture.dart';
 
 Future<void> releaseRuntimes() async {
@@ -69,6 +70,7 @@ Future<void> abandonSession() async {
     ],
   });
   var frames = Completer<void>();
+  final device = createDeviceUnderTest();
   final session = map.attach(
     RenderTarget.offscreen(
       OffscreenTarget(logicalSize: LogicalSize(width: 32, height: 32)),
@@ -81,7 +83,10 @@ Future<void> abandonSession() async {
         },
       ),
     ),
+    device: device,
   );
+  // The session keeps the device until the session ends.
+  device.release();
   await session.ready;
   // A frame wake leaves the isolate free to finish, so a port keeps it alive
   // until a frame result arrives.

@@ -3,8 +3,8 @@
 ///
 /// A test attaches a borrowed texture in such a context only for what an
 /// offscreen session lacks: acquired frames, and a device that wraps the host's
-/// Vulkan device with a queue lock. Both exist only on Metal and Vulkan builds,
-/// so an OpenGL build opens no context here.
+/// Vulkan device with a queue lock. Both exist only on Metal and Vulkan, so a
+/// run that tests OpenGL opens no context here.
 library;
 
 import 'dart:ffi';
@@ -13,6 +13,8 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
+
+import 'backend.dart';
 
 const _backendMetal = 1;
 const _backendVulkan = 2;
@@ -133,38 +135,37 @@ String _libraryPath() {
   return '$prefix/lib/libmln_test_graphics.so';
 }
 
-/// The backend the native library was built for, which is the one backend
-/// every render test runs on, or null on an OpenGL build.
-int? _buildBackend() {
-  final backends = supportedRenderBackendMask();
-  if (backends.contains(RenderBackendFlag.metal)) return _backendMetal;
-  if (backends.contains(RenderBackendFlag.vulkan)) return _backendVulkan;
-  return null;
-}
+/// The `tests/graphics` backend of the backend under test, or null for
+/// OpenGL.
+int? _graphicsBackend() => switch (backendUnderTest) {
+  RenderBackend.metal => _backendMetal,
+  RenderBackend.vulkan => _backendVulkan,
+  _ => null,
+};
 
-/// Whether this build attaches sessions to Vulkan, the one backend whose
-/// devices take a queue lock.
-bool get buildAttachesVulkan => _buildBackend() == _backendVulkan;
+/// Whether the backend under test is Vulkan, the one backend whose devices
+/// take a queue lock.
+bool get vulkanUnderTest => _graphicsBackend() == _backendVulkan;
 
-/// Whether [TestGraphics.open] opens a context on this build.
-bool get buildOpensTestGraphics => _buildBackend() != null;
+/// Whether [TestGraphics.open] opens a context for the backend under test.
+bool get testGraphicsOpens => _graphicsBackend() != null;
 
-/// Whether a core-worker session on this build exposes its frames to the host.
-/// Metal and Vulkan sessions do. An OpenGL session exposes frames only from a
-/// context that it shares with the host, which only a caller-driven session
-/// can drive.
-bool get buildExposesCoreWorkerFrames => _buildBackend() != null;
+/// Whether a core-worker session of the backend under test exposes its frames
+/// to the host. Metal and Vulkan sessions do. An OpenGL session exposes frames
+/// only from a context that it shares with the host, which only a
+/// caller-driven session can drive.
+bool get coreWorkerExposesFrames => _graphicsBackend() != null;
 
 /// A device or context standing in for the host's.
 final class TestGraphics {
   TestGraphics._(this._handle, this._context);
 
-  /// Creates the build's backend context, destroyed by a teardown that runs
-  /// after every session the test attaches to it. A build whose backend has
-  /// no context here fails, rather than skipping.
+  /// Creates a context of the backend under test, destroyed by a teardown that
+  /// runs after every session the test attaches to it. A backend with no
+  /// context here fails, rather than skipping.
   factory TestGraphics.open() {
-    final backend = _buildBackend();
-    if (backend == null) fail('an OpenGL build has no test graphics context');
+    final backend = _graphicsBackend();
+    if (backend == null) fail('OpenGL has no test graphics context');
     final handle = _library.create(backend);
     if (handle == nullptr) {
       fail('mln_test_graphics_create: ${_library.lastError().toDartString()}');

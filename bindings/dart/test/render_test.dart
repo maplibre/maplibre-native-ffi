@@ -4,6 +4,7 @@
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
 
+import 'support/backend.dart';
 import 'support/fixture.dart';
 import 'support/graphics.dart';
 import 'support/render.dart';
@@ -30,16 +31,20 @@ void _expectRed(TextureReadbackResult image) {
 /// An OpenGL session exposes frames only from a context that it shares with
 /// the host, which only a caller-driven session can drive. A core-worker EGL
 /// session keeps its frames in its own context and offers readback instead.
-final Object _openGlFrameSkip = buildExposesCoreWorkerFrames
+final Object _openGlFrameSkip = coreWorkerExposesFrames
     ? false
     : 'An OpenGL core-worker session exposes no frames to view';
 
-/// Only a Metal or Vulkan build opens a context from `tests/graphics`.
-final Object _testGraphicsSkip = buildOpensTestGraphics
+/// Only Metal and Vulkan open a context from `tests/graphics`.
+final Object _testGraphicsSkip = testGraphicsOpens
     ? false
-    : 'An OpenGL build opens no test graphics context';
+    : 'OpenGL opens no test graphics context';
 
 void main() {
+  test('a device renders with the backend under test, $backendUnderTest', () {
+    expect(openGpuDevice().getCapabilities().backend, backendUnderTest);
+  });
+
   test(
     'an offscreen session renders a frame that reads back as pixels',
     () async {
@@ -242,8 +247,7 @@ _FrameView _openFrameView(
   AcquiredFrameHandle frame,
   void Function(_FrameView view) inside,
 ) {
-  final backends = supportedRenderBackendMask();
-  if (backends.contains(RenderBackendFlag.metal)) {
+  if (backendUnderTest == RenderBackend.metal) {
     late _FrameView escaped;
     frame.withMetalTexture((view) {
       escaped = (width: () => view.width, texture: () => view.texture.address);
@@ -251,7 +255,7 @@ _FrameView _openFrameView(
     });
     return escaped;
   }
-  if (backends.contains(RenderBackendFlag.vulkan)) {
+  if (backendUnderTest == RenderBackend.vulkan) {
     late _FrameView escaped;
     frame.withVulkanTexture((view) {
       escaped = (width: () => view.width, texture: () => view.image);
@@ -259,5 +263,5 @@ _FrameView _openFrameView(
     });
     return escaped;
   }
-  fail('no core-worker frame view on $backends');
+  fail('no core-worker frame view on $backendUnderTest');
 }

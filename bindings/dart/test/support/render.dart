@@ -1,4 +1,4 @@
-/// Render sessions on the build's backend, driven by their core worker
+/// Render sessions on the backend under test, driven by their core worker
 /// and waited on through their frame wake. A session renders on a graphics
 /// device that native code creates, or on a borrowed texture in a context from
 /// `tests/graphics` when a test needs the frames that only such a session
@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
 
+import 'backend.dart';
 import 'fixture.dart';
 import 'graphics.dart';
 
@@ -44,20 +45,32 @@ final offscreenTarget = RenderTarget.offscreen(
   OffscreenTarget(logicalSize: _size),
 );
 
-/// Creates a GPU device that the library owns, which a teardown releases.
+/// Creates a GPU device of the backend under test that the library owns, which
+/// a teardown releases.
 GpuDeviceHandle openGpuDevice() {
-  final device = GpuDeviceHandle.create();
+  final device = createDeviceUnderTest();
   addTearDown(device.release);
   return device;
 }
 
 /// Attaches an offscreen session of the render size, on [device] or else on a
-/// device of its own.
+/// device of its own of the backend under test.
 RenderSessionHandle attachOffscreenSession(
   MapHandle map,
   RenderSessionAttachOptions options, {
   GpuDeviceHandle? device,
-}) => map.attach(offscreenTarget, options, device: device);
+}) {
+  if (device != null) {
+    return map.attach(offscreenTarget, options, device: device);
+  }
+  final own = createDeviceUnderTest();
+  try {
+    return map.attach(offscreenTarget, options, device: own);
+  } finally {
+    // The session keeps the device until the session ends.
+    own.release();
+  }
+}
 
 /// A session driven by its core worker, which a teardown releases before the
 /// map and any graphics context it uses.
