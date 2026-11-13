@@ -43,5 +43,8 @@ fi
 # The simulator is slower than the host, so waits and the native hang watchdog
 # stretch by the timeout scale.
 export SIMCTL_CHILD_MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-3}"
+if [[ -n "${MLN_FFI_TEST_BACKEND:-}" ]]; then
+  export SIMCTL_CHILD_MLN_FFI_TEST_BACKEND="$MLN_FFI_TEST_BACKEND"
+fi
 
 exec perl -e 'alarm shift; exec @ARGV' "$timeout_seconds" xcrun simctl spawn "$device" "$test_executable" "$@"

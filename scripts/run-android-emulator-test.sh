@@ -149,6 +149,11 @@ for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
 done
 
 fixture_environment=
+# The backend under test, which a binding's suite reads.
+backend_environment=
+if [[ -n "${MLN_FFI_TEST_BACKEND:-}" ]]; then
+  backend_environment="MLN_FFI_TEST_BACKEND='$MLN_FFI_TEST_BACKEND' "
+fi
 if [[ -n "$fixture_dir" ]]; then
   run_adb "the push of the fixtures" push "$fixture_dir" "$remote_dir/fixtures" >/dev/null
   fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' "
@@ -163,7 +168,7 @@ for test_executable in "${test_executables[@]}"; do
   # TMPDIR is unset, so a test that asks for a temporary directory gets one here.
   # The emulator renders in software, so waits and the native hang watchdog
   # stretch by the timeout scale.
-  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}MLN_TEST_TIMEOUT_SCALE='$timeout_scale' TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
+  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}${backend_environment}MLN_TEST_TIMEOUT_SCALE='$timeout_scale' TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
   for argument in ${test_arguments[@]+"${test_arguments[@]}"}; do
     printf -v quoted_argument '%q' "$argument"
     remote_command+=" $quoted_argument"

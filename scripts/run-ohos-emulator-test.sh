@@ -85,6 +85,10 @@ fi
 # Software rendering under QEMU is slow, so waits and the native hang watchdog
 # stretch by the timeout scale.
 graphics_environment="EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LIBGL_DRIVERS_PATH=/vendor/lib64/chipsetsdk MLN_TEST_TIMEOUT_SCALE='${MLN_TEST_TIMEOUT_SCALE:-3}' "
+# The backend under test, which a binding's suite reads.
+if [[ -n "${MLN_FFI_TEST_BACKEND:-}" ]]; then
+  graphics_environment+="MLN_FFI_TEST_BACKEND='$MLN_FFI_TEST_BACKEND' "
+fi
 
 for test_executable in "${test_executables[@]}"; do
   echo "Running $(basename "$test_executable") in the OpenHarmony emulator."
