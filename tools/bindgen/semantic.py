@@ -104,9 +104,9 @@ class HandlePlan:
     @property
     def scoped_dispose(self) -> str | None:
         """The operation that every other scope calls, such as TypeScript's
-        `Symbol.dispose`, .NET's `Dispose`, Kotlin's `AutoCloseable.close`,
-        Python's `with`, or Rust's `Drop`: the dispose, which is the release of
-        a handle that its release frees at once."""
+        `Symbol.dispose`, .NET's `Dispose`, Kotlin's `AutoCloseable.close`, or
+        Python's `with`: the dispose, which is the release of a handle that its
+        release frees at once."""
         return None if self.discard else self.dispose
 
 

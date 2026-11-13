@@ -13,7 +13,6 @@ from tools.bindgen.emitters import (
     gobject,
     kotlin,
     python,
-    rust,
     swift,
     typescript,
     zig,
@@ -126,17 +125,6 @@ mln_status mln_box_use(const mln_box *box, mln_diagnostic *out_diagnostic);
         dart_operations = dart.lower(api()).files[dart.OPERATIONS]
         self.assertIn("useMetal(", dart_operations)
         self.assertNotIn("attachCanvas(", dart_operations)
-
-    def test_rust_compiles_a_function_only_for_the_platforms_it_serves(self):
-        source = emitted(rust, api())["crates/maplibre-native-ffi/src/generated/map.rs"]
-        self.assertIn(
-            '    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos", target_os = "visionos"))]\n'
-            "    pub fn use_metal(",
-            source,
-        )
-        self.assertIn('    #[cfg(target_os = "emscripten")]\n    pub', source)
-        self.assertIn("    pub fn redraw(", source)
-        self.assertNotIn('#[cfg(any(target_os = "android"', source)
 
     def test_swift_compiles_a_function_only_for_the_platforms_it_serves(self):
         generated = "\n".join(emitted(swift, api()).values())

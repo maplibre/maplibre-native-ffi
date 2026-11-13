@@ -112,10 +112,6 @@
     ],
     "commands": [
       {
-        "command": "rustfmt --edition 2024 --config max_width=70",
-        "associations": ["**/maplibre-native-ffi/examples/**/*.rs"],
-      },
-      {
         "command": "bash .mise/bin/dprint-dart format --output=show --page-width=70 --stdin-name={{file_path}}",
         "associations": ["**/docsnippets/**/*.dart"],
       },

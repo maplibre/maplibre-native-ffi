@@ -33,7 +33,7 @@ class GenerateCommandTests(unittest.TestCase):
         removed = "bindings/dotnet/src/Maplibre.NativeFfi/Api/Label.g.cs"
         # Only the previous run's output list decides what is stale, never a
         # file's header line.
-        handwritten = "bindings/rust/src/handwritten.rs"
+        handwritten = "bindings/python/src/handwritten.rs"
         with TemporaryDirectory() as directory:
             root = Path(directory)
             self.assertEqual(self.generate(root, ("keywords", "conventions"))[0], 0)
@@ -47,19 +47,24 @@ class GenerateCommandTests(unittest.TestCase):
             self.assertFalse((root / removed).exists())
             self.assertTrue((root / handwritten).is_file())
 
-    def test_the_values_group_fails_generation_before_writing_output(self):
-        # The values group declares a nullable counted input that the Rust
-        # emitter reports unsupported.
+    def test_an_unsupported_declaration_fails_generation_before_writing_output(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             self.assertEqual(self.generate(root, ("keywords",))[0], 0)
             manifest = (root / cli.MANIFEST).read_text()
+            api = parse(groups=("values",))
+            outputs, _ = cli.render(api)
+            gap = {"python": {"mln_probe_roundtrip": "api.h:1:1: no lowering"}}
             output = io.StringIO()
-            with UNFORMATTED, contextlib.redirect_stdout(output):
-                status = cli.generate(parse(groups=("values",)), root=root)
+            with (
+                UNFORMATTED,
+                patch.object(cli, "render", return_value=(outputs, gap)),
+                contextlib.redirect_stdout(output),
+            ):
+                status = cli.generate(api, root=root)
             self.assertEqual(status, 1)
             self.assertIn(
-                "rust: 1 declarations require implementation", output.getvalue()
+                "python: 1 declarations require implementation", output.getvalue()
             )
             self.assertIn("mln_probe_roundtrip", output.getvalue())
             self.assertEqual((root / cli.MANIFEST).read_text(), manifest)

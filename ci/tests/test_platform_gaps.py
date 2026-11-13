@@ -277,29 +277,27 @@ class PlatformGapsTest(unittest.TestCase):
     def test_selectors_normalize_backends_and_apple_simulators(self):
         entry = gaps.Entry(
             0,
-            {"bindings": ("rust",), "platforms": ("ios",), "backends": ("metal",)},
+            {"bindings": ("go",), "platforms": ("ios",), "backends": ("metal",)},
             "path-known",
             "runner needed",
             None,
         )
         with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
             for name in ("ios-arm64-metal", "ios-simulator-arm64-metal"):
-                self.assertFalse(gaps.supported("rust", self.targets[name]))
+                self.assertFalse(gaps.supported("go", self.targets[name]))
                 self.assertTrue(gaps.supported("swift", self.targets[name]))
-            self.assertTrue(gaps.supported("rust", self.targets["tvos-arm64-metal"]))
+            self.assertTrue(gaps.supported("go", self.targets["tvos-arm64-metal"]))
         entry = dataclasses.replace(
             entry,
             selectors={
-                "bindings": ("rust",),
+                "bindings": ("go",),
                 "platforms": ("linux-gnu",),
                 "backends": ("opengl",),
             },
         )
         with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
-            self.assertFalse(gaps.supported("rust", self.targets["linux-gnu-x64-egl"]))
-            self.assertTrue(
-                gaps.supported("rust", self.targets["linux-gnu-x64-vulkan"])
-            )
+            self.assertFalse(gaps.supported("go", self.targets["linux-gnu-x64-egl"]))
+            self.assertTrue(gaps.supported("go", self.targets["linux-gnu-x64-vulkan"]))
 
     def test_a_native_gap_excludes_its_bindings_and_target_job(self):
         target = self.targets["linux-gnu-x64-vulkan"]

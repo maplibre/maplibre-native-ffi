@@ -126,11 +126,6 @@ export default defineConfig({
           label: "Reference",
           items: [
             reference("c", "C API", "/reference/c/"),
-            reference(
-              "rust",
-              "Rust API",
-              "/reference/rust/maplibre_native_ffi/",
-            ),
             reference("zig", "Zig API", "/reference/zig/"),
             reference("kotlin", "Kotlin API", "/reference/kotlin/"),
             reference("dart", "Dart API", "/reference/dart/"),

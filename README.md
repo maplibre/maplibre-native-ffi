@@ -31,7 +31,6 @@
 [![Go](https://img.shields.io/badge/Go-pkg.go.dev-00ADD8?logo=go&logoColor=white)](https://pkg.go.dev/maplibre.org/maplibre-native-ffi/bindings/go/maplibre)
 [![Kotlin](https://img.shields.io/badge/Kotlin-Maven%20Central-7F52FF?logo=kotlin&logoColor=white)](https://central.sonatype.com/artifact/org.maplibre.nativeffi/maplibre-native-ffi)
 [![Python](https://img.shields.io/badge/Python-PyPI-3776AB?logo=python&logoColor=white)](https://pypi.org/project/maplibre-native-ffi/)
-[![Rust](https://img.shields.io/badge/Rust-crates.io-000000?logo=rust&logoColor=white)](https://crates.io/crates/maplibre-native-ffi)
 [![Swift](https://img.shields.io/badge/Swift-Swift%20Package%20Index-F05138?logo=swift&logoColor=white)](https://swiftpackageindex.com/maplibre/maplibre-native-ffi-distribution)
 [![TypeScript](https://img.shields.io/badge/TypeScript-npm-3178C6?logo=typescript&logoColor=white)](https://www.npmjs.com/package/@maplibre/native-ffi)
 [![ArkTS](https://img.shields.io/badge/ArkTS-OHPM-0A59F7?logo=harmonyos&logoColor=white)](https://ohpm.openharmony.cn/#/en/detail/@maplibre%2Fnative-ffi)
@@ -39,9 +38,9 @@
 
 MapLibre Native FFI is the
 [MapLibre Native](https://github.com/maplibre/maplibre-native) map engine as a C
-API, with bindings for Dart, Go, Kotlin, .NET, Python, Rust, Swift, TypeScript,
-and Zig. Use it to build map components for a UI framework, or to render maps on
-a server.
+API, with bindings for Dart, Go, Kotlin, .NET, Python, Swift, TypeScript, and
+Zig. Use it to build map components for a UI framework, or to render maps on a
+server.
 
 To start, [install](https://maplibre.org/maplibre-native-ffi/install/) the
 package for your language, then

@@ -1,10 +1,10 @@
-"""Raw `repr(C)` declarations for the Rust -sys crate.
+"""Raw `repr(C)` declarations for the Python extension's -sys crate.
 
 The crate mirrors the C boundary: one constant per constant macro, one type
 alias and its constants per enum,
 one `repr(C)` item per record, one transparent newtype per handle, and one
-`extern "C"` declaration per function. Rust code above the crate and the
-Python extension call the C API only through these declarations.
+`extern "C"` declaration per function. The Python extension calls the C API
+only through these declarations.
 
 Only the C forms that the headers use are translated. A function whose
 signature reaches any other form is left out and reported unsupported, since
@@ -16,7 +16,7 @@ from __future__ import annotations
 from ..model import Api, CType, Function, Record, Unsupported
 from ..semantic import BoundApi
 
-PATH = "crates/maplibre-native-ffi-sys/src/generated.rs"
+PATH = "sys/src/generated.rs"
 
 SCALARS = {
     "int8_t": "i8",
@@ -49,10 +49,97 @@ SCALARS = {
 }
 
 
-def identifier(name: str) -> str:
-    from .rust import native_identifier
+RUST_KEYWORDS = {
+    "abstract",
+    "as",
+    "async",
+    "await",
+    "become",
+    "box",
+    "break",
+    "const",
+    "continue",
+    "crate",
+    "do",
+    "dyn",
+    "else",
+    "enum",
+    "extern",
+    "false",
+    "final",
+    "fn",
+    "for",
+    "gen",
+    "if",
+    "impl",
+    "in",
+    "let",
+    "loop",
+    "macro",
+    "match",
+    "mod",
+    "move",
+    "mut",
+    "override",
+    "priv",
+    "pub",
+    "ref",
+    "return",
+    "Self",
+    "self",
+    "static",
+    "struct",
+    "super",
+    "trait",
+    "true",
+    "try",
+    "type",
+    "typeof",
+    "unsafe",
+    "unsized",
+    "use",
+    "virtual",
+    "where",
+    "while",
+    "yield",
+}
+BINDGEN_RESERVED = RUST_KEYWORDS | {
+    "alignof",
+    "offsetof",
+    "proc",
+    "pure",
+    "sizeof",
+    "str",
+    "bool",
+    "f32",
+    "f64",
+    "usize",
+    "isize",
+    "u128",
+    "i128",
+    "u64",
+    "i64",
+    "u32",
+    "i32",
+    "u16",
+    "i16",
+    "u8",
+    "i8",
+    "_",
+}
 
-    return native_identifier(name)
+
+def identifier(name: str) -> str:
+    """A C name as a Rust identifier, with an underscore appended when Rust
+    reserves the name or uses it for a primitive type."""
+    return name + "_" if name in BINDGEN_RESERVED else name
+
+
+def native_call(function, arguments, diagnostic: str = "diagnostic") -> str:
+    """Calls a C function, passing `diagnostic` for its diagnostic parameter."""
+    if function.diagnostic:
+        arguments = [*arguments, diagnostic]
+    return f"sys::{function.name}({', '.join(arguments)})"
 
 
 class Declarations:

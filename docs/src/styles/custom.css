@@ -75,12 +75,6 @@
   background: var(--logo) center / contain no-repeat;
 }
 
-/* Rust's logo is black. */
-:root[data-theme="dark"] img[data-logo="rust"],
-:root[data-theme="dark"] a[data-logo="rust"]::before {
-  filter: invert(1);
-}
-
 /* Where the browser can style a select, its options show their logos, so the
    logo beside it goes. */
 @supports (appearance: base-select) {

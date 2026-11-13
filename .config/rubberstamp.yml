@@ -6,7 +6,7 @@ version: 1
 context: >-
   A C API for MapLibre Native, implemented by mln-rs, the Rust port of the
   MapLibre Native map renderer, which is vendored as a git submodule with
-  carried patches. Bindings for Dart, Go, Kotlin, .NET, Python, Rust, Swift,
+  carried patches. Bindings for Dart, Go, Kotlin, .NET, Python, Swift,
   TypeScript, and Zig wrap the C API, as does a GObject library for C, Vala, and
   GJS, and example apps use them. Mise defines tools and tasks, CMake drives
   Cargo to build the native library, and Gradle builds the Kotlin packages.
@@ -215,7 +215,6 @@ ci:
               - tests/native/docsnippets/**
               - bindings/**/docsnippets/**
               - bindings/**/DocSnippets/**
-              - bindings/rust/crates/maplibre-native-ffi/examples/**
           then: apply
     support-matrix:
       covers: >-
@@ -367,11 +366,11 @@ ci:
     ios:
       covers: >-
         iOS and Mac Catalyst with Metal, on device and simulator. Builds the
-        native library and the supported Kotlin, Swift, Rust, Dart, and Zig
-        bindings, and runs simulator and Mac Catalyst tests. Catches mobile SDK
-        and cross-compilation problems, and stands in for tvOS and visionOS on
-        what every Apple mobile platform shares. Platform-independent code that
-        Linux x64 tests doesn't need it.
+        native library and the supported Kotlin, Swift, Dart, and Zig bindings,
+        and runs simulator and Mac Catalyst tests. Catches mobile SDK and
+        cross-compilation problems, and stands in for tvOS and visionOS on what
+        every Apple mobile platform shares. Platform-independent code that Linux
+        x64 tests doesn't need it.
       rules:
         - if:
             files:
@@ -382,10 +381,10 @@ ci:
     tvos:
       covers: >-
         tvOS with Metal, on device and simulator. Builds the native library and
-        the Kotlin, Swift, and Rust bindings, and runs simulator tests. Only
-        what tvOS alone builds or runs needs it: tvOS conditionals, SDK setup,
-        presets, and suites. Changes that every Apple mobile platform shares
-        need only iOS.
+        the Kotlin and Swift bindings, and runs simulator tests. Only what tvOS
+        alone builds or runs needs it: tvOS conditionals, SDK setup, presets,
+        and suites. Changes that every Apple mobile platform shares need only
+        iOS.
       rules:
         - if:
             files:
@@ -396,10 +395,10 @@ ci:
     visionos:
       covers: >-
         visionOS with Metal, on device and simulator. Builds the native library
-        and the Swift and Rust bindings, and runs simulator tests. Only what
-        visionOS alone builds or runs needs it: visionOS conditionals, SDK
-        setup, presets, and suites. Changes that every Apple mobile platform
-        shares need only iOS.
+        and the Swift binding, and runs simulator tests. Only what visionOS
+        alone builds or runs needs it: visionOS conditionals, SDK setup,
+        presets, and suites. Changes that every Apple mobile platform shares
+        need only iOS.
       rules:
         - if:
             files:
@@ -421,10 +420,10 @@ ci:
     mingw:
       covers: >-
         Windows x64 with OpenGL (WGL) and Vulkan, built with Clang in MSYS2's
-        MINGW64 environment. Runs the C, C#, Dart, Go, Rust, and TypeScript
-        suites and verifies shared and static C package consumers. Catches MinGW
-        headers, libstdc++, GNU archive and import library handling, and MSYS2
-        toolchain setup.
+        MINGW64 environment. Runs the C, C#, Dart, Go, and TypeScript suites and
+        verifies shared and static C package consumers. Catches MinGW headers,
+        libstdc++, GNU archive and import library handling, and MSYS2 toolchain
+        setup.
       rules:
         - if:
             files:
@@ -515,15 +514,14 @@ ci:
     android-x86:
       covers: >-
         Android x86, a 32-bit ABI, with OpenGL ES and Vulkan, built with the
-        NDK. The OpenGL ES job runs the C, C#, Go, Kotlin, Rust, TypeScript, and
-        Zig tests in an API 30 x86 emulator, and the Vulkan job only builds.
-        Dart, Python, and Swift have no Android x86 target. Catches only what
-        differs by CPU architecture on Android: architecture conditionals in
-        code or build logic, a tool or dependency fetched per ABI, the x86
-        emulator image, and 32-bit ABI or pointer-size problems at run time,
-        such as x86 aligning 64-bit fields to four bytes. Android platform,
-        renderer, and binding changes that Android x64 already builds and tests
-        don't need it.
+        NDK. The OpenGL ES job runs the C, C#, Go, Kotlin, TypeScript, and Zig
+        tests in an API 30 x86 emulator, and the Vulkan job only builds. Dart,
+        Python, and Swift have no Android x86 target. Catches only what differs
+        by CPU architecture on Android: architecture conditionals in code or
+        build logic, a tool or dependency fetched per ABI, the x86 emulator
+        image, and 32-bit ABI or pointer-size problems at run time, such as x86
+        aligning 64-bit fields to four bytes. Android platform, renderer, and
+        binding changes that Android x64 already builds and tests don't need it.
       rules:
         - if:
             files:
@@ -545,7 +543,7 @@ ci:
           then: apply
     ohos:
       covers: >-
-        OpenHarmony on x64 with OpenGL ES and Vulkan. Runs the C, Rust, Go, and
+        OpenHarmony on x64 with OpenGL ES and Vulkan. Runs the C, Go, and
         TypeScript (ArkTS) tests in the Oniro emulator. Catches OpenHarmony SDK
         and platform problems. Platform-independent code that Linux x64 tests
         doesn't need it. Nor does a C API change that only regenerates the
@@ -571,7 +569,7 @@ ci:
     ohos-arm64:
       covers: >-
         OpenHarmony ARM64 with OpenGL ES and Vulkan, built with the OpenHarmony
-        SDK on an x64 runner. Builds the native library and the Go, Rust, and
+        SDK on an x64 runner. Builds the native library and the Go and
         TypeScript (ArkTS) bindings, but runs nothing. Catches only what differs
         by CPU architecture on OpenHarmony: architecture conditionals in code or
         build logic, and a tool or dependency fetched per architecture.
@@ -585,11 +583,10 @@ ci:
           then: apply
     web:
       covers: >-
-        The browser, built with Emscripten for WebGL and WebGPU. Runs the C,
-        Rust, and Kotlin/Wasm tests in a browser, and adds the docs site's live
-        demo to its preview. Catches Emscripten, wasm32, and browser rendering
-        problems. Platform-independent code that Linux x64 tests doesn't need
-        it.
+        The browser, built with Emscripten for WebGL and WebGPU. Runs the C and
+        Kotlin/Wasm tests in a browser, and adds the docs site's live demo to
+        its preview. Catches Emscripten, wasm32, and browser rendering problems.
+        Platform-independent code that Linux x64 tests doesn't need it.
       rules:
         - if:
             files:

@@ -1,0 +1,17 @@
+[package]
+name = "maplibre-native-ffi-python-sys"
+description = "Raw declarations for the MapLibre Native C API that the Python extension calls, and the native library they link."
+version = "0.0.0"
+build = "build.rs"
+edition.workspace = true
+license.workspace = true
+links = "maplibre-native-c"
+publish = false
+repository.workspace = true
+
+[lib]
+test = false
+
+[build-dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"

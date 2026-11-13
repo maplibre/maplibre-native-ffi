@@ -5,11 +5,9 @@ mod py_errors {
 }
 fn map_error(error: Error) -> PyErr {
     match error {
-        Error::Status {
-            status,
-            diagnostic,
-            generation,
-        } => py_errors::MaplibreError::new_err((status.as_raw(), diagnostic, generation)),
+        Error::Status { status, diagnostic } => {
+            py_errors::MaplibreError::new_err((status, diagnostic))
+        }
         Error::AbiVersionMismatch { expected, actual } => {
             py_errors::AbiVersionMismatchError::new_err((expected, actual))
         }

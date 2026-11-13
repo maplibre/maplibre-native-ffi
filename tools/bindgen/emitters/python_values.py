@@ -16,6 +16,7 @@ from ..semantic import (
     enum_member_prefix,
     required_member,
 )
+from . import python_sys
 
 SCALARS = {
     "bool": "bool",
@@ -93,9 +94,7 @@ def native_name(plan: ValuePlan) -> str:
 
 
 def rust_field(name: str) -> str:
-    from .rust import BINDGEN_RESERVED
-
-    return name + "_" if name in BINDGEN_RESERVED else name
+    return python_sys.identifier(name)
 
 
 def optional(plan: ValuePlan) -> bool:

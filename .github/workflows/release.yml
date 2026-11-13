@@ -171,20 +171,6 @@ jobs:
       tag: ${{ github.ref_name }}
       version: ${{ needs.source.outputs.version }}
 
-  rust:
-    name: Rust
-    needs:
-      - source
-      - native
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/_rust-crates.yml
-    with:
-      sha: ${{ needs.source.outputs.sha }}
-      tag: ${{ github.ref_name }}
-      version: ${{ needs.source.outputs.version }}
-
   typescript-npm:
     name: package / npm
     needs:
@@ -575,7 +561,6 @@ jobs:
       - go
       - kotlin
       - python
-      - rust
       - typescript
     if: >-
       !cancelled() && needs.source.result == 'success' && needs.native.result ==

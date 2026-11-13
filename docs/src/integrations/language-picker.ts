@@ -5,7 +5,7 @@ import type { Language } from "../languages";
 
 /**
  * Adds a language picker to the header of a code block whose meta names its
- * language, as in `picker=rust`. The picker starts on that language. Picking
+ * language, as in `picker=python`. The picker starts on that language. Picking
  * another shows that language's block instead; `Snippet.astro` handles the
  * switch.
  */

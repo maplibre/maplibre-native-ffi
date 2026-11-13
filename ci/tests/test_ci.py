@@ -219,12 +219,12 @@ class SuitesTest(unittest.TestCase):
 
     def test_a_target_cannot_run_one_task_as_two_suites(self):
         target = self.targets["windows-x64-wgl"]
-        command = ["mise", "run", "//bindings/rust:test", target.preset]
+        command = ["mise", "run", "//bindings/go:test", target.preset]
         with (
             mock.patch.object(
                 suites, "consumer_commands", return_value=[command, command]
             ),
-            self.assertRaisesRegex(SystemExit, "'bindings-rust-test'"),
+            self.assertRaisesRegex(SystemExit, "'bindings-go-test'"),
         ):
             suites.target_suites(target)
 

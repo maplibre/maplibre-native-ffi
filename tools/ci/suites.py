@@ -99,7 +99,7 @@ def binding_command(binding: str, target: Target) -> list[str]:
         mobile or platform.endswith("-simulator") or platform == "ios-maccatalyst"
     ):
         action += ":hermes"
-    if binding in {"rust", "swift"} and preset == "linux-gnu-x64-vulkan":
+    if binding == "swift" and preset == "linux-gnu-x64-vulkan":
         args.append("release")
     return ["mise", "run", f"//bindings/{language}:{action}", *args]
 
@@ -134,7 +134,6 @@ def consumer_commands(target: Target) -> list[list[str]]:
         if target.preset == "linux-gnu-x64-vulkan":
             extra = {
                 "go": "//bindings/go:test:package",
-                "rust": "//bindings/rust:test:package",
                 "python": "//bindings/python:test:floor",
             }.get(binding)
         elif target.preset == "macos-arm64-metal" and binding == "go":
