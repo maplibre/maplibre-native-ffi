@@ -1,6 +1,18 @@
 #pragma once
 
-#ifdef _WIN32
+#if defined(__wasm__)
+// The browser module runs on one thread, which nothing else enters, so a lock
+// has nothing to exclude.
+typedef struct mln_ts_mutex {
+  char unused;
+} mln_ts_mutex;
+#define MLN_TS_MUTEX_INITIALIZER {0}
+
+static inline void mln_ts_mutex_init(mln_ts_mutex* mutex) { (void)mutex; }
+static inline void mln_ts_mutex_destroy(mln_ts_mutex* mutex) { (void)mutex; }
+static inline void mln_ts_mutex_lock(mln_ts_mutex* mutex) { (void)mutex; }
+static inline void mln_ts_mutex_unlock(mln_ts_mutex* mutex) { (void)mutex; }
+#elif defined(_WIN32)
 #include <windows.h>
 
 typedef SRWLOCK mln_ts_mutex;

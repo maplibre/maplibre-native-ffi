@@ -79,9 +79,11 @@ against it in headless Chromium, and
 suite. The module runs on the thread that loads it, with no threads of its own
 and no cross-origin isolation, and starts Web Workers for its tile work.
 
-The browser example in `examples/browser`, which the site serves as its live
-demo, loads the TypeScript binding's browser modules, which still build with
-Emscripten until that binding moves onto the browser package.
+The TypeScript binding compiles its Node-API C with the library into a browser
+module of its own (`bindings/typescript/web`), over a Node-API that it
+implements in Rust: `mise -E web run //bindings/typescript:test <preset>` runs
+its suite in headless Chromium. The browser example in `examples/browser`, which
+the site serves as its live demo, loads those modules.
 
 ### Emulators and simulators
 

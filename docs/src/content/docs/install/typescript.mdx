@@ -35,17 +35,21 @@ instead.
 ## Browser
 
 Add the binding and `@maplibre/native-ffi-opengl`, which renders with WebGL 2,
-or `@maplibre/native-ffi-webgpu`, which renders with WebGPU. Serve
-`maplibre_native_ffi.mjs` and `maplibre_native_ffi.wasm` from the backend's
-`-wasm32` package as static files, such as from Vite's `public` directory. Load
-them before any other call:
+or `@maplibre/native-ffi-webgpu`, which renders with WebGPU. Serve the files of
+the backend's `-wasm32` package as static files, together, such as from Vite's
+`public` directory: the module loads its tile workers' script and its font
+shaper by URLs relative to its own. Load it before any other call, on a Web
+Worker:
 
-```ts title="main.ts"
-import { loadModule, RuntimeHandle } from "@maplibre/native-ffi";
+```ts title="map-worker.ts"
+import { loadModule, RuntimeHandle, WebObject } from "@maplibre/native-ffi";
 
-await loadModule(new URL("/maplibre_native_ffi.mjs", location.href));
+await loadModule(new URL("/maplibre_native_ffi.js", location.href));
 const runtime = RuntimeHandle.create();
 ```
+
+Lend the module JavaScript objects, such as the `OffscreenCanvas` that a web
+canvas target takes, with `WebObject.of(canvas)`, and pass its `handle`.
 
 The page must meet the [web requirements](/maplibre-native-ffi/install/#web).
 
