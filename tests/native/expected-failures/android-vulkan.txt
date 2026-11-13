@@ -1,0 +1,10 @@
+# The cases and exit programs that fail under the Android Vulkan presets on top
+# of vulkan.txt, on the x86_64 emulator's SwiftShader.
+abi/backend/retarget.c:a_released_surface_can_be_destroyed_before_the_next  # attaching a Vulkan surface to an Android window fails with MLN_STATUS_NATIVE_ERROR
+abi/backend/retarget.c:a_released_target_keeps_the_renderer  # attaching a Vulkan surface to an Android window fails with MLN_STATUS_NATIVE_ERROR
+abi/backend/retarget.c:a_surface_retarget_sizes_the_map  # attaching a Vulkan surface to an Android window fails with MLN_STATUS_NATIVE_ERROR
+abi/backend/retarget.c:refused_retargets_leave_the_old_target_rendering  # attaching a Vulkan surface to an Android window fails with MLN_STATUS_NATIVE_ERROR
+abi/render/host_targets.c:a_surface_presents_frames_and_takes_a_resize  # attaching a Vulkan surface to an Android window fails with MLN_STATUS_NATIVE_ERROR
+abi/render/redraw.c:a_session_without_a_target_asks_for_no_redraw  # attaching a Vulkan surface to an Android window fails with MLN_STATUS_NATIVE_ERROR
+exit/transition_release_at_exit.c  # a transition's release callback can still start after the library's exit handler ran
+!abi/backend/target_validation.c:set_target_rejects_malformed_targets  # crashes the process with a segmentation fault

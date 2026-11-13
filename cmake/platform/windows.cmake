@@ -1,18 +1,19 @@
-# The DLL links the dynamic CRT that MSVC toolchains default to, so the static
-# archive links into hosts that do the same, such as Swift. The runtime DLLs
-# that it imports install beside it, as Microsoft allows an application to
+# The DLL links the dynamic CRT that Rust's MSVC targets default to, so the
+# static archive links into hosts that do the same, such as Swift. The runtime
+# DLLs that it imports install beside it, as Microsoft allows an application to
 # carry them, so a host needs no Visual C++ redistributable installed.
 #
 # VsDevCmd names the redistributable's directory in VCToolsRedistDir. Another
 # host's /winsysroot tree has none, so a cross build installs no runtime unless
 # that variable names a copy, and the package check refuses its package.
 #
-# Each list names the runtime DLLs that the DLL and the runtime itself import on
-# that architecture. ARM64 code imports no vcruntime140_1.dll. The one in the
+# Each list names the runtime DLLs that Rust code imports on that architecture:
+# vcruntime140.dll for the C runtime's startup and unwinding support, and on x64
+# vcruntime140_1.dll, which holds the newer exception handler. The one in the
 # ARM64 Microsoft.VC*.CRT directory is ARM64EC, for x64-compatible code, and an
 # ARM64 process can't load it.
-set(MLN_FFI_MSVC_RUNTIME_DLLS_x64 vcruntime140.dll vcruntime140_1.dll
-    msvcp140.dll msvcp140_codecvt_ids.dll)
+set(MLN_FFI_MSVC_RUNTIME_DLLS_x64 vcruntime140.dll vcruntime140_1.dll)
+set(MLN_FFI_MSVC_RUNTIME_DLLS_arm64 vcruntime140.dll)
 set(MLN_FFI_MSVC_RUNTIME_DLLS_arm64 vcruntime140.dll msvcp140.dll
     msvcp140_codecvt_ids.dll)
 
@@ -58,197 +59,48 @@ function(mln_ffi_bundle_msvc_runtime target)
 endfunction()
 
 function(mln_ffi_configure_platform_dependencies target)
-  include(FetchContent)
-  # The Windows presets set CMAKE_TRY_COMPILE_TARGET_TYPE to STATIC_LIBRARY so
-  # compiler-flag probes skip the link step. zlib's fseeko probe is the one here
-  # that answers from linking, so the preset pins HAVE_FSEEKO to what the
-  # linking probe reports on clang-cl. A dependency bump that adds a link-based
-  # check needs the same treatment.
-  set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-  set(LIBUV_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-  set(LIBUV_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-  set(LIBUV_BUILD_BENCH OFF CACHE BOOL "" FORCE)
-  fetchcontent_declare(
-    mln_ffi_zlib_source
-    URL
-      "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
-    URL_HASH
-      "SHA256=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
-    EXCLUDE_FROM_ALL)
-  fetchcontent_declare(
-    mln_ffi_libuv_source
-    URL "https://dist.libuv.org/dist/v1.53.0/libuv-v1.53.0.tar.gz"
-    URL_HASH
-      "SHA256=cb0d6dd2128d5a95bd242c6cc982a24fe608fa93da57b6b4ec763b0018c53e64"
-    EXCLUDE_FROM_ALL)
-  fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
-  mln_ffi_add_component(
-    ${target}
-    zlib
-    https://github.com/madler/zlib
-    Zlib
-    VERSION
-    1.3.1
-    NOTICES
-    "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
-    zlib.txt)
-  mln_ffi_add_component(
-    ${target}
-    libuv
-    https://github.com/libuv/libuv
-    MIT
-    VERSION
-    1.53.0
-    NOTICES
-    "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
-    libuv.txt
-    "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
-    libuv-extra.txt)
-
-  target_link_libraries(${target} INTERFACE zlibstatic uv_a ntdll ws2_32)
-  set(archive_format coff)
   if(MINGW)
-    set(archive_format mingw)
+    # The x64 target links libgcc and winpthreads statically. The ARM64 one,
+    # aarch64-pc-windows-gnullvm, unwinds through MSYS2's libunwind.dll.
     if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
-      target_link_libraries(${target} INTERFACE c++)
-      set(runtime_packages libc++ libunwind)
-      set(package_prefix mingw-w64-clang-aarch64)
-      set(runtime_dlls "${MLN_FFI_MSYS2_ROOT}/bin/libc++.dll"
+      set_property(
+        TARGET ${target}
+        APPEND
+        PROPERTY
+          MLN_FFI_INSTALL_RUNTIME_FILES
           "${MLN_FFI_MSYS2_ROOT}/bin/libunwind.dll")
-    else()
-      target_link_libraries(${target} INTERFACE stdc++ winpthread)
-      set(runtime_packages libstdc++ libgcc libwinpthread)
-      set(package_prefix mingw-w64-x86_64)
-      set(runtime_dlls
-          "${MLN_FFI_MSYS2_ROOT}/bin/libstdc++-6.dll"
-          "${MLN_FFI_MSYS2_ROOT}/bin/libgcc_s_seh-1.dll"
-          "${MLN_FFI_MSYS2_ROOT}/bin/libwinpthread-1.dll")
-    endif()
-    set_property(
-      TARGET ${target}
-      APPEND
-      PROPERTY MLN_FFI_INSTALL_LIBRARY_FILES ${runtime_dlls})
-    foreach(package IN LISTS runtime_packages)
       execute_process(
         COMMAND
           "${MLN_FFI_MSYS2_ROOT}/../usr/bin/pacman.exe" -Q
-          "${package_prefix}-${package}"
+          mingw-w64-clang-aarch64-libunwind
         OUTPUT_VARIABLE package_version OUTPUT_STRIP_TRAILING_WHITESPACE
         COMMAND_ERROR_IS_FATAL ANY)
       string(REGEX REPLACE "^[^ ]+ " "" package_version "${package_version}")
-      set(notices "${MLN_FFI_MSYS2_ROOT}/share/licenses/${package}")
-      if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
-        mln_ffi_add_component(
-          ${target}
-          ${package}
-          https://llvm.org
-          "Apache-2.0 WITH LLVM-exception"
-          VERSION
-          "${package_version}"
-          NOTICES
-          "${notices}/LICENSE"
-          "${package}.txt")
-      elseif(package STREQUAL "libwinpthread")
-        mln_ffi_add_component(
-          ${target}
-          ${package}
-          https://www.mingw-w64.org
-          "MIT AND BSD-3-Clause"
-          VERSION
-          "${package_version}"
-          NOTICES
-          "${notices}/COPYING"
-          "${package}.txt")
-      else()
-        mln_ffi_add_component(
-          ${target}
-          ${package}
-          https://gcc.gnu.org
-          "GPL-3.0-or-later WITH GCC-exception-3.1"
-          VERSION
-          "${package_version}"
-          NOTICES
-          "${notices}/COPYING3"
-          "${package}.txt"
-          "${notices}/COPYING.RUNTIME"
-          "${package}-exception.txt")
-      endif()
-    endforeach()
+      mln_ffi_add_component(
+        ${target}
+        libunwind
+        https://llvm.org
+        "Apache-2.0 WITH LLVM-exception"
+        VERSION
+        "${package_version}"
+        NOTICES
+        "${MLN_FFI_MSYS2_ROOT}/share/licenses/libunwind/LICENSE"
+        "libunwind.txt")
+    endif()
   else()
     mln_ffi_bundle_msvc_runtime(${target})
   endif()
   set_target_properties(
     ${target}
     PROPERTIES
-      MLN_FFI_DEFAULT_LOGGING_STDERR
-      FALSE
-      MLN_FFI_DEFAULT_THREAD_LOCAL
-      FALSE
       MLN_FFI_SHARED_SUPPORTED
       TRUE
       MLN_FFI_ARCHIVE_FORMAT
-      ${archive_format}
-      MLN_FFI_STATIC_BASE_OUTPUT_NAME
-      maplibre-native-c-static-base
-      MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;zlibstatic;uv_a"
+      coff
       MLN_FFI_TEST_SUPPORTED
       TRUE
       MLN_FFI_TEST_LIBRARY_PATH_VARIABLE
       PATH
       MLN_FFI_TEST_RUNTIME_DIRS
       "${CMAKE_INSTALL_PREFIX}/bin")
-endfunction()
-
-function(mln_ffi_configure_platform target)
-  include(mln_ffi_rust)
-
-  include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
-
-  set(MLN_FFI_VENDOR_WINDOWS_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/async_task.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/png_writer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/run_loop.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/timer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/windows/src/thread.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/windows/src/thread_local.cpp)
-
-  set(MLN_FFI_WINDOWS_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/rust/i18n.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/windows/logging_debugger.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/dxgi_shared_texture_session.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/win32_window_session.cpp)
-
-  mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
-  mln_ffi_target_project_sources(${target} ${MLN_FFI_WINDOWS_SOURCES})
-
-  target_include_directories(
-    ${target}
-    SYSTEM
-    BEFORE
-    PRIVATE ${MLN_FFI_SOURCE_DIR}/vendor/icu/include)
-
-  target_include_directories(
-    ${target}
-    SYSTEM
-    PRIVATE ${MLN_FFI_SOURCE_DIR}/platform/windows/include)
-
-  target_compile_definitions(
-    ${target}
-    PRIVATE
-      NOMINMAX USE_STD_FILESYSTEM U_STATIC_IMPLEMENTATION _USE_MATH_DEFINES)
-
-  target_compile_definitions(mbgl-vendor-icu PRIVATE U_STATIC_IMPLEMENTATION)
-
-  target_link_libraries(
-    ${target}
-    PRIVATE mbgl-vendor-icu MLN_FFI::PlatformDependencies)
-
-  mln_ffi_link_rust_platform(${target})
 endfunction()

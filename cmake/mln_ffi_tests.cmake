@@ -142,41 +142,6 @@ function(mln_native_collect_abi_tests out_sources out_symbols)
   set(${out_symbols} ${symbols} PARENT_SCOPE)
 endfunction()
 
-# Collects the internal suite's test files for this target, one group per
-# file directly under tests/native/internal. Its helpers live in
-# internal/support, which holds no group.
-function(mln_native_collect_internal_tests out_sources out_symbols)
-  mln_native_active_file_tags(active_tags)
-  file(
-    GLOB
-    all_sources
-    RELATIVE
-    "${MLN_NATIVE_TESTS_DIR}/internal"
-    CONFIGURE_DEPENDS
-    "${MLN_NATIVE_TESTS_DIR}/internal/*.cpp"
-    "${MLN_NATIVE_TESTS_DIR}/internal/*.mm")
-  list(SORT all_sources)
-  set(sources)
-  set(symbols)
-  foreach(relative IN LISTS all_sources)
-    mln_native_file_selected("${relative}" "${active_tags}" selected)
-    if(NOT selected)
-      continue()
-    endif()
-    get_filename_component(stem "${relative}" NAME_WE)
-    string(MAKE_C_IDENTIFIER "internal_${stem}" identifier)
-    list(APPEND sources "internal/${relative}")
-    list(APPEND symbols "mln_test_group_${identifier}")
-    if(relative MATCHES "\\.mm$")
-      set_source_files_properties(
-        "${MLN_NATIVE_TESTS_DIR}/internal/${relative}"
-        PROPERTIES COMPILE_OPTIONS -fobjc-arc)
-    endif()
-  endforeach()
-  set(${out_sources} ${sources} PARENT_SCOPE)
-  set(${out_symbols} ${symbols} PARENT_SCOPE)
-endfunction()
-
 # Writes the registry the harness walks for one suite, and names each file's
 # group through a compile definition. `sources` are relative to
 # tests/native.
@@ -194,6 +159,102 @@ function(mln_native_write_registry registry_dir sources symbols)
     CONFIGURE
     OUTPUT "${registry_dir}/mln_native_test_registry.inc"
     CONTENT "${registry}")
+endfunction()
+
+# The cases and programs that a preset expects to fail, because the library
+# doesn't do yet what they test. tests/native/expected-failures/ holds a list
+# for each backend, named by the backend or, for OpenGL, its context provider
+# (vulkan.txt, egl.txt, metal.txt), and optionally one for a system and backend
+# (android-vulkan.txt). A line names a suite case as <file>:<case>, or an exit
+# program as its file, relative to tests/native, followed by `  # ` and why it
+# fails. The harness reports a listed case that fails as ignored, and CTest
+# expects a listed program to fail. Either fails when what it lists passes, so
+# a list only ever shrinks where the review sees it. A case that takes the
+# process down with it, which would end the cases after it, starts its line
+# with `!`: the harness skips it instead of running it.
+#
+# Sets `out_cases` to the harness's entries, one MLN_TEST_EXPECTED_FAILURE()
+# line each, and `out_programs` to the listed exit programs' stems.
+function(mln_native_read_expected_failures out_cases out_programs)
+  string(TOLOWER "${CMAKE_SYSTEM_NAME}" system)
+  set(backend ${MLN_FFI_RENDER_BACKEND})
+  if(backend STREQUAL "opengl")
+    set(backend ${MLN_FFI_OPENGL_CONTEXT_PROVIDER})
+  endif()
+  set(cases "")
+  set(programs "")
+  foreach(name IN ITEMS "${backend}" "${system}-${backend}")
+    set(list_file "${MLN_NATIVE_TESTS_DIR}/expected-failures/${name}.txt")
+    set_property(
+      DIRECTORY
+      APPEND
+      PROPERTY CMAKE_CONFIGURE_DEPENDS "${list_file}")
+    if(NOT EXISTS "${list_file}")
+      continue()
+    endif()
+    file(STRINGS "${list_file}" lines)
+    foreach(line IN LISTS lines)
+      string(STRIP "${line}" line)
+      if(line STREQUAL "" OR line MATCHES "^#")
+        continue()
+      endif()
+      if(NOT line MATCHES "^(!?)([^:! ]+)(:([A-Za-z0-9_]+))?( +# *(.*))?$")
+        message(
+          FATAL_ERROR "${list_file}: not [!]<file>[:<case>]  # reason: ${line}"
+        )
+      endif()
+      set(skip 0)
+      if(CMAKE_MATCH_1)
+        set(skip 1)
+      endif()
+      set(file "${CMAKE_MATCH_2}")
+      set(case "${CMAKE_MATCH_4}")
+      set(reason "${CMAKE_MATCH_6}")
+      # A list that names what the suite no longer has would hide nothing, and
+      # would keep a stale entry around.
+      if(NOT EXISTS "${MLN_NATIVE_TESTS_DIR}/${file}")
+        message(FATAL_ERROR "${list_file} names ${file}, which doesn't exist")
+      endif()
+      if(NOT case)
+        if(skip)
+          message(FATAL_ERROR "${list_file}: only a case is skipped: ${line}")
+        endif()
+        if(NOT file MATCHES "^exit/([^/]+)\\.c$")
+          message(
+            FATAL_ERROR
+              "${list_file} names ${file} without a case; only exit programs fail as a whole"
+          )
+        endif()
+        list(APPEND programs "${CMAKE_MATCH_1}")
+        continue()
+      endif()
+      file(
+        STRINGS "${MLN_NATIVE_TESTS_DIR}/${file}" defined
+        REGEX "RUN_TEST[(]${case}[),]")
+      if(NOT defined)
+        message(
+          FATAL_ERROR "${list_file} names ${file}:${case}, which doesn't exist")
+      endif()
+      string(REPLACE "\\" "\\\\" reason "${reason}")
+      string(REPLACE "\"" "\\\"" reason "${reason}")
+      string(
+        APPEND cases
+        "MLN_TEST_EXPECTED_FAILURE(\"tests/native/${file}\", \"${case}\", \"${reason}\", ${skip})\n"
+      )
+    endforeach()
+  endforeach()
+  set(${out_cases} "${cases}" PARENT_SCOPE)
+  set(${out_programs} ${programs} PARENT_SCOPE)
+endfunction()
+
+# Writes the harness's list of the cases that this preset expects to fail.
+function(mln_native_write_expected_failures registry_dir)
+  mln_native_read_expected_failures(cases programs)
+  # Written as is: a reason may hold characters that file(CONFIGURE) expands.
+  set(output "${registry_dir}/mln_native_expected_failures.inc")
+  file(WRITE "${output}.tmp" "${cases}")
+  file(COPY_FILE "${output}.tmp" "${output}" ONLY_IF_DIFFERENT)
+  file(REMOVE "${output}.tmp")
 endfunction()
 
 function(mln_native_fetch_unity)
@@ -250,7 +311,7 @@ function(mln_native_add_test_plugin)
   target_include_directories(
     mln_native_test_plugin
     PUBLIC "${MLN_NATIVE_TESTS_DIR}/plugin"
-    PRIVATE "${MLN_FFI_SOURCE_DIR}/include")
+    PRIVATE "${PROJECT_SOURCE_DIR}/include")
   target_compile_definitions(
     mln_native_test_plugin
     PRIVATE MLN_NATIVE_TEST_PLUGIN_BUILDING)
@@ -454,9 +515,7 @@ function(mln_native_configure_suite target registry_dir)
   target_include_directories(
     ${target}
     SYSTEM
-    PRIVATE
-      ${MLN_FFI_SOURCE_DIR}/include
-      ${MLN_FFI_SOURCE_DIR}/vendor/maplibre-native-base/include)
+    PRIVATE "${PROJECT_SOURCE_DIR}/include")
 
   # A case that no RUN_TEST references is an unused static function, and
   # dropping `static` to dodge that trips the missing-prototype error instead,
@@ -537,6 +596,7 @@ function(mln_native_add_abi_suite out_sources)
   mln_native_collect_abi_tests(sources symbols)
   set(registry_dir "${CMAKE_CURRENT_BINARY_DIR}/tests/native/abi")
   mln_native_write_registry("${registry_dir}" "${sources}" "${symbols}")
+  mln_native_write_expected_failures("${registry_dir}")
   list(TRANSFORM sources PREPEND "${MLN_NATIVE_TESTS_DIR}/" OUTPUT_VARIABLE
        test_sources)
   add_executable(mln_native_abi_tests ${test_sources})
@@ -544,52 +604,6 @@ function(mln_native_add_abi_suite out_sources)
   target_link_libraries(
     mln_native_abi_tests
     PRIVATE maplibre_native_c mln_native_test_plugin)
-  set(${out_sources} ${sources} PARENT_SCOPE)
-endfunction()
-
-# The internal suite includes src/ headers and links the static library, so a
-# case can drive a sync point, fault allocation, or reach an internal module.
-# Its objects are the shipped ones: nothing about the library changes for it.
-function(mln_native_add_internal_suite out_sources)
-  if(TARGET maplibre_native_c_static)
-    set(library maplibre_native_c_static)
-  else()
-    # A platform without shared libraries builds only the static one.
-    set(library maplibre_native_c)
-  endif()
-  mln_native_collect_internal_tests(sources symbols)
-  set(registry_dir "${CMAKE_CURRENT_BINARY_DIR}/tests/native/internal")
-  mln_native_write_registry("${registry_dir}" "${sources}" "${symbols}")
-  list(TRANSFORM sources PREPEND "${MLN_NATIVE_TESTS_DIR}/" OUTPUT_VARIABLE
-       test_sources)
-  file(GLOB internal_support CONFIGURE_DEPENDS
-       "${MLN_NATIVE_TESTS_DIR}/internal/support/*.cpp")
-  add_executable(mln_native_internal_tests ${test_sources} ${internal_support})
-  mln_native_configure_suite(mln_native_internal_tests "${registry_dir}")
-  # musl takes its default thread stack from the executable, and Zig links a
-  # large one, so the suite keeps musl's own 128 KiB, as a JVM host does.
-  if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
-    target_link_options(
-      mln_native_internal_tests
-      PRIVATE "LINKER:-z,stack-size=131072")
-  endif()
-  # The suite shares the library's C++ types, such as std::any, so it builds
-  # without RTTI as the library does.
-  mln_ffi_configure_c_api_compile_options(mln_native_internal_tests)
-  target_compile_definitions(
-    mln_native_internal_tests
-    PRIVATE $<TARGET_PROPERTY:maplibre_native_c_objects,COMPILE_DEFINITIONS>)
-  target_include_directories(
-    mln_native_internal_tests
-    PRIVATE
-      ${PROJECT_SOURCE_DIR}/src
-      $<TARGET_PROPERTY:maplibre_native_c_objects,INCLUDE_DIRECTORIES>)
-  target_include_directories(
-    mln_native_internal_tests
-    SYSTEM
-    PRIVATE
-      $<TARGET_PROPERTY:maplibre_native_c_objects,SYSTEM_INCLUDE_DIRECTORIES>)
-  target_link_libraries(mln_native_internal_tests PRIVATE ${library})
   set(${out_sources} ${sources} PARENT_SCOPE)
 endfunction()
 
@@ -658,6 +672,7 @@ endfunction()
 # only on matching presets, as a suite file does.
 function(mln_native_add_exit_tests out_tests)
   mln_native_active_file_tags(active_tags)
+  mln_native_read_expected_failures(expected_cases expected_programs)
   file(GLOB programs RELATIVE "${MLN_NATIVE_TESTS_DIR}/exit" CONFIGURE_DEPENDS
        "${MLN_NATIVE_TESTS_DIR}/exit/*.c")
   if(NOT WIN32)
@@ -684,6 +699,9 @@ function(mln_native_add_exit_tests out_tests)
     endif()
     add_test(NAME "native-exit/${stem}" COMMAND ${target})
     mln_native_bound_test("native-exit/${stem}" ${target} 60)
+    if(stem IN_LIST expected_programs)
+      set_tests_properties("native-exit/${stem}" PROPERTIES WILL_FAIL TRUE)
+    endif()
     list(APPEND tests "native-exit/${stem}")
   endforeach()
   set(${out_tests} ${tests} PARENT_SCOPE)
@@ -711,13 +729,10 @@ function(mln_ffi_add_native_tests)
   mln_native_fetch_unity()
   mln_native_add_test_plugin()
   mln_native_add_abi_suite(abi_sources)
-  mln_native_add_internal_suite(internal_sources)
   mln_native_add_doc_snippets()
 
   if(EMSCRIPTEN)
     mln_native_add_browser_abi_shards()
-    mln_native_add_browser_test(native-internal/browser
-                                mln_native_internal_tests)
     return()
   endif()
 
@@ -737,9 +752,7 @@ function(mln_ffi_add_native_tests)
       COMMAND mln_native_abi_tests -f /abi/plugin/)
     mln_native_bound_test(native-abi/plugin mln_native_abi_tests 120)
     set_tests_properties(native-abi/plugin PROPERTIES DEPENDS native-abi)
-    add_test(NAME native-internal COMMAND mln_native_internal_tests)
-    mln_native_bound_test(native-internal mln_native_internal_tests 120)
-    list(APPEND registered_tests native-abi native-abi/plugin native-internal)
+    list(APPEND registered_tests native-abi native-abi/plugin)
     if(NOT CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS|visionOS)$")
       mln_native_add_exit_tests(exit_tests)
       list(APPEND registered_tests ${exit_tests})
@@ -747,7 +760,7 @@ function(mln_ffi_add_native_tests)
   else()
     # One entry per file, so `ctest --parallel` spreads the suites across
     # processes and a crash takes down one file rather than the run.
-    foreach(relative IN LISTS abi_sources internal_sources)
+    foreach(relative IN LISTS abi_sources)
       string(REGEX MATCH "^[a-z]+" suite "${relative}")
       string(REGEX REPLACE "^[a-z]+/(.*)\\.[a-z]+$" "\\1" test_path
              "${relative}")

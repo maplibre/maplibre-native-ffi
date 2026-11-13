@@ -1,3 +1,6 @@
+# The render backend of a preset selects which of the library's backends the
+# test harness drives and which one the artifact descriptor names. The library
+# itself carries every backend that mln-rs builds for the target.
 function(mln_ffi_select_render_backend)
   add_library(mln_ffi_render_dependencies INTERFACE)
   add_library(MLN_FFI::RenderDependencies ALIAS mln_ffi_render_dependencies)
@@ -18,8 +21,4 @@ function(mln_ffi_select_render_backend)
   set_property(
     TARGET mln_ffi_render_dependencies
     PROPERTY MLN_FFI_RENDER_BACKEND "${MLN_FFI_RENDER_BACKEND}")
-endfunction()
-
-function(mln_ffi_configure_render_backend target)
-  mln_ffi_configure_renderer(${target})
 endfunction()

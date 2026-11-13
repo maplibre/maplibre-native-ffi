@@ -1,0 +1,25 @@
+# cargo-about's configuration for the Rust crates that Cargo builds into the
+# library from third_party/mln-rs. cmake/mln_ffi_mln_rs.cmake runs it for the
+# preset's target, and tools/release/sbom.py turns its inventory into the
+# package's SBOM and notices. The accepted licenses are mln-rs's own (its
+# deny.toml) and the ones its dependencies add.
+accepted = [
+  "0BSD",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "FTL",
+  "ICU",
+  "ISC",
+  "MIT",
+  "MIT-Modern-Variant",
+  "Unicode-3.0",
+  "Zlib",
+  "curl",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+workarounds = ["ring", "rustls"]
