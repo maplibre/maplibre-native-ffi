@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds and signs the example's HAP for one ABI from the binding's OHPM HARs.
 #
-#   build-hap.sh <abi> <facade HAR> <backend HAR>
+#   build-hap.sh <abi> <facade HAR> <runtime HAR>
 #
 # The HAP is build/<abi>/entry-default-signed.hap under the example.
 #
@@ -16,10 +16,10 @@
 # toolchain file.
 set -euo pipefail
 
-usage="usage: build-hap.sh <abi> <facade HAR> <backend HAR>"
+usage="usage: build-hap.sh <abi> <facade HAR> <runtime HAR>"
 abi=${1:?$usage}
 facade_har=${2:?$usage}
-backend_har=${3:?$usage}
+runtime_har=${3:?$usage}
 example="$(cd "$(dirname "$0")/.." && pwd)"
 sdk="$(dirname "${OHOS_SDK_NATIVE:?OHOS_SDK_NATIVE must name the OpenHarmony native SDK}")"
 loader="$sdk/ets/build-tools/ets-loader"
@@ -43,19 +43,19 @@ mkdir -p "$work/libs/$abi" "$work/cache"
 cp -R "$example/entry" "$work/entry"
 
 # Install both HARs in oh_modules, where ohpm puts them and ets-loader resolves
-# them. The backend carries the native libraries.
-for har in "$facade_har" "$backend_har"; do
+# them. The runtime carries the native libraries.
+for har in "$facade_har" "$runtime_har"; do
   name=$(tar -xOzf "$har" package/oh-package.json5 | jq -er .name)
   mkdir -p "$work/entry/oh_modules/$name"
   tar -xzf "$har" -C "$work/entry/oh_modules/$name" --strip-components 1
 done
 facade="$work/entry/oh_modules/@maplibre/native-ffi"
-backend="$work/entry/oh_modules/$(tar -xOzf "$backend_har" package/oh-package.json5 | jq -er .name)"
-if [[ ! -f "$facade/oh-package.json5" || ! -d "$backend/libs/$abi" ]]; then
-  echo "error: pass the @maplibre/native-ffi HAR, then a backend HAR with $abi libraries" >&2
+runtime="$work/entry/oh_modules/$(tar -xOzf "$runtime_har" package/oh-package.json5 | jq -er .name)"
+if [[ ! -f "$facade/oh-package.json5" || ! -d "$runtime/libs/$abi" ]]; then
+  echo "error: pass the @maplibre/native-ffi HAR, then a runtime HAR with $abi libraries" >&2
   exit 1
 fi
-cp "$backend/libs/$abi/"*.so "$work/libs/$abi/"
+cp "$runtime/libs/$abi/"*.so "$work/libs/$abi/"
 
 # The app requires and targets the API floor that the facade declares.
 api=$(jq -er .compatibleSdkVersion "$facade/oh-package.json5")
