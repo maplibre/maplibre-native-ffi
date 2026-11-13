@@ -111,13 +111,15 @@ typedef struct mln_test_graphics_texture_info {
 // of the surface's backend and platform are set; the rest are zero.
 typedef struct mln_test_graphics_surface_info {
   // Vulkan: VkSurfaceKHR bit pattern, presentable from the context's queue.
+  // Zero on Android, where the window takes one surface: the library's.
   uint64_t vulkan_surface;
   // Metal: CAMetalLayer* on the context's device. Vulkan on Apple platforms:
   // the CAMetalLayer* that the VkSurfaceKHR presents to.
   void* MLN_TEST_GRAPHICS_NULLABLE metal_layer;
   // Vulkan and WGL on Windows: the HWND of the surface's window.
   void* MLN_TEST_GRAPHICS_NULLABLE win32_window;
-  // Vulkan on Android: the ANativeWindow* that the VkSurfaceKHR presents to.
+  // Vulkan on Android: an ANativeWindow* that the context's queue can
+  // present to.
   void* MLN_TEST_GRAPHICS_NULLABLE android_window;
   // EGL: a pbuffer EGLSurface on the context's config. WGL: the HDC of a
   // hidden window with the context's pixel format.

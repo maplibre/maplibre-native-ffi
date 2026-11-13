@@ -1512,6 +1512,14 @@ static bool vulkan_surface_create(
     set_error("the context's queue family cannot present to the surface");
     return false;
   }
+#if defined(__ANDROID__)
+  // A window takes one producer, and the library connects its own surface
+  // to the window that the fixture hands it, so the fixture keeps none.
+  if (surface->info.android_window != NULL && vk->destroy_surface != NULL) {
+    vk->destroy_surface(instance, handle, NULL);
+    surface->info.vulkan_surface = 0;
+  }
+#endif
   return true;
 }
 
