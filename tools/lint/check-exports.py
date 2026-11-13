@@ -31,8 +31,8 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LIBRARY_STEM = "maplibre-native-c"
-# Upstream defines the plugin registration function, and the library exports
-# it for include/maplibre_native_c/plugin.h; see cmake/mln_ffi_c_api.cmake.
+# The plugin registration function that include/mln/plugin/plugin_api.h
+# declares, which the library exports for include/maplibre_native_c/plugin.h.
 EXTRA_EXPORTS = frozenset({"mln_plugin_register_v1"})
 FORBIDDEN = re.compile(r"mln_test|testing|sync_point", re.IGNORECASE)
 # Symbols a linker can define in a shared library's dynamic table on its own.
