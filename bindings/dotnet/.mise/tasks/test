@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-#MISE description="Test the .NET binding against a native preset's install."
-#MISE extends="ffi:preset"
+#MISE description="Test the .NET binding against a native preset's install, with one of its render backends."
+#MISE extends="ffi:test"
 #MISE dir="../.."
 #MISE shell="bash"
 set -euo pipefail
 
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 case "$usage_preset" in
   android-*)
-    exec mise run //bindings/dotnet:_android "$usage_preset"
+    exec mise run //bindings/dotnet:_android "$usage_preset" "$MLN_FFI_TEST_BACKEND"
     ;;
   ios-* | tvos-*)
-    exec "$MISE_MONOREPO_ROOT/scripts/test-dotnet-apple.sh" "$usage_preset"
+    exec "$MISE_MONOREPO_ROOT/scripts/test-dotnet-apple.sh" "$usage_preset" "$MLN_FFI_TEST_BACKEND"
     ;;
-  macos-x64-*)
+  macos-x64)
     if [[ $(uname -m) == arm64 ]]; then
       version=$(dotnet --version)
       sdk="$MISE_MONOREPO_ROOT/build/tools/dotnet/$version/x64"

@@ -1,8 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <PackageId>Maplibre.NativeFfi.Runtime.$(RenderBackend)</PackageId>
-    <Description>$(RenderBackend) native runtime assets for MapLibre Native .NET.</Description>
+    <!--
+      Maplibre.NativeFfi.Runtime carries every platform's native library, each
+      with all of its render backends. MinGW builds serve the RIDs of the MSVC
+      ones, so they pack as Maplibre.NativeFfi.Runtime.MinGW, with a
+      RuntimePackageIdSuffix of .MinGW.
+    -->
+    <PackageId>Maplibre.NativeFfi.Runtime$(RuntimePackageIdSuffix)</PackageId>
+    <Description>Native runtime assets for MapLibre Native .NET, with every render backend of each platform.</Description>
+    <Description Condition="'$(RuntimePackageIdSuffix)' == '.MinGW'">MinGW-built native runtime assets for MapLibre Native .NET on Windows, with every render backend.</Description>
     <Authors>MapLibre</Authors>
     <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/maplibre/maplibre-native-ffi</PackageProjectUrl>

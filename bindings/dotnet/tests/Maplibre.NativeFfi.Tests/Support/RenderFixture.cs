@@ -11,8 +11,9 @@ namespace Maplibre.NativeFfi.Tests;
 /// A fixture with a backend renders into a ring of textures from tests/graphics with the caller
 /// driver: an OpenGL session shares the fixture's context, which is current only on its graphics
 /// thread, and the other backends take the same path so one test covers them all. An offscreen
-/// fixture renders on a device that the library creates, with the core worker driver. The
-/// session's wakes release a semaphore, and the fixture blocks on it between services.
+/// fixture renders on a device that the library creates for the backend under test, with the core
+/// worker driver. The session's wakes release a semaphore, and the fixture blocks on it between
+/// services.
 /// </remarks>
 internal sealed class RenderFixture : IDisposable
 {
@@ -30,27 +31,61 @@ internal sealed class RenderFixture : IDisposable
     private readonly List<TestGraphicsTexture> textures = [];
     private ulong token;
 
-    internal static TheoryData<TestGraphicsBackend> Backends
+    private static readonly Lazy<TestGraphicsBackend> UnderTest = new(FindBackendUnderTest);
+
+    /// <summary>The backend under test, the one theory case of the render tests.</summary>
+    internal static TheoryData<TestGraphicsBackend> Backends => new(BackendUnderTest);
+
+    /// <summary>
+    /// The backend under test: the one that MLN_FFI_TEST_BACKEND names, vulkan, opengl, or
+    /// metal, which the loaded library must carry, or where nothing names one, the one backend
+    /// that the library carries. OpenGL is named by the platform's context provider.
+    /// </summary>
+    internal static TestGraphicsBackend BackendUnderTest => UnderTest.Value;
+
+    private static TestGraphicsBackend FindBackendUnderTest()
     {
-        get
-        {
-            var data = new TheoryData<TestGraphicsBackend>();
-            var backends = MaplibreNative.SupportedRenderBackendMask();
-            if (backends.HasFlag(RenderBackendFlag.Metal))
-                data.Add(TestGraphicsBackend.Metal);
-            if (backends.HasFlag(RenderBackendFlag.Vulkan))
-                data.Add(TestGraphicsBackend.Vulkan);
-            if (backends.HasFlag(RenderBackendFlag.OpenGl))
+        var carried = MaplibreNative.SupportedRenderBackendMask();
+        var named = Environment.GetEnvironmentVariable("MLN_FFI_TEST_BACKEND");
+        if (string.IsNullOrEmpty(named))
+            named = carried switch
             {
-                var providers = MaplibreNative.OpenGlSupportedContextProviderMask();
-                if (providers.HasFlag(OpenGlContextProviderFlag.Egl))
-                    data.Add(TestGraphicsBackend.Egl);
-                if (providers.HasFlag(OpenGlContextProviderFlag.Wgl))
-                    data.Add(TestGraphicsBackend.Wgl);
-            }
-            return data;
-        }
+                RenderBackendFlag.Metal => "metal",
+                RenderBackendFlag.Vulkan => "vulkan",
+                RenderBackendFlag.OpenGl => "opengl",
+                _ => throw new InvalidOperationException(
+                    $"The loaded library renders with {carried}; MLN_FFI_TEST_BACKEND must name the backend under test."
+                ),
+            };
+        var (flag, backend) = named switch
+        {
+            "metal" => (RenderBackendFlag.Metal, TestGraphicsBackend.Metal),
+            "vulkan" => (RenderBackendFlag.Vulkan, TestGraphicsBackend.Vulkan),
+            "opengl" => (
+                RenderBackendFlag.OpenGl,
+                MaplibreNative
+                    .OpenGlSupportedContextProviderMask()
+                    .HasFlag(OpenGlContextProviderFlag.Wgl)
+                    ? TestGraphicsBackend.Wgl
+                    : TestGraphicsBackend.Egl
+            ),
+            _ => throw new InvalidOperationException($"No tests drive the {named} backend."),
+        };
+        if (!carried.HasFlag(flag))
+            throw new InvalidOperationException(
+                $"The loaded library lacks the backend under test, {named}: it renders with {carried}."
+            );
+        return backend;
     }
+
+    /// <summary>The render backend of a device for <paramref name="backend" />.</summary>
+    private static RenderBackend RenderBackendOf(TestGraphicsBackend backend) =>
+        backend switch
+        {
+            TestGraphicsBackend.Metal => RenderBackend.Metal,
+            TestGraphicsBackend.Vulkan => RenderBackend.Vulkan,
+            _ => RenderBackend.OpenGl,
+        };
 
     private RenderFixture(TestGraphicsBackend? backend, Configure configure, QueueLock queueLock)
     {
@@ -336,12 +371,18 @@ internal sealed class RenderFixture : IDisposable
     {
         var logicalSize = new LogicalSize(Width, Height);
         if (Graphics is null)
-            // With no device, the session creates its own.
+        {
+            // A library of several backends would create the platform's default device, so the
+            // session takes one of the backend under test. It keeps the device until it ends.
+            using var own = GpuDeviceHandle.Create(
+                new GpuDeviceOptions { Backend = RenderBackendOf(BackendUnderTest) }
+            );
             return Map.Attach(
                 new RenderTarget.Offscreen(new OffscreenTarget(logicalSize)),
-                null,
+                own,
                 options
             );
+        }
         var infos = textures.Select(texture => texture.Info).ToArray();
         // Every texture of the ring shares the first one's format and size.
         var first = infos[0];
