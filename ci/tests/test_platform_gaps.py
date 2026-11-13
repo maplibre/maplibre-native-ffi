@@ -29,7 +29,7 @@ class PlatformGapsTest(unittest.TestCase):
         cls.targets = {target.preset: target for target in plan.targets(cls.presets)}
 
     def test_removing_a_gap_enables_tests_and_package_inputs(self):
-        target = self.targets["linux-gnu-riscv64-vulkan"]
+        target = self.targets["linux-gnu-riscv64"]
         self.assertNotIn(
             "//bindings/dotnet:test",
             {suite.task for suite in suites.target_suites(target)},
@@ -41,7 +41,7 @@ class PlatformGapsTest(unittest.TestCase):
         remaining = [
             entry
             for entry in entries
-            if not entry.matches("dotnet", gaps.target_from_preset(target))
+            if not any(entry.matches("dotnet", cell) for cell in gaps.cells(target))
         ]
         with mock.patch.object(gaps, "load_gaps", return_value=(issue, remaining)):
             self.assertIn(
@@ -53,26 +53,20 @@ class PlatformGapsTest(unittest.TestCase):
             )
             self.assertEqual(
                 suites.command_support(
-                    "mise run //bindings/dotnet:test " + target.preset
+                    f"mise run //bindings/dotnet:test {target.preset} vulkan"
                 ),
                 [("dotnet", "tested")],
             )
 
-    def test_jvm_runtime_jars_follow_package_gaps_and_available_backends(self):
-        target = self.targets["macos-x64-metal"]
+    def test_jvm_runtime_jars_follow_package_gaps(self):
+        target = self.targets["macos-x64"]
         runtimes = plan.jvm_runtimes(list(self.targets.values()))
-        self.assertEqual(runtimes["metal"]["natives-macos-x64"], "macos-x64")
-        self.assertNotIn("natives-macos-x64", runtimes["opengl"])
-        self.assertNotIn("natives-macos-x64", runtimes["vulkan"])
-        for backend in ("opengl", "vulkan"):
-            for arch in ("x64", "arm64"):
-                self.assertEqual(
-                    runtimes[backend][f"natives-windows-{arch}"], f"windows-{arch}"
-                )
-                self.assertEqual(
-                    runtimes[backend][f"natives-windows-mingw-{arch}"],
-                    f"windows-mingw-{arch}",
-                )
+        self.assertEqual(runtimes["natives-macos-x64"], "macos-x64")
+        for arch in ("x64", "arm64"):
+            self.assertEqual(runtimes[f"natives-windows-{arch}"], f"windows-{arch}")
+            self.assertEqual(
+                runtimes[f"natives-windows-mingw-{arch}"], f"windows-mingw-{arch}"
+            )
         entry = gaps.Entry(
             0,
             {
@@ -92,25 +86,20 @@ class PlatformGapsTest(unittest.TestCase):
         )
         with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
             self.assertEqual(
-                plan.jvm_runtimes([target]),
-                {"metal": {"natives-macos-x64": "macos-x64"}},
+                plan.jvm_runtimes([target]), {"natives-macos-x64": "macos-x64"}
             )
 
     def test_windows_native_kotlin_tests_do_not_imply_a_runtime_package(self):
-        for preset in ("windows-x64-wgl", "windows-x64-vulkan"):
-            target = self.targets[preset]
-            with self.subTest(preset=preset):
-                self.assertTrue(gaps.supported("kotlin-native", target, "build"))
-                self.assertTrue(gaps.supported("kotlin-native", target, "test"))
-                self.assertFalse(gaps.supported("kotlin-native", target, "package"))
-                self.assertIn(
-                    "//bindings/kotlin:test:native",
-                    {suite.task for suite in suites.target_suites(target)},
-                )
+        target = self.targets["windows-x64"]
+        self.assertTrue(gaps.supported("kotlin-native", target, "build"))
+        self.assertTrue(gaps.supported("kotlin-native", target, "test"))
+        self.assertFalse(gaps.supported("kotlin-native", target, "package"))
+        self.assertIn(
+            "//bindings/kotlin:test:native",
+            {suite.task for suite in suites.target_suites(target)},
+        )
         self.assertFalse(
-            gaps.supported(
-                "kotlin-native", self.targets["windows-arm64-vulkan"], "test"
-            )
+            gaps.supported("kotlin-native", self.targets["windows-arm64"], "test")
         )
         self.assertNotIn(
             "windows-x64",
@@ -123,49 +112,43 @@ class PlatformGapsTest(unittest.TestCase):
             {target.preset for target in selected},
             {name for name in self.targets if plan.dotnet_runtime_target(name)},
         )
-        target = self.targets["macos-x64-metal"]
+        target = self.targets["macos-x64"]
         self.assertIn(target, selected)
-        self.assertEqual(
-            plan.dotnet_runtime_target(target.preset), ("Metal", "osx-x64")
-        )
+        self.assertEqual(plan.dotnet_runtime_target(target.preset), ("", "osx-x64"))
         self.assertTrue(gaps.supported("dotnet", target))
         self.assertIn(
             "//bindings/dotnet:test",
             {suite.task for suite in suites.target_suites(target)},
         )
-        self.assertEqual(
-            plan.dotnet_runtime_target("mingw-x64-vulkan"), ("Vulkan.MinGW", "win-x64")
-        )
+        self.assertEqual(plan.dotnet_runtime_target("windows-x64"), ("", "win-x64"))
+        self.assertEqual(plan.dotnet_runtime_target("mingw-x64"), (".MinGW", "win-x64"))
         self.assertIn(
             "//bindings/dotnet:test",
-            {
-                suite.task
-                for suite in suites.target_suites(self.targets["mingw-x64-vulkan"])
-            },
+            {suite.task for suite in suites.target_suites(self.targets["mingw-x64"])},
         )
 
     def test_package_gaps_control_each_planner_without_disabling_tests(self):
         targets = list(self.targets.values())
         cases = (
-            ("dotnet", "dotnet-nuget", "linux-gnu-x64-vulkan"),
-            ("python", "python-wheels", "linux-gnu-x64-vulkan"),
-            ("typescript", "typescript-npm", "linux-gnu-x64-vulkan"),
-            ("typescript", "arkts-ohpm", "ohos-x64-egl"),
-            ("kotlin-jvm", "kotlin-maven", "freebsd-x64-egl"),
-            ("swift", "swift-package", "macos-arm64-metal"),
-            ("swift", "swift-artifact-bundles", "linux-gnu-x64-vulkan"),
+            ("dotnet", "dotnet-nuget", "linux-gnu-x64"),
+            ("python", "python-wheels", "linux-gnu-x64"),
+            ("typescript", "typescript-npm", "linux-gnu-x64"),
+            ("typescript", "arkts-ohpm", "ohos-x64"),
+            ("kotlin-jvm", "kotlin-maven", "freebsd-x64"),
+            ("swift", "swift-package", "macos-arm64"),
+            ("swift", "swift-artifact-bundles", "linux-gnu-x64"),
         )
         issue, entries = gaps.load_gaps()
         for binding, job, preset in cases:
             target = self.targets[preset]
-            metadata = gaps.target_from_preset(target)
+            metadata = gaps.cell(target, target.default_backend)
+            # A package carries every backend, so a package gap names them all.
             entry = gaps.Entry(
                 len(entries),
                 {
                     "bindings": (binding,),
                     "platforms": (metadata.platform,),
                     "archs": (metadata.arch,),
-                    "backends": (metadata.backend,),
                     "operations": ("package",),
                 },
                 "path-known",
@@ -194,14 +177,13 @@ class PlatformGapsTest(unittest.TestCase):
             "kotlin-jvm",
             "kotlin-native",
         ):
-            target = self.targets["linux-gnu-x64-vulkan"]
+            target = self.targets["linux-gnu-x64"]
             entry = gaps.Entry(
                 len(entries),
                 {
                     "bindings": (binding,),
                     "platforms": ("linux-gnu",),
                     "archs": ("x64",),
-                    "backends": ("vulkan",),
                     "operations": ("test",),
                 },
                 "path-known",
@@ -214,64 +196,113 @@ class PlatformGapsTest(unittest.TestCase):
                     gaps, "load_gaps", return_value=(issue, [*entries, entry])
                 ),
             ):
-                command = suites.binding_command(binding, target)
+                self.assertEqual(gaps.tested_backends(binding, target), ())
+                commands = [
+                    command
+                    for command, backend in suites.consumer_commands(target)
+                    if suites.LINUX_ARM64_KLIB not in command
+                    and any(
+                        name == binding
+                        for name, _ in suites.command_support(" ".join(command))
+                    )
+                ]
                 self.assertEqual(
-                    suites.command_support(" ".join(command)), [(binding, "build-only")]
+                    [suites.command_support(" ".join(command)) for command in commands],
+                    [[(binding, "build-only")]],
                 )
                 self.assertTrue(plan.packaged(binding)(target))
+
+    def test_a_backend_test_gap_keeps_the_targets_other_backends(self):
+        issue, entries = gaps.load_gaps()
+        target = self.targets["linux-gnu-x64"]
+        entry = gaps.Entry(
+            len(entries),
+            {
+                "bindings": ("go",),
+                "platforms": ("linux-gnu",),
+                "backends": ("opengl",),
+                "operations": ("test",),
+            },
+            "path-known",
+            "driver needed",
+            None,
+        )
+        with mock.patch.object(
+            gaps, "load_gaps", return_value=(issue, [*entries, entry])
+        ):
+            self.assertEqual(gaps.tested_backends("go", target), ("vulkan",))
+            self.assertIn(
+                (
+                    ["mise", "run", "//bindings/go:test", target.preset, "vulkan"],
+                    "vulkan",
+                ),
+                suites.consumer_commands(target),
+            )
+            self.assertNotIn(
+                ["mise", "run", "//bindings/go:test", target.preset, "opengl"],
+                [command for command, _ in suites.consumer_commands(target)],
+            )
 
     def test_unlisted_nuget_platform_fails_instead_of_silently_excluding_it(self):
         with (
             mock.patch.object(gaps, "load_gaps", return_value=(936, [])),
             self.assertRaises(KeyError),
         ):
-            plan.dotnet_runtime_target("futureos-x64-vulkan")
+            plan.dotnet_runtime_target(
+                dataclasses.replace(self.targets["linux-gnu-x64"], platform="futureos")
+            )
 
     def test_xcframework_includes_both_macos_archives(self):
         inputs = plan.consumed("apple-xcframework", list(self.targets.values()))
         for arch in ("arm64", "x64"):
-            target = self.targets[f"macos-{arch}-metal"]
+            target = self.targets[f"macos-{arch}"]
             self.assertTrue(gaps.supported("c", target, "package"))
             self.assertIn(target, inputs)
 
     def test_no_gap_means_every_binding_runs_on_every_runner_family(self):
         names = (
-            "linux-gnu-riscv64-egl",
-            "linux-musl-loongarch64-vulkan",
-            "macos-x64-metal",
-            "windows-arm64-wgl",
-            "mingw-x64-vulkan",
-            "freebsd-x64-egl",
+            "linux-gnu-riscv64",
+            "linux-musl-loongarch64",
+            "macos-x64",
+            "windows-arm64",
+            "mingw-x64",
+            "freebsd-x64",
             "web-wasm32-webgl",
-            "ohos-x64-egl",
-            "android-x64-egl",
-            "android-arm64-egl",
-            "ios-arm64-metal",
-            "ios-simulator-arm64-metal",
-            "ios-maccatalyst-arm64-metal",
-            "tvos-arm64-metal",
-            "visionos-simulator-arm64-metal",
+            "ohos-x64",
+            "android-x64",
+            "android-arm64",
+            "ios-arm64",
+            "ios-simulator-arm64",
+            "ios-maccatalyst-arm64",
+            "tvos-arm64",
+            "visionos-simulator-arm64",
         )
         with mock.patch.object(gaps, "load_gaps", return_value=(936, [])):
             for name in names:
+                target = self.targets[name]
                 with self.subTest(preset=name):
-                    self.assertIn(
-                        ["mise", "run", "test", name],
-                        suites.native_checks(self.targets[name]),
-                    )
-                    commands = suites.consumer_commands(self.targets[name])
-                    bindings = {
-                        binding
-                        for command in commands
-                        for binding, _ in suites.command_support(" ".join(command))
-                    }
-                    self.assertEqual(bindings, set(gaps.BINDING_LABELS) - {"c"})
+                    for backend in target.backends:
+                        self.assertIn(
+                            (["mise", "run", "test", name, backend], backend),
+                            suites.native_checks(target),
+                        )
+                    commands = suites.consumer_commands(target)
+                    for backend in target.backends:
+                        bindings = {
+                            binding
+                            for command, tested in commands
+                            if tested == backend
+                            for binding, _ in suites.command_support(" ".join(command))
+                        }
+                        self.assertEqual(bindings, set(gaps.BINDING_LABELS) - {"c"})
             # A new architecture inherits support without another opt-in knob.
             target = dataclasses.replace(
                 self.targets[names[0]], architecture="future64"
             )
+            # Each binding tests each backend, and the GObject library archives.
             self.assertEqual(
-                len(suites.consumer_commands(target)), len(gaps.BINDING_LABELS) - 1
+                len(suites.consumer_commands(target)),
+                (len(gaps.BINDING_LABELS) - 1) * len(target.backends) + 1,
             )
 
     def test_selectors_normalize_backends_and_apple_simulators(self):
@@ -283,10 +314,10 @@ class PlatformGapsTest(unittest.TestCase):
             None,
         )
         with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
-            for name in ("ios-arm64-metal", "ios-simulator-arm64-metal"):
+            for name in ("ios-arm64", "ios-simulator-arm64"):
                 self.assertFalse(gaps.supported("go", self.targets[name]))
                 self.assertTrue(gaps.supported("swift", self.targets[name]))
-            self.assertTrue(gaps.supported("go", self.targets["tvos-arm64-metal"]))
+            self.assertTrue(gaps.supported("go", self.targets["tvos-arm64"]))
         entry = dataclasses.replace(
             entry,
             selectors={
@@ -296,18 +327,20 @@ class PlatformGapsTest(unittest.TestCase):
             },
         )
         with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
-            self.assertFalse(gaps.supported("go", self.targets["linux-gnu-x64-egl"]))
-            self.assertTrue(gaps.supported("go", self.targets["linux-gnu-x64-vulkan"]))
+            target = self.targets["linux-gnu-x64"]
+            self.assertFalse(gaps.supported("go", target, "test", "opengl"))
+            self.assertTrue(gaps.supported("go", target, "test", "vulkan"))
+            # The package carries both, so the binding still builds.
+            self.assertTrue(gaps.supported("go", target, "build"))
 
     def test_a_native_gap_excludes_its_bindings_and_target_job(self):
-        target = self.targets["linux-gnu-x64-vulkan"]
+        target = self.targets["linux-gnu-x64"]
         entry = gaps.Entry(
             0,
             {
                 "bindings": ("c",),
                 "platforms": ("linux-gnu",),
                 "archs": ("x64",),
-                "backends": ("vulkan",),
             },
             "path-known",
             "native build needed",
@@ -317,8 +350,23 @@ class PlatformGapsTest(unittest.TestCase):
             self.assertEqual(suites.consumer_commands(target), [])
             result = plan.plan(self.presets, False, ["linux-x64"])
             self.assertNotIn(target.preset, {row["preset"] for row in result["matrix"]})
-            self.assertIn(
-                "linux-gnu-x64-egl", {row["preset"] for row in result["matrix"]}
+        # A native test gap on one backend leaves the other's suites.
+        entry = dataclasses.replace(
+            entry,
+            selectors={
+                **entry.selectors,
+                "backends": ("vulkan",),
+                "operations": ("test",),
+            },
+        )
+        with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
+            self.assertEqual(
+                suites.native_checks(target)[0],
+                (["mise", "run", "test", target.preset, "opengl"], "opengl"),
+            )
+            self.assertNotIn(
+                "vulkan",
+                {backend for _, backend in suites.consumer_commands(target)},
             )
 
     def test_the_matrix_rejects_a_missing_suite_without_a_gap(self):

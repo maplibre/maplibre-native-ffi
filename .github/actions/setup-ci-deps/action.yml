@@ -18,8 +18,8 @@ inputs:
     default: ""
   software-gpu:
     description:
-      The render backend, egl, vulkan, or wgl, whose software driver stands in
-      for the GPU that the runners lack
+      The graphics APIs, separated by commas, such as vulkan,egl or vulkan,wgl,
+      whose software drivers stand in for the GPU that the runners lack
     required: false
     default: ""
   sccache-access-key-id:
@@ -211,8 +211,8 @@ runs:
         } >> "$GITHUB_ENV"
 
     # devices-cli runs one emulator per 8 GiB of RAM by default, which leaves a
-    # 16 GiB runner, whose kernel keeps some, room for one. The EGL job's
-    # suites run on API 26 and API 36 at once.
+    # 16 GiB runner, whose kernel keeps some, room for one. The x64 job's
+    # OpenGL ES suites run on API 26 and its other suites on API 36, at once.
     - name: Let the Android emulators run side by side
       if: ${{ runner.os == 'Linux' && inputs.device == 'Android emulator' }}
       shell: bash
@@ -270,11 +270,12 @@ runs:
         test -w /dev/kvm
 
     - name: Use Windows Vulkan software driver
-      if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'vulkan' }}
+      if:
+        ${{ runner.os == 'Windows' && contains(inputs.software-gpu, 'vulkan') }}
       uses: ./.github/actions/setup-windows-vulkan-software
 
     - name: Use Windows OpenGL software driver
-      if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'wgl' }}
+      if: ${{ runner.os == 'Windows' && contains(inputs.software-gpu, 'wgl') }}
       uses: ./.github/actions/setup-windows-opengl-software
 
     - name: Cache Cargo packages
@@ -425,7 +426,8 @@ runs:
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
     - name: Install Windows Vulkan SDK
-      if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'vulkan' }}
+      if:
+        ${{ runner.os == 'Windows' && contains(inputs.software-gpu, 'vulkan') }}
       uses: jakoch/install-vulkan-sdk-action@7fe84289ddbf750f7eff9f8e4588e600e1dd06c8 # v1.8.1
       with:
         # The action's cache key is the OS, architecture and this version, and a
@@ -445,7 +447,8 @@ runs:
     # directory to both ordinary processes and runtimes with isolated DLL
     # search paths, such as Python 3.8+.
     - name: Expose the Vulkan loader
-      if: ${{ runner.os == 'Windows' && inputs.software-gpu == 'vulkan' }}
+      if:
+        ${{ runner.os == 'Windows' && contains(inputs.software-gpu, 'vulkan') }}
       shell: pwsh
       run: |
         # Where the loader sits differs by runner: the x64 SDK groups it under

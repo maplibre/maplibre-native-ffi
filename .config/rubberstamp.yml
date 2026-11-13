@@ -514,14 +514,14 @@ ci:
     android-x86:
       covers: >-
         Android x86, a 32-bit ABI, with OpenGL ES and Vulkan, built with the
-        NDK. The OpenGL ES job runs the C, C#, Go, Kotlin, TypeScript, and Zig
-        tests in an API 30 x86 emulator, and the Vulkan job only builds. Dart,
-        Python, and Swift have no Android x86 target. Catches only what differs
-        by CPU architecture on Android: architecture conditionals in code or
-        build logic, a tool or dependency fetched per ABI, the x86 emulator
-        image, and 32-bit ABI or pointer-size problems at run time, such as x86
-        aligning 64-bit fields to four bytes. Android platform, renderer, and
-        binding changes that Android x64 already builds and tests don't need it.
+        NDK. Runs the C, C#, Go, Kotlin, TypeScript, and Zig tests with OpenGL
+        ES in an API 30 x86 emulator, whose Vulkan can't run them. Dart, Python,
+        and Swift have no Android x86 target. Catches only what differs by CPU
+        architecture on Android: architecture conditionals in code or build
+        logic, a tool or dependency fetched per ABI, the x86 emulator image, and
+        32-bit ABI or pointer-size problems at run time, such as x86 aligning
+        64-bit fields to four bytes. Android platform, renderer, and binding
+        changes that Android x64 already builds and tests don't need it.
       rules:
         - if:
             files:
@@ -646,11 +646,11 @@ ci:
       covers: >-
         Packs the TypeScript npm packages from the addons that the Linux, macOS,
         and browser targets built and tested, and the React Native package from
-        the Android EGL archives and the XCFramework, so it runs those targets.
-        Only changes to what the packages contain or how they are packed need
-        it: the package manifests, the facade bundle, the React Native package's
-        files, and the packing script. Ordinary TypeScript binding changes and
-        one platform's addon don't.
+        the Android archives and the XCFramework, so it runs those targets. Only
+        changes to what the packages contain or how they are packed need it: the
+        package manifests, the facade bundle, the React Native package's files,
+        and the packing script. Ordinary TypeScript binding changes and one
+        platform's addon don't.
     react-native:
       covers: >-
         Builds the React Native example for Android x64 and the iOS simulator as
@@ -696,11 +696,11 @@ ci:
     gtk:
       covers: >-
         Builds the GObject library and the GTK example for Linux x64 against the
-        archive that the Linux x64 Vulkan target built, so it runs that target.
-        It runs no app. Catches what breaks the example's Vala or its meson
-        build against GTK 4.14 and the installed VAPI: changes to the example,
-        and to the GObject library's render session, frame, and dmabuf API that
-        it calls.
+        archive that the Linux x64 target built, so it runs that target. It runs
+        no app. Catches what breaks the example's Vala or its meson build
+        against GTK 4.14 and the installed VAPI: changes to the example, and to
+        the GObject library's render session, frame, and dmabuf API that it
+        calls.
       rules:
         - if:
             files:
@@ -709,10 +709,10 @@ ci:
     wpf:
       covers: >-
         Builds the WPF example on Linux against the archive that the Windows x64
-        Vulkan target built, so it runs that target. It runs no app. Catches
-        what breaks the example's C# or XAML, or its build against the .NET
-        binding: changes to the example, and to the .NET binding's render
-        session and Win32 API that it calls.
+        target built, so it runs that target. It runs no app. Catches what
+        breaks the example's C# or XAML, or its build against the .NET binding:
+        changes to the example, and to the .NET binding's render session and
+        Win32 API that it calls.
       rules:
         - if:
             files:
@@ -721,12 +721,12 @@ ci:
     sdl:
       covers: >-
         Builds the SDL example for Linux x64, Windows x64, and macOS, each on
-        its own runner, against the archives that the Linux x64 Vulkan, Windows
-        x64 Vulkan, and macOS ARM64 Metal targets built, so it runs those
-        targets. It runs no app. Catches what breaks the example's Zig or its
-        build against the Zig binding and SDL: changes to the example, and to
-        the Zig binding's build script and the render session, Wayland, Win32,
-        and Metal API that it calls.
+        its own runner, against the archives that the Linux x64, Windows x64,
+        and macOS ARM64 targets built, so it runs those targets. It runs no app.
+        Catches what breaks the example's Zig or its build against the Zig
+        binding and SDL: changes to the example, and to the Zig binding's build
+        script and the render session, Wayland, Win32, and Metal API that it
+        calls.
       rules:
         - if:
             files:
@@ -755,7 +755,7 @@ ci:
           then: apply
     swiftpm:
       covers: >-
-        Assembles the XCFramework from every Apple Metal target's slice, and the
+        Assembles the XCFramework from every Apple target's slice, and the
         artifact bundles from every Linux, Android, and Windows target's
         archive, so it runs those targets, and writes the Swift package that a
         release pushes to the distribution repository with them. Then builds and
@@ -789,9 +789,9 @@ ci:
     conan:
       covers: >-
         Resolves the distribution repository's local Conan recipe index and
-        builds a CMakeDeps consumer of the Linux x64 Vulkan archive, so it runs
-        that target. Changes to the recipe, its release generator or consumer
-        check need it.
+        builds a CMakeDeps consumer of the Linux x64 archive, so it runs that
+        target. Changes to the recipe, its release generator or consumer check
+        need it.
       rules:
         - if:
             files:

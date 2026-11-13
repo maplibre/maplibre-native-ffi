@@ -43,11 +43,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(upload["with"]["if-no-files-found"], "ignore")
         self.assertEqual(
             [row["preset"] for row in self.matrix if row["emulator_logs"]],
-            [
-                "android-x86-egl",
-                "android-x64-egl",
-                "android-x64-vulkan",
-            ],
+            ["android-x86", "android-x64"],
         )
 
     def test_the_target_job_runs_its_suites_after_build_and_boot(self):
@@ -150,31 +146,24 @@ class VendorTest(unittest.TestCase):
                 if target.device
             },
             {
-                "freebsd-x64-egl": freebsd,
-                "freebsd-x64-vulkan": freebsd,
-                "ios-simulator-arm64-metal": ("iOS simulator", "devices-cli get ios"),
-                "tvos-simulator-arm64-metal": (
-                    "tvOS simulator",
-                    "devices-cli get tvos",
-                ),
-                "visionos-simulator-arm64-metal": (
+                "freebsd-x64": freebsd,
+                "ios-simulator-arm64": ("iOS simulator", "devices-cli get ios"),
+                "tvos-simulator-arm64": ("tvOS simulator", "devices-cli get tvos"),
+                "visionos-simulator-arm64": (
                     "visionOS simulator",
                     "devices-cli get visionos",
                 ),
-                "android-x86-egl": ("Android emulator", f"{android} android-x86-egl"),
-                "android-x64-egl": ("Android emulator", f"{android} android-x64-egl"),
-                "android-x64-vulkan": ("Android emulator", f"{android} x86_64"),
-                "ohos-x64-egl": ("OpenHarmony emulator", "tools/devices/ohos-key"),
-                "ohos-x64-vulkan": ("OpenHarmony emulator", "tools/devices/ohos-key"),
+                "android-x86": ("Android emulator", f"{android} android-x86"),
+                "android-x64": ("Android emulator", f"{android} android-x64"),
+                "ohos-x64": ("OpenHarmony emulator", "tools/devices/ohos-key"),
                 # Each emulated libc and architecture has a root of its own.
                 **{
-                    f"linux-{libc}-{arch}-{backend}": (
+                    f"linux-{libc}-{arch}": (
                         "QEMU user mode",
                         f"tools/devices/linux-root {libc} {arch}",
                     )
                     for libc in ("gnu", "musl")
                     for arch in ("riscv64", "loongarch64")
-                    for backend in ("egl", "vulkan")
                 },
             },
         )
@@ -187,29 +176,30 @@ class SuitesTest(unittest.TestCase):
 
     def test_typescript_linux_and_freebsd_suites_publish_their_addons(self):
         expected = {
-            f"linux-{libc}-{arch}-{backend}"
-            for libc, architectures in (
-                ("gnu", ("x64", "arm64", "riscv64", "loongarch64")),
-                ("musl", ("x64", "arm64", "riscv64", "loongarch64")),
-            )
-            for arch in architectures
-            for backend in ("egl", "vulkan")
-        } | {"freebsd-x64-egl", "freebsd-x64-vulkan"}
-        build_only = {"linux-gnu-riscv64-egl", "linux-gnu-riscv64-vulkan"}
+            f"linux-{libc}-{arch}"
+            for libc in ("gnu", "musl")
+            for arch in ("x64", "arm64", "riscv64", "loongarch64")
+        } | {"freebsd-x64"}
+        build_only = {"linux-gnu-riscv64"}
         commands = {
-            name: suite.task
+            name: [
+                suite.command[2:]
+                for suite in suites.target_suites(target)
+                if suite.task
+                in {"//bindings/typescript:test", "//bindings/typescript:build"}
+            ]
             for name, target in self.targets.items()
             if (target.platform.startswith("linux-") or target.platform == "freebsd")
-            for suite in suites.target_suites(target)
-            if suite.task
-            in {"//bindings/typescript:test", "//bindings/typescript:build"}
         }
         self.assertEqual(
             commands,
             {
-                name: "//bindings/typescript:build"
+                name: [("//bindings/typescript:build", name)]
                 if name in build_only
-                else "//bindings/typescript:test"
+                else [
+                    ("//bindings/typescript:test", name, "vulkan"),
+                    ("//bindings/typescript:test", name, "opengl"),
+                ]
                 for name in expected
             },
         )
@@ -218,15 +208,71 @@ class SuitesTest(unittest.TestCase):
                 self.assertEqual(plan.addon(self.targets[name]), "typescript")
 
     def test_a_target_cannot_run_one_task_as_two_suites(self):
-        target = self.targets["windows-x64-wgl"]
-        command = ["mise", "run", "//bindings/go:test", target.preset]
+        target = self.targets["windows-x64"]
+        command = ["mise", "run", "//bindings/go:test", target.preset, "opengl"]
         with (
             mock.patch.object(
-                suites, "consumer_commands", return_value=[command, command]
+                suites,
+                "consumer_commands",
+                return_value=[(command, "opengl"), (command, "opengl")],
             ),
-            self.assertRaisesRegex(SystemExit, "'bindings-go-test'"),
+            self.assertRaisesRegex(SystemExit, "'bindings-go-test-opengl'"),
         ):
             suites.target_suites(target)
+
+    def test_a_target_runs_each_backends_native_suites_once(self):
+        for name, backends in (
+            ("linux-gnu-x64", ("vulkan", "opengl")),
+            ("windows-x64", ("vulkan", "opengl")),
+            ("macos-arm64", ("metal",)),
+            # The x86 emulator can't run Vulkan, as support-gaps.toml records.
+            ("android-x86", ("opengl",)),
+            # No ARM Android device is configured.
+            ("android-arm64", ()),
+        ):
+            with self.subTest(preset=name):
+                self.assertEqual(
+                    [
+                        (suite.command, suite.backend)
+                        for suite in suites.target_suites(self.targets[name])
+                        if suite.task == "test"
+                    ],
+                    [
+                        (("mise", "run", "test", name, backend), backend)
+                        for backend in backends
+                    ],
+                )
+
+    def test_a_binding_tests_each_backend_or_builds_once(self):
+        go = {
+            name: [
+                suite.command[2:]
+                for suite in suites.target_suites(self.targets[name])
+                if suite.task.startswith("//bindings/go:")
+                and suite.task != "//bindings/go:test:package"
+            ]
+            for name in ("linux-gnu-x64", "android-x86", "android-arm64")
+        }
+        self.assertEqual(
+            go,
+            {
+                "linux-gnu-x64": [
+                    ("//bindings/go:test", "linux-gnu-x64", "vulkan"),
+                    ("//bindings/go:test", "linux-gnu-x64", "opengl"),
+                ],
+                "android-x86": [("//bindings/go:test", "android-x86", "opengl")],
+                "android-arm64": [("//bindings/go:build", "android-arm64")],
+            },
+        )
+
+    def test_only_the_windows_vulkan_native_suites_need_the_desktop(self):
+        wrapped = {
+            (target.preset, suite.backend)
+            for target in self.targets.values()
+            for suite in suites.target_suites(target)
+            if suite.wrapper == "windows-console"
+        }
+        self.assertEqual(wrapped, {("windows-x64", "vulkan"), ("mingw-x64", "vulkan")})
 
     def test_consumer_suites_use_the_packaged_install(self):
         for target in self.targets.values():
@@ -238,112 +284,112 @@ class SuitesTest(unittest.TestCase):
                         self.assertIn("install", suite.prerequisites)
 
     def test_dart_ios_runs_on_the_simulator_and_builds_for_the_device(self):
-        for preset, action in (
-            ("ios-simulator-arm64-metal", "test:ios"),
-            ("ios-arm64-metal", "build:mobile"),
+        for preset, command in (
+            ("ios-simulator-arm64", ("//bindings/dart:test:ios", "metal")),
+            ("ios-arm64", ("//bindings/dart:build:mobile",)),
         ):
             commands = [
                 suite.command for suite in suites.target_suites(self.targets[preset])
             ]
-            self.assertIn(
-                ("mise", "run", f"//bindings/dart:{action}", preset), commands
-            )
+            self.assertIn(("mise", "run", command[0], preset, *command[1:]), commands)
 
     def test_swift_runs_on_windows_msvc_and_mingw(self):
-        for preset in (
-            "windows-x64-wgl",
-            "windows-x64-vulkan",
-            "windows-arm64-wgl",
-            "windows-arm64-vulkan",
-            "mingw-x64-wgl",
-            "mingw-x64-vulkan",
-        ):
-            with self.subTest(preset=preset):
-                commands = [
-                    suite.command
-                    for suite in suites.target_suites(self.targets[preset])
-                ]
-                self.assertIn(
-                    ("mise", "run", "//bindings/swift:test", preset), commands
-                )
-
-    def test_swift_builds_android_arm_targets_and_tests_x64(self):
-        for architecture in ("arm", "arm64", "x64", "x86"):
-            for backend in ("egl", "vulkan"):
-                preset = f"android-{architecture}-{backend}"
-                with self.subTest(preset=preset):
+        for preset in ("windows-x64", "windows-arm64", "mingw-x64"):
+            for backend in ("vulkan", "opengl"):
+                with self.subTest(preset=preset, backend=backend):
                     commands = [
                         suite.command
                         for suite in suites.target_suites(self.targets[preset])
-                        if suite.task.startswith("//bindings/swift:")
                     ]
-                    action = "test" if architecture == "x64" else "build"
-                    self.assertEqual(
+                    self.assertIn(
+                        ("mise", "run", "//bindings/swift:test", preset, backend),
                         commands,
-                        []
-                        if architecture == "x86"
-                        else [("mise", "run", f"//bindings/swift:{action}", preset)],
                     )
 
+    def test_swift_builds_android_arm_targets_and_tests_x64(self):
+        for architecture in ("arm", "arm64", "x64", "x86"):
+            preset = f"android-{architecture}"
+            with self.subTest(preset=preset):
+                commands = [
+                    suite.command[2:]
+                    for suite in suites.target_suites(self.targets[preset])
+                    if suite.task.startswith("//bindings/swift:")
+                ]
+                expected = {
+                    "x86": [],
+                    "x64": [
+                        ("//bindings/swift:test", preset, "vulkan"),
+                        ("//bindings/swift:test", preset, "opengl"),
+                    ],
+                }.get(architecture, [("//bindings/swift:build", preset)])
+                self.assertEqual(commands, expected)
+
     def test_dotnet_android_builds_packages_and_tests_emulator_targets(self):
-        for preset, action in (
-            ("android-arm-egl", "build"),
-            ("android-arm-vulkan", "build"),
-            ("android-arm64-egl", "build"),
-            ("android-arm64-vulkan", "build"),
-            ("android-x86-egl", "test"),
-            ("android-x86-vulkan", "build"),
-            ("android-x64-egl", "test"),
-            ("android-x64-vulkan", "test"),
+        for preset, expected in (
+            ("android-arm", [("build",)]),
+            ("android-arm64", [("build",)]),
+            ("android-x86", [("test", "opengl")]),
+            ("android-x64", [("test", "vulkan"), ("test", "opengl")]),
         ):
             commands = [
-                suite.command for suite in suites.target_suites(self.targets[preset])
+                suite.command[2:]
+                for suite in suites.target_suites(self.targets[preset])
+                if suite.task.startswith("//bindings/dotnet:")
             ]
-            self.assertIn(
-                ("mise", "run", f"//bindings/dotnet:{action}", preset), commands
+            self.assertEqual(
+                commands,
+                [
+                    (f"//bindings/dotnet:{action}", preset, *backend)
+                    for action, *backend in expected
+                ],
             )
 
     def test_dotnet_apple_builds_devices_and_tests_simulators_and_catalyst(self):
         for preset, action in (
-            ("ios-arm64-metal", "build"),
-            ("ios-simulator-arm64-metal", "test"),
-            ("ios-maccatalyst-arm64-metal", "test"),
-            ("tvos-arm64-metal", "build"),
-            ("tvos-simulator-arm64-metal", "test"),
+            ("ios-arm64", "build"),
+            ("ios-simulator-arm64", "test"),
+            ("ios-maccatalyst-arm64", "test"),
+            ("tvos-arm64", "build"),
+            ("tvos-simulator-arm64", "test"),
         ):
             commands = [
                 suite.command for suite in suites.target_suites(self.targets[preset])
             ]
+            backend = ("metal",) if action == "test" else ()
             self.assertIn(
-                ("mise", "run", f"//bindings/dotnet:{action}", preset), commands
+                ("mise", "run", f"//bindings/dotnet:{action}", preset, *backend),
+                commands,
             )
 
     def test_hermes_builds_mobile_hosts_and_tests_device_targets(self):
-        for preset, action in (
-            ("android-arm-egl", "build"),
-            ("android-arm-vulkan", "build"),
-            ("android-arm64-egl", "build"),
-            ("android-arm64-vulkan", "build"),
-            ("android-x86-egl", "test"),
-            ("android-x86-vulkan", "build"),
-            ("android-x64-egl", "test"),
-            ("android-x64-vulkan", "test"),
-            ("ios-arm64-metal", "build"),
-            ("ios-simulator-arm64-metal", "test"),
-            ("ios-maccatalyst-arm64-metal", "test"),
-            ("tvos-arm64-metal", "build"),
-            ("tvos-simulator-arm64-metal", "test"),
-            ("visionos-arm64-metal", "build"),
-            ("visionos-simulator-arm64-metal", "test"),
+        for preset, expected in (
+            ("android-arm", [()]),
+            ("android-arm64", [()]),
+            ("android-x86", [("opengl",)]),
+            ("android-x64", [("vulkan",), ("opengl",)]),
+            ("ios-arm64", [()]),
+            ("ios-simulator-arm64", [("metal",)]),
+            ("ios-maccatalyst-arm64", [("metal",)]),
+            ("tvos-arm64", [()]),
+            ("tvos-simulator-arm64", [("metal",)]),
+            ("visionos-arm64", [()]),
+            ("visionos-simulator-arm64", [("metal",)]),
         ):
             commands = [
-                suite.command for suite in suites.target_suites(self.targets[preset])
+                suite.command[2:]
+                for suite in suites.target_suites(self.targets[preset])
+                if suite.task.endswith(":hermes")
             ]
             self.assertEqual(
-                commands.count(
-                    ("mise", "run", f"//bindings/typescript:{action}:hermes", preset)
-                ),
-                1,
+                commands,
+                [
+                    (
+                        f"//bindings/typescript:{'test' if backend else 'build'}:hermes",
+                        preset,
+                        *backend,
+                    )
+                    for backend in expected
+                ],
                 preset,
             )
 
@@ -364,7 +410,7 @@ class RetryTest(unittest.TestCase):
             {"name": "ci-required", "conclusion": "failure"},
             {"name": "Kotlin Maven / verify", "conclusion": "skipped"},
         ]
-        target = "target / android-x64-egl"
+        target = "target / android-x64"
         for failed in (
             ["Set up job"],
             ["Set up CI dependencies"],
@@ -390,7 +436,7 @@ class RetryTest(unittest.TestCase):
             retryable(
                 [
                     job(target, "Boot Android emulator"),
-                    job("target / ohos-x64-egl", "Set up CI dependencies"),
+                    job("target / ohos-x64", "Set up CI dependencies"),
                     *aggregates,
                 ]
             )

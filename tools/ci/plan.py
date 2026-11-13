@@ -1,12 +1,14 @@
 """Plan the CI matrix from the targets that `CMakePresets.json` defines.
 
-Each visible configure preset is a target. Its `vendor.maplibre-native-ffi`
-block, usually inherited from a hidden platform preset, names the Rubberstamp
-coverage unit that runs it, the runner label it runs on, and the device its
-suites run on, if any. A device is the name of the CI step that boots it and
-the command that step runs. `miseEnv` names the mise
+Each visible configure preset is a target: one platform's build, with every
+render backend that the platform's package carries. Its job builds the target
+once and runs each backend's suites that the runner can run. Its
+`vendor.maplibre-native-ffi` block, usually inherited from a hidden platform
+preset, names the Rubberstamp coverage unit that runs it, the runner label it
+runs on, and the device its suites run on, if any. A device is the name of the
+CI step that boots it and the command that step runs. `miseEnv` names the mise
 configuration environment that supplies the target's SDK, and `softwareGpu`
-asks for a software driver for the target's backend on a runner without a
+asks for software drivers for the target's backends on a runner without a
 GPU. This script uses only the standard library, so CI can run it with the
 runner's `python3` from a sparse checkout.
 """
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import functools
 import json
 import pathlib
 
@@ -30,12 +33,24 @@ class Target:
     preset: str
     platform: str
     architecture: str
-    backend: str
+    # The render backends that the package carries: vulkan, opengl, metal, or
+    # webgpu.
+    backends: tuple[str, ...]
+    # The backend that a suite takes when nothing names one: the platform's
+    # default, or for a browser package, the one it carries.
+    default_backend: str
+    # egl, wgl, or webgl, for a target that carries OpenGL.
+    opengl_provider: str
     unit: str
     runner: str
     device: dict[str, str] | None
     mise_env: str
     software_gpu: bool
+
+    def driver(self, backend: str) -> str:
+        """The graphics API that a backend draws through: an OpenGL backend's
+        context provider, or the backend itself."""
+        return self.opengl_provider if backend == "opengl" else backend
 
 
 def packaged(*bindings: str):
@@ -54,11 +69,14 @@ def package_platforms(binding: str, all_targets: list[Target]) -> set[str]:
     }
 
 
-def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
-    """The NuGet runtime package suffix and RID, shared with its packager."""
-    target = gaps.target_from_name(preset)
-    if gaps.gap("dotnet", target, "package"):
+def dotnet_runtime_target(preset: Target | str) -> tuple[str, str] | None:
+    """The NuGet runtime package's ID suffix, empty or `.MinGW`, and the RID,
+    shared with its packager. MinGW builds have a package of their own, since
+    they serve the RIDs of the MSVC builds."""
+    native = target_named(preset) if isinstance(preset, str) else preset
+    if not gaps.supported("dotnet", native, "package"):
         return None
+    target = gaps.cell(native, native.default_backend)
     rid_platform = {
         "linux-gnu": "linux",
         "linux-musl": "linux-musl",
@@ -72,12 +90,8 @@ def dotnet_runtime_target(preset: str) -> tuple[str, str] | None:
     }[target.platform]
     if target.simulator:
         rid_platform += "simulator"
-    package_backend = {"opengl": "OpenGL", "metal": "Metal", "vulkan": "Vulkan"}[
-        target.backend
-    ]
-    if target.platform == "windows-mingw":
-        package_backend += ".MinGW"
-    return package_backend, f"{rid_platform}-{target.arch}"
+    suffix = ".MinGW" if target.platform == "windows-mingw" else ""
+    return suffix, f"{rid_platform}-{target.arch}"
 
 
 # The jobs other than target jobs: the unit that owns each, and which targets it
@@ -94,11 +108,11 @@ JOBS = {
             and gaps.supported("kotlin-jvm", target, "package")
         ),
     ),
-    # Apple Metal archives supply the XCFramework's slices.
+    # Apple archives supply the XCFramework's slices.
     "apple-xcframework": (
         "swiftpm",
         lambda target: (
-            target.backend == "metal" and gaps.supported("c", target, "xcframework")
+            "metal" in target.backends and gaps.supported("c", target, "xcframework")
         ),
     ),
     "kotlin-maven": (
@@ -124,55 +138,55 @@ JOBS = {
     # The React Native example builds against one archive per platform.
     "react-native-android": (
         "react-native",
-        lambda target: target.preset == "android-x64-egl",
+        lambda target: target.preset == "android-x64",
     ),
     "react-native-ios": (
         "react-native",
-        lambda target: target.preset == "ios-simulator-arm64-metal",
+        lambda target: target.preset == "ios-simulator-arm64",
     ),
     # The SwiftUI example builds against one archive per platform.
     "swiftui-ios": (
         "swiftui",
-        lambda target: target.preset == "ios-simulator-arm64-metal",
+        lambda target: target.preset == "ios-simulator-arm64",
     ),
     "swiftui-macos": (
         "swiftui",
-        lambda target: target.preset == "macos-arm64-metal",
+        lambda target: target.preset == "macos-arm64",
     ),
-    # The Compose example builds against the Android x64 OpenGL ES archive.
+    # The Compose example builds against the Android x64 archive.
     "compose-android": (
         "compose",
-        lambda target: target.preset == "android-x64-egl",
+        lambda target: target.preset == "android-x64",
     ),
-    # The GTK example builds against the Linux x64 Vulkan archive.
+    # The GTK example builds against the Linux x64 archive.
     "gtk-linux": (
         "gtk",
-        lambda target: target.preset == "linux-gnu-x64-vulkan",
+        lambda target: target.preset == "linux-gnu-x64",
     ),
-    # The WPF example builds against the Windows x64 Vulkan archive.
+    # The WPF example builds against the Windows x64 archive.
     "wpf-windows": (
         "wpf",
-        lambda target: target.preset == "windows-x64-vulkan",
+        lambda target: target.preset == "windows-x64",
     ),
     # The SDL example builds against one archive per platform.
     "sdl-linux": (
         "sdl",
-        lambda target: target.preset == "linux-gnu-x64-vulkan",
+        lambda target: target.preset == "linux-gnu-x64",
     ),
     "sdl-windows": (
         "sdl",
-        lambda target: target.preset == "windows-x64-vulkan",
+        lambda target: target.preset == "windows-x64",
     ),
     "sdl-macos": (
         "sdl",
-        lambda target: target.preset == "macos-arm64-metal",
+        lambda target: target.preset == "macos-arm64",
     ),
     # The ArkUI example packs its HARs from one addon.
-    "arkui-hap": ("arkui", lambda target: target.preset == "ohos-x64-egl"),
+    "arkui-hap": ("arkui", lambda target: target.preset == "ohos-x64"),
     "swift-package": (
         "swiftpm",
         lambda target: (
-            target.backend == "metal" and gaps.supported("swift", target, "package")
+            "metal" in target.backends and gaps.supported("swift", target, "package")
         ),
     ),
     # The Linux, Android, and Windows archives supply the artifact bundles.
@@ -183,9 +197,9 @@ JOBS = {
             and gaps.supported("swift", target, "package")
         ),
     ),
-    "vcpkg-registry": ("vcpkg", lambda target: target.preset == "linux-gnu-x64-egl"),
-    "conan-recipes": ("conan", lambda target: target.preset == "linux-gnu-x64-vulkan"),
-    "xmake-package": ("xmake", lambda target: target.preset == "linux-gnu-x64-egl"),
+    "vcpkg-registry": ("vcpkg", lambda target: target.preset == "linux-gnu-x64"),
+    "conan-recipes": ("conan", lambda target: target.preset == "linux-gnu-x64"),
+    "xmake-package": ("xmake", lambda target: target.preset == "linux-gnu-x64"),
 }
 # The jobs whose artifacts a job downloads, which run whenever it does. A job
 # that a skipped one needs would skip it too, and a skip passes the required
@@ -258,15 +272,25 @@ def targets(presets: dict) -> list[Target]:
         target_platform, _, architecture = variables[
             "MLN_FFI_TARGET_PLATFORM"
         ].rpartition("-")
-        backend = variables["MLN_FFI_RENDER_BACKEND"]
-        if backend == "opengl":
-            backend = variables["MLN_FFI_OPENGL_CONTEXT_PROVIDER"]
+        backends = tuple(variables["MLN_FFI_RENDER_BACKENDS"].split(";"))
+        default_backend = variables["MLN_FFI_DEFAULT_RENDER_BACKEND"]
+        if default_backend not in backends:
+            # The browser's default backend is WebGPU, which the WebGL
+            # package lacks. Every other package carries its platform's.
+            if not variables["MLN_FFI_TARGET_PLATFORM"].startswith("web-"):
+                raise SystemExit(
+                    f"error: preset {name!r} defaults to {default_backend}, which it "
+                    f"does not carry"
+                )
+            default_backend = backends[0]
         result.append(
             Target(
                 preset=name,
                 platform=target_platform,
                 architecture=architecture,
-                backend=backend,
+                backends=backends,
+                default_backend=default_backend,
+                opengl_provider=variables.get("MLN_FFI_OPENGL_CONTEXT_PROVIDER", ""),
                 unit=vendor["unit"],
                 runner=vendor["runner"],
                 device=device,
@@ -275,6 +299,19 @@ def targets(presets: dict) -> list[Target]:
             )
         )
     return result
+
+
+@functools.cache
+def _presets() -> dict:
+    return json.loads((ROOT / "CMakePresets.json").read_text())
+
+
+def target_named(preset: str) -> Target:
+    """The target of a visible preset in this checkout's CMakePresets.json."""
+    for target in targets(_presets()):
+        if target.preset == preset:
+            return target
+    raise SystemExit(f"error: unknown preset {preset!r}")
 
 
 def consumed(job: str, all_targets: list[Target]) -> list[Target]:
@@ -287,20 +324,18 @@ def consumed(job: str, all_targets: list[Target]) -> list[Target]:
     ]
 
 
-def jvm_runtimes(all_targets: list[Target]) -> dict[str, dict[str, str]]:
-    """The desktop runtime JAR classifiers and native platforms of each backend."""
-    result: dict[str, dict[str, str]] = {}
+def jvm_runtimes(all_targets: list[Target]) -> dict[str, str]:
+    """The desktop runtime JAR classifiers, and the native platform of each."""
+    result: dict[str, str] = {}
     for target in all_targets:
         if target.platform == "android" or not gaps.supported(
             "kotlin-jvm", target, "package"
         ):
             continue
-        normalized = gaps.target_from_preset(target)
+        normalized = gaps.cell(target, target.default_backend)
         platform = normalized.platform.replace("linux-gnu", "linux")
         classifier = f"natives-{platform}-{normalized.arch}"
-        result.setdefault(normalized.backend, {})[classifier] = (
-            f"{target.platform}-{target.architecture}"
-        )
+        result[classifier] = f"{target.platform}-{target.architecture}"
     return result
 
 
@@ -351,8 +386,11 @@ def row(target: Target, save_toolchains: bool) -> dict[str, object]:
         "save_toolchains": save_toolchains,
         "zig": zig,
         "mise_env": target.mise_env,
-        # The backend that the software driver serves.
-        "software_gpu": target.backend if target.software_gpu else "",
+        # The graphics APIs, such as vulkan and egl, whose software drivers
+        # the suites draw with, separated by commas.
+        "software_gpu": ",".join(target.driver(backend) for backend in target.backends)
+        if target.software_gpu
+        else "",
         # `setup-gradle` restores a Gradle user home and stops the daemons in
         # its post-action, so Windows file locks do not outlive the job. A row
         # with no Gradle build pays that setup and teardown for an empty cache
@@ -365,7 +403,7 @@ def row(target: Target, save_toolchains: bool) -> dict[str, object]:
         "device_command": target.device["command"] if target.device else "",
         "addon": addon(target),
         "python_wheel": python_wheel(target),
-        "gobject_archive": gobject_archive(target.preset) or "",
+        "gobject_archive": gobject_archive(target) or "",
         # devices-cli writes the logs of the Android emulators it boots.
         "emulator_logs": target.platform == "android" and target.device is not None,
     }
@@ -428,7 +466,7 @@ def main() -> int:
         help="Print native platform IDs with no package gap for a binding, one per line",
     )
     args = parser.parse_args()
-    presets = json.loads((ROOT / "CMakePresets.json").read_text())
+    presets = _presets()
     if args.jvm_runtimes:
         print(json.dumps(jvm_runtimes(targets(presets))))
     elif args.package_platforms:

@@ -416,10 +416,10 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           gradle: false
-      - name: Download Apple Metal native artifacts
+      - name: Download Apple native artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: native-package-*-metal-${{ github.sha }}
+          pattern: native-package-{macos,ios,tvos,visionos}-*-${{ github.sha }}
           path: build/packages/native/xcframework-input
       - run: mise run package-xcframework build/packages/native/xcframework-input
       - name: Upload XCFramework
@@ -518,7 +518,7 @@ jobs:
       - name: Download native archive
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-linux-gnu-x64-egl-${{ github.sha }}
+          name: native-package-linux-gnu-x64-${{ github.sha }}
           path: build/packages/native/vcpkg-input
       - name: Install vcpkg
         run: |
@@ -548,13 +548,13 @@ jobs:
           install_args: python aqua:astral-sh/uv aqua:Kitware/CMake
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
+          name: native-package-linux-gnu-x64-${{ github.sha }}
           path: build/packages/native/conan-input
       - name: Resolve the recipe and build a CMakeDeps consumer
         run: >-
           mise exec --no-deps -- uv tool run --from conan==2.33.0
           python tools/release/check_conan.py
-          build/packages/native/conan-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
+          build/packages/native/conan-input/maplibre-native-c-linux-gnu-x64.tar.gz
   xmake-package:
     name: package / xmake
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -582,12 +582,12 @@ jobs:
       - name: Download native archive
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-linux-gnu-x64-egl-${{ github.sha }}
+          name: native-package-linux-gnu-x64-${{ github.sha }}
           path: build/packages/native/xmake-input
       - name: Build and run the xmake consumer
         run: >-
           mise exec --no-deps python -- python tools/release/test_xmake_package.py
-          build/packages/native/xmake-input/maplibre-native-c-linux-gnu-x64-egl.tar.gz
+          build/packages/native/xmake-input/maplibre-native-c-linux-gnu-x64.tar.gz
   # Every run stages at the snapshot version, because snapshot publication
   # reuses the verified repository of a run on main.
   kotlin-maven:
@@ -686,11 +686,11 @@ jobs:
           zig: skip
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-android-x64-egl-${{ github.sha }}
+          name: native-package-android-x64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package android-x64-egl
-          build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
+          mise run --no-deps install-native-package android-x64
+          build/packages/native/dist/maplibre-native-c-android-x64.tar.gz
       - run: mise run //examples/react-native:build-android x64
   react-native-ios:
     name: example / react-native ios
@@ -714,11 +714,11 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-ios-simulator-arm64-metal-${{ github.sha }}
+          name: native-package-ios-simulator-arm64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package ios-simulator-arm64-metal
-          build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
+          mise run --no-deps install-native-package ios-simulator-arm64
+          build/packages/native/dist/maplibre-native-c-ios-simulator-arm64.tar.gz
       - run: mise run //examples/react-native:build-ios
   # The SwiftUI example builds against the archive that a target job built
   # and tested. It doesn't run the app.
@@ -744,11 +744,11 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-ios-simulator-arm64-metal-${{ github.sha }}
+          name: native-package-ios-simulator-arm64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package ios-simulator-arm64-metal
-          build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
+          mise run --no-deps install-native-package ios-simulator-arm64
+          build/packages/native/dist/maplibre-native-c-ios-simulator-arm64.tar.gz
       - run: mise run //examples/swiftui:build-ios
   swiftui-macos:
     name: example / swiftui macos
@@ -772,11 +772,11 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-macos-arm64-metal-${{ github.sha }}
+          name: native-package-macos-arm64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package macos-arm64-metal
-          build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
+          mise run --no-deps install-native-package macos-arm64
+          build/packages/native/dist/maplibre-native-c-macos-arm64.tar.gz
       - run: mise run //examples/swiftui:build-macos
   # The Compose example builds the Kotlin binding and its OpenGL runtime from
   # this checkout against the archive that a target job built and tested. It
@@ -803,11 +803,11 @@ jobs:
           zig: skip
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-android-x64-egl-${{ github.sha }}
+          name: native-package-android-x64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package android-x64-egl
-          build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
+          mise run --no-deps install-native-package android-x64
+          build/packages/native/dist/maplibre-native-c-android-x64.tar.gz
       - run: mise run //examples/compose:build-android x64
   # The GTK example builds the GObject library and the app against the archive
   # that a target job built and tested. It doesn't run the app.
@@ -833,12 +833,12 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
+          name: native-package-linux-gnu-x64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package linux-gnu-x64-vulkan
-          build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
-      - run: mise run //examples/gtk:build linux-gnu-x64-vulkan
+          mise run --no-deps install-native-package linux-gnu-x64
+          build/packages/native/dist/maplibre-native-c-linux-gnu-x64.tar.gz
+      - run: mise run //examples/gtk:build linux-gnu-x64
   # The WPF example builds on Linux against the archive that a target job built
   # and tested. It doesn't run the app.
   wpf-windows:
@@ -863,12 +863,12 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-windows-x64-vulkan-${{ github.sha }}
+          name: native-package-windows-x64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package windows-x64-vulkan
-          build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
-      - run: mise run //examples/wpf:build windows-x64-vulkan
+          mise run --no-deps install-native-package windows-x64
+          build/packages/native/dist/maplibre-native-c-windows-x64.tar.gz
+      - run: mise run //examples/wpf:build windows-x64
   # The SDL example builds against the archive that a target job built and
   # tested, on each platform's own runner. It doesn't run the app.
   sdl-linux:
@@ -892,12 +892,12 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
+          name: native-package-linux-gnu-x64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package linux-gnu-x64-vulkan
-          build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
-      - run: mise run //examples/sdl:build linux-gnu-x64-vulkan
+          mise run --no-deps install-native-package linux-gnu-x64
+          build/packages/native/dist/maplibre-native-c-linux-gnu-x64.tar.gz
+      - run: mise run //examples/sdl:build linux-gnu-x64
   sdl-windows:
     name: example / sdl windows
     runs-on: blacksmith-4vcpu-windows-2025
@@ -919,12 +919,12 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-windows-x64-vulkan-${{ github.sha }}
+          name: native-package-windows-x64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package windows-x64-vulkan
-          build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
-      - run: mise run //examples/sdl:build windows-x64-vulkan
+          mise run --no-deps install-native-package windows-x64
+          build/packages/native/dist/maplibre-native-c-windows-x64.tar.gz
+      - run: mise run //examples/sdl:build windows-x64
   sdl-macos:
     name: example / sdl macos
     runs-on: blacksmith-6vcpu-macos-26
@@ -946,12 +946,12 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: native-package-macos-arm64-metal-${{ github.sha }}
+          name: native-package-macos-arm64-${{ github.sha }}
           path: build/packages/native/dist
       - run: >-
-          mise run --no-deps install-native-package macos-arm64-metal
-          build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
-      - run: mise run //examples/sdl:build macos-arm64-metal
+          mise run --no-deps install-native-package macos-arm64
+          build/packages/native/dist/maplibre-native-c-macos-arm64.tar.gz
+      - run: mise run //examples/sdl:build macos-arm64
   # The ArkUI example builds against the OHPM packages packed from the addon
   # that a target job built and tested. It doesn't run the app.
   arkui-hap:
@@ -977,9 +977,9 @@ jobs:
           gradle: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: arkts-addon-ohos-x64-egl-${{ github.sha }}
-          path: bindings/typescript/native/build/ohos-x64-egl/install
-      - run: mise run //examples/arkui:build ohos-x64-egl
+          name: arkts-addon-ohos-x64-${{ github.sha }}
+          path: bindings/typescript/native/build/ohos-x64/install
+      - run: mise run //examples/arkui:build ohos-x64
   # A skipped job passes a required check, so a failed plan must fail this one.
   required:
     name: ci-required
