@@ -174,9 +174,9 @@ Test a patch with mln-rs's own tests, which `cargo test` runs from
 the pull request.
 
 To update mln-rs, check out the commit in the submodule, run `mise deps` to
-reapply the patches, and run the C tests. mln-rs's ABI test lists in
-`tools/c-abi-test/expected-failures*.txt` say which cases to expect in
-`tests/native/expected-failures/`.
+reapply the patches, and run the C tests. mln-rs runs a copy of the ABI suite
+in `tools/c-abi-test`, which it passes completely, so the lists here hold only
+the exit programs and the platforms that its copy doesn't run.
 
 ## CI
 
