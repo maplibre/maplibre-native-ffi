@@ -2,16 +2,13 @@
 #MISE description="Build the Dart binding in a Flutter mobile application."
 #MISE depends=[{ task = "//:build", args = ["{{usage.preset}}"] }, { task = ":_native-prefix", args = ["{{usage.preset}}"] }]
 #MISE shell="bash"
-#USAGE arg "[preset]" {
+#USAGE arg "<preset>" {
 #USAGE   choices \
-#USAGE     "android-arm-egl" \
-#USAGE     "android-arm-vulkan" \
-#USAGE     "android-arm64-egl" \
-#USAGE     "android-arm64-vulkan" \
-#USAGE     "android-x64-egl" \
-#USAGE     "android-x64-vulkan" \
-#USAGE     "ios-arm64-metal" \
-#USAGE     "ios-simulator-arm64-metal"
+#USAGE     "android-arm" \
+#USAGE     "android-arm64" \
+#USAGE     "android-x64" \
+#USAGE     "ios-arm64" \
+#USAGE     "ios-simulator-arm64"
 #USAGE }
 set -euo pipefail
 
@@ -29,19 +26,19 @@ cd "$app"
 flutter pub get
 
 case "$usage_preset" in
-  android-arm-*)
+  android-arm)
     flutter build apk --release --target-platform android-arm
     ;;
-  android-arm64-*)
+  android-arm64)
     flutter build apk --release --target-platform android-arm64
     ;;
-  android-x64-*)
+  android-x64)
     flutter build apk --release --target-platform android-x64
     ;;
-  ios-arm64-*)
+  ios-arm64)
     flutter build ios --release --no-codesign
     ;;
-  ios-simulator-arm64-*)
+  ios-simulator-arm64)
     # Flutter prepares native assets for every standard simulator architecture
     # before Xcode narrows a debug build to the active architecture.
     printf '\nARCHS = arm64\n' >>ios/Flutter/Debug.xcconfig

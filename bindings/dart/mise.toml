@@ -37,12 +37,9 @@ run = 'python3 "$MISE_MONOREPO_ROOT/tools/release/dart_release.py" . "$usage_tag
 depends = [":analyze"]
 
 [tasks."test:android"]
-description = "Run portable Dart binding suites in a Flutter Android host."
-usage = '''
-arg "<preset>" {
-  choices "android-arm64-egl" "android-arm64-vulkan" "android-x64-egl" "android-x64-vulkan"
-}
-'''
+description = "Run portable Dart binding suites in a Flutter Android host, with one of the preset's render backends."
+extends = "ffi:test"
+# A task's depends replace the template's, so these name the native build too.
 depends = [
   { task = "//:build", args = [
     "{{usage.preset}}",
@@ -52,6 +49,7 @@ depends = [
   ] },
 ]
 run = '''
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 exec "$MISE_MONOREPO_ROOT/scripts/test-dart-android-device.sh" "$usage_preset"
 '''
 
@@ -68,7 +66,8 @@ ln -s "$MISE_MONOREPO_ROOT/build/$usage_preset/install" .dart_tool/native
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+description = "Test the Dart binding against a native preset's install, with one of its render backends."
+extends = "ffi:test"
 depends = [
   { task = "//:build", args = [
     "{{usage.preset}}",
@@ -80,15 +79,17 @@ depends = [
   ":check-publish",
 ]
 run = '''
-if [[ "$usage_preset" == macos-x64-* ]]; then
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+if [[ "$usage_preset" == macos-x64 ]]; then
   exec mise run :_test-macos-x64
 fi
-if [[ "$usage_preset" == linux-gnu-riscv64-* ]]; then
+if [[ "$usage_preset" == linux-gnu-riscv64 ]]; then
   # Build hooks strip QEMU's loader environment, so run inside the target OS.
   exec docker run --rm --platform linux/riscv64 \
     --volume "$MISE_MONOREPO_ROOT:$MISE_MONOREPO_ROOT" \
     --volume "${PUB_CACHE:-$HOME/.pub-cache}:${PUB_CACHE:-$HOME/.pub-cache}:ro" \
     --env PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}" \
+    --env MLN_FFI_TEST_BACKEND \
     --workdir "$PWD" \
     "dart:{{vars.dart_version}}" sh -euc '
       # LLVM 19 lavapipe fails to JIT RISC-V shaders; match the QEMU roots.
@@ -103,6 +104,7 @@ fi
 exec dart test
 '''
 run_windows = '''
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 # The DLL loads its own dependencies from the prefix it was installed into.
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
 dart test

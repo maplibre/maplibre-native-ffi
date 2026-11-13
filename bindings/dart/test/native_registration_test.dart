@@ -16,7 +16,7 @@ typedef _ContextCallback = Void Function(Pointer<Void>);
 final _size = LogicalSize(width: renderSize, height: renderSize);
 
 /// Only a Vulkan device takes a queue lock.
-final Object _vulkanSkip = buildAttachesVulkan
+final Object _vulkanSkip = vulkanUnderTest
     ? false
     : 'Only a Vulkan device takes a queue lock';
 

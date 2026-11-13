@@ -77,7 +77,7 @@ Future<void> main(List<String> arguments) async {
   });
 }
 
-/// Names the platform half of the preset serving [code].
+/// Names the platform that [code] targets, as a native descriptor does.
 String _targetPlatform(CodeConfig code) {
   final architecture = switch (code.targetArchitecture) {
     Architecture.x64 => 'x64',
@@ -92,6 +92,9 @@ String _targetPlatform(CodeConfig code) {
   };
 }
 
+/// The backend that the application selects for [os], which the served
+/// library must carry, or null to take a library with the platform's default
+/// backend.
 String? _selectedBackend(BuildInput input, OS os) =>
     switch (input.userDefines['backend']) {
       null => null,
@@ -130,24 +133,22 @@ Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
   final request = _request(platform, backend);
   if (_descriptor(directory).existsSync()) {
     // A prefix serves one platform, so a build for several targets names a
-    // directory of installs instead. Only a selected backend can conflict;
-    // without one, the prefix's own backend serves.
+    // directory of installs instead. Without a selected backend, the prefix
+    // serves with whichever backends it carries.
     final descriptor = _readDescriptor(directory);
     final built = _platform(descriptor);
+    final backends = _backends(descriptor);
     if (!_matchesLocalPlatform(built['id'], platform) ||
-        (backend != null && descriptor['backend'] != backend)) {
+        (backend != null && !backends.contains(backend))) {
       throw StateError(
         '$_defines.local_build names an install prefix built for '
-        '${built['id']} ${descriptor['backend']}, '
+        '${built['id']} with ${backends.join(', ')}, '
         'which cannot serve $request.',
       );
     }
     return directory;
   }
 
-  // Without a selected backend, only the target's default backend serves, so
-  // that building another backend under the same directory never changes
-  // which install an unchanged request gets.
   final root = Directory.fromUri(directory);
   final matches = [
     if (root.existsSync())
@@ -177,10 +178,10 @@ Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
 
 String _request(String platform, String? backend) => backend == null
     ? '$platform with its default backend'
-    : '$platform $backend';
+    : '$platform with $backend';
 
-/// Whether [descriptor] serves [platform] with the [backend] selected for it,
-/// or without one, with the platform's default backend.
+/// Whether [descriptor] describes an install for [platform] that carries the
+/// [backend] selected for it, or without one, the platform's default backend.
 bool _serves(
   Map<String, Object?> descriptor,
   String platform,
@@ -188,8 +189,12 @@ bool _serves(
 ) {
   final built = _platform(descriptor);
   return _matchesLocalPlatform(built['id'], platform) &&
-      descriptor['backend'] == (backend ?? built['defaultBackend']);
+      _backends(descriptor).contains(backend ?? built['defaultBackend']);
 }
+
+/// The render backends that an install or a release archive carries.
+List<String> _backends(Map<String, Object?> entry) =>
+    (entry['backends']! as List<Object?>).cast<String>();
 
 // A local Windows DLL uses the same C ABI whether MSVC or MinGW built it.
 bool _matchesLocalPlatform(Object? built, String requested) =>
@@ -206,8 +211,9 @@ Map<String, Object?> _readDescriptor(Uri prefix) =>
 File _descriptor(Uri prefix) =>
     File.fromUri(prefix.resolve('share/maplibre-native-c/artifact.json'));
 
-/// Downloads and unpacks the pinned release's archive for [platform] with the
-/// [backend] selected for it, unless an earlier build already did.
+/// Downloads and unpacks the pinned release's archive for [platform] that
+/// carries the [backend] selected for it, or without one, the platform's
+/// default backend, unless an earlier build already did.
 Future<Uri> _download(
   BuildInput input,
   BuildOutputBuilder output,
@@ -234,7 +240,8 @@ Future<Uri> _download(
     if (published != null)
       for (final entry
           in (pin['artifacts']! as List<Object?>).cast<Map<String, Object?>>())
-        if (entry['platform'] == platform && entry['backend'] == wanted) entry,
+        if (entry['platform'] == platform && _backends(entry).contains(wanted))
+          entry,
   ];
   if (entries.length != 1) {
     throw UnsupportedError(

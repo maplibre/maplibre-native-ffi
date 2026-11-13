@@ -20,8 +20,8 @@ INDEX = {
     "artifacts": [
         {
             "platform": "android-arm64",
-            "backend": "opengl",
-            "archive": "maplibre-native-c-android-arm64-egl.tar.gz",
+            "backends": ["vulkan", "opengl"],
+            "archive": "maplibre-native-c-android-arm64.tar.gz",
             "sha256": "aaa",
         }
     ],
