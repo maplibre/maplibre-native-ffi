@@ -211,7 +211,7 @@ static void a_session_presents_to_a_window_that_the_host_let_go_of(void) {
     );
     mln_test_completion completion = mln_test_completion_default(0);
     const mln_status attached = start_attach(
-      map, consumer.window, 0, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER,
+      map, consumer.window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER,
       &completion, &fixture
     );
     (void)OH_NativeWindow_NativeObjectUnreference(consumer.window);
@@ -289,7 +289,7 @@ static void a_session_survives_a_window_whose_consumer_went_away(void) {
       )
     );
     consumer_create(&second);
-    set_window(&fixture, second.window, 0);
+    set_window(&fixture, second.window);
     render_frame(&fixture);
     expect_red_frame(&second);
   }
