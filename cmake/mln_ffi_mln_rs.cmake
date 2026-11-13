@@ -357,6 +357,16 @@ function(mln_ffi_add_c_api_library target)
     message(
       FATAL_ERROR "The build needs MLN_FFI_RUST_TARGET, which the preset sets")
   endif()
+  # See the Emscripten entry in docs/support-gaps.toml.
+  if(EMSCRIPTEN)
+    message(
+      FATAL_ERROR
+        "The Emscripten presets are disabled: mln-rs doesn't build for "
+        "wasm32-unknown-emscripten. Its browser build targets "
+        "wasm32-unknown-unknown with wasm-bindgen, and its OpenGL and storage "
+        "crates take those paths for every wasm32 target, while the browser "
+        "builds here link Emscripten modules with pthreads.")
+  endif()
   set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/build/cargo"
       CACHE PATH "Cargo target directory for mln-rs")
 
