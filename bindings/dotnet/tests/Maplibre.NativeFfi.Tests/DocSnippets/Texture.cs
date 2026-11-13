@@ -118,8 +118,14 @@ internal static class Texture
                 // Your new textures, at the new size.
                 Textures =
                 [
-                    new VulkanBorrowedTexture(newImages[0], newViews[0]),
-                    new VulkanBorrowedTexture(newImages[1], newViews[1]),
+                    new VulkanBorrowedTexture(
+                        newImages[0],
+                        newViews[0]
+                    ),
+                    new VulkanBorrowedTexture(
+                        newImages[1],
+                        newViews[1]
+                    ),
                 ],
                 Format = 37,
                 FinalLayout = 5,

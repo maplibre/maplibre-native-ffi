@@ -387,9 +387,7 @@ internal sealed class RenderFixture : IDisposable
                         PhysicalHeight = first.Height,
                         Textures =
                         [
-                            .. infos.Select(info => new OpenGlBorrowedTexture(
-                                info.OpenGlTexture
-                            )),
+                            .. infos.Select(info => new OpenGlBorrowedTexture(info.OpenGlTexture)),
                         ],
                         Target = first.OpenGlTarget,
                     }

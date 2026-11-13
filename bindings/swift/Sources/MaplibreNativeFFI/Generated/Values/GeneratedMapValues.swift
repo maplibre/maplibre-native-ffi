@@ -11,33 +11,52 @@ public struct AnchoredMomentum: Equatable, Hashable, Sendable {
   /// How fast the value changed at release: zoom levels per second for zoom,
   /// and degrees per second for bearing and pitch. The part moves only when
   /// this is set.
-  public var `velocity`: Double?
+  public var velocity: Double?
   /// The screen point that the change keeps in place. Without one, the change
   /// keeps the center of the view in place.
-  public var `anchor`: ScreenPoint?
-  public var `decay`: MomentumDecay
+  public var anchor: ScreenPoint?
+  public var decay: MomentumDecay
   /// Where the part settles. Without this, it stays where the gesture and its
   /// glide leave it.
-  public var `snap`: MomentumSnap?
-  public init(`velocity`: Double? = nil, `anchor`: ScreenPoint? = nil, `decay`: MomentumDecay = .init(), `snap`: MomentumSnap? = nil) {
-    self.`velocity` = `velocity`
-    self.`anchor` = `anchor`
-    self.`decay` = `decay`
-    self.`snap` = `snap`
+  public var snap: MomentumSnap?
+  public init(
+    velocity: Double? = nil,
+    anchor: ScreenPoint? = nil,
+    decay: MomentumDecay = .init(),
+    snap: MomentumSnap? = nil
+  ) {
+    self.velocity = velocity
+    self.anchor = anchor
+    self.decay = decay
+    self.snap = snap
   }
+
   init(raw: mln_anchored_momentum) {
-    self.`velocity` = raw.`fields` & MLN_ANCHORED_MOMENTUM_VELOCITY.rawValue != 0 ? raw.`velocity` : nil
-    self.`anchor` = raw.`fields` & MLN_ANCHORED_MOMENTUM_ANCHOR.rawValue != 0 ? ScreenPoint(raw: raw.`anchor`) : nil
-    self.`decay` = MomentumDecay(raw: raw.`decay`)
-    self.`snap` = raw.`fields` & MLN_ANCHORED_MOMENTUM_SNAP.rawValue != 0 ? MomentumSnap(raw: raw.`snap`) : nil
+    velocity = raw.fields & MLN_ANCHORED_MOMENTUM_VELOCITY.rawValue != 0 ? raw
+      .velocity : nil
+    anchor = raw.fields & MLN_ANCHORED_MOMENTUM_ANCHOR
+      .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
+    decay = MomentumDecay(raw: raw.decay)
+    snap = raw.fields & MLN_ANCHORED_MOMENTUM_SNAP
+      .rawValue != 0 ? MomentumSnap(raw: raw.snap) : nil
   }
+
   func nativeValue() -> mln_anchored_momentum {
     var raw = mln_anchored_momentum()
     raw.fields = 0
-    if let item = self.`velocity` { raw.`fields` |= MLN_ANCHORED_MOMENTUM_VELOCITY.rawValue; raw.`velocity` = item }
-    if let item = self.`anchor` { raw.`fields` |= MLN_ANCHORED_MOMENTUM_ANCHOR.rawValue; raw.`anchor` = item.nativeValue() }
-    raw.`decay` = self.`decay`.nativeValue()
-    if let item = self.`snap` { raw.`fields` |= MLN_ANCHORED_MOMENTUM_SNAP.rawValue; raw.`snap` = item.nativeValue() }
+    if let item = velocity {
+      raw.fields |= MLN_ANCHORED_MOMENTUM_VELOCITY.rawValue; raw
+        .velocity = item
+    }
+    if let item = anchor {
+      raw.fields |= MLN_ANCHORED_MOMENTUM_ANCHOR.rawValue; raw.anchor = item
+        .nativeValue()
+    }
+    raw.decay = decay.nativeValue()
+    if let item = snap {
+      raw.fields |= MLN_ANCHORED_MOMENTUM_SNAP.rawValue; raw.snap = item
+        .nativeValue()
+    }
     return raw
   }
 }
@@ -47,41 +66,66 @@ public struct AnchoredMomentum: Equatable, Hashable, Sendable {
 /// See `mln_animation_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct AnimationOptions: Sendable {
-  public var `durationMs`: Double?
+  public var durationMs: Double?
   /// The average speed of a fly animation, in screens per second. `duration_ms`
   /// overrides it.
-  public var `velocity`: Double?
+  public var velocity: Double?
   /// The zoom level at the peak of a fly animation.
-  public var `minZoom`: Double?
+  public var minZoom: Double?
   /// The longest a fly animation may take. A fly animation whose duration, set
   /// or derived from `velocity`, is longer moves the camera at once instead,
   /// and so does one too slow for the library to time, without this field.
   /// Other animations ignore it.
-  public var `maxDurationMs`: Double?
-  public var `easing`: UnitBezier?
+  public var maxDurationMs: Double?
+  public var easing: UnitBezier?
   /// An ID that `MapHandle.cancelCameraTransitionsWithId()` cancels the change
   /// by. Several changes can share one.
-  public var `transitionId`: UInt64?
-  public var `endHandler`: CameraTransitionHandler
-  public init(`durationMs`: Double? = nil, `velocity`: Double? = nil, `minZoom`: Double? = nil, `maxDurationMs`: Double? = nil, `easing`: UnitBezier? = nil, `transitionId`: UInt64? = nil, `endHandler`: CameraTransitionHandler = .init()) {
-    self.`durationMs` = `durationMs`
-    self.`velocity` = `velocity`
-    self.`minZoom` = `minZoom`
-    self.`maxDurationMs` = `maxDurationMs`
-    self.`easing` = `easing`
-    self.`transitionId` = `transitionId`
-    self.`endHandler` = `endHandler`
+  public var transitionId: UInt64?
+  public var endHandler: CameraTransitionHandler
+  public init(
+    durationMs: Double? = nil,
+    velocity: Double? = nil,
+    minZoom: Double? = nil,
+    maxDurationMs: Double? = nil,
+    easing: UnitBezier? = nil,
+    transitionId: UInt64? = nil,
+    endHandler: CameraTransitionHandler = .init()
+  ) {
+    self.durationMs = durationMs
+    self.velocity = velocity
+    self.minZoom = minZoom
+    self.maxDurationMs = maxDurationMs
+    self.easing = easing
+    self.transitionId = transitionId
+    self.endHandler = endHandler
   }
+
   func nativeValue(arena: NativeInputArena) throws -> mln_animation_options {
     var raw = mln_animation_options()
-    raw.`fields` = 0
-    if let item = self.`durationMs` { raw.`fields` |= MLN_ANIMATION_OPTION_DURATION.rawValue; raw.`duration_ms` = item }
-    if let item = self.`velocity` { raw.`fields` |= MLN_ANIMATION_OPTION_VELOCITY.rawValue; raw.`velocity` = item }
-    if let item = self.`minZoom` { raw.`fields` |= MLN_ANIMATION_OPTION_MIN_ZOOM.rawValue; raw.`min_zoom` = item }
-    if let item = self.`maxDurationMs` { raw.`fields` |= MLN_ANIMATION_OPTION_MAX_DURATION.rawValue; raw.`max_duration_ms` = item }
-    if let item = self.`easing` { raw.`fields` |= MLN_ANIMATION_OPTION_EASING.rawValue; raw.`easing` = item.nativeValue() }
-    if let item = self.`transitionId` { raw.`fields` |= MLN_ANIMATION_OPTION_TRANSITION_ID.rawValue; raw.`transition_id` = item }
-    raw.`end_handler` = try self.`endHandler`.nativeValue(arena: arena)
+    raw.fields = 0
+    if let item = durationMs {
+      raw.fields |= MLN_ANIMATION_OPTION_DURATION.rawValue; raw
+        .duration_ms = item
+    }
+    if let item = velocity {
+      raw.fields |= MLN_ANIMATION_OPTION_VELOCITY.rawValue; raw.velocity = item
+    }
+    if let item = minZoom {
+      raw.fields |= MLN_ANIMATION_OPTION_MIN_ZOOM.rawValue; raw.min_zoom = item
+    }
+    if let item = maxDurationMs {
+      raw.fields |= MLN_ANIMATION_OPTION_MAX_DURATION.rawValue; raw
+        .max_duration_ms = item
+    }
+    if let item = easing {
+      raw.fields |= MLN_ANIMATION_OPTION_EASING.rawValue; raw.easing = item
+        .nativeValue()
+    }
+    if let item = transitionId {
+      raw.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID.rawValue; raw
+        .transition_id = item
+    }
+    raw.end_handler = try endHandler.nativeValue(arena: arena)
     return raw
   }
 }
@@ -92,41 +136,68 @@ public struct AnimationOptions: Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct BoundOptions: Equatable, Hashable, Sendable {
   /// Removes the area that limits the camera's center.
-  public var `unbounded`: Bool
+  public var unbounded: Bool
   /// The area that the camera's center stays within.
-  public var `bounds`: LatLngBounds?
-  public var `minZoom`: Double?
-  public var `maxZoom`: Double?
+  public var bounds: LatLngBounds?
+  public var minZoom: Double?
+  public var maxZoom: Double?
   /// The lowest pitch, in degrees.
-  public var `minPitch`: Double?
+  public var minPitch: Double?
   /// The highest pitch, in degrees.
-  public var `maxPitch`: Double?
-  public init(`unbounded`: Bool = false, `bounds`: LatLngBounds? = nil, `minZoom`: Double? = nil, `maxZoom`: Double? = nil, `minPitch`: Double? = nil, `maxPitch`: Double? = nil) {
-    self.`unbounded` = `unbounded`
-    self.`bounds` = `bounds`
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
-    self.`minPitch` = `minPitch`
-    self.`maxPitch` = `maxPitch`
+  public var maxPitch: Double?
+  public init(
+    unbounded: Bool = false,
+    bounds: LatLngBounds? = nil,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    minPitch: Double? = nil,
+    maxPitch: Double? = nil
+  ) {
+    self.unbounded = unbounded
+    self.bounds = bounds
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.minPitch = minPitch
+    self.maxPitch = maxPitch
   }
+
   init(raw: mln_bound_options) {
-    self.`unbounded` = raw.fields & MLN_BOUND_OPTION_UNBOUNDED.rawValue != 0
-    self.`bounds` = raw.`fields` & MLN_BOUND_OPTION_BOUNDS.rawValue != 0 ? LatLngBounds(raw: raw.`bounds`) : nil
-    self.`minZoom` = raw.`fields` & MLN_BOUND_OPTION_MIN_ZOOM.rawValue != 0 ? raw.`min_zoom` : nil
-    self.`maxZoom` = raw.`fields` & MLN_BOUND_OPTION_MAX_ZOOM.rawValue != 0 ? raw.`max_zoom` : nil
-    self.`minPitch` = raw.`fields` & MLN_BOUND_OPTION_MIN_PITCH.rawValue != 0 ? raw.`min_pitch` : nil
-    self.`maxPitch` = raw.`fields` & MLN_BOUND_OPTION_MAX_PITCH.rawValue != 0 ? raw.`max_pitch` : nil
+    unbounded = raw.fields & MLN_BOUND_OPTION_UNBOUNDED.rawValue != 0
+    bounds = raw.fields & MLN_BOUND_OPTION_BOUNDS
+      .rawValue != 0 ? LatLngBounds(raw: raw.bounds) : nil
+    minZoom = raw.fields & MLN_BOUND_OPTION_MIN_ZOOM.rawValue != 0 ? raw
+      .min_zoom : nil
+    maxZoom = raw.fields & MLN_BOUND_OPTION_MAX_ZOOM.rawValue != 0 ? raw
+      .max_zoom : nil
+    minPitch = raw.fields & MLN_BOUND_OPTION_MIN_PITCH.rawValue != 0 ? raw
+      .min_pitch : nil
+    maxPitch = raw.fields & MLN_BOUND_OPTION_MAX_PITCH.rawValue != 0 ? raw
+      .max_pitch : nil
   }
+
   func nativeValue() -> mln_bound_options {
     var raw = mln_bound_options()
     raw.fields = 0
-    if `unbounded` { raw.fields |= MLN_BOUND_OPTION_UNBOUNDED.rawValue }
-    raw.`size` = UInt32(MemoryLayout<mln_bound_options>.size)
-    if let item = self.`bounds` { raw.`fields` |= MLN_BOUND_OPTION_BOUNDS.rawValue; raw.`bounds` = item.nativeValue() }
-    if let item = self.`minZoom` { raw.`fields` |= MLN_BOUND_OPTION_MIN_ZOOM.rawValue; raw.`min_zoom` = item }
-    if let item = self.`maxZoom` { raw.`fields` |= MLN_BOUND_OPTION_MAX_ZOOM.rawValue; raw.`max_zoom` = item }
-    if let item = self.`minPitch` { raw.`fields` |= MLN_BOUND_OPTION_MIN_PITCH.rawValue; raw.`min_pitch` = item }
-    if let item = self.`maxPitch` { raw.`fields` |= MLN_BOUND_OPTION_MAX_PITCH.rawValue; raw.`max_pitch` = item }
+    if unbounded {
+      raw.fields |= MLN_BOUND_OPTION_UNBOUNDED.rawValue
+    }
+    raw.size = UInt32(MemoryLayout<mln_bound_options>.size)
+    if let item = bounds {
+      raw.fields |= MLN_BOUND_OPTION_BOUNDS.rawValue; raw.bounds = item
+        .nativeValue()
+    }
+    if let item = minZoom {
+      raw.fields |= MLN_BOUND_OPTION_MIN_ZOOM.rawValue; raw.min_zoom = item
+    }
+    if let item = maxZoom {
+      raw.fields |= MLN_BOUND_OPTION_MAX_ZOOM.rawValue; raw.max_zoom = item
+    }
+    if let item = minPitch {
+      raw.fields |= MLN_BOUND_OPTION_MIN_PITCH.rawValue; raw.min_pitch = item
+    }
+    if let item = maxPitch {
+      raw.fields |= MLN_BOUND_OPTION_MAX_PITCH.rawValue; raw.max_pitch = item
+    }
     return raw
   }
 }
@@ -136,55 +207,76 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
 /// See `mln_camera` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct Camera: Equatable, Hashable, Sendable {
-  public var `center`: LatLng
+  public var center: LatLng
   /// The altitude of the center, in meters above sea level.
-  public var `centerAltitude`: Double
+  public var centerAltitude: Double
   /// Insets from the map's edges. The camera centers within the rest.
-  public var `padding`: EdgeInsets
-  public var `zoom`: Double
+  public var padding: EdgeInsets
+  public var zoom: Double
   /// The rotation from north, in degrees.
-  public var `bearing`: Double
+  public var bearing: Double
   /// The tilt toward the horizon, in degrees. 0 looks straight down.
-  public var `pitch`: Double
+  public var pitch: Double
   /// The roll, in degrees.
-  public var `roll`: Double
+  public var roll: Double
   /// The vertical field of view, in degrees.
-  public var `fieldOfView`: Double
-  public init(`center`: LatLng = .init(), `centerAltitude`: Double = 0, `padding`: EdgeInsets = .init(), `zoom`: Double = 0, `bearing`: Double = 0, `pitch`: Double = 0, `roll`: Double = 0, `fieldOfView`: Double = 0) {
-    self.`center` = `center`
-    self.`centerAltitude` = `centerAltitude`
-    self.`padding` = `padding`
-    self.`zoom` = `zoom`
-    self.`bearing` = `bearing`
-    self.`pitch` = `pitch`
-    self.`roll` = `roll`
-    self.`fieldOfView` = `fieldOfView`
+  public var fieldOfView: Double
+  public init(
+    center: LatLng = .init(),
+    centerAltitude: Double = 0,
+    padding: EdgeInsets = .init(),
+    zoom: Double = 0,
+    bearing: Double = 0,
+    pitch: Double = 0,
+    roll: Double = 0,
+    fieldOfView: Double = 0
+  ) {
+    self.center = center
+    self.centerAltitude = centerAltitude
+    self.padding = padding
+    self.zoom = zoom
+    self.bearing = bearing
+    self.pitch = pitch
+    self.roll = roll
+    self.fieldOfView = fieldOfView
   }
+
   init(raw: mln_camera) {
-    self.`center` = LatLng(raw: raw.`center`)
-    self.`centerAltitude` = raw.`center_altitude`
-    self.`padding` = EdgeInsets(raw: raw.`padding`)
-    self.`zoom` = raw.`zoom`
-    self.`bearing` = raw.`bearing`
-    self.`pitch` = raw.`pitch`
-    self.`roll` = raw.`roll`
-    self.`fieldOfView` = raw.`field_of_view`
+    center = LatLng(raw: raw.center)
+    centerAltitude = raw.center_altitude
+    padding = EdgeInsets(raw: raw.padding)
+    zoom = raw.zoom
+    bearing = raw.bearing
+    pitch = raw.pitch
+    roll = raw.roll
+    fieldOfView = raw.field_of_view
   }
+
   func nativeValue() -> mln_camera {
     var raw = mln_camera()
-    raw.`center` = self.`center`.nativeValue()
-    raw.`center_altitude` = self.`centerAltitude`
-    raw.`padding` = self.`padding`.nativeValue()
-    raw.`zoom` = self.`zoom`
-    raw.`bearing` = self.`bearing`
-    raw.`pitch` = self.`pitch`
-    raw.`roll` = self.`roll`
-    raw.`field_of_view` = self.`fieldOfView`
+    raw.center = center.nativeValue()
+    raw.center_altitude = centerAltitude
+    raw.padding = padding.nativeValue()
+    raw.zoom = zoom
+    raw.bearing = bearing
+    raw.pitch = pitch
+    raw.roll = roll
+    raw.field_of_view = fieldOfView
     return raw
   }
+
   /// Converts this `Camera` to `CameraOptions` that set each of its members.
   public func toOptions() -> CameraOptions {
-    CameraOptions(`center`: `center`, `centerAltitude`: `centerAltitude`, `padding`: `padding`, `zoom`: `zoom`, `bearing`: `bearing`, `pitch`: `pitch`, `roll`: `roll`, `fieldOfView`: `fieldOfView`)
+    CameraOptions(
+      center: center,
+      centerAltitude: centerAltitude,
+      padding: padding,
+      zoom: zoom,
+      bearing: bearing,
+      pitch: pitch,
+      roll: roll,
+      fieldOfView: fieldOfView
+    )
   }
 }
 
@@ -197,30 +289,38 @@ public struct Camera: Equatable, Hashable, Sendable {
 public struct CameraBounds: Equatable, Hashable, Sendable {
   /// The area that the camera's center stays within. When `unbounded` is true,
   /// it covers the whole world.
-  public var `bounds`: LatLngBounds
+  public var bounds: LatLngBounds
   /// Whether no area limits the camera's center.
-  public var `unbounded`: Bool
-  public var `minZoom`: Double
-  public var `maxZoom`: Double
+  public var unbounded: Bool
+  public var minZoom: Double
+  public var maxZoom: Double
   /// The lowest pitch, in degrees.
-  public var `minPitch`: Double
+  public var minPitch: Double
   /// The highest pitch, in degrees.
-  public var `maxPitch`: Double
-  public init(`bounds`: LatLngBounds = .init(), `unbounded`: Bool = false, `minZoom`: Double = 0, `maxZoom`: Double = 0, `minPitch`: Double = 0, `maxPitch`: Double = 0) {
-    self.`bounds` = `bounds`
-    self.`unbounded` = `unbounded`
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
-    self.`minPitch` = `minPitch`
-    self.`maxPitch` = `maxPitch`
+  public var maxPitch: Double
+  public init(
+    bounds: LatLngBounds = .init(),
+    unbounded: Bool = false,
+    minZoom: Double = 0,
+    maxZoom: Double = 0,
+    minPitch: Double = 0,
+    maxPitch: Double = 0
+  ) {
+    self.bounds = bounds
+    self.unbounded = unbounded
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.minPitch = minPitch
+    self.maxPitch = maxPitch
   }
+
   init(raw: mln_camera_bounds) {
-    self.`bounds` = LatLngBounds(raw: raw.`bounds`)
-    self.`unbounded` = raw.`unbounded`
-    self.`minZoom` = raw.`min_zoom`
-    self.`maxZoom` = raw.`max_zoom`
-    self.`minPitch` = raw.`min_pitch`
-    self.`maxPitch` = raw.`max_pitch`
+    bounds = LatLngBounds(raw: raw.bounds)
+    unbounded = raw.unbounded
+    minZoom = raw.min_zoom
+    maxZoom = raw.max_zoom
+    minPitch = raw.min_pitch
+    maxPitch = raw.max_pitch
   }
 }
 
@@ -230,44 +330,69 @@ public struct CameraBounds: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraDelta: Sendable {
   /// Moves the map's content this far on the screen, as a drag does.
-  public var `offset`: ScreenPoint?
+  public var offset: ScreenPoint?
   /// Multiplies the map's scale. 2 zooms in by one level.
-  public var `scale`: Double?
+  public var scale: Double?
   /// Degrees to add to the bearing.
-  public var `bearing`: Double?
+  public var bearing: Double?
   /// Degrees to add to the pitch.
-  public var `pitch`: Double?
+  public var pitch: Double?
   /// The screen point that `scale`, `bearing`, and `pitch` keep in place. It
   /// needs one of them, and it combines with `offset` only in a delta without a
   /// duration.
-  public var `anchor`: ScreenPoint?
+  public var anchor: ScreenPoint?
   /// How the gesture keeps moving after this delta. Only a delta in the
   /// `GesturePhase.end` phase carries it.
-  public var `momentum`: GestureMomentum?
-  public var `animation`: AnimationOptions
-  public var `gesturePhase`: GesturePhase
-  public init(`offset`: ScreenPoint? = nil, `scale`: Double? = nil, `bearing`: Double? = nil, `pitch`: Double? = nil, `anchor`: ScreenPoint? = nil, `momentum`: GestureMomentum? = nil, `animation`: AnimationOptions = .init(), `gesturePhase`: GesturePhase = .init(rawValue: 0)) {
-    self.`offset` = `offset`
-    self.`scale` = `scale`
-    self.`bearing` = `bearing`
-    self.`pitch` = `pitch`
-    self.`anchor` = `anchor`
-    self.`momentum` = `momentum`
-    self.`animation` = `animation`
-    self.`gesturePhase` = `gesturePhase`
+  public var momentum: GestureMomentum?
+  public var animation: AnimationOptions
+  public var gesturePhase: GesturePhase
+  public init(
+    offset: ScreenPoint? = nil,
+    scale: Double? = nil,
+    bearing: Double? = nil,
+    pitch: Double? = nil,
+    anchor: ScreenPoint? = nil,
+    momentum: GestureMomentum? = nil,
+    animation: AnimationOptions = .init(),
+    gesturePhase: GesturePhase = .init(rawValue: 0)
+  ) {
+    self.offset = offset
+    self.scale = scale
+    self.bearing = bearing
+    self.pitch = pitch
+    self.anchor = anchor
+    self.momentum = momentum
+    self.animation = animation
+    self.gesturePhase = gesturePhase
   }
+
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_delta {
     var raw = mln_camera_delta()
-    raw.`fields` = 0
-    raw.`size` = UInt32(MemoryLayout<mln_camera_delta>.size)
-    if let item = self.`offset` { raw.`fields` |= MLN_CAMERA_DELTA_OFFSET.rawValue; raw.`offset` = item.nativeValue() }
-    if let item = self.`scale` { raw.`fields` |= MLN_CAMERA_DELTA_SCALE.rawValue; raw.`scale` = item }
-    if let item = self.`bearing` { raw.`fields` |= MLN_CAMERA_DELTA_BEARING.rawValue; raw.`bearing` = item }
-    if let item = self.`pitch` { raw.`fields` |= MLN_CAMERA_DELTA_PITCH.rawValue; raw.`pitch` = item }
-    if let item = self.`anchor` { raw.`fields` |= MLN_CAMERA_DELTA_ANCHOR.rawValue; raw.`anchor` = item.nativeValue() }
-    if let item = self.`momentum` { raw.`fields` |= MLN_CAMERA_DELTA_MOMENTUM.rawValue; raw.`momentum` = item.nativeValue() }
-    raw.`animation` = try self.`animation`.nativeValue(arena: arena)
-    raw.`gesture_phase` = mln_gesture_phase(rawValue: self.`gesturePhase`.rawValue)
+    raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_camera_delta>.size)
+    if let item = offset {
+      raw.fields |= MLN_CAMERA_DELTA_OFFSET.rawValue; raw.offset = item
+        .nativeValue()
+    }
+    if let item = scale {
+      raw.fields |= MLN_CAMERA_DELTA_SCALE.rawValue; raw.scale = item
+    }
+    if let item = bearing {
+      raw.fields |= MLN_CAMERA_DELTA_BEARING.rawValue; raw.bearing = item
+    }
+    if let item = pitch {
+      raw.fields |= MLN_CAMERA_DELTA_PITCH.rawValue; raw.pitch = item
+    }
+    if let item = anchor {
+      raw.fields |= MLN_CAMERA_DELTA_ANCHOR.rawValue; raw.anchor = item
+        .nativeValue()
+    }
+    if let item = momentum {
+      raw.fields |= MLN_CAMERA_DELTA_MOMENTUM.rawValue; raw.momentum = item
+        .nativeValue()
+    }
+    raw.animation = try animation.nativeValue(arena: arena)
+    raw.gesture_phase = mln_gesture_phase(rawValue: gesturePhase.rawValue)
     return raw
   }
 }
@@ -280,28 +405,44 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
   /// Space to leave between the area and each edge of the map. The left and
   /// right insets must add up to less than the map's width, and the top and
   /// bottom to less than its height.
-  public var `padding`: EdgeInsets?
+  public var padding: EdgeInsets?
   /// The rotation from north, in degrees.
-  public var `bearing`: Double?
+  public var bearing: Double?
   /// The tilt toward the horizon, in degrees.
-  public var `pitch`: Double?
-  public init(`padding`: EdgeInsets? = nil, `bearing`: Double? = nil, `pitch`: Double? = nil) {
-    self.`padding` = `padding`
-    self.`bearing` = `bearing`
-    self.`pitch` = `pitch`
+  public var pitch: Double?
+  public init(
+    padding: EdgeInsets? = nil,
+    bearing: Double? = nil,
+    pitch: Double? = nil
+  ) {
+    self.padding = padding
+    self.bearing = bearing
+    self.pitch = pitch
   }
+
   init(raw: mln_camera_fit_options) {
-    self.`padding` = raw.`fields` & MLN_CAMERA_FIT_OPTION_PADDING.rawValue != 0 ? EdgeInsets(raw: raw.`padding`) : nil
-    self.`bearing` = raw.`fields` & MLN_CAMERA_FIT_OPTION_BEARING.rawValue != 0 ? raw.`bearing` : nil
-    self.`pitch` = raw.`fields` & MLN_CAMERA_FIT_OPTION_PITCH.rawValue != 0 ? raw.`pitch` : nil
+    padding = raw.fields & MLN_CAMERA_FIT_OPTION_PADDING
+      .rawValue != 0 ? EdgeInsets(raw: raw.padding) : nil
+    bearing = raw.fields & MLN_CAMERA_FIT_OPTION_BEARING.rawValue != 0 ? raw
+      .bearing : nil
+    pitch = raw.fields & MLN_CAMERA_FIT_OPTION_PITCH.rawValue != 0 ? raw
+      .pitch : nil
   }
+
   func nativeValue() -> mln_camera_fit_options {
     var raw = mln_camera_fit_options()
     raw.fields = 0
-    raw.`size` = UInt32(MemoryLayout<mln_camera_fit_options>.size)
-    if let item = self.`padding` { raw.`fields` |= MLN_CAMERA_FIT_OPTION_PADDING.rawValue; raw.`padding` = item.nativeValue() }
-    if let item = self.`bearing` { raw.`fields` |= MLN_CAMERA_FIT_OPTION_BEARING.rawValue; raw.`bearing` = item }
-    if let item = self.`pitch` { raw.`fields` |= MLN_CAMERA_FIT_OPTION_PITCH.rawValue; raw.`pitch` = item }
+    raw.size = UInt32(MemoryLayout<mln_camera_fit_options>.size)
+    if let item = padding {
+      raw.fields |= MLN_CAMERA_FIT_OPTION_PADDING.rawValue; raw.padding = item
+        .nativeValue()
+    }
+    if let item = bearing {
+      raw.fields |= MLN_CAMERA_FIT_OPTION_BEARING.rawValue; raw.bearing = item
+    }
+    if let item = pitch {
+      raw.fields |= MLN_CAMERA_FIT_OPTION_PITCH.rawValue; raw.pitch = item
+    }
     return raw
   }
 }
@@ -314,20 +455,25 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
 /// See `mln_camera_fit_update` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraFitUpdate: Sendable {
-  public var `mode`: CameraUpdateMode
-  public var `fit`: CameraFitOptions
-  public var `animation`: AnimationOptions
-  public init(`mode`: CameraUpdateMode = .init(rawValue: 0), `fit`: CameraFitOptions = .init(), `animation`: AnimationOptions = .init()) {
-    self.`mode` = `mode`
-    self.`fit` = `fit`
-    self.`animation` = `animation`
+  public var mode: CameraUpdateMode
+  public var fit: CameraFitOptions
+  public var animation: AnimationOptions
+  public init(
+    mode: CameraUpdateMode = .init(rawValue: 0),
+    fit: CameraFitOptions = .init(),
+    animation: AnimationOptions = .init()
+  ) {
+    self.mode = mode
+    self.fit = fit
+    self.animation = animation
   }
+
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_fit_update {
     var raw = mln_camera_fit_update()
-    raw.`size` = UInt32(MemoryLayout<mln_camera_fit_update>.size)
-    raw.`mode` = mln_camera_update_mode(rawValue: self.`mode`.rawValue)
-    raw.`fit` = self.`fit`.nativeValue()
-    raw.`animation` = try self.`animation`.nativeValue(arena: arena)
+    raw.size = UInt32(MemoryLayout<mln_camera_fit_update>.size)
+    raw.mode = mln_camera_update_mode(rawValue: mode.rawValue)
+    raw.fit = fit.nativeValue()
+    raw.animation = try animation.nativeValue(arena: arena)
     return raw
   }
 }
@@ -337,58 +483,98 @@ public struct CameraFitUpdate: Sendable {
 /// See `mln_camera_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraOptions: Equatable, Hashable, Sendable {
-  public var `center`: LatLng?
+  public var center: LatLng?
   /// The altitude of the center, in meters above sea level.
-  public var `centerAltitude`: Double?
+  public var centerAltitude: Double?
   /// Insets from the map's edges. The camera centers within the rest.
-  public var `padding`: EdgeInsets?
+  public var padding: EdgeInsets?
   /// The screen point that a change to the zoom, bearing, or pitch keeps in
   /// place. A `center` overrides it.
-  public var `anchor`: ScreenPoint?
-  public var `zoom`: Double?
+  public var anchor: ScreenPoint?
+  public var zoom: Double?
   /// The rotation from north, in degrees.
-  public var `bearing`: Double?
+  public var bearing: Double?
   /// The tilt toward the horizon, in degrees. 0 looks straight down.
-  public var `pitch`: Double?
+  public var pitch: Double?
   /// The roll, in degrees.
-  public var `roll`: Double?
+  public var roll: Double?
   /// The vertical field of view, in degrees.
-  public var `fieldOfView`: Double?
-  public init(`center`: LatLng? = nil, `centerAltitude`: Double? = nil, `padding`: EdgeInsets? = nil, `anchor`: ScreenPoint? = nil, `zoom`: Double? = nil, `bearing`: Double? = nil, `pitch`: Double? = nil, `roll`: Double? = nil, `fieldOfView`: Double? = nil) {
-    self.`center` = `center`
-    self.`centerAltitude` = `centerAltitude`
-    self.`padding` = `padding`
-    self.`anchor` = `anchor`
-    self.`zoom` = `zoom`
-    self.`bearing` = `bearing`
-    self.`pitch` = `pitch`
-    self.`roll` = `roll`
-    self.`fieldOfView` = `fieldOfView`
+  public var fieldOfView: Double?
+  public init(
+    center: LatLng? = nil,
+    centerAltitude: Double? = nil,
+    padding: EdgeInsets? = nil,
+    anchor: ScreenPoint? = nil,
+    zoom: Double? = nil,
+    bearing: Double? = nil,
+    pitch: Double? = nil,
+    roll: Double? = nil,
+    fieldOfView: Double? = nil
+  ) {
+    self.center = center
+    self.centerAltitude = centerAltitude
+    self.padding = padding
+    self.anchor = anchor
+    self.zoom = zoom
+    self.bearing = bearing
+    self.pitch = pitch
+    self.roll = roll
+    self.fieldOfView = fieldOfView
   }
+
   init(raw: mln_camera_options) {
-    self.`center` = raw.`fields` & MLN_CAMERA_OPTION_CENTER.rawValue != 0 ? LatLng(raw: raw.`center`) : nil
-    self.`centerAltitude` = raw.`fields` & MLN_CAMERA_OPTION_CENTER_ALTITUDE.rawValue != 0 ? raw.`center_altitude` : nil
-    self.`padding` = raw.`fields` & MLN_CAMERA_OPTION_PADDING.rawValue != 0 ? EdgeInsets(raw: raw.`padding`) : nil
-    self.`anchor` = raw.`fields` & MLN_CAMERA_OPTION_ANCHOR.rawValue != 0 ? ScreenPoint(raw: raw.`anchor`) : nil
-    self.`zoom` = raw.`fields` & MLN_CAMERA_OPTION_ZOOM.rawValue != 0 ? raw.`zoom` : nil
-    self.`bearing` = raw.`fields` & MLN_CAMERA_OPTION_BEARING.rawValue != 0 ? raw.`bearing` : nil
-    self.`pitch` = raw.`fields` & MLN_CAMERA_OPTION_PITCH.rawValue != 0 ? raw.`pitch` : nil
-    self.`roll` = raw.`fields` & MLN_CAMERA_OPTION_ROLL.rawValue != 0 ? raw.`roll` : nil
-    self.`fieldOfView` = raw.`fields` & MLN_CAMERA_OPTION_FOV.rawValue != 0 ? raw.`field_of_view` : nil
+    center = raw.fields & MLN_CAMERA_OPTION_CENTER
+      .rawValue != 0 ? LatLng(raw: raw.center) : nil
+    centerAltitude = raw.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE
+      .rawValue != 0 ? raw.center_altitude : nil
+    padding = raw.fields & MLN_CAMERA_OPTION_PADDING
+      .rawValue != 0 ? EdgeInsets(raw: raw.padding) : nil
+    anchor = raw.fields & MLN_CAMERA_OPTION_ANCHOR
+      .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
+    zoom = raw.fields & MLN_CAMERA_OPTION_ZOOM.rawValue != 0 ? raw.zoom : nil
+    bearing = raw.fields & MLN_CAMERA_OPTION_BEARING.rawValue != 0 ? raw
+      .bearing : nil
+    pitch = raw.fields & MLN_CAMERA_OPTION_PITCH.rawValue != 0 ? raw.pitch : nil
+    roll = raw.fields & MLN_CAMERA_OPTION_ROLL.rawValue != 0 ? raw.roll : nil
+    fieldOfView = raw.fields & MLN_CAMERA_OPTION_FOV.rawValue != 0 ? raw
+      .field_of_view : nil
   }
+
   func nativeValue() -> mln_camera_options {
     var raw = mln_camera_options()
     raw.fields = 0
-    raw.`size` = UInt32(MemoryLayout<mln_camera_options>.size)
-    if let item = self.`center` { raw.`fields` |= MLN_CAMERA_OPTION_CENTER.rawValue; raw.`center` = item.nativeValue() }
-    if let item = self.`centerAltitude` { raw.`fields` |= MLN_CAMERA_OPTION_CENTER_ALTITUDE.rawValue; raw.`center_altitude` = item }
-    if let item = self.`padding` { raw.`fields` |= MLN_CAMERA_OPTION_PADDING.rawValue; raw.`padding` = item.nativeValue() }
-    if let item = self.`anchor` { raw.`fields` |= MLN_CAMERA_OPTION_ANCHOR.rawValue; raw.`anchor` = item.nativeValue() }
-    if let item = self.`zoom` { raw.`fields` |= MLN_CAMERA_OPTION_ZOOM.rawValue; raw.`zoom` = item }
-    if let item = self.`bearing` { raw.`fields` |= MLN_CAMERA_OPTION_BEARING.rawValue; raw.`bearing` = item }
-    if let item = self.`pitch` { raw.`fields` |= MLN_CAMERA_OPTION_PITCH.rawValue; raw.`pitch` = item }
-    if let item = self.`roll` { raw.`fields` |= MLN_CAMERA_OPTION_ROLL.rawValue; raw.`roll` = item }
-    if let item = self.`fieldOfView` { raw.`fields` |= MLN_CAMERA_OPTION_FOV.rawValue; raw.`field_of_view` = item }
+    raw.size = UInt32(MemoryLayout<mln_camera_options>.size)
+    if let item = center {
+      raw.fields |= MLN_CAMERA_OPTION_CENTER.rawValue; raw.center = item
+        .nativeValue()
+    }
+    if let item = centerAltitude {
+      raw.fields |= MLN_CAMERA_OPTION_CENTER_ALTITUDE.rawValue; raw
+        .center_altitude = item
+    }
+    if let item = padding {
+      raw.fields |= MLN_CAMERA_OPTION_PADDING.rawValue; raw.padding = item
+        .nativeValue()
+    }
+    if let item = anchor {
+      raw.fields |= MLN_CAMERA_OPTION_ANCHOR.rawValue; raw.anchor = item
+        .nativeValue()
+    }
+    if let item = zoom {
+      raw.fields |= MLN_CAMERA_OPTION_ZOOM.rawValue; raw.zoom = item
+    }
+    if let item = bearing {
+      raw.fields |= MLN_CAMERA_OPTION_BEARING.rawValue; raw.bearing = item
+    }
+    if let item = pitch {
+      raw.fields |= MLN_CAMERA_OPTION_PITCH.rawValue; raw.pitch = item
+    }
+    if let item = roll {
+      raw.fields |= MLN_CAMERA_OPTION_ROLL.rawValue; raw.roll = item
+    }
+    if let item = fieldOfView {
+      raw.fields |= MLN_CAMERA_OPTION_FOV.rawValue; raw.field_of_view = item
+    }
     return raw
   }
 }
@@ -398,15 +584,16 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
 /// See `mln_camera_query_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraQueryResult: Equatable, Hashable, Sendable {
-  public var `generation`: UInt64
-  public var `camera`: Camera
-  public init(`generation`: UInt64 = 0, `camera`: Camera = .init()) {
-    self.`generation` = `generation`
-    self.`camera` = `camera`
+  public var generation: UInt64
+  public var camera: Camera
+  public init(generation: UInt64 = 0, camera: Camera = .init()) {
+    self.generation = generation
+    self.camera = camera
   }
+
   init(raw: mln_camera_query_result) {
-    self.`generation` = raw.`generation`
-    self.`camera` = Camera(raw: raw.`camera`)
+    generation = raw.generation
+    camera = Camera(raw: raw.camera)
   }
 }
 
@@ -415,23 +602,28 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
 /// See `mln_camera_transition_end` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
-  public var `outcome`: CameraTransitionOutcome
+  public var outcome: CameraTransitionOutcome
   /// The generation of the first map snapshot that shows where the change left
   /// the camera, or 0 when the map closed first.
-  public var `generation`: UInt64
+  public var generation: UInt64
   /// How fast a gesture's momentum still moved when it was cancelled, which the
   /// next gesture can add to its own release velocities. Zero for every other
   /// end.
-  public var `velocity`: CameraVelocity
-  public init(`outcome`: CameraTransitionOutcome = .init(rawValue: 0), `generation`: UInt64 = 0, `velocity`: CameraVelocity = .init()) {
-    self.`outcome` = `outcome`
-    self.`generation` = `generation`
-    self.`velocity` = `velocity`
+  public var velocity: CameraVelocity
+  public init(
+    outcome: CameraTransitionOutcome = .init(rawValue: 0),
+    generation: UInt64 = 0,
+    velocity: CameraVelocity = .init()
+  ) {
+    self.outcome = outcome
+    self.generation = generation
+    self.velocity = velocity
   }
+
   init(raw: mln_camera_transition_end) {
-    self.`outcome` = CameraTransitionOutcome(rawValue: raw.`outcome`.rawValue)
-    self.`generation` = raw.`generation`
-    self.`velocity` = CameraVelocity(raw: raw.`velocity`)
+    outcome = CameraTransitionOutcome(rawValue: raw.outcome.rawValue)
+    generation = raw.generation
+    velocity = CameraVelocity(raw: raw.velocity)
   }
 }
 
@@ -439,7 +631,8 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
 ///
 /// See `mln_camera_transition_end_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public typealias CameraTransitionEndCallback = @Sendable (_ `end`: CameraTransitionEnd) -> Void
+public typealias CameraTransitionEndCallback =
+  @Sendable (_ end: CameraTransitionEnd) -> Void
 
 /// A callback for the end of a camera change, for `AnimationOptions`.
 ///
@@ -449,24 +642,40 @@ public typealias CameraTransitionEndCallback = @Sendable (_ `end`: CameraTransit
 /// See `mln_camera_transition_handler` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraTransitionHandler: Sendable {
-  public var `callback`: CameraTransitionEndCallback?
-  public init(`callback`: CameraTransitionEndCallback? = nil) {
-    self.`callback` = `callback`
+  public var callback: CameraTransitionEndCallback?
+  public init(callback: CameraTransitionEndCallback? = nil) {
+    self.callback = callback
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_camera_transition_handler {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_camera_transition_handler
+  {
     var raw = mln_camera_transition_handler()
-    raw.`callback` = `callback` == nil ? nil : invokeCameraTransitionHandlerCallback
-    if `callback` != nil {
+    raw.callback = callback == nil ? nil : invokeCameraTransitionHandlerCallback
+    if callback != nil {
       raw.user_data = arena.callback(self)
       raw.release_user_data = releaseGeneratedCallback
     }
     return raw
   }
 }
-private func invokeCameraTransitionHandlerCallback(`user_data`: UnsafeMutableRawPointer?, `end`: UnsafePointer<mln_camera_transition_end>?) -> Void {
-  guard let `user_data` else { return }
-  let box = Unmanaged<GeneratedCallbackBox<CameraTransitionHandler>>.fromOpaque(`user_data`).takeUnretainedValue()
-  do { box.value.`callback`?(try NativeInputArena.copyArray(`end`, count: 1).map { CameraTransitionEnd(raw: $0) }[0]) } catch { reportToStandardError("mln_camera_transition_end_callback failed: \(error)\n");  }
+
+private func invokeCameraTransitionHandlerCallback(
+  user_data: UnsafeMutableRawPointer?,
+  end: UnsafePointer<mln_camera_transition_end>?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CameraTransitionHandler>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  do {
+    try box.value
+      .callback?(NativeInputArena.copyArray(end, count: 1)
+        .map { CameraTransitionEnd(raw: $0) }[0])
+  } catch {
+    reportToStandardError(
+      "mln_camera_transition_end_callback failed: \(error)\n"
+    )
+  }
 }
 
 /// How a camera change ended.
@@ -477,20 +686,26 @@ private func invokeCameraTransitionHandlerCallback(`user_data`: UnsafeMutableRaw
 ///
 /// See `mln_camera_transition_outcome` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraTransitionOutcome: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct CameraTransitionOutcome: RawRepresentable,
+  CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
   /// The camera finished the change.
-  public static let `completed`: CameraTransitionOutcome = CameraTransitionOutcome(rawValue: 0)
+  public static let completed: CameraTransitionOutcome = .init(rawValue: 0)
   /// `MapHandle.cancelCameraTransitions()`,
   /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
   /// `GesturePhase.begin` or `GesturePhase.cancel`,
   /// `MapHandle.setFreeCameraOptions()`, or a resize that moved the camera back
   /// inside its bounds stopped the change. A command that fails before it moves
   /// the camera also reports this.
-  public static let `cancelled`: CameraTransitionOutcome = CameraTransitionOutcome(rawValue: 1)
+  public static let cancelled: CameraTransitionOutcome = .init(rawValue: 1)
   /// The map closed before the change ended.
-  public static let `closed`: CameraTransitionOutcome = CameraTransitionOutcome(rawValue: 2)
+  public static let closed: CameraTransitionOutcome = .init(rawValue: 2)
   /// A later camera change set every field that a part of the change was still
   /// animating, so that part stopped. Its other parts keep animating, and the
   /// change reports this outcome when they end, unless one was cancelled.
@@ -498,13 +713,13 @@ public struct CameraTransitionOutcome: RawRepresentable, CustomStringConvertible
   /// A later change that sets only some of those fields leaves the change
   /// animating the rest. A fly's center and zoom count as one field, and so do
   /// an anchored change's center and the fields that the anchor holds in place.
-  public static let `replaced`: CameraTransitionOutcome = CameraTransitionOutcome(rawValue: 3)
+  public static let replaced: CameraTransitionOutcome = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-case 0: return "completed"
-case 1: return "cancelled"
-case 2: return "closed"
-case 3: return "replaced"
+    case 0: return "completed"
+    case 1: return "cancelled"
+    case 2: return "closed"
+    case 3: return "replaced"
     default: return "CameraTransitionOutcome(\(rawValue))"
     }
   }
@@ -518,23 +733,29 @@ case 3: return "replaced"
 /// See `mln_camera_update` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraUpdate: Sendable {
-  public var `mode`: CameraUpdateMode
-  public var `camera`: CameraOptions
-  public var `animation`: AnimationOptions
-  public var `gesturePhase`: GesturePhase
-  public init(`mode`: CameraUpdateMode = .init(rawValue: 0), `camera`: CameraOptions = .init(), `animation`: AnimationOptions = .init(), `gesturePhase`: GesturePhase = .init(rawValue: 0)) {
-    self.`mode` = `mode`
-    self.`camera` = `camera`
-    self.`animation` = `animation`
-    self.`gesturePhase` = `gesturePhase`
+  public var mode: CameraUpdateMode
+  public var camera: CameraOptions
+  public var animation: AnimationOptions
+  public var gesturePhase: GesturePhase
+  public init(
+    mode: CameraUpdateMode = .init(rawValue: 0),
+    camera: CameraOptions = .init(),
+    animation: AnimationOptions = .init(),
+    gesturePhase: GesturePhase = .init(rawValue: 0)
+  ) {
+    self.mode = mode
+    self.camera = camera
+    self.animation = animation
+    self.gesturePhase = gesturePhase
   }
+
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_update {
     var raw = mln_camera_update()
-    raw.`size` = UInt32(MemoryLayout<mln_camera_update>.size)
-    raw.`mode` = mln_camera_update_mode(rawValue: self.`mode`.rawValue)
-    raw.`camera` = self.`camera`.nativeValue()
-    raw.`animation` = try self.`animation`.nativeValue(arena: arena)
-    raw.`gesture_phase` = mln_gesture_phase(rawValue: self.`gesturePhase`.rawValue)
+    raw.size = UInt32(MemoryLayout<mln_camera_update>.size)
+    raw.mode = mln_camera_update_mode(rawValue: mode.rawValue)
+    raw.camera = camera.nativeValue()
+    raw.animation = try animation.nativeValue(arena: arena)
+    raw.gesture_phase = mln_gesture_phase(rawValue: gesturePhase.rawValue)
     return raw
   }
 }
@@ -543,20 +764,25 @@ public struct CameraUpdate: Sendable {
 ///
 /// See `mln_camera_update_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraUpdateMode: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct CameraUpdateMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
   /// Moves the camera at once.
-  public static let `jump`: CameraUpdateMode = CameraUpdateMode(rawValue: 0)
+  public static let jump: CameraUpdateMode = .init(rawValue: 0)
   /// Animates the camera straight to the target.
-  public static let `ease`: CameraUpdateMode = CameraUpdateMode(rawValue: 1)
+  public static let ease: CameraUpdateMode = .init(rawValue: 1)
   /// Zooms out, travels to the target, and zooms back in.
-  public static let `fly`: CameraUpdateMode = CameraUpdateMode(rawValue: 2)
+  public static let fly: CameraUpdateMode = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-case 0: return "jump"
-case 1: return "ease"
-case 2: return "fly"
+    case 0: return "jump"
+    case 1: return "ease"
+    case 2: return "fly"
     default: return "CameraUpdateMode(\(rawValue))"
     }
   }
@@ -569,24 +795,30 @@ case 2: return "fly"
 public struct CameraVelocity: Equatable, Hashable, Sendable {
   /// How fast the map's content moves on the screen, in logical pixels per
   /// second.
-  public var `pan`: ScreenPoint
+  public var pan: ScreenPoint
   /// In zoom levels per second.
-  public var `zoom`: Double
+  public var zoom: Double
   /// In degrees per second.
-  public var `bearing`: Double
+  public var bearing: Double
   /// In degrees per second.
-  public var `pitch`: Double
-  public init(`pan`: ScreenPoint = .init(), `zoom`: Double = 0, `bearing`: Double = 0, `pitch`: Double = 0) {
-    self.`pan` = `pan`
-    self.`zoom` = `zoom`
-    self.`bearing` = `bearing`
-    self.`pitch` = `pitch`
+  public var pitch: Double
+  public init(
+    pan: ScreenPoint = .init(),
+    zoom: Double = 0,
+    bearing: Double = 0,
+    pitch: Double = 0
+  ) {
+    self.pan = pan
+    self.zoom = zoom
+    self.bearing = bearing
+    self.pitch = pitch
   }
+
   init(raw: mln_camera_velocity) {
-    self.`pan` = ScreenPoint(raw: raw.`pan`)
-    self.`zoom` = raw.`zoom`
-    self.`bearing` = raw.`bearing`
-    self.`pitch` = raw.`pitch`
+    pan = ScreenPoint(raw: raw.pan)
+    zoom = raw.zoom
+    bearing = raw.bearing
+    pitch = raw.pitch
   }
 }
 
@@ -594,18 +826,23 @@ public struct CameraVelocity: Equatable, Hashable, Sendable {
 ///
 /// See `mln_clip_depth_range` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct ClipDepthRange: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct ClipDepthRange: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
   /// Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and OpenGL
   /// with `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
-  public static let `zeroToOne`: ClipDepthRange = ClipDepthRange(rawValue: 1)
+  public static let zeroToOne: ClipDepthRange = .init(rawValue: 1)
   /// Clip z runs from -w to w, as in OpenGL by default.
-  public static let `negativeOneToOne`: ClipDepthRange = ClipDepthRange(rawValue: 2)
+  public static let negativeOneToOne: ClipDepthRange = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-case 1: return "zeroToOne"
-case 2: return "negativeOneToOne"
+    case 1: return "zeroToOne"
+    case 2: return "negativeOneToOne"
     default: return "ClipDepthRange(\(rawValue))"
     }
   }
@@ -615,22 +852,27 @@ case 2: return "negativeOneToOne"
 ///
 /// See `mln_constrain_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct ConstrainMode: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct ConstrainMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `none`: ConstrainMode = ConstrainMode(rawValue: 0)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let none: ConstrainMode = .init(rawValue: 0)
   /// Keeps the world filling the view from top to bottom.
-  public static let `heightOnly`: ConstrainMode = ConstrainMode(rawValue: 1)
+  public static let heightOnly: ConstrainMode = .init(rawValue: 1)
   /// Keeps the world filling the view in both directions.
-  public static let `widthAndHeight`: ConstrainMode = ConstrainMode(rawValue: 2)
+  public static let widthAndHeight: ConstrainMode = .init(rawValue: 2)
   /// Keeps the whole view inside the bounds from `MapHandle.setBounds()`.
-  public static let `screen`: ConstrainMode = ConstrainMode(rawValue: 3)
+  public static let screen: ConstrainMode = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-case 0: return "none"
-case 1: return "heightOnly"
-case 2: return "widthAndHeight"
-case 3: return "screen"
+    case 0: return "none"
+    case 1: return "heightOnly"
+    case 2: return "widthAndHeight"
+    case 3: return "screen"
     default: return "ConstrainMode(\(rawValue))"
     }
   }
@@ -641,28 +883,35 @@ case 3: return "screen"
 /// See `mln_edge_insets` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct EdgeInsets: Equatable, Hashable, Sendable {
-  public var `top`: Double
-  public var `left`: Double
-  public var `bottom`: Double
-  public var `right`: Double
-  public init(`top`: Double = 0, `left`: Double = 0, `bottom`: Double = 0, `right`: Double = 0) {
-    self.`top` = `top`
-    self.`left` = `left`
-    self.`bottom` = `bottom`
-    self.`right` = `right`
+  public var top: Double
+  public var left: Double
+  public var bottom: Double
+  public var right: Double
+  public init(
+    top: Double = 0,
+    left: Double = 0,
+    bottom: Double = 0,
+    right: Double = 0
+  ) {
+    self.top = top
+    self.left = left
+    self.bottom = bottom
+    self.right = right
   }
+
   init(raw: mln_edge_insets) {
-    self.`top` = raw.`top`
-    self.`left` = raw.`left`
-    self.`bottom` = raw.`bottom`
-    self.`right` = raw.`right`
+    top = raw.top
+    left = raw.left
+    bottom = raw.bottom
+    right = raw.right
   }
+
   func nativeValue() -> mln_edge_insets {
     var raw = mln_edge_insets()
-    raw.`top` = self.`top`
-    raw.`left` = self.`left`
-    raw.`bottom` = self.`bottom`
-    raw.`right` = self.`right`
+    raw.top = top
+    raw.left = left
+    raw.bottom = bottom
+    raw.right = right
     return raw
   }
 }
@@ -675,18 +924,22 @@ public struct EdgeInsets: Equatable, Hashable, Sendable {
 /// See `mln_feature_id` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public enum FeatureId: Equatable, Hashable, Sendable {
-  case `stringValue`(String)
-  case `uintValue`(UInt64)
-  case `intValue`(Int64)
+  case stringValue(String)
+  case uintValue(UInt64)
+  case intValue(Int64)
   /// A finite number.
-  case `doubleValue`(Double)
+  case doubleValue(Double)
   func nativeValue(arena: NativeInputArena) throws -> mln_feature_id {
     var raw = mln_feature_id()
     switch self {
-    case .`stringValue`(let item): raw.`type` = MLN_FEATURE_ID_TYPE_STRING; raw.`data`.`string_value` = arena.view(item)
-    case .`uintValue`(let item): raw.`type` = MLN_FEATURE_ID_TYPE_UINT; raw.`data`.`uint_value` = item
-    case .`intValue`(let item): raw.`type` = MLN_FEATURE_ID_TYPE_INT; raw.`data`.`int_value` = item
-    case .`doubleValue`(let item): raw.`type` = MLN_FEATURE_ID_TYPE_DOUBLE; raw.`data`.`double_value` = item
+    case let .stringValue(item): raw.type = MLN_FEATURE_ID_TYPE_STRING; raw.data
+      .string_value = arena.view(item)
+    case let .uintValue(item): raw.type = MLN_FEATURE_ID_TYPE_UINT; raw.data
+      .uint_value = item
+    case let .intValue(item): raw.type = MLN_FEATURE_ID_TYPE_INT; raw.data
+      .int_value = item
+    case let .doubleValue(item): raw.type = MLN_FEATURE_ID_TYPE_DOUBLE; raw.data
+      .double_value = item
     }
     return raw
   }
@@ -697,30 +950,41 @@ public enum FeatureId: Equatable, Hashable, Sendable {
 /// See `mln_feature_state_selector` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FeatureStateSelector: Equatable, Hashable, Sendable {
-  public var `sourceId`: String
+  public var sourceId: String
   /// The source layer, for a vector source. Empty for other sources.
-  public var `sourceLayerId`: String
+  public var sourceLayerId: String
   /// The feature's ID. Setting or reading state needs it. Without it,
   /// `MapHandle.removeFeatureState()` removes the state of every feature in the
   /// source layer.
-  public var `featureId`: FeatureId?
+  public var featureId: FeatureId?
   /// The one key that `MapHandle.removeFeatureState()` removes. It needs
   /// `feature_id`. Empty removes every key.
-  public var `stateKey`: String
-  public init(`sourceId`: String, `sourceLayerId`: String = "", `featureId`: FeatureId? = nil, `stateKey`: String = "") {
-    self.`sourceId` = `sourceId`
-    self.`sourceLayerId` = `sourceLayerId`
-    self.`featureId` = `featureId`
-    self.`stateKey` = `stateKey`
+  public var stateKey: String
+  public init(
+    sourceId: String,
+    sourceLayerId: String = "",
+    featureId: FeatureId? = nil,
+    stateKey: String = ""
+  ) {
+    self.sourceId = sourceId
+    self.sourceLayerId = sourceLayerId
+    self.featureId = featureId
+    self.stateKey = stateKey
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_feature_state_selector {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_feature_state_selector
+  {
     var raw = mln_feature_state_selector()
-    raw.`fields` = 0
-    raw.`size` = UInt32(MemoryLayout<mln_feature_state_selector>.size)
-    raw.`source_id` = arena.view(self.`sourceId`)
-    raw.`source_layer_id` = arena.view(self.`sourceLayerId`)
-    if let item = self.`featureId` { raw.`fields` |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.rawValue; raw.`feature_id` = try item.nativeValue(arena: arena) }
-    raw.`state_key` = arena.view(self.`stateKey`)
+    raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_feature_state_selector>.size)
+    raw.source_id = arena.view(sourceId)
+    raw.source_layer_id = arena.view(sourceLayerId)
+    if let item = featureId {
+      raw.fields |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.rawValue; raw
+        .feature_id = try item.nativeValue(arena: arena)
+    }
+    raw.state_key = arena.view(stateKey)
     return raw
   }
 }
@@ -766,35 +1030,43 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
 /// See `mln_frame_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FrameProjection: Equatable, Hashable, Sendable {
-  public var `matrix`: Mat4
-  public var `clipDepthRange`: ClipDepthRange
+  public var matrix: Mat4
+  public var clipDepthRange: ClipDepthRange
   /// The distance from the camera to the plane where the depth that you get
   /// through `matrix` is 0, along the camera's view. Like `far_distance`, it is
   /// in pixels of the map at the camera's zoom, where the world is 512 × 2^zoom
   /// pixels wide.
-  public var `nearDistance`: Double
+  public var nearDistance: Double
   /// The distance to the plane where the depth is `far_depth`.
-  public var `farDistance`: Double
+  public var farDistance: Double
   /// The depth at `far_distance`, below 1.
-  public var `farDepth`: Double
+  public var farDepth: Double
   /// Whether the frame drew the map as a globe, alone or blending into
   /// Mercator.
-  public var `globe`: Bool
-  public init(`matrix`: Mat4 = .init(), `clipDepthRange`: ClipDepthRange = .init(rawValue: 0), `nearDistance`: Double = 0, `farDistance`: Double = 0, `farDepth`: Double = 0, `globe`: Bool = false) {
-    self.`matrix` = `matrix`
-    self.`clipDepthRange` = `clipDepthRange`
-    self.`nearDistance` = `nearDistance`
-    self.`farDistance` = `farDistance`
-    self.`farDepth` = `farDepth`
-    self.`globe` = `globe`
+  public var globe: Bool
+  public init(
+    matrix: Mat4 = .init(),
+    clipDepthRange: ClipDepthRange = .init(rawValue: 0),
+    nearDistance: Double = 0,
+    farDistance: Double = 0,
+    farDepth: Double = 0,
+    globe: Bool = false
+  ) {
+    self.matrix = matrix
+    self.clipDepthRange = clipDepthRange
+    self.nearDistance = nearDistance
+    self.farDistance = farDistance
+    self.farDepth = farDepth
+    self.globe = globe
   }
+
   init(raw: mln_frame_projection) {
-    self.`matrix` = Mat4(raw: raw.`matrix`)
-    self.`clipDepthRange` = ClipDepthRange(rawValue: raw.`clip_depth_range`.rawValue)
-    self.`nearDistance` = raw.`near_distance`
-    self.`farDistance` = raw.`far_distance`
-    self.`farDepth` = raw.`far_depth`
-    self.`globe` = raw.`globe`
+    matrix = Mat4(raw: raw.matrix)
+    clipDepthRange = ClipDepthRange(rawValue: raw.clip_depth_range.rawValue)
+    nearDistance = raw.near_distance
+    farDistance = raw.far_distance
+    farDepth = raw.far_depth
+    globe = raw.globe
   }
 }
 
@@ -805,15 +1077,16 @@ public struct FrameProjection: Equatable, Hashable, Sendable {
 /// See `mln_free_camera` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FreeCamera: Equatable, Hashable, Sendable {
-  public var `position`: Vec3
-  public var `orientation`: Quaternion
-  public init(`position`: Vec3 = .init(), `orientation`: Quaternion = .init()) {
-    self.`position` = `position`
-    self.`orientation` = `orientation`
+  public var position: Vec3
+  public var orientation: Quaternion
+  public init(position: Vec3 = .init(), orientation: Quaternion = .init()) {
+    self.position = position
+    self.orientation = orientation
   }
+
   init(raw: mln_free_camera) {
-    self.`position` = Vec3(raw: raw.`position`)
-    self.`orientation` = Quaternion(raw: raw.`orientation`)
+    position = Vec3(raw: raw.position)
+    orientation = Quaternion(raw: raw.orientation)
   }
 }
 
@@ -825,24 +1098,34 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   /// The camera's position in Web Mercator units, where the world is 1 wide,
   /// (0, 0) is its northwest corner, and (1, 1) is its southeast corner. `z` is
   /// the altitude in the same units.
-  public var `position`: Vec3?
+  public var position: Vec3?
   /// The camera's rotation from looking straight down with north at the top of
   /// the screen.
-  public var `orientation`: Quaternion?
-  public init(`position`: Vec3? = nil, `orientation`: Quaternion? = nil) {
-    self.`position` = `position`
-    self.`orientation` = `orientation`
+  public var orientation: Quaternion?
+  public init(position: Vec3? = nil, orientation: Quaternion? = nil) {
+    self.position = position
+    self.orientation = orientation
   }
+
   init(raw: mln_free_camera_options) {
-    self.`position` = raw.`fields` & MLN_FREE_CAMERA_OPTION_POSITION.rawValue != 0 ? Vec3(raw: raw.`position`) : nil
-    self.`orientation` = raw.`fields` & MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue != 0 ? Quaternion(raw: raw.`orientation`) : nil
+    position = raw.fields & MLN_FREE_CAMERA_OPTION_POSITION
+      .rawValue != 0 ? Vec3(raw: raw.position) : nil
+    orientation = raw.fields & MLN_FREE_CAMERA_OPTION_ORIENTATION
+      .rawValue != 0 ? Quaternion(raw: raw.orientation) : nil
   }
+
   func nativeValue() -> mln_free_camera_options {
     var raw = mln_free_camera_options()
     raw.fields = 0
-    raw.`size` = UInt32(MemoryLayout<mln_free_camera_options>.size)
-    if let item = self.`position` { raw.`fields` |= MLN_FREE_CAMERA_OPTION_POSITION.rawValue; raw.`position` = item.nativeValue() }
-    if let item = self.`orientation` { raw.`fields` |= MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue; raw.`orientation` = item.nativeValue() }
+    raw.size = UInt32(MemoryLayout<mln_free_camera_options>.size)
+    if let item = position {
+      raw.fields |= MLN_FREE_CAMERA_OPTION_POSITION.rawValue; raw
+        .position = item.nativeValue()
+    }
+    if let item = orientation {
+      raw.fields |= MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue; raw
+        .orientation = item.nativeValue()
+    }
     return raw
   }
 }
@@ -865,28 +1148,35 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
 /// See `mln_gesture_momentum` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct GestureMomentum: Equatable, Hashable, Sendable {
-  public var `pan`: PanMomentum
-  public var `zoom`: AnchoredMomentum
-  public var `bearing`: AnchoredMomentum
-  public var `pitch`: AnchoredMomentum
-  public init(`pan`: PanMomentum = .init(), `zoom`: AnchoredMomentum = .init(), `bearing`: AnchoredMomentum = .init(), `pitch`: AnchoredMomentum = .init()) {
-    self.`pan` = `pan`
-    self.`zoom` = `zoom`
-    self.`bearing` = `bearing`
-    self.`pitch` = `pitch`
+  public var pan: PanMomentum
+  public var zoom: AnchoredMomentum
+  public var bearing: AnchoredMomentum
+  public var pitch: AnchoredMomentum
+  public init(
+    pan: PanMomentum = .init(),
+    zoom: AnchoredMomentum = .init(),
+    bearing: AnchoredMomentum = .init(),
+    pitch: AnchoredMomentum = .init()
+  ) {
+    self.pan = pan
+    self.zoom = zoom
+    self.bearing = bearing
+    self.pitch = pitch
   }
+
   init(raw: mln_gesture_momentum) {
-    self.`pan` = PanMomentum(raw: raw.`pan`)
-    self.`zoom` = AnchoredMomentum(raw: raw.`zoom`)
-    self.`bearing` = AnchoredMomentum(raw: raw.`bearing`)
-    self.`pitch` = AnchoredMomentum(raw: raw.`pitch`)
+    pan = PanMomentum(raw: raw.pan)
+    zoom = AnchoredMomentum(raw: raw.zoom)
+    bearing = AnchoredMomentum(raw: raw.bearing)
+    pitch = AnchoredMomentum(raw: raw.pitch)
   }
+
   func nativeValue() -> mln_gesture_momentum {
     var raw = mln_gesture_momentum()
-    raw.`pan` = self.`pan`.nativeValue()
-    raw.`zoom` = self.`zoom`.nativeValue()
-    raw.`bearing` = self.`bearing`.nativeValue()
-    raw.`pitch` = self.`pitch`.nativeValue()
+    raw.pan = pan.nativeValue()
+    raw.zoom = zoom.nativeValue()
+    raw.bearing = bearing.nativeValue()
+    raw.pitch = pitch.nativeValue()
     return raw
   }
 }
@@ -898,28 +1188,33 @@ public struct GestureMomentum: Equatable, Hashable, Sendable {
 ///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct GesturePhase: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct GesturePhase: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
   /// The change isn't part of a gesture.
-  public static let `none`: GesturePhase = GesturePhase(rawValue: 0)
+  public static let none: GesturePhase = .init(rawValue: 0)
   /// The gesture starts. This cancels every running camera animation before the
   /// change applies.
-  public static let `begin`: GesturePhase = GesturePhase(rawValue: 1)
+  public static let begin: GesturePhase = .init(rawValue: 1)
   /// The gesture continues. To start a gesture that keeps the running camera
   /// animations, start it with this phase instead of `GesturePhase.begin`.
-  public static let `update`: GesturePhase = GesturePhase(rawValue: 2)
-  public static let `end`: GesturePhase = GesturePhase(rawValue: 3)
+  public static let update: GesturePhase = .init(rawValue: 2)
+  public static let end: GesturePhase = .init(rawValue: 3)
   /// The platform cancelled the gesture. This also cancels every running camera
   /// animation after the change applies.
-  public static let `cancel`: GesturePhase = GesturePhase(rawValue: 4)
+  public static let cancel: GesturePhase = .init(rawValue: 4)
   public var description: String {
     switch rawValue {
-case 0: return "none"
-case 1: return "begin"
-case 2: return "update"
-case 3: return "end"
-case 4: return "cancel"
+    case 0: return "none"
+    case 1: return "begin"
+    case 2: return "update"
+    case 3: return "end"
+    case 4: return "cancel"
     default: return "GesturePhase(\(rawValue))"
     }
   }
@@ -930,20 +1225,22 @@ case 4: return "cancel"
 /// See `mln_lat_lng` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LatLng: Equatable, Hashable, Sendable {
-  public var `latitude`: Double
-  public var `longitude`: Double
-  public init(`latitude`: Double = 0, `longitude`: Double = 0) {
-    self.`latitude` = `latitude`
-    self.`longitude` = `longitude`
+  public var latitude: Double
+  public var longitude: Double
+  public init(latitude: Double = 0, longitude: Double = 0) {
+    self.latitude = latitude
+    self.longitude = longitude
   }
+
   init(raw: mln_lat_lng) {
-    self.`latitude` = raw.`latitude`
-    self.`longitude` = raw.`longitude`
+    latitude = raw.latitude
+    longitude = raw.longitude
   }
+
   func nativeValue() -> mln_lat_lng {
     var raw = mln_lat_lng()
-    raw.`latitude` = self.`latitude`
-    raw.`longitude` = self.`longitude`
+    raw.latitude = latitude
+    raw.longitude = longitude
     return raw
   }
 }
@@ -953,20 +1250,22 @@ public struct LatLng: Equatable, Hashable, Sendable {
 /// See `mln_lat_lng_bounds` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LatLngBounds: Equatable, Hashable, Sendable {
-  public var `southwest`: LatLng
-  public var `northeast`: LatLng
-  public init(`southwest`: LatLng = .init(), `northeast`: LatLng = .init()) {
-    self.`southwest` = `southwest`
-    self.`northeast` = `northeast`
+  public var southwest: LatLng
+  public var northeast: LatLng
+  public init(southwest: LatLng = .init(), northeast: LatLng = .init()) {
+    self.southwest = southwest
+    self.northeast = northeast
   }
+
   init(raw: mln_lat_lng_bounds) {
-    self.`southwest` = LatLng(raw: raw.`southwest`)
-    self.`northeast` = LatLng(raw: raw.`northeast`)
+    southwest = LatLng(raw: raw.southwest)
+    northeast = LatLng(raw: raw.northeast)
   }
+
   func nativeValue() -> mln_lat_lng_bounds {
     var raw = mln_lat_lng_bounds()
-    raw.`southwest` = self.`southwest`.nativeValue()
-    raw.`northeast` = self.`northeast`.nativeValue()
+    raw.southwest = southwest.nativeValue()
+    raw.northeast = northeast.nativeValue()
     return raw
   }
 }
@@ -976,24 +1275,26 @@ public struct LatLngBounds: Equatable, Hashable, Sendable {
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LogicalExtent: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public var `scaleFactor`: Double
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0, `scaleFactor`: Double = 0) {
-    self.`width` = `width`
-    self.`height` = `height`
-    self.`scaleFactor` = `scaleFactor`
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+  public init(width: UInt32 = 0, height: UInt32 = 0, scaleFactor: Double = 0) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
   }
+
   init(raw: mln_logical_extent) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
-    self.`scaleFactor` = raw.`scale_factor`
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
   }
+
   func nativeValue() -> mln_logical_extent {
     var raw = mln_logical_extent()
-    raw.`width` = self.`width`
-    raw.`height` = self.`height`
-    raw.`scale_factor` = self.`scaleFactor`
+    raw.width = width
+    raw.height = height
+    raw.scale_factor = scaleFactor
     return raw
   }
 }
@@ -1003,20 +1304,22 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
 /// See `mln_logical_size` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LogicalSize: Equatable, Hashable, Sendable {
-  public var `width`: UInt32
-  public var `height`: UInt32
-  public init(`width`: UInt32 = 0, `height`: UInt32 = 0) {
-    self.`width` = `width`
-    self.`height` = `height`
+  public var width: UInt32
+  public var height: UInt32
+  public init(width: UInt32 = 0, height: UInt32 = 0) {
+    self.width = width
+    self.height = height
   }
+
   init(raw: mln_logical_size) {
-    self.`width` = raw.`width`
-    self.`height` = raw.`height`
+    width = raw.width
+    height = raw.height
   }
+
   func nativeValue() -> mln_logical_size {
     var raw = mln_logical_size()
-    raw.`width` = self.`width`
-    raw.`height` = self.`height`
+    raw.width = width
+    raw.height = height
     return raw
   }
 }
@@ -1025,36 +1328,46 @@ public struct LogicalSize: Equatable, Hashable, Sendable {
 ///
 /// See `mln_map_debug_flag` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MapDebugFlag: OptionSet, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct MapDebugFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `tileBorders`: MapDebugFlag = MapDebugFlag(rawValue: 2)
-  public static let `parseStatus`: MapDebugFlag = MapDebugFlag(rawValue: 4)
-  public static let `timestamps`: MapDebugFlag = MapDebugFlag(rawValue: 8)
-  public static let `collision`: MapDebugFlag = MapDebugFlag(rawValue: 16)
-  public static let `overdraw`: MapDebugFlag = MapDebugFlag(rawValue: 32)
-  public static let `stencilClip`: MapDebugFlag = MapDebugFlag(rawValue: 64)
-  public static let `depthBuffer`: MapDebugFlag = MapDebugFlag(rawValue: 128)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let tileBorders: MapDebugFlag = .init(rawValue: 2)
+  public static let parseStatus: MapDebugFlag = .init(rawValue: 4)
+  public static let timestamps: MapDebugFlag = .init(rawValue: 8)
+  public static let collision: MapDebugFlag = .init(rawValue: 16)
+  public static let overdraw: MapDebugFlag = .init(rawValue: 32)
+  public static let stencilClip: MapDebugFlag = .init(rawValue: 64)
+  public static let depthBuffer: MapDebugFlag = .init(rawValue: 128)
 }
 
 /// When a map renders.
 ///
 /// See `mln_map_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MapMode: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct MapMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
   /// Renders whenever the map changes.
-  public static let `continuous`: MapMode = MapMode(rawValue: 0)
+  public static let continuous: MapMode = .init(rawValue: 0)
   /// Renders only when `MapHandle.requestStillImage()` asks for an image.
-  public static let `static`: MapMode = MapMode(rawValue: 1)
+  public static let `static`: MapMode = .init(rawValue: 1)
   /// Renders still images of single tiles, as `MapMode.static` does.
-  public static let `tile`: MapMode = MapMode(rawValue: 2)
+  public static let tile: MapMode = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-case 0: return "continuous"
-case 1: return "static"
-case 2: return "tile"
+    case 0: return "continuous"
+    case 1: return "static"
+    case 2: return "tile"
     default: return "MapMode(\(rawValue))"
     }
   }
@@ -1068,40 +1381,54 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// The map's first size, and its scale factor. Render sessions of the map
   /// render at its scale factor. `MapHandle.resize()` changes both, or
   /// `RenderSessionHandle.resize()` while a render session is attached.
-  public var `initialExtent`: LogicalExtent
-  public var `mapMode`: MapMode
+  public var initialExtent: LogicalExtent
+  public var mapMode: MapMode
   /// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
   /// encoding. Without it, such tiles fail to load.
-  public var `fastPforEnabled`: Bool
+  public var fastPforEnabled: Bool
   /// The events that the map reports. Without it, the map reports them all.
-  public var `eventMask`: RuntimeEventFlag?
+  public var eventMask: RuntimeEventFlag?
   /// Whether the map keeps tiles in memory after they leave the view, so they
   /// show again without loading. Without it, the map keeps them.
-  public var `tileCacheEnabled`: Bool?
+  public var tileCacheEnabled: Bool?
   /// Fonts for the text that a style's own fonts don't draw, such as scripts
   /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
   /// font files, each an object with a `url` and an optional `unicode-range`,
   /// as in a font face of a style's `font-faces`, which every font stack uses
   /// after the style's own font faces. Empty for none.
-  public var `fallbackFontFaces`: String
-  public init(`initialExtent`: LogicalExtent, `mapMode`: MapMode = .init(rawValue: 0), `fastPforEnabled`: Bool = false, `eventMask`: RuntimeEventFlag? = nil, `tileCacheEnabled`: Bool? = nil, `fallbackFontFaces`: String = "") {
-    self.`initialExtent` = `initialExtent`
-    self.`mapMode` = `mapMode`
-    self.`fastPforEnabled` = `fastPforEnabled`
-    self.`eventMask` = `eventMask`
-    self.`tileCacheEnabled` = `tileCacheEnabled`
-    self.`fallbackFontFaces` = `fallbackFontFaces`
+  public var fallbackFontFaces: String
+  public init(
+    initialExtent: LogicalExtent,
+    mapMode: MapMode = .init(rawValue: 0),
+    fastPforEnabled: Bool = false,
+    eventMask: RuntimeEventFlag? = nil,
+    tileCacheEnabled: Bool? = nil,
+    fallbackFontFaces: String = ""
+  ) {
+    self.initialExtent = initialExtent
+    self.mapMode = mapMode
+    self.fastPforEnabled = fastPforEnabled
+    self.eventMask = eventMask
+    self.tileCacheEnabled = tileCacheEnabled
+    self.fallbackFontFaces = fallbackFontFaces
   }
+
   func nativeValue(arena: NativeInputArena) throws -> mln_map_options {
     var raw = mln_map_options()
-    raw.`fields` = 0
-    raw.`size` = UInt32(MemoryLayout<mln_map_options>.size)
-    raw.`initial_extent` = self.`initialExtent`.nativeValue()
-    raw.`map_mode` = mln_map_mode(rawValue: self.`mapMode`.rawValue)
-    raw.`fast_pfor_enabled` = self.`fastPforEnabled`
-    if let item = self.`eventMask` { raw.`fields` |= MLN_MAP_OPTION_EVENT_MASK.rawValue; raw.`event_mask` = item.rawValue }
-    if let item = self.`tileCacheEnabled` { raw.`fields` |= MLN_MAP_OPTION_TILE_CACHE_ENABLED.rawValue; raw.`tile_cache_enabled` = item }
-    raw.`fallback_font_faces` = arena.view(self.`fallbackFontFaces`)
+    raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_map_options>.size)
+    raw.initial_extent = initialExtent.nativeValue()
+    raw.map_mode = mln_map_mode(rawValue: mapMode.rawValue)
+    raw.fast_pfor_enabled = fastPforEnabled
+    if let item = eventMask {
+      raw.fields |= MLN_MAP_OPTION_EVENT_MASK.rawValue; raw.event_mask = item
+        .rawValue
+    }
+    if let item = tileCacheEnabled {
+      raw.fields |= MLN_MAP_OPTION_TILE_CACHE_ENABLED.rawValue; raw
+        .tile_cache_enabled = item
+    }
+    raw.fallback_font_faces = arena.view(fallbackFontFaces)
     return raw
   }
 }
@@ -1111,56 +1438,72 @@ public struct MapOptions: Equatable, Hashable, Sendable {
 /// See `mln_map_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapSnapshot: Equatable, Hashable, Sendable {
-  public var `debugFlags`: MapDebugFlag
+  public var debugFlags: MapDebugFlag
   /// Grows with each change to the map's state.
-  public var `generation`: UInt64
+  public var generation: UInt64
   /// Whether the style and every resource that the view needs have loaded.
-  public var `fullyLoaded`: Bool
-  public var `renderingStatsViewEnabled`: Bool
-  public var `gestureInProgress`: Bool
-  public var `transitionInProgress`: Bool
-  public var `eventMask`: RuntimeEventFlag
+  public var fullyLoaded: Bool
+  public var renderingStatsViewEnabled: Bool
+  public var gestureInProgress: Bool
+  public var transitionInProgress: Bool
+  public var eventMask: RuntimeEventFlag
   /// Counts the render updates that the map has made for its render session.
-  public var `latestRenderUpdateGeneration`: UInt64
-  public var `tile`: MapTileSettings
-  public var `bounds`: CameraBounds
-  public var `freeCamera`: FreeCamera
-  public var `view`: MapView
+  public var latestRenderUpdateGeneration: UInt64
+  public var tile: MapTileSettings
+  public var bounds: CameraBounds
+  public var freeCamera: FreeCamera
+  public var view: MapView
   /// Whether the map draws as a globe, alone or blending into Mercator.
-  public var `globeRendering`: Bool
+  public var globeRendering: Bool
   /// The setting from `MapHandle.setGlobeFreeBearingEnabled()`.
-  public var `globeFreeBearingEnabled`: Bool
-  public init(`debugFlags`: MapDebugFlag = .init(rawValue: 0), `generation`: UInt64 = 0, `fullyLoaded`: Bool = false, `renderingStatsViewEnabled`: Bool = false, `gestureInProgress`: Bool = false, `transitionInProgress`: Bool = false, `eventMask`: RuntimeEventFlag = .init(rawValue: 0), `latestRenderUpdateGeneration`: UInt64 = 0, `tile`: MapTileSettings = .init(), `bounds`: CameraBounds = .init(), `freeCamera`: FreeCamera = .init(), `view`: MapView = .init(), `globeRendering`: Bool = false, `globeFreeBearingEnabled`: Bool = false) {
-    self.`debugFlags` = `debugFlags`
-    self.`generation` = `generation`
-    self.`fullyLoaded` = `fullyLoaded`
-    self.`renderingStatsViewEnabled` = `renderingStatsViewEnabled`
-    self.`gestureInProgress` = `gestureInProgress`
-    self.`transitionInProgress` = `transitionInProgress`
-    self.`eventMask` = `eventMask`
-    self.`latestRenderUpdateGeneration` = `latestRenderUpdateGeneration`
-    self.`tile` = `tile`
-    self.`bounds` = `bounds`
-    self.`freeCamera` = `freeCamera`
-    self.`view` = `view`
-    self.`globeRendering` = `globeRendering`
-    self.`globeFreeBearingEnabled` = `globeFreeBearingEnabled`
+  public var globeFreeBearingEnabled: Bool
+  public init(
+    debugFlags: MapDebugFlag = .init(rawValue: 0),
+    generation: UInt64 = 0,
+    fullyLoaded: Bool = false,
+    renderingStatsViewEnabled: Bool = false,
+    gestureInProgress: Bool = false,
+    transitionInProgress: Bool = false,
+    eventMask: RuntimeEventFlag = .init(rawValue: 0),
+    latestRenderUpdateGeneration: UInt64 = 0,
+    tile: MapTileSettings = .init(),
+    bounds: CameraBounds = .init(),
+    freeCamera: FreeCamera = .init(),
+    view: MapView = .init(),
+    globeRendering: Bool = false,
+    globeFreeBearingEnabled: Bool = false
+  ) {
+    self.debugFlags = debugFlags
+    self.generation = generation
+    self.fullyLoaded = fullyLoaded
+    self.renderingStatsViewEnabled = renderingStatsViewEnabled
+    self.gestureInProgress = gestureInProgress
+    self.transitionInProgress = transitionInProgress
+    self.eventMask = eventMask
+    self.latestRenderUpdateGeneration = latestRenderUpdateGeneration
+    self.tile = tile
+    self.bounds = bounds
+    self.freeCamera = freeCamera
+    self.view = view
+    self.globeRendering = globeRendering
+    self.globeFreeBearingEnabled = globeFreeBearingEnabled
   }
+
   init(raw: mln_map_snapshot) {
-    self.`debugFlags` = MapDebugFlag(rawValue: raw.`debug_flags`)
-    self.`generation` = raw.`generation`
-    self.`fullyLoaded` = raw.`fully_loaded`
-    self.`renderingStatsViewEnabled` = raw.`rendering_stats_view_enabled`
-    self.`gestureInProgress` = raw.`gesture_in_progress`
-    self.`transitionInProgress` = raw.`transition_in_progress`
-    self.`eventMask` = RuntimeEventFlag(rawValue: raw.`event_mask`)
-    self.`latestRenderUpdateGeneration` = raw.`latest_render_update_generation`
-    self.`tile` = MapTileSettings(raw: raw.`tile`)
-    self.`bounds` = CameraBounds(raw: raw.`bounds`)
-    self.`freeCamera` = FreeCamera(raw: raw.`free_camera`)
-    self.`view` = MapView(raw: raw.`view`)
-    self.`globeRendering` = raw.`globe_rendering`
-    self.`globeFreeBearingEnabled` = raw.`globe_free_bearing_enabled`
+    debugFlags = MapDebugFlag(rawValue: raw.debug_flags)
+    generation = raw.generation
+    fullyLoaded = raw.fully_loaded
+    renderingStatsViewEnabled = raw.rendering_stats_view_enabled
+    gestureInProgress = raw.gesture_in_progress
+    transitionInProgress = raw.transition_in_progress
+    eventMask = RuntimeEventFlag(rawValue: raw.event_mask)
+    latestRenderUpdateGeneration = raw.latest_render_update_generation
+    tile = MapTileSettings(raw: raw.tile)
+    bounds = CameraBounds(raw: raw.bounds)
+    freeCamera = FreeCamera(raw: raw.free_camera)
+    view = MapView(raw: raw.view)
+    globeRendering = raw.globe_rendering
+    globeFreeBearingEnabled = raw.globe_free_bearing_enabled
   }
 }
 
@@ -1174,43 +1517,76 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
 public struct MapTileOptions: Equatable, Hashable, Sendable {
   /// How many zoom levels lower the map also loads tiles for, so it can show a
   /// coarse map while the current tiles load. 0 loads only the current tiles.
-  public var `prefetchZoomDelta`: UInt32?
+  public var prefetchZoomDelta: UInt32?
   /// The radius around the view point, in tiles, that keeps full detail.
-  public var `lodMinRadius`: Double?
+  public var lodMinRadius: Double?
   /// Scales the distance to the view point. Above 1 lowers the detail.
-  public var `lodScale`: Double?
+  public var lodScale: Double?
   /// The pitch, in degrees, above which the map lowers the detail.
-  public var `lodPitchThreshold`: Double?
+  public var lodPitchThreshold: Double?
   /// Zoom levels to add for picking the detail. Below 0 loads fewer tiles.
-  public var `lodZoomShift`: Double?
+  public var lodZoomShift: Double?
   /// `TileLodMode.distance` ignores `lod_min_radius`.
-  public var `lodMode`: TileLodMode?
-  public init(`prefetchZoomDelta`: UInt32? = nil, `lodMinRadius`: Double? = nil, `lodScale`: Double? = nil, `lodPitchThreshold`: Double? = nil, `lodZoomShift`: Double? = nil, `lodMode`: TileLodMode? = nil) {
-    self.`prefetchZoomDelta` = `prefetchZoomDelta`
-    self.`lodMinRadius` = `lodMinRadius`
-    self.`lodScale` = `lodScale`
-    self.`lodPitchThreshold` = `lodPitchThreshold`
-    self.`lodZoomShift` = `lodZoomShift`
-    self.`lodMode` = `lodMode`
+  public var lodMode: TileLodMode?
+  public init(
+    prefetchZoomDelta: UInt32? = nil,
+    lodMinRadius: Double? = nil,
+    lodScale: Double? = nil,
+    lodPitchThreshold: Double? = nil,
+    lodZoomShift: Double? = nil,
+    lodMode: TileLodMode? = nil
+  ) {
+    self.prefetchZoomDelta = prefetchZoomDelta
+    self.lodMinRadius = lodMinRadius
+    self.lodScale = lodScale
+    self.lodPitchThreshold = lodPitchThreshold
+    self.lodZoomShift = lodZoomShift
+    self.lodMode = lodMode
   }
+
   init(raw: mln_map_tile_options) {
-    self.`prefetchZoomDelta` = raw.`fields` & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA.rawValue != 0 ? raw.`prefetch_zoom_delta` : nil
-    self.`lodMinRadius` = raw.`fields` & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS.rawValue != 0 ? raw.`lod_min_radius` : nil
-    self.`lodScale` = raw.`fields` & MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue != 0 ? raw.`lod_scale` : nil
-    self.`lodPitchThreshold` = raw.`fields` & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD.rawValue != 0 ? raw.`lod_pitch_threshold` : nil
-    self.`lodZoomShift` = raw.`fields` & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT.rawValue != 0 ? raw.`lod_zoom_shift` : nil
-    self.`lodMode` = raw.`fields` & MLN_MAP_TILE_OPTION_LOD_MODE.rawValue != 0 ? TileLodMode(rawValue: raw.`lod_mode`.rawValue) : nil
+    prefetchZoomDelta = raw.fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA
+      .rawValue != 0 ? raw.prefetch_zoom_delta : nil
+    lodMinRadius = raw.fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS
+      .rawValue != 0 ? raw.lod_min_radius : nil
+    lodScale = raw.fields & MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue != 0 ? raw
+      .lod_scale : nil
+    lodPitchThreshold = raw.fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD
+      .rawValue != 0 ? raw.lod_pitch_threshold : nil
+    lodZoomShift = raw.fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT
+      .rawValue != 0 ? raw.lod_zoom_shift : nil
+    lodMode = raw.fields & MLN_MAP_TILE_OPTION_LOD_MODE
+      .rawValue != 0 ? TileLodMode(rawValue: raw.lod_mode.rawValue) : nil
   }
+
   func nativeValue() -> mln_map_tile_options {
     var raw = mln_map_tile_options()
     raw.fields = 0
-    raw.`size` = UInt32(MemoryLayout<mln_map_tile_options>.size)
-    if let item = self.`prefetchZoomDelta` { raw.`fields` |= MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA.rawValue; raw.`prefetch_zoom_delta` = item }
-    if let item = self.`lodMinRadius` { raw.`fields` |= MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS.rawValue; raw.`lod_min_radius` = item }
-    if let item = self.`lodScale` { raw.`fields` |= MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue; raw.`lod_scale` = item }
-    if let item = self.`lodPitchThreshold` { raw.`fields` |= MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD.rawValue; raw.`lod_pitch_threshold` = item }
-    if let item = self.`lodZoomShift` { raw.`fields` |= MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT.rawValue; raw.`lod_zoom_shift` = item }
-    if let item = self.`lodMode` { raw.`fields` |= MLN_MAP_TILE_OPTION_LOD_MODE.rawValue; raw.`lod_mode` = mln_tile_lod_mode(rawValue: item.rawValue) }
+    raw.size = UInt32(MemoryLayout<mln_map_tile_options>.size)
+    if let item = prefetchZoomDelta {
+      raw.fields |= MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA.rawValue; raw
+        .prefetch_zoom_delta = item
+    }
+    if let item = lodMinRadius {
+      raw.fields |= MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS.rawValue; raw
+        .lod_min_radius = item
+    }
+    if let item = lodScale {
+      raw.fields |= MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue; raw
+        .lod_scale = item
+    }
+    if let item = lodPitchThreshold {
+      raw.fields |= MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD.rawValue; raw
+        .lod_pitch_threshold = item
+    }
+    if let item = lodZoomShift {
+      raw.fields |= MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT.rawValue; raw
+        .lod_zoom_shift = item
+    }
+    if let item = lodMode {
+      raw.fields |= MLN_MAP_TILE_OPTION_LOD_MODE.rawValue; raw
+        .lod_mode = mln_tile_lod_mode(rawValue: item.rawValue)
+    }
     return raw
   }
 }
@@ -1222,28 +1598,36 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
 /// See `mln_map_tile_settings` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapTileSettings: Equatable, Hashable, Sendable {
-  public var `prefetchZoomDelta`: UInt32
-  public var `lodMinRadius`: Double
-  public var `lodScale`: Double
+  public var prefetchZoomDelta: UInt32
+  public var lodMinRadius: Double
+  public var lodScale: Double
   /// The pitch, in degrees, above which the map lowers the detail.
-  public var `lodPitchThreshold`: Double
-  public var `lodZoomShift`: Double
-  public var `lodMode`: TileLodMode
-  public init(`prefetchZoomDelta`: UInt32 = 0, `lodMinRadius`: Double = 0, `lodScale`: Double = 0, `lodPitchThreshold`: Double = 0, `lodZoomShift`: Double = 0, `lodMode`: TileLodMode = .init(rawValue: 0)) {
-    self.`prefetchZoomDelta` = `prefetchZoomDelta`
-    self.`lodMinRadius` = `lodMinRadius`
-    self.`lodScale` = `lodScale`
-    self.`lodPitchThreshold` = `lodPitchThreshold`
-    self.`lodZoomShift` = `lodZoomShift`
-    self.`lodMode` = `lodMode`
+  public var lodPitchThreshold: Double
+  public var lodZoomShift: Double
+  public var lodMode: TileLodMode
+  public init(
+    prefetchZoomDelta: UInt32 = 0,
+    lodMinRadius: Double = 0,
+    lodScale: Double = 0,
+    lodPitchThreshold: Double = 0,
+    lodZoomShift: Double = 0,
+    lodMode: TileLodMode = .init(rawValue: 0)
+  ) {
+    self.prefetchZoomDelta = prefetchZoomDelta
+    self.lodMinRadius = lodMinRadius
+    self.lodScale = lodScale
+    self.lodPitchThreshold = lodPitchThreshold
+    self.lodZoomShift = lodZoomShift
+    self.lodMode = lodMode
   }
+
   init(raw: mln_map_tile_settings) {
-    self.`prefetchZoomDelta` = raw.`prefetch_zoom_delta`
-    self.`lodMinRadius` = raw.`lod_min_radius`
-    self.`lodScale` = raw.`lod_scale`
-    self.`lodPitchThreshold` = raw.`lod_pitch_threshold`
-    self.`lodZoomShift` = raw.`lod_zoom_shift`
-    self.`lodMode` = TileLodMode(rawValue: raw.`lod_mode`.rawValue)
+    prefetchZoomDelta = raw.prefetch_zoom_delta
+    lodMinRadius = raw.lod_min_radius
+    lodScale = raw.lod_scale
+    lodPitchThreshold = raw.lod_pitch_threshold
+    lodZoomShift = raw.lod_zoom_shift
+    lodMode = TileLodMode(rawValue: raw.lod_mode.rawValue)
   }
 }
 
@@ -1252,34 +1636,42 @@ public struct MapTileSettings: Equatable, Hashable, Sendable {
 /// See `mln_map_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapView: Equatable, Hashable, Sendable {
-  public var `camera`: Camera
-  public var `extent`: LogicalExtent
-  public var `projectionMode`: ProjectionMode
-  public var `viewport`: MapViewport
+  public var camera: Camera
+  public var extent: LogicalExtent
+  public var projectionMode: ProjectionMode
+  public var viewport: MapViewport
   /// The style's projection at the camera's zoom.
-  public var `projection`: ProjectionDefinition
-  public init(`camera`: Camera = .init(), `extent`: LogicalExtent = .init(), `projectionMode`: ProjectionMode = .init(), `viewport`: MapViewport = .init(), `projection`: ProjectionDefinition = .init()) {
-    self.`camera` = `camera`
-    self.`extent` = `extent`
-    self.`projectionMode` = `projectionMode`
-    self.`viewport` = `viewport`
-    self.`projection` = `projection`
+  public var projection: ProjectionDefinition
+  public init(
+    camera: Camera = .init(),
+    extent: LogicalExtent = .init(),
+    projectionMode: ProjectionMode = .init(),
+    viewport: MapViewport = .init(),
+    projection: ProjectionDefinition = .init()
+  ) {
+    self.camera = camera
+    self.extent = extent
+    self.projectionMode = projectionMode
+    self.viewport = viewport
+    self.projection = projection
   }
+
   init(raw: mln_map_view) {
-    self.`camera` = Camera(raw: raw.`camera`)
-    self.`extent` = LogicalExtent(raw: raw.`extent`)
-    self.`projectionMode` = ProjectionMode(raw: raw.`projection_mode`)
-    self.`viewport` = MapViewport(raw: raw.`viewport`)
-    self.`projection` = ProjectionDefinition(raw: raw.`projection`)
+    camera = Camera(raw: raw.camera)
+    extent = LogicalExtent(raw: raw.extent)
+    projectionMode = ProjectionMode(raw: raw.projection_mode)
+    viewport = MapViewport(raw: raw.viewport)
+    projection = ProjectionDefinition(raw: raw.projection)
   }
+
   func nativeValue() -> mln_map_view {
     var raw = mln_map_view()
-    raw.`size` = UInt32(MemoryLayout<mln_map_view>.size)
-    raw.`camera` = self.`camera`.nativeValue()
-    raw.`extent` = self.`extent`.nativeValue()
-    raw.`projection_mode` = self.`projectionMode`.nativeValue()
-    raw.`viewport` = self.`viewport`.nativeValue()
-    raw.`projection` = self.`projection`.nativeValue()
+    raw.size = UInt32(MemoryLayout<mln_map_view>.size)
+    raw.camera = camera.nativeValue()
+    raw.extent = extent.nativeValue()
+    raw.projection_mode = projectionMode.nativeValue()
+    raw.viewport = viewport.nativeValue()
+    raw.projection = projection.nativeValue()
     return raw
   }
 }
@@ -1291,28 +1683,38 @@ public struct MapView: Equatable, Hashable, Sendable {
 /// See `mln_map_viewport` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapViewport: Equatable, Hashable, Sendable {
-  public var `northOrientation`: NorthOrientation
-  public var `constrainMode`: ConstrainMode
-  public var `viewportMode`: ViewportMode
-  public var `frustumOffset`: EdgeInsets
-  public init(`northOrientation`: NorthOrientation = .init(rawValue: 0), `constrainMode`: ConstrainMode = .init(rawValue: 0), `viewportMode`: ViewportMode = .init(rawValue: 0), `frustumOffset`: EdgeInsets = .init()) {
-    self.`northOrientation` = `northOrientation`
-    self.`constrainMode` = `constrainMode`
-    self.`viewportMode` = `viewportMode`
-    self.`frustumOffset` = `frustumOffset`
+  public var northOrientation: NorthOrientation
+  public var constrainMode: ConstrainMode
+  public var viewportMode: ViewportMode
+  public var frustumOffset: EdgeInsets
+  public init(
+    northOrientation: NorthOrientation = .init(rawValue: 0),
+    constrainMode: ConstrainMode = .init(rawValue: 0),
+    viewportMode: ViewportMode = .init(rawValue: 0),
+    frustumOffset: EdgeInsets = .init()
+  ) {
+    self.northOrientation = northOrientation
+    self.constrainMode = constrainMode
+    self.viewportMode = viewportMode
+    self.frustumOffset = frustumOffset
   }
+
   init(raw: mln_map_viewport) {
-    self.`northOrientation` = NorthOrientation(rawValue: raw.`north_orientation`.rawValue)
-    self.`constrainMode` = ConstrainMode(rawValue: raw.`constrain_mode`.rawValue)
-    self.`viewportMode` = ViewportMode(rawValue: raw.`viewport_mode`.rawValue)
-    self.`frustumOffset` = EdgeInsets(raw: raw.`frustum_offset`)
+    northOrientation = NorthOrientation(rawValue: raw.north_orientation
+      .rawValue)
+    constrainMode = ConstrainMode(rawValue: raw.constrain_mode.rawValue)
+    viewportMode = ViewportMode(rawValue: raw.viewport_mode.rawValue)
+    frustumOffset = EdgeInsets(raw: raw.frustum_offset)
   }
+
   func nativeValue() -> mln_map_viewport {
     var raw = mln_map_viewport()
-    raw.`north_orientation` = mln_north_orientation(rawValue: self.`northOrientation`.rawValue)
-    raw.`constrain_mode` = mln_constrain_mode(rawValue: self.`constrainMode`.rawValue)
-    raw.`viewport_mode` = mln_viewport_mode(rawValue: self.`viewportMode`.rawValue)
-    raw.`frustum_offset` = self.`frustumOffset`.nativeValue()
+    raw
+      .north_orientation = mln_north_orientation(rawValue: northOrientation
+        .rawValue)
+    raw.constrain_mode = mln_constrain_mode(rawValue: constrainMode.rawValue)
+    raw.viewport_mode = mln_viewport_mode(rawValue: viewportMode.rawValue)
+    raw.frustum_offset = frustumOffset.nativeValue()
     return raw
   }
 }
@@ -1322,30 +1724,55 @@ public struct MapViewport: Equatable, Hashable, Sendable {
 /// See `mln_map_viewport_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapViewportOptions: Equatable, Hashable, Sendable {
-  public var `northOrientation`: NorthOrientation?
-  public var `constrainMode`: ConstrainMode?
-  public var `viewportMode`: ViewportMode?
-  public var `frustumOffset`: EdgeInsets?
-  public init(`northOrientation`: NorthOrientation? = nil, `constrainMode`: ConstrainMode? = nil, `viewportMode`: ViewportMode? = nil, `frustumOffset`: EdgeInsets? = nil) {
-    self.`northOrientation` = `northOrientation`
-    self.`constrainMode` = `constrainMode`
-    self.`viewportMode` = `viewportMode`
-    self.`frustumOffset` = `frustumOffset`
+  public var northOrientation: NorthOrientation?
+  public var constrainMode: ConstrainMode?
+  public var viewportMode: ViewportMode?
+  public var frustumOffset: EdgeInsets?
+  public init(
+    northOrientation: NorthOrientation? = nil,
+    constrainMode: ConstrainMode? = nil,
+    viewportMode: ViewportMode? = nil,
+    frustumOffset: EdgeInsets? = nil
+  ) {
+    self.northOrientation = northOrientation
+    self.constrainMode = constrainMode
+    self.viewportMode = viewportMode
+    self.frustumOffset = frustumOffset
   }
+
   init(raw: mln_map_viewport_options) {
-    self.`northOrientation` = raw.`fields` & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION.rawValue != 0 ? NorthOrientation(rawValue: raw.`north_orientation`.rawValue) : nil
-    self.`constrainMode` = raw.`fields` & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE.rawValue != 0 ? ConstrainMode(rawValue: raw.`constrain_mode`.rawValue) : nil
-    self.`viewportMode` = raw.`fields` & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE.rawValue != 0 ? ViewportMode(rawValue: raw.`viewport_mode`.rawValue) : nil
-    self.`frustumOffset` = raw.`fields` & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue != 0 ? EdgeInsets(raw: raw.`frustum_offset`) : nil
+    northOrientation = raw.fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
+      .rawValue != 0 ?
+      NorthOrientation(rawValue: raw.north_orientation.rawValue) : nil
+    constrainMode = raw.fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
+      .rawValue != 0 ? ConstrainMode(rawValue: raw.constrain_mode.rawValue) :
+      nil
+    viewportMode = raw.fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
+      .rawValue != 0 ? ViewportMode(rawValue: raw.viewport_mode.rawValue) : nil
+    frustumOffset = raw.fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET
+      .rawValue != 0 ? EdgeInsets(raw: raw.frustum_offset) : nil
   }
+
   func nativeValue() -> mln_map_viewport_options {
     var raw = mln_map_viewport_options()
     raw.fields = 0
-    raw.`size` = UInt32(MemoryLayout<mln_map_viewport_options>.size)
-    if let item = self.`northOrientation` { raw.`fields` |= MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION.rawValue; raw.`north_orientation` = mln_north_orientation(rawValue: item.rawValue) }
-    if let item = self.`constrainMode` { raw.`fields` |= MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE.rawValue; raw.`constrain_mode` = mln_constrain_mode(rawValue: item.rawValue) }
-    if let item = self.`viewportMode` { raw.`fields` |= MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE.rawValue; raw.`viewport_mode` = mln_viewport_mode(rawValue: item.rawValue) }
-    if let item = self.`frustumOffset` { raw.`fields` |= MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue; raw.`frustum_offset` = item.nativeValue() }
+    raw.size = UInt32(MemoryLayout<mln_map_viewport_options>.size)
+    if let item = northOrientation {
+      raw.fields |= MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION.rawValue; raw
+        .north_orientation = mln_north_orientation(rawValue: item.rawValue)
+    }
+    if let item = constrainMode {
+      raw.fields |= MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE.rawValue; raw
+        .constrain_mode = mln_constrain_mode(rawValue: item.rawValue)
+    }
+    if let item = viewportMode {
+      raw.fields |= MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE.rawValue; raw
+        .viewport_mode = mln_viewport_mode(rawValue: item.rawValue)
+    }
+    if let item = frustumOffset {
+      raw.fields |= MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue; raw
+        .frustum_offset = item.nativeValue()
+    }
     return raw
   }
 }
@@ -1358,21 +1785,27 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
 /// See `mln_mat4` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct Mat4: Equatable, Hashable, Sendable {
-  public var `x`: Vec4
-  public var `y`: Vec4
-  public var `z`: Vec4
-  public var `w`: Vec4
-  public init(`x`: Vec4 = .init(), `y`: Vec4 = .init(), `z`: Vec4 = .init(), `w`: Vec4 = .init()) {
-    self.`x` = `x`
-    self.`y` = `y`
-    self.`z` = `z`
-    self.`w` = `w`
+  public var x: Vec4
+  public var y: Vec4
+  public var z: Vec4
+  public var w: Vec4
+  public init(
+    x: Vec4 = .init(),
+    y: Vec4 = .init(),
+    z: Vec4 = .init(),
+    w: Vec4 = .init()
+  ) {
+    self.x = x
+    self.y = y
+    self.z = z
+    self.w = w
   }
+
   init(raw: mln_mat4) {
-    self.`x` = Vec4(raw: raw.`x`)
-    self.`y` = Vec4(raw: raw.`y`)
-    self.`z` = Vec4(raw: raw.`z`)
-    self.`w` = Vec4(raw: raw.`w`)
+    x = Vec4(raw: raw.x)
+    y = Vec4(raw: raw.y)
+    z = Vec4(raw: raw.z)
+    w = Vec4(raw: raw.w)
   }
 }
 
@@ -1389,63 +1822,108 @@ public struct Mat4: Equatable, Hashable, Sendable {
 /// See `mln_momentum_decay` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MomentumDecay: Equatable, Hashable, Sendable {
-  public var `model`: MomentumDecayModel?
+  public var model: MomentumDecayModel?
   /// For `MomentumDecayModel.friction`, how long the speed takes to halve.
-  public var `halfLifeMs`: Double?
+  public var halfLifeMs: Double?
   /// For `MomentumDecayModel.friction`, the speed at which it ends.
-  public var `stopSpeed`: Double?
+  public var stopSpeed: Double?
   /// Required for `MomentumDecayModel.ease`.
-  public var `distance`: Double?
+  public var distance: Double?
   /// Required for `MomentumDecayModel.ease`.
-  public var `durationMs`: Double?
+  public var durationMs: Double?
   /// For `MomentumDecayModel.ease`, the share of `distance` covered over the
   /// share of `duration_ms`. Its control points are between 0 and 1, so the
   /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
   /// that camera animations ease along by default. Android's scroll fling
   /// follows (0.175, 0.5, 0.35, 1).
-  public var `easing`: UnitBezier?
+  public var easing: UnitBezier?
   /// A slower release starts no momentum.
-  public var `minSpeed`: Double?
+  public var minSpeed: Double?
   /// For `MomentumDecayModel.friction`, a faster release counts as this.
-  public var `maxSpeed`: Double?
+  public var maxSpeed: Double?
   /// The farthest the part moves. A friction release that would move farther
   /// starts slower, so it ends sooner, and a planned glide moves at most this
   /// far over its duration.
-  public var `maxDistance`: Double?
-  public init(`model`: MomentumDecayModel? = nil, `halfLifeMs`: Double? = nil, `stopSpeed`: Double? = nil, `distance`: Double? = nil, `durationMs`: Double? = nil, `easing`: UnitBezier? = nil, `minSpeed`: Double? = nil, `maxSpeed`: Double? = nil, `maxDistance`: Double? = nil) {
-    self.`model` = `model`
-    self.`halfLifeMs` = `halfLifeMs`
-    self.`stopSpeed` = `stopSpeed`
-    self.`distance` = `distance`
-    self.`durationMs` = `durationMs`
-    self.`easing` = `easing`
-    self.`minSpeed` = `minSpeed`
-    self.`maxSpeed` = `maxSpeed`
-    self.`maxDistance` = `maxDistance`
+  public var maxDistance: Double?
+  public init(
+    model: MomentumDecayModel? = nil,
+    halfLifeMs: Double? = nil,
+    stopSpeed: Double? = nil,
+    distance: Double? = nil,
+    durationMs: Double? = nil,
+    easing: UnitBezier? = nil,
+    minSpeed: Double? = nil,
+    maxSpeed: Double? = nil,
+    maxDistance: Double? = nil
+  ) {
+    self.model = model
+    self.halfLifeMs = halfLifeMs
+    self.stopSpeed = stopSpeed
+    self.distance = distance
+    self.durationMs = durationMs
+    self.easing = easing
+    self.minSpeed = minSpeed
+    self.maxSpeed = maxSpeed
+    self.maxDistance = maxDistance
   }
+
   init(raw: mln_momentum_decay) {
-    self.`model` = raw.`fields` & MLN_MOMENTUM_DECAY_MODEL.rawValue != 0 ? MomentumDecayModel(rawValue: raw.`model`.rawValue) : nil
-    self.`halfLifeMs` = raw.`fields` & MLN_MOMENTUM_DECAY_HALF_LIFE_MS.rawValue != 0 ? raw.`half_life_ms` : nil
-    self.`stopSpeed` = raw.`fields` & MLN_MOMENTUM_DECAY_STOP_SPEED.rawValue != 0 ? raw.`stop_speed` : nil
-    self.`distance` = raw.`fields` & MLN_MOMENTUM_DECAY_DISTANCE.rawValue != 0 ? raw.`distance` : nil
-    self.`durationMs` = raw.`fields` & MLN_MOMENTUM_DECAY_DURATION_MS.rawValue != 0 ? raw.`duration_ms` : nil
-    self.`easing` = raw.`fields` & MLN_MOMENTUM_DECAY_EASING.rawValue != 0 ? UnitBezier(raw: raw.`easing`) : nil
-    self.`minSpeed` = raw.`fields` & MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue != 0 ? raw.`min_speed` : nil
-    self.`maxSpeed` = raw.`fields` & MLN_MOMENTUM_DECAY_MAX_SPEED.rawValue != 0 ? raw.`max_speed` : nil
-    self.`maxDistance` = raw.`fields` & MLN_MOMENTUM_DECAY_MAX_DISTANCE.rawValue != 0 ? raw.`max_distance` : nil
+    model = raw.fields & MLN_MOMENTUM_DECAY_MODEL
+      .rawValue != 0 ? MomentumDecayModel(rawValue: raw.model.rawValue) : nil
+    halfLifeMs = raw.fields & MLN_MOMENTUM_DECAY_HALF_LIFE_MS
+      .rawValue != 0 ? raw.half_life_ms : nil
+    stopSpeed = raw.fields & MLN_MOMENTUM_DECAY_STOP_SPEED.rawValue != 0 ? raw
+      .stop_speed : nil
+    distance = raw.fields & MLN_MOMENTUM_DECAY_DISTANCE.rawValue != 0 ? raw
+      .distance : nil
+    durationMs = raw.fields & MLN_MOMENTUM_DECAY_DURATION_MS.rawValue != 0 ? raw
+      .duration_ms : nil
+    easing = raw.fields & MLN_MOMENTUM_DECAY_EASING
+      .rawValue != 0 ? UnitBezier(raw: raw.easing) : nil
+    minSpeed = raw.fields & MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue != 0 ? raw
+      .min_speed : nil
+    maxSpeed = raw.fields & MLN_MOMENTUM_DECAY_MAX_SPEED.rawValue != 0 ? raw
+      .max_speed : nil
+    maxDistance = raw.fields & MLN_MOMENTUM_DECAY_MAX_DISTANCE
+      .rawValue != 0 ? raw.max_distance : nil
   }
+
   func nativeValue() -> mln_momentum_decay {
     var raw = mln_momentum_decay()
     raw.fields = 0
-    if let item = self.`model` { raw.`fields` |= MLN_MOMENTUM_DECAY_MODEL.rawValue; raw.`model` = mln_momentum_decay_model(rawValue: item.rawValue) }
-    if let item = self.`halfLifeMs` { raw.`fields` |= MLN_MOMENTUM_DECAY_HALF_LIFE_MS.rawValue; raw.`half_life_ms` = item }
-    if let item = self.`stopSpeed` { raw.`fields` |= MLN_MOMENTUM_DECAY_STOP_SPEED.rawValue; raw.`stop_speed` = item }
-    if let item = self.`distance` { raw.`fields` |= MLN_MOMENTUM_DECAY_DISTANCE.rawValue; raw.`distance` = item }
-    if let item = self.`durationMs` { raw.`fields` |= MLN_MOMENTUM_DECAY_DURATION_MS.rawValue; raw.`duration_ms` = item }
-    if let item = self.`easing` { raw.`fields` |= MLN_MOMENTUM_DECAY_EASING.rawValue; raw.`easing` = item.nativeValue() }
-    if let item = self.`minSpeed` { raw.`fields` |= MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue; raw.`min_speed` = item }
-    if let item = self.`maxSpeed` { raw.`fields` |= MLN_MOMENTUM_DECAY_MAX_SPEED.rawValue; raw.`max_speed` = item }
-    if let item = self.`maxDistance` { raw.`fields` |= MLN_MOMENTUM_DECAY_MAX_DISTANCE.rawValue; raw.`max_distance` = item }
+    if let item = model {
+      raw.fields |= MLN_MOMENTUM_DECAY_MODEL.rawValue; raw
+        .model = mln_momentum_decay_model(rawValue: item.rawValue)
+    }
+    if let item = halfLifeMs {
+      raw.fields |= MLN_MOMENTUM_DECAY_HALF_LIFE_MS.rawValue; raw
+        .half_life_ms = item
+    }
+    if let item = stopSpeed {
+      raw.fields |= MLN_MOMENTUM_DECAY_STOP_SPEED.rawValue; raw
+        .stop_speed = item
+    }
+    if let item = distance {
+      raw.fields |= MLN_MOMENTUM_DECAY_DISTANCE.rawValue; raw.distance = item
+    }
+    if let item = durationMs {
+      raw.fields |= MLN_MOMENTUM_DECAY_DURATION_MS.rawValue; raw
+        .duration_ms = item
+    }
+    if let item = easing {
+      raw.fields |= MLN_MOMENTUM_DECAY_EASING.rawValue; raw.easing = item
+        .nativeValue()
+    }
+    if let item = minSpeed {
+      raw.fields |= MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue; raw.min_speed = item
+    }
+    if let item = maxSpeed {
+      raw.fields |= MLN_MOMENTUM_DECAY_MAX_SPEED.rawValue; raw.max_speed = item
+    }
+    if let item = maxDistance {
+      raw.fields |= MLN_MOMENTUM_DECAY_MAX_DISTANCE.rawValue; raw
+        .max_distance = item
+    }
     return raw
   }
 }
@@ -1454,21 +1932,26 @@ public struct MomentumDecay: Equatable, Hashable, Sendable {
 ///
 /// See `mln_momentum_decay_model` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MomentumDecayModel: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct MomentumDecayModel: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
   /// The speed halves every `half_life_ms`, until it drops to `stop_speed`.
   /// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
   /// deceleration 69 ms.
-  public static let `friction`: MomentumDecayModel = MomentumDecayModel(rawValue: 0)
+  public static let friction: MomentumDecayModel = .init(rawValue: 0)
   /// The part eases `distance` over `duration_ms`, along `easing`, as a camera
   /// animation does. The caller plans the glide, for example from the
   /// platform's own fling physics, such as Android's OverScroller.
-  public static let `ease`: MomentumDecayModel = MomentumDecayModel(rawValue: 1)
+  public static let ease: MomentumDecayModel = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-case 0: return "friction"
-case 1: return "ease"
+    case 0: return "friction"
+    case 1: return "ease"
     default: return "MomentumDecayModel(\(rawValue))"
     }
   }
@@ -1486,32 +1969,52 @@ case 1: return "ease"
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MomentumSnap: Equatable, Hashable, Sendable {
   /// Positive.
-  public var `spacing`: Double?
+  public var spacing: Double?
   /// Defaults to 0.
-  public var `offset`: Double?
+  public var offset: Double?
   /// Not negative.
-  public var `tolerance`: Double?
+  public var tolerance: Double?
   /// Zero settles without easing. Defaults to 300.
-  public var `durationMs`: Double?
-  public init(`spacing`: Double? = nil, `offset`: Double? = nil, `tolerance`: Double? = nil, `durationMs`: Double? = nil) {
-    self.`spacing` = `spacing`
-    self.`offset` = `offset`
-    self.`tolerance` = `tolerance`
-    self.`durationMs` = `durationMs`
+  public var durationMs: Double?
+  public init(
+    spacing: Double? = nil,
+    offset: Double? = nil,
+    tolerance: Double? = nil,
+    durationMs: Double? = nil
+  ) {
+    self.spacing = spacing
+    self.offset = offset
+    self.tolerance = tolerance
+    self.durationMs = durationMs
   }
+
   init(raw: mln_momentum_snap) {
-    self.`spacing` = raw.`fields` & MLN_MOMENTUM_SNAP_SPACING.rawValue != 0 ? raw.`spacing` : nil
-    self.`offset` = raw.`fields` & MLN_MOMENTUM_SNAP_OFFSET.rawValue != 0 ? raw.`offset` : nil
-    self.`tolerance` = raw.`fields` & MLN_MOMENTUM_SNAP_TOLERANCE.rawValue != 0 ? raw.`tolerance` : nil
-    self.`durationMs` = raw.`fields` & MLN_MOMENTUM_SNAP_DURATION_MS.rawValue != 0 ? raw.`duration_ms` : nil
+    spacing = raw.fields & MLN_MOMENTUM_SNAP_SPACING.rawValue != 0 ? raw
+      .spacing : nil
+    offset = raw.fields & MLN_MOMENTUM_SNAP_OFFSET.rawValue != 0 ? raw
+      .offset : nil
+    tolerance = raw.fields & MLN_MOMENTUM_SNAP_TOLERANCE.rawValue != 0 ? raw
+      .tolerance : nil
+    durationMs = raw.fields & MLN_MOMENTUM_SNAP_DURATION_MS.rawValue != 0 ? raw
+      .duration_ms : nil
   }
+
   func nativeValue() -> mln_momentum_snap {
     var raw = mln_momentum_snap()
     raw.fields = 0
-    if let item = self.`spacing` { raw.`fields` |= MLN_MOMENTUM_SNAP_SPACING.rawValue; raw.`spacing` = item }
-    if let item = self.`offset` { raw.`fields` |= MLN_MOMENTUM_SNAP_OFFSET.rawValue; raw.`offset` = item }
-    if let item = self.`tolerance` { raw.`fields` |= MLN_MOMENTUM_SNAP_TOLERANCE.rawValue; raw.`tolerance` = item }
-    if let item = self.`durationMs` { raw.`fields` |= MLN_MOMENTUM_SNAP_DURATION_MS.rawValue; raw.`duration_ms` = item }
+    if let item = spacing {
+      raw.fields |= MLN_MOMENTUM_SNAP_SPACING.rawValue; raw.spacing = item
+    }
+    if let item = offset {
+      raw.fields |= MLN_MOMENTUM_SNAP_OFFSET.rawValue; raw.offset = item
+    }
+    if let item = tolerance {
+      raw.fields |= MLN_MOMENTUM_SNAP_TOLERANCE.rawValue; raw.tolerance = item
+    }
+    if let item = durationMs {
+      raw.fields |= MLN_MOMENTUM_SNAP_DURATION_MS.rawValue; raw
+        .duration_ms = item
+    }
     return raw
   }
 }
@@ -1520,19 +2023,24 @@ public struct MomentumSnap: Equatable, Hashable, Sendable {
 ///
 /// See `mln_north_orientation` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct NorthOrientation: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct NorthOrientation: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `up`: NorthOrientation = NorthOrientation(rawValue: 0)
-  public static let `right`: NorthOrientation = NorthOrientation(rawValue: 1)
-  public static let `down`: NorthOrientation = NorthOrientation(rawValue: 2)
-  public static let `left`: NorthOrientation = NorthOrientation(rawValue: 3)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let up: NorthOrientation = .init(rawValue: 0)
+  public static let right: NorthOrientation = .init(rawValue: 1)
+  public static let down: NorthOrientation = .init(rawValue: 2)
+  public static let left: NorthOrientation = .init(rawValue: 3)
   public var description: String {
     switch rawValue {
-case 0: return "up"
-case 1: return "right"
-case 2: return "down"
-case 3: return "left"
+    case 0: return "up"
+    case 1: return "right"
+    case 2: return "down"
+    case 3: return "left"
     default: return "NorthOrientation(\(rawValue))"
     }
   }
@@ -1546,36 +2054,56 @@ case 3: return "left"
 /// See `mln_offline_geometry_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
-  public var `styleUrl`: String
-  public var `geometry`: String
-  public var `minZoom`: Double
-  public var `maxZoom`: Double
-  public var `pixelRatio`: Float
-  public var `includeIdeographs`: Bool
-  public init(`styleUrl`: String = "", `geometry`: String, `minZoom`: Double = 0, `maxZoom`: Double = 0, `pixelRatio`: Float = 0, `includeIdeographs`: Bool = false) {
-    self.`styleUrl` = `styleUrl`
-    self.`geometry` = `geometry`
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
-    self.`pixelRatio` = `pixelRatio`
-    self.`includeIdeographs` = `includeIdeographs`
+  public var styleUrl: String
+  public var geometry: String
+  public var minZoom: Double
+  public var maxZoom: Double
+  public var pixelRatio: Float
+  public var includeIdeographs: Bool
+  public init(
+    styleUrl: String = "",
+    geometry: String,
+    minZoom: Double = 0,
+    maxZoom: Double = 0,
+    pixelRatio: Float = 0,
+    includeIdeographs: Bool = false
+  ) {
+    self.styleUrl = styleUrl
+    self.geometry = geometry
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.pixelRatio = pixelRatio
+    self.includeIdeographs = includeIdeographs
   }
-  init(raw: mln_offline_geometry_region_definition, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`styleUrl` = try NativeString.copyUTF8(data: raw.`style_url`.data, size: raw.`style_url`.size)
-    self.`geometry` = try NativeString.copyUTF8(data: raw.`geometry`.data, size: raw.`geometry`.size)
-    self.`minZoom` = raw.`min_zoom`
-    self.`maxZoom` = raw.`max_zoom`
-    self.`pixelRatio` = raw.`pixel_ratio`
-    self.`includeIdeographs` = raw.`include_ideographs`
+
+  init(
+    raw: mln_offline_geometry_region_definition,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    styleUrl = try NativeString.copyUTF8(
+      data: raw.style_url.data,
+      size: raw.style_url.size
+    )
+    geometry = try NativeString.copyUTF8(
+      data: raw.geometry.data,
+      size: raw.geometry.size
+    )
+    minZoom = raw.min_zoom
+    maxZoom = raw.max_zoom
+    pixelRatio = raw.pixel_ratio
+    includeIdeographs = raw.include_ideographs
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_offline_geometry_region_definition {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_offline_geometry_region_definition
+  {
     var raw = mln_offline_geometry_region_definition()
-    raw.`style_url` = arena.view(self.`styleUrl`)
-    raw.`geometry` = arena.view(self.`geometry`)
-    raw.`min_zoom` = self.`minZoom`
-    raw.`max_zoom` = self.`maxZoom`
-    raw.`pixel_ratio` = self.`pixelRatio`
-    raw.`include_ideographs` = self.`includeIdeographs`
+    raw.style_url = arena.view(styleUrl)
+    raw.geometry = arena.view(geometry)
+    raw.min_zoom = minZoom
+    raw.max_zoom = maxZoom
+    raw.pixel_ratio = pixelRatio
+    raw.include_ideographs = includeIdeographs
     return raw
   }
 }
@@ -1585,19 +2113,50 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
 /// See `mln_offline_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public enum OfflineRegionDefinition: Equatable, Hashable, Sendable {
-  case `tilePyramid`(OfflineTilePyramidRegionDefinition)
-  case `geometry`(OfflineGeometryRegionDefinition)
+  case tilePyramid(OfflineTilePyramidRegionDefinition)
+  case geometry(OfflineGeometryRegionDefinition)
   case unknown(UInt32, Data)
-  init(raw: mln_offline_region_definition, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self = try { () throws -> OfflineRegionDefinition in switch raw.`type`.rawValue { case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID.rawValue: return .`tilePyramid`(try OfflineTilePyramidRegionDefinition(raw: raw.`data`.`tile_pyramid`)) case MLN_OFFLINE_REGION_DEFINITION_GEOMETRY.rawValue: return .`geometry`(try OfflineGeometryRegionDefinition(raw: raw.`data`.`geometry`)) default: return .unknown(raw.`type`.rawValue, recordBytes.map { Data($0.dropFirst(MemoryLayout<mln_offline_region_definition>.offset(of: \.data)!)) } ?? withUnsafeBytes(of: raw.`data`) { Data($0) }) } }()
+  init(
+    raw: mln_offline_region_definition,
+    recordBytes: UnsafeRawBufferPointer? = nil
+  ) throws {
+    self = try { () throws -> OfflineRegionDefinition in
+      switch raw.type
+        .rawValue
+      {
+      case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+        .rawValue: return try .tilePyramid(
+          OfflineTilePyramidRegionDefinition(raw: raw
+            .data.tile_pyramid)
+        ) case MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
+        .rawValue: return try .geometry(OfflineGeometryRegionDefinition(raw: raw
+            .data.geometry)) default: return .unknown(
+          raw.type.rawValue,
+          recordBytes
+            .map {
+              Data($0
+                .dropFirst(MemoryLayout<mln_offline_region_definition>
+                  .offset(of: \.data)!))
+            } ?? withUnsafeBytes(of: raw.data) { Data($0) }
+        )
+      }
+    }()
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_offline_region_definition {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_offline_region_definition
+  {
     var raw = mln_offline_region_definition()
-    raw.`size` = UInt32(MemoryLayout<mln_offline_region_definition>.size)
+    raw.size = UInt32(MemoryLayout<mln_offline_region_definition>.size)
     switch self {
-    case .`tilePyramid`(let item): raw.`type` = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID; raw.`data`.`tile_pyramid` = try item.nativeValue(arena: arena)
-    case .`geometry`(let item): raw.`type` = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY; raw.`data`.`geometry` = try item.nativeValue(arena: arena)
-    case .unknown: throw MaplibreError.invalidArgument("unknown union variant cannot be submitted")
+    case let .tilePyramid(item): raw
+      .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID; raw.data
+      .tile_pyramid = try item.nativeValue(arena: arena)
+    case let .geometry(item): raw
+      .type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY; raw.data
+      .geometry = try item.nativeValue(arena: arena)
+    case .unknown: throw MaplibreError
+      .invalidArgument("unknown union variant cannot be submitted")
     }
     return raw
   }
@@ -1608,18 +2167,29 @@ public enum OfflineRegionDefinition: Equatable, Hashable, Sendable {
 /// See `mln_offline_region_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
-  public var `id`: Int64
-  public var `definition`: OfflineRegionDefinition
-  public var `metadata`: Data
-  public init(`id`: Int64 = 0, `definition`: OfflineRegionDefinition = .unknown(0, Data()), `metadata`: Data = Data()) {
-    self.`id` = `id`
-    self.`definition` = `definition`
-    self.`metadata` = `metadata`
+  public var id: Int64
+  public var definition: OfflineRegionDefinition
+  public var metadata: Data
+  public init(
+    id: Int64 = 0,
+    definition: OfflineRegionDefinition = .unknown(0, Data()),
+    metadata: Data = Data()
+  ) {
+    self.id = id
+    self.definition = definition
+    self.metadata = metadata
   }
-  init(raw: mln_offline_region_info, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`id` = raw.`id`
-    self.`definition` = try OfflineRegionDefinition(raw: raw.`definition`)
-    self.`metadata` = try NativeString.copyData(data: raw.`metadata`, size: Int(raw.`metadata_size`))
+
+  init(
+    raw: mln_offline_region_info,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    id = raw.id
+    definition = try OfflineRegionDefinition(raw: raw.definition)
+    metadata = try NativeString.copyData(
+      data: raw.metadata,
+      size: Int(raw.metadata_size)
+    )
   }
 }
 
@@ -1627,42 +2197,61 @@ public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
 ///
 /// See `mln_offline_tile_pyramid_region_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable, Sendable {
+public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
+  Sendable
+{
   /// The style whose resources the region holds. Maps use the region when they
   /// load the same style URL.
-  public var `styleUrl`: String
-  public var `bounds`: LatLngBounds
-  public var `minZoom`: Double
+  public var styleUrl: String
+  public var bounds: LatLngBounds
+  public var minZoom: Double
   /// INFINITY covers every zoom level that the style's sources have.
-  public var `maxZoom`: Double
+  public var maxZoom: Double
   /// The pixel ratio of the images to download, such as 2 for dense screens.
-  public var `pixelRatio`: Float
+  public var pixelRatio: Float
   /// Whether the region holds the glyphs of CJK ideographs.
-  public var `includeIdeographs`: Bool
-  public init(`styleUrl`: String = "", `bounds`: LatLngBounds = .init(), `minZoom`: Double = 0, `maxZoom`: Double = 0, `pixelRatio`: Float = 0, `includeIdeographs`: Bool = false) {
-    self.`styleUrl` = `styleUrl`
-    self.`bounds` = `bounds`
-    self.`minZoom` = `minZoom`
-    self.`maxZoom` = `maxZoom`
-    self.`pixelRatio` = `pixelRatio`
-    self.`includeIdeographs` = `includeIdeographs`
+  public var includeIdeographs: Bool
+  public init(
+    styleUrl: String = "",
+    bounds: LatLngBounds = .init(),
+    minZoom: Double = 0,
+    maxZoom: Double = 0,
+    pixelRatio: Float = 0,
+    includeIdeographs: Bool = false
+  ) {
+    self.styleUrl = styleUrl
+    self.bounds = bounds
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.pixelRatio = pixelRatio
+    self.includeIdeographs = includeIdeographs
   }
-  init(raw: mln_offline_tile_pyramid_region_definition, recordBytes: UnsafeRawBufferPointer? = nil) throws {
-    self.`styleUrl` = try NativeString.copyUTF8(data: raw.`style_url`.data, size: raw.`style_url`.size)
-    self.`bounds` = LatLngBounds(raw: raw.`bounds`)
-    self.`minZoom` = raw.`min_zoom`
-    self.`maxZoom` = raw.`max_zoom`
-    self.`pixelRatio` = raw.`pixel_ratio`
-    self.`includeIdeographs` = raw.`include_ideographs`
+
+  init(
+    raw: mln_offline_tile_pyramid_region_definition,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    styleUrl = try NativeString.copyUTF8(
+      data: raw.style_url.data,
+      size: raw.style_url.size
+    )
+    bounds = LatLngBounds(raw: raw.bounds)
+    minZoom = raw.min_zoom
+    maxZoom = raw.max_zoom
+    pixelRatio = raw.pixel_ratio
+    includeIdeographs = raw.include_ideographs
   }
-  func nativeValue(arena: NativeInputArena) throws -> mln_offline_tile_pyramid_region_definition {
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_offline_tile_pyramid_region_definition
+  {
     var raw = mln_offline_tile_pyramid_region_definition()
-    raw.`style_url` = arena.view(self.`styleUrl`)
-    raw.`bounds` = self.`bounds`.nativeValue()
-    raw.`min_zoom` = self.`minZoom`
-    raw.`max_zoom` = self.`maxZoom`
-    raw.`pixel_ratio` = self.`pixelRatio`
-    raw.`include_ideographs` = self.`includeIdeographs`
+    raw.style_url = arena.view(styleUrl)
+    raw.bounds = bounds.nativeValue()
+    raw.min_zoom = minZoom
+    raw.max_zoom = maxZoom
+    raw.pixel_ratio = pixelRatio
+    raw.include_ideographs = includeIdeographs
     return raw
   }
 }
@@ -1674,21 +2263,27 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable, Sendable 
 public struct PanMomentum: Equatable, Hashable, Sendable {
   /// How fast the map's content moved on the screen at release, in logical
   /// pixels per second. The pan moves only when this is set.
-  public var `velocity`: ScreenPoint?
-  public var `decay`: MomentumDecay
-  public init(`velocity`: ScreenPoint? = nil, `decay`: MomentumDecay = .init()) {
-    self.`velocity` = `velocity`
-    self.`decay` = `decay`
+  public var velocity: ScreenPoint?
+  public var decay: MomentumDecay
+  public init(velocity: ScreenPoint? = nil, decay: MomentumDecay = .init()) {
+    self.velocity = velocity
+    self.decay = decay
   }
+
   init(raw: mln_pan_momentum) {
-    self.`velocity` = raw.`fields` & MLN_PAN_MOMENTUM_VELOCITY.rawValue != 0 ? ScreenPoint(raw: raw.`velocity`) : nil
-    self.`decay` = MomentumDecay(raw: raw.`decay`)
+    velocity = raw.fields & MLN_PAN_MOMENTUM_VELOCITY
+      .rawValue != 0 ? ScreenPoint(raw: raw.velocity) : nil
+    decay = MomentumDecay(raw: raw.decay)
   }
+
   func nativeValue() -> mln_pan_momentum {
     var raw = mln_pan_momentum()
     raw.fields = 0
-    if let item = self.`velocity` { raw.`fields` |= MLN_PAN_MOMENTUM_VELOCITY.rawValue; raw.`velocity` = item.nativeValue() }
-    raw.`decay` = self.`decay`.nativeValue()
+    if let item = velocity {
+      raw.fields |= MLN_PAN_MOMENTUM_VELOCITY.rawValue; raw.velocity = item
+        .nativeValue()
+    }
+    raw.decay = decay.nativeValue()
     return raw
   }
 }
@@ -1698,20 +2293,22 @@ public struct PanMomentum: Equatable, Hashable, Sendable {
 /// See `mln_projected_meters` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ProjectedMeters: Equatable, Hashable, Sendable {
-  public var `northing`: Double
-  public var `easting`: Double
-  public init(`northing`: Double = 0, `easting`: Double = 0) {
-    self.`northing` = `northing`
-    self.`easting` = `easting`
+  public var northing: Double
+  public var easting: Double
+  public init(northing: Double = 0, easting: Double = 0) {
+    self.northing = northing
+    self.easting = easting
   }
+
   init(raw: mln_projected_meters) {
-    self.`northing` = raw.`northing`
-    self.`easting` = raw.`easting`
+    northing = raw.northing
+    easting = raw.easting
   }
+
   func nativeValue() -> mln_projected_meters {
     var raw = mln_projected_meters()
-    raw.`northing` = self.`northing`
-    raw.`easting` = self.`easting`
+    raw.northing = northing
+    raw.easting = easting
     return raw
   }
 }
@@ -1723,26 +2320,32 @@ public struct ProjectedMeters: Equatable, Hashable, Sendable {
 /// See `mln_projection_definition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ProjectionDefinition: Equatable, Hashable, Sendable {
-  public var `from`: ProjectionType
-  public var `to`: ProjectionType
+  public var from: ProjectionType
+  public var to: ProjectionType
   /// How far `from` has turned into `to`, from 0 to 1. Ignored when `from`
   /// equals `to`. A value outside that range holds at the nearer end.
-  public var `transition`: Double
-  public init(`from`: ProjectionType = .init(rawValue: 0), `to`: ProjectionType = .init(rawValue: 0), `transition`: Double = 0) {
-    self.`from` = `from`
-    self.`to` = `to`
-    self.`transition` = `transition`
+  public var transition: Double
+  public init(
+    from: ProjectionType = .init(rawValue: 0),
+    to: ProjectionType = .init(rawValue: 0),
+    transition: Double = 0
+  ) {
+    self.from = from
+    self.to = to
+    self.transition = transition
   }
+
   init(raw: mln_projection_definition) {
-    self.`from` = ProjectionType(rawValue: raw.`from`.rawValue)
-    self.`to` = ProjectionType(rawValue: raw.`to`.rawValue)
-    self.`transition` = raw.`transition`
+    from = ProjectionType(rawValue: raw.from.rawValue)
+    to = ProjectionType(rawValue: raw.to.rawValue)
+    transition = raw.transition
   }
+
   func nativeValue() -> mln_projection_definition {
     var raw = mln_projection_definition()
-    raw.`from` = mln_projection_type(rawValue: self.`from`.rawValue)
-    raw.`to` = mln_projection_type(rawValue: self.`to`.rawValue)
-    raw.`transition` = self.`transition`
+    raw.from = mln_projection_type(rawValue: from.rawValue)
+    raw.to = mln_projection_type(rawValue: to.rawValue)
+    raw.transition = transition
     return raw
   }
 }
@@ -1754,24 +2357,26 @@ public struct ProjectionDefinition: Equatable, Hashable, Sendable {
 /// See `mln_projection_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ProjectionMode: Equatable, Hashable, Sendable {
-  public var `axonometric`: Bool
-  public var `xSkew`: Double
-  public var `ySkew`: Double
-  public init(`axonometric`: Bool = false, `xSkew`: Double = 0, `ySkew`: Double = 0) {
-    self.`axonometric` = `axonometric`
-    self.`xSkew` = `xSkew`
-    self.`ySkew` = `ySkew`
+  public var axonometric: Bool
+  public var xSkew: Double
+  public var ySkew: Double
+  public init(axonometric: Bool = false, xSkew: Double = 0, ySkew: Double = 0) {
+    self.axonometric = axonometric
+    self.xSkew = xSkew
+    self.ySkew = ySkew
   }
+
   init(raw: mln_projection_mode) {
-    self.`axonometric` = raw.`axonometric`
-    self.`xSkew` = raw.`x_skew`
-    self.`ySkew` = raw.`y_skew`
+    axonometric = raw.axonometric
+    xSkew = raw.x_skew
+    ySkew = raw.y_skew
   }
+
   func nativeValue() -> mln_projection_mode {
     var raw = mln_projection_mode()
-    raw.`axonometric` = self.`axonometric`
-    raw.`x_skew` = self.`xSkew`
-    raw.`y_skew` = self.`ySkew`
+    raw.axonometric = axonometric
+    raw.x_skew = xSkew
+    raw.y_skew = ySkew
     return raw
   }
 }
@@ -1782,26 +2387,44 @@ public struct ProjectionMode: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ProjectionModeOptions: Equatable, Hashable, Sendable {
   /// Whether the map draws without perspective.
-  public var `axonometric`: Bool?
-  public var `xSkew`: Double?
-  public var `ySkew`: Double?
-  public init(`axonometric`: Bool? = nil, `xSkew`: Double? = nil, `ySkew`: Double? = nil) {
-    self.`axonometric` = `axonometric`
-    self.`xSkew` = `xSkew`
-    self.`ySkew` = `ySkew`
+  public var axonometric: Bool?
+  public var xSkew: Double?
+  public var ySkew: Double?
+  public init(
+    axonometric: Bool? = nil,
+    xSkew: Double? = nil,
+    ySkew: Double? = nil
+  ) {
+    self.axonometric = axonometric
+    self.xSkew = xSkew
+    self.ySkew = ySkew
   }
+
   init(raw: mln_projection_mode_options) {
-    self.`axonometric` = raw.`fields` & MLN_PROJECTION_MODE_OPTION_AXONOMETRIC.rawValue != 0 ? raw.`axonometric` : nil
-    self.`xSkew` = raw.`fields` & MLN_PROJECTION_MODE_OPTION_X_SKEW.rawValue != 0 ? raw.`x_skew` : nil
-    self.`ySkew` = raw.`fields` & MLN_PROJECTION_MODE_OPTION_Y_SKEW.rawValue != 0 ? raw.`y_skew` : nil
+    axonometric = raw.fields & MLN_PROJECTION_MODE_OPTION_AXONOMETRIC
+      .rawValue != 0 ? raw.axonometric : nil
+    xSkew = raw.fields & MLN_PROJECTION_MODE_OPTION_X_SKEW.rawValue != 0 ? raw
+      .x_skew : nil
+    ySkew = raw.fields & MLN_PROJECTION_MODE_OPTION_Y_SKEW.rawValue != 0 ? raw
+      .y_skew : nil
   }
+
   func nativeValue() -> mln_projection_mode_options {
     var raw = mln_projection_mode_options()
     raw.fields = 0
-    raw.`size` = UInt32(MemoryLayout<mln_projection_mode_options>.size)
-    if let item = self.`axonometric` { raw.`fields` |= MLN_PROJECTION_MODE_OPTION_AXONOMETRIC.rawValue; raw.`axonometric` = item }
-    if let item = self.`xSkew` { raw.`fields` |= MLN_PROJECTION_MODE_OPTION_X_SKEW.rawValue; raw.`x_skew` = item }
-    if let item = self.`ySkew` { raw.`fields` |= MLN_PROJECTION_MODE_OPTION_Y_SKEW.rawValue; raw.`y_skew` = item }
+    raw.size = UInt32(MemoryLayout<mln_projection_mode_options>.size)
+    if let item = axonometric {
+      raw.fields |= MLN_PROJECTION_MODE_OPTION_AXONOMETRIC.rawValue; raw
+        .axonometric = item
+    }
+    if let item = xSkew {
+      raw.fields |= MLN_PROJECTION_MODE_OPTION_X_SKEW.rawValue; raw
+        .x_skew = item
+    }
+    if let item = ySkew {
+      raw.fields |= MLN_PROJECTION_MODE_OPTION_Y_SKEW.rawValue; raw
+        .y_skew = item
+    }
     return raw
   }
 }
@@ -1811,20 +2434,25 @@ public struct ProjectionModeOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_projection_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct ProjectionType: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct ProjectionType: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `mercator`: ProjectionType = ProjectionType(rawValue: 0)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let mercator: ProjectionType = .init(rawValue: 0)
   /// Draws the map as a globe.
-  public static let `verticalPerspective`: ProjectionType = ProjectionType(rawValue: 1)
+  public static let verticalPerspective: ProjectionType = .init(rawValue: 1)
   /// Draws the map as a globe at low zooms, and hands over to Mercator between
   /// zoom 11 and 12.
-  public static let `globe`: ProjectionType = ProjectionType(rawValue: 2)
+  public static let globe: ProjectionType = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
-case 0: return "mercator"
-case 1: return "verticalPerspective"
-case 2: return "globe"
+    case 0: return "mercator"
+    case 1: return "verticalPerspective"
+    case 2: return "globe"
     default: return "ProjectionType(\(rawValue))"
     }
   }
@@ -1835,28 +2463,30 @@ case 2: return "globe"
 /// See `mln_quaternion` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct Quaternion: Equatable, Hashable, Sendable {
-  public var `x`: Double
-  public var `y`: Double
-  public var `z`: Double
-  public var `w`: Double
-  public init(`x`: Double = 0, `y`: Double = 0, `z`: Double = 0, `w`: Double = 0) {
-    self.`x` = `x`
-    self.`y` = `y`
-    self.`z` = `z`
-    self.`w` = `w`
+  public var x: Double
+  public var y: Double
+  public var z: Double
+  public var w: Double
+  public init(x: Double = 0, y: Double = 0, z: Double = 0, w: Double = 0) {
+    self.x = x
+    self.y = y
+    self.z = z
+    self.w = w
   }
+
   init(raw: mln_quaternion) {
-    self.`x` = raw.`x`
-    self.`y` = raw.`y`
-    self.`z` = raw.`z`
-    self.`w` = raw.`w`
+    x = raw.x
+    y = raw.y
+    z = raw.z
+    w = raw.w
   }
+
   func nativeValue() -> mln_quaternion {
     var raw = mln_quaternion()
-    raw.`x` = self.`x`
-    raw.`y` = self.`y`
-    raw.`z` = self.`z`
-    raw.`w` = self.`w`
+    raw.x = x
+    raw.y = y
+    raw.z = z
+    raw.w = w
     return raw
   }
 }
@@ -1866,20 +2496,22 @@ public struct Quaternion: Equatable, Hashable, Sendable {
 /// See `mln_screen_point` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ScreenPoint: Equatable, Hashable, Sendable {
-  public var `x`: Double
-  public var `y`: Double
-  public init(`x`: Double = 0, `y`: Double = 0) {
-    self.`x` = `x`
-    self.`y` = `y`
+  public var x: Double
+  public var y: Double
+  public init(x: Double = 0, y: Double = 0) {
+    self.x = x
+    self.y = y
   }
+
   init(raw: mln_screen_point) {
-    self.`x` = raw.`x`
-    self.`y` = raw.`y`
+    x = raw.x
+    y = raw.y
   }
+
   func nativeValue() -> mln_screen_point {
     var raw = mln_screen_point()
-    raw.`x` = self.`x`
-    raw.`y` = self.`y`
+    raw.x = x
+    raw.y = y
     return raw
   }
 }
@@ -1888,17 +2520,22 @@ public struct ScreenPoint: Equatable, Hashable, Sendable {
 ///
 /// See `mln_tile_lod_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct TileLodMode: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct TileLodMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
   /// Uses the most detail at the center of the screen.
-  public static let `default`: TileLodMode = TileLodMode(rawValue: 0)
+  public static let `default`: TileLodMode = .init(rawValue: 0)
   /// Uses the most detail closest to the camera.
-  public static let `distance`: TileLodMode = TileLodMode(rawValue: 1)
+  public static let distance: TileLodMode = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-case 0: return "default"
-case 1: return "distance"
+    case 0: return "default"
+    case 1: return "distance"
     default: return "TileLodMode(\(rawValue))"
     }
   }
@@ -1912,28 +2549,30 @@ case 1: return "distance"
 /// See `mln_unit_bezier` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct UnitBezier: Equatable, Hashable, Sendable {
-  public var `x1`: Double
-  public var `y1`: Double
-  public var `x2`: Double
-  public var `y2`: Double
-  public init(`x1`: Double = 0, `y1`: Double = 0, `x2`: Double = 0, `y2`: Double = 0) {
-    self.`x1` = `x1`
-    self.`y1` = `y1`
-    self.`x2` = `x2`
-    self.`y2` = `y2`
+  public var x1: Double
+  public var y1: Double
+  public var x2: Double
+  public var y2: Double
+  public init(x1: Double = 0, y1: Double = 0, x2: Double = 0, y2: Double = 0) {
+    self.x1 = x1
+    self.y1 = y1
+    self.x2 = x2
+    self.y2 = y2
   }
+
   init(raw: mln_unit_bezier) {
-    self.`x1` = raw.`x1`
-    self.`y1` = raw.`y1`
-    self.`x2` = raw.`x2`
-    self.`y2` = raw.`y2`
+    x1 = raw.x1
+    y1 = raw.y1
+    x2 = raw.x2
+    y2 = raw.y2
   }
+
   func nativeValue() -> mln_unit_bezier {
     var raw = mln_unit_bezier()
-    raw.`x1` = self.`x1`
-    raw.`y1` = self.`y1`
-    raw.`x2` = self.`x2`
-    raw.`y2` = self.`y2`
+    raw.x1 = x1
+    raw.y1 = y1
+    raw.x2 = x2
+    raw.y2 = y2
     return raw
   }
 }
@@ -1943,24 +2582,26 @@ public struct UnitBezier: Equatable, Hashable, Sendable {
 /// See `mln_vec3` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct Vec3: Equatable, Hashable, Sendable {
-  public var `x`: Double
-  public var `y`: Double
-  public var `z`: Double
-  public init(`x`: Double = 0, `y`: Double = 0, `z`: Double = 0) {
-    self.`x` = `x`
-    self.`y` = `y`
-    self.`z` = `z`
+  public var x: Double
+  public var y: Double
+  public var z: Double
+  public init(x: Double = 0, y: Double = 0, z: Double = 0) {
+    self.x = x
+    self.y = y
+    self.z = z
   }
+
   init(raw: mln_vec3) {
-    self.`x` = raw.`x`
-    self.`y` = raw.`y`
-    self.`z` = raw.`z`
+    x = raw.x
+    y = raw.y
+    z = raw.z
   }
+
   func nativeValue() -> mln_vec3 {
     var raw = mln_vec3()
-    raw.`x` = self.`x`
-    raw.`y` = self.`y`
-    raw.`z` = self.`z`
+    raw.x = x
+    raw.y = y
+    raw.z = z
     return raw
   }
 }
@@ -1970,21 +2611,22 @@ public struct Vec3: Equatable, Hashable, Sendable {
 /// See `mln_vec4` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct Vec4: Equatable, Hashable, Sendable {
-  public var `x`: Double
-  public var `y`: Double
-  public var `z`: Double
-  public var `w`: Double
-  public init(`x`: Double = 0, `y`: Double = 0, `z`: Double = 0, `w`: Double = 0) {
-    self.`x` = `x`
-    self.`y` = `y`
-    self.`z` = `z`
-    self.`w` = `w`
+  public var x: Double
+  public var y: Double
+  public var z: Double
+  public var w: Double
+  public init(x: Double = 0, y: Double = 0, z: Double = 0, w: Double = 0) {
+    self.x = x
+    self.y = y
+    self.z = z
+    self.w = w
   }
+
   init(raw: mln_vec4) {
-    self.`x` = raw.`x`
-    self.`y` = raw.`y`
-    self.`z` = raw.`z`
-    self.`w` = raw.`w`
+    x = raw.x
+    y = raw.y
+    z = raw.z
+    w = raw.w
   }
 }
 
@@ -1992,16 +2634,21 @@ public struct Vec4: Equatable, Hashable, Sendable {
 ///
 /// See `mln_viewport_mode` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct ViewportMode: RawRepresentable, CustomStringConvertible, NativeOpenValue, Equatable, Hashable, Sendable {
+public struct ViewportMode: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
   public let rawValue: UInt32
-  public init(rawValue: UInt32) { self.rawValue = rawValue }
-  public static let `default`: ViewportMode = ViewportMode(rawValue: 0)
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let `default`: ViewportMode = .init(rawValue: 0)
   /// Renders the image upside down.
-  public static let `flippedY`: ViewportMode = ViewportMode(rawValue: 1)
+  public static let flippedY: ViewportMode = .init(rawValue: 1)
   public var description: String {
     switch rawValue {
-case 0: return "default"
-case 1: return "flippedY"
+    case 0: return "default"
+    case 1: return "flippedY"
     default: return "ViewportMode(\(rawValue))"
     }
   }
