@@ -156,14 +156,14 @@ typedef struct momentum_fixture {
   mln_test_render_fixture render;
 } momentum_fixture;
 
-static momentum_fixture create_fixture(void) {
-  momentum_fixture fixture = {.runtime = mln_test_create_runtime()};
-  fixture.map = mln_test_create_map(fixture.runtime);
-  mln_test_load_style_and_wait(fixture.map, mln_test_background_style_json);
+// Fills `fixture` where it stays: the render session's wakes count into it.
+static void create_fixture(momentum_fixture* fixture) {
+  *fixture = (momentum_fixture){.runtime = mln_test_create_runtime()};
+  fixture->map = mln_test_create_map(fixture->runtime);
+  mln_test_load_style_and_wait(fixture->map, mln_test_background_style_json);
   TEST_ASSERT_TRUE(
-    mln_test_render_fixture_create_offscreen(fixture.map, &fixture.render)
+    mln_test_render_fixture_create_offscreen(fixture->map, &fixture->render)
   );
-  return fixture;
 }
 
 static void destroy_fixture(momentum_fixture* fixture) {
@@ -176,7 +176,8 @@ static void destroy_fixture(momentum_fixture* fixture) {
 // s and slows at rate k = ln 2 / half-life. A short half-life keeps the glide
 // to a few frames.
 static void a_release_glides_and_then_ends_the_gesture(void) {
-  momentum_fixture fixture = create_fixture();
+  momentum_fixture fixture;
+  create_fixture(&fixture);
   const mln_lat_lng center = read_snapshot(fixture.map).view.camera.center;
   const mln_screen_point before = screen_point_of(fixture.map, center);
 
