@@ -468,11 +468,14 @@ guint64 maplibre_native_ffi_gpu_device_get_id(MaplibreNativeFfiGpuDevice* self);
  * It fails with these errors:
  *
  * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when this build or platform lacks
- *   `backend`, when the device can't render with `open_gl_client_api`, when a
- *   device that doesn't render with Vulkan gets a `queue_lock`, or in a browser
- *   for every backend: WebGPU makes devices asynchronously, and a WebGL2
- *   context needs a canvas. Attach without a device, which the session makes
- *   itself, or wrap your WebGL2 context.
+ *   `backend`, when the device can't render with `open_gl_client_api`, when
+ *   options name a GPU that the backend can't select (an OpenGL device takes no
+ *   `adapter_index`, `adapter_uuid`, or `adapter_luid`, and only a Vulkan
+ *   device takes `adapter_uuid` or `adapter_luid`), when a device that doesn't
+ *   render with Vulkan gets a `queue_lock`, or in a browser for every backend:
+ *   WebGPU makes devices asynchronously, and a WebGL2 context needs a canvas.
+ *   Attach without a device, which the session makes itself, or wrap your
+ *   WebGL2 context.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_NOT_FOUND` when no GPU matches `adapter_index`,
  *   `adapter_uuid`, or `adapter_luid`.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the platform can't create the

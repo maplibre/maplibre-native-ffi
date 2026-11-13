@@ -8,7 +8,8 @@ namespace Maplibre.NativeFfi;
 /// <remarks>
 /// <para>Name the GPU by at most one of <c>adapter_index</c>,
 /// <c>adapter_uuid</c>, and <c>adapter_luid</c>. Without one, the device
-/// prefers a discrete GPU.</para>
+/// prefers a discrete GPU. An OpenGL device takes none of them: it renders on
+/// the GPU that the platform picks.</para>
 /// <para>See <c>mln_gpu_device_options</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html">C API reference</see>.</para>
 /// </remarks>
@@ -29,8 +30,8 @@ public sealed record GpuDeviceOptions
 
     /// <summary>
     /// The 16-byte UUID of the GPU to use: Vulkan's
-    /// <c>VkPhysicalDeviceIDProperties.deviceUUID</c>, or OpenGL's
-    /// <c>GL_DEVICE_UUID_EXT</c>.
+    /// <c>VkPhysicalDeviceIDProperties.deviceUUID</c>. Only a Vulkan device
+    /// takes one.
     /// </summary>
     public ImmutableArray<byte>? AdapterUuid
     {
@@ -41,9 +42,8 @@ public sealed record GpuDeviceOptions
 
     /// <summary>
     /// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
-    /// which Vulkan reports as <c>VkPhysicalDeviceIDProperties.deviceLUID</c>,
-    /// and on Apple platforms, its <c>MTLDevice.registryID</c>, in the
-    /// platform's byte order.
+    /// which Vulkan reports as <c>VkPhysicalDeviceIDProperties.deviceLUID</c>.
+    /// Only a Vulkan device takes one.
     /// </summary>
     public ImmutableArray<byte>? AdapterLuid
     {

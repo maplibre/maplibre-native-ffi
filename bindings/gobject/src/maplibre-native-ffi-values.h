@@ -8707,7 +8707,8 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
  * Options for `maplibre_native_ffi_gpu_device_create()`.
  *
  * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
- * `adapter_luid`. Without one, the device prefers a discrete GPU.
+ * `adapter_luid`. Without one, the device prefers a discrete GPU. An OpenGL
+ * device takes none of them: it renders on the GPU that the platform picks.
  *
  * A member that a `has_` method reports on is unset until its property or
  * setter sets it.
@@ -8809,7 +8810,7 @@ void maplibre_native_ffi_gpu_device_options_set_adapter_index(
  * MaplibreNativeFfiGpuDeviceOptions:adapter-uuid: (setter set_adapter_uuid) (getter get_adapter_uuid)
  *
  * The 16-byte UUID of the GPU to use: Vulkan's
- * `VkPhysicalDeviceIDProperties.deviceUUID`, or OpenGL's `GL_DEVICE_UUID_EXT`.
+ * `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.
  */
 /**
  * maplibre_native_ffi_gpu_device_options_get_adapter_uuid: (get-property adapter-uuid)
@@ -8847,8 +8848,8 @@ void maplibre_native_ffi_gpu_device_options_set_adapter_uuid(
  * MaplibreNativeFfiGpuDeviceOptions:adapter-luid: (setter set_adapter_luid) (getter get_adapter_luid)
  *
  * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
- * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`, and on Apple
- * platforms, its `MTLDevice.registryID`, in the platform's byte order.
+ * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a Vulkan
+ * device takes one.
  */
 /**
  * maplibre_native_ffi_gpu_device_options_get_adapter_luid: (get-property adapter-luid)

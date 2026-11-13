@@ -15,8 +15,14 @@ Native WebGPU follows its feature. mln_vulkan becomes optional under the
 Windows, custom layers also see WGL's encoders and passes, which only EGL
 builds got before.
 
+It also carries include/maplibre_native_c/gpu_device.h's account of which
+devices take an adapter: only Vulkan takes `adapter_uuid` or
+`adapter_luid`, and OpenGL takes none.
+
+Upstream as louwers/mln-rs#323; drop this patch once the pin includes it.
+
 diff --git a/crates/mln_c/Cargo.toml b/crates/mln_c/Cargo.toml
-index a3f1837..771ce3f 100644
+index a3f1837a..771ce3fb 100644
 --- a/crates/mln_c/Cargo.toml
 +++ b/crates/mln_c/Cargo.toml
 @@ -26,7 +26,7 @@ doctest = false
@@ -38,7 +44,7 @@ index a3f1837..771ce3f 100644
  # A style's font faces, shaped in-process. The browser build leaves the
  # shaper to a module of its own (crates/mln_renderer/Cargo.toml). The C
 diff --git a/crates/mln_c/build.rs b/crates/mln_c/build.rs
-index ce08c47..45e9ed1 100644
+index ce08c479..45e9ed12 100644
 --- a/crates/mln_c/build.rs
 +++ b/crates/mln_c/build.rs
 @@ -2,9 +2,31 @@
@@ -74,8 +80,62 @@ index ce08c47..45e9ed1 100644
          println!("cargo::rustc-link-arg-cdylib=-zstack-size=2097152");
      }
  }
+diff --git a/crates/mln_c/include/maplibre_native_c/gpu_device.h b/crates/mln_c/include/maplibre_native_c/gpu_device.h
+index 5a3126a2..b6bcc2c9 100644
+--- a/crates/mln_c/include/maplibre_native_c/gpu_device.h
++++ b/crates/mln_c/include/maplibre_native_c/gpu_device.h
+@@ -38,7 +38,8 @@ typedef uint32_t mln_gpu_device_option_fields;
+  * Options for mln_gpu_device_create().
+  *
+  * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
+- * `adapter_luid`. Without one, the device prefers a discrete GPU.
++ * `adapter_luid`. Without one, the device prefers a discrete GPU. An OpenGL
++ * device takes none of them: it renders on the GPU that the platform picks.
+  */
+ typedef struct mln_gpu_device_options {
+   uint32_t size;
+@@ -56,16 +57,15 @@ typedef struct mln_gpu_device_options {
+     MLN_BINDING("mask=fields;bit=MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX");
+   /**
+    * The 16-byte UUID of the GPU to use: Vulkan's
+-   * `VkPhysicalDeviceIDProperties.deviceUUID`, or OpenGL's
+-   * `GL_DEVICE_UUID_EXT`.
++   * `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.
+    */
+   mln_buffer_view adapter_uuid MLN_BINDING(
+     "encoding=bytes;mask=fields;bit=MLN_GPU_DEVICE_OPTION_ADAPTER_UUID"
+   );
+   /**
+    * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
+-   * which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`, and on
+-   * Apple platforms, its `MTLDevice.registryID`, in the platform's byte order.
++   * which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a
++   * Vulkan device takes one.
+    */
+   mln_buffer_view adapter_luid MLN_BINDING(
+     "encoding=bytes;mask=fields;bit=MLN_GPU_DEVICE_OPTION_ADAPTER_LUID"
+@@ -186,11 +186,14 @@ typedef struct mln_gpu_device_vulkan_context_result {
+  *
+  * Returns:
+  * - MLN_STATUS_UNSUPPORTED when this build or platform lacks `backend`, when
+- *   the device can't render with `open_gl_client_api`, when a device that
+- *   doesn't render with Vulkan gets a `queue_lock`, or in a browser for every
+- *   backend: WebGPU makes devices asynchronously, and a WebGL2 context needs a
+- *   canvas. Attach without a device, which the session makes itself, or wrap
+- *   your WebGL2 context.
++ *   the device can't render with `open_gl_client_api`, when options name a GPU
++ *   that the backend can't select (an OpenGL device takes no `adapter_index`,
++ *   `adapter_uuid`, or `adapter_luid`, and only a Vulkan device takes
++ *   `adapter_uuid` or `adapter_luid`), when a device that doesn't render with
++ *   Vulkan gets a `queue_lock`, or in a browser for every backend: WebGPU makes
++ *   devices asynchronously, and a WebGL2 context needs a canvas. Attach
++ *   without a device, which the session makes itself, or wrap your WebGL2
++ *   context.
+  * - MLN_STATUS_NOT_FOUND when no GPU matches `adapter_index`, `adapter_uuid`,
+  *   or `adapter_luid`.
+  * - MLN_STATUS_NATIVE_ERROR when the platform can't create the device.
 diff --git a/crates/mln_c/src/custom_layer.rs b/crates/mln_c/src/custom_layer.rs
-index 00613ca..3d5b9b3 100644
+index 00613ca4..3d5b9b3b 100644
 --- a/crates/mln_c/src/custom_layer.rs
 +++ b/crates/mln_c/src/custom_layer.rs
 @@ -109,7 +109,7 @@ impl CustomLayerHost for Host {
@@ -132,8 +192,38 @@ index 00613ca..3d5b9b3 100644
      fn vulkan_context(device: &mln_vulkan::RawDevice) -> crate::generated::types::mln_vulkan_context_descriptor {
          use mln_vulkan::ash::vk::Handle as _;
          crate::generated::types::mln_vulkan_context_descriptor {
+diff --git a/crates/mln_c/src/generated/types.rs b/crates/mln_c/src/generated/types.rs
+index fa9e9555..d3d8aaa3 100644
+--- a/crates/mln_c/src/generated/types.rs
++++ b/crates/mln_c/src/generated/types.rs
+@@ -3340,7 +3340,8 @@ pub type mln_gpu_device_option_fields = u32;
+ /** Options for mln_gpu_device_create().
+ 
+  Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
+- `adapter_luid`. Without one, the device prefers a discrete GPU.*/
++ `adapter_luid`. Without one, the device prefers a discrete GPU. An OpenGL
++ device takes none of them: it renders on the GPU that the platform picks.*/
+ #[repr(C)]
+ #[derive(Debug, Copy, Clone)]
+ pub struct mln_gpu_device_options {
+@@ -3354,12 +3355,11 @@ pub struct mln_gpu_device_options {
+     /// The GPU to use, as an index into the backend's list of GPUs.
+     pub adapter_index: u32,
+     /** The 16-byte UUID of the GPU to use: Vulkan's
+- `VkPhysicalDeviceIDProperties.deviceUUID`, or OpenGL's
+- `GL_DEVICE_UUID_EXT`.*/
++ `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.*/
+     pub adapter_uuid: mln_buffer_view,
+     /** The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
+- which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`, and on
+- Apple platforms, its `MTLDevice.registryID`, in the platform's byte order.*/
++ which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a
++ Vulkan device takes one.*/
+     pub adapter_luid: mln_buffer_view,
+     /** The OpenGL API that an OpenGL device renders with. An EGL device
+  defaults to MLN_OPEN_GL_CLIENT_API_GLES, and takes
 diff --git a/crates/mln_c/src/gpu_device.rs b/crates/mln_c/src/gpu_device.rs
-index 0acc104..c2585ab 100644
+index 0acc1042..c2585abe 100644
 --- a/crates/mln_c/src/gpu_device.rs
 +++ b/crates/mln_c/src/gpu_device.rs
 @@ -41,12 +41,12 @@ static DEVICES: HandleTable<Device> = HandleTable::new(HandleKind::GpuDevice);
@@ -254,7 +344,7 @@ index 0acc104..c2585ab 100644
                  use mln_vulkan::ash::vk::Handle as _;
                  let raw = vulkan.raw();
 diff --git a/crates/mln_c/src/render_target.rs b/crates/mln_c/src/render_target.rs
-index 691dcf7..8c27884 100644
+index 691dcf7e..8c27884b 100644
 --- a/crates/mln_c/src/render_target.rs
 +++ b/crates/mln_c/src/render_target.rs
 @@ -64,7 +64,7 @@ enum Target {
@@ -368,3 +458,28 @@ index 691dcf7..8c27884 100644
              egl
          } else {
              0
+diff --git a/crates/mln_runtime/src/render/local.rs b/crates/mln_runtime/src/render/local.rs
+index e060b74d..1279d8a0 100644
+--- a/crates/mln_runtime/src/render/local.rs
++++ b/crates/mln_runtime/src/render/local.rs
+@@ -350,6 +350,8 @@ impl Backend {
+             }
+             #[cfg(all(feature = "gl", unix, not(target_vendor = "apple")))]
+             Backend::Gl(backend) => {
++                // A build with OpenGL alone has no other kind of device.
++                #[allow(irrefutable_let_patterns)]
+                 let Device::Gl(device) = device else {
+                     return Err(Error::unsupported("an OpenGL backend renders on an OpenGL device"));
+                 };
+diff --git a/crates/mln_runtime/src/render/target.rs b/crates/mln_runtime/src/render/target.rs
+index cb797d7e..f505a56d 100644
+--- a/crates/mln_runtime/src/render/target.rs
++++ b/crates/mln_runtime/src/render/target.rs
+@@ -285,6 +285,7 @@ impl BorrowedRing {
+     #[must_use]
+     pub fn takes_depth_on(&self, device: &Device) -> bool {
+         #[cfg(all(feature = "gl", not(target_family = "wasm")))]
++        #[allow(irrefutable_let_patterns)]
+         if let RingKind::Gl(_) = self.kind {
+             return true;
+         }

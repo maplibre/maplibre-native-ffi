@@ -38,7 +38,8 @@ typedef uint32_t mln_gpu_device_option_fields;
  * Options for mln_gpu_device_create().
  *
  * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
- * `adapter_luid`. Without one, the device prefers a discrete GPU.
+ * `adapter_luid`. Without one, the device prefers a discrete GPU. An OpenGL
+ * device takes none of them: it renders on the GPU that the platform picks.
  */
 typedef struct mln_gpu_device_options {
   uint32_t size;
@@ -56,16 +57,15 @@ typedef struct mln_gpu_device_options {
     MLN_BINDING("mask=fields;bit=MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX");
   /**
    * The 16-byte UUID of the GPU to use: Vulkan's
-   * `VkPhysicalDeviceIDProperties.deviceUUID`, or OpenGL's
-   * `GL_DEVICE_UUID_EXT`.
+   * `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.
    */
   mln_buffer_view adapter_uuid MLN_BINDING(
     "encoding=bytes;mask=fields;bit=MLN_GPU_DEVICE_OPTION_ADAPTER_UUID"
   );
   /**
    * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
-   * which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`, and on
-   * Apple platforms, its `MTLDevice.registryID`, in the platform's byte order.
+   * which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a
+   * Vulkan device takes one.
    */
   mln_buffer_view adapter_luid MLN_BINDING(
     "encoding=bytes;mask=fields;bit=MLN_GPU_DEVICE_OPTION_ADAPTER_LUID"
@@ -186,11 +186,14 @@ typedef struct mln_gpu_device_vulkan_context_result {
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when this build or platform lacks `backend`, when
- *   the device can't render with `open_gl_client_api`, when a device that
- *   doesn't render with Vulkan gets a `queue_lock`, or in a browser for every
- *   backend: WebGPU makes devices asynchronously, and a WebGL2 context needs a
- *   canvas. Attach without a device, which the session makes itself, or wrap
- *   your WebGL2 context.
+ *   the device can't render with `open_gl_client_api`, when options name a GPU
+ *   that the backend can't select (an OpenGL device takes no `adapter_index`,
+ *   `adapter_uuid`, or `adapter_luid`, and only a Vulkan device takes
+ *   `adapter_uuid` or `adapter_luid`), when a device that doesn't render with
+ *   Vulkan gets a `queue_lock`, or in a browser for every backend: WebGPU makes
+ *   devices asynchronously, and a WebGL2 context needs a canvas. Attach
+ *   without a device, which the session makes itself, or wrap your WebGL2
+ *   context.
  * - MLN_STATUS_NOT_FOUND when no GPU matches `adapter_index`, `adapter_uuid`,
  *   or `adapter_luid`.
  * - MLN_STATUS_NATIVE_ERROR when the platform can't create the device.

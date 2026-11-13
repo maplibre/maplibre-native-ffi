@@ -1310,7 +1310,8 @@ export interface GpuDeviceCapabilities {
  * Options for `GpuDeviceHandle.create()`.
  *
  * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
- * `adapter_luid`. Without one, the device prefers a discrete GPU.
+ * `adapter_luid`. Without one, the device prefers a discrete GPU. An OpenGL
+ * device takes none of them: it renders on the GPU that the platform picks.
  *
  * See `mln_gpu_device_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
@@ -1329,14 +1330,13 @@ export interface GpuDeviceOptions {
   adapterIndex?: number;
   /**
    * The 16-byte UUID of the GPU to use: Vulkan's
-   * `VkPhysicalDeviceIDProperties.deviceUUID`, or OpenGL's
-   * `GL_DEVICE_UUID_EXT`.
+   * `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.
    */
   adapterUuid?: Uint8Array;
   /**
    * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
-   * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`, and on Apple
-   * platforms, its `MTLDevice.registryID`, in the platform's byte order.
+   * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a Vulkan
+   * device takes one.
    */
   adapterLuid?: Uint8Array;
   /**
