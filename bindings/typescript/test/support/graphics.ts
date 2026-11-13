@@ -350,7 +350,7 @@ export function attachCallerSession(map: MapHandle): RenderSessionHandle {
     const session = map.attach(ownTarget().target, undefined, {
       driver: RenderDriverKind.callerGraphicsThread,
     });
-    teardown(() => releaseSession(session));
+    teardown(() => releaseSession(session, true));
     return session;
   }
   const context = openGraphics();
@@ -361,7 +361,7 @@ export function attachCallerSession(map: MapHandle): RenderSessionHandle {
   const session = attachBorrowedTexture(context, wrapDevice(context), map, {
     driver: RenderDriverKind.callerGraphicsThread,
   });
-  teardown(() => releaseSession(session));
+  teardown(() => releaseSession(session, true));
   return session;
 }
 
@@ -413,12 +413,23 @@ export class NativeProbe implements ProbeAddresses {
  * Abandons a session, then disposes it. A session that the case detached,
  * abandoned, or disposed already has nothing left to abandon, and a second
  * dispose does nothing.
+ *
+ * A session that this thread services keeps its graphics objects after the
+ * abandon until its next service, so a `serviced` session is serviced once
+ * more before the teardowns that destroy the device it renders on.
  */
-function releaseSession(session: RenderSessionHandle): void {
+function releaseSession(session: RenderSessionHandle, serviced = false): void {
   try {
     session.abandon();
   } catch {
     // Native code reports what the session has already given up.
+  }
+  if (serviced) {
+    try {
+      session.serviceDriverWork();
+    } catch {
+      // The service of an abandoned session reports that it ended.
+    }
   }
   session.dispose();
 }
@@ -505,7 +516,7 @@ export class TestSession {
       },
       driverWorkWake: serviced ? { callback: wake.wake } : undefined,
     });
-    teardown(() => releaseSession(session));
+    teardown(() => releaseSession(session, serviced));
     attached = new TestSession(session, wake, serviced);
     await attached.settle(session.ready, "the attachment");
     return attached;
@@ -573,7 +584,7 @@ export class TestSession {
       frameWake: { callback: wake.wake },
       driverWorkWake: serviced ? { callback: wake.wake } : undefined,
     });
-    teardown(() => releaseSession(session));
+    teardown(() => releaseSession(session, serviced));
     const attached = new TestSession(session, wake, serviced);
     await attached.settle(session.ready, "the attachment");
     return attached;
