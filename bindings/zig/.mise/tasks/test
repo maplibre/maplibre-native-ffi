@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-#MISE description="Test the Zig binding against a native preset's install."
-#MISE extends="ffi:preset"
+#MISE description="Test the Zig binding against a native preset's install, with one of its render backends."
+#MISE extends="ffi:test"
 #MISE shell="bash"
 set -euo pipefail
 
@@ -10,6 +10,7 @@ set -euo pipefail
 # MLN_TEST_TIMEOUT_SCALE, which defaults to 3 on emulators and in the software
 # renderers of Alpine and the virtual machine, and to 1 on the host; the fixture
 # scales its waits by the same value.
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 case "$usage_preset" in
   android-* | linux-musl-* | freebsd-*)
@@ -28,6 +29,7 @@ source "$MISE_MONOREPO_ROOT/tools/env/zig-cross-env.sh" "$usage_preset"
 zig build test --build-file ../../build.zig \
   -Doptimize=ReleaseSafe \
   -Dlocal-build="$native_install_dir" \
+  -Dbackend="$MLN_FFI_TEST_BACKEND" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/Vulkan-Headers/include" \
   ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
   --test-timeout "$((30 * MLN_TEST_TIMEOUT_SCALE))s" \
