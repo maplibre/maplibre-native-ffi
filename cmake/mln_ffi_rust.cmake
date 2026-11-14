@@ -77,6 +77,10 @@ function(mln_ffi_link_rust_platform target)
       "CARGO_TARGET_${rust_target_env}_LINKER=${rust_linker}"
       "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
       "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}")
+  # Go 1.27's cgo linker rejects LLVM bitcode sections in static archives named
+  # by #cgo LDFLAGS. rustc 1.100 embeds .llvmbc in staticlib output unless this
+  # is off.
+  set(rust_flags "-C embed-bitcode=no")
   # Emscripten rejects mixing objects that carry atomics with objects that do
   # not under shared memory, and rustup ships no wasm32-unknown-emscripten std
   # built with atomics, so std is rebuilt from source. -Zbuild-std is
@@ -85,10 +89,12 @@ function(mln_ffi_link_rust_platform target)
   # keeps the rest of the workspace, and every artifact we ship, on stable.
   set(rust_extra_args)
   if(EMSCRIPTEN)
-    list(APPEND rust_environment "RUSTC_BOOTSTRAP=1"
-         "RUSTFLAGS=-C target-feature=+atomics,+bulk-memory -C panic=abort")
+    set(rust_flags
+        "${rust_flags} -C target-feature=+atomics,+bulk-memory -C panic=abort")
+    list(APPEND rust_environment "RUSTC_BOOTSTRAP=1")
     list(APPEND rust_extra_args -Z build-std=std,panic_abort)
   endif()
+  list(APPEND rust_environment "RUSTFLAGS=${rust_flags}")
 
   # The manifest declares only the library that Rust hosts build from crates.io,
   # so the static library is asked for here.

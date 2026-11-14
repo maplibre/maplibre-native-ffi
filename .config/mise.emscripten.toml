@@ -4,6 +4,8 @@
 # The vfox plugin runs the current emsdk launcher before emsdk installs its bundled
 # Python. Use the project Python because Apple's version can be older than the
 # launcher's minimum; `depends` installs it before the environment below resolves it.
+# vfox:emsdk still downloads emsdk's `main` tarball for a tagged version, so
+# `.config/mise.emscripten.lock` must be relocked when that branch moves.
 emsdk = { version = "6.0.13", depends = ["python"] }
 
 [env]
