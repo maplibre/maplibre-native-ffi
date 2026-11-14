@@ -397,6 +397,8 @@ class Meter {
   uint64_t allocations_ = 0;
   uint64_t allocated_bytes_ = 0;
   uint64_t instructions_ = 0;
+  // Whether every span's instructions were counted.
+  bool instructions_counted_ = true;
   uint64_t events_ = 0;
   uint64_t process_cpu_ns_ = 0;
   uint64_t named_cpu_ns_ = 0;
@@ -405,6 +407,7 @@ class Meter {
   uint64_t span_allocations_ = 0;
   uint64_t span_bytes_ = 0;
   uint64_t span_instructions_ = 0;
+  bool span_instructions_counted_ = false;
   uint64_t span_events_ = 0;
   uint64_t span_process_cpu_ns_ = 0;
   uint64_t span_own_cpu_ns_ = 0;
@@ -413,12 +416,14 @@ class Meter {
 };
 
 // Starts counting the user-space instructions of this thread and of every
-// thread started after it, for the meter's `minstr`, on Linux where perf events
-// are open to the process (kernel.perf_event_paranoid at most 2). Load on the
-// machine hardly changes the count, so it shows a change in the work done where
-// the times are noise. The kernel's work, such as waking a thread, is left out
-// and shows only in the CPU times. Call it before the library starts any
-// thread. Reports whether it counts.
+// thread it, or a thread it starts, starts from now on, for the meter's
+// `minstr`. Linux only, and only where perf events are open to the process
+// (kernel.perf_event_paranoid at most 2). Call it at the top of main(): it
+// counts nothing when another thread already runs. The count leaves out other
+// processes, so load on the machine hardly changes it; it also leaves out the
+// kernel's work, such as waking a thread, which shows only in the CPU times. A
+// case reports no `minstr` when a counter can't be read. Reports whether it
+// counts.
 auto open_instruction_counters() -> bool;
 
 // The malloc heap in use and the resident memory, in KiB, or 0 where the
