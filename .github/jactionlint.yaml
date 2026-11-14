@@ -5,7 +5,7 @@ profile: correctness
 # Every third-party action is pinned to a commit, which Dependabot bumps.
 rules:
   unpinned-uses: error
-# The main branch ruleset requires this job. jactionlint 2.5.0's
+# The main branch ruleset requires this job. jactionlint 2.6.0's
 # unreachable-required-check uses the list; it does not read GitHub.
 required-checks:
   - name: ci-required
