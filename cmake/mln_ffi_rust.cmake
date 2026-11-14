@@ -79,8 +79,11 @@ function(mln_ffi_link_rust_platform target)
       "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}")
   # Go 1.27's cgo linker rejects LLVM bitcode sections in static archives named
   # by #cgo LDFLAGS. rustc 1.100 embeds .llvmbc in staticlib output unless this
-  # is off.
-  set(rust_flags "-C embed-bitcode=no")
+  # is off. Flags after cargo rustc `--` win over cargo's own -C flags; the
+  # encoded env form has no spaces, so cmake -E env cannot split them.
+  string(ASCII 31 rust_flag_sep)
+  set(encoded_rustflags "-Cembed-bitcode=no")
+  set(rustc_flags -Cembed-bitcode=no)
   # Emscripten rejects mixing objects that carry atomics with objects that do
   # not under shared memory, and rustup ships no wasm32-unknown-emscripten std
   # built with atomics, so std is rebuilt from source. -Zbuild-std is
@@ -89,21 +92,24 @@ function(mln_ffi_link_rust_platform target)
   # keeps the rest of the workspace, and every artifact we ship, on stable.
   set(rust_extra_args)
   if(EMSCRIPTEN)
-    set(rust_flags
-        "${rust_flags} -C target-feature=+atomics,+bulk-memory -C panic=abort")
+    set(encoded_rustflags
+        "${encoded_rustflags}${rust_flag_sep}-Ctarget-feature=+atomics,+bulk-memory${rust_flag_sep}-Cpanic=abort"
+    )
     list(APPEND rust_environment "RUSTC_BOOTSTRAP=1")
     list(APPEND rust_extra_args -Z build-std=std,panic_abort)
+    list(
+      APPEND rustc_flags -Ctarget-feature=+atomics,+bulk-memory -Cpanic=abort)
   endif()
-  list(APPEND rust_environment "RUSTFLAGS=${rust_flags}")
+  list(APPEND rust_environment "CARGO_ENCODED_RUSTFLAGS=${encoded_rustflags}")
 
   # The manifest declares only the library that Rust hosts build from crates.io,
   # so the static library is asked for here.
-  add_custom_command(
-    OUTPUT "${rust_library}"
-    COMMAND
+  set(rust_build_commands
+      COMMAND
       ${CMAKE_COMMAND}
       -E
       env
+      --
       ${rust_environment}
       "${CARGO_EXECUTABLE}"
       rustc
@@ -118,6 +124,22 @@ function(mln_ffi_link_rust_platform target)
       "${rust_target}"
       --release
       ${rust_extra_args}
+      --
+      ${rustc_flags})
+  # Go 1.27 scans ELF members of archives named by #cgo LDFLAGS. Strip leftover
+  # bitcode even if a wrapper dropped the rustc flag.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_OBJCOPY)
+    list(
+      APPEND
+      rust_build_commands
+      COMMAND
+      "${CMAKE_OBJCOPY}"
+      --remove-section=.llvmbc
+      --remove-section=.llvm_lto
+      "${rust_library}")
+  endif()
+  add_custom_command(
+    OUTPUT "${rust_library}" ${rust_build_commands}
     DEPENDS
       "${rust_manifest}" ${rust_sources} "${PROJECT_SOURCE_DIR}/Cargo.toml"
       "${PROJECT_SOURCE_DIR}/Cargo.lock"

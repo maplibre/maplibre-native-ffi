@@ -18,11 +18,25 @@ import 'fixture.dart';
 /// references and runs native finalizers before its reply arrives.
 Future<void> collectGarbage() => within(_collect(), 'garbage collection');
 
+Future<WebSocket> _connectService(String uri) async {
+  final deadline = DateTime.now().add(waitDeadline);
+  while (true) {
+    try {
+      return await WebSocket.connect(uri);
+    } on SocketException {
+      if (DateTime.now().isAfter(deadline)) {
+        rethrow;
+      }
+    }
+  }
+}
+
 Future<void> _collect() async {
   final previous = await developer.Service.getInfo();
   final service = await developer.Service.controlWebServer(enable: true);
   final uri = service.serverUri!;
-  final socket = await WebSocket.connect(
+  // Dart 3.14 can return this URI before loopback accepts the WebSocket.
+  final socket = await _connectService(
     uri.replace(scheme: 'ws', path: '${uri.path}ws').toString(),
   );
   final replies = StreamIterator(
