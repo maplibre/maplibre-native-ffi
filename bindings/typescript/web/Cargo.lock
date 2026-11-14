@@ -568,6 +568,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "fontdb"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2660c5e9157bf76d2db1294e4a9feba604ef610819a3b591088d0d8392a3290f"
+dependencies = [
+ "log",
+ "memmap2",
+ "slotmap",
+ "tinyvec",
+]
+
+[[package]]
 name = "foreign-types"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1482,6 +1494,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
+name = "memmap2"
+version = "0.9.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b0ca1155a9ecc25aa12e8313a119f32edf0255fea2f44839c4ac0a12b2ac157"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1529,6 +1550,7 @@ dependencies = [
  "mln-rs-storage",
  "mln-rs-style",
  "mln-rs-style-types",
+ "mln-rs-system-fonts",
  "mln-rs-text",
  "mln-rs-tile-id",
  "mln-rs-util",
@@ -1585,6 +1607,7 @@ dependencies = [
  "objc2-foundation",
  "serde",
  "serde_json",
+ "smallvec",
  "thiserror",
  "wasm-bindgen",
  "writeable",
@@ -1782,6 +1805,7 @@ dependencies = [
  "mln-rs-storage-offline",
  "mln-rs-style",
  "mln-rs-style-types",
+ "mln-rs-system-fonts",
  "mln-rs-text",
  "mln-rs-tile-id",
  "mln-rs-util",
@@ -1904,6 +1928,24 @@ dependencies = [
  "mln-rs-feature",
  "mln-rs-geometry",
  "mln-rs-kdbush",
+]
+
+[[package]]
+name = "mln-rs-system-fonts"
+version = "0.0.11"
+dependencies = [
+ "fontdb",
+ "jni",
+ "libloading",
+ "memmap2",
+ "mln-rs-text",
+ "mln-rs-util",
+ "objc2-core-foundation",
+ "objc2-core-text",
+ "skrifa",
+ "sys-locale",
+ "windows",
+ "windows-core",
 ]
 
 [[package]]
@@ -2190,10 +2232,22 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e022c9d066895efa1345f8e33e584b9f958da2fd4cd116792e15e07e4720a807"
 dependencies = [
+ "bitflags",
  "dispatch2",
  "objc2",
  "objc2-core-foundation",
  "objc2-io-surface",
+]
+
+[[package]]
+name = "objc2-core-text"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cde0dfb48d25d2b4862161a4d5fcc0e3c24367869ad306b0c9ec0073bfed92d"
+dependencies = [
+ "bitflags",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
 ]
 
 [[package]]
@@ -3166,6 +3220,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "sys-locale"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eab9a99a024a169fe8a903cf9d4a3b3601109bcc13bd9e3c6fff259138626c4"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

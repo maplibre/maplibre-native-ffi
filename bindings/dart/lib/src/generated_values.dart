@@ -7332,6 +7332,7 @@ final class MapOptions extends _Value {
     this.eventMask,
     this.tileCacheEnabled,
     this.fallbackFontFaces = '',
+    this.systemFontsEnabled,
   });
 
   /// The map's first size, and its scale factor. Render sessions of the map
@@ -7355,8 +7356,17 @@ final class MapOptions extends _Value {
   /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
   /// font files, each an object with a `url` and an optional `unicode-range`,
   /// as in a font face of a style's `font-faces`, which every font stack uses
-  /// after the style's own font faces. Empty for none.
+  /// after the style's own font faces. Empty for the system's fonts, unless
+  /// `system_fonts_enabled` is false.
   final String fallbackFontFaces;
+
+  /// Whether the map falls back to the system's fonts for CJK and the scripts
+  /// that need complex shaping when `fallback_font_faces` is empty: fonts that
+  /// the platform's font matcher picks for the user's preferred languages.
+  /// Without it, the map does. The first map that uses them waits for them to
+  /// be found. In the browser, the browser draws CJK glyphs in its sans-serif
+  /// font instead, where `fallback_font_faces` doesn't cover them.
+  final bool? systemFontsEnabled;
 
   /// A copy of this value with the given members replaced.
   MapOptions copyWith({
@@ -7366,6 +7376,7 @@ final class MapOptions extends _Value {
     RuntimeEventFlag? eventMask,
     bool? tileCacheEnabled,
     String? fallbackFontFaces,
+    bool? systemFontsEnabled,
   }) => MapOptions(
     initialExtent: initialExtent ?? this.initialExtent,
     mapMode: mapMode ?? this.mapMode,
@@ -7373,6 +7384,7 @@ final class MapOptions extends _Value {
     eventMask: eventMask ?? this.eventMask,
     tileCacheEnabled: tileCacheEnabled ?? this.tileCacheEnabled,
     fallbackFontFaces: fallbackFontFaces ?? this.fallbackFontFaces,
+    systemFontsEnabled: systemFontsEnabled ?? this.systemFontsEnabled,
   );
 
   @override
@@ -7383,6 +7395,7 @@ final class MapOptions extends _Value {
     eventMask,
     tileCacheEnabled,
     fallbackFontFaces,
+    systemFontsEnabled,
   ];
   @override
   String toString() => _describe('MapOptions', const [
@@ -7392,6 +7405,7 @@ final class MapOptions extends _Value {
     'eventMask',
     'tileCacheEnabled',
     'fallbackFontFaces',
+    'systemFontsEnabled',
   ]);
 }
 

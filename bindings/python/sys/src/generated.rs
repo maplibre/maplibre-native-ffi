@@ -204,6 +204,7 @@ pub const MLN_MAP_MODE_TILE: mln_map_mode = 2;
 pub type mln_map_option_field = u32;
 pub const MLN_MAP_OPTION_EVENT_MASK: mln_map_option_field = 1;
 pub const MLN_MAP_OPTION_TILE_CACHE_ENABLED: mln_map_option_field = 2;
+pub const MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED: mln_map_option_field = 4;
 pub type mln_map_tile_option_field = u32;
 pub const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA: mln_map_tile_option_field = 1;
 pub const MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS: mln_map_tile_option_field = 2;
@@ -1159,6 +1160,7 @@ pub struct mln_map_options {
     pub event_mask: mln_runtime_event_flags,
     pub tile_cache_enabled: bool,
     pub fallback_font_faces: mln_buffer_view,
+    pub system_fonts_enabled: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

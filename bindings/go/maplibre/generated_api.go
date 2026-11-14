@@ -4099,8 +4099,15 @@ type MapOptions struct {
 	// need complex shaping, like Myanmar or Devanagari. A JSON array of font files,
 	// each an object with a url and an optional unicode-range, as in a font face of
 	// a style's font-faces, which every font stack uses after the style's own font
-	// faces. Empty for none.
+	// faces. Empty for the system's fonts, unless system_fonts_enabled is false.
 	FallbackFontFaces string
+	// Whether the map falls back to the system's fonts for CJK and the scripts that
+	// need complex shaping when fallback_font_faces is empty: fonts that the
+	// platform's font matcher picks for the user's preferred languages. Without it,
+	// the map does. The first map that uses them waits for them to be found. In the
+	// browser, the browser draws CJK glyphs in its sans-serif font instead, where
+	// fallback_font_faces doesn't cover them.
+	SystemFontsEnabled *bool
 }
 
 func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
@@ -4113,6 +4120,7 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_EVENT_MASK, &raw.event_mask, input.EventMask, arena, bindingNumber[RuntimeEventFlag, C.mln_runtime_event_flags])
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_TILE_CACHE_ENABLED, &raw.tile_cache_enabled, input.TileCacheEnabled, arena, bindingBool[bool, C.bool])
 	raw.fallback_font_faces = C.mln_buffer_view{data: arena.bytes([]byte(input.FallbackFontFaces)), size: C.size_t(len(input.FallbackFontFaces))}
+	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED, &raw.system_fonts_enabled, input.SystemFontsEnabled, arena, bindingBool[bool, C.bool])
 	return raw
 }
 

@@ -5610,8 +5610,17 @@ pub const MapOptions = struct {
     /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
     /// font files, each an object with a `url` and an optional `unicode-range`,
     /// as in a font face of a style's `font-faces`, which every font stack uses
-    /// after the style's own font faces. Empty for none.
+    /// after the style's own font faces. Empty for the system's fonts, unless
+    /// `system_fonts_enabled` is false.
     fallback_font_faces: []const u8 = &.{},
+    /// Whether the map falls back to the system's fonts for CJK and the scripts
+    /// that need complex shaping when `fallback_font_faces` is empty: fonts
+    /// that the platform's font matcher picks for the user's preferred
+    /// languages. Without it, the map does. The first map that uses them waits
+    /// for them to be found. In the browser, the browser draws CJK glyphs in
+    /// its sans-serif font instead, where `fallback_font_faces` doesn't cover
+    /// them.
+    system_fonts_enabled: ?bool = null,
     pub fn toNative(self: MapOptions) status.Error!c.mln_map_options {
         var raw = std.mem.zeroes(c.mln_map_options);
         raw.fields = 0;
@@ -5622,6 +5631,7 @@ pub const MapOptions = struct {
         marshal.present(&raw.fields, c.MLN_MAP_OPTION_EVENT_MASK, &raw.event_mask, self.event_mask);
         marshal.present(&raw.fields, c.MLN_MAP_OPTION_TILE_CACHE_ENABLED, &raw.tile_cache_enabled, self.tile_cache_enabled);
         raw.fallback_font_faces = marshal.view(self.fallback_font_faces);
+        marshal.present(&raw.fields, c.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED, &raw.system_fonts_enabled, self.system_fonts_enabled);
         return raw;
     }
 
@@ -5633,6 +5643,7 @@ pub const MapOptions = struct {
             .event_mask = if (raw.fields & c.MLN_MAP_OPTION_EVENT_MASK != 0) RuntimeEventFlag.fromNative(raw.event_mask) else null,
             .tile_cache_enabled = if (raw.fields & c.MLN_MAP_OPTION_TILE_CACHE_ENABLED != 0) raw.tile_cache_enabled else null,
             .fallback_font_faces = try marshal.copyView(allocator, raw.fallback_font_faces),
+            .system_fonts_enabled = if (raw.fields & c.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED != 0) raw.system_fonts_enabled else null,
         };
     }
 };

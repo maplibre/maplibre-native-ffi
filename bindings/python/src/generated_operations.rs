@@ -2626,6 +2626,10 @@ fn generated_input_mln_map_options<'py>(
         raw.fields |= sys::MLN_MAP_OPTION_TILE_CACHE_ENABLED;
     }
     raw.fallback_font_faces = storage.buffer(value.getattr("fallback_font_faces")?, true)?;
+    if let Some(field) = generated_present(value, "system_fonts_enabled")? {
+        raw.system_fonts_enabled = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED;
+    }
     Ok(raw)
 }
 

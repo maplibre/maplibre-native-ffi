@@ -8957,9 +8957,18 @@ public data class MapOptions(
    * Fonts for the text that a style's own fonts don't draw, such as scripts that need complex
    * shaping, like Myanmar or Devanagari. A JSON array of font files, each an object with a `url`
    * and an optional `unicode-range`, as in a font face of a style's `font-faces`, which every font
-   * stack uses after the style's own font faces. Empty for none.
+   * stack uses after the style's own font faces. Empty for the system's fonts, unless
+   * `system_fonts_enabled` is false.
    */
   public val fallbackFontFaces: String = "",
+  /**
+   * Whether the map falls back to the system's fonts for CJK and the scripts that need complex
+   * shaping when `fallback_font_faces` is empty: fonts that the platform's font matcher picks for
+   * the user's preferred languages. Without it, the map does. The first map that uses them waits
+   * for them to be found. In the browser, the browser draws CJK glyphs in its sans-serif font
+   * instead, where `fallback_font_faces` doesn't cover them.
+   */
+  public val systemFontsEnabled: Boolean? = null,
 ) {
   @PublishedApi internal fun withMapMode(mapMode: MapMode): MapOptions = copy(mapMode = mapMode)
 
@@ -8977,6 +8986,10 @@ public data class MapOptions(
   @PublishedApi
   internal fun withFallbackFontFaces(fallbackFontFaces: String): MapOptions =
     copy(fallbackFontFaces = fallbackFontFaces)
+
+  @PublishedApi
+  internal fun withSystemFontsEnabled(systemFontsEnabled: Boolean): MapOptions =
+    copy(systemFontsEnabled = systemFontsEnabled)
 
   public companion object {
     /**

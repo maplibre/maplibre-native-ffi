@@ -43,7 +43,18 @@ public sealed record MapOptions
     /// font files, each an object with a <c>url</c> and an optional
     /// <c>unicode-range</c>, as in a font face of a style's <c>font-faces</c>,
     /// which every font stack uses after the style's own font faces. Empty for
-    /// none.
+    /// the system's fonts, unless <c>system_fonts_enabled</c> is false.
     /// </summary>
     public string FallbackFontFaces { get; init; } = "";
+
+    /// <summary>
+    /// Whether the map falls back to the system's fonts for CJK and the scripts
+    /// that need complex shaping when <c>fallback_font_faces</c> is empty:
+    /// fonts that the platform's font matcher picks for the user's preferred
+    /// languages. Without it, the map does. The first map that uses them waits
+    /// for them to be found. In the browser, the browser draws CJK glyphs in
+    /// its sans-serif font instead, where <c>fallback_font_faces</c> doesn't
+    /// cover them.
+    /// </summary>
+    public bool? SystemFontsEnabled { get; init; }
 }

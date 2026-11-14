@@ -1395,15 +1395,24 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
   /// font files, each an object with a `url` and an optional `unicode-range`,
   /// as in a font face of a style's `font-faces`, which every font stack uses
-  /// after the style's own font faces. Empty for none.
+  /// after the style's own font faces. Empty for the system's fonts, unless
+  /// `system_fonts_enabled` is false.
   public var fallbackFontFaces: String
+  /// Whether the map falls back to the system's fonts for CJK and the scripts
+  /// that need complex shaping when `fallback_font_faces` is empty: fonts that
+  /// the platform's font matcher picks for the user's preferred languages.
+  /// Without it, the map does. The first map that uses them waits for them to
+  /// be found. In the browser, the browser draws CJK glyphs in its sans-serif
+  /// font instead, where `fallback_font_faces` doesn't cover them.
+  public var systemFontsEnabled: Bool?
   public init(
     initialExtent: LogicalExtent,
     mapMode: MapMode = .init(rawValue: 0),
     fastPforEnabled: Bool = false,
     eventMask: RuntimeEventFlag? = nil,
     tileCacheEnabled: Bool? = nil,
-    fallbackFontFaces: String = ""
+    fallbackFontFaces: String = "",
+    systemFontsEnabled: Bool? = nil
   ) {
     self.initialExtent = initialExtent
     self.mapMode = mapMode
@@ -1411,6 +1420,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     self.eventMask = eventMask
     self.tileCacheEnabled = tileCacheEnabled
     self.fallbackFontFaces = fallbackFontFaces
+    self.systemFontsEnabled = systemFontsEnabled
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_map_options {
@@ -1429,6 +1439,10 @@ public struct MapOptions: Equatable, Hashable, Sendable {
         .tile_cache_enabled = item
     }
     raw.fallback_font_faces = arena.view(fallbackFontFaces)
+    if let item = systemFontsEnabled {
+      raw.fields |= MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED.rawValue; raw
+        .system_fonts_enabled = item
+    }
     return raw
   }
 }
