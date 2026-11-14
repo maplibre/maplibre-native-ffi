@@ -1,14 +1,22 @@
 // The child side of a spawned @ohos.worker realm, for the ArkTS bundle. The
-// first message is the realm's data; the port takes it as soon as this module
-// loads, so it is kept until the realm asks for it.
+// first message is the realm's data and the spawning realm's `process.env`,
+// which this realm's own `process` shim starts without. The port takes it as
+// soon as this module loads, so it is kept until the realm asks for it.
 
 import worker from "@ohos.worker";
+
+import process from "./node/process.ts";
 
 const port = worker.workerPort;
 const data = new Promise<unknown>((resolve) => {
   port.onmessage = (event) => {
     port.onmessage = null;
-    resolve(event.data);
+    const message = event.data as {
+      env: Record<string, string | undefined>;
+      data: unknown;
+    };
+    Object.assign(process.env, message.env);
+    resolve(message.data);
   };
 });
 
