@@ -26,7 +26,6 @@ from sbom import (
     document,
     package_inventory,
     stamp,
-    without_native_rust,
     write_json,
 )
 
@@ -158,13 +157,17 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
         RUNTIMES[runtime],
         "0.0.0",
         "pypi",
-        [without_native_rust(inventory), extension],
+        # The wheel bundles the prebuilt native library, crates and all, and
+        # adds the extension's own crates.
+        [inventory, extension],
     )
     result["metadata"]["component"]["properties"] = [
         {"name": "maplibre:source-commit", "value": descriptor["commit"]}
     ]
     write_json(licenses.parent / SBOM_NAME, result)
-    (licenses / "rust.md").write_text(cargo_notices(about), encoding="utf-8")
+    (licenses / "python-extension.md").write_text(
+        cargo_notices(about), encoding="utf-8"
+    )
     sysroot = pathlib.Path(
         subprocess.check_output(["rustc", "--print", "sysroot"], text=True).strip()
     )
