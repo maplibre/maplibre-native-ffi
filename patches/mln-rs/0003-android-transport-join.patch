@@ -1,0 +1,19 @@
+Wait for the Android HTTP transport's workers with JoinHandle::join.
+
+The pinned main doesn't build for Android: its HttpURLConnection transport
+calls mln_util::thread::join, which an earlier change removed. Upstream:
+https://github.com/louwers/mln-rs/pull/403
+
+diff --git a/crates/mln_storage/src/http_url_connection_transport.rs b/crates/mln_storage/src/http_url_connection_transport.rs
+index e285f25f..0e4327ae 100644
+--- a/crates/mln_storage/src/http_url_connection_transport.rs
++++ b/crates/mln_storage/src/http_url_connection_transport.rs
+@@ -98,7 +98,7 @@ impl Drop for Transport {
+         self.requests = None;
+         if matches!(self.ended.get_mut().recv_timeout(STOP_TIMEOUT), Err(mpsc::RecvTimeoutError::Disconnected)) {
+             for worker in self.workers.drain(..) {
+-                mln_util::thread::join(worker);
++                let _ = worker.join();
+             }
+         }
+     }
