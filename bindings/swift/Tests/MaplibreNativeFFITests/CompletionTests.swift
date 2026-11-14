@@ -45,7 +45,7 @@ private struct ConversionFailure: Error {}
     #expect(try fixture.map.getSnapshot().debugFlags == .tileBorders)
     #expect(throws: MaplibreError.self) {
       try fixture.map.discarding.resize(
-        logicalSize: LogicalSize(width: 0, height: 8)
+        extent: LogicalExtent(width: 0, height: 8, scaleFactor: 1)
       )
     }
   }

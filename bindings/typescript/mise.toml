@@ -13,7 +13,7 @@ pnpm exec typedoc --entryPoints src/index.ts src/browser.ts src/hermes.ts --excl
 '''
 
 [tasks.pack]
-description = "Pack the facade, a desktop or Emscripten preset's backend package, and its addon package into npm tarballs."
+description = "Pack the facade, and a desktop preset's runtime and addon packages or a web preset's runtime package, into npm tarballs."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}"
 flag "--version <version>" default="0.0.0" help="The version of every package"
@@ -25,7 +25,7 @@ node scripts/pack.ts --version "$usage_version" build/npm "$usage_preset"
 '''
 
 [tasks.pack-ohpm]
-description = "Pack the ArkTS facade and an OpenHarmony preset's backend into OHPM HARs."
+description = "Pack the ArkTS facade and an OpenHarmony preset's runtime into OHPM HARs."
 usage = '''
 arg "<preset>"
 flag "--version <version>" default="0.0.0" help="The version of every package"
@@ -39,19 +39,22 @@ scripts/pack-ohpm.sh --version "$usage_version" build/ohpm "$usage_preset"
 # The test task builds the addon first.
 [tasks._test-arkts]
 hide = true
-usage = 'arg "<preset>"'
+usage = '''
+arg "<preset>"
+arg "<backend>"
+'''
 # The OpenHarmony SDK packs and signs a HAP with Java tools.
 tools = { "core:java" = "{{vars.java_version}}" }
 run = '''
 cmake --build "native/build/$usage_preset" --target maplibre_native_ffi_test_graphics
-scripts/test-arkts.sh "$usage_preset"
+scripts/test-arkts.sh "$usage_preset" "$usage_backend"
 '''
 
 [tasks."build:hermes"]
 description = "Build the shared TypeScript suite and lifecycle probe with official Hermes."
 usage = '''
 arg "<preset>" {
-  choices "android-arm-egl" "android-arm-vulkan" "android-arm64-egl" "android-arm64-vulkan" "android-x86-egl" "android-x86-vulkan" "android-x64-egl" "android-x64-vulkan" "ios-arm64-metal" "ios-simulator-arm64-metal" "ios-maccatalyst-arm64-metal" "tvos-arm64-metal" "tvos-simulator-arm64-metal" "visionos-arm64-metal" "visionos-simulator-arm64-metal"
+  choices "android-arm" "android-arm64" "android-x86" "android-x64" "ios-arm64" "ios-simulator-arm64" "ios-maccatalyst-arm64" "tvos-arm64" "tvos-simulator-arm64" "visionos-arm64" "visionos-simulator-arm64"
 }
 '''
 tools = { "core:java" = "{{vars.java_version}}" }
@@ -59,11 +62,10 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = 'python scripts/hermes.py build "$usage_preset"'
 
 [tasks."test:hermes"]
-description = "Run the Hermes TypeScript suite, graphics readback, and runtime teardown."
-usage = '''
-arg "<preset>" {
-  choices "android-x86-egl" "android-x86-vulkan" "android-x64-egl" "android-x64-vulkan" "android-arm64-egl" "android-arm64-vulkan" "ios-simulator-arm64-metal" "ios-maccatalyst-arm64-metal" "tvos-simulator-arm64-metal" "visionos-simulator-arm64-metal"
-}
-'''
+description = "Run the Hermes TypeScript suite, graphics readback, and runtime teardown, with one of the preset's render backends."
+extends = "ffi:test"
 depends = [{ task = ":build:hermes", args = ["{{usage.preset}}"] }]
-run = 'python scripts/hermes.py test "$usage_preset"'
+run = '''
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+python scripts/hermes.py test "$usage_preset"
+'''

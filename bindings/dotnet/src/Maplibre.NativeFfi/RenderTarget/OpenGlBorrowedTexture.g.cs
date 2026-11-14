@@ -1,0 +1,24 @@
+// Generated from the C headers by tools/bindgen. Do not edit.
+#nullable enable
+namespace Maplibre.NativeFfi;
+
+/// <summary>
+/// An OpenGL texture of a borrowed ring.
+/// </summary>
+/// <remarks>
+/// See <c>mln_open_gl_borrowed_texture</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
+/// </remarks>
+public readonly partial record struct OpenGlBorrowedTexture
+{
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public OpenGlBorrowedTexture(uint Texture)
+    {
+        this.Texture = Texture;
+    }
+
+    /// <summary>
+    /// Your texture name.
+    /// </summary>
+    public required uint Texture { get; init; }
+}

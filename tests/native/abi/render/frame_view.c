@@ -321,7 +321,8 @@ static void a_frame_view_places_coordinates_where_the_frame_drew_them(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, resized, &completion.descriptor, NULL
+      fixture.session, mln_test_session_extent(fixture.session, resized),
+      &completion.descriptor, NULL
     )
   );
   mln_bound_options bounds = {.size = sizeof(mln_bound_options)};
@@ -455,7 +456,8 @@ static void a_session_resize_reports_the_render_update_of_its_extent(void) {
   const mln_logical_size resized = {.width = 48, .height = 32};
   mln_test_completion resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, resized, &resize.descriptor, NULL
+    fixture.session, mln_test_session_extent(fixture.session, resized),
+    &resize.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &resize));
   const uint64_t render_update =

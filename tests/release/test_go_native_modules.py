@@ -14,10 +14,10 @@ import zipfile
 import go_native_modules as go
 import native_package_release
 
-from tools.ci import gaps
+from tools.ci import gaps, plan
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-MODULE = "maplibre.org/maplibre-native-ffi/go-native/macos-arm64-metal"
+MODULE = "maplibre.org/maplibre-native-ffi/go-native/macos-arm64"
 PKG_CONFIG = """prefix=${pcfiledir}/../..
 libdir=${prefix}/lib
 Libs: -L${libdir} -Wl,-rpath,${libdir} -lmaplibre-native-c -lz
@@ -28,8 +28,8 @@ DESCRIPTOR = {
 
 
 def archive(directory: pathlib.Path, headers: dict[str, bytes]) -> pathlib.Path:
-    """A native archive for macos-arm64-metal with the given headers."""
-    root = "maplibre-native-c-macos-arm64-metal"
+    """A native archive for macos-arm64 with the given headers."""
+    root = "maplibre-native-c-macos-arm64"
     files = {
         "share/pkgconfig/maplibre-native-c.pc": PKG_CONFIG.encode(),
         "share/maplibre-native-c/artifact.json": json.dumps(DESCRIPTOR).encode(),
@@ -61,8 +61,8 @@ class GoNativeModulesTest(unittest.TestCase):
         expected = [
             preset
             for preset in native_package_release.package_presets(ROOT)
-            if gaps.gap("go", gaps.target_from_name(preset), "build") is None
-            and not gaps.target_from_name(preset).platform.startswith("windows")
+            if gaps.supported("go", plan.target_named(preset), "build")
+            and not plan.target_named(preset).platform.startswith(("windows", "mingw"))
         ]
 
         self.assertEqual(go.presets(), expected)
@@ -73,7 +73,7 @@ class GoNativeModulesTest(unittest.TestCase):
             archive(self.directory, headers), "v0.202610.2", "2026-10-01T00:00:00Z"
         )
 
-        self.assertEqual(preset, "macos-arm64-metal")
+        self.assertEqual(preset, "macos-arm64")
         self.assertEqual(
             files["v0.202610.2.mod"], f"module {MODULE}\n\ngo 1.26\n".encode()
         )
@@ -114,14 +114,14 @@ class GoNativeModulesTest(unittest.TestCase):
     ) -> None:
         archive(self.directory, go.binding_headers(ROOT))
         checksums = self.directory / "SHA256SUMS"
-        checksums.write_text("0  maplibre-native-c-macos-arm64-metal.tar.gz\n")
+        checksums.write_text("0  maplibre-native-c-macos-arm64.tar.gz\n")
 
         def release() -> dict[str, bytes]:
             paths = go.write_release(
                 self.directory,
                 "v0.202612.0",
                 "2026-12-01T00:00:00Z",
-                ["macos-arm64-metal"],
+                ["macos-arm64"],
             )
             return {path.name: path.read_bytes() for path in paths}
 
@@ -132,17 +132,17 @@ class GoNativeModulesTest(unittest.TestCase):
         self.assertEqual(
             sorted(first),
             [
-                f"go-native-macos-arm64-metal-v0.202612.0.{file}"
+                f"go-native-macos-arm64-v0.202612.0.{file}"
                 for file in ("info", "mod", "zip")
             ],
         )
         self.assertEqual(
-            json.loads(first["go-native-macos-arm64-metal-v0.202612.0.info"]),
+            json.loads(first["go-native-macos-arm64-v0.202612.0.info"]),
             {"Version": "v0.202612.0", "Time": "2026-12-01T00:00:00Z"},
         )
         self.assertEqual(
             checksums.read_text().splitlines(),
-            ["0  maplibre-native-c-macos-arm64-metal.tar.gz"]
+            ["0  maplibre-native-c-macos-arm64.tar.gz"]
             + [
                 f"{hashlib.sha256(content).hexdigest()}  {name}"
                 for name, content in first.items()
@@ -156,11 +156,11 @@ class GoNativeModulesTest(unittest.TestCase):
         for version, url in (
             (
                 "v0.202611.0",
-                f"{download}/go-native/v0.202611.0/linux-gnu-x64-vulkan-v0.202611.0",
+                f"{download}/go-native/v0.202611.0/linux-gnu-x64-v0.202611.0",
             ),
             (
                 "v0.202612.3",
-                f"{download}/v0.202612.3/go-native-linux-gnu-x64-vulkan-v0.202612.3",
+                f"{download}/v0.202612.3/go-native-linux-gnu-x64-v0.202612.3",
             ),
         ):
             for file in ("info", "mod", "zip"):
@@ -168,15 +168,12 @@ class GoNativeModulesTest(unittest.TestCase):
                     self.assertEqual(
                         redirect(
                             go.redirects(),
-                            f"/{go.MODULE_PREFIX}/linux-gnu-x64-vulkan/@v/"
-                            f"{version}.{file}",
+                            f"/{go.MODULE_PREFIX}/linux-gnu-x64/@v/{version}.{file}",
                         ),
                         f"{url}.{file}",
                     )
         self.assertIsNone(
-            redirect(
-                go.redirects(), f"/{go.MODULE_PREFIX}/linux-gnu-x64-vulkan/@v/list"
-            )
+            redirect(go.redirects(), f"/{go.MODULE_PREFIX}/linux-gnu-x64/@v/list")
         )
 
     def test_the_proxy_lists_each_presets_released_versions(self) -> None:
@@ -215,11 +212,11 @@ class GoNativeModulesTest(unittest.TestCase):
 
         git("init", "--quiet")
         release("v0.202610.3", None)
-        release("v0.202611.0", ["linux-gnu-x64-vulkan"])
-        release("v0.202611.10", ["linux-gnu-x64-vulkan", "macos-arm64-metal"])
-        release("v0.202611.9", ["linux-gnu-x64-vulkan"])
+        release("v0.202611.0", ["linux-gnu-x64"])
+        release("v0.202611.10", ["linux-gnu-x64", "macos-arm64"])
+        release("v0.202611.9", ["linux-gnu-x64"])
         # Its release has not published, so its files are not out yet.
-        release("v0.202611.11", ["linux-gnu-x64-vulkan"])
+        release("v0.202611.11", ["linux-gnu-x64"])
         out = self.directory / "site"
 
         go.write_site(
@@ -235,10 +232,10 @@ class GoNativeModulesTest(unittest.TestCase):
                 for path in out.rglob("list")
             },
             {
-                f"{go.MODULE_PREFIX}/linux-gnu-x64-vulkan/@v/list": (
+                f"{go.MODULE_PREFIX}/linux-gnu-x64/@v/list": (
                     "v0.202611.0\nv0.202611.9\nv0.202611.10\n"
                 ),
-                f"{go.MODULE_PREFIX}/macos-arm64-metal/@v/list": "v0.202611.10\n",
+                f"{go.MODULE_PREFIX}/macos-arm64/@v/list": "v0.202611.10\n",
             },
         )
 

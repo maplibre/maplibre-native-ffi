@@ -121,10 +121,7 @@ static void missing_style_ids_report_not_found(void) {
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "before_layer_id \"absent-layer\" does not exist",
     mln_map_add_style_layer_json(
-      map,
-      MLN_BUFFER_LITERAL(
-        "{\"id\":\"indicator\",\"type\":\"location-indicator\"}"
-      ),
+      map, MLN_BUFFER_LITERAL("{\"id\":\"backdrop\",\"type\":\"background\"}"),
       layer, &completion.descriptor, NULL
     )
   );
@@ -554,7 +551,7 @@ static void root_properties_change_the_light_and_the_transition(void) {
 }
 
 // The library reads the other root properties from the style as it loaded,
-// and can't change them after.
+// and can't change the terrain, the sprite, or the font faces after.
 static void other_root_properties_read_back_as_loaded_and_reject_changes(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -573,8 +570,6 @@ static void other_root_properties_read_back_as_loaded_and_reject_changes(void) {
     const char* name;
     const char* value;
   } unsupported[] = {
-    {"projection", "{\"type\":\"globe\"}"},
-    {"sky", "{\"sky-color\":\"#88c6fc\"}"},
     {"terrain", "{\"source\":\"dem\"}"},
     {"sprite", "\"sprite\""},
     {"font-faces", "{}"},
@@ -626,6 +621,76 @@ static void other_root_properties_read_back_as_loaded_and_reject_changes(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Sets a root property, and returns how the command completed. The library can
+// refuse a property that it can't change while the style is loaded.
+static mln_status set_root_property(
+  mln_map map, const char* name, const char* value
+) {
+  mln_test_completion set = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_set_style_root_property(
+    map, mln_buffer_view_from_cstr(name), mln_buffer_view_from_cstr(value),
+    &set.descriptor, NULL
+  ));
+  const mln_status status = mln_test_completion_finish(&set);
+  if (status == MLN_STATUS_UNSUPPORTED) {
+    TEST_ASSERT_NOT_NULL_MESSAGE(
+      strstr(mln_test_completion_diagnostic(&set), name),
+      mln_test_completion_diagnostic(&set)
+    );
+  } else {
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_OK, status, mln_test_completion_diagnostic(&set)
+    );
+  }
+  mln_test_completion_destroy(&set);
+  return status;
+}
+
+// The projection and the sky change while the style is loaded, and read back
+// as set, where the library can change them. Where it can't, they read back as
+// the style loaded them.
+static void the_projection_and_the_sky_change_where_the_library_can(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{},\"layers\":[],"
+           "\"projection\":{\"type\":\"globe\"}}"
+         )
+  );
+
+  if (
+    set_root_property(map, "projection", "{\"type\":\"mercator\"}") ==
+    MLN_STATUS_OK
+  ) {
+    EXPECT_ROOT_PROPERTY("{\"type\":\"mercator\"}", map, "projection");
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, set_root_property(map, "projection", "null")
+    );
+    EXPECT_ROOT_PROPERTY("", map, "projection");
+  } else {
+    EXPECT_ROOT_PROPERTY("{\"type\":\"globe\"}", map, "projection");
+  }
+
+  if (
+    set_root_property(map, "sky", "{\"sky-color\":\"#ff0000\"}") ==
+    MLN_STATUS_OK
+  ) {
+    mln_test_completion root = mln_test_completion_buffer_view();
+    MLN_TEST_OK(mln_map_get_style_root_property(
+      map, MLN_BUFFER_LITERAL("sky"), &root.descriptor, NULL
+    ));
+    char value[128];
+    MLN_TEST_OK(mln_test_style_finish_text(&root, value, sizeof(value), NULL));
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(value, "\"sky-color\""), value);
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, set_root_property(map, "sky", "null"));
+  }
+  EXPECT_ROOT_PROPERTY("", map, "sky");
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(style_commands_copy_inputs_and_fail_on_duplicate_or_missing_ids);
   RUN_TEST(missing_style_ids_report_not_found);
@@ -636,4 +701,5 @@ MLN_TEST_GROUP {
   RUN_TEST(the_style_light_round_trips_through_json);
   RUN_TEST(root_properties_change_the_light_and_the_transition);
   RUN_TEST(other_root_properties_read_back_as_loaded_and_reject_changes);
+  RUN_TEST(the_projection_and_the_sky_change_where_the_library_can);
 }

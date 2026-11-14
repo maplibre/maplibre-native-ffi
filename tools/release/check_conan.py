@@ -17,7 +17,7 @@ from native_package_release import sha256
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
-def check(archive: pathlib.Path, backend: str) -> None:
+def check(archive: pathlib.Path) -> None:
     archive = archive.resolve(strict=True)
     with tempfile.TemporaryDirectory() as temporary:
         scratch = pathlib.Path(temporary)
@@ -56,8 +56,6 @@ def check(archive: pathlib.Path, backend: str) -> None:
             "build",
             "-s",
             "build_type=Release",
-            "-o",
-            f"maplibre-native-c/*:backend={backend}",
         )
         run(
             "cmake",
@@ -75,13 +73,8 @@ def check(archive: pathlib.Path, backend: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive", type=pathlib.Path)
-    parser.add_argument(
-        "--backend",
-        default="default",
-        choices=("default", "metal", "opengl", "vulkan", "webgpu"),
-    )
     arguments = parser.parse_args()
-    check(arguments.archive, arguments.backend)
+    check(arguments.archive)
 
 
 if __name__ == "__main__":

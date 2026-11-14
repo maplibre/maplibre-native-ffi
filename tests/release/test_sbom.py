@@ -50,10 +50,11 @@ class NativeSbomTests(unittest.TestCase):
                 }
             ]
             artifact = {
+                "name": "linux-gnu-x64",
                 "version": "0.202610.0",
                 "commit": "abcdef",
                 "platform": {"id": "linux-gnu-x64"},
-                "backend": "vulkan",
+                "backends": ["vulkan", "opengl"],
                 "link": {"libraries": ["m"], "frameworks": []},
             }
             output = directory / "output"
@@ -68,6 +69,15 @@ class NativeSbomTests(unittest.TestCase):
             self.assertEqual(dependency["licenses"], [{"expression": "MIT"}])
             self.assertEqual(system["scope"], "excluded")
             root = result["metadata"]["component"]
+            self.assertEqual(root["bom-ref"], "native:linux-gnu-x64")
+            self.assertEqual(
+                [
+                    item["value"]
+                    for item in root["properties"]
+                    if item["name"] == "maplibre:backend"
+                ],
+                ["vulkan", "opengl"],
+            )
             graph = {
                 entry["ref"]: entry["dependsOn"] for entry in result["dependencies"]
             }

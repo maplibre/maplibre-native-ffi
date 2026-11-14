@@ -28,9 +28,9 @@ private val Project.localBuild: File?
 data class NativeInstall(val prefix: File?, internal val problem: String?) : Serializable
 
 /**
- * Finds the install in the local build that serves [targetPlatform] with [backend], or without one,
- * with the platform's default backend. An install prefix serves its own backend unless [backend] is
- * given.
+ * Finds the install in the local build that serves [targetPlatform] and carries [backend], or
+ * without one, the platform's default backend. A native platform has one install, which carries all
+ * of its backends; the browser has one for each backend, so a request for it names one.
  */
 fun Project.nativeInstall(targetPlatform: String, backend: String? = null): NativeInstall {
   val root =
@@ -77,28 +77,23 @@ internal abstract class NativeInstallSource :
 }
 
 private fun findInstall(root: File, targetPlatform: String, backend: String?): NativeInstall {
-  val request =
-    if (backend == null) "$targetPlatform with its default backend" else "$targetPlatform $backend"
+  val request = if (backend == null) targetPlatform else "$targetPlatform with $backend"
   if (root.resolve(NATIVE_DESCRIPTOR_PATH).isFile) {
     // A prefix serves one platform, so a build for several targets names a directory of installs
-    // instead. Only a selected backend can conflict; without one, the prefix's own backend serves.
+    // instead.
     val descriptor = readDescriptor(root)
-    return if (
-      descriptor.platform["id"] == targetPlatform &&
-        (backend == null || descriptor["backend"] == backend)
-    ) {
+    return if (descriptor.platform["id"] == targetPlatform && descriptor.carries(backend)) {
       NativeInstall(root, null)
     } else {
       NativeInstall(
         null,
         "$LOCAL_BUILD_PROPERTY names an install prefix built for " +
-          "${descriptor.platform["id"]} ${descriptor["backend"]}, which cannot serve $request",
+          "${descriptor.platform["id"]} with ${descriptor.backends.joinToString()}, which cannot " +
+          "serve $request",
       )
     }
   }
 
-  // Without a selected backend, only the target's default backend serves, so that building another
-  // backend under the same directory never changes which install an unchanged request gets.
   val matches =
     root
       .listFiles()
@@ -107,10 +102,7 @@ private fun findInstall(root: File, targetPlatform: String, backend: String?): N
       .flatMap { listOf(it.resolve("install"), it) }
       .filter { prefix ->
         prefix.resolve(NATIVE_DESCRIPTOR_PATH).isFile &&
-          readDescriptor(prefix).let {
-            it.platform["id"] == targetPlatform &&
-              it["backend"] == (backend ?: it.platform["defaultBackend"])
-          }
+          readDescriptor(prefix).let { it.platform["id"] == targetPlatform && it.carries(backend) }
       }
       .sorted()
   val named = "$LOCAL_BUILD_PROPERTY names $root, which holds"
@@ -119,7 +111,7 @@ private fun findInstall(root: File, targetPlatform: String, backend: String?): N
     0 ->
       NativeInstall(
         null,
-        "$named no install for $request. Build it, or select another backend.",
+        "$named no install for $request. Build its preset.",
       )
     else ->
       NativeInstall(
@@ -136,6 +128,13 @@ private fun readDescriptor(prefix: File): Map<*, *> =
 
 private val Map<*, *>.platform: Map<*, *>
   get() = this["platform"] as? Map<*, *> ?: emptyMap<Any, Any>()
+
+private val Map<*, *>.backends: List<*>
+  get() = this["backends"] as? List<*> ?: emptyList<Any>()
+
+/** Whether the install carries [backend], or without one, the platform's default backend. */
+private fun Map<*, *>.carries(backend: String?): Boolean =
+  (backend ?: platform["defaultBackend"]) in backends
 
 fun kotlinNativeTargetPlatform(kotlinTarget: String): String =
   AndroidTarget.entries.firstOrNull { it.kotlinNativeTarget == kotlinTarget }?.targetPlatform

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-#MISE description="Combine the Apple Metal native packages into the XCFramework zip, and check every slice."
+#MISE description="Combine the Apple native packages into the XCFramework zip, and check every slice."
 #MISE shell="bash"
-#USAGE arg "[input]" default="build/packages/native/dist" help="Directory that holds the Apple Metal native packages"
+#USAGE arg "[input]" default="build/packages/native/dist" help="Directory that holds the Apple native packages"
 
 set -euo pipefail
 
@@ -22,8 +22,8 @@ while IFS= read -r preset; do
   tar -xzf "$archive" -C "$work"
 done <<< "$presets"
 
-macos="$work/maplibre-native-c-macos-arm64-metal/Frameworks/MaplibreNativeC.framework"
-intel="$work/maplibre-native-c-macos-x64-metal/Frameworks/MaplibreNativeC.framework"
+macos="$work/maplibre-native-c-macos-arm64/Frameworks/MaplibreNativeC.framework"
+intel="$work/maplibre-native-c-macos-x64/Frameworks/MaplibreNativeC.framework"
 lipo -create "$macos/MaplibreNativeC" "$intel/MaplibreNativeC" \
   -output "$macos/Versions/A/MaplibreNativeC"
 lipo -create "$macos.dSYM/Contents/Resources/DWARF/MaplibreNativeC" \
@@ -62,15 +62,14 @@ PY
 # Catalyst slices also run.
 cat >"$work/consumer.m" <<'EOF'
 @import MaplibreNativeC;
-@import MaplibreNativeC.Plugin;
 
-int main(void) { return mln_plugin_get_register_function_v1() == NULL; }
+int main(void) { return mln_supported_render_backend_mask() == 0; }
 EOF
 
 frameworks=()
 while IFS= read -r preset; do
   variant=
-  case "${preset%-*-*}" in
+  case "${preset%-*}" in
     ios) sdk=iphoneos; os=ios ;;
     ios-maccatalyst) sdk=macosx; os=ios; variant=macabi ;;
     ios-simulator) sdk=iphonesimulator; os=ios; variant=simulator ;;
@@ -81,11 +80,10 @@ while IFS= read -r preset; do
     visionos-simulator) sdk=xrsimulator; os=xros; variant=simulator ;;
     *) echo "Missing XCFramework SDK mapping for $preset" >&2; exit 1 ;;
   esac
-  arch="${preset%-*}"
-  arch="${arch##*-}"
+  arch="${preset##*-}"
   [[ "$arch" != x64 ]] || arch=x86_64
   framework="$work/maplibre-native-c-${preset}/Frameworks/MaplibreNativeC.framework"
-  if [[ "$preset" == macos-x64-metal ]]; then
+  if [[ "$preset" == macos-x64 ]]; then
     framework="$macos"
   else
     frameworks+=(-framework "$framework" -debug-symbols "$framework.dSYM")

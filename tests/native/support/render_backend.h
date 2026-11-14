@@ -1,9 +1,8 @@
 #ifndef MLN_NATIVE_TESTS_RENDER_BACKEND_H
 #define MLN_NATIVE_TESTS_RENDER_BACKEND_H
 
-// What the preset's backend file, render_graphics.c on native targets or a
-// browser file, provides to render.c, and what render.c shares with it. Only
-// the support layer includes this header.
+// What the preset's backend file, render_graphics.c, provides to render.c, and
+// what render.c shares with it. Only the support layer includes this header.
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -47,6 +46,19 @@ void mln_test_backend_destroy(void* state);
 bool mln_test_render_fixture_create_with(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach
+);
+
+// mln_test_render_fixture_start_attach() with `attach` on `driver`.
+mln_status mln_test_render_fixture_start_attach_with(
+  mln_map map, const mln_render_session_attach_options* options,
+  const mln_completion* completion, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach, uint32_t driver
+);
+
+// Attaches with `attach` on `driver`, and waits for the attach.
+bool mln_test_render_fixture_create_on(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach, uint32_t driver
 );
 
 // Shared with the backends that attach fixtures of their own.

@@ -1,4 +1,10 @@
-"""The suites that each native target's CI job runs after its build."""
+"""The suites that each native target's CI job runs after its build.
+
+A job builds its platform once. The native suites and each binding's tests run
+once for every backend of the platform that support-gaps.toml lets them test
+on the runner, and name that backend as their last argument. A binding that
+can test on no backend builds instead, once.
+"""
 
 from __future__ import annotations
 
@@ -11,8 +17,8 @@ from tools.ci import gaps
 if TYPE_CHECKING:
     from tools.ci.plan import Target
 
-# Kotlin/Native can't run on Linux ARM64, so the Linux x64 Vulkan job compiles
-# the Linux ARM64 KLIB, and the Linux ARM64 jobs leave Kotlin/Native out.
+# Kotlin/Native can't run on Linux ARM64, so the Linux x64 job compiles the
+# Linux ARM64 KLIB, and the Linux ARM64 job leaves Kotlin/Native out.
 LINUX_ARM64_KLIB = "//bindings/kotlin:linux-arm64-klib"
 
 GOBJECT_ARCHIVE_PREFIX = "maplibre-native-ffi-gobject-"
@@ -36,32 +42,32 @@ class Suite:
     timeout_minutes: int | None
     # The steps that must have succeeded for this one to run.
     prerequisites: tuple[str, ...]
+    # The render backend whose suites it runs, if any.
+    backend: str | None = None
 
     @property
     def task(self) -> str:
         return self.command[2]
 
 
-def gobject_archive(preset: str) -> str | None:
-    """The GObject archive that a preset's job publishes, if any: one for each
-    platform and architecture, since the library is the same for every backend."""
-    target = gaps.target_from_name(preset)
-    if target.backend != "vulkan" or gaps.gap("gobject", target, "package"):
+def gobject_archive(target: Target) -> str | None:
+    """The GObject archive that a target's job publishes, if any."""
+    if not gaps.supported("gobject", target, "package"):
         return None
-    platform, arch, _ = preset.rsplit("-", 2)
-    return f"{GOBJECT_ARCHIVE_PREFIX}{platform}-{arch}.tar.gz"
+    return f"{GOBJECT_ARCHIVE_PREFIX}{target.preset}.tar.gz"
 
 
 def suite_id(task: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "-", task).strip("-")
 
 
-def binding_command(binding: str, target: Target) -> list[str]:
-    """Select how a supported binding builds or runs on the target's runner."""
+def binding_command(binding: str, target: Target, backend: str | None) -> list[str]:
+    """Select how a supported binding builds, or runs its tests for a backend,
+    on the target's runner."""
     platform = target.platform
     preset = target.preset
     mobile = platform in {"android", "ios", "tvos", "visionos"}
-    runnable = gaps.supported(binding, target, "test")
+    runnable = backend is not None
     action = "test" if runnable else "build"
     args = [preset]
     language = binding.split("-", 1)[0]
@@ -71,19 +77,18 @@ def binding_command(binding: str, target: Target) -> list[str]:
                 action = "test:android"
             else:
                 action = "android-build"
-                backend = "opengl" if target.backend == "egl" else target.backend
                 abi = {
                     "arm": "armeabi-v7a",
                     "arm64": "arm64-v8a",
                     "x86": "x86",
                     "x64": "x86_64",
                 }[target.architecture]
-                args = [backend, abi]
+                args = [abi]
         else:
             action = "test:jvm" if runnable else "build:jvm"
     elif binding == "kotlin-native":
-        if platform == "emscripten":
-            action = "test:wasm" if runnable else "wasm-module"
+        if platform == "web":
+            action = "test:wasm" if runnable else "build"
         elif runnable:
             action = "test:native"
         elif platform in {"ios", "tvos"}:
@@ -99,14 +104,18 @@ def binding_command(binding: str, target: Target) -> list[str]:
         mobile or platform.endswith("-simulator") or platform == "ios-maccatalyst"
     ):
         action += ":hermes"
-    if binding in {"rust", "swift"} and preset == "linux-gnu-x64-vulkan":
+    if runnable:
+        args.append(backend)
+    if binding == "swift" and preset == "linux-gnu-x64":
         args.append("release")
     return ["mise", "run", f"//bindings/{language}:{action}", *args]
 
 
-def consumer_commands(target: Target) -> list[list[str]]:
-    """Every binding runs unless support-gaps.toml explicitly excludes it."""
-    commands = []
+def consumer_commands(target: Target) -> list[tuple[list[str], str | None]]:
+    """Every binding runs unless support-gaps.toml explicitly excludes it: its
+    tests once for each backend that it can test, or else its build. Each
+    command comes with the backend whose tests it runs, if any."""
+    commands: list[tuple[list[str], str | None]] = []
     for binding in gaps.BINDING_LABELS:
         if binding == "c" or not gaps.supported(binding, target, "build"):
             continue
@@ -123,28 +132,39 @@ def consumer_commands(target: Target) -> list[list[str]]:
             and target.platform == "android"
             and target.device
         ):
-            commands.append(["mise", "run", "//bindings/kotlin:build", target.preset])
-        commands.append(binding_command(binding, target))
-        if binding == "gobject" and gobject_archive(target.preset):
             commands.append(
-                ["mise", "run", "//bindings/gobject:archive", target.preset]
+                (["mise", "run", "//bindings/kotlin:build", target.preset], None)
+            )
+        tested = gaps.tested_backends(binding, target)
+        for backend in tested or (None,):
+            commands.append((binding_command(binding, target, backend), backend))
+        if binding == "gobject" and gobject_archive(target):
+            commands.append(
+                (["mise", "run", "//bindings/gobject:archive", target.preset], None)
             )
         # These exercise additional contracts on one representative target.
-        extra = None
-        if target.preset == "linux-gnu-x64-vulkan":
-            extra = {
-                "go": "//bindings/go:test:package",
-                "rust": "//bindings/rust:test:package",
-                "python": "//bindings/python:test:floor",
-            }.get(binding)
-        elif target.preset == "macos-arm64-metal" and binding == "go":
+        # A suite runs with the target's default backend; the other checks
+        # render nothing.
+        extra, suite = None, False
+        if target.preset == "linux-gnu-x64":
+            extra, suite = {
+                "go": ("//bindings/go:test:package", False),
+                "python": ("//bindings/python:test:floor", True),
+            }.get(binding, (None, False))
+        elif target.preset == "macos-arm64" and binding == "go":
             extra = "//bindings/go:test:package"
-        elif target.preset == "emscripten-wasm32-webgl" and binding == "kotlin-native":
+        elif target.preset == "web-wasm32-webgl" and binding == "kotlin-native":
             extra = "//bindings/kotlin:test:wasm-canary"
-        if extra and gaps.supported(binding, target, "test"):
-            commands.append(["mise", "run", extra, target.preset])
-        if target.preset == "linux-gnu-x64-vulkan" and binding == "kotlin-native":
-            commands.append(["mise", "run", LINUX_ARM64_KLIB])
+        backend = target.default_backend
+        if extra and backend in tested:
+            if suite:
+                commands.append(
+                    (["mise", "run", extra, target.preset, backend], backend)
+                )
+            else:
+                commands.append((["mise", "run", extra, target.preset], None))
+        if target.preset == "linux-gnu-x64" and binding == "kotlin-native":
+            commands.append((["mise", "run", LINUX_ARM64_KLIB], None))
     return commands
 
 
@@ -169,17 +189,19 @@ def command_support(command: str) -> list[tuple[str, str]]:
     return [(binding, status)]
 
 
-def native_checks(target: Target) -> list[list[str]]:
-    """The checks against the target's own build tree."""
+def native_checks(target: Target) -> list[tuple[list[str], str | None]]:
+    """The checks against the target's own build tree: the native suites of
+    each backend that the runner can test, and the platform's ABI checks."""
     preset = target.preset
     target_platform = target.platform
-    commands = []
-    if gaps.supported("c", target, "test"):
-        commands.append(["mise", "run", "test", preset])
+    commands: list[tuple[list[str], str | None]] = [
+        (["mise", "run", "test", preset, backend], backend)
+        for backend in gaps.tested_backends("c", target)
+    ]
     if target_platform == "linux-gnu":
-        commands.append(["mise", "run", "check-glibc-floor", preset])
+        commands.append((["mise", "run", "check-glibc-floor", preset], None))
     elif target_platform == "linux-musl":
-        commands.append(["mise", "run", "check-musl-abi", preset])
+        commands.append((["mise", "run", "check-musl-abi", preset], None))
     return commands
 
 
@@ -196,32 +218,36 @@ def target_suites(target: Target) -> list[Suite]:
         command: list[str],
         prerequisites: tuple[str, ...],
         env: dict[str, str],
+        backend: str | None = None,
         step_id: str | None = None,
     ) -> None:
         wrapper, shell, timeout = None, None, None
         # Lavapipe presents Win32 surfaces through GDI, which needs the VM's
         # interactive desktop. WGL and the binding suites run in service session 0.
-        if preset in {"windows-x64-vulkan", "mingw-x64-vulkan"} and command[2:] == [
+        if preset in {"windows-x64", "mingw-x64"} and command[2:] == [
             "test",
             preset,
+            "vulkan",
         ]:
             wrapper, shell, timeout = "windows-console", "pwsh", 15
         suite = Suite(
-            id=step_id or suite_id(command[2]),
+            id=step_id or suite_id(command[2] + (f"-{backend}" if backend else "")),
             command=tuple(command),
             env=env,
             wrapper=wrapper,
             shell=shell,
             timeout_minutes=timeout,
             prerequisites=prerequisites,
+            backend=backend,
         )
-        # A failure names its suite's task, so a target runs each task once.
+        # A failure names its suite's task, so a target runs each task once for
+        # each backend.
         if any(other.id == suite.id for other in suites):
             raise SystemExit(f"error: {preset} runs two suites with id {suite.id!r}")
         suites.append(suite)
 
-    for command in native_checks(target):
-        add(command, native, {})
+    for command, backend in native_checks(target):
+        add(command, native, {}, backend)
     add(["mise", "run", "archive-native", preset], native, {}, step_id="archive")
     add(
         [
@@ -235,12 +261,13 @@ def target_suites(target: Target) -> list[Suite]:
         {},
         step_id="install",
     )
-    for command in consumer_commands(target):
+    for command, backend in consumer_commands(target):
         # The consumers run against the packaged install, which replaced the
         # build tree, so they must not rebuild it.
         add(
             command,
             (*native, "archive", "install"),
             {"MISE_TASK_SKIP": "//:build"},
+            backend,
         )
     return suites

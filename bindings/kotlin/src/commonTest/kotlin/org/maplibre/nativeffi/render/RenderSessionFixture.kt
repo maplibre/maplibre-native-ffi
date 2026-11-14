@@ -12,23 +12,27 @@ import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.Completion
 import org.maplibre.nativeffi.FrameDemand
 import org.maplibre.nativeffi.FrameDemandFlag
+import org.maplibre.nativeffi.GpuDeviceHandle
+import org.maplibre.nativeffi.GpuDeviceOptions
 import org.maplibre.nativeffi.GpuSync
 import org.maplibre.nativeffi.GpuSyncKind
 import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MapMode
-import org.maplibre.nativeffi.OffscreenDescriptor
+import org.maplibre.nativeffi.OffscreenTarget
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderFrameResult
 import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RenderSessionCapabilityFlag
 import org.maplibre.nativeffi.RenderSessionHandle
 import org.maplibre.nativeffi.RenderSessionState
+import org.maplibre.nativeffi.RenderTarget
 import org.maplibre.nativeffi.ResourceProvider
 import org.maplibre.nativeffi.RuntimeOptions
 import org.maplibre.nativeffi.WAIT_TIMEOUT
 import org.maplibre.nativeffi.Wake
+import org.maplibre.nativeffi.WebCanvasTarget
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
@@ -42,6 +46,8 @@ internal class RenderSessionFixture(
   val session: RenderSessionHandle,
   private val wakes: Channel<Unit>,
   driver: RenderDriverKind,
+  /** The canvas that the session presents to, in a browser, or null for any other target. */
+  val canvas: TestCanvas? = null,
 ) {
   private var nextToken = 1uL
   private val callerDriven = driver == RenderDriverKind.CALLER_GRAPHICS_THREAD
@@ -175,7 +181,8 @@ internal class RenderSessionFixture(
  * [ringDepth] textures of [width] x [height] on the build's backend, and abandons and disposes the
  * session afterwards, then destroys the textures. The caller drives the session on
  * [TestGraphics.thread]. The map's runtime is created from [runtimeOptions], and [onFrameWake] runs
- * on each frame wake.
+ * on each frame wake. Only a build whose sessions take borrowed textures has them, as
+ * [TestGraphics.borrowsTextures] says.
  */
 internal suspend fun <T> withBorrowedTexture(
   width: Int = 32,
@@ -186,8 +193,9 @@ internal suspend fun <T> withBorrowedTexture(
   runtimeOptions: RuntimeOptions = RuntimeOptions(),
   onFrameWake: () -> Unit = {},
   block: suspend RenderSessionFixture.() -> T,
-): T =
-  withMap(mapMode, provider, smallMapOptions(mapMode, width, height), runtimeOptions) {
+): T {
+  check(TestGraphics.borrowsTextures) { "a ${TestGraphics.backend} build has no borrowed textures" }
+  return withMap(mapMode, provider, smallMapOptions(mapMode, width, height), runtimeOptions) {
     withTestTextures(width, height, ringDepth) { textures ->
       withRenderSession(
         RenderDriverKind.CALLER_GRAPHICS_THREAD,
@@ -197,6 +205,7 @@ internal suspend fun <T> withBorrowedTexture(
       )
     }
   }
+}
 
 /**
  * Runs [block] with [count] textures of [width] x [height] from [TestGraphics.createTextures], and
@@ -218,9 +227,11 @@ internal suspend fun <T> withTestTextures(
 }
 
 /**
- * Runs [block] against a map with an attached offscreen session of [width] x [height] that a core
- * worker renders, and abandons and disposes the session afterwards. The map's runtime is created
- * from [runtimeOptions], and [onFrameWake] runs on each frame wake.
+ * Runs [block] against a map with an attached session of [width] x [height] on a device of its own,
+ * which a core worker renders, and abandons and disposes the session afterwards. The session
+ * renders offscreen, or in a browser presents to a [TestCanvas], whose center pixel each frame wake
+ * captures. The map's runtime is created from [runtimeOptions], and [onFrameWake] runs on each
+ * frame wake.
  */
 internal suspend fun <T> withOffscreenSession(
   width: Int = 32,
@@ -232,13 +243,51 @@ internal suspend fun <T> withOffscreenSession(
   block: suspend RenderSessionFixture.() -> T,
 ): T =
   withMap(mapMode, provider, smallMapOptions(mapMode, width, height), runtimeOptions) {
-    withRenderSession(
-      RenderDriverKind.CORE_WORKER,
-      attach = { options -> attachOffscreenSession(map, width, height, options) },
-      onFrameWake = onFrameWake,
-      block = block,
-    )
+    val canvas = createTestCanvas(width, height)
+    try {
+      withRenderSession(
+        RenderDriverKind.CORE_WORKER,
+        attach = { options -> map.attachOwn(ownTarget(width, height, canvas), options, canvas) },
+        onFrameWake = {
+          canvas?.capture()
+          onFrameWake()
+        },
+        canvas = canvas,
+        block = block,
+      )
+    } finally {
+      canvas?.close()
+    }
   }
+
+/**
+ * The target of a [width] x [height] session on a device of its own: [canvas] in a browser, and an
+ * offscreen image elsewhere, where [canvas] is null.
+ */
+internal fun ownTarget(width: Int, height: Int, canvas: TestCanvas?): RenderTarget {
+  val logicalSize = LogicalSize(width.toUInt(), height.toUInt())
+  return if (canvas != null) {
+    RenderTarget.WebCanvas(WebCanvasTarget(logicalSize, canvas.handle))
+  } else {
+    RenderTarget.Offscreen(OffscreenTarget(logicalSize))
+  }
+}
+
+/**
+ * Submits an attach of [target] on a device of its own: one of the backend under test, which a
+ * library of several backends would not pick by default, or in a browser, where [canvas] is the
+ * target and the module carries one backend, the device that the session creates.
+ */
+internal fun MapHandle.attachOwn(
+  target: RenderTarget,
+  options: RenderSessionAttachOptions,
+  canvas: TestCanvas?,
+): RenderSessionHandle {
+  if (canvas != null) return attach(target, options = options)
+  // The session keeps the device until it ends.
+  return GpuDeviceHandle.create(GpuDeviceOptions(backend = TestGraphics.backend.renderBackend))
+    .use { device -> attach(target, device, options) }
+}
 
 /** Submits an attach of a [width] x [height] offscreen session on a device of its own. */
 internal fun attachOffscreenSession(
@@ -246,21 +295,18 @@ internal fun attachOffscreenSession(
   width: Int,
   height: Int,
   options: RenderSessionAttachOptions,
-): RenderSessionHandle =
-  map.attachOffscreen(
-    OffscreenDescriptor(LogicalSize(width.toUInt(), height.toUInt())),
-    options,
-  )
+): RenderSessionHandle = map.attachOwn(ownTarget(width, height, canvas = null), options, null)
 
 /**
  * Runs [block] against a session of this map that [attach] submits on [TestGraphics.thread] with
  * options for [driver], once the attach completes, and abandons and disposes the session
- * afterwards.
+ * afterwards. [canvas] is the canvas that the session presents to, if any.
  */
 internal suspend fun <T> MapFixture.withRenderSession(
   driver: RenderDriverKind,
   attach: suspend (RenderSessionAttachOptions) -> RenderSessionHandle,
   onFrameWake: () -> Unit = {},
+  canvas: TestCanvas? = null,
   block: suspend RenderSessionFixture.() -> T,
 ): T {
   val wakes = Channel<Unit>(Channel.CONFLATED)
@@ -276,7 +322,7 @@ internal suspend fun <T> MapFixture.withRenderSession(
     )
   val session = withContext(TestGraphics.thread) { attach(options) }
   try {
-    val fixture = RenderSessionFixture(this, session, wakes, driver)
+    val fixture = RenderSessionFixture(this, session, wakes, driver, canvas)
     fixture.complete(session.ready, "the attach")
     return fixture.block()
   } finally {

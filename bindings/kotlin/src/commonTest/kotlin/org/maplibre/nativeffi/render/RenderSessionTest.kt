@@ -26,9 +26,9 @@ import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.useReleasing
 
 /**
- * Render sessions on the build's backend: an offscreen session where a test only reads pixels back
- * or needs a session, and a caller-driven borrowed ring of the host's textures where it takes
- * frames.
+ * Render sessions on the build's backend: an offscreen session, or in a browser a canvas, where a
+ * test only reads pixels back or needs a session, and a caller-driven borrowed ring of the host's
+ * textures where it takes frames, which a browser build doesn't have.
  */
 class RenderSessionTest {
   @Test
@@ -38,6 +38,14 @@ class RenderSessionTest {
       renderStill()
       assertEquals(RenderResult.RENDERED, renderFrame().disposition)
 
+      // A browser has no readback, so the frame shows on the canvas instead.
+      val canvas = canvas
+      if (canvas != null) {
+        assertEquals(listOf(255, 0, 0, 255), canvas.centerPixel)
+        complete(session.detach())
+        assertEquals(RenderSessionState.DETACHED, session.getSnapshot().state)
+        return@withOffscreenSession
+      }
       val readback = complete(session.readTexture())
       assertEquals(32u, readback.info.width)
       assertEquals(16u, readback.info.height)
@@ -98,6 +106,7 @@ class RenderSessionTest {
 
   @Test
   fun anAcquiredFrameNamesTheTextureTheSessionRendered() = runSuspendTest {
+    if (!TestGraphics.borrowsTextures) return@runSuspendTest
     withBorrowedTexture(width = 32, height = 16) {
       setStyle(RED_BACKGROUND_STYLE)
       renderStill()
@@ -112,6 +121,7 @@ class RenderSessionTest {
 
   @Test
   fun aDrainBeforeAnyDemandReturnsNoResults() = runSuspendTest {
+    if (!TestGraphics.borrowsTextures) return@runSuspendTest
     withBorrowedTexture {
       // Native writes a null batch and a null frame, which read as no results and no frame.
       assertEquals(emptyList(), session.drainFrameResults())
@@ -121,6 +131,7 @@ class RenderSessionTest {
 
   @Test
   fun aBorrowedFrameViewExpiresWithItsBlockAndHoldsOffItsRelease() = runSuspendTest {
+    if (!TestGraphics.borrowsTextures) return@runSuspendTest
     // Two textures, since the test holds two frames at once.
     withBorrowedTexture(ringDepth = 2) {
       setStyle(RED_BACKGROUND_STYLE)
@@ -177,14 +188,18 @@ class RenderSessionTest {
         renderStill()
       }
       // Native refuses an attach while the map still has a session.
-      val next =
-        attachOffscreenSession(
-          mapFixture.map,
-          32,
-          16,
-          RenderSessionAttachOptions(driver = RenderDriverKind.CORE_WORKER),
-        )
-      next.use { next.ready.awaitWithin("the next attach") }
+      val nextCanvas = createTestCanvas(32, 16)
+      try {
+        val next =
+          mapFixture.map.attachOwn(
+            ownTarget(32, 16, nextCanvas),
+            RenderSessionAttachOptions(driver = RenderDriverKind.CORE_WORKER),
+            nextCanvas,
+          )
+        next.use { next.ready.awaitWithin("the next attach") }
+      } finally {
+        nextCanvas?.close()
+      }
     }
   }
 }

@@ -9,8 +9,8 @@
 [tasks.build]
 description = "Build the C library for a Windows preset, then build the WPF example against its install."
 usage = '''
-arg "[preset]" default="windows-x64-vulkan" {
-  choices "windows-x64-vulkan"
+arg "[preset]" default="windows-x64" {
+  choices "windows-x64"
 }
 '''
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
@@ -24,8 +24,8 @@ MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
 [tasks.run]
 description = "Build the WPF example for a Windows preset and run it, under Wine on Linux."
 usage = '''
-arg "[preset]" default="windows-x64-vulkan" {
-  choices "windows-x64-vulkan"
+arg "[preset]" default="windows-x64" {
+  choices "windows-x64"
 }
 '''
 depends = [{ task = "build", args = ["{{usage.preset}}"] }]

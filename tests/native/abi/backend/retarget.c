@@ -8,8 +8,6 @@
 #include "support/style.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
-
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 #include <objc/message.h>
 #include <objc/runtime.h>
@@ -43,20 +41,20 @@ typedef struct layer_size {
   double height;
 } layer_size;
 
-static id metal_layer(const mln_test_graphics_surface* surface) {
-  mln_test_graphics_surface_info info = {0};
-  TEST_ASSERT_TRUE(mln_test_graphics_surface_get_info(surface, &info));
-  return (id)info.metal_layer;
+static id metal_layer(const mln_test_render_surface* surface) {
+  id layer = (id)mln_test_render_surface_metal_layer(surface);
+  TEST_ASSERT_NOT_NULL(layer);
+  return layer;
 }
 
-static layer_size drawable_size(const mln_test_graphics_surface* surface) {
+static layer_size drawable_size(const mln_test_render_surface* surface) {
   return ((layer_size (*)(id, SEL))objc_msgSend)(
     metal_layer(surface), sel_registerName("drawableSize")
   );
 }
 #endif
 
-static void unconfigure_surface(const mln_test_graphics_surface* surface) {
+static void unconfigure_surface(const mln_test_render_surface* surface) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   ((void (*)(id, SEL, layer_size))objc_msgSend)(
     metal_layer(surface), sel_registerName("setDrawableSize:"),
@@ -69,7 +67,7 @@ static void unconfigure_surface(const mln_test_graphics_surface* surface) {
 }
 
 static void expect_surface_configured(
-  const mln_test_graphics_surface* surface, int width, int height
+  const mln_test_render_surface* surface, int width, int height
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   const layer_size size = drawable_size(surface);
@@ -548,7 +546,7 @@ static void a_retarget_sizes_the_map_to_the_new_target(enum target_kind kind) {
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, render_frame(fixture));
 
   mln_test_completion completion = mln_test_completion_default(0);
-  mln_test_graphics_surface* surface = NULL;
+  mln_test_render_surface* surface = NULL;
   if (kind == TARGET_SURFACE) {
     surface = mln_test_render_fixture_new_sized_surface(fixture, width, height);
     TEST_ASSERT_NOT_NULL_MESSAGE(surface, mln_test_graphics_last_error());
@@ -631,7 +629,7 @@ static const refusal_row refusal_rows[] = {
 
 typedef struct replacement {
   mln_test_graphics_texture* texture;
-  mln_test_graphics_surface* surface;
+  mln_test_render_surface* surface;
   // An id<MTLTexture> the case made itself.
   void* metal_texture;
 } replacement;
@@ -721,16 +719,22 @@ static mln_status submit_metal_texture(
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   const mln_metal_borrowed_texture entry = {.texture = texture};
-  const mln_metal_borrowed_texture_replacement replacement = {
-    .size = sizeof(mln_metal_borrowed_texture_replacement),
-    .logical_size =
-      {.width = MLN_TEST_HOST_TARGET_SIZE, .height = MLN_TEST_HOST_TARGET_SIZE},
-    .physical_width = MLN_TEST_HOST_TARGET_SIZE,
-    .physical_height = MLN_TEST_HOST_TARGET_SIZE,
-    .textures = &entry,
-    .texture_count = 1,
+  const mln_render_target replacement = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES,
+    .data.metal_borrowed_textures = {
+      .logical_size =
+        {
+          .width = MLN_TEST_HOST_TARGET_SIZE,
+          .height = MLN_TEST_HOST_TARGET_SIZE,
+        },
+      .physical_width = MLN_TEST_HOST_TARGET_SIZE,
+      .physical_height = MLN_TEST_HOST_TARGET_SIZE,
+      .textures = &entry,
+      .texture_count = 1,
+    },
   };
-  return mln_render_session_set_metal_borrowed_texture_target(
+  return mln_render_session_set_target(
     fixture->session, &replacement, &completion->descriptor, MLN_TEST_DIAGNOSTIC
   );
 #else
@@ -812,12 +816,10 @@ static void a_released_target_can_be_destroyed_before_the_next(
 
   // A target that the case owns, so that it can destroy it.
   mln_test_graphics_texture* texture = NULL;
-  mln_test_graphics_surface* surface = NULL;
+  mln_test_render_surface* surface = NULL;
   mln_test_completion completion = mln_test_completion_default(0);
   if (kind == TARGET_SURFACE) {
-    surface = mln_test_graphics_surface_create(
-      graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
-    );
+    surface = mln_test_render_surface_create(fixture);
     TEST_ASSERT_NOT_NULL_MESSAGE(surface, mln_test_graphics_last_error());
     restore_fixture_context(fixture);
     MLN_TEST_OK_MESSAGE(
@@ -845,7 +847,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
   TEST_ASSERT_TRUE(has_target(fixture));
   release_target(fixture, MLN_STATUS_OK);
   TEST_ASSERT_FALSE(has_target(fixture));
-  mln_test_graphics_surface_destroy(surface);
+  mln_test_render_surface_destroy(fixture, surface);
   mln_test_graphics_texture_destroy(texture);
   restore_fixture_context(fixture);
   TEST_ASSERT_EQUAL_UINT32(
@@ -855,7 +857,7 @@ static void a_released_target_can_be_destroyed_before_the_next(
   completion = mln_test_completion_default(0);
   mln_test_graphics_texture* next_texture = NULL;
   if (kind == TARGET_SURFACE) {
-    mln_test_graphics_surface* next =
+    mln_test_render_surface* next =
       mln_test_render_fixture_new_surface(fixture);
     TEST_ASSERT_NOT_NULL_MESSAGE(next, mln_test_graphics_last_error());
     restore_fixture_context(fixture);
@@ -933,7 +935,8 @@ static void a_released_target_keeps_the_renderer(void) {
   };
   mln_test_completion resized = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, size, &resized.descriptor, MLN_TEST_DIAGNOSTIC
+    fixture.session, mln_test_session_extent(fixture.session, size),
+    &resized.descriptor, MLN_TEST_DIAGNOSTIC
   ));
   finish(&fixture, &resized, MLN_STATUS_OK, "the resize");
   TEST_ASSERT_EQUAL_UINT32(
@@ -1049,10 +1052,8 @@ static void releases_that_a_ring_refuses(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   tear_down_map(&map);
 }
-#endif
 
 MLN_TEST_GROUP {
-#if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_borrowed_texture_retarget_renders_into_the_new_texture);
   RUN_TEST(a_borrowed_retarget_is_refused_while_a_frame_is_acquired);
   RUN_TEST(a_borrowed_retarget_returns_quarantined_slots_to_service);
@@ -1068,5 +1069,4 @@ MLN_TEST_GROUP {
   RUN_TEST(a_release_finishes_a_waiting_demand);
   RUN_TEST(an_offscreen_session_refuses_targets);
   RUN_TEST(releases_that_a_ring_refuses);
-#endif
 }

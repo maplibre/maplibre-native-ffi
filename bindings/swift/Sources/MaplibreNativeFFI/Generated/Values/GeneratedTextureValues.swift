@@ -3,124 +3,200 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// A Metal texture of a borrowed ring.
+/// The Android hardware buffer of an exported ring's acquired frame.
 ///
-/// See `mln_metal_borrowed_texture` in the
+/// See `mln_android_hardware_buffer_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
-  /// Your MTLTexture.
-  public var texture: NativePointer
-  public init(texture: NativePointer) {
-    self.texture = texture
+public struct AndroidHardwareBufferFrame: Equatable, Hashable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+  /// The buffer's index in the ring.
+  public var slot: UInt32
+  /// The `AHardwareBuffer*`.
+  public var buffer: NativePointer
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    buffer: NativePointer = .null
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.buffer = buffer
   }
 
-  init(raw: mln_metal_borrowed_texture) {
-    texture = NativePointer(bitPattern: unsafeBitCast(
-      raw.texture,
+  init(raw: mln_android_hardware_buffer_frame) {
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    buffer = NativePointer(bitPattern: unsafeBitCast(raw.buffer, to: UInt.self))
+  }
+}
+
+/// The dmabuf of an exported ring's acquired frame.
+///
+/// See `mln_dma_buf_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct DmaBufFrame: Equatable, Hashable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+  /// The buffer's index in the ring.
+  public var slot: UInt32
+  public var fourcc: UInt32
+  public var modifier: UInt64
+  /// The buffer's planes, in the order that its fourcc and modifier define.
+  /// Import all of them, as EGL_EXT_image_dma_buf_import_modifiers planes 0 and
+  /// up, or with one `zwp_linux_buffer_params_v1.add` call each.
+  public var planes: [DmaBufPlane]
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    fourcc: UInt32 = 0,
+    modifier: UInt64 = 0,
+    planes: [DmaBufPlane] = []
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.fourcc = fourcc
+    self.modifier = modifier
+    self.planes = planes
+  }
+
+  init(
+    raw: mln_dma_buf_frame,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    fourcc = raw.fourcc
+    modifier = raw.modifier
+    planes = try NativeInputArena.copyArray(
+      raw.planes,
+      count: Int(raw.plane_count)
+    ).map { DmaBufPlane(raw: $0) }
+  }
+}
+
+/// Where one plane of a dmabuf keeps its data.
+///
+/// See `mln_dma_buf_plane` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct DmaBufPlane: Equatable, Hashable, Sendable {
+  /// The file descriptor of the dmabuf that holds the plane. The planes of a
+  /// buffer often share one.
+  public var fd: Int32
+  /// The bytes from the start of the dmabuf to the plane's first byte.
+  public var offset: UInt32
+  /// The bytes from the start of one row to the start of the next.
+  public var stride: UInt32
+  public init(fd: Int32 = 0, offset: UInt32 = 0, stride: UInt32 = 0) {
+    self.fd = fd
+    self.offset = offset
+    self.stride = stride
+  }
+
+  init(raw: mln_dma_buf_plane) {
+    fd = raw.fd
+    offset = raw.offset
+    self.stride = raw.stride
+  }
+}
+
+/// The DXGI shared texture of an exported ring's acquired frame.
+///
+/// See `mln_dxgi_shared_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct DxgiSharedTextureFrame: Equatable, Hashable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+  /// The texture's index in the ring.
+  public var slot: UInt32
+  /// The texture's `DXGI_FORMAT`.
+  public var format: UInt32
+  /// The texture's shared NT `HANDLE`.
+  public var handle: NativePointer
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    format: UInt32 = 0,
+    handle: NativePointer = .null
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.format = format
+    self.handle = handle
+  }
+
+  init(raw: mln_dxgi_shared_texture_frame) {
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    format = raw.format
+    handle = NativePointer(bitPattern: unsafeBitCast(raw.handle, to: UInt.self))
+  }
+}
+
+/// The IOSurface of an exported ring's acquired frame.
+///
+/// See `mln_io_surface_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct IoSurfaceFrame: Equatable, Hashable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+  /// The surface's index in the ring.
+  public var slot: UInt32
+  /// The `IOSurfaceRef`.
+  public var surface: NativePointer
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    surface: NativePointer = .null
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.surface = surface
+  }
+
+  init(raw: mln_io_surface_frame) {
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    surface = NativePointer(bitPattern: unsafeBitCast(
+      raw.surface,
       to: UInt.self
     ))
-  }
-
-  func nativeValue() -> mln_metal_borrowed_texture {
-    var raw = mln_metal_borrowed_texture()
-    raw.texture = texture.unsafeMutableRawPointer
-    return raw
-  }
-}
-
-/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
-///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the textures' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. The textures must all have that size, one device, one
-/// pixel format, one sample, and MTLTextureUsageRenderTarget. The ring holds up
-/// to `textureRingMaxDepth` distinct textures.
-///
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
-///
-/// See `mln_metal_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var logicalSize: LogicalSize
-  public var physicalWidth: UInt32
-  public var physicalHeight: UInt32
-  public var textures: [MetalBorrowedTexture]
-  /// Your MTLCommandQueue on the textures' device, or null for a queue of the
-  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
-  public var commandQueue: NativePointer
-  public init(
-    logicalSize: LogicalSize,
-    physicalWidth: UInt32,
-    physicalHeight: UInt32,
-    textures: [MetalBorrowedTexture],
-    commandQueue: NativePointer = .null
-  ) {
-    self.logicalSize = logicalSize
-    self.physicalWidth = physicalWidth
-    self.physicalHeight = physicalHeight
-    self.textures = textures
-    self.commandQueue = commandQueue
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_metal_borrowed_texture_descriptor
-  {
-    var raw = mln_metal_borrowed_texture_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_metal_borrowed_texture_descriptor>.size)
-    raw.logical_size = logicalSize.nativeValue()
-    raw.physical_width = physicalWidth
-    raw.physical_height = physicalHeight
-    raw.textures = arena.array(textures.map { $0.nativeValue() })
-    raw.texture_count = try NativeInputArena.count(textures.count)
-    raw.command_queue = commandQueue.unsafeMutableRawPointer
-    return raw
-  }
-}
-
-/// New Metal textures for a borrowed ring, for
-/// `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
-///
-/// The members and the textures follow the rules of
-/// `MetalBorrowedTextureDescriptor`. The ring keeps its depth, device, and
-/// command queue, so give it as many textures as it attached with, on the same
-/// device.
-///
-/// See `mln_metal_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct MetalBorrowedTextureReplacement: Equatable, Hashable, Sendable {
-  public var logicalSize: LogicalSize
-  public var physicalWidth: UInt32
-  public var physicalHeight: UInt32
-  public var textures: [MetalBorrowedTexture]
-  public init(
-    logicalSize: LogicalSize,
-    physicalWidth: UInt32,
-    physicalHeight: UInt32,
-    textures: [MetalBorrowedTexture]
-  ) {
-    self.logicalSize = logicalSize
-    self.physicalWidth = physicalWidth
-    self.physicalHeight = physicalHeight
-    self.textures = textures
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_metal_borrowed_texture_replacement
-  {
-    var raw = mln_metal_borrowed_texture_replacement()
-    raw.size = UInt32(MemoryLayout<mln_metal_borrowed_texture_replacement>.size)
-    raw.logical_size = logicalSize.nativeValue()
-    raw.physical_width = physicalWidth
-    raw.physical_height = physicalHeight
-    raw.textures = arena.array(textures.map { $0.nativeValue() })
-    raw.texture_count = try NativeInputArena.count(textures.count)
-    return raw
   }
 }
 
 /// The Metal texture of an acquired frame.
+///
+/// The depth members are set when the frame has a depth texture: one of a
+/// borrowed ring's `depth_textures`, or an exported ring's with
+/// `RenderSessionAttachOptions.keepDepth`. Otherwise they are zero.
 ///
 /// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -136,6 +212,10 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
   public var device: NativePointer
   /// The texture's MTLPixelFormat.
   public var pixelFormat: UInt64
+  /// The MTLTexture that holds the frame's depth and stencil.
+  public var depthTexture: NativePointer
+  /// The depth texture's MTLPixelFormat.
+  public var depthPixelFormat: UInt64
   public init(
     width: UInt32 = 0,
     height: UInt32 = 0,
@@ -143,7 +223,9 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
     slot: UInt32 = 0,
     texture: NativePointer = .null,
     device: NativePointer = .null,
-    pixelFormat: UInt64 = 0
+    pixelFormat: UInt64 = 0,
+    depthTexture: NativePointer = .null,
+    depthPixelFormat: UInt64 = 0
   ) {
     self.width = width
     self.height = height
@@ -152,6 +234,8 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
     self.texture = texture
     self.device = device
     self.pixelFormat = pixelFormat
+    self.depthTexture = depthTexture
+    self.depthPixelFormat = depthPixelFormat
   }
 
   init(raw: mln_metal_texture_frame) {
@@ -165,131 +249,110 @@ public struct MetalTextureFrame: Equatable, Hashable, Sendable {
     ))
     device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
     pixelFormat = raw.pixel_format
+    depthTexture = NativePointer(bitPattern: unsafeBitCast(
+      raw.depth_texture,
+      to: UInt.self
+    ))
+    depthPixelFormat = raw.depth_pixel_format
   }
 }
 
-/// An OpenGL texture of a borrowed ring.
+/// The memory of an exported ring's acquired frame, as an opaque file
+/// descriptor.
 ///
-/// See `mln_open_gl_borrowed_texture` in the
+/// The memory holds a 2D Vulkan image of `format`, with one mip level, one
+/// layer, optimal tiling, and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+/// VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a
+/// Vulkan image that imports it has too. In OpenGL, import it with
+/// glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the texture
+/// with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
+/// glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
+/// VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+///
+/// With `RenderSessionAttachOptions.keepDepth`, on a device whose
+/// `GpuDeviceCapabilities.depthExportKinds` has `GpuExportKind.opaqueFd`, the
+/// depth members share the memory of the frame's depth image in the same way.
+/// Otherwise `depth_fd` is -1 and the others are zero. The depth image is 2D,
+/// of `depth_format`, with one mip level, one layer, optimal tiling, and the
+/// usage VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+/// VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame
+/// leaves it in VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+/// In OpenGL, make its texture with the internal format that
+/// `DepthStencilFormatFlag` names for `depth_format`.
+///
+/// See `mln_opaque_fd_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenGlBorrowedTexture: Equatable, Hashable, Sendable {
-  /// Your texture name.
-  public var texture: UInt32
-  public init(texture: UInt32) {
-    self.texture = texture
-  }
-
-  init(raw: mln_open_gl_borrowed_texture) {
-    texture = raw.texture
-  }
-
-  func nativeValue() -> mln_open_gl_borrowed_texture {
-    var raw = mln_open_gl_borrowed_texture()
-    raw.texture = texture
-    return raw
-  }
-}
-
-/// A ring of your OpenGL textures, for
-/// `MapHandle.attachOpenGlBorrowedTexture()`.
-///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the textures' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. The context must use `OpenGlContextOwnership.shared`.
-/// Each texture must be in your context's share group, with storage of that
-/// size. The ring holds up to `textureRingMaxDepth` distinct textures.
-///
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
-///
-/// See `mln_open_gl_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenGlBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var logicalSize: LogicalSize
-  public var physicalWidth: UInt32
-  public var physicalHeight: UInt32
-  public var context: OpenGlContextDescriptor
-  public var textures: [OpenGlBorrowedTexture]
-  /// The textures' target. It must be GL_TEXTURE_2D.
-  public var target: UInt32
+public struct OpaqueFdFrame: Equatable, Hashable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+  /// The texture's index in the ring.
+  public var slot: UInt32
+  /// The file descriptor of the image's memory.
+  public var fd: Int32
+  /// The size of the memory in bytes.
+  public var allocationSize: UInt64
+  /// Whether the memory is the image's own, which an import says, such as with
+  /// GL_DEDICATED_MEMORY_OBJECT_EXT.
+  public var dedicated: Bool
+  /// The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8.
+  public var format: UInt32
+  /// The file descriptor of the depth image's memory.
+  public var depthFd: Int32
+  /// The size of the depth image's memory in bytes.
+  public var depthAllocationSize: UInt64
+  /// Whether the memory is the depth image's own.
+  public var depthDedicated: Bool
+  /// The depth image's `VkFormat`.
+  public var depthFormat: UInt32
   public init(
-    logicalSize: LogicalSize,
-    physicalWidth: UInt32,
-    physicalHeight: UInt32,
-    context: OpenGlContextDescriptor,
-    textures: [OpenGlBorrowedTexture],
-    target: UInt32
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    fd: Int32 = 0,
+    allocationSize: UInt64 = 0,
+    dedicated: Bool = false,
+    format: UInt32 = 0,
+    depthFd: Int32 = 0,
+    depthAllocationSize: UInt64 = 0,
+    depthDedicated: Bool = false,
+    depthFormat: UInt32 = 0
   ) {
-    self.logicalSize = logicalSize
-    self.physicalWidth = physicalWidth
-    self.physicalHeight = physicalHeight
-    self.context = context
-    self.textures = textures
-    self.target = target
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.fd = fd
+    self.allocationSize = allocationSize
+    self.dedicated = dedicated
+    self.format = format
+    self.depthFd = depthFd
+    self.depthAllocationSize = depthAllocationSize
+    self.depthDedicated = depthDedicated
+    self.depthFormat = depthFormat
   }
 
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_open_gl_borrowed_texture_descriptor
-  {
-    var raw = mln_open_gl_borrowed_texture_descriptor()
-    raw
-      .size = UInt32(MemoryLayout<mln_open_gl_borrowed_texture_descriptor>.size)
-    raw.logical_size = logicalSize.nativeValue()
-    raw.physical_width = physicalWidth
-    raw.physical_height = physicalHeight
-    raw.context = try context.nativeValue(arena: arena)
-    raw.textures = arena.array(textures.map { $0.nativeValue() })
-    raw.texture_count = try NativeInputArena.count(textures.count)
-    raw.target = target
-    return raw
-  }
-}
-
-/// New OpenGL textures for a borrowed ring, for
-/// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
-///
-/// The members and the textures follow the rules of
-/// `OpenGlBorrowedTextureDescriptor`. The ring keeps its depth, context, and
-/// texture target, so give it as many textures as it attached with, in the same
-/// share group.
-///
-/// See `mln_open_gl_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenGlBorrowedTextureReplacement: Equatable, Hashable, Sendable {
-  public var logicalSize: LogicalSize
-  public var physicalWidth: UInt32
-  public var physicalHeight: UInt32
-  public var textures: [OpenGlBorrowedTexture]
-  public init(
-    logicalSize: LogicalSize,
-    physicalWidth: UInt32,
-    physicalHeight: UInt32,
-    textures: [OpenGlBorrowedTexture]
-  ) {
-    self.logicalSize = logicalSize
-    self.physicalWidth = physicalWidth
-    self.physicalHeight = physicalHeight
-    self.textures = textures
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_open_gl_borrowed_texture_replacement
-  {
-    var raw = mln_open_gl_borrowed_texture_replacement()
-    raw
-      .size = UInt32(MemoryLayout<mln_open_gl_borrowed_texture_replacement>
-        .size)
-    raw.logical_size = logicalSize.nativeValue()
-    raw.physical_width = physicalWidth
-    raw.physical_height = physicalHeight
-    raw.textures = arena.array(textures.map { $0.nativeValue() })
-    raw.texture_count = try NativeInputArena.count(textures.count)
-    return raw
+  init(raw: mln_opaque_fd_frame) {
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    fd = raw.fd
+    allocationSize = raw.allocation_size
+    dedicated = raw.dedicated
+    format = raw.format
+    depthFd = raw.depth_fd
+    depthAllocationSize = raw.depth_allocation_size
+    depthDedicated = raw.depth_dedicated
+    depthFormat = raw.depth_format
   }
 }
 
 /// The OpenGL texture of an acquired frame.
+///
+/// The depth members are set when the frame has a depth texture, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
 ///
 /// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -301,13 +364,20 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
   public var slot: UInt32
   public var texture: UInt32
   public var target: UInt32
+  /// The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil.
+  public var depthTexture: UInt32
+  /// The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero
+  /// for a borrowed ring's.
+  public var depthInternalFormat: UInt32
   public init(
     width: UInt32 = 0,
     height: UInt32 = 0,
     scaleFactor: Double = 0,
     slot: UInt32 = 0,
     texture: UInt32 = 0,
-    target: UInt32 = 0
+    target: UInt32 = 0,
+    depthTexture: UInt32 = 0,
+    depthInternalFormat: UInt32 = 0
   ) {
     self.width = width
     self.height = height
@@ -315,6 +385,8 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
     self.slot = slot
     self.texture = texture
     self.target = target
+    self.depthTexture = depthTexture
+    self.depthInternalFormat = depthInternalFormat
   }
 
   init(raw: mln_open_gl_texture_frame) {
@@ -324,6 +396,8 @@ public struct OpenGlTextureFrame: Equatable, Hashable, Sendable {
     slot = raw.slot
     texture = raw.texture
     target = raw.target
+    depthTexture = raw.depth_texture
+    depthInternalFormat = raw.depth_internal_format
   }
 }
 
@@ -380,170 +454,10 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
   }
 }
 
-/// A Vulkan image of a borrowed ring.
-///
-/// See `mln_vulkan_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
-  /// Your VkImage.
-  public var image: UInt64
-  /// A 2D VkImageView of `image` with one mip level and one layer.
-  public var imageView: UInt64
-  public init(image: UInt64, imageView: UInt64) {
-    self.image = image
-    self.imageView = imageView
-  }
-
-  init(raw: mln_vulkan_borrowed_texture) {
-    image = raw.image
-    imageView = raw.image_view
-  }
-
-  func nativeValue() -> mln_vulkan_borrowed_texture {
-    var raw = mln_vulkan_borrowed_texture()
-    raw.image = image
-    raw.image_view = imageView
-    return raw
-  }
-}
-
-/// A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
-///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the images' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. Each image must have that size, `format`, and
-/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
-/// ring holds up to `textureRingMaxDepth` distinct images.
-///
-/// The session uses the images until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
-///
-/// See `mln_vulkan_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  public var logicalSize: LogicalSize
-  public var physicalWidth: UInt32
-  public var physicalHeight: UInt32
-  public var context: VulkanContextDescriptor
-  public var textures: [VulkanBorrowedTexture]
-  /// The images' VkFormat.
-  public var format: UInt32
-  /// The VkImageLayout that each frame leaves its image in.
-  public var finalLayout: UInt32
-  public var owner: VulkanImageOwner
-  public init(
-    logicalSize: LogicalSize,
-    physicalWidth: UInt32,
-    physicalHeight: UInt32,
-    context: VulkanContextDescriptor,
-    textures: [VulkanBorrowedTexture],
-    format: UInt32,
-    finalLayout: UInt32,
-    owner: VulkanImageOwner = .init(rawValue: 0)
-  ) {
-    self.logicalSize = logicalSize
-    self.physicalWidth = physicalWidth
-    self.physicalHeight = physicalHeight
-    self.context = context
-    self.textures = textures
-    self.format = format
-    self.finalLayout = finalLayout
-    self.owner = owner
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_vulkan_borrowed_texture_descriptor
-  {
-    var raw = mln_vulkan_borrowed_texture_descriptor()
-    raw.size = UInt32(MemoryLayout<mln_vulkan_borrowed_texture_descriptor>.size)
-    raw.logical_size = logicalSize.nativeValue()
-    raw.physical_width = physicalWidth
-    raw.physical_height = physicalHeight
-    raw.context = context.nativeValue()
-    raw.textures = arena.array(textures.map { $0.nativeValue() })
-    raw.texture_count = try NativeInputArena.count(textures.count)
-    raw.format = format
-    raw.final_layout = finalLayout
-    raw.owner = mln_vulkan_image_owner(rawValue: owner.rawValue)
-    return raw
-  }
-}
-
-/// New Vulkan images for a borrowed ring, for
-/// `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
-///
-/// The members and the images follow the rules of
-/// `VulkanBorrowedTextureDescriptor`. The ring keeps its depth, context,
-/// `format`, `final_layout`, and `owner`, so give it as many images as it
-/// attached with, in that format, on the same device.
-///
-/// See `mln_vulkan_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct VulkanBorrowedTextureReplacement: Equatable, Hashable, Sendable {
-  public var logicalSize: LogicalSize
-  public var physicalWidth: UInt32
-  public var physicalHeight: UInt32
-  public var textures: [VulkanBorrowedTexture]
-  public init(
-    logicalSize: LogicalSize,
-    physicalWidth: UInt32,
-    physicalHeight: UInt32,
-    textures: [VulkanBorrowedTexture]
-  ) {
-    self.logicalSize = logicalSize
-    self.physicalWidth = physicalWidth
-    self.physicalHeight = physicalHeight
-    self.textures = textures
-  }
-
-  func nativeValue(arena: NativeInputArena) throws
-    -> mln_vulkan_borrowed_texture_replacement
-  {
-    var raw = mln_vulkan_borrowed_texture_replacement()
-    raw
-      .size = UInt32(MemoryLayout<mln_vulkan_borrowed_texture_replacement>.size)
-    raw.logical_size = logicalSize.nativeValue()
-    raw.physical_width = physicalWidth
-    raw.physical_height = physicalHeight
-    raw.textures = arena.array(textures.map { $0.nativeValue() })
-    raw.texture_count = try NativeInputArena.count(textures.count)
-    return raw
-  }
-}
-
-/// The queue family that a borrowed image goes to after each frame.
-///
-/// With `VulkanImageOwner.external` or `VulkanImageOwner.foreign`, acquire the
-/// image on your side before you read it. You don't need to release it back.
-///
-/// See `mln_vulkan_image_owner` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct VulkanImageOwner: RawRepresentable, CustomStringConvertible,
-  NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// The image stays with the queue family of `graphics_queue_family_index`.
-  public static let graphicsQueue: VulkanImageOwner = .init(rawValue: 0)
-  /// Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL.
-  public static let external: VulkanImageOwner = .init(rawValue: 1)
-  /// Each frame releases the image to VK_QUEUE_FAMILY_FOREIGN_EXT.
-  public static let foreign: VulkanImageOwner = .init(rawValue: 2)
-  public var description: String {
-    switch rawValue {
-    case 0: return "graphicsQueue"
-    case 1: return "external"
-    case 2: return "foreign"
-    default: return "VulkanImageOwner(\(rawValue))"
-    }
-  }
-}
-
 /// The Vulkan image of an acquired frame.
+///
+/// The depth members are set when the frame has a depth image, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
 ///
 /// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -563,6 +477,14 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
   public var format: UInt32
   /// The VkImageLayout that the frame left the image in.
   public var layout: UInt32
+  /// The VkImage that holds the frame's depth and stencil.
+  public var depthImage: UInt64
+  /// A VkImageView of the depth image's depth and stencil aspects.
+  public var depthImageView: UInt64
+  /// The depth image's VkFormat.
+  public var depthFormat: UInt32
+  /// The VkImageLayout that the frame left the depth image in.
+  public var depthLayout: UInt32
   public init(
     width: UInt32 = 0,
     height: UInt32 = 0,
@@ -572,7 +494,11 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
     imageView: UInt64 = 0,
     device: NativePointer = .null,
     format: UInt32 = 0,
-    layout: UInt32 = 0
+    layout: UInt32 = 0,
+    depthImage: UInt64 = 0,
+    depthImageView: UInt64 = 0,
+    depthFormat: UInt32 = 0,
+    depthLayout: UInt32 = 0
   ) {
     self.width = width
     self.height = height
@@ -583,6 +509,10 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
     self.device = device
     self.format = format
     self.layout = layout
+    self.depthImage = depthImage
+    self.depthImageView = depthImageView
+    self.depthFormat = depthFormat
+    self.depthLayout = depthLayout
   }
 
   init(raw: mln_vulkan_texture_frame) {
@@ -595,5 +525,9 @@ public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
     device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
     format = raw.format
     layout = raw.layout
+    depthImage = raw.depth_image
+    depthImageView = raw.depth_image_view
+    depthFormat = raw.depth_format
+    depthLayout = raw.depth_layout
   }
 }

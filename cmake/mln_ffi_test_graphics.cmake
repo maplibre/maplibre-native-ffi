@@ -1,7 +1,7 @@
 # Builds tests/graphics, the GPU fixtures that the C suite and the binding
 # suites share. tests/graphics/include/mln_test_graphics.h states its interface.
-# A binding that compiles graphics.c itself, as Swift does, adds MapLibre
-# Native's vendor/Vulkan-Headers/include to its include path, and links dl on
+# A binding that compiles graphics.c itself, as Swift does, adds
+# third_party/Vulkan-Headers/include to its include path, and links dl on
 # Linux, or user32 and gdi32 on Windows.
 #
 # Two targets come from the one source file:
@@ -51,11 +51,6 @@ function(mln_ffi_test_graphics_loader_definitions out_var)
 endfunction()
 
 function(mln_ffi_add_test_graphics)
-  # Browser GPU contexts come from JavaScript, so the browser suite keeps its
-  # own fixtures in tests/native/support.
-  if(EMSCRIPTEN)
-    return()
-  endif()
   mln_ffi_test_graphics_loader_definitions(loader_definitions)
 
   add_library(
@@ -80,7 +75,7 @@ function(mln_ffi_add_test_graphics)
   target_include_directories(
     mln_test_graphics_objects
     SYSTEM
-    PRIVATE "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/include")
+    PRIVATE "${PROJECT_SOURCE_DIR}/third_party/Vulkan-Headers/include")
   target_compile_definitions(
     mln_test_graphics_objects
     PRIVATE MLN_TEST_GRAPHICS_EXPORTS ${loader_definitions})

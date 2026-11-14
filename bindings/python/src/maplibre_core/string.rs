@@ -1,6 +1,6 @@
 use std::str;
 
-use maplibre_native_ffi_sys as sys;
+use maplibre_native_ffi_python_sys as sys;
 
 use super::{Error, Result};
 

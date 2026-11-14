@@ -7,7 +7,7 @@ import { cVersion, RuntimeHandle } from "@maplibre/native-ffi";
 declare const console: { log(line: string): void };
 
 void RuntimeHandle.create()
-  .then((runtime: RuntimeHandle) => runtime.release())
+  .release()
   .then(() => {
     console.log(`loaded C API version ${cVersion()}`);
   });

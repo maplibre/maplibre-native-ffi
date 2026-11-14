@@ -115,29 +115,6 @@ def package_inventory(
     return compose(root, inventories)
 
 
-def without_native_rust(inventory: dict) -> dict:
-    """Cargo consumers rebuild the platform crate with their own resolution."""
-    result = copy.deepcopy(inventory)
-    result["components"] = [
-        item
-        for item in result["components"]
-        if not item.get("purl", "").startswith("pkg:cargo/")
-        and item.get("group") != "org.maplibre.nativeffi"
-        and item["name"] != "rust-std"
-    ]
-    refs = {item["bom-ref"] for item in result["components"]}
-    refs.add(result["metadata"]["component"]["bom-ref"])
-    result["dependencies"] = [
-        {
-            "ref": entry["ref"],
-            "dependsOn": [ref for ref in entry["dependsOn"] if ref in refs],
-        }
-        for entry in result["dependencies"]
-        if entry["ref"] in refs
-    ]
-    return result
-
-
 def source_version(source: pathlib.Path) -> tuple[str, list[dict]]:
     commit = git(source, "rev-parse", "HEAD")
     checkout = pathlib.Path(git(source, "rev-parse", "--show-toplevel"))
@@ -164,7 +141,7 @@ def source_version(source: pathlib.Path) -> tuple[str, list[dict]]:
 def cargo_components(
     about: dict,
     target: str,
-    manifest: pathlib.Path = REPOSITORY / "src/platform/rust/Cargo.toml",
+    manifest: pathlib.Path = REPOSITORY / "third_party/mln-rs/crates/mln_c/Cargo.toml",
     flags: tuple[str, ...] = (),
 ) -> tuple[list[dict], dict[str, set[str]], str]:
     packages = {entry["package"]["id"]: entry for entry in about["crates"]}
@@ -252,11 +229,14 @@ def native(
         "BSD-2-Clause",
         "https://github.com/maplibre/maplibre-native-ffi",
     )
-    root["bom-ref"] = f"native:{artifact['platform']['id']}:{artifact['backend']}"
+    root["bom-ref"] = f"native:{artifact['name']}"
     root["group"] = "org.maplibre.nativeffi"
     root["properties"] = [
         {"name": "maplibre:platform", "value": artifact["platform"]["id"]},
-        {"name": "maplibre:backend", "value": artifact["backend"]},
+        *(
+            {"name": "maplibre:backend", "value": backend}
+            for backend in artifact["backends"]
+        ),
         {"name": "maplibre:source-commit", "value": artifact["commit"]},
     ]
     components = []
@@ -273,8 +253,8 @@ def native(
         item = component(record["name"], version, record["license"], record["url"])
         if properties:
             item["properties"] = properties
-        if record["name"] == "maplibre-native":
-            patches = sorted((REPOSITORY / "patches/maplibre-native").glob("*.patch"))
+        if record["name"] == "mln-rs":
+            patches = sorted((REPOSITORY / "patches/mln-rs").glob("*.patch"))
             item.setdefault("properties", []).extend(
                 {
                     "name": f"maplibre:patch:{patch.name}",

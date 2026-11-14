@@ -16,6 +16,12 @@ public extension RenderSessionHandle {
   /// exits, and reports how many it kept. Detach the session instead to free
   /// them.
   ///
+  /// A session lets go of your graphics objects later when you call this on the
+  /// thread that runs its graphics work: from a callback that the session runs
+  /// there, once the callback returns, and for a session driven by
+  /// `RenderDriverKind.callerGraphicsThread`, at your next
+  /// `RenderSessionHandle.serviceDriverWork()` for it.
+  ///
   /// See `mln_render_session_abandon` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func abandon() throws -> RenderAbandonResult {
@@ -120,6 +126,8 @@ public extension RenderSessionHandle {
   ///
   /// Errors:
   ///
+  /// - `Status.invalidArgument` when `demand.token` is
+  ///   `frameDemandTokenStillImage`.
   /// - `Status.targetLost` or `Status.nativeError`, as
   ///   `RenderSessionSnapshot.failureStatus` reports, when the session has
   ///   failed.
@@ -343,17 +351,26 @@ public extension RenderSessionHandle {
   /// to the background. Release every acquired frame first. Frame demands that
   /// are still pending, and later ones until you give the session a new target,
   /// finish with `RenderResult.targetNotReady`. Once the release completes, you
-  /// can destroy the old target.
+  /// can destroy the old target. An Android or OpenHarmony window can go away
+  /// sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
+  ///
+  /// For a borrowed ring, a completed release also means that the session has
+  /// stopped waiting on the consumer sync that you released its frames with, so
+  /// you can reuse or destroy the textures. The session waits about a second at
+  /// most for that sync, and logs a warning when the wait runs out. It checks
+  /// the sync without blocking a thread: keep servicing a session driven by
+  /// `RenderDriverKind.callerGraphicsThread` until the release completes. The
+  /// session keeps nothing of the released textures: a texture that a later
+  /// target gives it again is a new one, even one that you discarded a frame
+  /// of.
   ///
   /// See `mln_render_session_release_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` when the session renders offscreen or into Android
-  ///   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
-  ///   allocates.
-  /// - `Status.unsupported` when the target is a WebGL canvas.
+  /// - `Status.unsupported` when the session renders offscreen or into an
+  ///   exported ring.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
   func releaseTarget() async throws {
@@ -366,11 +383,15 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Resizes the session's target and its map.
+  /// Resizes the session's target and its map, and sets the map's scale factor.
   ///
-  /// The session renders at the map's scale factor. Release every acquired
-  /// frame first. You can call it once the attach call returns. While the
-  /// attach runs, the resize waits for it to complete.
+  /// Use it when the window changes size, or moves to a display with another
+  /// scale factor. The map keeps its loaded tiles, and draws its next frame at
+  /// the new size and scale factor. You can call it once the attach call
+  /// returns. While the attach runs, the resize waits for it to complete.
+  ///
+  /// An exported ring gets textures of the new size. The frames that you hold
+  /// keep their textures, of the old size, until you release or discard them.
   ///
   /// See `mln_render_session_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -379,13 +400,12 @@ public extension RenderSessionHandle {
   ///
   /// - `Status.unsupported` when the session renders into a borrowed ring. Give
   ///   it new textures of the new size instead.
-  /// - `Status.invalidState` while you hold one of the session's acquired
-  ///   frames, or when the session failed, or you detached, abandoned,
-  ///   released, or disposed it.
+  /// - `Status.invalidState` when the session failed, or you detached,
+  ///   abandoned, released, or disposed it.
   /// - `Status.targetLost` when the session loses its target before the resize
   ///   applies.
   @discardableResult
-  func resize(logicalSize bindingArg0: LogicalSize) async throws
+  func resize(extent bindingArg0: LogicalExtent) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in
@@ -411,6 +431,11 @@ public extension RenderSessionHandle {
   ///
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.busy` when called while a service of the session already runs on
+  ///   this thread, from a callback that the service runs.
   func serviceDriverWork() throws {
     try nativeInvoke { raw, _, diagnostic in
       mln_render_session_service_driver_work(
@@ -446,10 +471,61 @@ public extension RenderSessionHandle {
       )
     }
   }
+
+  /// Replaces the window, surface, or borrowed ring that the session renders
+  /// to, and resizes the map to it.
+  ///
+  /// Use it to give the session a target again after
+  /// `RenderSessionHandle.releaseTarget()`, to move it to another window or
+  /// surface, or to give a borrowed ring new textures, such as of a new size.
+  /// The session renders to `target` with the device that it attached with.
+  /// Once the replacement completes, the session no longer uses the old target.
+  /// A borrowed ring takes only a ring of the kind it attached with, with as
+  /// many textures, with depth textures only when it attached with them, and
+  /// with the same formats, final layouts, and owner. Release every acquired
+  /// frame of a borrowed ring first. Once the replacement completes, the
+  /// session has also stopped waiting on the consumer sync of the textures that
+  /// the new ring doesn't have, as `RenderSessionHandle.releaseTarget()` says,
+  /// so you can reuse or destroy them.
+  ///
+  /// See `mln_render_session_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when a borrowed ring gets more or fewer
+  ///   textures than it attached with, or depth textures but not one for each
+  ///   texture.
+  /// - `Status.invalidState` when a window is minimized or has no client area,
+  ///   or while you hold one of a borrowed ring's acquired frames.
+  /// - `Status.unsupported` when the session renders offscreen or into an
+  ///   exported ring, when `target` is offscreen or an exported ring, when a
+  ///   session that presents gets a borrowed ring or a borrowed ring gets
+  ///   anything else, or when no backend of this build renders to the target's
+  ///   kind. An exported ring takes a new size from
+  ///   `RenderSessionHandle.resize()` instead.
+  /// - `Status.invalidState` when a window was minimized or had no client area
+  ///   when the replacement ran.
+  /// - `Status.unsupported` when the session's device can't render to `target`,
+  ///   the new target needs a different color format or pre-rotation support
+  ///   than the old one, or a borrowed ring's new textures differ from the old
+  ///   ones in their formats, final layouts, or owner, or in having depth
+  ///   textures. Attach a new session instead.
+  /// - `Status.nativeError` when the library can't render to the new target.
+  func setTarget(_ bindingArg0: RenderTarget) async throws {
+    try await nativeUnit { raw, arena, completion, diagnostic in
+      try mln_render_session_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        completion,
+        diagnostic
+      )
+    }
+  }
 }
 
 public extension RenderSessionHandleDiscarding {
-  func resize(logicalSize bindingArg0: LogicalSize) throws {
+  func resize(extent bindingArg0: LogicalExtent) throws {
     try owner.nativeInvoke { raw, _, diagnostic in mln_render_session_resize(
       raw,
       bindingArg0.nativeValue(),

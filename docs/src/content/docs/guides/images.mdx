@@ -21,13 +21,13 @@ as in [Create a map](/maplibre-native-ffi/guides/create-a-map/#set-a-style).
 
 ## Render offscreen
 
-Attach an offscreen render session to the map with
-[](api:mln_map_attach_offscreen), at the map's size. It renders on a GPU device
-that the library creates, so your app doesn't need a graphics context. Use the
-render session it returns.
+Attach an offscreen render session to the map with [](api:mln_map_attach) and an
+offscreen [](api:mln_render_target), at the map's size. It renders on a GPU
+device that the library creates, so your app doesn't need a graphics context.
+Use the render session it returns.
 
-To share one device among the sessions of many maps, or to pick a GPU, create an
-[](api:mln_offscreen_device) and pass it when you attach.
+To share one device among the sessions of many maps, or to pick a GPU, create a
+[](api:mln_gpu_device) and pass it when you attach.
 
 <Snippet page="images" region="attach" />
 

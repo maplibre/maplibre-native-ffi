@@ -1,14 +1,13 @@
 """Consume the release's complete static C archive through CMakeDeps.
 
-`backend=default` selects the platform's default renderer. Linux defaults to
+The archive carries every render backend of its platform. Linux defaults to
 `libc=gnu`; musl consumers must select `libc=musl`. Only OS/architecture and
-these options select the prebuilt binary; the consumer's compiler and build
-mode do not rebuild it.
+this option select the prebuilt binary; the consumer's compiler and build mode
+do not rebuild it.
 """
 
 import json
 import os
-import shlex
 from typing import ClassVar
 
 from conan import ConanFile
@@ -23,11 +22,8 @@ class MaplibreNativeC(ConanFile):
     homepage = "https://github.com/maplibre/maplibre-native-ffi"
     description = "The C API for MapLibre Native, as a prebuilt static library"
     settings = "os", "arch", "compiler"
-    options: ClassVar[dict[str, list[str]]] = {
-        "backend": ["default", "metal", "opengl", "vulkan", "webgpu"],
-        "libc": ["gnu", "musl"],
-    }
-    default_options: ClassVar[dict[str, str]] = {"backend": "default", "libc": "gnu"}
+    options: ClassVar[dict[str, list[str]]] = {"libc": ["gnu", "musl"]}
+    default_options: ClassVar[dict[str, str]] = {"libc": "gnu"}
 
     def config_options(self):
         if self.settings.os != "Linux":
@@ -44,14 +40,12 @@ class MaplibreNativeC(ConanFile):
             "iOS": "ios",
             "tvOS": "tvos",
             "visionOS": "visionos",
-            "Emscripten": "emscripten",
         }
         architectures = {
             "x86": "x86",
             "x86_64": "x64",
             "armv8": "arm64",
             "armv7": "arm",
-            "wasm": "wasm32",
         }
         platform = platforms.get(str(self.settings.os))
         arch = architectures.get(str(self.settings.arch))
@@ -66,20 +60,7 @@ class MaplibreNativeC(ConanFile):
         return f"{platform}-{arch}"
 
     def _source(self):
-        backend = str(self.options.backend)
-        if backend == "default":
-            if self.settings.os in ("Macos", "iOS", "tvOS", "visionOS"):
-                backend = "metal"
-            elif self.settings.os in ("Linux", "Windows", "FreeBSD"):
-                backend = "vulkan"
-            elif self.settings.os == "Emscripten":
-                backend = "webgpu"
-            else:
-                backend = "opengl"
-        suffix = {"Windows": "wgl", "Emscripten": "webgl"}.get(
-            str(self.settings.os), "egl"
-        )
-        key = f"{self._platform}-{suffix if backend == 'opengl' else backend}"
+        key = self._platform
         try:
             return self.conan_data["sources"][str(self.version)][key]
         except KeyError:
@@ -94,7 +75,7 @@ class MaplibreNativeC(ConanFile):
             if self.settings.os == "Windows"
             else "maplibre-native-c"
         )
-        return [main, "mln_ffi_platform"]
+        return [main]
 
     def package_id(self):
         self.info.settings.rm_safe("compiler")
@@ -165,29 +146,3 @@ class MaplibreNativeC(ConanFile):
         if self.settings.os == "Linux" and self.options.libc == "gnu":
             self.cpp_info.system_libs.append("gcc_s")
         self.cpp_info.frameworks = descriptor["link"]["frameworks"]
-        # The archive's pkg-config file carries Emscripten's compile flags;
-        # its installed header directory is supplied by Conan instead.
-        if self.settings.os == "Emscripten":
-            pc = load(
-                self,
-                os.path.join(
-                    self.package_folder, "share/pkgconfig/maplibre-native-c.pc"
-                ),
-            )
-            cflags = next(
-                line.removeprefix("Cflags:").strip()
-                for line in pc.splitlines()
-                if line.startswith("Cflags:")
-            )
-            flags = [flag for flag in shlex.split(cflags) if not flag.startswith("-I")]
-            self.cpp_info.cflags = flags
-            self.cpp_info.cxxflags = flags
-            link_flags = load(
-                self,
-                os.path.join(
-                    self.package_folder,
-                    "share/maplibre-native-c/emscripten-link-flags.txt",
-                ),
-            ).splitlines()
-            self.cpp_info.exelinkflags = link_flags
-            self.cpp_info.sharedlinkflags = link_flags

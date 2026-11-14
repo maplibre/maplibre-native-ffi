@@ -26,9 +26,11 @@ from dataclasses import dataclass
 from ..model import CType, Function
 from ..protocol import (
     COMPLETION,
+    COMPLETION_CALLBACK,
     COMPLETION_RESULT,
     DIAGNOSTIC,
     RENDER_ABANDON_RESULT,
+    USER_DATA_RELEASE,
 )
 from ..semantic import DeliverySupport
 from .kotlin_abi import (
@@ -137,45 +139,60 @@ DISPATCHED_RUNTIME = {"completion", "completionRelease"}
 # The global through which a wasm extern reaches the loaded module.
 WASM_MODULE = "globalThis[Symbol.for('org.maplibre.nativeffi.c')]"
 
+# The C callback type of each runtime site, whose trampoline the module serves.
+RUNTIME_UPCALLS = {
+    "completion": COMPLETION_CALLBACK,
+    "completionRelease": USER_DATA_RELEASE,
+    "releaseRoot": USER_DATA_RELEASE,
+}
+
+
+def upcall_typedef(site):
+    """The C callback type whose trampoline serves [site] in the module."""
+    return site.callback or RUNTIME_UPCALLS[site.name]
+
+
 # Each primitive as wasm32 passes it to JavaScript: the Kotlin type of the
-# extern's argument, the C type of the wrapper's parameter, and the Kotlin
-# expressions that convert a common carrier to it and back. Integers of 32 bits
-# or fewer cross as a Number, 64-bit ones as a BigInt, and pointers and sizes
-# as a 32-bit word that Carriers.kt narrows with a check.
+# extern's argument, and the Kotlin expressions that convert a common carrier to
+# it and back. Integers of 32 bits or fewer cross as a Number, 64-bit ones as a
+# BigInt, and pointers and sizes as a 32-bit word that Carriers.kt narrows with
+# a check.
 WASM = {
-    "bool": ("Int", "int32_t", "if ({}) 1 else 0", "{} != 0"),
-    "i8": ("Int", "int32_t", "{}.toInt()", "{}.toByte()"),
-    "u8": ("Int", "int32_t", "{}.toInt()", "{}.toByte()"),
-    "i16": ("Int", "int32_t", "{}.toInt()", "{}.toShort()"),
-    "u16": ("Int", "int32_t", "{}.toInt()", "{}.toShort()"),
-    "i32": ("Int", "int32_t", "{}", "{}"),
-    "u32": ("Int", "int32_t", "{}", "{}"),
-    "i64": ("Long", "int64_t", "{}", "{}"),
-    "u64": ("Long", "int64_t", "{}", "{}"),
-    "size": ("Int", "uint32_t", "word({})", "unsignedWord({})"),
-    "ssize": ("Int", "int32_t", "signedWord({})", "{}.toLong()"),
-    "f32": ("Float", "float", "{}", "{}"),
-    "f64": ("Double", "double", "{}", "{}"),
-    "ptr": ("Int", "uintptr_t", "word({})", "unsignedWord({})"),
+    "bool": ("Int", "if ({}) 1 else 0", "{} != 0"),
+    "i8": ("Int", "{}.toInt()", "{}.toByte()"),
+    "u8": ("Int", "{}.toInt()", "{}.toByte()"),
+    "i16": ("Int", "{}.toInt()", "{}.toShort()"),
+    "u16": ("Int", "{}.toInt()", "{}.toShort()"),
+    "i32": ("Int", "{}", "{}"),
+    "u32": ("Int", "{}", "{}"),
+    "i64": ("Long", "{}", "{}"),
+    "u64": ("Long", "{}", "{}"),
+    "size": ("Int", "word({})", "unsignedWord({})"),
+    "ssize": ("Int", "signedWord({})", "{}.toLong()"),
+    "f32": ("Float", "{}", "{}"),
+    "f64": ("Double", "{}", "{}"),
+    "ptr": ("Int", "word({})", "unsignedWord({})"),
 }
 
 # The reader of each primitive that a trampoline passes to its site in a slot,
 # which returns the site parameter's carrier.
-WASM_READ = {
-    "bool": "readBool({})",
-    "i8": "readI8({})",
-    "u8": "readI8({})",
-    "i16": "readI16({})",
-    "u16": "readI16({})",
-    "i32": "readI32({})",
-    "u32": "readI32({})",
-    "i64": "readI64({})",
-    "u64": "readI64({})",
-    "size": "readAddress({})",
-    "ssize": "readI32({}).toLong()",
-    "f32": "readF32({})",
-    "f64": "readF64({})",
-    "ptr": "readAddress({})",
+# How a dispatched site reads each primitive from the JavaScript value that a
+# trampoline passes.
+WASM_ARG = {
+    "bool": "argBool({})",
+    "i8": "argInt({}).toByte()",
+    "u8": "argInt({}).toByte()",
+    "i16": "argInt({}).toShort()",
+    "u16": "argInt({}).toShort()",
+    "i32": "argInt({})",
+    "u32": "argInt({})",
+    "i64": "argLong({})",
+    "u64": "argLong({})",
+    "size": "unsignedWord(argInt({}))",
+    "ssize": "argInt({}).toLong()",
+    "f32": "argDouble({}).toFloat()",
+    "f64": "argDouble({})",
+    "ptr": "unsignedWord(argInt({}))",
 }
 
 CINTEROP_TYPE = {
@@ -214,8 +231,6 @@ class Signature:
     parameters: tuple[Parameter, ...]
     result: Primitive | Record | None
     result_ctype: CType
-    # What the call waits for before it returns, from `blocks=`.
-    blocks: str | None = None
 
     @property
     def wrapper(self):
@@ -319,7 +334,6 @@ class NativeShims:
             tuple(parameters),
             result,
             function.return_type,
-            function.metadata.get("blocks"),
         )
 
     def kotlin_parameters(self, signature):
@@ -758,8 +772,7 @@ class NativeShims:
             + "// The JNI half of each C function and upcall the Kotlin binding uses. Every\n"
             + "// argument is a primitive; mln_jni.h defines the casts and mln_jni.c the rest.\n"
             + '#include "mln_jni.h"\n\n'
-            + "#include <maplibre_native_c.h>\n"
-            + "#include <maplibre_native_c/plugin.h>\n\n"
+            + "#include <maplibre_native_c.h>\n\n"
             + "\n\n".join(functions)
             + "\n\nconst JNINativeMethod mln_jni_methods[] = {\n"
             + "\n".join(methods)
@@ -783,48 +796,37 @@ class NativeShims:
         """The primitive that carries [kind] across wasm32: a record crosses by address."""
         return POINTER if isinstance(kind, Record) else kind
 
-    def wasm_cast(self, parameter, value):
-        """The C argument that a wasm wrapper passes for [parameter], from its carrier [value]."""
-        ctype = parameter.ctype
-        if isinstance(parameter.kind, Record):
-            return f"*(const {ctype.declaration or ctype.spelling}*)(uintptr_t){value}"
-        return f"({ctype.spelling}){value}"
-
     def wasm(self):
-        """The wasm shim: the Kotlin externs, the C wrappers they call, the export
-        list, the upcall stubs that the browser module serves, and the
-        trampolines behind them.
+        """The Kotlin/Wasm externs, which call the raw C exports of the browser
+        package's module, the function pointers of the module's upcall
+        trampolines, and the dispatch that runs each upcall site.
 
-        A function whose header records `blocks=thread_start` cannot run on the
-        page, which cannot wait for a thread to start. Its wrapper copies the
-        arguments into the thread start that `ThreadStart` staged, starts the call
-        on a pthread, and returns at once; the page later receives the call's
-        status.
+        A raw export takes the C ABI that clang uses for wasm32: a struct that
+        crosses by value crosses by address, as every struct of more than one
+        scalar does, and a returned struct is written through an address that
+        comes first.
         """
-        externs, functions, wrappers, exports = [], [], [], []
+        externs, functions = [], []
         for s in self.signatures:
-            names = [f"p{index}" for index in range(len(s.parameters) + bool(s.blocks))]
-            carriers = [self.wasm_kind(p.kind) for p in s.parameters]
+            parameters = sorted(s.parameters, key=lambda p: not p.returned)
+            names = [f"p{index}" for index in range(len(parameters))]
+            carriers = [self.wasm_kind(p.kind) for p in parameters]
             extern_types = [WASM[kind.name][0] for kind in carriers]
             arguments = [
-                WASM[kind.name][2].format(p.name)
-                for p, kind in zip(s.parameters, carriers, strict=True)
+                WASM[kind.name][1].format(p.name)
+                for p, kind in zip(parameters, carriers, strict=True)
             ]
-            if s.blocks:
-                extern_types.insert(0, "Int")
-                arguments.insert(0, "ThreadStart.staged()")
             result = (
                 None if s.result is None or isinstance(s.result, Record) else s.result
             )
             extern_result = "Unit" if result is None else WASM[result.name][0]
-            extern = f"_{s.wrapper}"
             externs.append(
                 f"private fun {s.wrapper}("
                 + ", ".join(
                     f"{n}: {t}" for n, t in zip(names, extern_types, strict=True)
                 )
                 + f"): {extern_result} =\n"
-                + f'  js("{WASM_MODULE}.{extern}({", ".join(names)})")'
+                + f'  js("{WASM_MODULE}.{s.function}({", ".join(names)})")'
             )
             call = f"{s.wrapper}({', '.join(arguments)})"
             head = f"  actual fun {s.function}({self.kotlin_parameters(s)})"
@@ -832,15 +834,13 @@ class NativeShims:
                 functions.append(f"{head} {{ {call} }}")
             else:
                 functions.append(
-                    f"{head}: {s.carrier} = {WASM[result.name][3].format(call)}"
+                    f"{head}: {s.carrier} = {WASM[result.name][2].format(call)}"
                 )
-            wrappers.append(self.wasm_wrapper(s, carriers, result))
-            exports.append(extern)
-        index = {site.name: number for number, site in enumerate(self.dispatched)}
+        dispatched = {site.name for site in self.dispatched}
         stubs = []
         for site in self.sites:
-            if site.name in index:
-                getter = f"upcallFunction({index[site.name]})"
+            if site.name in dispatched:
+                getter = f'upcallFunction("{upcall_typedef(site)}")'
             else:
                 getter = (
                     "throw MaplibreException(Status.UNSUPPORTED, "
@@ -850,14 +850,14 @@ class NativeShims:
         for site in self.dispatched:
             if site.split:
                 stubs.append(
-                    f"  val {site.name}: Long\n    get() = upcallFunction({index[site.name]})"
+                    f"  val {site.name}: Long\n"
+                    f'    get() = upcallFunction("{upcall_typedef(site)}")'
                 )
         kotlin = (
             HEADER
             + "@file:OptIn(ExperimentalWasmJsInterop::class)\n\n"
             + f"package {PACKAGE}\n\n"
-            + "import org.maplibre.nativeffi.internal.call.ThreadStart\n\n"
-            + "/** The C wrapper behind each C function, in the module that `loadWasmModule` loads. */\n"
+            + "/** Each C function, as the raw export of the module that `loadWasmModule` loads. */\n"
             + "internal actual object C {\n"
             + "\n".join(functions)
             + "\n}\n\n"
@@ -871,157 +871,105 @@ class NativeShims:
             + "import org.maplibre.nativeffi.MaplibreException\n"
             + "import org.maplibre.nativeffi.Status\n\n"
             + "/**\n"
-            + " * The browser module serves each site that the binding's delivery queue carries, with a\n"
-            + " * trampoline that the page's dispatch calls. A site that native calls on its own thread has no\n"
-            + " * function pointer.\n"
+            + " * The module serves each site that the binding's delivery queue carries with the trampoline of\n"
+            + " * the site's C callback type, which calls `DispatchedUpcalls`. A site that native calls on its\n"
+            + " * own thread has no function pointer.\n"
             + " */\n"
             + "internal actual object UpcallStubs {\n"
             + "\n".join(stubs)
             + "\n}\n\n"
-            + "private fun upcallFunction(site: Int): Long = unsignedWord(mln_kw_upcall_function(site))\n\n"
-            + "private fun mln_kw_upcall_function(site: Int): Int =\n"
-            + f'  js("{WASM_MODULE}._mln_kw_upcall_function(site)")\n'
+            + "/** The trampoline of the C callback type [name]. */\n"
+            + "private fun upcallFunction(name: String): Long =\n"
+            + "  unsignedWord(mlnWebUpcallPointer(name)).also {\n"
+            + "    if (it == 0L) {\n"
+            + '      throw MaplibreException(Status.UNSUPPORTED, "the browser module has no trampoline for $name")\n'
+            + "    }\n"
+            + "  }\n\n"
+            + "private fun mlnWebUpcallPointer(name: String): Int =\n"
+            + f'  js("{WASM_MODULE}.mlnWebUpcallPointer(name)")\n'
         )
-        c = (
-            HEADER
-            + "// The C half of each wasm extern of the Kotlin binding, and the trampoline\n"
-            + "// of each site that the binding's delivery queue carries. Every argument is a\n"
-            + "// primitive that wasm32 passes to JavaScript, and a record crosses by\n"
-            + "// address.\n"
-            + '#include "mln_kw_runtime.h"\n\n'
-            + "#include <maplibre_native_c.h>\n"
-            + "#include <maplibre_native_c/plugin.h>\n"
-            + "#include <stddef.h>\n\n"
-            + "\n\n".join(wrappers)
-            + "\n\n"
-            + self.trampolines()
-        )
-        return (
-            {
-                "C.kt": kotlin,
-                "UpcallStubs.kt": upcall_stubs,
-                "DispatchedUpcalls.kt": self.dispatched_upcalls(),
-            },
-            c,
-            "\n".join([*exports, "_mln_kw_upcall_function"]) + "\n",
-        )
-
-    def trampolines(self):
-        """The trampoline of each dispatched site, and the table that Kotlin reads
-        their function pointers from.
-
-        A trampoline copies each argument into its own zeroed 8-byte slot, a
-        record as its address, with the builtin memcpy, since the glue includes
-        no libc header, and hands the slots to the page, which reads
-        them in `DispatchedUpcalls`.
-        """
-        functions = []
-        for number, site in enumerate(self.dispatched):
-            parameters, copies = [], []
-            for slot, (local, ctype, _carrier) in enumerate(site.parameters):
-                parameters.append(self.c_declaration(ctype, local))
-                source = local
-                if isinstance(self.abi.classify(ctype), Record):
-                    source = f"{local}_address"
-                    copies.append(
-                        f"  const {ctype.declaration or ctype.spelling}* {source} = &{local};"
-                    )
-                copies.append(
-                    f"  __builtin_memcpy(&arguments[{slot}], &{source}, sizeof {source});"
-                )
-            functions.append(
-                f"static void mln_kw_upcall_{site.name}({', '.join(parameters) or 'void'}) {{\n"
-                f"  uint64_t arguments[{max(len(site.parameters), 1)}] = {{0}};\n"
-                + "".join(f"{copy}\n" for copy in copies)
-                + f"  mln_kw_js_upcall({number}, arguments);\n"
-                + "}"
-            )
-        table = "".join(
-            f"    (void (*)(void))mln_kw_upcall_{site.name},\n"
-            for site in self.dispatched
-        )
-        return (
-            "\n\n".join(functions)
-            + "\n\n"
-            + "/** The function pointer of the trampoline of [site], or 0 past the last. */\n"
-            + "uintptr_t mln_kw_upcall_function(uint32_t site) {\n"
-            + "  static void (*const functions[])(void) = {\n"
-            + table
-            + "  };\n"
-            + "  return site < sizeof functions / sizeof functions[0]\n"
-            + "           ? (uintptr_t)functions[site]\n"
-            + "           : 0;\n"
-            + "}\n"
-        )
+        return {
+            "C.kt": kotlin,
+            "UpcallStubs.kt": upcall_stubs,
+            "DispatchedUpcalls.kt": self.dispatched_upcalls(),
+        }
 
     def dispatched_upcalls(self):
-        """`DispatchedUpcalls`: the site that each trampoline names, with the
-        arguments in its slots."""
+        """`DispatchedUpcalls`: the site of each call of a trampoline, by the
+        trampoline's C callback type, with the arguments that the module passes
+        as JavaScript values.
+
+        Sites that share a C callback type differ by what the call's user data
+        roots: a registration of the site's root type, or, for the two kinds of
+        user data release, a callback root or a completion.
+        """
+        groups = {}
+        for site in self.dispatched:
+            if site.result.spelling != "void":
+                raise ValueError(f"the dispatched site {site.name} returns a value")
+            groups.setdefault(upcall_typedef(site), []).append(site)
         branches = []
-        for number, site in enumerate(self.dispatched):
-            arguments = []
-            for slot, (_local, ctype, _carrier) in enumerate(site.parameters):
-                address = f"arguments + {8 * slot}" if slot else "arguments"
-                kind = self.abi.classify(ctype)
-                if isinstance(kind, Record):
-                    kind = POINTER
-                arguments.append(WASM_READ[kind.name].format(address))
-            branches.append(
-                f"      {number} -> {site.owner}.{site.name}({', '.join(arguments)})"
-            )
+        for name, sites in groups.items():
+            calls = [
+                f"{site.owner}.{site.name}({self.upcall_arguments(site)})"
+                for site in sites
+            ]
+            if len(sites) == 1:
+                body = calls[0]
+            elif {site.name for site in sites} == {"completionRelease", "releaseRoot"}:
+                by_name = dict(zip((site.name for site in sites), calls, strict=True))
+                body = (
+                    f"if (isCallbackRoot({self.upcall_argument(sites[0], 0)})) "
+                    f"{by_name['releaseRoot']} else {by_name['completionRelease']}"
+                )
+            elif all(site.root for site in sites):
+                cases = [
+                    f"        is org.maplibre.nativeffi.{site.root} -> {call}"
+                    for site, call in zip(sites, calls, strict=True)
+                ]
+                body = (
+                    f"\n      when (CallbackRoots.get({self.upcall_argument(sites[0], 0)})?.value) {{\n"
+                    + "\n".join(cases)
+                    + "\n        else -> Unit\n      }"
+                )
+            else:
+                raise ValueError(f"the sites of {name} can't be told apart")
+            branches.append(f'      "{name}" -> {body}')
         return (
             HEADER
+            + "@file:OptIn(ExperimentalWasmJsInterop::class)\n\n"
             + f"package {PACKAGE}\n\n"
-            + "import org.maplibre.nativeffi.internal.memory.*\n\n"
+            + "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
+            + "import org.maplibre.nativeffi.internal.callback.isCallbackRoot\n\n"
             + "/**\n"
-            + " * Runs the site of each trampoline that the browser module's dispatch calls, with the\n"
-            + " * arguments that the trampoline copied into 8-byte slots.\n"
+            + " * Runs the site of each call that the module's trampolines make, by the C callback type, with\n"
+            + " * the call's arguments: numbers, `BigInt`s for 64-bit integers, and a struct passed by value as\n"
+            + " * the address of a copy.\n"
             + " */\n"
             + "internal object DispatchedUpcalls {\n"
-            + "  fun run(site: Int, arguments: Long) {\n"
-            + "    when (site) {\n"
+            + "  fun run(name: String, arguments: JsAny) {\n"
+            + "    when (name) {\n"
             + "\n".join(branches)
-            + '\n      else -> error("the browser module called an unknown upcall site $site")\n'
-            + "    }\n  }\n}\n"
+            + '\n      else -> error("the browser module called an unknown upcall $name")\n'
+            + "    }\n  }\n}\n\n"
+            + 'private fun argInt(values: JsAny, index: Int): Int = js("values[index] | 0")\n\n'
+            + "private fun argLong(values: JsAny, index: Int): Long =\n"
+            + '  js("BigInt.asIntN(64, BigInt(values[index]))")\n\n'
+            + 'private fun argDouble(values: JsAny, index: Int): Double = js("+values[index]")\n\n'
+            + 'private fun argBool(values: JsAny, index: Int): Boolean = js("!!values[index]")\n'
         )
 
-    def wasm_wrapper(self, s, carriers, result):
-        parameters = [
-            f"{WASM[kind.name][1]} {p.c_name}"
-            for p, kind in zip(s.parameters, carriers, strict=True)
-        ]
-        c_result = "void" if result is None else WASM[result.name][1]
-        if s.blocks:
-            arguments = f"{s.wrapper}_arguments"
-            fields = "".join(f"  {parameter};\n" for parameter in parameters)
-            casts = [
-                self.wasm_cast(p, f"call->{p.c_name}")
-                for p in s.parameters
-                if not p.returned
-            ]
-            return (
-                f"typedef struct {arguments} {{\n{fields}}} {arguments};\n"
-                f"_Static_assert(sizeof({arguments}) <= MLN_KW_THREAD_START_ARGUMENTS_SIZE, "
-                f'"{s.function} arguments");\n\n'
-                f"static int32_t {s.wrapper}_run(const void* arguments) {{\n"
-                f"  const {arguments}* call = arguments;\n"
-                f"  return (int32_t){s.function}({', '.join(casts)});\n}}\n\n"
-                f"int32_t {s.wrapper}({', '.join(['uintptr_t start', *parameters])}) {{\n"
-                f"  {arguments} arguments = {{"
-                + ", ".join(p.c_name for p in s.parameters)
-                + "};\n"
-                f"  return mln_kw_start_thread((mln_kw_thread_start*)start, {s.wrapper}_run, "
-                "&arguments, sizeof arguments);\n}"
-            )
-        casts = [self.wasm_cast(p, p.c_name) for p in s.parameters if not p.returned]
-        call = f"{s.function}({', '.join(casts)})"
-        if isinstance(s.result, Record):
-            body = f"*({s.result_ctype.spelling}*)returned = {call};"
-        elif result is None:
-            body = f"{call};"
-        else:
-            body = f"return ({c_result}){call};"
-        return f"{c_result} {s.wrapper}({', '.join(parameters) or 'void'}) {{\n  {body}\n}}"
+    def upcall_argument(self, site, slot):
+        _local, ctype, _carrier = site.parameters[slot]
+        kind = self.abi.classify(ctype)
+        if isinstance(kind, Record):
+            kind = POINTER
+        return WASM_ARG[kind.name].format(f"arguments, {slot}")
+
+    def upcall_arguments(self, site):
+        return ", ".join(
+            self.upcall_argument(site, slot) for slot in range(len(site.parameters))
+        )
 
     def c_declaration(self, ctype, local):
         spelling = ctype.spelling

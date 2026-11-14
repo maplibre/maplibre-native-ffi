@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <deque>
 #include <functional>
 #include <map>
@@ -86,6 +87,14 @@ static void function(
 }
 
 static void installHost(jsi::Runtime& runtime, Loop& loop) {
+  // The render backend under test. The Android activity sets the variable
+  // from its launch intent, and a simulator passes it on as SIMCTL_CHILD_.
+  const char* backend = std::getenv("MLN_FFI_TEST_BACKEND");
+  runtime.global().setProperty(
+    runtime, "__mlnTestBackend",
+    backend ? jsi::Value(jsi::String::createFromUtf8(runtime, backend))
+            : jsi::Value::undefined()
+  );
   function(
     runtime, "__mlnPrint", 1,
     [](jsi::Runtime& rt, const jsi::Value&, const jsi::Value* args, size_t) {

@@ -4,11 +4,12 @@
 # already has a label keeps it.
 version: 1
 context: >-
-  A C API for MapLibre Native, the C++ map renderer, which is vendored as a git
-  submodule with carried patches. Bindings for Dart, Go, Kotlin, .NET, Python,
-  Rust, Swift, TypeScript, and Zig wrap the C API, as does a GObject library for
-  C, Vala, and GJS, and example apps use them. Mise defines tools and tasks,
-  CMake builds the native library, and Gradle builds the Kotlin packages.
+  A C API for MapLibre Native, implemented by mln-rs, the Rust port of the
+  MapLibre Native map renderer, which is vendored as a git submodule with
+  carried patches. Bindings for Dart, Go, Kotlin, .NET, Python, Swift,
+  TypeScript, and Zig wrap the C API, as does a GObject library for C, Vala, and
+  GJS, and example apps use them. Mise defines tools and tasks, CMake drives
+  Cargo to build the native library, and Gradle builds the Kotlin packages.
 
 labels:
   context: >-
@@ -35,8 +36,7 @@ labels:
           decision rather than shipped code.
     area:
       min: 1
-      guidance:
-        A patch to MapLibre Native takes the area of the behavior it changes.
+      guidance: A patch to mln-rs takes the area of the behavior it changes.
       labels:
         "area:*": ~
         area:api: >-
@@ -56,11 +56,11 @@ labels:
         area:rendering: >-
           Turning a map into pixels: render sessions and drivers, targets,
           surfaces, textures, readback, frame pacing, the OpenGL, Vulkan, Metal,
-          and WebGPU backends, and layer plugins. How a binding or the generator
-          exposes rendering types is api, not rendering.
+          and WebGPU backends. How a binding or the generator exposes rendering
+          types is api, not rendering.
         area:platform: >-
-          The OS services under `src/platform/` that MapLibre Native runs on:
-          the run loop, threads, HTTP and TLS, image decoding, locale and text,
+          The OS services that the library runs on, which mln-rs implements: the
+          run loop, threads, HTTP and TLS, image decoding, locale and text,
           assets, and log sinks.
         area:tooling: >-
           Building, checking, and shipping: CMake, mise, Gradle, CI and its
@@ -140,14 +140,13 @@ labels:
       labels:
         upstream:
           meaning: >-
-            The work changes MapLibre Native's own code: a patch under
-            `patches/maplibre-native/` or the `third_party/maplibre-native`
-            submodule.
+            The work changes mln-rs's own code: a patch under `patches/mln-rs/`
+            or the `third_party/mln-rs` submodule.
           rules:
             - if:
                 files:
-                  - patches/maplibre-native/**
-                  - third_party/maplibre-native
+                  - patches/mln-rs/**
+                  - third_party/mln-rs
               then: apply
           otherwise: skip
     dependencies:
@@ -216,7 +215,6 @@ ci:
               - tests/native/docsnippets/**
               - bindings/**/docsnippets/**
               - bindings/**/DocSnippets/**
-              - bindings/rust/crates/maplibre-native-ffi/examples/**
           then: apply
     support-matrix:
       covers: >-
@@ -238,7 +236,8 @@ ci:
         - if:
             files:
               - bindings/gobject/**
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-arm64:
       covers: >-
@@ -252,7 +251,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-musl:
       covers: >-
@@ -263,7 +263,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-musl-arm64:
       covers: >-
@@ -277,7 +278,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-riscv64:
       covers: >-
@@ -285,8 +287,8 @@ ci:
         Cross-compiles the native library on an x64 runner, checks its libc ABI,
         and runs the C tests and the Zig suite under QEMU's user-mode emulator.
         Catches architecture conditionals in the engine and its vendored code,
-        and problems in the Zig toolchain's cross builds, the Rust platform
-        crate, or the emulated test roots on RISC-V. Code that Linux x64 and
+        and problems in the Zig toolchain's cross builds, the Cargo build of
+        mln-rs, or the emulated test roots on RISC-V. Code that Linux x64 and
         ARM64 build alike doesn't need it.
       rules:
         - if:
@@ -294,7 +296,8 @@ ci:
               - scripts/run-qemu-test.sh
               - tools/deps/sync-linux-sysroot
               - tools/devices/linux-root
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     linux-loongarch64:
       covers: >-
@@ -302,8 +305,8 @@ ci:
         Cross-compiles the native library on an x64 runner, checks its libc ABI,
         and runs the C tests and the Zig suite under QEMU's user-mode emulator.
         Catches architecture conditionals in the engine and its vendored code,
-        and problems in the Zig toolchain's cross builds, the Rust platform
-        crate, or the emulated test roots on LoongArch. Code that Linux x64 and
+        and problems in the Zig toolchain's cross builds, the Cargo build of
+        mln-rs, or the emulated test roots on LoongArch. Code that Linux x64 and
         ARM64 build alike doesn't need it.
       rules:
         - if:
@@ -311,14 +314,15 @@ ci:
               - scripts/run-qemu-test.sh
               - tools/deps/sync-linux-sysroot
               - tools/devices/linux-root
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     freebsd:
       covers: >-
         FreeBSD x64 with OpenGL (EGL) and Vulkan. Cross-compiles the native
         library and the binding tests on Linux and runs them in a FreeBSD
         virtual machine. Catches assumptions that only Linux holds, in platform
-        conditionals, the Zig toolchain, the Rust platform crate, and the
+        conditionals, the Zig toolchain, the Cargo build of mln-rs, and the
         bindings' cross-compilation. Platform-independent code that Linux x64
         tests doesn't need it.
       rules:
@@ -326,21 +330,23 @@ ci:
             files:
               - scripts/run-freebsd-test.sh
               - tools/devices/freebsd-host
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     macos:
       covers: >-
-        macOS ARM64 with Metal, Vulkan (MoltenVK), and OpenGL (ANGLE). Runs the
-        C tests and the desktop binding suites, including Swift. Catches Apple
-        Clang, Apple SDK, Metal, and macOS packaging problems.
-        Platform-independent code that Linux x64 tests doesn't need it.
+        macOS ARM64 with Metal. Runs the C tests and the desktop binding suites,
+        including Swift. Catches Apple Clang, Apple SDK, Metal, and macOS
+        packaging problems. Platform-independent code that Linux x64 tests
+        doesn't need it.
       rules:
         - if:
             files:
               # The GObject library's suite runs only on Linux and macOS.
               - bindings/gobject/**
               - bindings/kotlin/src/macosTest/**
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     macos-x64:
       covers: >-
@@ -354,46 +360,50 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     ios:
       covers: >-
         iOS and Mac Catalyst with Metal, on device and simulator. Builds the
-        native library and the supported Kotlin, Swift, Rust, Dart, and Zig
-        bindings, and runs simulator and Mac Catalyst tests. Catches mobile SDK
-        and cross-compilation problems, and stands in for tvOS and visionOS on
-        what every Apple mobile platform shares. Platform-independent code that
-        Linux x64 tests doesn't need it.
+        native library and the supported Kotlin, Swift, Dart, and Zig bindings,
+        and runs simulator and Mac Catalyst tests. Catches mobile SDK and
+        cross-compilation problems, and stands in for tvOS and visionOS on what
+        every Apple mobile platform shares. Platform-independent code that Linux
+        x64 tests doesn't need it.
       rules:
         - if:
             files:
               - bindings/kotlin/src/iosTest/**
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     tvos:
       covers: >-
         tvOS with Metal, on device and simulator. Builds the native library and
-        the Kotlin, Swift, and Rust bindings, and runs simulator tests. Only
-        what tvOS alone builds or runs needs it: tvOS conditionals, SDK setup,
+        the Kotlin and Swift bindings, and runs simulator tests. Only what tvOS
+        alone builds or runs needs it: tvOS conditionals, SDK setup, presets,
+        and suites. Changes that every Apple mobile platform shares need only
+        iOS.
+      rules:
+        - if:
+            files:
+              - bindings/kotlin/src/tvosTest/**
+              - third_party/mln-rs
+              - patches/mln-rs/**
+          then: apply
+    visionos:
+      covers: >-
+        visionOS with Metal, on device and simulator. Builds the native library
+        and the Swift binding, and runs simulator tests. Only what visionOS
+        alone builds or runs needs it: visionOS conditionals, SDK setup,
         presets, and suites. Changes that every Apple mobile platform shares
         need only iOS.
       rules:
         - if:
             files:
-              - bindings/kotlin/src/tvosTest/**
-              - third_party/maplibre-native
-          then: apply
-    visionos:
-      covers: >-
-        visionOS with Metal, on device and simulator. Builds the native library
-        and the Swift and Rust bindings, and runs simulator tests. Only what
-        visionOS alone builds or runs needs it: visionOS conditionals, SDK
-        setup, presets, and suites. Changes that every Apple mobile platform
-        shares need only iOS.
-      rules:
-        - if:
-            files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     windows-x64:
       covers: >-
@@ -404,23 +414,23 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/windows/**
-              - src/render/opengl/wgl_*
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     mingw:
       covers: >-
         Windows x64 with OpenGL (WGL) and Vulkan, built with Clang in MSYS2's
-        MINGW64 environment. Runs the C, C#, Dart, Go, Rust, and TypeScript
-        suites and verifies shared and static C package consumers. Catches MinGW
-        headers, libstdc++, GNU archive and import library handling, and MSYS2
-        toolchain setup.
+        MINGW64 environment. Runs the C, C#, Dart, Go, and TypeScript suites and
+        verifies shared and static C package consumers. Catches MinGW headers,
+        libstdc++, GNU archive and import library handling, and MSYS2 toolchain
+        setup.
       rules:
         - if:
             files:
               - cmake/toolchains/msys2.cmake
               - .config/mise.msys2.*
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     mingw-arm64:
       covers: >-
@@ -435,7 +445,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     windows-arm64:
       covers: >-
@@ -448,7 +459,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android:
       covers: >-
@@ -459,14 +471,14 @@ ci:
       rules:
         - if:
             files:
-              - src/platform/android/**
               - cmake/platform/android.cmake
               - .config/mise.android.*
               - bindings/kotlin/src/android*/**
               - .mise/tasks/kotlin/check-android-api-floor
               - tools/devices/android-serial
               - tools/env/swift-android-env.sh
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android-arm64:
       covers: >-
@@ -480,7 +492,8 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android-arm:
       covers: >-
@@ -495,33 +508,34 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android-x86:
       covers: >-
         Android x86, a 32-bit ABI, with OpenGL ES and Vulkan, built with the
-        NDK. The OpenGL ES job runs the C, C#, Go, Kotlin, Rust, TypeScript, and
-        Zig tests in an API 30 x86 emulator, and the Vulkan job only builds.
-        Dart, Python, and Swift have no Android x86 target. Catches only what
-        differs by CPU architecture on Android: architecture conditionals in
-        code or build logic, a tool or dependency fetched per ABI, the x86
-        emulator image, and 32-bit ABI or pointer-size problems at run time,
-        such as x86 aligning 64-bit fields to four bytes. Android platform,
-        renderer, and binding changes that Android x64 already builds and tests
-        don't need it.
+        NDK. Runs the C, C#, Go, Kotlin, TypeScript, and Zig tests with OpenGL
+        ES in an API 30 x86 emulator, whose Vulkan can't run them. Dart, Python,
+        and Swift have no Android x86 target. Catches only what differs by CPU
+        architecture on Android: architecture conditionals in code or build
+        logic, a tool or dependency fetched per ABI, the x86 emulator image, and
+        32-bit ABI or pointer-size problems at run time, such as x86 aligning
+        64-bit fields to four bytes. Android platform, renderer, and binding
+        changes that Android x64 already builds and tests don't need it.
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     android-multi-abi:
       covers: >-
-        Builds the Kotlin Android runtime AARs for OpenGL ES and Vulkan with
-        every Android ABI's native library, from the native packages of every
-        Android target, so it runs those targets. Only changes to how the AAR
-        gathers ABIs need it: the verification task, and the Kotlin Android
-        build's ABI selection and native library packaging. Ordinary Kotlin or
-        Android changes and one ABI's native packaging don't.
+        Builds the Kotlin Android runtime AAR with every Android ABI's native
+        library, from the native packages of every Android target, so it runs
+        those targets. Only changes to how the AAR gathers ABIs need it: the
+        verification task, and the Kotlin Android build's ABI selection and
+        native library packaging. Ordinary Kotlin or Android changes and one
+        ABI's native packaging don't.
       rules:
         - if:
             files:
@@ -529,7 +543,7 @@ ci:
           then: apply
     ohos:
       covers: >-
-        OpenHarmony on x64 with OpenGL ES and Vulkan. Runs the C, Rust, Go, and
+        OpenHarmony on x64 with OpenGL ES and Vulkan. Runs the C, Go, and
         TypeScript (ArkTS) tests in the Oniro emulator. Catches OpenHarmony SDK
         and platform problems. Platform-independent code that Linux x64 tests
         doesn't need it. Nor does a C API change that only regenerates the
@@ -541,7 +555,6 @@ ci:
             files:
               - cmake/platform/ohos.cmake
               - .config/mise.ohos.*
-              - src/platform/ohos/**
               - tests/native/abi/platform/transport.c
               - bindings/typescript/scripts/build-hap.sh
               - bindings/typescript/scripts/test-arkts.sh
@@ -550,12 +563,13 @@ ci:
               - bindings/typescript/test/arkts/**
               - bindings/typescript/test/ohpm/**
               - tools/devices/ohos-key
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     ohos-arm64:
       covers: >-
         OpenHarmony ARM64 with OpenGL ES and Vulkan, built with the OpenHarmony
-        SDK on an x64 runner. Builds the native library and the Go, Rust, and
+        SDK on an x64 runner. Builds the native library and the Go and
         TypeScript (ArkTS) bindings, but runs nothing. Catches only what differs
         by CPU architecture on OpenHarmony: architecture conditionals in code or
         build logic, and a tool or dependency fetched per architecture.
@@ -564,31 +578,26 @@ ci:
       rules:
         - if:
             files:
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     web:
       covers: >-
-        The browser, built with Emscripten for WebGL and WebGPU. Runs the C,
-        Rust, and Kotlin/Wasm tests in a browser, and adds the docs site's live
-        demo to its preview. Catches Emscripten, wasm32, and browser rendering
-        problems. Platform-independent code that Linux x64 tests doesn't need
-        it.
+        The browser package, built from mln-rs for WebGL and WebGPU. Runs
+        mln-rs's browser check against it and the Kotlin/Wasm tests in a
+        browser. Catches wasm32 and browser rendering problems.
+        Platform-independent code that Linux x64 tests doesn't need it.
       rules:
         - if:
             files:
-              - src/platform/emscripten/**
-              - src/render/webgpu/**
-              - cmake/platform/emscripten.cmake
-              - cmake/toolchains/emscripten.cmake
-              - cmake/mln_ffi_emscripten.cmake
-              - .config/mise.emscripten.*
+              - cmake/mln_ffi_web.cmake
               - bindings/kotlin/src/wasmJs*/**
-              - bindings/kotlin/wasm/**
               - bindings/kotlin/karma.config.d/**
               - examples/browser/**
               - examples/styles.json
               - examples/fallback-font-faces.json
-              - third_party/maplibre-native
+              - third_party/mln-rs
+              - patches/mln-rs/**
           then: apply
     maven:
       covers: >-
@@ -637,11 +646,11 @@ ci:
       covers: >-
         Packs the TypeScript npm packages from the addons that the Linux, macOS,
         and browser targets built and tested, and the React Native package from
-        the Android EGL archives and the XCFramework, so it runs those targets.
-        Only changes to what the packages contain or how they are packed need
-        it: the package manifests, the facade bundle, the React Native package's
-        files, and the packing script. Ordinary TypeScript binding changes and
-        one platform's addon don't.
+        the Android archives and the XCFramework, so it runs those targets. Only
+        changes to what the packages contain or how they are packed need it: the
+        package manifests, the facade bundle, the React Native package's files,
+        and the packing script. Ordinary TypeScript binding changes and one
+        platform's addon don't.
     react-native:
       covers: >-
         Builds the React Native example for Android x64 and the iOS simulator as
@@ -687,11 +696,11 @@ ci:
     gtk:
       covers: >-
         Builds the GObject library and the GTK example for Linux x64 against the
-        archive that the Linux x64 Vulkan target built, so it runs that target.
-        It runs no app. Catches what breaks the example's Vala or its meson
-        build against GTK 4.14 and the installed VAPI: changes to the example,
-        and to the GObject library's render session, frame, and dmabuf API that
-        it calls.
+        archive that the Linux x64 target built, so it runs that target. It runs
+        no app. Catches what breaks the example's Vala or its meson build
+        against GTK 4.14 and the installed VAPI: changes to the example, and to
+        the GObject library's render session, frame, and dmabuf API that it
+        calls.
       rules:
         - if:
             files:
@@ -700,10 +709,10 @@ ci:
     wpf:
       covers: >-
         Builds the WPF example on Linux against the archive that the Windows x64
-        Vulkan target built, so it runs that target. It runs no app. Catches
-        what breaks the example's C# or XAML, or its build against the .NET
-        binding: changes to the example, and to the .NET binding's render
-        session and Win32 API that it calls.
+        target built, so it runs that target. It runs no app. Catches what
+        breaks the example's C# or XAML, or its build against the .NET binding:
+        changes to the example, and to the .NET binding's render session and
+        Win32 API that it calls.
       rules:
         - if:
             files:
@@ -712,12 +721,12 @@ ci:
     sdl:
       covers: >-
         Builds the SDL example for Linux x64, Windows x64, and macOS, each on
-        its own runner, against the archives that the Linux x64 Vulkan, Windows
-        x64 Vulkan, and macOS ARM64 Metal targets built, so it runs those
-        targets. It runs no app. Catches what breaks the example's Zig or its
-        build against the Zig binding and SDL: changes to the example, and to
-        the Zig binding's build script and the render session, Wayland, Win32,
-        and Metal API that it calls.
+        its own runner, against the archives that the Linux x64, Windows x64,
+        and macOS ARM64 targets built, so it runs those targets. It runs no app.
+        Catches what breaks the example's Zig or its build against the Zig
+        binding and SDL: changes to the example, and to the Zig binding's build
+        script and the render session, Wayland, Win32, and Metal API that it
+        calls.
       rules:
         - if:
             files:
@@ -746,14 +755,14 @@ ci:
           then: apply
     swiftpm:
       covers: >-
-        Assembles the XCFramework from every Apple Metal target's slice, and the
-        artifact bundles from every Linux, Android, and Windows target's
-        archive, so it runs those targets, and writes the Swift package that a
-        release pushes to the distribution repository with them. Then builds and
-        runs a Swift consumer against the package on macOS, builds it for iOS,
-        and runs it on Linux with each backend trait. Only changes to what the
-        XCFramework, the bundles, or the package contains or how they are
-        assembled need it: XCFramework and bundle packaging, the release's
+        Assembles the XCFramework from every Apple target's slice, and the
+        artifact bundle from every Linux, Android, and Windows target's archive,
+        so it runs those targets, and writes the Swift package that a release
+        pushes to the distribution repository with them. Then builds and runs a
+        Swift consumer against the package on macOS, builds it for iOS, and runs
+        it on Linux, where it checks that every backend is linked. Only changes
+        to what the XCFramework, the bundle, or the package contains or how they
+        are assembled need it: XCFramework and bundle packaging, the release's
         distribution tool, and the root manifest's platforms and binding target.
         Ordinary Swift binding changes and one target's native packaging don't.
       rules:
@@ -780,9 +789,9 @@ ci:
     conan:
       covers: >-
         Resolves the distribution repository's local Conan recipe index and
-        builds a CMakeDeps consumer of the Linux x64 Vulkan archive, so it runs
-        that target. Changes to the recipe, its release generator or consumer
-        check need it.
+        builds a CMakeDeps consumer of the Linux x64 archive, so it runs that
+        target. Changes to the recipe, its release generator or consumer check
+        need it.
       rules:
         - if:
             files:

@@ -60,9 +60,13 @@ namespace Window {
 	// #endregion frame-wake
 
 	// #region resize
-	void on_window_resized (uint32 width, uint32 height) {
-		// The window's new size in logical pixels.
-		session.resize_async.begin ({ width, height });
+	// Runs when the window changes size, or moves to a display with
+	// another scale factor.
+	void on_window_resized (
+		uint32 width, uint32 height, double scale_factor
+	) {
+		// The window's new size in logical pixels, and its scale factor.
+		session.resize_async.begin ({ width, height, scale_factor });
 	}
 	// #endregion resize
 
@@ -91,11 +95,16 @@ namespace Window {
 	}
 
 	public async void surface_restored (
-		uint64 new_surface
+		void* display, void* new_surface
 	) throws GLib.Error {
 		// #region lost-surface
-		yield session.set_vulkan_surface_target_async (
-			{ logical_size: { width: 800, height: 600 }, surface: new_surface }
+		var surface = new WaylandSurfaceTarget () {
+			logical_size = { width: 800, height: 600 },
+			display = display,
+			surface = new_surface,
+		};
+		yield session.set_target_async (
+			new RenderTarget.wayland_surface (surface)
 		);
 		// #endregion lost-surface
 	}
@@ -107,17 +116,15 @@ namespace Window {
 	}
 
 	public async void render_to_window (
-		Map map, VulkanContextDescriptor vulkan, uint64 window_surface
+		Map map, void* display, void* window_surface
 	) throws GLib.Error {
 		// #region attach
-		var descriptor = new VulkanSurfaceDescriptor () {
+		var surface = new WaylandSurfaceTarget () {
 			// The window's size in logical pixels. The map's scale
 			// factor turns it into pixels.
 			logical_size = { width: 800, height: 600 },
-			// Your VkInstance, VkPhysicalDevice, VkDevice, and graphics
-			// VkQueue.
-			context = vulkan,
-			// Your VkSurfaceKHR.
+			// Your wl_display and wl_surface.
+			display = display,
 			surface = window_surface,
 		};
 
@@ -127,11 +134,15 @@ namespace Window {
 			frame_wake = wake (on_frame_wake),
 		};
 
-		session = map.attach_vulkan_surface (descriptor, options);
+		// With no device, the session creates one on the platform's own
+		// backend.
+		session = map.attach (
+			new RenderTarget.wayland_surface (surface), null, options
+		);
 		yield session.ready_async ();
 		// #endregion attach
 
-		on_window_resized (1024, 768);
+		on_window_resized (1024, 768, 2.0);
 
 		// #region service
 		var graphics_thread_options = new RenderSessionAttachOptions () {
@@ -144,6 +155,6 @@ namespace Window {
 		assert (graphics_thread_options != null);
 
 		yield session.release_async ();
-		destroy_surface (); // For example, with vkDestroySurfaceKHR.
+		destroy_surface (); // For example, with wl_surface_destroy.
 	}
 }

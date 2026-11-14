@@ -266,14 +266,30 @@ mln_status mln_log_set_callback(
 ### Platform-specific APIs
 
 A function that only some platforms can use lists those platforms in its
-annotation. A function that integrates with one platform's own objects, such as
-its windows or display timing, goes in that platform's header under
-`include/maplibre_native_c/platform/`.
+annotation, and so does a tagged union's variant. A function that integrates
+with one platform's own objects, such as Android's Java VM, goes in that
+platform's header under `include/maplibre_native_c/platform/`. A feature that
+each platform provides in its own way, such as pacing frames to the display, is
+one function for every platform, which returns `MLN_STATUS_UNSUPPORTED` where
+the platform lacks it.
 
 ```c
-MLN_BINDING("execution=lifecycle;platforms=ios,macos,tvos,visionos")
-MLN_API mln_status mln_map_attach_metal_surface(/* ... */);
+MLN_BINDING("platforms=android")
+MLN_API mln_status mln_android_init(/* ... */);
+
+typedef union mln_render_target_data {
+  mln_metal_layer_target metal_layer MLN_BINDING(
+    "variant=MLN_RENDER_TARGET_KIND_METAL_LAYER;"
+    "platforms=ios,macos,tvos,visionos"
+  );
+  /* ... */
+} mln_render_target_data;
 ```
+
+A union that describes something of many kinds, such as a render target, has one
+variant for each kind, in a struct that holds the kind and the union. Each
+binding presents the struct as a sum type. A later release adds kinds as new
+variants.
 
 ## Documentation
 

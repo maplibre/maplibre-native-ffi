@@ -4,9 +4,18 @@ from dataclasses import replace
 
 from ..model import Unsupported
 from ..semantic import required_callbacks
-from .rust_dynamic_values import dynamic
 from .zig import doc, identifier
 from .zig_values import field_default
+
+
+def dynamic(value):
+    """Whether a value holds a buffer, an array, a reference, a union, or a
+    callback registration, itself or in a member."""
+    return (
+        bool(value.registration)
+        or value.kind in {"buffer", "array", "reference", "union"}
+        or any(dynamic(f.value) for f in value.fields if f.role == "value")
+    )
 
 
 def slice_of(values, value):

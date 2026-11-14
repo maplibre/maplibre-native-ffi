@@ -23,13 +23,6 @@ export type NativeCompletion = (
   error: unknown,
 ) => void;
 
-/** What the addon calls with the outcome of a call on a thread of its own. */
-export type NativeThreadStart = (
-  status: number,
-  handle: bigint,
-  diagnostic: string,
-) => void;
-
 /** The runtime exports of the addon, beside the generated operations. */
 export interface Addon extends NativeOperations {
   install(

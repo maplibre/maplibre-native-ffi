@@ -43,11 +43,15 @@ static mln_status start_attach(
   mln_map map, mln_render_driver_kind driver, const mln_queue_lock* queue_lock,
   mln_test_completion* completion, mln_test_render_fixture* fixture
 ) {
-  const mln_android_hardware_buffer_ring_descriptor descriptor = {
-    .size = sizeof(mln_android_hardware_buffer_ring_descriptor),
-    .logical_size = {.width = ring_width, .height = ring_height},
-    .buffer_count = buffer_count,
-    .usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN,
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_EXPORTED_RING,
+    .data.exported_ring = {
+      .logical_size = {.width = ring_width, .height = ring_height},
+      .texture_count = buffer_count,
+      .export_kinds = MLN_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER,
+      .android_hardware_buffer_usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN,
+    },
   };
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options),
@@ -56,12 +60,23 @@ static mln_status start_attach(
       MLN_GPU_SYNC_KIND_FLAG_SYNC_FD | MLN_GPU_SYNC_KIND_FLAG_CPU_COMPLETE,
   };
   options.frame_wake = mln_test_pulse_wake();
-  if (queue_lock != NULL) options.queue_lock = *queue_lock;
+  // A host's queue lock is its device's.
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  if (queue_lock != NULL) {
+    mln_gpu_device_options device_options = {
+      .size = sizeof(mln_gpu_device_options),
+      .fields = MLN_GPU_DEVICE_OPTION_BACKEND,
+      .backend = MLN_RENDER_BACKEND_VULKAN,
+      .queue_lock = *queue_lock,
+    };
+    MLN_TEST_OK(mln_gpu_device_create(&device_options, &device, NULL));
+  }
   fixture->driver = driver;
-  const mln_status status = mln_map_attach_android_hardware_buffer_ring(
-    map, &descriptor, MLN_HANDLE_NULL, &options, &fixture->session,
-    &completion->descriptor, MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_map_attach(
+    map, &target, device, &options, &fixture->session, &completion->descriptor,
+    MLN_TEST_DIAGNOSTIC
   );
+  mln_gpu_device_release(device);
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
 }
@@ -347,7 +362,10 @@ static void a_resize_gives_the_ring_buffers_of_the_new_size(void) {
       MLN_STATUS_OK, &fixture,
       mln_render_session_resize(
         fixture.session,
-        (mln_logical_size){.width = ring_height, .height = ring_width},
+        mln_test_session_extent(
+          fixture.session,
+          (mln_logical_size){.width = ring_height, .height = ring_width}
+        ),
         &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );
@@ -398,8 +416,8 @@ static void give_host_lock(void* user_data) {
   atomic_fetch_add(&((counted_queue_lock*)user_data)->unlocks, 1);
 }
 
-// A host that submits to the device's queue itself passes its lock, which the
-// session holds around its own queue calls.
+// A host that submits to the device's queue itself gives the device its lock,
+// which the session holds around its own queue calls.
 static void a_hardware_buffer_ring_takes_the_host_queue_lock(void) {
   atomic_store(&host_lock.locks, 0);
   atomic_store(&host_lock.unlocks, 0);

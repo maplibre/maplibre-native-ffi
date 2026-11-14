@@ -8,22 +8,20 @@ sidebar:
 
 ## Install
 
-Add the binding and one runtime from
+Add the binding and its runtime from
 [NuGet](https://www.nuget.org/packages/Maplibre.NativeFfi). It needs .NET 10 or
-later. The runtime holds the native library for your
-[backend](/maplibre-native-ffi/install/#choose-a-backend):
-`Maplibre.NativeFfi.Runtime.OpenGL`, `.Metal`, or `.Vulkan`.
+later. The runtime holds the native library, with every
+[backend](/maplibre-native-ffi/install/#choose-a-backend) of your platform.
 
 ```bash frame="terminal"
 dotnet add package Maplibre.NativeFfi
-dotnet add package Maplibre.NativeFfi.Runtime.Vulkan
+dotnet add package Maplibre.NativeFfi.Runtime
 ```
 
 ## Windows with MinGW
 
-The runtimes above use MSVC on Windows. For MinGW, add
-`Maplibre.NativeFfi.Runtime.OpenGL.MinGW` or
-`Maplibre.NativeFfi.Runtime.Vulkan.MinGW` instead.
+The runtime above uses MSVC on Windows. For MinGW, add
+`Maplibre.NativeFfi.Runtime.MinGW` instead.
 
 ## Android
 

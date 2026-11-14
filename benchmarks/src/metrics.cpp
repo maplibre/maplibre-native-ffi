@@ -42,7 +42,7 @@
 // driver's the same way, so each thread reports its name and CPU time as it
 // ends, and threads that a case starts and stops keep their names. Threads
 // that the kernel starts for the process, such as io_uring's, end unseen.
-#if defined(__GLIBC__) && !defined(__EMSCRIPTEN__)
+#if defined(__GLIBC__)
 #define BENCH_GLIBC 1
 #include <dlfcn.h>
 #include <pthread.h>
@@ -114,7 +114,7 @@ auto to_ns(const timespec& time) -> uint64_t {
          static_cast<uint64_t>(time.tv_nsec);
 }
 
-#if defined(CLOCK_PROCESS_CPUTIME_ID) && !defined(__EMSCRIPTEN__)
+#if defined(CLOCK_PROCESS_CPUTIME_ID)
 auto clock_ns(clockid_t clock) -> uint64_t {
   timespec now{};
   return clock_gettime(clock, &now) == 0 ? to_ns(now) : 0;
@@ -496,14 +496,7 @@ auto heap_in_use_kib() -> uint64_t {
 
 auto resident_kib() -> uint64_t { return status_kib("VmRSS:"); }
 
-auto process_cpu_measured() -> bool {
-#if defined(__EMSCRIPTEN__)
-  // The browser has no CPU clock for the page's threads.
-  return false;
-#else
-  return true;
-#endif
-}
+auto process_cpu_measured() -> bool { return true; }
 
 Meter::Meter(benchmark::State& state) : state_(state) {
   series_.reserve(8);

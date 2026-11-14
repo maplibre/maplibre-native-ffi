@@ -6,7 +6,7 @@
 //
 // A test file is one group: it writes each case as a static void function and
 // runs it from its MLN_TEST_GROUP block. CMake globs the files. A file whose
-// name ends in a backend or platform tag, such as _metal or _emscripten, builds
+// name ends in a backend or platform tag, such as _metal or _android, builds
 // only on matching presets; select a whole file this way rather than skip its
 // cases at run time. A program goes in exit/ only when process exit is what the
 // behavior promises.
@@ -34,7 +34,7 @@
 // server in support/http_server.h. The browser has no sockets, and Android's
 // client calls Java, which these executables run without; the Kotlin device
 // suite covers Android's client instead.
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+#if defined(__ANDROID__)
 #define MLN_TEST_PLATFORM_HTTP 0
 #else
 #define MLN_TEST_PLATFORM_HTTP 1

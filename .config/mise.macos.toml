@@ -1,5 +1,5 @@
 [vars]
-host_native_preset = "macos-arm64-metal"
+host_native_preset = "macos-arm64"
 
 # GLib, gobject-introspection, Vala, and GJS build and test the GObject library.
 [bootstrap.packages]
@@ -8,12 +8,6 @@ host_native_preset = "macos-arm64-metal"
 "brew:glib" = "latest"
 "brew:glslang" = "latest"
 "brew:gobject-introspection" = "latest"
-"brew:molten-vk" = "latest"
 "brew:pkgconf" = "latest"
 "brew:qemu" = "latest"
 "brew:vala" = "latest"
-"brew:vulkan-loader" = "latest"
-
-[env]
-MLN_FFI_VULKAN_LOADER_DIR = "/opt/homebrew/opt/vulkan-loader/lib"
-VK_DRIVER_FILES = "/opt/homebrew/opt/molten-vk/etc/vulkan/icd.d/MoltenVK_icd.json"

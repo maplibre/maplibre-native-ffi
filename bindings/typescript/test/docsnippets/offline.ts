@@ -24,7 +24,7 @@ function recordRegion(
 
 export async function offline(): Promise<void> {
   // #region cache-file
-  const runtime = await RuntimeHandle.create({
+  const runtime = RuntimeHandle.create({
     cachePath: "maplibre-cache.db",
   });
   // #endregion cache-file

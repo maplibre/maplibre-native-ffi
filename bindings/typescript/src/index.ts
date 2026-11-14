@@ -5,9 +5,9 @@
  * Linux with musl on Node.js and Bun, and macOS and Windows on all three runtimes.
  * The GNU RISC-V, LoongArch64, and FreeBSD x64 addons support Node.js.
  *
- * Windows backend packages use MSVC. To use a MinGW native host on x64,
- * install `@maplibre/native-ffi-opengl-mingw` or
- * `@maplibre/native-ffi-vulkan-mingw` instead of the ordinary backend package.
+ * The Windows addons of `@maplibre/native-ffi-runtime` use MSVC. To use a
+ * MinGW native host on x64, install `@maplibre/native-ffi-runtime-mingw`
+ * instead.
  * Native handles shared with the host must come from the same C library DLL
  * that the addon loads.
  *

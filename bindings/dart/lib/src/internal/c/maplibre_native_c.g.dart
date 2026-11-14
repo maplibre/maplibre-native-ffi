@@ -12,16 +12,15 @@ const int MLN_C_VERSION = 0;
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_queue = Uint64;
 typedef mln_frame_pacer = Uint64;
+typedef mln_gpu_device = Uint64;
 typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
-typedef mln_offscreen_device = Uint64;
 typedef mln_render_frame_batch = Uint64;
 typedef mln_render_session = Uint64;
 typedef mln_resource_request = Uint64;
 typedef mln_resource_transform_request = Uint64;
 typedef mln_runtime = Uint64;
 typedef mln_style_expression = Uint64;
-typedef mln_vulkan_device = Uint64;
 
 typedef mln_camera_transition_end_callback =
     Pointer<NativeFunction<mln_camera_transition_end_callbackFunction>>;
@@ -37,6 +36,24 @@ typedef mln_completion_callbackFunction =
       Pointer<Void> user_data,
       Pointer<mln_completion_result> result,
     );
+typedef mln_custom_layer_prerender_callback =
+    Pointer<NativeFunction<mln_custom_layer_prerender_callbackFunction>>;
+typedef mln_custom_layer_prerender_callbackFunction =
+    Void Function(
+      Pointer<Void> user_data,
+      Pointer<mln_custom_layer_prerender_parameters> parameters,
+    );
+typedef mln_custom_layer_render_callback =
+    Pointer<NativeFunction<mln_custom_layer_render_callbackFunction>>;
+typedef mln_custom_layer_render_callbackFunction =
+    Void Function(
+      Pointer<Void> user_data,
+      Pointer<mln_custom_layer_render_parameters> parameters,
+    );
+typedef mln_custom_layer_session_end_callback =
+    Pointer<NativeFunction<mln_custom_layer_session_end_callbackFunction>>;
+typedef mln_custom_layer_session_end_callbackFunction =
+    Void Function(Pointer<Void> user_data);
 typedef mln_custom_source_cancel_tile_callback =
     Pointer<NativeFunction<mln_custom_source_cancel_tile_callbackFunction>>;
 typedef mln_custom_source_cancel_tile_callbackFunction =
@@ -135,32 +152,9 @@ final class mln_android_hardware_buffer_frame extends Struct {
   external Pointer<Void> buffer;
 }
 
-final class mln_android_hardware_buffer_ring_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  @Uint32()
-  external int buffer_count;
-  @Uint64()
-  external int usage;
-}
-
-final class mln_android_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
+final class mln_android_window_target extends Struct {
   external mln_logical_size logical_size;
   external Pointer<Void> window;
-  external Pointer<Void> jni_env;
-  external Pointer<Void> surface;
-}
-
-final class mln_android_surface_replacement extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  external Pointer<Void> window;
-  external Pointer<Void> jni_env;
-  external Pointer<Void> surface;
 }
 
 final class mln_animation_options extends Struct {
@@ -407,6 +401,59 @@ final class mln_custom_geometry_source_options extends Struct {
   external int queue;
 }
 
+final class mln_custom_layer_encoder_data extends Union {
+  external mln_metal_custom_layer_encoder metal;
+  external mln_vulkan_custom_layer_encoder vulkan;
+  external mln_web_gpu_custom_layer_encoder web_gpu;
+}
+
+final class mln_custom_layer_frame extends Struct {
+  external mln_map_view view;
+  external mln_frame_projection frame_projection;
+  @Uint32()
+  external int width;
+  @Uint32()
+  external int height;
+}
+
+final class mln_custom_layer_host extends Struct {
+  @Uint32()
+  external int size;
+  external mln_custom_layer_prerender_callback prerender;
+  external mln_custom_layer_render_callback render;
+  external mln_custom_layer_session_end_callback deinitialize;
+  external mln_custom_layer_session_end_callback context_lost;
+  external Pointer<Void> user_data;
+  external mln_user_data_release release_user_data;
+}
+
+final class mln_custom_layer_pass_data extends Union {
+  external mln_metal_custom_layer_pass metal;
+  external mln_vulkan_custom_layer_pass vulkan;
+  external mln_open_gl_custom_layer_pass open_gl;
+  external mln_web_gpu_custom_layer_pass web_gpu;
+}
+
+final class mln_custom_layer_prerender_parameters extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int backend;
+  external mln_custom_layer_encoder_data encoder;
+  external mln_custom_layer_frame frame;
+}
+
+final class mln_custom_layer_render_parameters extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int backend;
+  external mln_custom_layer_pass_data pass;
+  external mln_custom_layer_frame frame;
+  @Double()
+  external double layer_depth;
+}
+
 final class mln_custom_vector_source_options extends Struct {
   @Uint32()
   external int size;
@@ -474,17 +521,6 @@ final class mln_dma_buf_plane extends Struct {
   external int stride;
 }
 
-final class mln_dma_buf_ring_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  @Uint32()
-  external int buffer_count;
-  external Pointer<mln_dma_buf_format> formats;
-  @Size()
-  external int format_count;
-}
-
 final class mln_dxgi_shared_texture_frame extends Struct {
   @Uint32()
   external int size;
@@ -499,14 +535,6 @@ final class mln_dxgi_shared_texture_frame extends Struct {
   @Uint32()
   external int format;
   external Pointer<Void> handle;
-}
-
-final class mln_dxgi_shared_texture_ring_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  @Uint32()
-  external int texture_count;
 }
 
 final class mln_edge_insets extends Struct {
@@ -524,8 +552,6 @@ final class mln_egl_context_descriptor extends Struct {
   external Pointer<Void> display;
   external Pointer<Void> config;
   external Pointer<Void> share_context;
-  @Uint32()
-  external int client_api;
   external Pointer<Void> get_proc_address;
 }
 
@@ -537,6 +563,19 @@ final class mln_event_batch_view extends Struct {
   external Pointer<mln_runtime_event> events;
   @Size()
   external int event_count;
+}
+
+final class mln_exported_ring_target extends Struct {
+  external mln_logical_size logical_size;
+  @Uint32()
+  external int texture_count;
+  @Uint32()
+  external int export_kinds;
+  external Pointer<mln_dma_buf_format> dma_buf_formats;
+  @Size()
+  external int dma_buf_format_count;
+  @Uint64()
+  external int android_hardware_buffer_usage;
 }
 
 final class mln_feature_id extends Struct {
@@ -584,6 +623,20 @@ final class mln_frame_pacer_options extends Struct {
   external int maximum_frames_per_second;
 }
 
+final class mln_frame_projection extends Struct {
+  external mln_mat4 matrix;
+  @Uint32()
+  external int clip_depth_range;
+  @Double()
+  external double near_distance;
+  @Double()
+  external double far_distance;
+  @Double()
+  external double far_depth;
+  @Bool()
+  external bool globe;
+}
+
 final class mln_free_camera extends Struct {
   external mln_vec3 position;
   external mln_quaternion orientation;
@@ -629,6 +682,47 @@ final class mln_gesture_momentum extends Struct {
   external mln_anchored_momentum zoom;
   external mln_anchored_momentum bearing;
   external mln_anchored_momentum pitch;
+}
+
+final class mln_gpu_device_capabilities extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int backend;
+  @Uint32()
+  external int target_kinds;
+  @Uint32()
+  external int export_kinds;
+  @Uint32()
+  external int sync_kinds;
+  @Uint32()
+  external int depth_stencil_formats;
+  @Uint32()
+  external int depth_export_kinds;
+}
+
+final class mln_gpu_device_options extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  @Uint32()
+  external int backend;
+  @Uint32()
+  external int adapter_index;
+  external mln_buffer_view adapter_uuid;
+  external mln_buffer_view adapter_luid;
+  @Uint32()
+  external int open_gl_client_api;
+  @Bool()
+  external bool open_gl_single_context;
+  external mln_queue_lock queue_lock;
+}
+
+final class mln_gpu_device_vulkan_context_result extends Struct {
+  @Uint32()
+  external int size;
+  external mln_vulkan_context_descriptor context;
 }
 
 final class mln_gpu_sync extends Struct {
@@ -709,15 +803,6 @@ final class mln_io_surface_frame extends Struct {
   external Pointer<Void> surface;
 }
 
-final class mln_io_surface_ring_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  @Uint32()
-  external int buffer_count;
-  external mln_metal_context_descriptor context;
-}
-
 final class mln_lat_lng extends Struct {
   @Double()
   external double latitude;
@@ -773,6 +858,8 @@ final class mln_map_options extends Struct {
   @Bool()
   external bool tile_cache_enabled;
   external mln_buffer_view fallback_font_faces;
+  @Bool()
+  external bool system_fonts_enabled;
 }
 
 final class mln_map_projection_camera_result extends Struct {
@@ -878,13 +965,18 @@ final class mln_map_viewport_options extends Struct {
   external mln_edge_insets frustum_offset;
 }
 
+final class mln_mat4 extends Struct {
+  external mln_vec4 x;
+  external mln_vec4 y;
+  external mln_vec4 z;
+  external mln_vec4 w;
+}
+
 final class mln_metal_borrowed_texture extends Struct {
   external Pointer<Void> texture;
 }
 
-final class mln_metal_borrowed_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
+final class mln_metal_borrowed_textures_target extends Struct {
   external mln_logical_size logical_size;
   @Uint32()
   external int physical_width;
@@ -893,37 +985,40 @@ final class mln_metal_borrowed_texture_descriptor extends Struct {
   external Pointer<mln_metal_borrowed_texture> textures;
   @Size()
   external int texture_count;
-  external Pointer<Void> command_queue;
-}
-
-final class mln_metal_borrowed_texture_replacement extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  @Uint32()
-  external int physical_width;
-  @Uint32()
-  external int physical_height;
-  external Pointer<mln_metal_borrowed_texture> textures;
+  external Pointer<mln_metal_borrowed_texture> depth_textures;
   @Size()
-  external int texture_count;
+  external int depth_texture_count;
 }
 
 final class mln_metal_context_descriptor extends Struct {
   external Pointer<Void> device;
 }
 
-final class mln_metal_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  external mln_metal_context_descriptor context;
-  external Pointer<Void> layer;
+final class mln_metal_custom_layer_encoder extends Struct {
+  external Pointer<Void> command_buffer;
 }
 
-final class mln_metal_surface_replacement extends Struct {
+final class mln_metal_custom_layer_pass extends Struct {
+  external Pointer<Void> encoder;
+  external Pointer<Void> command_buffer;
+  @Uint64()
+  external int color_format;
+  @Uint64()
+  external int depth_format;
+  @Uint64()
+  external int stencil_format;
+  @Uint32()
+  external int sample_count;
+}
+
+final class mln_metal_device_descriptor extends Struct {
   @Uint32()
   external int size;
+  external Pointer<Void> device;
+  external Pointer<Void> command_queue;
+}
+
+final class mln_metal_layer_target extends Struct {
   external mln_logical_size logical_size;
   external Pointer<Void> layer;
 }
@@ -943,6 +1038,9 @@ final class mln_metal_texture_frame extends Struct {
   external Pointer<Void> device;
   @Uint64()
   external int pixel_format;
+  external Pointer<Void> depth_texture;
+  @Uint64()
+  external int depth_pixel_format;
 }
 
 final class mln_momentum_decay extends Struct {
@@ -1049,41 +1147,42 @@ final class mln_offline_tile_pyramid_region_definition extends Struct {
   external bool include_ideographs;
 }
 
-final class mln_offscreen_descriptor extends Struct {
-  @Uint32()
-  external int size;
+final class mln_offscreen_target extends Struct {
   external mln_logical_size logical_size;
 }
 
-final class mln_offscreen_device_options extends Struct {
+final class mln_ohos_window_target extends Struct {
+  external mln_logical_size logical_size;
+  external Pointer<Void> window;
+}
+
+final class mln_opaque_fd_frame extends Struct {
   @Uint32()
   external int size;
   @Uint32()
-  external int fields;
+  external int width;
   @Uint32()
-  external int adapter_index;
+  external int height;
+  @Double()
+  external double scale_factor;
+  @Uint32()
+  external int slot;
+  @Int32()
+  external int fd;
+  @Uint64()
+  external int allocation_size;
   @Bool()
-  external bool single_context;
+  external bool dedicated;
   @Uint32()
-  external int client_api;
-}
-
-final class mln_ohos_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  external Pointer<Void> window;
+  external int format;
+  @Int32()
+  external int depth_fd;
   @Uint64()
-  external int surface_id;
-}
-
-final class mln_ohos_surface_replacement extends Struct {
+  external int depth_allocation_size;
+  @Bool()
+  external bool depth_dedicated;
   @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  external Pointer<Void> window;
-  @Uint64()
-  external int surface_id;
+  external int depth_format;
 }
 
 final class mln_open_gl_borrowed_texture extends Struct {
@@ -1091,40 +1190,25 @@ final class mln_open_gl_borrowed_texture extends Struct {
   external int texture;
 }
 
-final class mln_open_gl_borrowed_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
+final class mln_open_gl_borrowed_textures_target extends Struct {
   external mln_logical_size logical_size;
   @Uint32()
   external int physical_width;
   @Uint32()
   external int physical_height;
-  external mln_open_gl_context_descriptor context;
   external Pointer<mln_open_gl_borrowed_texture> textures;
   @Size()
   external int texture_count;
   @Uint32()
   external int target;
-}
-
-final class mln_open_gl_borrowed_texture_replacement extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  @Uint32()
-  external int physical_width;
-  @Uint32()
-  external int physical_height;
-  external Pointer<mln_open_gl_borrowed_texture> textures;
+  external Pointer<mln_open_gl_borrowed_texture> depth_textures;
   @Size()
-  external int texture_count;
+  external int depth_texture_count;
 }
 
 final class mln_open_gl_context_descriptor extends Struct {
   @Uint32()
   external int platform;
-  @Uint32()
-  external int ownership;
   external mln_open_gl_context_descriptor_data data;
 }
 
@@ -1134,17 +1218,12 @@ final class mln_open_gl_context_descriptor_data extends Union {
   external mln_web_gl_context_descriptor web_gl;
 }
 
-final class mln_open_gl_surface_descriptor extends Struct {
+final class mln_open_gl_custom_layer_pass extends Struct {
   @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  external mln_open_gl_context_descriptor context;
-  external Pointer<Void> surface;
+  external int framebuffer;
 }
 
-final class mln_open_gl_surface_replacement extends Struct {
-  @Uint32()
-  external int size;
+final class mln_open_gl_surface_target extends Struct {
   external mln_logical_size logical_size;
   external Pointer<Void> surface;
 }
@@ -1164,6 +1243,10 @@ final class mln_open_gl_texture_frame extends Struct {
   external int texture;
   @Uint32()
   external int target;
+  @Uint32()
+  external int depth_texture;
+  @Uint32()
+  external int depth_internal_format;
 }
 
 final class mln_pan_momentum extends Struct {
@@ -1280,6 +1363,7 @@ final class mln_render_frame_result extends Struct {
   @Bool()
   external bool needs_repaint;
   external mln_map_view view;
+  external mln_frame_projection frame_projection;
   @Uint32()
   external int mode;
 }
@@ -1294,7 +1378,8 @@ final class mln_render_session_attach_options extends Struct {
   external mln_wake frame_wake;
   external mln_wake redraw_wake;
   external mln_wake driver_work_wake;
-  external mln_queue_lock queue_lock;
+  @Bool()
+  external bool keep_depth;
 }
 
 final class mln_render_session_capabilities extends Struct {
@@ -1310,6 +1395,8 @@ final class mln_render_session_capabilities extends Struct {
   external int producer_sync_kind;
   @Uint32()
   external int consumer_sync_kinds;
+  @Uint32()
+  external int export_kind;
 }
 
 final class mln_render_session_snapshot extends Struct {
@@ -1328,6 +1415,32 @@ final class mln_render_session_snapshot extends Struct {
   external int failure_status;
   @Bool()
   external bool has_target;
+}
+
+final class mln_render_target extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int kind;
+  external mln_render_target_data data;
+}
+
+final class mln_render_target_data extends Union {
+  external mln_offscreen_target offscreen;
+  external mln_metal_layer_target metal_layer;
+  external mln_win32_window_target win32_window;
+  external mln_xlib_window_target xlib_window;
+  external mln_wayland_surface_target wayland_surface;
+  external mln_android_window_target android_window;
+  external mln_ohos_window_target ohos_window;
+  external mln_vulkan_surface_target vulkan_surface;
+  external mln_open_gl_surface_target open_gl_surface;
+  external mln_metal_borrowed_textures_target metal_borrowed_textures;
+  external mln_vulkan_borrowed_textures_target vulkan_borrowed_textures;
+  external mln_open_gl_borrowed_textures_target open_gl_borrowed_textures;
+  external mln_web_gpu_borrowed_textures_target web_gpu_borrowed_textures;
+  external mln_exported_ring_target exported_ring;
+  external mln_web_canvas_target web_canvas;
 }
 
 final class mln_rendered_feature extends Struct {
@@ -1568,13 +1681,6 @@ final class mln_runtime_event_offline_region_status extends Struct {
   external mln_offline_region_status status;
 }
 
-final class mln_runtime_event_offline_region_tile_count_limit extends Struct {
-  @Int64()
-  external int region_id;
-  @Uint64()
-  external int limit;
-}
-
 final class mln_runtime_event_payload extends Union {
   external mln_runtime_event_camera_change camera_change;
   external mln_runtime_event_loading_failed loading_failed;
@@ -1585,8 +1691,6 @@ final class mln_runtime_event_payload extends Union {
   external mln_runtime_event_offline_region_status offline_region_status;
   external mln_runtime_event_offline_region_response_error
   offline_region_response_error;
-  external mln_runtime_event_offline_region_tile_count_limit
-  offline_region_tile_count_limit;
   external mln_runtime_event_glyphs glyphs;
   external mln_runtime_event_sprite sprite;
 }
@@ -1870,6 +1974,17 @@ final class mln_vec3 extends Struct {
   external double z;
 }
 
+final class mln_vec4 extends Struct {
+  @Double()
+  external double x;
+  @Double()
+  external double y;
+  @Double()
+  external double z;
+  @Double()
+  external double w;
+}
+
 final class mln_vulkan_borrowed_texture extends Struct {
   @Uint64()
   external int image;
@@ -1877,15 +1992,12 @@ final class mln_vulkan_borrowed_texture extends Struct {
   external int image_view;
 }
 
-final class mln_vulkan_borrowed_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
+final class mln_vulkan_borrowed_textures_target extends Struct {
   external mln_logical_size logical_size;
   @Uint32()
   external int physical_width;
   @Uint32()
   external int physical_height;
-  external mln_vulkan_context_descriptor context;
   external Pointer<mln_vulkan_borrowed_texture> textures;
   @Size()
   external int texture_count;
@@ -1895,19 +2007,13 @@ final class mln_vulkan_borrowed_texture_descriptor extends Struct {
   external int final_layout;
   @Uint32()
   external int owner;
-}
-
-final class mln_vulkan_borrowed_texture_replacement extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  @Uint32()
-  external int physical_width;
-  @Uint32()
-  external int physical_height;
-  external Pointer<mln_vulkan_borrowed_texture> textures;
+  external Pointer<mln_vulkan_borrowed_texture> depth_textures;
   @Size()
-  external int texture_count;
+  external int depth_texture_count;
+  @Uint32()
+  external int depth_format;
+  @Uint32()
+  external int depth_final_layout;
 }
 
 final class mln_vulkan_context_descriptor extends Struct {
@@ -1921,35 +2027,37 @@ final class mln_vulkan_context_descriptor extends Struct {
   external Pointer<Void> get_device_proc_addr;
 }
 
-final class mln_vulkan_device_context_result extends Struct {
-  @Uint32()
-  external int size;
+final class mln_vulkan_custom_layer_encoder extends Struct {
   external mln_vulkan_context_descriptor context;
+  external Pointer<Void> command_buffer;
 }
 
-final class mln_vulkan_device_options extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int fields;
-  @Bool()
-  external bool presentation;
-  external mln_buffer_view device_uuid;
-  external mln_buffer_view device_luid;
-}
-
-final class mln_vulkan_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
+final class mln_vulkan_custom_layer_pass extends Struct {
   external mln_vulkan_context_descriptor context;
+  external Pointer<Void> command_buffer;
   @Uint64()
-  external int surface;
+  external int render_pass;
+  @Uint32()
+  external int subpass;
+  @Uint32()
+  external int sample_count;
+  @Uint32()
+  external int color_format;
+  @Uint32()
+  external int depth_stencil_format;
 }
 
-final class mln_vulkan_surface_replacement extends Struct {
+final class mln_vulkan_device_descriptor extends Struct {
   @Uint32()
   external int size;
+  external mln_vulkan_context_descriptor context;
+  external mln_queue_lock queue_lock;
+  external Pointer<mln_buffer_view> enabled_extensions;
+  @Size()
+  external int enabled_extension_count;
+}
+
+final class mln_vulkan_surface_target extends Struct {
   external mln_logical_size logical_size;
   @Uint64()
   external int surface;
@@ -1975,6 +2083,14 @@ final class mln_vulkan_texture_frame extends Struct {
   external int format;
   @Uint32()
   external int layout;
+  @Uint64()
+  external int depth_image;
+  @Uint64()
+  external int depth_image_view;
+  @Uint32()
+  external int depth_format;
+  @Uint32()
+  external int depth_layout;
 }
 
 final class mln_wake extends Struct {
@@ -1985,53 +2101,30 @@ final class mln_wake extends Struct {
   external int queue;
 }
 
-final class mln_wayland_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
+final class mln_wayland_surface_target extends Struct {
   external mln_logical_size logical_size;
   external Pointer<Void> display;
   external Pointer<Void> surface;
 }
 
-final class mln_wayland_surface_replacement extends Struct {
-  @Uint32()
-  external int size;
+final class mln_web_canvas_target extends Struct {
   external mln_logical_size logical_size;
-  external Pointer<Void> surface;
+  @Uint32()
+  external int canvas;
+  external mln_buffer_view format;
 }
 
 final class mln_web_gl_context_descriptor extends Struct {
   @Uint32()
-  external int kind;
-  @Int32()
   external int context;
-  external mln_buffer_view canvas_selector;
 }
 
 final class mln_web_gpu_borrowed_texture extends Struct {
-  external Pointer<Void> texture;
-  external Pointer<Void> texture_view;
+  @Uint32()
+  external int texture;
 }
 
-final class mln_web_gpu_borrowed_texture_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  @Uint32()
-  external int physical_width;
-  @Uint32()
-  external int physical_height;
-  external mln_web_gpu_context_descriptor context;
-  external Pointer<mln_web_gpu_borrowed_texture> textures;
-  @Size()
-  external int texture_count;
-  @Uint32()
-  external int format;
-}
-
-final class mln_web_gpu_borrowed_texture_replacement extends Struct {
-  @Uint32()
-  external int size;
+final class mln_web_gpu_borrowed_textures_target extends Struct {
   external mln_logical_size logical_size;
   @Uint32()
   external int physical_width;
@@ -2040,29 +2133,34 @@ final class mln_web_gpu_borrowed_texture_replacement extends Struct {
   external Pointer<mln_web_gpu_borrowed_texture> textures;
   @Size()
   external int texture_count;
+  external mln_buffer_view format;
+  external Pointer<mln_web_gpu_borrowed_texture> depth_textures;
+  @Size()
+  external int depth_texture_count;
+  external mln_buffer_view depth_format;
 }
 
 final class mln_web_gpu_context_descriptor extends Struct {
-  external Pointer<Void> instance;
-  external Pointer<Void> device;
-  external Pointer<Void> queue;
+  @Uint32()
+  external int device;
 }
 
-final class mln_web_gpu_surface_descriptor extends Struct {
+final class mln_web_gpu_custom_layer_encoder extends Struct {
   @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  external mln_web_gpu_context_descriptor context;
-  external Pointer<Void> surface;
+  external int device;
   @Uint32()
-  external int format;
+  external int encoder;
 }
 
-final class mln_web_gpu_surface_replacement extends Struct {
+final class mln_web_gpu_custom_layer_pass extends Struct {
   @Uint32()
-  external int size;
-  external mln_logical_size logical_size;
-  external Pointer<Void> surface;
+  external int device;
+  @Uint32()
+  external int encoder;
+  external mln_buffer_view color_format;
+  external mln_buffer_view depth_stencil_format;
+  @Uint32()
+  external int sample_count;
 }
 
 final class mln_web_gpu_texture_frame extends Struct {
@@ -2076,11 +2174,14 @@ final class mln_web_gpu_texture_frame extends Struct {
   external double scale_factor;
   @Uint32()
   external int slot;
-  external Pointer<Void> texture;
-  external Pointer<Void> texture_view;
-  external Pointer<Void> device;
   @Uint32()
-  external int format;
+  external int texture;
+  @Uint32()
+  external int device;
+  external mln_buffer_view format;
+  @Uint32()
+  external int depth_texture;
+  external mln_buffer_view depth_format;
 }
 
 final class mln_wgl_context_descriptor extends Struct {
@@ -2089,18 +2190,16 @@ final class mln_wgl_context_descriptor extends Struct {
   external Pointer<Void> get_proc_address;
 }
 
-final class mln_win32_window_descriptor extends Struct {
-  @Uint32()
-  external int size;
+final class mln_win32_window_target extends Struct {
   external mln_logical_size logical_size;
   external Pointer<Void> window;
 }
 
-final class mln_win32_window_replacement extends Struct {
-  @Uint32()
-  external int size;
+final class mln_xlib_window_target extends Struct {
   external mln_logical_size logical_size;
-  external Pointer<Void> window;
+  external Pointer<Void> display;
+  @Uint64()
+  external int window;
 }
 
 // mln_anchored_momentum_field
@@ -2174,6 +2273,10 @@ const MLN_CAMERA_UPDATE_MODE_JUMP = 0;
 const MLN_CAMERA_UPDATE_MODE_EASE = 1;
 const MLN_CAMERA_UPDATE_MODE_FLY = 2;
 
+// mln_clip_depth_range
+const MLN_CLIP_DEPTH_RANGE_ZERO_TO_ONE = 1;
+const MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE = 2;
+
 // mln_constrain_mode
 const MLN_CONSTRAIN_MODE_NONE = 0;
 const MLN_CONSTRAIN_MODE_HEIGHT_ONLY = 1;
@@ -2193,6 +2296,10 @@ const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 64;
 const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1;
 const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2;
 
+// mln_depth_stencil_format_flag
+const MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8 = 1;
+const MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8 = 2;
+
 // mln_feature_id_type
 const MLN_FEATURE_ID_TYPE_STRING = 1;
 const MLN_FEATURE_ID_TYPE_UINT = 2;
@@ -2208,6 +2315,7 @@ const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4;
 
 // mln_frame_pacer_option_field
 const MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1;
+const MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND = 2;
 
 // mln_free_camera_option_field
 const MLN_FREE_CAMERA_OPTION_POSITION = 1;
@@ -2230,6 +2338,29 @@ const MLN_GESTURE_PHASE_BEGIN = 1;
 const MLN_GESTURE_PHASE_UPDATE = 2;
 const MLN_GESTURE_PHASE_END = 3;
 const MLN_GESTURE_PHASE_CANCEL = 4;
+
+// mln_gpu_device_option_field
+const MLN_GPU_DEVICE_OPTION_BACKEND = 1;
+const MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX = 2;
+const MLN_GPU_DEVICE_OPTION_ADAPTER_UUID = 4;
+const MLN_GPU_DEVICE_OPTION_ADAPTER_LUID = 8;
+const MLN_GPU_DEVICE_OPTION_OPEN_GL_CLIENT_API = 16;
+const MLN_GPU_DEVICE_OPTION_OPEN_GL_SINGLE_CONTEXT = 32;
+
+// mln_gpu_export_kind
+const MLN_GPU_EXPORT_KIND_NONE = 0;
+const MLN_GPU_EXPORT_KIND_IO_SURFACE = 1;
+const MLN_GPU_EXPORT_KIND_DMA_BUF = 2;
+const MLN_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER = 3;
+const MLN_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE = 4;
+const MLN_GPU_EXPORT_KIND_OPAQUE_FD = 5;
+
+// mln_gpu_export_kind_flag
+const MLN_GPU_EXPORT_KIND_FLAG_IO_SURFACE = 1;
+const MLN_GPU_EXPORT_KIND_FLAG_DMA_BUF = 2;
+const MLN_GPU_EXPORT_KIND_FLAG_ANDROID_HARDWARE_BUFFER = 4;
+const MLN_GPU_EXPORT_KIND_FLAG_DXGI_SHARED_HANDLE = 8;
+const MLN_GPU_EXPORT_KIND_FLAG_OPAQUE_FD = 16;
 
 // mln_gpu_sync_kind
 const MLN_GPU_SYNC_CPU_COMPLETE = 0;
@@ -2302,6 +2433,7 @@ const MLN_MAP_MODE_TILE = 2;
 // mln_map_option_field
 const MLN_MAP_OPTION_EVENT_MASK = 1;
 const MLN_MAP_OPTION_TILE_CACHE_ENABLED = 2;
+const MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 4;
 
 // mln_map_tile_option_field
 const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1;
@@ -2356,19 +2488,10 @@ const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY = 2;
 const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0;
 const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1;
 
-// mln_offscreen_device_option_field
-const MLN_OFFSCREEN_DEVICE_OPTION_ADAPTER_INDEX = 1;
-const MLN_OFFSCREEN_DEVICE_OPTION_SINGLE_CONTEXT = 2;
-const MLN_OFFSCREEN_DEVICE_OPTION_CLIENT_API = 4;
-
 // mln_open_gl_client_api
 const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0;
 const MLN_OPEN_GL_CLIENT_API_GL = 1;
 const MLN_OPEN_GL_CLIENT_API_GLES = 2;
-
-// mln_open_gl_context_ownership
-const MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED = 0;
-const MLN_OPEN_GL_CONTEXT_OWNERSHIP_DEDICATED = 1;
 
 // mln_open_gl_context_platform
 const MLN_OPEN_GL_CONTEXT_PLATFORM_UNSPECIFIED = 0;
@@ -2397,6 +2520,12 @@ const MLN_PROJECTION_TYPE_GLOBE = 2;
 // mln_render_abandon_disposition
 const MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0;
 const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1;
+
+// mln_render_backend
+const MLN_RENDER_BACKEND_METAL = 1;
+const MLN_RENDER_BACKEND_VULKAN = 2;
+const MLN_RENDER_BACKEND_OPEN_GL = 3;
+const MLN_RENDER_BACKEND_WEB_GPU = 4;
 
 // mln_render_backend_flag
 const MLN_RENDER_BACKEND_FLAG_METAL = 1;
@@ -2431,6 +2560,40 @@ const MLN_RENDER_SESSION_STATE_DETACHING = 3;
 const MLN_RENDER_SESSION_STATE_DETACHED = 4;
 const MLN_RENDER_SESSION_STATE_FAILED = 5;
 const MLN_RENDER_SESSION_STATE_ABANDONED = 6;
+
+// mln_render_target_kind
+const MLN_RENDER_TARGET_KIND_OFFSCREEN = 1;
+const MLN_RENDER_TARGET_KIND_METAL_LAYER = 2;
+const MLN_RENDER_TARGET_KIND_WIN32_WINDOW = 3;
+const MLN_RENDER_TARGET_KIND_XLIB_WINDOW = 4;
+const MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE = 5;
+const MLN_RENDER_TARGET_KIND_ANDROID_WINDOW = 6;
+const MLN_RENDER_TARGET_KIND_OHOS_WINDOW = 7;
+const MLN_RENDER_TARGET_KIND_VULKAN_SURFACE = 10;
+const MLN_RENDER_TARGET_KIND_OPEN_GL_SURFACE = 11;
+const MLN_RENDER_TARGET_KIND_METAL_BORROWED_TEXTURES = 12;
+const MLN_RENDER_TARGET_KIND_VULKAN_BORROWED_TEXTURES = 13;
+const MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES = 14;
+const MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES = 15;
+const MLN_RENDER_TARGET_KIND_EXPORTED_RING = 16;
+const MLN_RENDER_TARGET_KIND_WEB_CANVAS = 17;
+
+// mln_render_target_kind_flag
+const MLN_RENDER_TARGET_KIND_FLAG_OFFSCREEN = 1;
+const MLN_RENDER_TARGET_KIND_FLAG_METAL_LAYER = 2;
+const MLN_RENDER_TARGET_KIND_FLAG_WIN32_WINDOW = 4;
+const MLN_RENDER_TARGET_KIND_FLAG_XLIB_WINDOW = 8;
+const MLN_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE = 16;
+const MLN_RENDER_TARGET_KIND_FLAG_ANDROID_WINDOW = 32;
+const MLN_RENDER_TARGET_KIND_FLAG_OHOS_WINDOW = 64;
+const MLN_RENDER_TARGET_KIND_FLAG_VULKAN_SURFACE = 512;
+const MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_SURFACE = 1024;
+const MLN_RENDER_TARGET_KIND_FLAG_METAL_BORROWED_TEXTURES = 2048;
+const MLN_RENDER_TARGET_KIND_FLAG_VULKAN_BORROWED_TEXTURES = 4096;
+const MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES = 8192;
+const MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 16384;
+const MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 32768;
+const MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS = 65536;
 
 // mln_rendered_feature_query_option_field
 const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1;
@@ -2524,16 +2687,15 @@ const MLN_RUNTIME_EVENT_FLAG_MAP_TILE_ACTION = 32768;
 const MLN_RUNTIME_EVENT_FLAG_MAP_SOURCE_CHANGED = 65536;
 const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED = 131072;
 const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 262144;
-const MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 524288;
-const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 1048576;
-const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 2097152;
-const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 4194304;
-const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 8388608;
-const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 16777216;
-const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 33554432;
-const MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 66191358;
-const MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 917504;
-const MLN_RUNTIME_EVENT_FLAG_ALL = 67108862;
+const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 524288;
+const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 1048576;
+const MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_ERROR = 2097152;
+const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_REQUESTED = 4194304;
+const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_LOADED = 8388608;
+const MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR = 16777216;
+const MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS = 33161214;
+const MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS = 393216;
+const MLN_RUNTIME_EVENT_FLAG_ALL = 33554430;
 
 // mln_runtime_event_payload_type
 const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
@@ -2545,9 +2707,8 @@ const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 5;
 const MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED = 6;
 const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 7;
 const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 8;
-const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 9;
-const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 10;
-const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 11;
+const MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 9;
+const MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 10;
 
 // mln_runtime_event_source_type
 const MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0;
@@ -2572,13 +2733,12 @@ const MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 15;
 const MLN_RUNTIME_EVENT_MAP_SOURCE_CHANGED = 16;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18;
-const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19;
-const MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20;
-const MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21;
-const MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22;
-const MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23;
-const MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24;
-const MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25;
+const MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 19;
+const MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 20;
+const MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 21;
+const MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 22;
+const MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 23;
+const MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 24;
 
 // mln_source_feature_query_option_field
 const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;
@@ -2699,19 +2859,10 @@ const MLN_URL_MATCH_GLOB = 1;
 const MLN_VIEWPORT_MODE_DEFAULT = 0;
 const MLN_VIEWPORT_MODE_FLIPPED_Y = 1;
 
-// mln_vulkan_device_option_field
-const MLN_VULKAN_DEVICE_OPTION_PRESENTATION = 1;
-const MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID = 2;
-const MLN_VULKAN_DEVICE_OPTION_DEVICE_LUID = 4;
-
 // mln_vulkan_image_owner
 const MLN_VULKAN_IMAGE_OWNER_GRAPHICS_QUEUE = 0;
 const MLN_VULKAN_IMAGE_OWNER_EXTERNAL = 1;
 const MLN_VULKAN_IMAGE_OWNER_FOREIGN = 2;
-
-// mln_web_gl_context_kind
-const MLN_WEB_GL_CONTEXT_EXISTING = 0;
-const MLN_WEB_GL_CONTEXT_TRANSFERRED_CANVAS = 1;
 
 @Native<Int32 Function(mln_acquired_frame, Pointer<mln_diagnostic>)>()
 external int mln_acquired_frame_discard(
@@ -2781,6 +2932,19 @@ external int mln_acquired_frame_get_io_surface(
 external int mln_acquired_frame_get_metal_texture(
   int frame,
   Pointer<mln_metal_texture_frame> out_frame,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_acquired_frame,
+    Pointer<mln_opaque_fd_frame>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_acquired_frame_get_opaque_fd(
+  int frame,
+  Pointer<mln_opaque_fd_frame> out_frame,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -2865,36 +3029,10 @@ external int mln_acquired_frame_view_begin(
 @Native<Void Function(Pointer<Void>)>()
 external void mln_acquired_frame_view_end(Pointer<Void> scope);
 
-@Native<
-  Int32 Function(
-    Pointer<mln_frame_pacer_options>,
-    Pointer<mln_frame_pacer>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_android_frame_pacer_create(
-  Pointer<mln_frame_pacer_options> options,
-  Pointer<mln_frame_pacer> out_pacer,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<Int32 Function(Pointer<Void>, Pointer<Void>, Pointer<mln_diagnostic>)>()
 external int mln_android_init(
   Pointer<Void> jni_env,
   Pointer<Void> context,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    Pointer<mln_frame_pacer_options>,
-    Pointer<mln_frame_pacer>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_apple_frame_pacer_create(
-  Pointer<mln_frame_pacer_options> options,
-  Pointer<mln_frame_pacer> out_pacer,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -2975,8 +3113,115 @@ external int mln_delivery_queue_dispatch(
 @Native<Void Function(mln_delivery_queue)>()
 external void mln_delivery_queue_release(int queue);
 
+@Native<
+  Int32 Function(
+    Pointer<mln_frame_pacer_options>,
+    Pointer<mln_frame_pacer>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_frame_pacer_create(
+  Pointer<mln_frame_pacer_options> options,
+  Pointer<mln_frame_pacer> out_pacer,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
 @Native<Void Function(mln_frame_pacer)>()
 external void mln_frame_pacer_release(int pacer);
+
+@Native<
+  Int32 Function(
+    mln_frame_pacer,
+    Pointer<mln_frame_pacer_options>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_frame_pacer_set_options(
+  int pacer,
+  Pointer<mln_frame_pacer_options> options,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    Pointer<mln_gpu_device_options>,
+    Pointer<mln_gpu_device>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gpu_device_create(
+  Pointer<mln_gpu_device_options> options,
+  Pointer<mln_gpu_device> out_device,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_gpu_device,
+    Pointer<mln_gpu_device_capabilities>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gpu_device_get_capabilities(
+  int device,
+  Pointer<mln_gpu_device_capabilities> out_capabilities,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_gpu_device,
+    Pointer<mln_gpu_device_vulkan_context_result>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gpu_device_get_vulkan_context(
+  int device,
+  Pointer<mln_gpu_device_vulkan_context_result> out_result,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Void Function(mln_gpu_device)>()
+external void mln_gpu_device_release(int device);
+
+@Native<
+  Int32 Function(
+    Pointer<mln_metal_device_descriptor>,
+    Pointer<mln_gpu_device>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gpu_device_wrap_metal(
+  Pointer<mln_metal_device_descriptor> descriptor,
+  Pointer<mln_gpu_device> out_device,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    Pointer<mln_open_gl_context_descriptor>,
+    Pointer<mln_gpu_device>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gpu_device_wrap_open_gl(
+  Pointer<mln_open_gl_context_descriptor> context,
+  Pointer<mln_gpu_device> out_device,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    Pointer<mln_vulkan_device_descriptor>,
+    Pointer<mln_gpu_device>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gpu_device_wrap_vulkan(
+  Pointer<mln_vulkan_device_descriptor> descriptor,
+  Pointer<mln_gpu_device> out_device,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @Native<
   Int32 Function(
@@ -3049,6 +3294,25 @@ external int mln_map_add_custom_geometry_source(
   int map,
   mln_buffer_view source_id,
   Pointer<mln_custom_geometry_source_options> options,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    Pointer<mln_custom_layer_host>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_add_custom_layer(
+  int map,
+  mln_buffer_view layer_id,
+  mln_buffer_view before_layer_id,
+  Pointer<mln_custom_layer_host> host,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -3162,276 +3426,17 @@ external int mln_map_apply_camera_delta(
 @Native<
   Int32 Function(
     mln_map,
-    Pointer<mln_android_hardware_buffer_ring_descriptor>,
-    mln_vulkan_device,
+    Pointer<mln_render_target>,
+    mln_gpu_device,
     Pointer<mln_render_session_attach_options>,
     Pointer<mln_render_session>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_attach_android_hardware_buffer_ring(
+external int mln_map_attach(
   int map,
-  Pointer<mln_android_hardware_buffer_ring_descriptor> descriptor,
-  int device,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_android_surface_descriptor>,
-    mln_vulkan_device,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_android_surface(
-  int map,
-  Pointer<mln_android_surface_descriptor> descriptor,
-  int device,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_dma_buf_ring_descriptor>,
-    mln_vulkan_device,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_dma_buf_ring(
-  int map,
-  Pointer<mln_dma_buf_ring_descriptor> descriptor,
-  int device,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_dxgi_shared_texture_ring_descriptor>,
-    mln_vulkan_device,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_dxgi_shared_texture_ring(
-  int map,
-  Pointer<mln_dxgi_shared_texture_ring_descriptor> descriptor,
-  int device,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_io_surface_ring_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_io_surface_ring(
-  int map,
-  Pointer<mln_io_surface_ring_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_metal_borrowed_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_metal_borrowed_texture(
-  int map,
-  Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_metal_surface_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_metal_surface(
-  int map,
-  Pointer<mln_metal_surface_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_offscreen_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    mln_offscreen_device,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_offscreen(
-  int map,
-  Pointer<mln_offscreen_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  int device,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_open_gl_borrowed_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_open_gl_borrowed_texture(
-  int map,
-  Pointer<mln_open_gl_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_open_gl_surface_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_open_gl_surface(
-  int map,
-  Pointer<mln_open_gl_surface_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_vulkan_borrowed_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_vulkan_borrowed_texture(
-  int map,
-  Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_vulkan_surface_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_vulkan_surface(
-  int map,
-  Pointer<mln_vulkan_surface_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_wayland_surface_descriptor>,
-    mln_vulkan_device,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_wayland_surface(
-  int map,
-  Pointer<mln_wayland_surface_descriptor> descriptor,
-  int device,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_win32_window_descriptor>,
-    mln_vulkan_device,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_attach_win32_window(
-  int map,
-  Pointer<mln_win32_window_descriptor> descriptor,
+  Pointer<mln_render_target> target,
   int device,
   Pointer<mln_render_session_attach_options> options,
   Pointer<mln_render_session> out_session,
@@ -4166,14 +4171,14 @@ external int mln_map_request_still_image(
 @Native<
   Int32 Function(
     mln_map,
-    mln_logical_size,
+    mln_logical_extent,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_resize(
   int map,
-  mln_logical_size logical_size,
+  mln_logical_extent extent,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -4690,27 +4695,8 @@ external int mln_network_set_status(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<
-  Int32 Function(
-    Pointer<mln_offscreen_device_options>,
-    Pointer<mln_offscreen_device>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_offscreen_device_create(
-  Pointer<mln_offscreen_device_options> options,
-  Pointer<mln_offscreen_device> out_device,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Void Function(mln_offscreen_device)>()
-external void mln_offscreen_device_release(int device);
-
 @Native<Uint32 Function()>()
 external int mln_open_gl_supported_context_provider_mask();
-
-@Native<Pointer<Void> Function()>()
-external Pointer<Void> mln_plugin_get_register_function_v1();
 
 @Native<
   Int32 Function(
@@ -5027,14 +5013,14 @@ external int mln_render_session_release_target(
 @Native<
   Int32 Function(
     mln_render_session,
-    mln_logical_size,
+    mln_logical_extent,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_resize(
   int session,
-  mln_logical_size logical_size,
+  mln_logical_extent extent,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -5042,21 +5028,6 @@ external int mln_render_session_resize(
 @Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
 external int mln_render_session_service_driver_work(
   int session,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_android_surface_replacement>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_android_surface_target(
-  int session,
-  Pointer<mln_android_surface_replacement> replacement,
-  Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -5072,119 +5043,14 @@ external int mln_render_session_set_frame_pacer(
 @Native<
   Int32 Function(
     mln_render_session,
-    Pointer<mln_metal_borrowed_texture_replacement>,
+    Pointer<mln_render_target>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_render_session_set_metal_borrowed_texture_target(
+external int mln_render_session_set_target(
   int session,
-  Pointer<mln_metal_borrowed_texture_replacement> replacement,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_metal_surface_replacement>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_metal_surface_target(
-  int session,
-  Pointer<mln_metal_surface_replacement> replacement,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_open_gl_borrowed_texture_replacement>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_open_gl_borrowed_texture_target(
-  int session,
-  Pointer<mln_open_gl_borrowed_texture_replacement> replacement,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_open_gl_surface_replacement>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_open_gl_surface_target(
-  int session,
-  Pointer<mln_open_gl_surface_replacement> replacement,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_vulkan_borrowed_texture_replacement>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_vulkan_borrowed_texture_target(
-  int session,
-  Pointer<mln_vulkan_borrowed_texture_replacement> replacement,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_vulkan_surface_replacement>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_vulkan_surface_target(
-  int session,
-  Pointer<mln_vulkan_surface_replacement> replacement,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_wayland_surface_replacement>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_wayland_surface_target(
-  int session,
-  Pointer<mln_wayland_surface_replacement> replacement,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_win32_window_replacement>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_set_win32_window_target(
-  int session,
-  Pointer<mln_win32_window_replacement> replacement,
+  Pointer<mln_render_target> target,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -5643,32 +5509,3 @@ external void mln_style_expression_release(int expression);
 
 @Native<Uint32 Function()>()
 external int mln_supported_render_backend_mask();
-
-@Native<
-  Int32 Function(
-    Pointer<mln_vulkan_device_options>,
-    Pointer<mln_vulkan_device>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_vulkan_device_create(
-  Pointer<mln_vulkan_device_options> options,
-  Pointer<mln_vulkan_device> out_device,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_vulkan_device,
-    Pointer<mln_vulkan_device_context_result>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_vulkan_device_get_context(
-  int device,
-  Pointer<mln_vulkan_device_context_result> out_result,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<Void Function(mln_vulkan_device)>()
-external void mln_vulkan_device_release(int device);

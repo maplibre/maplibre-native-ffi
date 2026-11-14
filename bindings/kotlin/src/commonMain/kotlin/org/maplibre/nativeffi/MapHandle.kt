@@ -83,6 +83,46 @@ private constructor(
     }
 
   /**
+   * Adds a layer that draws with your own GPU commands, through `host`.
+   *
+   * The layer goes below the layer named `beforeLayerId`, or above every layer when `beforeLayerId`
+   * is empty. Its type is `custom`, and it takes the `visibility`, `minzoom`, and `maxzoom`
+   * properties, but no paint properties. `MapHandle.removeStyleLayer()` removes it.
+   *
+   * Runs on the thread that runs the session's graphics work: a library thread, or yours with
+   * `RenderDriverKind.CALLER_GRAPHICS_THREAD`. It can't call the library.
+   *
+   * Runs on the thread that runs the session's graphics work, as `CustomLayerPrerenderCallback`
+   * says. It can't call the library.
+   *
+   * See `mln_map_add_custom_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the style has no layer named `beforeLayerId`.
+   * - `Status.ALREADY_EXISTS` when the style already has a layer named `layerId`.
+   * - `Status.INVALID_STATE` while the style isn't loaded, as `MapHandle.setStyleUrl()` describes.
+   */
+  public fun addCustomLayer(
+    layerId: String,
+    beforeLayerId: String? = null,
+    host: CustomLayerHost,
+  ): Completion<CommandCompletion> =
+    nativeCommand(this, binding, bindingCallbacks) {
+      check(
+        C.mln_map_add_custom_layer(
+          handle,
+          view(layerId),
+          view(beforeLayerId),
+          writeCustomLayerHost(host),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
+  /**
    * Adds a source whose vector tiles come from callbacks.
    *
    * See `mln_map_add_custom_vector_source` in the
@@ -273,101 +313,41 @@ private constructor(
     }
 
   /**
-   * Attaches a render session that renders the map offscreen.
-   *
-   * Read each image's pixels with `RenderSessionHandle.readTexture()`.
+   * Attaches a render session that renders the map into `target`.
    *
    * The session renders on `device`. When `device` is null, the session creates a device with the
    * default options, and releases it when the session ends.
    *
-   * See `mln_map_attach_offscreen` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+   * See `mln_map_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    *
    * Errors:
    *
-   * - `Status.INVALID_STATE` when the map already has a render session.
-   * - `Status.NATIVE_ERROR` when `device` is null and the platform can't create a device.
+   * - `Status.INVALID_ARGUMENT` when a borrowed ring has depth textures, but not one for each of
+   *   its textures.
+   * - `Status.INVALID_STATE` when the map already has a render session, or a window is minimized or
+   *   has no client area.
+   * - `Status.UNSUPPORTED` when the device's `GpuDeviceCapabilities.targetKinds` lacks the target's
+   *   kind, or, for a null `device`, when no backend of this build renders to it, when `options`
+   *   sets `keep_depth` for a target other than an exported ring, or when a borrowed ring's depth
+   *   format isn't one of the device's `GpuDeviceCapabilities.depthStencilFormats`.
+   * - `Status.INVALID_STATE` when a window was minimized or had no client area when the attach ran.
+   * - `Status.UNSUPPORTED` when the GPU or the graphics driver can't present to the window.
+   * - `Status.NATIVE_ERROR` when `device` is null and the platform can't create a device, or when
+   *   the library can't create its graphics context or present to the window.
    */
-  public fun attachOffscreen(
-    descriptor: OffscreenDescriptor,
+  public fun attach(
+    target: RenderTarget,
+    device: GpuDeviceHandle? = null,
     options: RenderSessionAttachOptions,
-    device: OffscreenDeviceHandle? = null,
   ): RenderSessionHandle =
     nativeCall(this, binding) {
       attach(
         { out, completion ->
-          C.mln_map_attach_offscreen(
+          C.mln_map_attach(
             handle,
-            writeOffscreenDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
+            writeRenderTarget(target),
             device?.let { argument(it, it.binding) } ?: 0L,
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-      )
-    }
-
-  /**
-   * Creates a session that renders the map into a ring of your OpenGL textures.
-   *
-   * See `mln_map_attach_open_gl_borrowed_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.UNSUPPORTED` when `openGlSupportedContextProviderMask()` lacks the context's
-   *   platform, or when the target supports none of the `producer_sync_kinds` in `options`.
-   */
-  public fun attachOpenGlBorrowedTexture(
-    descriptor: OpenGlBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle =
-    nativeCall(this, binding) {
-      attach(
-        { out, completion ->
-          C.mln_map_attach_open_gl_borrowed_texture(
-            handle,
-            writeOpenGlBorrowedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { created, ready -> RenderSessionHandle.wrap(created, this@MapHandle, ready) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-      )
-    }
-
-  /**
-   * Creates a session that renders the map to an OpenGL surface.
-   *
-   * See `mln_map_attach_open_gl_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.UNSUPPORTED` when `openGlSupportedContextProviderMask()` lacks the context's
-   *   platform.
-   */
-  public fun attachOpenGlSurface(
-    descriptor: OpenGlSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle =
-    nativeCall(this, binding) {
-      attach(
-        { out, completion ->
-          C.mln_map_attach_open_gl_surface(
-            handle,
-            writeOpenGlSurfaceDescriptor(descriptor),
             writeRenderSessionAttachOptions(options),
             out,
             completion,
@@ -1255,6 +1235,19 @@ private constructor(
    * Renders a still image of a static or tile map.
    *
    * The map's render session draws the image once every resource that the image needs has loaded.
+   * While the image waits, the session holds a demand of its own for it, whose frame result carries
+   * `FRAME_DEMAND_TOKEN_STILL_IMAGE`:
+   *
+   * - It waits for the map to load what the image needs, and while every texture of a borrowed ring
+   *   holds a frame.
+   * - It finishes with the image's frame, and the image completes once that frame's result is
+   *   queued. Frames of your own demands complete no image.
+   * - Your demands never replace it, nor it them.
+   * - `RenderSessionHandle.barrier()` ends it with `RenderResult.NO_UPDATE`, and a detach or
+   *   `RenderSessionHandle.releaseTarget()` ends it with `RenderResult.TARGET_NOT_READY`. The image
+   *   gets a new demand once the barrier runs, the session has a target again, or the next session
+   *   attaches.
+   * - An image that fails ends its demand with `RenderResult.NO_UPDATE`.
    *
    * See `mln_map_request_still_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1270,10 +1263,10 @@ private constructor(
     }
 
   /**
-   * Sets the map's size.
+   * Sets the map's size and scale factor.
    *
-   * A map with a render session takes its size from the session, so resize the session with
-   * `RenderSessionHandle.resize()` instead.
+   * The map keeps its loaded tiles. A map with a render session takes its size and scale factor
+   * from the session, so resize the session with `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1283,9 +1276,9 @@ private constructor(
    * - `Status.INVALID_STATE` when the map has a render session.
    * - `Status.INVALID_STATE` when a render session attached to the map before the resize applied.
    */
-  public fun resize(logicalSize: LogicalSize): Completion<CommandCompletion> =
+  public fun resize(extent: LogicalExtent): Completion<CommandCompletion> =
     nativeCommand(this, binding) {
-      check(C.mln_map_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic))
+      check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
   /**
@@ -2066,6 +2059,25 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
       )
     }
 
+  /** [MapHandle.addCustomLayer] without its completion. */
+  public fun addCustomLayer(
+    layerId: String,
+    beforeLayerId: String? = null,
+    host: CustomLayerHost,
+  ): Unit =
+    nativeDiscard(owner, binding, bindingCallbacks) {
+      check(
+        C.mln_map_add_custom_layer(
+          handle,
+          view(layerId),
+          view(beforeLayerId),
+          writeCustomLayerHost(host),
+          completion,
+          diagnostic,
+        ),
+      )
+    }
+
   /** [MapHandle.addCustomVectorSource] without its completion. */
   public fun addCustomVectorSource(sourceId: String, options: CustomVectorSourceOptions): Unit =
     nativeDiscard(owner, binding, bindingCallbacks) {
@@ -2342,9 +2354,9 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
     }
 
   /** [MapHandle.resize] without its completion. */
-  public fun resize(logicalSize: LogicalSize): Unit =
+  public fun resize(extent: LogicalExtent): Unit =
     nativeDiscard(owner, binding) {
-      check(C.mln_map_resize(handle, writeLogicalSize(logicalSize), completion, diagnostic))
+      check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
   /** [MapHandle.setBounds] without its completion. */

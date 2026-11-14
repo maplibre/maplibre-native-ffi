@@ -15,6 +15,15 @@
 
 set(MLN_BENCH_FIXTURE_DIR "" CACHE PATH "Prepared benchmark fixtures")
 set(MLN_BENCH_GOOGLE_BENCHMARK_DIR "" CACHE PATH "Google Benchmark's source")
+set(MLN_BENCH_BACKEND ""
+    CACHE
+      STRING
+      "Render backend that the harness drives; empty takes the default backend")
+if(MLN_BENCH_BACKEND)
+  set(bench_backend "${MLN_BENCH_BACKEND}")
+else()
+  set(bench_backend "${MLN_FFI_DEFAULT_RENDER_BACKEND}")
+endif()
 
 get_filename_component(bench_dir "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
@@ -26,31 +35,22 @@ if(NOT EXISTS "${google_benchmark}/src/benchmark.cc")
       "'${google_benchmark}'. The bench tasks check it out.")
   return()
 endif()
-# The browser build embeds the fixtures, so it needs them at configure time.
-if(EMSCRIPTEN AND NOT IS_DIRECTORY "${MLN_BENCH_FIXTURE_DIR}")
-  message(
-    STATUS
-      "Skipping mln_ffi_bench: a browser build embeds its fixtures, and "
-      "MLN_BENCH_FIXTURE_DIR names no directory. The bench tasks prepare them.")
-  return()
-endif()
 
 if(NOT DEFINED MLN_BENCH_LIBRARY)
   set(MLN_BENCH_LIBRARY maplibre_native_c)
   if(TARGET mln_test_graphics_objects)
     set(MLN_BENCH_TEST_GRAPHICS mln_test_graphics_objects)
   endif()
-  # Another implementation of the C API, such as maplibre-native-next, may
-  # skip the engine's render dependencies; the Vulkan headers come from the
-  # engine's checkout then.
+  # A backend other than Vulkan names no Vulkan headers, which the host
+  # graphics still compile against.
   set(MLN_BENCH_GRAPHICS_INCLUDE_DIRS "")
-  if(TARGET mln_ffi_render_dependencies)
-    get_target_property(MLN_BENCH_GRAPHICS_INCLUDE_DIRS
-                        mln_ffi_render_dependencies MLN_FFI_INCLUDE_DIRS)
+  if(TARGET mln_ffi_render_dependencies_${bench_backend})
+    mln_ffi_render_dependency_property(MLN_BENCH_GRAPHICS_INCLUDE_DIRS
+                                       ${bench_backend} MLN_FFI_INCLUDE_DIRS)
   endif()
-  if(NOT MLN_BENCH_GRAPHICS_INCLUDE_DIRS AND DEFINED MLN_FFI_SOURCE_DIR)
+  if(NOT MLN_BENCH_GRAPHICS_INCLUDE_DIRS)
     set(MLN_BENCH_GRAPHICS_INCLUDE_DIRS
-        "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/include")
+        "${bench_dir}/../third_party/Vulkan-Headers/include")
   endif()
 endif()
 
@@ -109,16 +109,16 @@ if(NOT WIN32)
   target_link_libraries(mln_ffi_bench PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 endif()
 
-if(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+if(bench_backend STREQUAL "vulkan")
   target_compile_definitions(mln_ffi_bench PRIVATE BENCH_BACKEND_VULKAN=1)
   target_include_directories(
     mln_ffi_bench
     SYSTEM
     PRIVATE ${MLN_BENCH_GRAPHICS_INCLUDE_DIRS})
-elseif(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+elseif(bench_backend STREQUAL "metal")
   target_compile_definitions(mln_ffi_bench PRIVATE BENCH_BACKEND_METAL=1)
   target_link_libraries(mln_ffi_bench PRIVATE "-framework Foundation" objc)
-elseif(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+elseif(bench_backend STREQUAL "webgpu")
   target_compile_definitions(mln_ffi_bench PRIVATE BENCH_BACKEND_WEBGPU=1)
 elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
   target_compile_definitions(
@@ -144,45 +144,13 @@ if(TARGET mln_ffi_platform_dependencies)
   endif()
 endif()
 
-# The browser runs the harness as a page, in the native suite's shell, with the
-# fixtures embedded at /fixtures. main() runs on a worker, where blocking is
-# legal.
-set(browser false)
-set(fixture_argument "")
-if(EMSCRIPTEN)
-  set(browser true)
-  # A change to an embedded file, such as the style, links the harness again.
-  file(GLOB_RECURSE embedded_fixtures "${MLN_BENCH_FIXTURE_DIR}/*")
-  set_property(
-    TARGET mln_ffi_bench
-    APPEND
-    PROPERTY LINK_DEPENDS ${embedded_fixtures})
-  set_target_properties(mln_ffi_bench PROPERTIES SUFFIX ".html")
-  target_link_options(
-    mln_ffi_bench
-    PRIVATE
-      "-sENVIRONMENT=web,worker"
-      "-sPROXY_TO_PTHREAD"
-      "-sOFFSCREENCANVAS_SUPPORT=1"
-      "-sEXPORTED_RUNTIME_METHODS=GL,ENV"
-      "-sALLOW_MEMORY_GROWTH=1"
-      "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/tests/native/support/browser_shell.html"
-      "-sEXIT_RUNTIME=1"
-      "SHELL:--embed-file ${MLN_BENCH_FIXTURE_DIR}@/fixtures")
-  # Like the native suites, the harness stands in for a WebGPU host that waits
-  # in place for its device and buffer maps, so it suspends through JSPI.
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
-    target_link_options(mln_ffi_bench PRIVATE "-sJSPI")
-  endif()
-  set(fixture_argument "/fixtures")
-endif()
-
 # How the bench task runs the harness: the environment that the native suites
-# get, and whether it runs in a browser.
+# get.
 set(environment)
 set(modifications)
-if(COMMAND mln_native_test_environment AND TARGET mln_ffi_render_dependencies)
-  mln_native_test_environment(environment modifications)
+if(COMMAND mln_native_test_environment
+   AND TARGET mln_ffi_render_dependencies_${bench_backend})
+  mln_native_test_environment(environment modifications ${bench_backend})
 endif()
 list(FILTER environment EXCLUDE REGEX "^MLN_FFI_TEST_FIXTURE_DIR=")
 set(environment_json "")
@@ -200,9 +168,7 @@ file(
   CONTENT
     "{
   \"executable\": \"$<TARGET_FILE:mln_ffi_bench>\",
-  \"browser\": ${browser},
-  \"render_backend\": \"${MLN_FFI_RENDER_BACKEND}\",
-  \"fixture_argument\": \"${fixture_argument}\",
+  \"render_backend\": \"${bench_backend}\",
   \"environment\": [${environment_json}]
 }
 ")

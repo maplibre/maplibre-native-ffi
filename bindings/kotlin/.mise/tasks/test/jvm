@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-#MISE description="Run the Kotlin/JVM suite against a native preset's install."
-#MISE extends="ffi:preset"
+#MISE description="Run the Kotlin/JVM suite against a native preset's install, with one of its render backends."
+#MISE extends="ffi:test"
 #MISE dir="../.."
 #MISE shell="bash"
 set -euo pipefail
 
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 case "$usage_preset" in
-  macos-x64-*)
+  macos-x64)
     MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
       MISE_ARCH=x64 MISE_NO_HOOKS=1 exec mise -C bindings/kotlin exec --no-deps java -- \
       ../../gradlew -Pmaplibre.localBuild="build/$usage_preset/install" :bindings:kotlin:jvmTest
     ;;
-  linux-musl-* | freebsd-* | linux-*-riscv64-*)
+  linux-musl-* | freebsd-* | linux-*-riscv64)
     # Gradle stages the classpath on the host; the target JVM runs it.
     ./gradlew :bindings:kotlin:jvmDeviceTestClasspath
     install="$PWD/build/$usage_preset/install"
@@ -25,7 +26,7 @@ case "$usage_preset" in
     fi
     java=java
     case "$usage_preset" in
-      linux-*-riscv64-*)
+      linux-*-riscv64)
         libc=${usage_preset#linux-}
         architecture=${libc#*-}
         root=$(tools/devices/linux-root "${libc%%-*}" "${architecture%%-*}")

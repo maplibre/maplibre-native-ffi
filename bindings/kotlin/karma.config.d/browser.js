@@ -1,9 +1,9 @@
-// The wasm suite's page: cross-origin isolated, so the browser module's
-// threads can share its memory, with the module served beside the tests.
+// The wasm suite's page, with the browser package served beside the tests.
 //
-// mise run //bindings/kotlin:test:wasm passes the module's directory through
-// MLN_KOTLIN_WASM_MODULE_DIR, its render backend through
-// MLN_KOTLIN_WASM_RENDER_BACKEND, and the browser through CHROME_BIN.
+// mise run //bindings/kotlin:test:wasm passes the directory of the package and
+// the runtime's module object through MLN_KOTLIN_WASM_MODULE_DIR, the
+// package's render backend through MLN_KOTLIN_WASM_RENDER_BACKEND, and the
+// browser through CHROME_BIN.
 const moduleDir = process.env.MLN_KOTLIN_WASM_MODULE_DIR;
 if (!moduleDir) {
   throw new Error(
@@ -11,18 +11,25 @@ if (!moduleDir) {
   );
 }
 
-config.customHeaders = [
-  { match: ".*", name: "Cross-Origin-Opener-Policy", value: "same-origin" },
-  { match: ".*", name: "Cross-Origin-Embedder-Policy", value: "require-corp" },
-];
-// The suite bundles its fixture-bearing engine through the same import as a published runtime.
+// The package loads its tile worker script and shaper module by URLs relative
+// to its own, so Karma serves it as files rather than webpack bundling it. The
+// suite imports the runtime through test-runtime.mjs, which loads the served
+// package, under the same name as a published runtime.
+config.files = (config.files || []).concat({
+  pattern: `${moduleDir}/**/*`,
+  included: false,
+  served: true,
+  watched: false,
+  nocache: true,
+});
+config.mime = Object.assign({}, config.mime, { "application/wasm": ["wasm"] });
 config.webpack = {
   ...config.webpack,
   resolve: {
     ...config.webpack?.resolve,
     alias: {
       ...config.webpack?.resolve?.alias,
-      "@maplibre/native-ffi-runtime$": `${moduleDir}/maplibre-native-kotlin-test.mjs`,
+      "@maplibre/native-ffi-runtime$": `${moduleDir}/test-runtime.mjs`,
     },
   },
 };
@@ -39,8 +46,8 @@ config.client.mocha = Object.assign({}, config.client.mocha, {
 config.browserNoActivityTimeout = 120000;
 
 // Headless Chromium renders through SwiftShader where the host has no GPU it
-// can use, with the flags that scripts/run-browser-test.mjs passes the native
-// suite for the module's backend, which MLN_KOTLIN_WASM_RENDER_BACKEND names.
+// can use, with the flags that the package's backend needs there, which
+// MLN_KOTLIN_WASM_RENDER_BACKEND names.
 // requestCollection calls globalThis.gc, which --expose-gc defines.
 const renderBackend = process.env.MLN_KOTLIN_WASM_RENDER_BACKEND;
 const backendFlags = {
@@ -63,11 +70,20 @@ if (!backendFlags) {
     `MLN_KOTLIN_WASM_RENDER_BACKEND names no known backend: ${renderBackend}`,
   );
 }
+// ChromeHeadless adds --disable-gpu, under which Chromium can't back a WebGPU
+// canvas: its first present loses the device. The launcher is Chrome with
+// ChromeHeadless's other flags.
 config.browsers = ["ChromeHeadlessMaplibre"];
 config.customLaunchers = Object.assign({}, config.customLaunchers, {
   ChromeHeadlessMaplibre: {
-    base: "ChromeHeadless",
-    flags: [...backendFlags, "--js-flags=--expose-gc"],
+    base: "Chrome",
+    flags: [
+      "--headless",
+      "--disable-dev-shm-usage",
+      "--remote-debugging-port=9222",
+      ...backendFlags,
+      "--js-flags=--expose-gc",
+    ],
   },
 });
 

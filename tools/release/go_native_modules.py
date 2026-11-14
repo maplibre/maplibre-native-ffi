@@ -28,7 +28,7 @@ import zipfile
 from release_version import parse_tag, parse_version
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
-from tools.ci import gaps
+from tools.ci import gaps, plan
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PRESETS = pathlib.Path("bindings/go/presets.json")
@@ -41,7 +41,6 @@ ARCHIVE_SUFFIX = ".tar.gz"
 # names them.
 ARCHIVES = {
     "-lmaplibre-native-c": "libmaplibre-native-c.a",
-    "-lmln_ffi_platform": "libmln_ffi_platform.a",
 }
 DESCRIPTOR = "share/maplibre-native-c/artifact.json"
 PKG_CONFIG = "share/pkgconfig/maplibre-native-c.pc"
@@ -91,7 +90,8 @@ def presets(root: pathlib.Path = ROOT) -> list[str]:
 
 def constraint(preset: str) -> str:
     """The build constraint for the platform that the preset targets."""
-    target = gaps.target_from_name(preset)
+    native = plan.target_named(preset)
+    target = gaps.cell(native, native.default_backend)
     return f"{GOOS[target.platform]} && {GOARCH[target.arch]}"
 
 

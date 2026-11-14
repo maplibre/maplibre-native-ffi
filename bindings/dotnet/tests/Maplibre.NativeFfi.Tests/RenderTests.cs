@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Xunit;
 
@@ -29,6 +30,65 @@ public sealed class RenderTests
                 }
             }
         });
+    }
+
+    // A custom layer's callbacks run on the thread that runs the session's graphics work, here the
+    // fixture's, with the render pass of the session's backend. The session deinitializes the
+    // layer once the layer leaves the style.
+    [Theory]
+    [MemberData(nameof(Backends))]
+    public void ACustomLayerDrawsInTheSessionsPassUntilItLeavesTheStyle(TestGraphicsBackend backend)
+    {
+        RenderFixture.Run(
+            backend,
+            fixture =>
+            {
+                var passes = new List<CustomLayerRenderParameters.PassValue>();
+                var deinitialized = 0;
+                var host = new CustomLayerHost(
+                    Prerender: null,
+                    Render: parameters => passes.Add(parameters.Pass),
+                    Deinitialize: () => deinitialized++,
+                    ContextLost: null
+                );
+                fixture.Await(fixture.Session.Ready, "the session to be ready");
+
+                var added = fixture.Await(
+                    fixture.Map.AddCustomLayerAsync("custom", null, host),
+                    "the custom layer"
+                );
+                RenderUpdate(fixture, added);
+                Assert.NotEmpty(passes);
+                var expected = backend switch
+                {
+                    TestGraphicsBackend.Metal =>
+                        typeof(CustomLayerRenderParameters.PassValue.Metal),
+                    TestGraphicsBackend.Vulkan =>
+                        typeof(CustomLayerRenderParameters.PassValue.Vulkan),
+                    _ => typeof(CustomLayerRenderParameters.PassValue.OpenGl),
+                };
+                Assert.All(passes, pass => Assert.IsType(expected, pass));
+                Assert.Equal(0, deinitialized);
+
+                var removed = fixture.Await(
+                    fixture.Map.RemoveStyleLayerAsync("custom"),
+                    "the layer's removal"
+                );
+                RenderUpdate(fixture, removed);
+                Assert.Equal(1, deinitialized);
+            }
+        );
+    }
+
+    // Renders frames until one shows the change that the completion reports.
+    private static void RenderUpdate(RenderFixture fixture, CommandCompletion completion)
+    {
+        var elapsed = Stopwatch.StartNew();
+        while (fixture.RenderFrame().MapUpdateGeneration < completion.RenderUpdateGeneration)
+        {
+            if (elapsed.Elapsed > TestWaits.Deadline)
+                throw new TimeoutException("Timed out waiting for a frame with the change.");
+        }
     }
 
     [Theory]
@@ -216,7 +276,21 @@ public sealed class RenderTests
     {
         var scope = new NativeViewScope();
         var frame = new VulkanTextureFrameView(
-            new VulkanTextureFrame(2, 3, 4, 6, 7, 8, NativePointer.FromBorrowedAddress(9), 10, 11),
+            new VulkanTextureFrame(
+                2,
+                3,
+                4,
+                6,
+                7,
+                8,
+                NativePointer.FromBorrowedAddress(9),
+                10,
+                11,
+                12,
+                13,
+                14,
+                15
+            ),
             scope
         );
         Assert.Equal(7ul, frame.Image);

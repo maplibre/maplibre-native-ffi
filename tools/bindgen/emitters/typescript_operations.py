@@ -466,8 +466,6 @@ def lower_function(
             return lower_consuming(call, values, natives)
         case "release_async":
             return lower_release_async(call, values, natives)
-        case "thread_start":
-            return lower_thread_start(call, values.bound)
         case "attach":
             return lower_attach(call, values, natives)
         case "command":
@@ -493,11 +491,6 @@ def lower_consuming(call: Call, values: Values, natives: NativeValues) -> Lowere
     """A release, a discard, or an answer: an immediate call that consumes its
     receiver and returns nothing."""
     lowered = call.lowered
-    if lowered.plan.blocks:
-        # Only a call without a receiver waits on a thread of its own.
-        raise Unsupported(
-            f"blocks={lowered.plan.blocks} takes no receiver or registration and returns one owner"
-        )
     publish(call, values, natives, invoke(call, values))
     # An answer that consumes its receiver is no release, so no disposer runs
     # it and a repeated one reaches native.
@@ -788,113 +781,7 @@ def publish(
             lowered.returns += " | undefined"
 
 
-def lower_thread_start(call: Call, bound: BoundApi) -> Lowered:
-    """A call that waits for a thread to start, which runs on a thread of its own.
-
-    A thread that a browser page starts runs only after the page yields, so
-    the page cannot wait for one. The export copies the converted arguments,
-    with the call memory that they point into, and returns at once; the call's
-    thread creates the owner and settles the Promise through the realm. An
-    absent nullable argument copies only its absence.
-    """
-    lowered = call.lowered
-    plan = lowered.plan
-    function = plan.function
-    owned = lowered.owned
-    if (
-        lowered.owner
-        or plan.completion
-        or plan.registrations
-        or plan.absence
-        or not plan.status
-        or not function.diagnostic
-        or not owned
-        or len(plan.outputs) != 1
-    ):
-        raise Unsupported(
-            f"blocks={plan.blocks} takes no receiver or registration and returns one owner"
-        )
-    types = {}
-    for declaration in lowered.c_locals:
-        match = re.fullmatch(r"(.+?) (\w+)(?: = .*)?;", declaration)
-        if match:
-            types[match.group(2)] = match.group(1)
-    output = f"&arg_{owned.parameter}"
-    members, present, run_arguments = [], [], []
-    for argument in call.args:
-        name = argument.removeprefix("&")
-        nullable = re.fullmatch(r"present_(\w+)", argument)
-        if argument == output:
-            run_arguments.append("&handle")
-        elif re.fullmatch(r"arg_\w+", name) and name in types:
-            members.append(name)
-            run_arguments.append(argument.replace(name, f"arguments->{name}"))
-        elif nullable and argument in types and f"arg_{nullable[1]}" in types:
-            value = f"arg_{nullable[1]}"
-            present.append((argument, value))
-            run_arguments.append(f"arguments->{argument} ? &arguments->{value} : NULL")
-        else:
-            raise Unsupported(f"blocks={plan.blocks} copies only converted arguments")
-    name = plan.name
-    structure = f"mln_ts_{name}_arguments"
-    native = owned.handle.native
-    assert owned.handle.cleanup is not None
-    cleanup = bound.source.functions_by_name[owned.handle.cleanup]
-    # A dispose takes the handle, then null for a diagnostic, which
-    # simple_disposer() allows.
-    extra = len(cleanup.parameters) - 1 + bool(cleanup.diagnostic)
-    dispose = ", ".join([f"({native})handle", *["NULL"] * extra])
-    fields = "".join(f"  {types[member]} {member};\n" for member in members) + "".join(
-        f"  {types[value]} {value};\n  bool {argument};\n"
-        for argument, value in present
-    )
-    lowered.c_helpers = (
-        f"typedef struct {structure} {{\n{fields}}} {structure};\n\n"
-        f"static mln_status mln_ts_run_{name}(\n"
-        "  const void* data, uint64_t* out_handle, mln_diagnostic* diagnostic\n) {\n"
-        f"  const {structure}* arguments = data;\n"
-        f"  {native} handle = MLN_HANDLE_NULL;\n"
-        f"  mln_status status = {function.name}({', '.join([*run_arguments, 'diagnostic'])});\n"
-        "  *out_handle = (uint64_t)handle;\n"
-        "  return status;\n}\n\n"
-        f"static void mln_ts_dispose_{name}(uint64_t handle) {{\n"
-        f"  {cleanup.name}({dispose});\n}}\n"
-    )
-    # The thread writes the handle, so the export keeps no output.
-    lowered.c_locals = [
-        declaration
-        for declaration in lowered.c_locals
-        if not declaration.startswith(f"{native} {output.removeprefix('&')} ")
-    ]
-    lowered.c_locals.append(f"{structure} arguments;")
-    lowered.c_body += [
-        *[f"arguments.{member} = {member};" for member in members],
-        *[
-            line
-            for argument, value in present
-            for line in (
-                f"arguments.{argument} = {argument} != NULL;",
-                f"if ({argument}) arguments.{value} = {value};",
-            )
-        ],
-        (
-            f"mln_ts_start_thread(call, call->argv[{call.index}], mln_ts_run_{name}, "
-            f"mln_ts_dispose_{name}, &arguments, sizeof arguments);"
-        ),
-    ]
-    lowered.native_parameters.append(NativeParameter("start", "NativeThreadStart"))
-    lowered.shape = "thread_start"
-    lowered.returns = f"Promise<{owner_class(owned.handle)}>"
-    return lowered
-
-
 HEADER = "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-# What a call that waits for a thread to start does in TypeScript, in place of
-# the C notes on blocking.
-THREAD_START_NOTE = (
-    "Resolves once the call completes, so a browser page, which cannot block, "
-    "can call it."
-)
 
 
 def signature(entry: Lowered) -> str:
@@ -979,12 +866,6 @@ def method_body(bound, values, entry: Lowered, discard=False) -> list[str]:
         lines = [
             f"return attach({start}, (handle, ready) => {construct(bound, entry, entry.owned, 'handle')});",
         ]
-    elif shape == "thread_start":
-        arguments = ", ".join([*entry.arguments, "start"])
-        adopted = construct(bound, entry, entry.owned, "handle")
-        lines = [
-            f"return threadStart((start) => native.{entry.plan.name}({arguments}), (handle) => {adopted});"
-        ]
     elif shape == "owned":
         lines = [f"const handle = {call};"]
         adopted = construct(bound, entry, entry.owned, "handle")
@@ -1032,8 +913,7 @@ def render_method(bound, values, entry: Lowered, indent: str) -> str:
     head = (
         "static " if entry.plan.factory else "" if entry.owner else "export function "
     )
-    notes = (THREAD_START_NOTE,) if entry.shape == "thread_start" else ()
-    text = doc(bound, entry.plan.name, indent, notes)
+    text = doc(bound, entry.plan.name, indent)
     generic = "<T>" if entry.shape == "view" else ""
     text += f"{indent}{head}{entry.method}{generic}({signature(entry)}): {entry.returns} {{\n"
     text += "".join(f"{indent}  {line}\n" for line in body)
@@ -1334,7 +1214,6 @@ def runtime_imports(text: str) -> str:
             "query",
             "run",
             "submitRun",
-            "threadStart",
         ],
         "./internal/owners.ts": [
             "ADOPT",
@@ -1404,7 +1283,7 @@ def render_operations(
     interface_text = "".join(interface)
     runtime_types = [
         name
-        for name in ("NativeCompletion", "NativeThreadStart")
+        for name in ("NativeCompletion",)
         if re.search(rf"\b{name}\b", interface_text)
     ]
     native = (

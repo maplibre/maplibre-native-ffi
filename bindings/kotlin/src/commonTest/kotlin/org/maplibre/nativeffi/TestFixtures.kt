@@ -126,7 +126,7 @@ private constructor(val runtime: RuntimeHandle, private val events: Channel<Runt
       block: suspend RuntimeFixture.() -> T,
     ): T {
       val events = Channel<RuntimeEvent>(Channel.UNLIMITED)
-      val runtime = RuntimeHandle.create(options).awaitWithin("the runtime")
+      val runtime = RuntimeHandle.create(options)
       val fixture = RuntimeFixture(runtime, events)
       return runThenRelease(listOf(runtime)) {
         runtime

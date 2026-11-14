@@ -25,15 +25,15 @@ runs:
         }
 
         if ($env:RUNNER_ARCH -eq "ARM64") {
-          $mesaVersion = "26.1.3"
+          $mesaVersion = "26.2.6"
           $archiveName = "mesa-lavapipe-arm64-$mesaVersion.7z"
-          $expectedHash = "371EF5E595A0A3D7FF1965E336F98314EB2C7787FCB7953BC700DFCCC72DB457"
+          $expectedHash = "B6FDAA1F8E96C90C5D90B07F25C93FE85D1B09AF752CC190DFF0EFFF781CE89D"
           $mesaUrl = "https://github.com/mmozeiko/build-mesa/releases/download/$mesaVersion/$archiveName"
           $manifestName = "lvp_icd.aarch64.json"
         } else {
-          $mesaVersion = "26.1.3"
+          $mesaVersion = "26.2.6"
           $archiveName = "mesa3d-$mesaVersion-release-msvc.7z"
-          $expectedHash = "6DD431F4620CEA73970B13E3FFA94F721F2A3924306B8A4283C97648CDB6EB9C"
+          $expectedHash = "B2E00615FEABA45942343C265CC8C5F576142CA682C1AC6661922D4B72492877"
           $mesaUrl = "https://github.com/pal1000/mesa-dist-win/releases/download/$mesaVersion/$archiveName"
           $manifestName = "lvp_icd.x86_64.json"
         }

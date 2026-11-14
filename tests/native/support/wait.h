@@ -44,11 +44,9 @@ bool mln_test_await(
   const char* what
 );
 
-// mln_test_await() for a wait that the calling thread's browser event loop must
-// run through: a WebGPU buffer map finishes there, on the thread that issued
-// it. On browser WebGPU the thread suspends through JSPI between checks, so
-// the caller must be the thread's own code, never a callback that the event
-// loop runs, where the suspension throws. Elsewhere this is mln_test_await().
+// mln_test_await() for a wait that a browser host's event loop would run
+// through, such as a WebGPU buffer map. The suite runs natively, where this is
+// mln_test_await().
 bool mln_test_await_on_event_loop(
   bool (*ready)(void* context), void* context, mln_test_deadline deadline,
   const char* what
@@ -79,11 +77,19 @@ void mln_test_gate_init(mln_test_gate* gate);
 void mln_test_gate_park(mln_test_gate* gate);
 bool mln_test_gate_wait_entered(mln_test_gate* gate);
 void mln_test_gate_release(mln_test_gate* gate);
-// A completion that parks the thread that delivers it on `gate`. That is the
-// submitting thread when the work finishes before the submission returns, so
-// the completion cannot be relied on to park a library worker. The gate must
-// outlive the delivery.
-mln_completion mln_test_gate_completion(mln_test_gate* gate);
+// Sends work that a library worker completes, through `submit`.
+typedef mln_status (*mln_test_gate_submit)(
+  void* context, const mln_completion* completion
+);
+// Parks the library worker that completes the work `submit` sends on `gate`.
+// The completion can run on the submitting thread when the work finishes
+// before the submission returns, and that thread doesn't park, so the work is
+// sent again until a worker parks: it must be safe to repeat. Returns false
+// when a submission fails, or when no worker parks by the default deadline.
+// The gate must outlive the delivery.
+bool mln_test_gate_park_worker(
+  mln_test_gate* gate, mln_test_gate_submit submit, void* context
+);
 
 // Records one completion delivery and its release for a test to inspect.
 typedef struct mln_test_completion {

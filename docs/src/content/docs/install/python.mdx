@@ -8,33 +8,20 @@ sidebar:
 
 ## Install
 
-Install the binding and one runtime from
+Install the binding and its runtime from
 [PyPI](https://pypi.org/project/maplibre-native-ffi/). It needs Python 3.12 or
-later. The runtime holds the native library for your
-[backend](/maplibre-native-ffi/install/#choose-a-backend):
-`maplibre-native-ffi-runtime-opengl`, `-metal`, or `-vulkan`. Importing the
-binding fails unless exactly one runtime is installed.
+later. The runtime holds the native library, with every
+[backend](/maplibre-native-ffi/install/#choose-a-backend) of your platform.
+Importing the binding fails unless exactly one runtime is installed.
 
 ```bash frame="terminal"
-pip install maplibre-native-ffi maplibre-native-ffi-runtime-vulkan
-```
-
-To choose the runtime by platform, give each one an environment marker:
-
-```toml title="pyproject.toml"
-[project]
-dependencies = [
-  "maplibre-native-ffi",
-  "maplibre-native-ffi-runtime-metal; sys_platform == 'darwin'",
-  "maplibre-native-ffi-runtime-opengl; sys_platform != 'darwin'",
-]
+pip install maplibre-native-ffi maplibre-native-ffi-runtime
 ```
 
 ## Windows with MinGW
 
-The runtimes above use MSVC on Windows. For MinGW, install
-`maplibre-native-ffi-runtime-opengl-mingw` or
-`maplibre-native-ffi-runtime-vulkan-mingw` instead.
+The runtime above uses MSVC on Windows. For MinGW, install
+`maplibre-native-ffi-runtime-mingw` instead.
 
 ## Android
 

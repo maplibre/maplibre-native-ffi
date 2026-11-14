@@ -56,7 +56,7 @@ test(
     await released[Symbol.asyncDispose]();
     released[Symbol.dispose]();
 
-    const disposed = await RuntimeHandle.create();
+    const disposed = RuntimeHandle.create();
     disposed.dispose();
     await disposed[Symbol.asyncDispose]();
     await disposed[Symbol.asyncDispose]();
@@ -105,7 +105,7 @@ test("a handle names its id and whether it is closed", async () => {
     `MapProjectionHandle(id=${projectionId}, closed=true)`,
   );
 
-  const runtime = await RuntimeHandle.create();
+  const runtime = RuntimeHandle.create();
   const runtimeId = `0x${runtime.id.toString(16)}`;
   assert.equal(runtime.isClosed, false);
   assert.equal(String(runtime), `RuntimeHandle(id=${runtimeId}, closed=false)`);
@@ -117,7 +117,7 @@ test("a handle names its id and whether it is closed", async () => {
 });
 
 test("a refused release leaves the handle usable for a later release", async () => {
-  const runtime = await RuntimeHandle.create();
+  const runtime = RuntimeHandle.create();
   const map = runtime.createMap(mapOptions);
   await bounded(map.ready, "map creation");
 
@@ -145,7 +145,7 @@ test("a handle id names its events and outlives its release", async () => {
 
 /** Creates a runtime and a map on it, and keeps only the map. */
 async function mapWithoutItsRuntime() {
-  const runtime = await RuntimeHandle.create();
+  const runtime = RuntimeHandle.create();
   const map = runtime.createMap(mapOptions);
   await bounded(map.ready, "map creation");
   return { map, runtime: new WeakRef(runtime) };

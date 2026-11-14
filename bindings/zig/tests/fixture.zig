@@ -302,6 +302,14 @@ else if (supports_egl)
 else
     test_graphics.MLN_TEST_GRAPHICS_BACKEND_WGL;
 
+/// The backend under test, which the build selects with `-Dbackend`.
+const render_backend: maplibre.RenderBackend = if (build_options.supports_metal)
+    .metal
+else if (build_options.supports_vulkan)
+    .vulkan
+else
+    .open_gl;
+
 pub const Graphics = struct {
     handle: *test_graphics.mln_test_graphics,
     context: test_graphics.mln_test_graphics_context,
@@ -328,16 +336,25 @@ pub const Graphics = struct {
     }
 
     fn openGlContext(self: *const Graphics) maplibre.OpenGlContextDescriptor {
-        if (supports_egl) return .{ .data = .{ .egl = .{
+        if (supports_egl) return .{ .egl = .{
             .display = self.context.egl_display,
             .config = self.context.egl_config,
             .share_context = self.context.egl_context,
-        } } };
-        return .{ .data = .{ .wgl = .{
+            .get_proc_address = self.context.get_proc_address,
+        } };
+        return .{ .wgl = .{
             .device_context = self.context.wgl_device_context,
             .share_context = self.context.wgl_context,
             .get_proc_address = self.context.get_proc_address,
-        } } };
+        } };
+    }
+
+    /// Wraps the graphics object's device, or its OpenGL context, in a GPU
+    /// device for the sessions that render into its textures.
+    fn wrapDevice(self: *const Graphics) !maplibre.GpuDevice {
+        if (build_options.supports_metal) return maplibre.GpuDevice.wrapMetal(.{ .device = self.context.metal_device }, null);
+        if (build_options.supports_vulkan) return maplibre.GpuDevice.wrapVulkan(testing.allocator, .{ .context = self.vulkanContext() }, null);
+        return maplibre.GpuDevice.wrapOpenGl(self.openGlContext(), null);
     }
 
     fn vulkanContext(self: *const Graphics) maplibre.VulkanContextDescriptor {
@@ -380,11 +397,14 @@ else
     maplibre.OpenGlBorrowedTexture;
 
 /// A render session on a fixture's map, with the wakes that its waits block
-/// on. An offscreen session renders on a device of its own. A borrowed
-/// session renders into a ring of textures from tests/graphics.
+/// on. An offscreen session renders on a device of its own, of the backend
+/// under test, which a library of several backends would not pick by default.
+/// A borrowed session renders into a ring of textures from tests/graphics, on
+/// a device that wraps the graphics object's.
 pub const TextureSession = struct {
     wakes: Signal = .{},
     graphics: ?Graphics = null,
+    device: ?maplibre.GpuDevice = null,
     textures: [ring_depth]?*test_graphics.mln_test_graphics_texture = @splat(null),
     session: maplibre.RenderSession = undefined,
     caller_driven: bool = false,
@@ -403,8 +423,9 @@ pub const TextureSession = struct {
     pub fn attachOffscreen(map: maplibre.Map, extent: maplibre.LogicalExtent) !*TextureSession {
         const self = try testing.allocator.create(TextureSession);
         errdefer testing.allocator.destroy(self);
-        self.* = .{};
-        const attachment = try map.attachOffscreen(.{ .logical_size = logicalSize(extent) }, self.attachOptions(.core_worker), null, null);
+        self.* = .{ .device = try maplibre.GpuDevice.create(.{ .backend = render_backend }, null) };
+        errdefer self.destroyGraphics();
+        const attachment = try map.attach(testing.allocator, .{ .offscreen = .{ .logical_size = logicalSize(extent) } }, self.device, self.attachOptions(.core_worker), null);
         self.session = attachment.session;
         errdefer self.release();
         try self.resolve(attachment.ready);
@@ -434,33 +455,32 @@ pub const TextureSession = struct {
             else
                 .{ .texture = info.opengl_texture };
         }
-        const options = self.attachOptions(driver);
-        const attachment = if (build_options.supports_metal)
-            try map.attachMetalBorrowedTexture(testing.allocator, .{
+        self.device = try graphics.wrapDevice();
+        const target: maplibre.RenderTarget = if (build_options.supports_metal)
+            .{ .metal_borrowed_textures = .{
                 .logical_size = logicalSize(extent),
                 .physical_width = info.width,
                 .physical_height = info.height,
                 .textures = &entries,
-            }, options, null)
+            } }
         else if (build_options.supports_vulkan)
-            try map.attachVulkanBorrowedTexture(testing.allocator, .{
+            .{ .vulkan_borrowed_textures = .{
                 .logical_size = logicalSize(extent),
                 .physical_width = info.width,
                 .physical_height = info.height,
-                .context = graphics.vulkanContext(),
                 .textures = &entries,
                 .format = info.format,
                 .final_layout = info.vulkan_final_layout,
-            }, options, null)
+            } }
         else
-            try map.attachOpenGlBorrowedTexture(testing.allocator, .{
+            .{ .open_gl_borrowed_textures = .{
                 .logical_size = logicalSize(extent),
                 .physical_width = info.width,
                 .physical_height = info.height,
-                .context = graphics.openGlContext(),
                 .textures = &entries,
                 .target = info.opengl_target,
-            }, options, null);
+            } };
+        const attachment = try map.attach(testing.allocator, target, self.device, self.attachOptions(driver), null);
         self.session = attachment.session;
         errdefer self.release();
         try self.resolve(attachment.ready);
@@ -495,6 +515,8 @@ pub const TextureSession = struct {
     }
 
     fn destroyGraphics(self: *TextureSession) void {
+        if (self.device) |*device| device.release();
+        self.device = null;
         for (&self.textures) |*texture| {
             test_graphics.mln_test_graphics_texture_destroy(texture.*);
             texture.* = null;

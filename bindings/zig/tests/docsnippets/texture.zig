@@ -4,9 +4,9 @@
 const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
-// Targets without Vulkan, such as Mac Catalyst, have no Vulkan attach methods.
+// Targets without Vulkan, such as Mac Catalyst, can't wrap a Vulkan device.
 comptime {
-    if (@TypeOf(maplibre.Map.attachVulkanBorrowedTexture) != void) _ = &renderToTexture;
+    if (@TypeOf(maplibre.GpuDevice.wrapVulkan) != void) _ = &renderToTexture;
 }
 
 var session: maplibre.RenderSession = undefined;
@@ -53,35 +53,40 @@ fn renderToTexture(
     const options = maplibre.RenderSessionAttachOptions{
         .driver = .core_worker,
         .frame_wake = .{ .callback = onFrameWake },
-        // Only if your renderer also submits to the graphics queue.
-        .queue_lock = .{ .lock = lockQueue, .unlock = unlockQueue },
     };
     // #endregion attach-options
 
     // #region attach-borrowed
+    // Your VkDevice and graphics queue.
+    var device = try maplibre.GpuDevice.wrapVulkan(allocator, .{
+        .context = vulkan,
+        // Only if your renderer also submits to the graphics queue.
+        .queue_lock = .{ .lock = lockQueue, .unlock = unlockQueue },
+        // The device extensions that you enabled on your VkDevice.
+        .enabled_extensions = &.{ "VK_KHR_swapchain", "VK_KHR_external_semaphore_fd" },
+    }, null);
+    // The session keeps the device until it detaches.
+    defer device.release();
+
     // Your VkImage and VkImageView for each texture of the ring.
     const textures = [_]maplibre.VulkanBorrowedTexture{
         .{ .image = images[0], .image_view = views[0] },
         .{ .image = images[1], .image_view = views[1] },
     };
-    const ring = maplibre.VulkanBorrowedTextureDescriptor{
-        // The map's size in logical pixels.
-        .logical_size = .{ .width = 800, .height = 600 },
-        // The size of your textures in device pixels.
-        .physical_width = 1600,
-        .physical_height = 1200,
-        .context = vulkan,
-        .textures = &textures,
-        .format = 37, // VK_FORMAT_R8G8B8A8_UNORM
-        .final_layout = 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    const ring = maplibre.RenderTarget{
+        .vulkan_borrowed_textures = .{
+            // The map's size in logical pixels.
+            .logical_size = .{ .width = 800, .height = 600 },
+            // The size of your textures in device pixels.
+            .physical_width = 1600,
+            .physical_height = 1200,
+            .textures = &textures,
+            .format = 37, // VK_FORMAT_R8G8B8A8_UNORM
+            .final_layout = 5, // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        },
     };
 
-    const borrowed = try map.attachVulkanBorrowedTexture(
-        allocator,
-        ring,
-        options,
-        null,
-    );
+    const borrowed = try map.attach(allocator, ring, device, options, null);
     session = borrowed.session;
     try borrowed.ready.await(null);
     // #endregion attach-borrowed
@@ -94,18 +99,16 @@ fn renderToTexture(
         .{ .image = new_images[0], .image_view = new_views[0] },
         .{ .image = new_images[1], .image_view = new_views[1] },
     };
-    const resized = maplibre.VulkanBorrowedTextureReplacement{
+    const resized = maplibre.RenderTarget{ .vulkan_borrowed_textures = .{
         .logical_size = .{ .width = 1024, .height = 768 },
         .physical_width = 2048,
         .physical_height = 1536,
         .textures = &new_textures,
-    };
+        .format = 37,
+        .final_layout = 5,
+    } };
 
-    const replaced = try session.setVulkanBorrowedTextureTarget(
-        allocator,
-        resized,
-        null,
-    );
+    const replaced = try session.setTarget(allocator, resized, null);
     try replaced.await(null);
 
     // vkDestroyImageView and vkDestroyImage

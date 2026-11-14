@@ -1,0 +1,49 @@
+# The TypeScript binding's browser module: the binding's Node-API C
+# (bindings/typescript/native), compiled for wasm32-unknown-unknown and linked
+# with mln-rs's C library and the Node-API that src/napi.rs implements over
+# wasm-bindgen. wasm-bindgen makes one package of it per render backend
+# (native/web.cmake).
+[package]
+name = "maplibre-native-ffi-typescript-web"
+version = "0.0.0"
+edition = "2024"
+license = "BSD-2-Clause"
+repository = "https://github.com/maplibre/maplibre-native-ffi"
+publish = false
+
+[lib]
+# The package's files are maplibre_native_ffi.js and maplibre_native_ffi_bg.wasm.
+name = "maplibre_native_ffi"
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+# One render backend per module, as mln-rs's own browser package has.
+[features]
+webgpu = ["mln-rs-c/webgpu"]
+gl = ["mln-rs-c/gl"]
+# The browser suite's module: the addon's exports gain `testGraphics`, the
+# native probe of test/support/native_probe.c.
+test = []
+
+[dependencies]
+js-sys = "0.3.107"
+mln-rs-c = { path = "../../../third_party/mln-rs/crates/mln_c", default-features = false }
+mln-rs-web-host = { path = "../../../third_party/mln-rs/crates/mln_web_host" }
+# The version that mln-rs locks, which .config/mise.web.toml's wasm-bindgen
+# matches.
+wasm-bindgen = "=0.2.130"
+
+[build-dependencies]
+cc = "1.11.1"
+
+# mln-rs's release profile, which `just c-web` builds the library's own
+# browser package with.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = "s"
+
+# Its own workspace, with a lockfile that follows mln-rs's, rather than a
+# member of the repository's.
+[workspace]

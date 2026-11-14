@@ -27,6 +27,8 @@ internal expect object C {
 
   fun mln_acquired_frame_get_metal_texture(frame: Long, outFrame: Long, outDiagnostic: Long): Int
 
+  fun mln_acquired_frame_get_opaque_fd(frame: Long, outFrame: Long, outDiagnostic: Long): Int
+
   fun mln_acquired_frame_get_open_gl_texture(frame: Long, outFrame: Long, outDiagnostic: Long): Int
 
   fun mln_acquired_frame_get_producer_sync(frame: Long, outSync: Long, outDiagnostic: Long): Int
@@ -43,11 +45,7 @@ internal expect object C {
 
   fun mln_acquired_frame_view_end(scope: Long): Unit
 
-  fun mln_android_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int
-
   fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int
-
-  fun mln_apple_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int
 
   fun mln_c_version(): Int
 
@@ -59,7 +57,27 @@ internal expect object C {
 
   fun mln_delivery_queue_release(queue: Long): Unit
 
+  fun mln_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int
+
   fun mln_frame_pacer_release(pacer: Long): Unit
+
+  fun mln_frame_pacer_set_options(pacer: Long, options: Long, outDiagnostic: Long): Int
+
+  fun mln_gpu_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int
+
+  fun mln_gpu_device_get_capabilities(device: Long, outCapabilities: Long, outDiagnostic: Long): Int
+
+  fun mln_gpu_device_get_vulkan_context(device: Long, outResult: Long, outDiagnostic: Long): Int
+
+  fun mln_gpu_device_release(device: Long): Unit
+
+  fun mln_gpu_device_wrap_metal(descriptor: Long, outDevice: Long, outDiagnostic: Long): Int
+
+  fun mln_gpu_device_wrap_open_gl(context: Long, outDevice: Long, outDiagnostic: Long): Int
+
+  fun mln_gpu_device_wrap_vulkan(descriptor: Long, outDevice: Long, outDiagnostic: Long): Int
+
+  fun mln_gpu_device_wrap_web_gpu(context: Long, outDevice: Long, outDiagnostic: Long): Int
 
   fun mln_http_header_transform_response_set_header(
     response: Long,
@@ -87,6 +105,15 @@ internal expect object C {
     map: Long,
     sourceId: Long,
     options: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_add_custom_layer(
+    map: Long,
+    layerId: Long,
+    beforeLayerId: Long,
+    host: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -136,150 +163,9 @@ internal expect object C {
 
   fun mln_map_apply_camera_delta(map: Long, delta: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_attach_android_hardware_buffer_ring(
+  fun mln_map_attach(
     map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_android_surface(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_dma_buf_ring(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_dxgi_shared_texture_ring(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_io_surface_ring(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_metal_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_metal_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_offscreen(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    device: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_open_gl_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_open_gl_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_vulkan_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_vulkan_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_wayland_surface(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_web_gpu_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_web_gpu_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_attach_win32_window(
-    map: Long,
-    descriptor: Long,
+    target: Long,
     device: Long,
     options: Long,
     outSession: Long,
@@ -572,7 +458,7 @@ internal expect object C {
 
   fun mln_map_request_still_image(map: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_resize(map: Long, logicalSize: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_resize(map: Long, extent: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_set_bounds(map: Long, options: Long, completion: Long, outDiagnostic: Long): Int
 
@@ -778,13 +664,7 @@ internal expect object C {
 
   fun mln_network_set_status(status: Int, outDiagnostic: Long): Int
 
-  fun mln_offscreen_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int
-
-  fun mln_offscreen_device_release(device: Long): Unit
-
   fun mln_open_gl_supported_context_provider_mask(): Int
-
-  fun mln_plugin_get_register_function_v1(): Long
 
   fun mln_projected_meters_for_lat_lng(coordinate: Long, outMeters: Long, outDiagnostic: Long): Int
 
@@ -885,88 +765,18 @@ internal expect object C {
 
   fun mln_render_session_resize(
     session: Long,
-    logicalSize: Long,
+    extent: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
 
   fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int
 
-  fun mln_render_session_set_android_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_render_session_set_frame_pacer(session: Long, pacer: Long, outDiagnostic: Long): Int
 
-  fun mln_render_session_set_metal_borrowed_texture_target(
+  fun mln_render_session_set_target(
     session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_metal_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_open_gl_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_open_gl_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_vulkan_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_vulkan_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_wayland_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_web_gpu_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_web_gpu_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_session_set_win32_window_target(
-    session: Long,
-    replacement: Long,
+    target: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1157,9 +967,9 @@ internal expect object C {
 
   fun mln_supported_render_backend_mask(): Int
 
-  fun mln_vulkan_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int
+  fun mln_web_alloc(size: Long, align: Long): Long
 
-  fun mln_vulkan_device_get_context(device: Long, outResult: Long, outDiagnostic: Long): Int
+  fun mln_web_free(pointer: Long, size: Long, align: Long): Unit
 
-  fun mln_vulkan_device_release(device: Long): Unit
+  fun mln_web_object_release(`object`: Int): Unit
 }

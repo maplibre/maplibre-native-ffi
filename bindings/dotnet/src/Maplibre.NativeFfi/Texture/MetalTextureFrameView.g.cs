@@ -20,4 +20,6 @@ public sealed class MetalTextureFrameView
     public NativePointer Texture => scope.Active(value).Texture;
     public NativePointer Device => scope.Active(value).Device;
     public ulong PixelFormat => value.PixelFormat;
+    public NativePointer DepthTexture => scope.Active(value).DepthTexture;
+    public ulong DepthPixelFormat => value.DepthPixelFormat;
 }

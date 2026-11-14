@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .model import Api, CType, Function, ModelError
+from .model import Api, CType, Field, Function, ModelError
 from .names import type_name
 from .protocol import (
     BUFFER_VIEW,
@@ -37,7 +37,8 @@ COMPLETION_EXECUTIONS = frozenset({"command", "query", "operation", "lifecycle"}
 ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # The operating systems that a native build targets, as the presets name them.
 # A `platforms=` annotation lists, in this order and without repeats, the ones
-# where a function can do its work; a function without one serves them all.
+# where a function, or a tagged union's variant, can do its work; one without
+# it serves them all.
 PLATFORMS = (
     "android",
     "freebsd",
@@ -91,8 +92,8 @@ PLATFORMS = (
 #
 # native_object=true marks an integer that names a host graphics object, such as
 # a VkImage or an OpenGL texture name. Native code uses the object it names as
-# it would a pointer, so a binding treats it as one: Rust marks an operation
-# that takes one as unsafe.
+# it would a pointer, so a binding that marks pointer use as unsafe treats it as
+# one.
 ANNOTATION_VALUES = {
     "execution": EXECUTIONS - {"immediate"},
     "shape": frozenset({"array"}),
@@ -103,7 +104,6 @@ ANNOTATION_VALUES = {
     "lifetime": frozenset({"call", "owner", "process"}),
     "synchronous": frozenset({"true"}),
     "capture": frozenset({"manual"}),
-    "blocks": frozenset({"thread_start"}),
     "consumes": frozenset({"always"}),
     "required": frozenset({"true"}),
     "native_object": frozenset({"true"}),
@@ -121,7 +121,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "length",
         "accepted_unless",
         "view_owner",
-        "blocks",
         "consumes",
         "platforms",
         "after_release",
@@ -143,6 +142,7 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "stride",
         "required",
         "native_object",
+        "platforms",
     }
 )
 # Field roles that hold control state rather than a value a host chooses, so a
@@ -226,13 +226,13 @@ def integer_type(type_: CType) -> bool:
     )
 
 
-def platforms(function: Function) -> frozenset[str]:
-    value = function.metadata.get("platforms")
+def platforms(declaration: Function | Field) -> frozenset[str]:
+    value = declaration.metadata.get("platforms")
     return frozenset(value.split(",")) if value else frozenset(PLATFORMS)
 
 
-def platform_errors(function: Function, context: str) -> list[str]:
-    value = function.metadata.get("platforms")
+def platform_errors(declaration: Function | Field, context: str) -> list[str]:
+    value = declaration.metadata.get("platforms")
     if value is None:
         return []
     names = value.split(",")
@@ -849,12 +849,6 @@ def validate(api: Api) -> None:
                     f"{context}: after_release requires an immediate function "
                     "that returns a status and takes a released handle first"
                 )
-        if "blocks" in metadata and (
-            execution not in {None, "immediate"} or not returns_status
-        ):
-            errors.append(
-                f"{context}: blocks requires an immediate function that returns a status"
-            )
         if any(
             parameter.metadata.get("direction") == "out"
             and "nullable" in parameter.metadata
@@ -1037,6 +1031,9 @@ def validate(api: Api) -> None:
                 errors.append(f"{fcontext}: native_object requires an integer")
             if "variant" in field.metadata and record.kind != "union":
                 errors.append(f"{fcontext}: variant requires a union member")
+            if "platforms" in field.metadata and "variant" not in field.metadata:
+                errors.append(f"{fcontext}: platforms requires a union variant")
+            errors.extend(platform_errors(field, fcontext))
             if "empty_variant" in field.metadata and "tag" not in field.metadata:
                 errors.append(f"{fcontext}: empty_variant requires a tagged union")
             # A required member is one whose zero native rejects because no

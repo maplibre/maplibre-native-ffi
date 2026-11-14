@@ -1,7 +1,7 @@
 ---
 title: Render to a window
 description: Present a map to a window or view.
-# Scope: surfaces, the frame loop, resizing, losing and restoring the surface,
+# Scope: windows, the frame loop, resizing, losing and restoring the window,
 # such as when an app goes to the background, and running driver work on your
 # graphics thread.
 ---
@@ -14,76 +14,45 @@ This guide shows how to present a continuous map in a native window or surface,
 and keep it updated as the map changes. Start with a runtime and a continuous
 map from [Create a map](/maplibre-native-ffi/guides/create-a-map/).
 
-## Attach a surface
+## Attach a window
 
-First, create the window with your platform or windowing library, and get the
-surface handle for your backend:
+First, create the window with your platform or windowing library, and describe
+it to the library as an [](api:mln_render_target) of the kind that names it:
 
-- Metal: a
+- Apple platforms: a
   [`CAMetalLayer`](https://developer.apple.com/documentation/quartzcore/cametallayer)
-- Vulkan: a
-  [`VkSurfaceKHR`](https://registry.khronos.org/vulkan/specs/latest/man/html/VkSurfaceKHR.html)
-- OpenGL: an
-  [`EGLSurface`](https://registry.khronos.org/EGL/sdk/docs/man/html/eglCreateWindowSurface.xhtml)
-  with EGL, or an
-  [`HDC`](https://learn.microsoft.com/en-us/windows/win32/gdi/device-contexts)
-  with WGL
-- WebGL: a
-  [`<canvas>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/canvas),
-  either through a WebGL context that you create on it with
-  [`emscripten_webgl_create_context`](https://emscripten.org/docs/api_reference/html5.h.html#c.emscripten_webgl_create_context),
-  or by its selector, which the library
-  [transfers](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen)
-  to a worker
-- WebGPU: a
-  [`WGPUSurface`](https://webgpu-native.github.io/webgpu-headers/Surfaces.html),
-  which a browser creates from a
+- Windows: the window's `HWND`
+- Linux and FreeBSD: a Wayland `wl_surface` and its `wl_display`, or an X11
+  `Window` and its Xlib `Display`
+- Android: the window's `ANativeWindow`
+- OpenHarmony: the `OHNativeWindow` of an `XComponent`
+- A browser: an
+  [`OffscreenCanvas`](https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas),
+  such as one that the page
+  [transferred](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/transferControlToOffscreen)
+  to the library's Web Worker, or a
   [`<canvas>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/canvas)
+  when the library runs on the page's thread, in a [](api:mln_web_canvas_target)
 
 <Aside type="note">
-  The snippets below use Vulkan. For another backend, attach and replace the
-  surface with that backend's calls. The other steps are the same.
+  The snippets below use a Wayland surface. For another platform, describe its
+  window instead. The other steps are the same.
 </Aside>
 
-On Vulkan, the session renders with your instance, device, and graphics queue.
-To have the library create them instead, call [](api:mln_vulkan_device_create)
-with [](api:mln_vulkan_device_options.presentation) set. Then create your
-surface on the instance of the context from
-[](api:mln_vulkan_device_get_context), and attach with that context.
+Attach with [](api:mln_map_attach). The session renders on the
+[](api:mln_gpu_device) that you pass, or on a device of the platform's own
+backend that it creates when you pass none. Create a device with
+[](api:mln_gpu_device_create) to share it among sessions, or to pick the backend
+or the GPU.
 
-On Android, attach the window itself with
-[](api:mln_map_attach_android_surface), by its `ANativeWindow` or its Java
-`Surface`, and the library creates the graphics context. Replace the window with
-[](api:mln_render_session_set_android_surface_target). Release it when
-`surfaceDestroyed` runs, as [Handle a lost surface](#handle-a-lost-surface)
-shows.
-
-On OpenHarmony, attach an `XComponent`'s window the same way with
-[](api:mln_map_attach_ohos_surface), by its `OHNativeWindow` or its surface ID,
-and replace it with [](api:mln_render_session_set_ohos_surface_target). Release
-it when the component's `onSurfaceDestroyed` runs.
-
-On Linux and FreeBSD, attach a Wayland `wl_surface` and its `wl_display` the
-same way with [](api:mln_map_attach_wayland_surface), and replace it with
-[](api:mln_render_session_set_wayland_surface_target). Release the target before
-you destroy the surface, and detach the session before you disconnect the
-display.
-
-On Windows, attach a window by its `HWND` the same way with
-[](api:mln_map_attach_win32_window), and replace it with
-[](api:mln_render_session_set_win32_window_target). Release the target before
-you destroy the window.
-
-Attach the surface to the map at the window's size in logical pixels. The
-session renders at the scale factor that you created the map with. To move the
-window to a display of another density, create a new map and attach a new
-session. You also pass a redraw wake and a frame wake here, covered in the next
-section.
+Attach the window at its size in logical pixels. The session renders at the
+map's scale factor. You also pass a redraw wake and a frame wake here, covered
+in the next section.
 
 The [](api:mln_render_session_attach_options.driver) picks which thread runs the
-session's graphics work. Usually that's the library's own thread. If the surface
-uses your OpenGL or WebGPU context, use your graphics thread instead, since that
-context belongs to your thread. See [Service driver work](#service-driver-work).
+session's graphics work. For a window, that's the library's own thread. A WebGPU
+surface uses your device, so it runs on your graphics thread instead. See
+[Service driver work](#service-driver-work).
 
 <Snippet page="window" region="attach" />
 
@@ -130,8 +99,9 @@ a new one.
 
 ## Resize the window
 
-When the window's size changes, resize the session with
-[](api:mln_render_session_resize). The session resizes the map for you.
+When the window's size changes, or it moves to a display with another scale
+factor, resize the session with [](api:mln_render_session_resize). The session
+resizes the map for you, and keeps the tiles that it loaded.
 
 <Snippet page="window" region="resize" />
 
@@ -153,9 +123,9 @@ and the redraw wake asks for a frame again.
 
 ## Service driver work
 
-With the graphics-thread driver, the session does its graphics work only when
-you service it with [](api:mln_render_session_service_driver_work) on your
-graphics thread, with the target's context current.
+With the graphics-thread driver, such as for a WebGPU surface on your device,
+the session does its graphics work only when you service it with
+[](api:mln_render_session_service_driver_work) on your graphics thread.
 
 The [](api:mln_render_session_attach_options.driver_work_wake) tells you when
 there's work to do. Each time it fires, schedule a service on your graphics

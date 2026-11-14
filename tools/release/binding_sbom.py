@@ -1,4 +1,4 @@
-"""Compose the inventories of registry packages and final Wasm modules."""
+"""Compose the inventories of registry packages."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import json
 import pathlib
 import re
 import shutil
-import subprocess
 from collections.abc import Sequence
 from urllib.parse import quote
 
@@ -15,7 +14,6 @@ from sbom import (
     REPOSITORY,
     SBOM_NAME,
     component,
-    compose,
     document,
     git,
     package_inventory,
@@ -126,111 +124,6 @@ def package(
     return result
 
 
-def wasm(
-    prefix: pathlib.Path,
-    sdk: pathlib.Path,
-    output: pathlib.Path,
-    emnapi: pathlib.Path | None,
-) -> None:
-    inventory = json.loads((prefix / "share/maplibre-native-c" / SBOM_NAME).read_text())
-    shutil.rmtree(output, ignore_errors=True)
-    notices = output / "licenses"
-    shutil.copytree(prefix / "share/maplibre-native-c/licenses", notices)
-    version = (sdk / "emscripten-version.txt").read_text().strip().strip('"')
-    runtime = component(
-        "emscripten-runtime",
-        version,
-        "MIT OR NCSA",
-        "https://github.com/emscripten-core/emscripten",
-    )
-    components = []
-    graph = {runtime["bom-ref"]: set()}
-
-    def add(name: str, version: str, license: str, notice: pathlib.Path) -> None:
-        item = component(name, version, license)
-        components.append(item)
-        graph[runtime["bom-ref"]].add(item["bom-ref"])
-        shutil.copyfile(notice, notices / f"emscripten-{name}.txt")
-
-    shutil.copyfile(sdk / "LICENSE", notices / "emscripten.txt")
-    clang = subprocess.check_output(
-        [str(sdk.parent / "bin/clang"), "--version"], text=True
-    )
-    llvm_version = re.search(r"clang version (\S+)", clang)[1]
-    for library in ("libcxx", "libcxxabi", "libunwind", "compiler-rt"):
-        add(
-            library,
-            llvm_version,
-            "Apache-2.0 WITH LLVM-exception",
-            sdk / f"system/lib/{library}/LICENSE.TXT",
-        )
-    add(
-        "musl",
-        (sdk / "system/lib/libc/musl/VERSION").read_text().strip(),
-        "MIT",
-        sdk / "system/lib/libc/musl/COPYRIGHT",
-    )
-    zlib_version = re.search(
-        r"^VERSION = '([^']+)'", (sdk / "tools/ports/zlib.py").read_text(), re.MULTILINE
-    )[1]
-    add(
-        "zlib",
-        zlib_version,
-        "Zlib",
-        sdk / f"cache/ports/zlib/zlib-{zlib_version}/README",
-    )
-    backend = next(
-        p["value"]
-        for p in inventory["metadata"]["component"]["properties"]
-        if p["name"] == "maplibre:backend"
-    )
-    if backend == "webgpu":
-        dawn_version = re.search(
-            r"^_VERSION = '([^']+)'",
-            (sdk / "tools/ports/emdawnwebgpu.py").read_text(),
-            re.MULTILINE,
-        )[1]
-        add(
-            "emdawnwebgpu",
-            dawn_version,
-            "BSD-3-Clause AND (MIT OR NCSA)",
-            REPOSITORY / "third_party/maplibre-native/vendor/emdawnwebgpu.LICENSE",
-        )
-    inventories = [inventory, document(runtime, components, graph)]
-    if emnapi:
-        emnapi_inventory = npm_inventory(emnapi, notices)
-        header = (emnapi / "include/node/uv/version.h").read_text()
-        uv_version = ".".join(
-            re.search(rf"#define UV_VERSION_{part}\s+(\d+)", header)[1]
-            for part in ("MAJOR", "MINOR", "PATCH")
-        )
-        uv = component("emnapi-libuv", uv_version, "MIT")
-        emnapi_inventory["components"].append(uv)
-        emnapi_inventory["dependencies"][0]["dependsOn"].append(uv["bom-ref"])
-        texts = set()
-        for path in [
-            *emnapi.glob("src/uv/**/*.[ch]"),
-            *emnapi.glob("include/node/uv*.h"),
-            *emnapi.glob("include/node/uv/*.h"),
-        ]:
-            text = path.read_text()
-            if text.startswith("/*"):
-                texts.add(text.split("*/", 1)[0] + "*/")
-        (notices / "emnapi-libuv.txt").write_text(
-            "\n\n".join(sorted(texts)), encoding="utf-8"
-        )
-        inventories.append(emnapi_inventory)
-    root = component(
-        "maplibre-native-wasm",
-        inventory["metadata"]["component"]["version"],
-        "BSD-2-Clause",
-    )
-    root["bom-ref"] = f"wasm:{'typescript' if emnapi else 'kotlin'}:{backend}"
-    root["group"] = "org.maplibre.nativeffi"
-    root["properties"] = inventory["metadata"]["component"]["properties"]
-    write_json(output / "sbom" / PACKAGE_SBOM, compose(root, inventories))
-
-
 def framework(directory: pathlib.Path, version: str) -> None:
     from native_package_release import FRAMEWORK_INFO_PLIST, framework_plist_bytes
 
@@ -263,10 +156,6 @@ def main() -> None:
     package_parser.add_argument("--optional-dependency", action="append", default=[])
     package_parser.add_argument("--classifier", default="")
     package_parser.add_argument("--output", required=True, type=pathlib.Path)
-    wasm_parser = commands.add_parser("wasm")
-    for argument in ("prefix", "sdk", "output"):
-        wasm_parser.add_argument(f"--{argument}", required=True, type=pathlib.Path)
-    wasm_parser.add_argument("--emnapi", type=pathlib.Path)
     framework_parser = commands.add_parser("framework")
     framework_parser.add_argument("directory", type=pathlib.Path)
     framework_parser.add_argument("version")
@@ -283,10 +172,8 @@ def main() -> None:
             args.optional_dependency,
             args.classifier,
         )
-    elif args.command == "framework":
-        framework(args.directory, args.version)
     else:
-        wasm(args.prefix, args.sdk, args.output, args.emnapi)
+        framework(args.directory, args.version)
 
 
 if __name__ == "__main__":

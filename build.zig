@@ -26,16 +26,24 @@ const Platform = struct {
 const ArtifactDescriptor = struct {
     name: []const u8,
     platform: Platform,
-    backend: []const u8,
+    backends: []const []const u8,
 };
 
 /// A release pin's entry for one native archive, which the published package
-/// declares as a lazy dependency named by the archive.
+/// declares as a lazy dependency named by the archive. A native platform's
+/// archive carries all of its backends.
 const PinnedArtifact = struct {
     platform: []const u8,
-    backend: []const u8,
+    backends: []const []const u8,
     archive: []const u8,
 };
+
+fn carries(backends: []const []const u8, backend: []const u8) bool {
+    for (backends) |carried| {
+        if (std.mem.eql(u8, carried, backend)) return true;
+    }
+    return false;
+}
 
 const descriptor_sub_path = "share/maplibre-native-c/artifact.json";
 const pin_sub_path = "bindings/zig/native_release.json";
@@ -129,8 +137,9 @@ fn targetOption(b: *std.Build, descriptor: ?ArtifactDescriptor) std.Build.Resolv
 }
 
 /// The release archive for the request, which the published package declares
-/// as a lazy dependency named by the archive, and its backend. Zig fetches it
-/// when a build first asks for it.
+/// as a lazy dependency named by the archive, and the backend it serves: the
+/// selected one, or the platform's default. Zig fetches it when a build first
+/// asks for it.
 fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) struct { std.Build.LazyPath, []const u8 } {
     const pin_path = b.path(pin_sub_path);
     const pin_file = configurePath(b, pin_path);
@@ -145,19 +154,19 @@ fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) s
         artifacts: []const PinnedArtifact,
     }, b.allocator, contents, .{ .ignore_unknown_fields = true }) catch
         std.debug.panic("invalid native release pin: {s}", .{pin_file});
-    var chosen: ?PinnedArtifact = null;
+    var chosen: ?struct { PinnedArtifact, []const u8 } = null;
     for (pin.value.platforms) |platform| {
         if (!servesTarget(b, platform, target)) continue;
         const wanted = if (backend) |selected| @tagName(selected) else platform.defaultBackend;
         for (pin.value.artifacts) |artifact| {
-            if (std.mem.eql(u8, artifact.platform, platform.id) and std.mem.eql(u8, artifact.backend, wanted)) chosen = artifact;
+            if (std.mem.eql(u8, artifact.platform, platform.id) and carries(artifact.backends, wanted)) chosen = .{ artifact, wanted };
         }
     }
-    const artifact = chosen orelse std.debug.panic("release {s} has no native archive for {s}; pass -Dlocal-build to use your own build", .{
+    const artifact, const served = chosen orelse std.debug.panic("release {s} has no native archive for {s}; pass -Dlocal-build to use your own build", .{
         pin.value.tag,
         requestName(b, target, backend),
     });
-    return .{ b.dependency(artifact.archive, .{}).path(""), artifact.backend };
+    return .{ b.dependency(artifact.archive, .{}).path(""), served };
 }
 
 fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
@@ -165,27 +174,26 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
     const target = targetOption(b, if (local) |install| install.descriptor else null);
     switch (target.result.os.tag) {
         .ios, .tvos, .visionos => @panic("The Zig binding does not support iOS, tvOS, or visionOS targets, including simulators"),
-        .emscripten => @panic("The Zig binding does not support Emscripten"),
+        .emscripten => @panic("The Zig binding does not support the browser"),
         else => {},
     }
     const selected_backend = b.option(
         RenderBackend,
         "backend",
-        "Render backend. Defaults to the target's default, which the native artifact names.",
+        "Render backend that the build draws with: one of the native artifact's, by default the target's default backend",
     );
 
     const prefix: std.Build.LazyPath, const backend = if (local) |install| local: {
-        // A prefix serves one target, with its own backend unless one is
-        // selected.
+        // A prefix serves one target, with each backend that it carries.
         const descriptor = install.descriptor;
-        const other_backend = if (selected_backend) |selected| !std.mem.eql(u8, descriptor.backend, @tagName(selected)) else false;
-        if (!servesTarget(b, descriptor.platform, target.result) or other_backend) {
+        const wanted = if (selected_backend) |selected| @tagName(selected) else descriptor.platform.defaultBackend;
+        if (!servesTarget(b, descriptor.platform, target.result) or !carries(descriptor.backends, wanted)) {
             std.debug.panic("-Dlocal-build names an install prefix built by {s}, which cannot serve {s}", .{
                 descriptor.name,
                 requestName(b, target.result, selected_backend),
             });
         }
-        break :local .{ .{ .cwd_relative = install.prefix }, descriptor.backend };
+        break :local .{ .{ .cwd_relative = install.prefix }, wanted };
     } else publishedNative(b, target.result, selected_backend);
     return .{
         .prefix = prefix,
@@ -252,17 +260,6 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
     return translator.mod;
 }
 
-fn maplibreNativeCHeader(b: *std.Build) std.Build.LazyPath {
-    const header = b.addWriteFiles();
-    // Layer plugin registration stays outside the umbrella header; see
-    // include/maplibre_native_c/plugin.h.
-    return header.add("maplibre_native_c_import.h",
-        \\#include <maplibre_native_c.h>
-        \\#include <maplibre_native_c/plugin.h>
-        \\
-    );
-}
-
 fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const root = system_root orelse return;
@@ -311,7 +308,7 @@ fn addMaplibreNativeIncludes(
     }
     module.link_libc = true;
     module.addImport("maplibre_native_c", translateCModule(b, .{
-        .root_source_file = maplibreNativeCHeader(b),
+        .root_source_file = b.path("include/maplibre_native_c.h"),
         .target = target,
         .optimize = optimize,
         .include_dirs = include_dirs,

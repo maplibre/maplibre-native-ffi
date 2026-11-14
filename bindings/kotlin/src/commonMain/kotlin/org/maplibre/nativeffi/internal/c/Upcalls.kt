@@ -86,6 +86,36 @@ internal object Upcalls {
   }
 
   @JvmStatic
+  fun customLayerHostPrerender(userData: Long, parameters: Long): Unit =
+    upcall<CustomLayerHost, Unit>("mln_custom_layer_prerender_callback", userData, Unit) { value ->
+      val invoke = value.prerender ?: return@upcall Unit
+      invoke(readCustomLayerPrerenderParameters(parameters))
+    }
+
+  @JvmStatic
+  fun customLayerHostRender(userData: Long, parameters: Long): Unit =
+    upcall<CustomLayerHost, Unit>("mln_custom_layer_render_callback", userData, Unit) { value ->
+      val invoke = value.render ?: return@upcall Unit
+      invoke(readCustomLayerRenderParameters(parameters))
+    }
+
+  @JvmStatic
+  fun customLayerHostDeinitialize(userData: Long): Unit =
+    upcall<CustomLayerHost, Unit>("mln_custom_layer_session_end_callback", userData, Unit) { value
+      ->
+      val invoke = value.deinitialize ?: return@upcall Unit
+      invoke()
+    }
+
+  @JvmStatic
+  fun customLayerHostContextLost(userData: Long): Unit =
+    upcall<CustomLayerHost, Unit>("mln_custom_layer_session_end_callback", userData, Unit) { value
+      ->
+      val invoke = value.contextLost ?: return@upcall Unit
+      invoke()
+    }
+
+  @JvmStatic
   fun customVectorSourceOptionsFetchTile(
     userData: Long,
     map: Long,
@@ -178,13 +208,6 @@ internal object Upcalls {
   }
 
   @JvmStatic
-  fun wakeCallback(userData: Long): Unit =
-    upcall<Wake, Unit>("mln_wake_callback", userData, Unit) { value ->
-      val invoke = value.callback ?: return@upcall Unit
-      invoke()
-    }
-
-  @JvmStatic
   fun queueLockLock(userData: Long): Unit =
     upcall<QueueLock, Unit>("mln_queue_lock_callback", userData, Unit) { value ->
       val invoke = value.lock ?: return@upcall Unit
@@ -195,6 +218,13 @@ internal object Upcalls {
   fun queueLockUnlock(userData: Long): Unit =
     upcall<QueueLock, Unit>("mln_queue_lock_callback", userData, Unit) { value ->
       val invoke = value.unlock ?: return@upcall Unit
+      invoke()
+    }
+
+  @JvmStatic
+  fun wakeCallback(userData: Long): Unit =
+    upcall<Wake, Unit>("mln_wake_callback", userData, Unit) { value ->
+      val invoke = value.callback ?: return@upcall Unit
       invoke()
     }
 
@@ -224,14 +254,18 @@ internal expect object UpcallStubs {
   val logHandlerCallback: Long
   val customGeometrySourceOptionsFetchTile: Long
   val customGeometrySourceOptionsCancelTile: Long
+  val customLayerHostPrerender: Long
+  val customLayerHostRender: Long
+  val customLayerHostDeinitialize: Long
+  val customLayerHostContextLost: Long
   val customVectorSourceOptionsFetchTile: Long
   val customVectorSourceOptionsCancelTile: Long
   val resourceRequestCancelHandlerCallback: Long
   val runtimeEventHandlerCallback: Long
   val resourceProviderCallback: Long
   val resourceTransformCallback: Long
-  val wakeCallback: Long
   val queueLockLock: Long
   val queueLockUnlock: Long
+  val wakeCallback: Long
   val cameraTransitionHandlerCallback: Long
 }

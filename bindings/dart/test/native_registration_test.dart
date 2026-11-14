@@ -1,7 +1,7 @@
 // Native registrations: wakes and queue locks whose function pointers and
-// context native code in the host supplies. Sessions render offscreen, which
-// rejects a queue lock, so an accepted lock needs a Vulkan borrowed texture in
-// a context from tests/graphics.
+// context native code in the host supplies. Only a Vulkan device takes a queue
+// lock, so an accepted lock needs a device that wraps a Vulkan context from
+// tests/graphics.
 import 'dart:ffi';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -15,10 +15,10 @@ typedef _ContextCallback = Void Function(Pointer<Void>);
 
 final _size = LogicalSize(width: renderSize, height: renderSize);
 
-/// Only a Vulkan target takes a queue lock.
-final Object _vulkanSkip = buildAttachesVulkan
+/// Only a Vulkan device takes a queue lock.
+final Object _vulkanSkip = vulkanUnderTest
     ? false
-    : 'Only a Vulkan target takes a queue lock';
+    : 'Only a Vulkan device takes a queue lock';
 
 /// A native function that any thread may call with a context, which records
 /// the context on this isolate.
@@ -44,14 +44,11 @@ final class _Recorder {
   void close() => _callable.close();
 }
 
-RenderSessionAttachOptions _options({
-  Wake frameWake = const Wake(),
-  QueueLock? queueLock,
-}) => RenderSessionAttachOptions(
-  driver: RenderDriverKind.coreWorker,
-  frameWake: frameWake,
-  queueLock: queueLock,
-);
+RenderSessionAttachOptions _options({Wake frameWake = const Wake()}) =>
+    RenderSessionAttachOptions(
+      driver: RenderDriverKind.coreWorker,
+      frameWake: frameWake,
+    );
 
 Matcher _throwsStatus(Status status) => throwsA(
   isA<MaplibreException>().having((error) => error.status, 'status', status),
@@ -118,13 +115,20 @@ void main() {
     // answers at once. The host shares no queue with the session.
     final locks = _Recorder();
     final releases = _Recorder();
-    final session = TestGraphics.open().attachBorrowedTexture(
+    final graphics = TestGraphics.open();
+    final device = graphics.wrapDevice(queueLock: _queueLock(locks, releases));
+    final session = graphics.attachBorrowedTexture(
       map,
       _size,
-      _options(queueLock: _queueLock(locks, releases)),
+      _options(),
+      device: device,
     );
     addTearDown(() => releaseSession(session));
+    // The session keeps the device, and the device the lock, until the
+    // session ends.
+    device.release();
     await within(session.ready, 'attachment');
+    expect(releases.contexts, isEmpty);
     await within(session.release(), 'session release');
     await releases.wait('the release of the accepted queue lock');
     expect(releases.contexts, [3]);
@@ -133,16 +137,16 @@ void main() {
   }, skip: _vulkanSkip);
 
   test('a rejected native queue lock releases its context', () async {
-    final map = await openRenderMap(emptyStyle);
     final locks = _Recorder();
     final releases = _Recorder();
-    // An offscreen session takes no lock. Native code reaches that check
-    // only with both lock callbacks set, and the binding then releases the
-    // context of the rejected lock.
+    // This build lacks the backend, so native code rejects the device, and
+    // the binding then releases the context of the rejected lock.
     expect(
-      () => attachOffscreenSession(
-        map,
-        _options(queueLock: _queueLock(locks, releases)),
+      () => GpuDeviceHandle.create(
+        options: GpuDeviceOptions(
+          backend: _missingBackend(),
+          queueLock: _queueLock(locks, releases),
+        ),
       ),
       _throwsStatus(Status.unsupported),
     );
@@ -151,6 +155,20 @@ void main() {
     locks.close();
     releases.close();
   });
+}
+
+/// A backend that this build lacks.
+RenderBackend _missingBackend() {
+  final supported = supportedRenderBackendMask();
+  for (final (backend, flag) in [
+    (RenderBackend.metal, RenderBackendFlag.metal),
+    (RenderBackend.vulkan, RenderBackendFlag.vulkan),
+    (RenderBackend.openGl, RenderBackendFlag.openGl),
+    (RenderBackend.webGpu, RenderBackendFlag.webGpu),
+  ]) {
+    if (!supported.contains(flag)) return backend;
+  }
+  fail('this build has every backend');
 }
 
 /// A queue lock whose callbacks both record on [locks], with a context that

@@ -822,6 +822,32 @@ public struct CameraVelocity: Equatable, Hashable, Sendable {
   }
 }
 
+/// How a graphics API's clip space holds depth.
+///
+/// See `mln_clip_depth_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct ClipDepthRange: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and OpenGL
+  /// with `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+  public static let zeroToOne: ClipDepthRange = .init(rawValue: 1)
+  /// Clip z runs from -w to w, as in OpenGL by default.
+  public static let negativeOneToOne: ClipDepthRange = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 1: return "zeroToOne"
+    case 2: return "negativeOneToOne"
+    default: return "ClipDepthRange(\(rawValue))"
+    }
+  }
+}
+
 /// How the map keeps the camera within the world or within its bounds.
 ///
 /// See `mln_constrain_mode` in the
@@ -960,6 +986,87 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
     }
     raw.state_key = arena.view(stateKey)
     return raw
+  }
+}
+
+/// Where a frame drew the map, and the depth that it wrote there.
+///
+/// World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at
+/// 180° east, and on past both into the copies of the world beside the first. y
+/// runs from 0 at the north edge of the Mercator world, about 85.05° north, to
+/// 1 at its south edge. z is the altitude in meters above sea level, at the
+/// scale of the heights of the map's 3D layers, and the map draws its ground at
+/// 0.
+///
+/// `matrix` takes a world point to the clip coordinates where the frame drew
+/// it, with the camera's padding, roll, field of view, and center altitude, and
+/// the map's viewport and projection mode. Clip y points up, as the map draws
+/// with OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so
+/// negate it there too. At high zooms, single precision can't tell nearby world
+/// points apart: subtract an origin near your geometry from its coordinates in
+/// double precision, and fold the origin into the matrix, before you convert to
+/// float.
+///
+/// Clip z follows `clip_depth_range`, the convention of the device's graphics
+/// API. With the API's default depth range of 0 to 1, a fragment that you draw
+/// through `matrix` gets the depth that the map's 3D layers, such as fill
+/// extrusions, wrote at the same place: 0 at `near_distance` from the camera,
+/// up to `far_depth` at `far_distance`. Depth-tested against the frame's depth,
+/// your fragments hide behind the map's 3D layers where those stand in front of
+/// them.
+///
+/// The frame's depth starts at 1. The map's 3D layers write the depth of each
+/// of their fragments. A 2D layer below every 3D layer of the style that draws
+/// opaque fragments, such as an opaque fill, writes one depth over all of them,
+/// wherever they are: the higher the layer, the lower its depth, and every one
+/// between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D
+/// layers above a 3D layer, such as labels, write no depth. So what you draw
+/// through `matrix`, even on the ground, lies in front of every 2D layer.
+///
+/// While `globe` is true, the frame drew the map onto a globe, and its 2D
+/// layers wrote no depth. `matrix` then is the map's Mercator one, which
+/// doesn't place points on the globe.
+///
+/// See `mln_frame_projection` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct FrameProjection: Equatable, Hashable, Sendable {
+  public var matrix: Mat4
+  public var clipDepthRange: ClipDepthRange
+  /// The distance from the camera to the plane where the depth that you get
+  /// through `matrix` is 0, along the camera's view. Like `far_distance`, it is
+  /// in pixels of the map at the camera's zoom, where the world is 512 × 2^zoom
+  /// pixels wide.
+  public var nearDistance: Double
+  /// The distance to the plane where the depth is `far_depth`.
+  public var farDistance: Double
+  /// The depth at `far_distance`, below 1.
+  public var farDepth: Double
+  /// Whether the frame drew the map as a globe, alone or blending into
+  /// Mercator.
+  public var globe: Bool
+  public init(
+    matrix: Mat4 = .init(),
+    clipDepthRange: ClipDepthRange = .init(rawValue: 0),
+    nearDistance: Double = 0,
+    farDistance: Double = 0,
+    farDepth: Double = 0,
+    globe: Bool = false
+  ) {
+    self.matrix = matrix
+    self.clipDepthRange = clipDepthRange
+    self.nearDistance = nearDistance
+    self.farDistance = farDistance
+    self.farDepth = farDepth
+    self.globe = globe
+  }
+
+  init(raw: mln_frame_projection) {
+    matrix = Mat4(raw: raw.matrix)
+    clipDepthRange = ClipDepthRange(rawValue: raw.clip_depth_range.rawValue)
+    nearDistance = raw.near_distance
+    farDistance = raw.far_distance
+    farDepth = raw.far_depth
+    globe = raw.globe
   }
 }
 
@@ -1271,8 +1378,9 @@ public struct MapMode: RawRepresentable, CustomStringConvertible,
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapOptions: Equatable, Hashable, Sendable {
-  /// The map's first size, and its scale factor. The scale factor stays fixed
-  /// for the map's life, and every render session of the map renders at it.
+  /// The map's first size, and its scale factor. Render sessions of the map
+  /// render at its scale factor. `MapHandle.resize()` changes both, or
+  /// `RenderSessionHandle.resize()` while a render session is attached.
   public var initialExtent: LogicalExtent
   public var mapMode: MapMode
   /// Whether the map decodes MapLibre Tiles (MLT) that use FastPFOR integer
@@ -1287,15 +1395,24 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
   /// font files, each an object with a `url` and an optional `unicode-range`,
   /// as in a font face of a style's `font-faces`, which every font stack uses
-  /// after the style's own font faces. Empty for none.
+  /// after the style's own font faces. Empty for the system's fonts, unless
+  /// `system_fonts_enabled` is false.
   public var fallbackFontFaces: String
+  /// Whether the map falls back to the system's fonts for CJK and the scripts
+  /// that need complex shaping when `fallback_font_faces` is empty: fonts that
+  /// the platform's font matcher picks for the user's preferred languages.
+  /// Without it, the map does. The first map that uses them waits for them to
+  /// be found. In the browser, the browser draws CJK glyphs in its sans-serif
+  /// font instead, where `fallback_font_faces` doesn't cover them.
+  public var systemFontsEnabled: Bool?
   public init(
     initialExtent: LogicalExtent,
     mapMode: MapMode = .init(rawValue: 0),
     fastPforEnabled: Bool = false,
     eventMask: RuntimeEventFlag? = nil,
     tileCacheEnabled: Bool? = nil,
-    fallbackFontFaces: String = ""
+    fallbackFontFaces: String = "",
+    systemFontsEnabled: Bool? = nil
   ) {
     self.initialExtent = initialExtent
     self.mapMode = mapMode
@@ -1303,6 +1420,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     self.eventMask = eventMask
     self.tileCacheEnabled = tileCacheEnabled
     self.fallbackFontFaces = fallbackFontFaces
+    self.systemFontsEnabled = systemFontsEnabled
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_map_options {
@@ -1321,6 +1439,10 @@ public struct MapOptions: Equatable, Hashable, Sendable {
         .tile_cache_enabled = item
     }
     raw.fallback_font_faces = arena.view(fallbackFontFaces)
+    if let item = systemFontsEnabled {
+      raw.fields |= MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED.rawValue; raw
+        .system_fonts_enabled = item
+    }
     return raw
   }
 }
@@ -1666,6 +1788,38 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
         .frustum_offset = item.nativeValue()
     }
     return raw
+  }
+}
+
+/// A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x,
+/// plus `y` times its y, `z` times its z, and `w` times its w. In memory it is
+/// 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and WebGPU
+/// shaders take a matrix.
+///
+/// See `mln_mat4` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct Mat4: Equatable, Hashable, Sendable {
+  public var x: Vec4
+  public var y: Vec4
+  public var z: Vec4
+  public var w: Vec4
+  public init(
+    x: Vec4 = .init(),
+    y: Vec4 = .init(),
+    z: Vec4 = .init(),
+    w: Vec4 = .init()
+  ) {
+    self.x = x
+    self.y = y
+    self.z = z
+    self.w = w
+  }
+
+  init(raw: mln_mat4) {
+    x = Vec4(raw: raw.x)
+    y = Vec4(raw: raw.y)
+    z = Vec4(raw: raw.z)
+    w = Vec4(raw: raw.w)
   }
 }
 
@@ -2463,6 +2617,30 @@ public struct Vec3: Equatable, Hashable, Sendable {
     raw.y = y
     raw.z = z
     return raw
+  }
+}
+
+/// A vector in four dimensions, such as a point in homogeneous coordinates.
+///
+/// See `mln_vec4` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct Vec4: Equatable, Hashable, Sendable {
+  public var x: Double
+  public var y: Double
+  public var z: Double
+  public var w: Double
+  public init(x: Double = 0, y: Double = 0, z: Double = 0, w: Double = 0) {
+    self.x = x
+    self.y = y
+    self.z = z
+    self.w = w
+  }
+
+  init(raw: mln_vec4) {
+    x = raw.x
+    y = raw.y
+    z = raw.z
+    w = raw.w
   }
 }
 

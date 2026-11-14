@@ -12,7 +12,7 @@ static void visionos_has_no_apple_frame_pacer(void) {
   mln_frame_pacer pacer = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
-    mln_apple_frame_pacer_create(NULL, &pacer, MLN_TEST_DIAGNOSTIC)
+    mln_frame_pacer_create(NULL, &pacer, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, pacer);
 }
@@ -20,9 +20,7 @@ static void visionos_has_no_apple_frame_pacer(void) {
 
 static mln_frame_pacer create_pacer(const mln_frame_pacer_options* options) {
   mln_frame_pacer pacer = MLN_HANDLE_NULL;
-  MLN_TEST_OK(
-    mln_apple_frame_pacer_create(options, &pacer, MLN_TEST_DIAGNOSTIC)
-  );
+  MLN_TEST_OK(mln_frame_pacer_create(options, &pacer, MLN_TEST_DIAGNOSTIC));
   return pacer;
 }
 
@@ -73,6 +71,54 @@ static void a_paced_session_draws_each_change_without_a_demand(void) {
   expect_paced_frames(NULL, false);
 }
 
+// A new limit also changes the display link's preferred frame rate range, and
+// each change can come while the session waits for a refresh.
+static void a_pacer_keeps_pacing_its_sessions_as_its_limit_changes(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  const mln_frame_pacer pacer = create_pacer(NULL);
+  MLN_TEST_OK(mln_render_session_set_frame_pacer(fixture.session, pacer, NULL));
+  mln_frame_pacer_options options = {.size = sizeof(mln_frame_pacer_options)};
+
+  uint64_t generation = move_camera(map, 2.0);
+  options.fields = MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+  options.maximum_frames_per_second = 30;
+  MLN_TEST_OK(
+    mln_frame_pacer_set_options(pacer, &options, MLN_TEST_DIAGNOSTIC)
+  );
+  mln_test_render_wait_for_update(&fixture, generation);
+
+  generation = move_camera(map, 3.0);
+  options.fields = MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+  MLN_TEST_OK(
+    mln_frame_pacer_set_options(pacer, &options, MLN_TEST_DIAGNOSTIC)
+  );
+  mln_test_render_wait_for_update(&fixture, generation);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_frame_pacer_release(pacer);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void set_options_refuses_an_invalid_limit_and_a_released_pacer(void) {
+  const mln_frame_pacer pacer = create_pacer(NULL);
+  mln_frame_pacer_options options = {.size = sizeof(mln_frame_pacer_options)};
+  options.fields = MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+  options.maximum_frames_per_second = 0;
+  MLN_TEST_INVALID(mln_frame_pacer_set_options(pacer, &options, NULL));
+  options.fields |= MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+  options.maximum_frames_per_second = 30;
+  MLN_TEST_INVALID(mln_frame_pacer_set_options(pacer, &options, NULL));
+
+  mln_frame_pacer_release(pacer);
+  options.fields = MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+  MLN_TEST_INVALID_STATE(mln_frame_pacer_set_options(pacer, &options, NULL));
+}
+
 static void a_released_pacer_keeps_pacing_its_sessions(void) {
   expect_paced_frames(NULL, true);
 }
@@ -120,6 +166,8 @@ MLN_TEST_GROUP {
   RUN_TEST(a_paced_session_draws_each_change_without_a_demand);
   RUN_TEST(a_released_pacer_keeps_pacing_its_sessions);
   RUN_TEST(a_pacer_with_a_frame_rate_limit_paces_its_sessions);
+  RUN_TEST(a_pacer_keeps_pacing_its_sessions_as_its_limit_changes);
+  RUN_TEST(set_options_refuses_an_invalid_limit_and_a_released_pacer);
   RUN_TEST(a_session_with_a_redraw_wake_takes_no_pacer);
 #endif
 }

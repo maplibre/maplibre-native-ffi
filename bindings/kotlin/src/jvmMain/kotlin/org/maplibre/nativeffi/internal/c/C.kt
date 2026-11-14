@@ -30,6 +30,8 @@ internal actual object C {
     Ffm.downcall("mln_acquired_frame_get_io_surface", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_metal_texture =
     Ffm.downcall("mln_acquired_frame_get_metal_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_acquired_frame_get_opaque_fd =
+    Ffm.downcall("mln_acquired_frame_get_opaque_fd", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_open_gl_texture =
     Ffm.downcall(
       "mln_acquired_frame_get_open_gl_texture",
@@ -58,12 +60,8 @@ internal actual object C {
     Ffm.downcall("mln_acquired_frame_view_begin", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_view_end =
     Ffm.downcall("mln_acquired_frame_view_end", null, JAVA_LONG)
-  private val mln_android_frame_pacer_create =
-    Ffm.downcall("mln_android_frame_pacer_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_android_init =
     Ffm.downcall("mln_android_init", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_apple_frame_pacer_create =
-    Ffm.downcall("mln_apple_frame_pacer_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_c_version = Ffm.downcall("mln_c_version", JAVA_INT)
   private val mln_camera_for_tile =
     Ffm.downcall(
@@ -80,7 +78,26 @@ internal actual object C {
     Ffm.downcall("mln_delivery_queue_dispatch", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_release =
     Ffm.downcall("mln_delivery_queue_release", null, JAVA_LONG)
+  private val mln_frame_pacer_create =
+    Ffm.downcall("mln_frame_pacer_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_frame_pacer_release = Ffm.downcall("mln_frame_pacer_release", null, JAVA_LONG)
+  private val mln_frame_pacer_set_options =
+    Ffm.downcall("mln_frame_pacer_set_options", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gpu_device_create =
+    Ffm.downcall("mln_gpu_device_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gpu_device_get_capabilities =
+    Ffm.downcall("mln_gpu_device_get_capabilities", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gpu_device_get_vulkan_context =
+    Ffm.downcall("mln_gpu_device_get_vulkan_context", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gpu_device_release = Ffm.downcall("mln_gpu_device_release", null, JAVA_LONG)
+  private val mln_gpu_device_wrap_metal =
+    Ffm.downcall("mln_gpu_device_wrap_metal", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gpu_device_wrap_open_gl =
+    Ffm.downcall("mln_gpu_device_wrap_open_gl", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gpu_device_wrap_vulkan =
+    Ffm.downcall("mln_gpu_device_wrap_vulkan", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gpu_device_wrap_web_gpu =
+    Ffm.downcall("mln_gpu_device_wrap_web_gpu", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_http_header_transform_response_set_header =
     Ffm.downcall(
       "mln_http_header_transform_response_set_header",
@@ -117,6 +134,17 @@ internal actual object C {
       "mln_map_add_custom_geometry_source",
       JAVA_INT,
       JAVA_LONG,
+      mln_buffer_view,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_map_add_custom_layer =
+    Ffm.downcall(
+      "mln_map_add_custom_layer",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_buffer_view,
       mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
@@ -177,180 +205,9 @@ internal actual object C {
     )
   private val mln_map_apply_camera_delta =
     Ffm.downcall("mln_map_apply_camera_delta", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_attach_android_hardware_buffer_ring =
+  private val mln_map_attach =
     Ffm.downcall(
-      "mln_map_attach_android_hardware_buffer_ring",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_android_surface =
-    Ffm.downcall(
-      "mln_map_attach_android_surface",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_dma_buf_ring =
-    Ffm.downcall(
-      "mln_map_attach_dma_buf_ring",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_dxgi_shared_texture_ring =
-    Ffm.downcall(
-      "mln_map_attach_dxgi_shared_texture_ring",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_io_surface_ring =
-    Ffm.downcall(
-      "mln_map_attach_io_surface_ring",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_metal_borrowed_texture =
-    Ffm.downcall(
-      "mln_map_attach_metal_borrowed_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_metal_surface =
-    Ffm.downcall(
-      "mln_map_attach_metal_surface",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_offscreen =
-    Ffm.downcall(
-      "mln_map_attach_offscreen",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_open_gl_borrowed_texture =
-    Ffm.downcall(
-      "mln_map_attach_open_gl_borrowed_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_open_gl_surface =
-    Ffm.downcall(
-      "mln_map_attach_open_gl_surface",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_vulkan_borrowed_texture =
-    Ffm.downcall(
-      "mln_map_attach_vulkan_borrowed_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_vulkan_surface =
-    Ffm.downcall(
-      "mln_map_attach_vulkan_surface",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_wayland_surface =
-    Ffm.downcall(
-      "mln_map_attach_wayland_surface",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_web_gpu_borrowed_texture =
-    Ffm.downcall(
-      "mln_map_attach_web_gpu_borrowed_texture",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_web_gpu_surface =
-    Ffm.downcall(
-      "mln_map_attach_web_gpu_surface",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_attach_win32_window =
-    Ffm.downcall(
-      "mln_map_attach_win32_window",
+      "mln_map_attach",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -716,7 +573,7 @@ internal actual object C {
   private val mln_map_request_still_image =
     Ffm.downcall("mln_map_request_still_image", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_resize =
-    Ffm.downcall("mln_map_resize", JAVA_INT, JAVA_LONG, mln_logical_size, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall("mln_map_resize", JAVA_INT, JAVA_LONG, mln_logical_extent, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_bounds =
     Ffm.downcall("mln_map_set_bounds", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_custom_geometry_source_tile_data =
@@ -981,14 +838,8 @@ internal actual object C {
     Ffm.downcall("mln_network_get_status", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_network_set_status =
     Ffm.downcall("mln_network_set_status", JAVA_INT, JAVA_INT, JAVA_LONG)
-  private val mln_offscreen_device_create =
-    Ffm.downcall("mln_offscreen_device_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_offscreen_device_release =
-    Ffm.downcall("mln_offscreen_device_release", null, JAVA_LONG)
   private val mln_open_gl_supported_context_provider_mask =
     Ffm.downcall("mln_open_gl_supported_context_provider_mask", JAVA_INT)
-  private val mln_plugin_get_register_function_v1 =
-    Ffm.downcall("mln_plugin_get_register_function_v1", JAVA_LONG)
   private val mln_projected_meters_for_lat_lng =
     Ffm.downcall("mln_projected_meters_for_lat_lng", JAVA_INT, mln_lat_lng, JAVA_LONG, JAVA_LONG)
   private val mln_render_frame_batch_release =
@@ -1097,107 +948,17 @@ internal actual object C {
       "mln_render_session_resize",
       JAVA_INT,
       JAVA_LONG,
-      mln_logical_size,
+      mln_logical_extent,
       JAVA_LONG,
       JAVA_LONG,
     )
   private val mln_render_session_service_driver_work =
     Ffm.downcall("mln_render_session_service_driver_work", JAVA_INT, JAVA_LONG, JAVA_LONG)
-  private val mln_render_session_set_android_surface_target =
-    Ffm.downcall(
-      "mln_render_session_set_android_surface_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_render_session_set_frame_pacer =
     Ffm.downcall("mln_render_session_set_frame_pacer", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_render_session_set_metal_borrowed_texture_target =
+  private val mln_render_session_set_target =
     Ffm.downcall(
-      "mln_render_session_set_metal_borrowed_texture_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_metal_surface_target =
-    Ffm.downcall(
-      "mln_render_session_set_metal_surface_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_open_gl_borrowed_texture_target =
-    Ffm.downcall(
-      "mln_render_session_set_open_gl_borrowed_texture_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_open_gl_surface_target =
-    Ffm.downcall(
-      "mln_render_session_set_open_gl_surface_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_vulkan_borrowed_texture_target =
-    Ffm.downcall(
-      "mln_render_session_set_vulkan_borrowed_texture_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_vulkan_surface_target =
-    Ffm.downcall(
-      "mln_render_session_set_vulkan_surface_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_wayland_surface_target =
-    Ffm.downcall(
-      "mln_render_session_set_wayland_surface_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_web_gpu_borrowed_texture_target =
-    Ffm.downcall(
-      "mln_render_session_set_web_gpu_borrowed_texture_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_web_gpu_surface_target =
-    Ffm.downcall(
-      "mln_render_session_set_web_gpu_surface_target",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_render_session_set_win32_window_target =
-    Ffm.downcall(
-      "mln_render_session_set_win32_window_target",
+      "mln_render_session_set_target",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -1432,11 +1193,9 @@ internal actual object C {
     Ffm.downcall("mln_style_expression_release", null, JAVA_LONG)
   private val mln_supported_render_backend_mask =
     Ffm.downcall("mln_supported_render_backend_mask", JAVA_INT)
-  private val mln_vulkan_device_create =
-    Ffm.downcall("mln_vulkan_device_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_vulkan_device_get_context =
-    Ffm.downcall("mln_vulkan_device_get_context", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_vulkan_device_release = Ffm.downcall("mln_vulkan_device_release", null, JAVA_LONG)
+  private val mln_web_alloc = Ffm.downcall("mln_web_alloc", JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_web_free = Ffm.downcall("mln_web_free", null, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_web_object_release = Ffm.downcall("mln_web_object_release", null, JAVA_INT)
 
   actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
     mln_acquired_frame_discard.invokeExact(frame, outDiagnostic) as Int
@@ -1470,6 +1229,12 @@ internal actual object C {
     outFrame: Long,
     outDiagnostic: Long,
   ): Int = mln_acquired_frame_get_metal_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
+
+  actual fun mln_acquired_frame_get_opaque_fd(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int = mln_acquired_frame_get_opaque_fd.invokeExact(frame, outFrame, outDiagnostic) as Int
 
   actual fun mln_acquired_frame_get_open_gl_texture(
     frame: Long,
@@ -1511,17 +1276,8 @@ internal actual object C {
     mln_acquired_frame_view_end.invoke(scope)
   }
 
-  actual fun mln_android_frame_pacer_create(
-    options: Long,
-    outPacer: Long,
-    outDiagnostic: Long,
-  ): Int = mln_android_frame_pacer_create.invokeExact(options, outPacer, outDiagnostic) as Int
-
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     mln_android_init.invokeExact(jniEnv, context, outDiagnostic) as Int
-
-  actual fun mln_apple_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
-    mln_apple_frame_pacer_create.invokeExact(options, outPacer, outDiagnostic) as Int
 
   actual fun mln_c_version(): Int = mln_c_version.invokeExact() as Int
 
@@ -1548,9 +1304,53 @@ internal actual object C {
     mln_delivery_queue_release.invoke(queue)
   }
 
+  actual fun mln_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
+    mln_frame_pacer_create.invokeExact(options, outPacer, outDiagnostic) as Int
+
   actual fun mln_frame_pacer_release(pacer: Long) {
     mln_frame_pacer_release.invoke(pacer)
   }
+
+  actual fun mln_frame_pacer_set_options(pacer: Long, options: Long, outDiagnostic: Long): Int =
+    mln_frame_pacer_set_options.invokeExact(pacer, options, outDiagnostic) as Int
+
+  actual fun mln_gpu_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_gpu_device_create.invokeExact(options, outDevice, outDiagnostic) as Int
+
+  actual fun mln_gpu_device_get_capabilities(
+    device: Long,
+    outCapabilities: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_gpu_device_get_capabilities.invokeExact(device, outCapabilities, outDiagnostic) as Int
+
+  actual fun mln_gpu_device_get_vulkan_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int = mln_gpu_device_get_vulkan_context.invokeExact(device, outResult, outDiagnostic) as Int
+
+  actual fun mln_gpu_device_release(device: Long) {
+    mln_gpu_device_release.invoke(device)
+  }
+
+  actual fun mln_gpu_device_wrap_metal(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int = mln_gpu_device_wrap_metal.invokeExact(descriptor, outDevice, outDiagnostic) as Int
+
+  actual fun mln_gpu_device_wrap_open_gl(context: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_gpu_device_wrap_open_gl.invokeExact(context, outDevice, outDiagnostic) as Int
+
+  actual fun mln_gpu_device_wrap_vulkan(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int = mln_gpu_device_wrap_vulkan.invokeExact(descriptor, outDevice, outDiagnostic) as Int
+
+  actual fun mln_gpu_device_wrap_web_gpu(context: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_gpu_device_wrap_web_gpu.invokeExact(context, outDevice, outDiagnostic) as Int
 
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
@@ -1609,6 +1409,23 @@ internal actual object C {
       map,
       Ffm.value(sourceId, mln_buffer_view),
       options,
+      completion,
+      outDiagnostic,
+    ) as Int
+
+  actual fun mln_map_add_custom_layer(
+    map: Long,
+    layerId: Long,
+    beforeLayerId: Long,
+    host: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_add_custom_layer.invokeExact(
+      map,
+      Ffm.value(layerId, mln_buffer_view),
+      Ffm.value(beforeLayerId, mln_buffer_view),
+      host,
       completion,
       outDiagnostic,
     ) as Int
@@ -1701,291 +1518,17 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_map_apply_camera_delta.invokeExact(map, delta, completion, outDiagnostic) as Int
 
-  actual fun mln_map_attach_android_hardware_buffer_ring(
+  actual fun mln_map_attach(
     map: Long,
-    descriptor: Long,
+    target: Long,
     device: Long,
     options: Long,
     outSession: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_attach_android_hardware_buffer_ring.invokeExact(
-      map,
-      descriptor,
-      device,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_android_surface(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_android_surface.invokeExact(
-      map,
-      descriptor,
-      device,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_dma_buf_ring(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_dma_buf_ring.invokeExact(
-      map,
-      descriptor,
-      device,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_dxgi_shared_texture_ring(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_dxgi_shared_texture_ring.invokeExact(
-      map,
-      descriptor,
-      device,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_io_surface_ring(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_io_surface_ring.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_metal_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_metal_borrowed_texture.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_metal_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_metal_surface.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_offscreen(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    device: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_offscreen.invokeExact(
-      map,
-      descriptor,
-      options,
-      device,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_open_gl_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_open_gl_borrowed_texture.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_open_gl_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_open_gl_surface.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_vulkan_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_vulkan_borrowed_texture.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_vulkan_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_vulkan_surface.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_wayland_surface(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_wayland_surface.invokeExact(
-      map,
-      descriptor,
-      device,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_web_gpu_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_web_gpu_borrowed_texture.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_web_gpu_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_web_gpu_surface.invokeExact(
-      map,
-      descriptor,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_attach_win32_window(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_attach_win32_window.invokeExact(
-      map,
-      descriptor,
-      device,
-      options,
-      outSession,
-      completion,
-      outDiagnostic,
-    ) as Int
+    mln_map_attach.invokeExact(map, target, device, options, outSession, completion, outDiagnostic)
+      as Int
 
   actual fun mln_map_begin_command_group(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_begin_command_group.invokeExact(map, completion, outDiagnostic) as Int
@@ -2519,15 +2062,10 @@ internal actual object C {
   actual fun mln_map_request_still_image(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_request_still_image.invokeExact(map, completion, outDiagnostic) as Int
 
-  actual fun mln_map_resize(
-    map: Long,
-    logicalSize: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
+  actual fun mln_map_resize(map: Long, extent: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_resize.invokeExact(
       map,
-      Ffm.value(logicalSize, mln_logical_size),
+      Ffm.value(extent, mln_logical_extent),
       completion,
       outDiagnostic,
     ) as Int
@@ -2918,18 +2456,8 @@ internal actual object C {
   actual fun mln_network_set_status(status: Int, outDiagnostic: Long): Int =
     mln_network_set_status.invokeExact(status, outDiagnostic) as Int
 
-  actual fun mln_offscreen_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
-    mln_offscreen_device_create.invokeExact(options, outDevice, outDiagnostic) as Int
-
-  actual fun mln_offscreen_device_release(device: Long) {
-    mln_offscreen_device_release.invoke(device)
-  }
-
   actual fun mln_open_gl_supported_context_provider_mask(): Int =
     mln_open_gl_supported_context_provider_mask.invokeExact() as Int
-
-  actual fun mln_plugin_get_register_function_v1(): Long =
-    mln_plugin_get_register_function_v1.invokeExact() as Long
 
   actual fun mln_projected_meters_for_lat_lng(
     coordinate: Long,
@@ -3122,13 +2650,13 @@ internal actual object C {
 
   actual fun mln_render_session_resize(
     session: Long,
-    logicalSize: Long,
+    extent: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
     mln_render_session_resize.invokeExact(
       session,
-      Ffm.value(logicalSize, mln_logical_size),
+      Ffm.value(extent, mln_logical_extent),
       completion,
       outDiagnostic,
     ) as Int
@@ -3136,154 +2664,19 @@ internal actual object C {
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     mln_render_session_service_driver_work.invokeExact(session, outDiagnostic) as Int
 
-  actual fun mln_render_session_set_android_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_android_surface_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_render_session_set_frame_pacer(
     session: Long,
     pacer: Long,
     outDiagnostic: Long,
   ): Int = mln_render_session_set_frame_pacer.invokeExact(session, pacer, outDiagnostic) as Int
 
-  actual fun mln_render_session_set_metal_borrowed_texture_target(
+  actual fun mln_render_session_set_target(
     session: Long,
-    replacement: Long,
+    target: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_render_session_set_metal_borrowed_texture_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_metal_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_metal_surface_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_open_gl_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_open_gl_borrowed_texture_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_open_gl_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_open_gl_surface_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_vulkan_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_vulkan_borrowed_texture_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_vulkan_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_vulkan_surface_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_wayland_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_wayland_surface_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_web_gpu_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_web_gpu_borrowed_texture_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_web_gpu_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_web_gpu_surface_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_render_session_set_win32_window_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_session_set_win32_window_target.invokeExact(
-      session,
-      replacement,
-      completion,
-      outDiagnostic,
-    ) as Int
+    mln_render_session_set_target.invokeExact(session, target, completion, outDiagnostic) as Int
 
   actual fun mln_resource_request_complete(handle: Long, response: Long, outDiagnostic: Long): Int =
     mln_resource_request_complete.invokeExact(handle, response, outDiagnostic) as Int
@@ -3598,17 +2991,15 @@ internal actual object C {
   actual fun mln_supported_render_backend_mask(): Int =
     mln_supported_render_backend_mask.invokeExact() as Int
 
-  actual fun mln_vulkan_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
-    mln_vulkan_device_create.invokeExact(options, outDevice, outDiagnostic) as Int
+  actual fun mln_web_alloc(size: Long, align: Long): Long =
+    mln_web_alloc.invokeExact(size, align) as Long
 
-  actual fun mln_vulkan_device_get_context(
-    device: Long,
-    outResult: Long,
-    outDiagnostic: Long,
-  ): Int = mln_vulkan_device_get_context.invokeExact(device, outResult, outDiagnostic) as Int
+  actual fun mln_web_free(pointer: Long, size: Long, align: Long) {
+    mln_web_free.invoke(pointer, size, align)
+  }
 
-  actual fun mln_vulkan_device_release(device: Long) {
-    mln_vulkan_device_release.invoke(device)
+  actual fun mln_web_object_release(`object`: Int) {
+    mln_web_object_release.invoke(`object`)
   }
 }
 

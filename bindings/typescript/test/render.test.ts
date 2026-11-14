@@ -1,10 +1,11 @@
 // Offscreen sessions on a core worker, a borrowed texture serviced on the
 // JavaScript thread, the scope of a frame view, a drain that finds nothing,
-// and the native registrations that a session's attach options take.
+// and the native registrations that attach options and GPU devices take.
 
 import assert from "node:assert/strict";
 
 import {
+  GpuDeviceHandle,
   GpuSyncKind,
   type MapHandle,
   MaplibreError,
@@ -18,8 +19,8 @@ import {
   attachSession,
   attachVulkanSession,
   backend,
-  centerPixel,
   NativeProbe,
+  renderBackend,
   renderExtent,
   renderSize,
   demandFrame,
@@ -43,13 +44,7 @@ test("an offscreen session renders a frame that reads back as pixels", async () 
 
   const result = await worker.renderFrame();
   assert.ok(result.frameGeneration > 0n);
-  const image = await worker.settle(
-    worker.session.readTexture(),
-    "the readback",
-  );
-  assert.equal(image.info.width, renderSize);
-  assert.equal(image.info.height, renderSize);
-  assert.deepEqual(centerPixel(image), red);
+  assert.deepEqual(await worker.centerPixel(), red);
 });
 
 test(
@@ -146,7 +141,7 @@ test("a session disposed while it attaches rejects its ready without an unhandle
 
 test("a caller-driven session is serviced from the event loop", async () => {
   const map = await openRenderMap();
-  const caller = await TestSession.borrowed(map, "caller");
+  const caller = await TestSession.serviced(map);
 
   // A borrowed texture has no readback, so the frame's result shows that the
   // session rendered it.
@@ -161,65 +156,70 @@ async function frameSession(map: MapHandle) {
   return attached.session;
 }
 
-test("a frame view expires with its scope and holds off release inside it", async () => {
-  const map = await openRenderMap();
-  const session = await frameSession(map);
-  const frame = session.acquireFrame();
-  assert.ok(frame, "the session exposed no frame");
-  const done = { kind: GpuSyncKind.cpuComplete, handle: 0n, value: 0n };
+test(
+  "a frame view expires with its scope and holds off release inside it",
+  async () => {
+    const map = await openRenderMap();
+    const session = await frameSession(map);
+    const frame = session.acquireFrame();
+    assert.ok(frame, "the session exposed no frame");
+    const done = { kind: GpuSyncKind.cpuComplete, handle: 0n, value: 0n };
 
-  // Reads a view's width, a plain value, and the texture object it lends.
-  type Reader = { width(): number; texture(): unknown };
-  const withTexture = <T>(use: (view: Reader) => T): T =>
-    backend === "metal"
-      ? frame.withMetalTexture((view) =>
-          use({ width: () => view.width, texture: () => view.texture }),
-        )
-      : backend === "vulkan"
-        ? frame.withVulkanTexture((view) =>
-            use({ width: () => view.width, texture: () => view.image }),
+    // Reads a view's width, a plain value, and the texture object it lends.
+    type Reader = { width(): number; texture(): unknown };
+    const withTexture = <T>(use: (view: Reader) => T): T =>
+      backend() === "metal"
+        ? frame.withMetalTexture((view) =>
+            use({ width: () => view.width, texture: () => view.texture }),
           )
-        : backend === "webgpu"
-          ? frame.withWebGpuTexture((view) =>
-              use({ width: () => view.width, texture: () => view.texture }),
+        : backend() === "vulkan"
+          ? frame.withVulkanTexture((view) =>
+              use({ width: () => view.width, texture: () => view.image }),
             )
-          : frame.withOpenGlTexture((view) =>
-              use({ width: () => view.width, texture: () => view.texture }),
-            );
-  let escaped: Reader | undefined;
-  const width = withTexture((view) => {
-    escaped = view;
-    view.texture();
-    // The view borrows the frame, so native refuses to release the frame or
-    // abandon its session while the view is open.
+          : backend() === "webgpu"
+            ? frame.withWebGpuTexture((view) =>
+                use({ width: () => view.width, texture: () => view.texture }),
+              )
+            : frame.withOpenGlTexture((view) =>
+                use({ width: () => view.width, texture: () => view.texture }),
+              );
+    let escaped: Reader | undefined;
+    const width = withTexture((view) => {
+      escaped = view;
+      view.texture();
+      // The view borrows the frame, so native refuses to release the frame or
+      // abandon its session while the view is open.
+      assert.throws(
+        () => frame.release(done),
+        (error) => error instanceof MaplibreError,
+      );
+      assert.throws(
+        () => session.abandon(),
+        (error) =>
+          error instanceof MaplibreError && error.status === Status.busy,
+      );
+      return view.width();
+    });
+    assert.equal(width, renderSize);
+    // A view that escapes its scope refuses to read the texture it lends, and
+    // still reads its plain values.
+    assert.equal(escaped!.width(), renderSize);
     assert.throws(
-      () => frame.release(done),
-      (error) => error instanceof MaplibreError,
+      () => escaped!.texture(),
+      (error) =>
+        error instanceof MaplibreError && error.status === Status.invalidState,
     );
-    assert.throws(
-      () => session.abandon(),
-      (error) => error instanceof MaplibreError && error.status === Status.busy,
-    );
-    return view.width();
-  });
-  assert.equal(width, renderSize);
-  // A view that escapes its scope refuses to read the texture it lends, and
-  // still reads its plain values.
-  assert.equal(escaped!.width(), renderSize);
-  assert.throws(
-    () => escaped!.texture(),
-    (error) =>
-      error instanceof MaplibreError && error.status === Status.invalidState,
-  );
 
-  frame.release(done);
-  // A released frame reaches native code, which reports it stale.
-  assert.throws(
-    () => frame.getResult(),
-    (error) =>
-      error instanceof MaplibreError && error.status === Status.invalidState,
-  );
-});
+    frame.release(done);
+    // A released frame reaches native code, which reports it stale.
+    assert.throws(
+      () => frame.getResult(),
+      (error) =>
+        error instanceof MaplibreError && error.status === Status.invalidState,
+    );
+  },
+  { needs: ["borrowedTextures"] },
+);
 
 function failsWith(status: Status) {
   return (error: unknown) =>
@@ -281,7 +281,7 @@ test("a native registration reaches native unchanged, a call consumes it, and a 
   assert.deepEqual(unconverted.events, ["release"]);
 });
 
-test("a native queue lock reaches a session whose target takes one", async () => {
+test("a native queue lock reaches a session on a Vulkan device", async () => {
   const map = await openRenderMap();
   const probe = new NativeProbe();
   const queueLock = QueueLock.native({
@@ -290,18 +290,18 @@ test("a native queue lock reaches a session whose target takes one", async () =>
     userData: probe.userData,
     releaseUserData: probe.release,
   });
-  if (backend !== "vulkan") {
-    // Only a Vulkan texture or surface takes a queue lock, and the binding
-    // releases the context of the attach that native code refuses.
+  if (backend() !== "vulkan") {
+    // Only a Vulkan device takes a queue lock, and the binding releases the
+    // context of the call that native code refuses.
     assert.throws(
-      () => attachSession(map, { queueLock }),
+      () => GpuDeviceHandle.create({ backend: renderBackend(), queueLock }),
       failsWith(Status.unsupported),
     );
     await probe.arrival("release");
     assert.deepEqual(probe.events, ["release"]);
     return;
   }
-  const session = attachVulkanSession(map, { queueLock });
+  const session = attachVulkanSession(map, queueLock);
   await bounded(session.ready, "the attachment");
   demandFrame(session, 1n);
   await probe.arrival("unlock");

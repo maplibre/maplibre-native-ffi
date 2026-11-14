@@ -7,8 +7,7 @@
   <ItemGroup>
     <!-- Copies every shared library from the selected install beside the app,
          matching how NuGet runtime assets enter the native-library lookup.
-         The OpenGL presets install ANGLE beside the C API library. The copy
-         is unconditional because presets share an output path, and their
+         The copy is unconditional because presets share an output path, and their
          libraries can have unrelated timestamps. -->
     <Content Include="$(MaplibreNativeCRuntimeDir)/*.so;$(MaplibreNativeCRuntimeDir)/*.so.*;$(MaplibreNativeCRuntimeDir)/*.dylib;$(MaplibreNativeCRuntimeDir)/*.dll">
       <Link>%(Filename)%(Extension)</Link>

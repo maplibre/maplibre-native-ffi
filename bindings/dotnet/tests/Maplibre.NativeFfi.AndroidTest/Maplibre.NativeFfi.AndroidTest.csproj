@@ -13,7 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference
-      Include="Maplibre.NativeFfi.Runtime.$(MaplibreNativeFfiRenderBackend)"
+      Include="Maplibre.NativeFfi.Runtime"
       VersionOverride="[$(MaplibreNativeFfiPackageVersion)]"
     />
     <PackageReference Include="xunit.v3.extensibility.core" />
@@ -31,6 +31,14 @@
     <AndroidNativeLibrary
       Include="$(MaplibreNativeCInstallDir)/lib/libmln_test_graphics.so"
       Abi="$(MaplibreAndroidAbi)"
+    />
+    <!--
+      The app starts without the host's environment, so a file of variables, such
+      as the backend under test in MLN_FFI_TEST_BACKEND, travels inside it.
+    -->
+    <AndroidEnvironment
+      Include="$(MaplibreTestEnvironmentFile)"
+      Condition="'$(MaplibreTestEnvironmentFile)' != ''"
     />
   </ItemGroup>
 </Project>

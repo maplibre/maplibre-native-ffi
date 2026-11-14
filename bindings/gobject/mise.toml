@@ -20,33 +20,40 @@ export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
 '''
 
 [tasks.test]
-description = "Test the GObject library against a native preset's install."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+description = "Test the GObject library against a native preset's install, with one of its render backends."
+extends = "ffi:test"
 run = '''
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 case "$usage_preset" in
-  linux-musl-* | freebsd-*) exec mise run :_test-device "$usage_preset" ;;
-  *) exec mise run :_test-host "$usage_preset" ;;
+  linux-musl-* | freebsd-*) exec mise run :_test-device "$usage_preset" "$MLN_FFI_TEST_BACKEND" ;;
+  *) exec mise run :_test-host "$usage_preset" "$MLN_FFI_TEST_BACKEND" ;;
 esac
 '''
 
 [tasks._test-host]
 hide = true
-usage = 'arg "<preset>"'
+usage = '''
+arg "<preset>"
+arg "<backend>"
+'''
 run = [
   { task = ":package", args = [
     "{{usage.preset}}",
   ] },
   { task = ":suite", args = [
     "{{usage.preset}}",
+    "{{usage.backend}}",
   ] },
 ]
 
 # Alpine and the FreeBSD virtual machine build the library against their own
-# GLib and run the programs there.
+# GLib and run the programs there. The device runner passes them
+# MLN_FFI_TEST_BACKEND and sets up that backend's drivers.
 [tasks._test-device]
 hide = true
-extends = "ffi:preset"
+extends = "ffi:test"
 run = '''
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 install="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 if [[ "$usage_preset" == freebsd-* ]]; then
   host=$("$MISE_MONOREPO_ROOT/tools/devices/freebsd-host")

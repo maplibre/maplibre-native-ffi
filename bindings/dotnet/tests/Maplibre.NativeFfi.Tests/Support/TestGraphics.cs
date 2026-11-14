@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -158,6 +159,16 @@ internal sealed class TestGraphicsTexture : IDisposable
 [StructLayout(LayoutKind.Sequential)]
 internal struct TestGraphicsContext
 {
+    /// <summary>The names of the device extensions that the Vulkan device enabled.</summary>
+    internal readonly unsafe ImmutableArray<string> VulkanDeviceExtensionNames()
+    {
+        var names = (nint*)VulkanDeviceExtensions;
+        var builder = ImmutableArray.CreateBuilder<string>((int)VulkanDeviceExtensionCount);
+        for (var index = 0; index < VulkanDeviceExtensionCount; index++)
+            builder.Add(Marshal.PtrToStringUTF8(names[index])!);
+        return builder.MoveToImmutable();
+    }
+
     internal uint Backend;
     internal uint VulkanQueueFamilyIndex;
     internal nint MetalDevice;
@@ -167,6 +178,8 @@ internal struct TestGraphicsContext
     internal nint VulkanQueue;
     internal nint VulkanGetInstanceProcAddr;
     internal nint VulkanGetDeviceProcAddr;
+    internal nint VulkanDeviceExtensions;
+    internal uint VulkanDeviceExtensionCount;
     internal nint EglDisplay;
     internal nint EglConfig;
     internal nint EglContext;

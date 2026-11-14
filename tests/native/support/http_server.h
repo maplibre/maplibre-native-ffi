@@ -6,9 +6,6 @@
 // past 127.0.0.1, answers each request from a fixed route table, closes every
 // connection after one response, and logs each request's path and headers for
 // a case to inspect.
-//
-// The browser has no sockets, so the browser build leaves this file out; its
-// transport runs against the runner's routes instead.
 
 #include <stdbool.h>
 #include <stddef.h>

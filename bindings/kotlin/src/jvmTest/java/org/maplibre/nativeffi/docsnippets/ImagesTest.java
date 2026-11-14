@@ -18,10 +18,11 @@ import org.maplibre.nativeffi.MapHandle;
 import org.maplibre.nativeffi.MapMode;
 import org.maplibre.nativeffi.MapOptions;
 import org.maplibre.nativeffi.MaplibreNative;
-import org.maplibre.nativeffi.OffscreenDescriptor;
+import org.maplibre.nativeffi.OffscreenTarget;
 import org.maplibre.nativeffi.RenderDriverKind;
 import org.maplibre.nativeffi.RenderSessionAttachOptions;
 import org.maplibre.nativeffi.RenderSessionHandle;
+import org.maplibre.nativeffi.RenderTarget;
 import org.maplibre.nativeffi.RuntimeHandle;
 import org.maplibre.nativeffi.TextureReadbackResult;
 
@@ -34,7 +35,7 @@ public class ImagesTest {
 
   @Test(timeout = SnippetFixture.TEST_TIMEOUT_MS)
   public void images() {
-    RuntimeHandle runtime = RuntimeHandle.create(null).join();
+    RuntimeHandle runtime = RuntimeHandle.create(null);
     try {
       // The demo style is empty here.
       SnippetFixture.serve(
@@ -58,12 +59,13 @@ public class ImagesTest {
 
       // #region attach
       RenderSessionHandle session =
-          map.attachOffscreen(
-              new OffscreenDescriptor(LogicalSize.of(800, 600)),
+          map.attach(
+              new RenderTarget.Offscreen(
+                  new OffscreenTarget(LogicalSize.of(800, 600))),
+              null,
               // The library renders on its own thread.
               RenderSessionAttachOptions.of(
-                  RenderDriverKind.CORE_WORKER),
-              null);
+                  RenderDriverKind.CORE_WORKER));
       session.getReady().join();
       // #endregion attach
 

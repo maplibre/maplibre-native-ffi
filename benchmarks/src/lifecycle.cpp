@@ -66,6 +66,7 @@ void map_lifecycle(benchmark::State& state) {
 
     Session session;
     session.borrow_ring(ring);
+    // Unlike the old C API's attach, this one first wraps the host's device.
     start = Clock::now();
     completion.reset();
     session.start_attach(map, completion);

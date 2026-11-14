@@ -135,19 +135,12 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 17,
   /** A resource that the region needs failed to download. */
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 18,
-  /**
-   * The region's download became inactive because the cache file's offline
-   * regions hold as many tiles from MapLibre's demo tile server as the limit
-   * allows. Only tiles of sources with a `maplibre://` URL count toward the
-   * limit.
-   */
-  MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 19,
-  MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 20,
-  MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 21,
-  MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 22,
-  MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 23,
-  MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 24,
-  MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 25,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED = 19,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_LOADED = 20,
+  MLN_RUNTIME_EVENT_MAP_GLYPHS_ERROR = 21,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_REQUESTED = 22,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_LOADED = 23,
+  MLN_RUNTIME_EVENT_MAP_SPRITE_ERROR = 24,
 } mln_runtime_event_type;
 
 /** An event type, as a bit in a set. */
@@ -188,8 +181,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
     << MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
   MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR = 1ULL
     << MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
-  MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 1ULL
-    << MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
   MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_REQUESTED = 1ULL
     << MLN_RUNTIME_EVENT_MAP_GLYPHS_REQUESTED,
   MLN_RUNTIME_EVENT_FLAG_MAP_GLYPHS_LOADED = 1ULL
@@ -226,8 +217,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_flag : uint64_t {
     MLN_RUNTIME_EVENT_FLAG_MAP_SPRITE_ERROR,
   MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS =
       MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_STATUS_CHANGED |
-    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR |
-    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
+    MLN_RUNTIME_EVENT_FLAG_OFFLINE_REGION_RESPONSE_ERROR,
   MLN_RUNTIME_EVENT_FLAG_ALL = MLN_RUNTIME_EVENT_FLAG_ALL_MAP_EVENTS |
     MLN_RUNTIME_EVENT_FLAG_ALL_RUNTIME_EVENTS,
 } mln_runtime_event_flag;
@@ -252,9 +242,8 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_SOURCE_CHANGED = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 7,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 8,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 9,
-  MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 10,
-  MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 11,
+  MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS = 9,
+  MLN_RUNTIME_EVENT_PAYLOAD_SPRITE = 10,
 } mln_runtime_event_payload_type;
 
 /** Whether a camera change jumps or animates. */
@@ -510,18 +499,6 @@ typedef struct mln_runtime_event_offline_region_response_error {
   mln_resource_error_reason reason;
 } mln_runtime_event_offline_region_response_error;
 
-/**
- * The details of MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED.
- */
-typedef struct mln_runtime_event_offline_region_tile_count_limit {
-  mln_offline_region_id region_id;
-  /**
-   * The number of demo server tiles that the cache file's offline regions may
-   * hold together.
-   */
-  uint64_t limit;
-} mln_runtime_event_offline_region_tile_count_limit;
-
 /** The details of an event, in the member that its `payload_type` names. */
 typedef union mln_runtime_event_payload {
   mln_runtime_event_camera_change camera_change
@@ -541,10 +518,6 @@ typedef union mln_runtime_event_payload {
   mln_runtime_event_offline_region_response_error offline_region_response_error
     MLN_BINDING(
       "variant=MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR"
-    );
-  mln_runtime_event_offline_region_tile_count_limit
-    offline_region_tile_count_limit MLN_BINDING(
-      "variant=MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT"
     );
   mln_runtime_event_glyphs glyphs
     MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_GLYPHS");
@@ -975,14 +948,22 @@ typedef struct mln_resource_provider {
  * Creates a runtime.
  *
  * A runtime holds maps and the resource loading, cache, and offline regions
- * that they share. In a browser, create runtimes on a Web Worker, not on the
- * main thread.
+ * that they share.
+ *
+ * In a browser, the library runs on the thread that loaded its module and
+ * never blocks it: commands, render sessions, completions, wakes and callbacks
+ * all run on that thread, in tasks of the library's own after the call that
+ * started them returns. Wait for a completion with a callback, or yield to the
+ * event loop; a blocking wait can't end. Load the module on a dedicated Web
+ * Worker, so that the map's work doesn't delay the page. On the page's thread
+ * it works too, but every frame and style parse runs there.
  *
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when the cache database file that `options`
  *   names can't be opened or created.
+ * - MLN_STATUS_UNSUPPORTED in a browser for a cache path: the browser caches
+ *   the runtime's requests.
  */
-MLN_BINDING("blocks=thread_start")
 MLN_API mln_status mln_runtime_create(
   const mln_runtime_options* options MLN_BINDING("nullable=true"),
   mln_runtime* out_runtime MLN_BINDING("direction=out"),
@@ -1147,12 +1128,12 @@ MLN_API void mln_resource_transform_request_release(
 /**
  * Adds headers to the runtime's HTTP requests.
  *
- * The transform replaces the one set before. In a browser or on OpenHarmony,
- * serve the requests with mln_runtime_set_resource_provider() instead.
+ * The transform replaces the one set before. A redirect to another origin
+ * drops its headers. In a browser, serve the requests with
+ * mln_runtime_set_resource_provider() instead.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when the library runs in a browser or on
- *   OpenHarmony.
+ * - MLN_STATUS_UNSUPPORTED when the library runs in a browser.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_runtime_set_http_header_transform(

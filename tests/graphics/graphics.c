@@ -15,6 +15,9 @@
 #else
 #include <dlfcn.h>
 #endif
+#if defined(__OHOS__)
+#include <unistd.h>
+#endif
 
 #define VK_NO_PROTOTYPES
 #include <vulkan/vulkan_core.h>
@@ -25,7 +28,7 @@
 #if defined(__APPLE__)
 #define MLN_TG_HAS_METAL 1
 #endif
-#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#if !defined(_WIN32) && !defined(__APPLE__)
 #define MLN_TG_HAS_EGL 1
 #endif
 #if defined(_WIN32)
@@ -119,7 +122,6 @@ typedef struct vulkan_functions {
   PFN_vkDestroySurfaceKHR destroy_surface;
   PFN_vkGetPhysicalDeviceSurfaceSupportKHR get_surface_support;
   PFN_vkCreateHeadlessSurfaceEXT create_headless_surface;
-  PFN_vkVoidFunction create_metal_surface;
   PFN_vkVoidFunction create_win32_surface;
   PFN_vkVoidFunction create_android_surface;
   PFN_vkDestroyDevice destroy_device;
@@ -228,6 +230,35 @@ typedef struct android_media_functions {
 } android_media_functions;
 #endif
 
+#if defined(__OHOS__)
+// OpenHarmony's consumer surface, an OH_NativeImage that hands out an
+// OHNativeWindow with no XComponent behind it. Loaded from
+// libnative_image.so, so the declarations here stand in for
+// <native_image/native_image.h>.
+typedef struct ohos_native_image ohos_native_image;
+typedef struct ohos_frame_listener {
+  void* context;
+  void (*on_frame_available)(void* context);
+} ohos_frame_listener;
+
+typedef struct ohos_image_functions {
+  ohos_native_image* (*create)(void);
+  int32_t (*set_default_size)(
+    ohos_native_image* image, int32_t width, int32_t height
+  );
+  int32_t (*set_default_usage)(ohos_native_image* image, uint64_t usage);
+  int32_t (*set_listener)(
+    ohos_native_image* image, ohos_frame_listener listener
+  );
+  void* (*acquire_window)(ohos_native_image* image);
+  int32_t (*acquire_buffer)(
+    ohos_native_image* image, void** buffer, int* fence
+  );
+  int32_t (*release_buffer)(ohos_native_image* image, void* buffer, int fence);
+  void (*destroy)(ohos_native_image** image);
+} ohos_image_functions;
+#endif
+
 struct mln_test_graphics {
   mln_test_graphics_context context;
   void* library;
@@ -236,14 +267,19 @@ struct mln_test_graphics {
   vulkan_functions vk;
   // Set when the instance and device are the caller's.
   bool vulkan_borrowed;
+  // The device extensions that the library's device enabled.
+  const char* vulkan_device_extensions[6];
   VkCommandPool vulkan_command_pool;
   bool vulkan_headless_surface;
-  bool vulkan_metal_surface;
   bool vulkan_win32_surface;
   bool vulkan_android_surface;
 #if defined(__ANDROID__)
   void* media_library;
   android_media_functions media;
+#endif
+#if defined(__OHOS__)
+  void* image_library;
+  ohos_image_functions image;
 #endif
   egl_functions egl;
   void* egl_pbuffer;
@@ -267,18 +303,22 @@ struct mln_test_graphics_texture {
   mln_test_graphics* graphics;
   mln_test_graphics_texture_info info;
   VkDeviceMemory vulkan_memory;
+  // Whether the texture holds depth and stencil rather than color.
+  bool depth;
 };
 
 struct mln_test_graphics_surface {
   mln_test_graphics* graphics;
   mln_test_graphics_surface_info info;
-  void* vulkan_layer;
 #if defined(MLN_TG_HAS_WGL)
   HWND window;
 #endif
 #if defined(__ANDROID__)
   android_image_reader* image_reader;
   android_image_listener image_listener;
+#endif
+#if defined(__OHOS__)
+  ohos_native_image* consumer;
 #endif
 };
 
@@ -574,9 +614,7 @@ static void metal_surface_destroy(mln_test_graphics_surface* surface) {
 #endif
 
 static const char* vulkan_loader_name(void) {
-#if defined(__APPLE__)
-  return "libvulkan.1.dylib";
-#elif defined(__ANDROID__) || defined(__OHOS__)
+#if defined(__ANDROID__) || defined(__OHOS__)
   // Neither platform's loader carries a versioned soname.
   return "libvulkan.so";
 #elif defined(_WIN32)
@@ -647,13 +685,7 @@ static bool vulkan_create_instance(mln_test_graphics* graphics) {
   if (portability) enabled[enabled_count++] = "VK_KHR_portability_enumeration";
   if (has_extension(available, available_count, "VK_KHR_surface")) {
     enabled[enabled_count++] = "VK_KHR_surface";
-#if defined(__APPLE__)
-    graphics->vulkan_metal_surface =
-      has_extension(available, available_count, "VK_EXT_metal_surface");
-    if (graphics->vulkan_metal_surface) {
-      enabled[enabled_count++] = "VK_EXT_metal_surface";
-    }
-#elif defined(_WIN32)
+#if defined(_WIN32)
     graphics->vulkan_win32_surface =
       has_extension(available, available_count, "VK_KHR_win32_surface");
     if (graphics->vulkan_win32_surface) {
@@ -749,7 +781,6 @@ static bool vulkan_load_functions(mln_test_graphics* graphics) {
     vulkan_proc(graphics, "vkGetPhysicalDeviceSurfaceSupportKHR");
   *(PFN_vkVoidFunction*)&vk->create_headless_surface =
     vulkan_proc(graphics, "vkCreateHeadlessSurfaceEXT");
-  vk->create_metal_surface = vulkan_proc(graphics, "vkCreateMetalSurfaceEXT");
   vk->create_win32_surface = vulkan_proc(graphics, "vkCreateWin32SurfaceKHR");
   vk->create_android_surface =
     vulkan_proc(graphics, "vkCreateAndroidSurfaceKHR");
@@ -906,6 +937,12 @@ static bool vulkan_create_device(mln_test_graphics* graphics) {
       graphics->context.vulkan_device = device;
       graphics->context.vulkan_queue = queue;
       graphics->context.vulkan_queue_family_index = q;
+      for (uint32_t e = 0; e < enabled_count; e += 1) {
+        graphics->vulkan_device_extensions[e] = enabled[e];
+      }
+      graphics->context.vulkan_device_extensions =
+        graphics->vulkan_device_extensions;
+      graphics->context.vulkan_device_extension_count = enabled_count;
       break;
     }
     free(queues);
@@ -1011,22 +1048,36 @@ static bool vulkan_memory_type(
   return false;
 }
 
+// The aspects of the texture's image that its view and readback cover.
+static VkImageAspectFlags vulkan_aspects(
+  const mln_test_graphics_texture* texture
+) {
+  return texture->depth
+           ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+           : VK_IMAGE_ASPECT_COLOR_BIT;
+}
+
+// A color texture is RGBA8, and a depth texture 32-bit float depth with
+// 8-bit stencil.
 static bool vulkan_texture_create(
   mln_test_graphics* graphics, mln_test_graphics_texture* texture
 ) {
   const vulkan_functions* vk = &graphics->vk;
   VkDevice device = (VkDevice)graphics->context.vulkan_device;
+  const VkFormat format =
+    texture->depth ? VK_FORMAT_D32_SFLOAT_S8_UINT : VK_FORMAT_R8G8B8A8_UNORM;
   const VkImageCreateInfo image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .imageType = VK_IMAGE_TYPE_2D,
-    .format = VK_FORMAT_R8G8B8A8_UNORM,
+    .format = format,
     .extent = {texture->info.width, texture->info.height, 1},
     .mipLevels = 1,
     .arrayLayers = 1,
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .tiling = VK_IMAGE_TILING_OPTIMAL,
-    .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-             VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+    .usage = (texture->depth ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                             : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
@@ -1064,8 +1115,8 @@ static bool vulkan_texture_create(
     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
     .image = image,
     .viewType = VK_IMAGE_VIEW_TYPE_2D,
-    .format = VK_FORMAT_R8G8B8A8_UNORM,
-    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+    .format = format,
+    .subresourceRange = {vulkan_aspects(texture), 0, 1, 0, 1},
   };
   VkImageView view = VK_NULL_HANDLE;
   if (vk->create_image_view(device, &view_info, NULL, &view) != VK_SUCCESS) {
@@ -1073,8 +1124,10 @@ static bool vulkan_texture_create(
     return false;
   }
   texture->info.vulkan_image_view = (uint64_t)(uintptr_t)view;
-  texture->info.format = VK_FORMAT_R8G8B8A8_UNORM;
-  texture->info.vulkan_final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  texture->info.format = format;
+  texture->info.vulkan_final_layout =
+    texture->depth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                   : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   return true;
 }
 
@@ -1099,9 +1152,9 @@ static void vulkan_texture_destroy(mln_test_graphics_texture* texture) {
 
 static void vulkan_image_barrier(
   const vulkan_functions* vk, VkCommandBuffer commands, VkImage image,
-  VkImageLayout from, VkImageLayout to, VkAccessFlags source_access,
-  VkAccessFlags destination_access, VkPipelineStageFlags source_stage,
-  VkPipelineStageFlags destination_stage
+  VkImageAspectFlags aspects, VkImageLayout from, VkImageLayout to,
+  VkAccessFlags source_access, VkAccessFlags destination_access,
+  VkPipelineStageFlags source_stage, VkPipelineStageFlags destination_stage
 ) {
   const VkImageMemoryBarrier barrier = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1112,7 +1165,7 @@ static void vulkan_image_barrier(
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .image = image,
-    .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
+    .subresourceRange = {aspects, 0, 1, 0, 1},
   };
   vk->cmd_pipeline_barrier(
     commands, source_stage, destination_stage, 0, 0, NULL, 0, NULL, 1, &barrier
@@ -1120,7 +1173,8 @@ static void vulkan_image_barrier(
 }
 
 // Copies the image through a host-visible buffer on the context's queue, and
-// returns the image to its final layout afterwards.
+// returns the image to its final layout afterwards. A depth texture's copy is
+// of its depth aspect, a 32-bit float per pixel.
 static bool vulkan_texture_read(
   mln_test_graphics_texture* texture, uint8_t* pixels
 ) {
@@ -1204,21 +1258,25 @@ static bool vulkan_texture_read(
     .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
   };
   vk->begin_command_buffer(commands, &begin_info);
+  const VkImageAspectFlags aspects = vulkan_aspects(texture);
   vulkan_image_barrier(
-    vk, commands, image, final_layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-    VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
-    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT
+    vk, commands, image, aspects, final_layout,
+    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_MEMORY_WRITE_BIT,
+    VK_ACCESS_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+    VK_PIPELINE_STAGE_TRANSFER_BIT
   );
   const VkBufferImageCopy region = {
-    .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+    .imageSubresource =
+      {texture->depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+       0, 0, 1},
     .imageExtent = {texture->info.width, texture->info.height, 1},
   };
   vk->cmd_copy_image_to_buffer(
     commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &region
   );
   vulkan_image_barrier(
-    vk, commands, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, final_layout,
-    VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_MEMORY_READ_BIT,
+    vk, commands, image, aspects, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    final_layout, VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_MEMORY_READ_BIT,
     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
   );
   const VkBufferMemoryBarrier to_host = {
@@ -1269,13 +1327,6 @@ done:
   if (memory != VK_NULL_HANDLE) vk->free_memory(device, memory, NULL);
   return read;
 }
-
-typedef struct vulkan_metal_surface_info {
-  VkStructureType sType;
-  const void* pNext;
-  VkFlags flags;
-  const void* pLayer;
-} vulkan_metal_surface_info;
 
 #if defined(_WIN32)
 typedef struct vulkan_win32_surface_info {
@@ -1379,6 +1430,103 @@ static void* android_window_create(
 }
 #endif
 
+#if defined(__OHOS__)
+// NATIVEBUFFER_USAGE_CPU_READ | NATIVEBUFFER_USAGE_HW_RENDER
+static const uint64_t ohos_gpu_usage = (1ULL << 0) | (1ULL << 8);
+
+static bool ohos_image_load(mln_test_graphics* graphics) {
+  if (graphics->image_library != NULL) return true;
+  static const char* const names[] = {"libnative_image.so"};
+  void* library = library_open_first("the native image library", names, 1);
+  if (library == NULL) return false;
+  ohos_image_functions* image = &graphics->image;
+#define MLN_TG_LOAD(field, name)                          \
+  *(void**)&image->field = library_symbol(library, name); \
+  if (image->field == NULL) {                             \
+    set_error("libnative_image.so lacks %s", name);       \
+    return false;                                         \
+  }
+  MLN_TG_LOAD(create, "OH_ConsumerSurface_Create");
+  MLN_TG_LOAD(set_default_size, "OH_ConsumerSurface_SetDefaultSize");
+  MLN_TG_LOAD(set_default_usage, "OH_ConsumerSurface_SetDefaultUsage");
+  MLN_TG_LOAD(set_listener, "OH_NativeImage_SetOnFrameAvailableListener");
+  MLN_TG_LOAD(acquire_window, "OH_NativeImage_AcquireNativeWindow");
+  MLN_TG_LOAD(acquire_buffer, "OH_NativeImage_AcquireNativeWindowBuffer");
+  MLN_TG_LOAD(release_buffer, "OH_NativeImage_ReleaseNativeWindowBuffer");
+  MLN_TG_LOAD(destroy, "OH_NativeImage_Destroy");
+#undef MLN_TG_LOAD
+  graphics->image_library = library;
+  return true;
+}
+
+// Consumes each presented buffer, so the producer never runs out of buffers to
+// dequeue. The consumer calls this on a thread of its own.
+static void ohos_release_presented_buffer(void* context) {
+  const mln_test_graphics_surface* surface = context;
+  const ohos_image_functions* image = &surface->graphics->image;
+  void* buffer = NULL;
+  int fence = -1;
+  if (image->acquire_buffer(surface->consumer, &buffer, &fence) == 0) {
+    if (fence >= 0) close(fence);
+    (void)image->release_buffer(surface->consumer, buffer, -1);
+  }
+}
+
+// A consumer surface's window stands in for an XComponent's: the library's
+// producer presents into its buffer queue, and the listener above consumes
+// each frame.
+static void* ohos_window_create(
+  mln_test_graphics* graphics, mln_test_graphics_surface* surface
+) {
+  if (!ohos_image_load(graphics)) return NULL;
+  const ohos_image_functions* image = &graphics->image;
+  surface->consumer = image->create();
+  if (surface->consumer == NULL) {
+    set_error("OH_ConsumerSurface_Create failed");
+    return NULL;
+  }
+  int32_t status = image->set_default_size(
+    surface->consumer, (int32_t)surface->info.width,
+    (int32_t)surface->info.height
+  );
+  if (status == 0) {
+    status = image->set_default_usage(surface->consumer, ohos_gpu_usage);
+  }
+  if (status == 0) {
+    status = image->set_listener(
+      surface->consumer, (ohos_frame_listener){
+                           .context = surface,
+                           .on_frame_available = ohos_release_presented_buffer,
+                         }
+    );
+  }
+  if (status != 0) {
+    set_error("configuring the consumer surface failed with %d", (int)status);
+    return NULL;
+  }
+  // The consumer owns the window and releases it with the consumer.
+  void* window = image->acquire_window(surface->consumer);
+  if (window == NULL) set_error("OH_NativeImage_AcquireNativeWindow failed");
+  return window;
+}
+#endif
+
+// The window of an Android or OpenHarmony surface, which the fixture hands to
+// the library and never presents to itself: a window takes one producer.
+static void platform_window_destroy(mln_test_graphics_surface* surface) {
+#if defined(__ANDROID__)
+  if (surface->image_reader != NULL) {
+    surface->graphics->media.reader_delete(surface->image_reader);
+  }
+#elif defined(__OHOS__)
+  if (surface->consumer != NULL) {
+    surface->graphics->image.destroy(&surface->consumer);
+  }
+#else
+  (void)surface;
+#endif
+}
+
 // Prefers the platform's own surface kind, which a real window would use, and
 // falls back to VK_EXT_headless_surface.
 static bool vulkan_surface_create(
@@ -1388,27 +1536,6 @@ static bool vulkan_surface_create(
   VkInstance instance = (VkInstance)graphics->context.vulkan_instance;
   VkSurfaceKHR handle = VK_NULL_HANDLE;
   VkResult result = VK_ERROR_EXTENSION_NOT_PRESENT;
-#if defined(MLN_TG_HAS_METAL)
-  if (graphics->vulkan_metal_surface && vk->create_metal_surface != NULL) {
-    if (!metal_load(&graphics->objc)) return false;
-    void* device = graphics->objc.create_device();
-    void* pool = graphics->objc.pool_push();
-    surface->vulkan_layer = metal_layer_create(
-      graphics, device, surface->info.width, surface->info.height
-    );
-    graphics->objc.pool_pop(pool);
-    if (device != NULL) objc_send_void(graphics, device, "release");
-    if (surface->vulkan_layer == NULL) return false;
-    const vulkan_metal_surface_info info = {
-      .sType = (VkStructureType)1000217000,
-      .pLayer = surface->vulkan_layer,
-    };
-    result = ((VkResult(VKAPI_PTR*)(
-      VkInstance, const vulkan_metal_surface_info*,
-      const VkAllocationCallbacks*, VkSurfaceKHR*
-    ))vk->create_metal_surface)(instance, &info, NULL, &handle);
-  }
-#endif
 #if defined(_WIN32)
   if (
     handle == VK_NULL_HANDLE && graphics->vulkan_win32_surface &&
@@ -1420,6 +1547,7 @@ static bool vulkan_surface_create(
     // Mesa presents through StretchBlt, which needs a visible destination.
     ShowWindow(surface->window, SW_SHOWNOACTIVATE);
     UpdateWindow(surface->window);
+    surface->info.win32_window = surface->window;
     const vulkan_win32_surface_info info = {
       .sType = (VkStructureType)1000009000,
       .hinstance = GetModuleHandleA(NULL),
@@ -1438,6 +1566,7 @@ static bool vulkan_surface_create(
   ) {
     void* window = android_window_create(graphics, surface);
     if (window == NULL) return false;
+    surface->info.android_window = window;
     const vulkan_android_surface_info info = {
       .sType = (VkStructureType)1000008000,
       .window = window,
@@ -1478,6 +1607,14 @@ static bool vulkan_surface_create(
     set_error("the context's queue family cannot present to the surface");
     return false;
   }
+#if defined(__ANDROID__)
+  // A window takes one producer, and the library connects its own surface
+  // to the window that the fixture hands it, so the fixture keeps none.
+  if (surface->info.android_window != NULL && vk->destroy_surface != NULL) {
+    vk->destroy_surface(instance, handle, NULL);
+    surface->info.vulkan_surface = 0;
+  }
+#endif
   return true;
 }
 
@@ -1489,17 +1626,6 @@ static void vulkan_surface_destroy(mln_test_graphics_surface* surface) {
       (VkSurfaceKHR)(uintptr_t)surface->info.vulkan_surface, NULL
     );
   }
-#if defined(MLN_TG_HAS_METAL)
-  if (surface->vulkan_layer != NULL) {
-    objc_send_void(graphics, surface->vulkan_layer, "release");
-  }
-#endif
-#if defined(__ANDROID__)
-  // After the surface, which holds the reader's window.
-  if (surface->image_reader != NULL) {
-    graphics->media.reader_delete(surface->image_reader);
-  }
-#endif
 }
 
 // OpenGL objects, shared by EGL and WGL
@@ -1675,11 +1801,6 @@ enum {
   EGL_CONTEXT_CLIENT_VERSION_VALUE = 0x3098,
   EGL_DRAW_VALUE = 0x3059,
   EGL_READ_VALUE = 0x305A,
-  EGL_PLATFORM_ANGLE_ANGLE_VALUE = 0x3202,
-  EGL_PLATFORM_ANGLE_TYPE_ANGLE_VALUE = 0x3203,
-  EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE_VALUE = 0x3489,
-  EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE_VALUE = 0x3209,
-  EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE_VALUE = 0x320A,
   EGL_PLATFORM_SURFACELESS_MESA_VALUE = 0x31DD,
 };
 
@@ -1704,10 +1825,7 @@ static void* egl_open_library(
 }
 
 static bool egl_load(mln_test_graphics* graphics) {
-#if defined(__APPLE__)
-  static const char* const egl_names[] = {"libEGL.dylib"};
-  static const char* const gles_names[] = {"libGLESv2.dylib"};
-#elif defined(__ANDROID__)
+#if defined(__ANDROID__)
   static const char* const egl_names[] = {"libEGL.so"};
   static const char* const gles_names[] = {"libGLESv3.so", "libGLESv2.so"};
 #else
@@ -1765,9 +1883,8 @@ static bool egl_load(mln_test_graphics* graphics) {
 
 // Test contexts render into pbuffers and never present, so desktop Linux names
 // the surfaceless platform: the default display resolves to whatever libEGL was
-// built for, commonly X11, which fails without a display server. Apple uses
-// ANGLE on Metal. Android and OpenHarmony keep the default display, which
-// serves their own window systems.
+// built for, commonly X11, which fails without a display server. Android and
+// OpenHarmony keep the default display, which serves their own window systems.
 static void* egl_display(const mln_test_graphics* graphics) {
   const egl_functions* egl = &graphics->egl;
 #if defined(__ANDROID__) || defined(__OHOS__)
@@ -1776,18 +1893,7 @@ static void* egl_display(const mln_test_graphics* graphics) {
   void* (*get_platform_display)(uint32_t, void*, const intptr_t*) =
     egl->get_platform_display;
   if (get_platform_display == NULL) return NULL;
-#if defined(__APPLE__)
-  const intptr_t attributes[] = {
-    EGL_PLATFORM_ANGLE_TYPE_ANGLE_VALUE,
-    EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE_VALUE,
-    EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE_VALUE,
-    EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE_VALUE,
-    EGL_NONE_VALUE,
-  };
-  return get_platform_display(EGL_PLATFORM_ANGLE_ANGLE_VALUE, NULL, attributes);
-#else
   return get_platform_display(EGL_PLATFORM_SURFACELESS_MESA_VALUE, NULL, NULL);
-#endif
 #endif
 }
 
@@ -1906,6 +2012,13 @@ static bool egl_surface_create(
     );
     return false;
   }
+#if defined(__ANDROID__)
+  surface->info.android_window = android_window_create(graphics, surface);
+  if (surface->info.android_window == NULL) return false;
+#elif defined(__OHOS__)
+  surface->info.ohos_window = ohos_window_create(graphics, surface);
+  if (surface->info.ohos_window == NULL) return false;
+#endif
   return true;
 }
 
@@ -2036,6 +2149,7 @@ static bool wgl_surface_create(
   surface->window =
     wgl_create_window(surface->info.width, surface->info.height);
   if (surface->window == NULL) return false;
+  surface->info.win32_window = surface->window;
   HDC device_context = GetDC(surface->window);
   surface->info.opengl_surface = device_context;
   if (!SetPixelFormat(
@@ -2156,11 +2270,9 @@ mln_test_graphics* mln_test_graphics_create(uint32_t backend) {
       created = metal_create(graphics);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       created = vulkan_create(graphics);
       break;
-#endif
 #if defined(MLN_TG_HAS_EGL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
       created = egl_create(graphics);
@@ -2189,7 +2301,6 @@ mln_test_graphics* mln_test_graphics_create(uint32_t backend) {
 mln_test_graphics* mln_test_graphics_create_vulkan_borrowed(
   const mln_test_graphics_context* context
 ) {
-#if !defined(__EMSCRIPTEN__)
   mln_test_graphics* graphics = calloc(1, sizeof(*graphics));
   if (graphics == NULL) {
     set_error("out of memory");
@@ -2200,11 +2311,6 @@ mln_test_graphics* mln_test_graphics_create_vulkan_borrowed(
     return NULL;
   }
   return graphics;
-#else
-  (void)context;
-  set_error("this platform has no Vulkan");
-  return NULL;
-#endif
 }
 
 void mln_test_graphics_destroy(mln_test_graphics* graphics) {
@@ -2215,11 +2321,9 @@ void mln_test_graphics_destroy(mln_test_graphics* graphics) {
       metal_destroy(graphics);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       vulkan_destroy(graphics);
       break;
-#endif
 #if defined(MLN_TG_HAS_EGL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
       egl_destroy(graphics);
@@ -2325,7 +2429,6 @@ void* mln_test_graphics_metal_command_queue(mln_test_graphics* graphics) {
 static PFN_vkVoidFunction vulkan_device_proc(
   mln_test_graphics* graphics, const char* name
 ) {
-#if !defined(__EMSCRIPTEN__)
   if (graphics->context.backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN) {
     PFN_vkVoidFunction proc = graphics->vk.get_device_proc_addr(
       (VkDevice)graphics->context.vulkan_device, name
@@ -2333,9 +2436,6 @@ static PFN_vkVoidFunction vulkan_device_proc(
     if (proc == NULL) set_error("the Vulkan device lacks %s", name);
     return proc;
   }
-#else
-  (void)name;
-#endif
   set_error("only a Vulkan graphics object has timeline semaphores");
   return NULL;
 }
@@ -2554,11 +2654,9 @@ mln_test_graphics_texture* mln_test_graphics_texture_create(
       created = metal_texture_create(graphics, texture);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       created = vulkan_texture_create(graphics, texture);
       break;
-#endif
 #if defined(MLN_TG_HAS_GL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
@@ -2586,11 +2684,9 @@ void mln_test_graphics_texture_destroy(mln_test_graphics_texture* texture) {
       metal_texture_destroy(texture);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       vulkan_texture_destroy(texture);
       break;
-#endif
 #if defined(MLN_TG_HAS_GL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
@@ -2635,10 +2731,8 @@ bool mln_test_graphics_texture_read_rgba8(
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
       return metal_texture_read(texture, pixels);
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       return vulkan_texture_read(texture, pixels);
-#endif
 #if defined(MLN_TG_HAS_GL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
     case MLN_TEST_GRAPHICS_BACKEND_WGL:
@@ -2648,6 +2742,53 @@ bool mln_test_graphics_texture_read_rgba8(
       set_error("unknown backend");
       return false;
   }
+}
+
+mln_test_graphics_texture* mln_test_graphics_depth_texture_create(
+  mln_test_graphics* graphics, uint32_t width, uint32_t height
+) {
+  if (graphics == NULL || width == 0 || height == 0) {
+    set_error("a texture needs a graphics object and a nonzero size");
+    return NULL;
+  }
+  if (graphics->context.backend == MLN_TEST_GRAPHICS_BACKEND_VULKAN) {
+    mln_test_graphics_texture* texture = calloc(1, sizeof(*texture));
+    if (texture == NULL) {
+      set_error("out of memory");
+      return NULL;
+    }
+    texture->graphics = graphics;
+    texture->info.width = width;
+    texture->info.height = height;
+    texture->depth = true;
+    if (!vulkan_texture_create(graphics, texture)) {
+      char reason[sizeof(last_error)];
+      memcpy(reason, last_error, sizeof(reason));
+      mln_test_graphics_texture_destroy(texture);
+      set_error("%s", reason);
+      return NULL;
+    }
+    return texture;
+  }
+  set_error("only a Vulkan graphics object makes depth textures");
+  return NULL;
+}
+
+bool mln_test_graphics_depth_texture_read(
+  mln_test_graphics_texture* texture, float* depths, size_t count
+) {
+  if (texture == NULL || depths == NULL || !texture->depth) {
+    set_error("a depth readback needs a depth texture and a buffer");
+    return false;
+  }
+  if (count / texture->info.width < texture->info.height) {
+    set_error(
+      "a %ux%u depth readback needs %zu values", texture->info.width,
+      texture->info.height, (size_t)texture->info.width * texture->info.height
+    );
+    return false;
+  }
+  return vulkan_texture_read(texture, (uint8_t*)depths);
 }
 
 mln_test_graphics_surface* mln_test_graphics_surface_create(
@@ -2672,11 +2813,9 @@ mln_test_graphics_surface* mln_test_graphics_surface_create(
       created = metal_surface_create(graphics, surface);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       created = vulkan_surface_create(graphics, surface);
       break;
-#endif
 #if defined(MLN_TG_HAS_EGL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
       created = egl_surface_create(graphics, surface);
@@ -2708,14 +2847,12 @@ void mln_test_graphics_surface_destroy(mln_test_graphics_surface* surface) {
       metal_surface_destroy(surface);
       break;
 #endif
-#if !defined(__EMSCRIPTEN__)
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
       vulkan_surface_destroy(surface);
 #if defined(MLN_TG_HAS_WGL)
       if (surface->window != NULL) DestroyWindow(surface->window);
 #endif
       break;
-#endif
 #if defined(MLN_TG_HAS_EGL)
     case MLN_TEST_GRAPHICS_BACKEND_EGL:
       egl_surface_destroy(surface);
@@ -2729,6 +2866,8 @@ void mln_test_graphics_surface_destroy(mln_test_graphics_surface* surface) {
     default:
       break;
   }
+  // After the backend's surface, which may hold the window.
+  platform_window_destroy(surface);
   free(surface);
 }
 

@@ -41,7 +41,11 @@ guint64 maplibre_native_ffi_acquired_frame_get_id(
  * Gives up an acquired frame without saying when your GPU stops reading it.
  *
  * Because your GPU may still read the frame's texture, the session never
- * renders into that texture again.
+ * renders into that texture again, even when
+ * `maplibre_native_ffi_render_session_set_target_async()` gives it the texture
+ * again, until `maplibre_native_ffi_render_session_release_target_async()`
+ * releases the ring. A view that is open on the frame keeps the frame's sync
+ * objects in place until it ends.
  *
  * The object calls this when it is disposed, unless it was released or
  * discarded. Later calls fail as on any released handle.
@@ -59,7 +63,7 @@ gboolean maplibre_native_ffi_acquired_frame_discard(
 /**
  * maplibre_native_ffi_acquired_frame_get_dma_buf:
  *
- * Gets the dmabuf of an acquired frame.
+ * Gets the dmabuf of an exported ring's acquired frame.
  *
  * Wait for `maplibre_native_ffi_acquired_frame_get_producer_sync()` before you
  * read the buffer. Once you release or discard the frame, the session may
@@ -72,10 +76,12 @@ gboolean maplibre_native_ffi_acquired_frame_discard(
  * `dup`. A duplicate keeps the buffer's memory, but not its contents.
  *
  * See `mln_acquired_frame_get_dma_buf` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  *
  * It fails with these errors:
  *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the session's ring shares its
+ *   textures in another way.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` when the session failed, or you
  *   detached, abandoned, or disposed it.
  *
@@ -90,7 +96,7 @@ MaplibreNativeFfiDmaBufFrame* maplibre_native_ffi_acquired_frame_get_dma_buf(
 /**
  * maplibre_native_ffi_acquired_frame_get_io_surface:
  *
- * Gets the IOSurface of an acquired frame.
+ * Gets the IOSurface of an exported ring's acquired frame.
  *
  * Wait for `maplibre_native_ffi_acquired_frame_get_producer_sync()` before you
  * read the surface. Once you release or discard the frame, the session may
@@ -100,10 +106,12 @@ MaplibreNativeFfiDmaBufFrame* maplibre_native_ffi_acquired_frame_get_dma_buf(
  * surface's memory, but not its contents.
  *
  * See `mln_acquired_frame_get_io_surface` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  *
  * It fails with these errors:
  *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the session's ring shares its
+ *   textures in another way.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` when the session failed, or you
  *   detached, abandoned, or disposed it.
  *
@@ -121,6 +129,13 @@ maplibre_native_ffi_acquired_frame_get_io_surface(
  *
  * Gets the Metal texture of an acquired frame.
  *
+ * It gets a borrowed ring's texture, or an exported ring's on a Metal device:
+ * the texture of the IOSurface that
+ * `maplibre_native_ffi_acquired_frame_get_io_surface()` gets, and the frame's
+ * depth texture with `MaplibreNativeFfiRenderSessionAttachOptions:keep-depth`.
+ * Wait for `maplibre_native_ffi_acquired_frame_get_producer_sync()` before you
+ * use them.
+ *
  * See `mln_acquired_frame_get_metal_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  *
@@ -137,10 +152,52 @@ maplibre_native_ffi_acquired_frame_get_metal_texture(
 );
 #endif
 
+#if defined(__linux__)
+/**
+ * maplibre_native_ffi_acquired_frame_get_opaque_fd:
+ *
+ * Gets the memory of an exported ring's acquired frame, as an opaque file
+ * descriptor.
+ *
+ * Wait for `maplibre_native_ffi_acquired_frame_get_producer_sync()` before you
+ * read the image. Once you release or discard the frame, the session may render
+ * into the image again.
+ *
+ * The session owns the file descriptor, so don't close it. An import takes the
+ * descriptor, so import a duplicate from `dup`. Memory that you import keeps
+ * the image's memory, but not its contents.
+ *
+ * See `mln_acquired_frame_get_opaque_fd` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the session's ring shares its
+ *   textures in another way.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` when the session failed, or you
+ *   detached, abandoned, or disposed it.
+ *
+ * Returns: (transfer full): the value
+ */
+MaplibreNativeFfiOpaqueFdFrame*
+maplibre_native_ffi_acquired_frame_get_opaque_fd(
+  MaplibreNativeFfiAcquiredFrame* self, GError** error
+);
+#endif
+
 /**
  * maplibre_native_ffi_acquired_frame_get_open_gl_texture:
  *
  * Gets the OpenGL texture of an acquired frame.
+ *
+ * It gets a borrowed ring's texture, or an exported ring's on an OpenGL device:
+ * the texture of the dmabuf that
+ * `maplibre_native_ffi_acquired_frame_get_dma_buf()` gets, and the frame's
+ * depth texture with `MaplibreNativeFfiRenderSessionAttachOptions:keep-depth`,
+ * in the device's share group. An exported ring's textures hold the frame
+ * upside down from OpenGL's rows, top row first, as a dmabuf's readers take it,
+ * so negate clip y to draw into them. Wait for
+ * `maplibre_native_ffi_acquired_frame_get_producer_sync()` before you use them.
  *
  * See `mln_acquired_frame_get_open_gl_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -199,6 +256,13 @@ maplibre_native_ffi_acquired_frame_get_result(
  *
  * Gets the Vulkan image of an acquired frame.
  *
+ * It gets a borrowed ring's image, or an exported ring's on a Vulkan device:
+ * the image whose memory the ring shares, and the frame's depth image with
+ * `MaplibreNativeFfiRenderSessionAttachOptions:keep-depth`. An exported ring's
+ * frame releases them to VK_QUEUE_FAMILY_EXTERNAL, so acquire them from there.
+ * Wait for `maplibre_native_ffi_acquired_frame_get_producer_sync()` before you
+ * use them.
+ *
  * See `mln_acquired_frame_get_vulkan_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  *
@@ -219,11 +283,11 @@ maplibre_native_ffi_acquired_frame_get_vulkan_texture(
  *
  * Gives an acquired frame back to the session once you're done reading it.
  *
- * `consumer_completion` says when your GPU work that reads the texture
- * finishes. Pass `MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE` when that work has
- * already finished. The session waits for that point before it renders into the
- * texture again. If that wait fails, such as for an OpenGL fence outside the
- * session's share group, the session fails.
+ * `consumer_completion` says when your GPU work on the texture, and on its
+ * depth texture, finishes. Pass `MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE`
+ * when that work has already finished. The session waits for that point before
+ * it renders into the textures again. If that wait fails, such as for an OpenGL
+ * fence outside the session's share group, the session fails.
  *
  * The object calls this when it is disposed, unless it was released. Later
  * calls fail as on any released handle.
@@ -271,6 +335,50 @@ guint64 maplibre_native_ffi_frame_pacer_get_id(
 );
 
 /**
+ * maplibre_native_ffi_frame_pacer_create: (constructor)
+ * @options: (nullable): the value, or %NULL
+ *
+ * Creates a frame pacer that follows the platform's display.
+ *
+ * On iOS, macOS, and tvOS, the pacer follows the display through a
+ * `CADisplayLink`. You can call it on any thread, and the pacer needs no run
+ * loop of yours. On macOS, it follows the main display, the one with the menu
+ * bar. With `MaplibreNativeFfiFramePacerOptions:maximum-frames-per-second`, the
+ * pacer also asks the system for that refresh rate. On iPhone, a rate above 60
+ * needs `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+ *
+ * On Android, the pacer follows the display through the calling thread's
+ * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+ * main thread, and keep that thread running its looper while sessions use the
+ * pacer. `AChoreographer` can stop while the phone's display is off, even while
+ * a Surface on another display, such as an Android Auto projection, still shows
+ * the map. The pacer then keeps demanding frames from a timer on the looper,
+ * within the frame rate limit, until vsyncs arrive again.
+ *
+ * On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
+ * can call it on any thread, and the pacer needs no event loop of yours.
+ *
+ * See `mln_frame_pacer_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` on the other platforms, such as
+ *   visionOS, Linux, and Windows, where the library has no source of display
+ *   refreshes.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` on Android when the calling
+ *   thread has no `ALooper`.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` on iOS, macOS, and tvOS when the
+ *   system has no display to follow, and on OpenHarmony when the system can't
+ *   report the display's refreshes to the process.
+ *
+ * Returns: (transfer full): the object
+ */
+MaplibreNativeFfiFramePacer* maplibre_native_ffi_frame_pacer_create(
+  MaplibreNativeFfiFramePacerOptions* options, GError** error
+);
+
+/**
  * maplibre_native_ffi_frame_pacer_release:
  *
  * Releases a frame pacer.
@@ -285,6 +393,237 @@ guint64 maplibre_native_ffi_frame_pacer_get_id(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 void maplibre_native_ffi_frame_pacer_release(MaplibreNativeFfiFramePacer* self);
+
+/**
+ * maplibre_native_ffi_frame_pacer_set_options:
+ *
+ * Changes a frame pacer's settings.
+ *
+ * Settings that `options` doesn't set keep their current values. You can call
+ * it on any thread.
+ *
+ * The sessions that the pacer serves follow the new settings from the next
+ * display refresh, including a refresh that they already wait for. The pacer
+ * counts a new limit from the last frames it demanded, so a higher limit can
+ * demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
+ * the system for the new limit's refresh rate, or for the display's own rate
+ * once the limit is removed.
+ *
+ * See `mln_frame_pacer_set_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when you released `pacer`, even
+ *   while sessions still use it.
+ *
+ * Returns: %TRUE on success, or %FALSE with `error` set
+ */
+gboolean maplibre_native_ffi_frame_pacer_set_options(
+  MaplibreNativeFfiFramePacer* self,
+  MaplibreNativeFfiFramePacerOptions* options, GError** error
+);
+
+/**
+ * MaplibreNativeFfiGpuDevice:
+ *
+ * A GPU, and the queue that render sessions on it share.
+ *
+ * See `mln_gpu_device` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+#define MAPLIBRE_NATIVE_FFI_TYPE_GPU_DEVICE \
+  (maplibre_native_ffi_gpu_device_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiGpuDevice, maplibre_native_ffi_gpu_device,
+  MAPLIBRE_NATIVE_FFI, GPU_DEVICE, GObject
+)
+
+/**
+ * maplibre_native_ffi_gpu_device_get_id:
+ *
+ * The handle's ID, which runtime events name as their source.
+ *
+ * Returns: the ID
+ */
+guint64 maplibre_native_ffi_gpu_device_get_id(MaplibreNativeFfiGpuDevice* self);
+
+/**
+ * maplibre_native_ffi_gpu_device_create: (constructor)
+ * @options: (nullable): the value, or %NULL
+ *
+ * Creates a GPU device that the library owns, for render sessions to share.
+ *
+ * The sessions on a device share its GPU and queue: one `VkDevice` and queue,
+ * one `MTLDevice` and command queue, or one OpenGL share group.
+ * `maplibre_native_ffi_map_attach()` creates a device of its own when it gets
+ * none. Create one to share it among the sessions of many maps, or to pick the
+ * backend or the GPU. A Vulkan device enables the presentation, timeline
+ * semaphore, external memory, and external semaphore extensions that its GPU
+ * offers.
+ *
+ * See `mln_gpu_device_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when this build or platform lacks
+ *   `backend`, when the device can't render with `open_gl_client_api`, when
+ *   options name a GPU that the backend can't select (an OpenGL device takes no
+ *   `adapter_index`, `adapter_uuid`, or `adapter_luid`, and only a Vulkan
+ *   device takes `adapter_uuid` or `adapter_luid`), when a device that doesn't
+ *   render with Vulkan gets a `queue_lock`, or in a browser for every backend:
+ *   WebGPU makes devices asynchronously, and a WebGL2 context needs a canvas.
+ *   Attach without a device, which the session makes itself, or wrap your
+ *   WebGL2 context.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NOT_FOUND` when no GPU matches `adapter_index`,
+ *   `adapter_uuid`, or `adapter_luid`.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the platform can't create the
+ *   device.
+ *
+ * Returns: (transfer full): the object
+ */
+MaplibreNativeFfiGpuDevice* maplibre_native_ffi_gpu_device_create(
+  MaplibreNativeFfiGpuDeviceOptions* options, GError** error
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_get_capabilities:
+ *
+ * Reads what the device can do.
+ *
+ * Check `export_kinds` before you attach an exported ring, to choose between
+ * the ring and a way of your own to show the map.
+ *
+ * See `mln_gpu_device_get_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * Returns: (transfer full): the value
+ */
+MaplibreNativeFfiGpuDeviceCapabilities*
+maplibre_native_ffi_gpu_device_get_capabilities(
+  MaplibreNativeFfiGpuDevice* self, GError** error
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_get_vulkan_context:
+ *
+ * Gets the Vulkan instance, device, and graphics queue of a Vulkan device.
+ *
+ * Use them to make the images of a borrowed ring, or a surface, that sessions
+ * on the device render to. The sessions on the device share its graphics queue.
+ * To submit to the queue yourself, create the device with
+ * `MaplibreNativeFfiGpuDeviceOptions:queue-lock`.
+ *
+ * See `mln_gpu_device_get_vulkan_context` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the device doesn't render with
+ *   Vulkan.
+ *
+ * Returns: (transfer full): the value
+ */
+MaplibreNativeFfiGpuDeviceVulkanContextResult*
+maplibre_native_ffi_gpu_device_get_vulkan_context(
+  MaplibreNativeFfiGpuDevice* self, GError** error
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_release:
+ *
+ * Releases a GPU device.
+ *
+ * Render sessions on the device keep using it until they detach, or their
+ * release finishes.
+ *
+ * The object calls this when it is disposed, unless it was released. Later
+ * calls fail as on any released handle.
+ *
+ * See `mln_gpu_device_release` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+void maplibre_native_ffi_gpu_device_release(MaplibreNativeFfiGpuDevice* self);
+
+#if defined(__APPLE__)
+/**
+ * maplibre_native_ffi_gpu_device_wrap_metal: (constructor)
+ *
+ * Wraps your Metal device and command queue, so that sessions render on them.
+ *
+ * See `mln_gpu_device_wrap_metal` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
+ *   `maplibre_native_ffi_supported_render_backend_mask()` lacks
+ *   `MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_METAL`.
+ *
+ * Returns: (transfer full): the object
+ */
+MaplibreNativeFfiGpuDevice* maplibre_native_ffi_gpu_device_wrap_metal(
+  MaplibreNativeFfiMetalDeviceDescriptor* descriptor, GError** error
+);
+#endif
+
+/**
+ * maplibre_native_ffi_gpu_device_wrap_open_gl: (constructor)
+ *
+ * Makes an OpenGL device whose share group is your context's.
+ *
+ * Each session on the device makes a context of its own that shares objects
+ * with yours, so that it can render into your textures and present to your
+ * surfaces. A device that the library creates is a share group of its own.
+ *
+ * WebGL has no share groups: a WebGL device is your context. Its sessions
+ * present to a web canvas target whose canvas is the context's own, and take
+ * turns in the context. The library resets the context's state that it tracks
+ * at the start of each frame, and leaves it undefined after.
+ *
+ * See `mln_gpu_device_wrap_open_gl` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
+ *   `maplibre_native_ffi_open_gl_supported_context_provider_mask()` lacks the
+ *   context's platform.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the platform rejects the
+ *   context.
+ *
+ * Returns: (transfer full): the object
+ */
+MaplibreNativeFfiGpuDevice* maplibre_native_ffi_gpu_device_wrap_open_gl(
+  const MaplibreNativeFfiOpenGlContextDescriptor* context, GError** error
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_wrap_vulkan: (constructor)
+ *
+ * Wraps your Vulkan device and queue, so that sessions render on them.
+ *
+ * Sessions on the device render into your images, present to your surfaces, and
+ * submit to your queue, under your queue lock when you give one. Sessions of
+ * several devices that wrap one queue never submit to it at once.
+ *
+ * See `mln_gpu_device_wrap_vulkan` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
+ *   `maplibre_native_ffi_supported_render_backend_mask()` lacks
+ *   `MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_VULKAN`.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the library can't load the
+ *   device's functions.
+ *
+ * Returns: (transfer full): the object
+ */
+MaplibreNativeFfiGpuDevice* maplibre_native_ffi_gpu_device_wrap_vulkan(
+  MaplibreNativeFfiVulkanDeviceDescriptor* descriptor, GError** error
+);
 
 /**
  * MaplibreNativeFfiMap:
@@ -345,6 +684,61 @@ void maplibre_native_ffi_map_add_custom_geometry_source_async(
  */
 MaplibreNativeFfiCommandCompletion*
 maplibre_native_ffi_map_add_custom_geometry_source_finish(
+  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
+);
+
+/**
+ * maplibre_native_ffi_map_add_custom_layer_async:
+ * @layer_id: the UTF-8 text
+ * @before_layer_id: (nullable): the UTF-8 text
+ * @callback: (scope async) (nullable): the callback to call when the call finishes
+ * @user_data: the data to pass to `callback`
+ *
+ * Adds a layer that draws with your own GPU commands, through `host`.
+ *
+ * The layer goes below the layer named `before_layer_id`, or above every layer
+ * when `before_layer_id` is empty. Its type is `custom`, and it takes the
+ * `visibility`, `minzoom`, and `maxzoom` properties, but no paint properties.
+ * `maplibre_native_ffi_map_remove_style_layer_async()` removes it.
+ *
+ * Runs on the thread that runs the session's graphics work: a library thread,
+ * or yours with `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`. It
+ * can't call the library.
+ *
+ * Runs on the thread that runs the session's graphics work, as
+ * `MaplibreNativeFfiCustomLayerPrerenderCallback` says. It can't call the
+ * library.
+ *
+ * See `mln_map_add_custom_layer` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NOT_FOUND` when the style has no layer named
+ *   `before_layer_id`.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_ALREADY_EXISTS` when the style already has a
+ *   layer named `layer_id`.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while the style isn't loaded, as
+ *   `maplibre_native_ffi_map_set_style_url_async()` describes.
+ *
+ * Without `callback`, nothing reports whether the call succeeds.
+ */
+void maplibre_native_ffi_map_add_custom_layer_async(
+  MaplibreNativeFfiMap* self, const char* layer_id, const char* before_layer_id,
+  const MaplibreNativeFfiCustomLayerHost* host, GAsyncReadyCallback callback,
+  gpointer user_data
+);
+
+/**
+ * maplibre_native_ffi_map_add_custom_layer_finish:
+ * @result: the result that the callback received
+ *
+ * Finishes a call that `maplibre_native_ffi_map_add_custom_layer_async` started.
+ *
+ * Returns: (transfer full): the command's completion, or %NULL with `error` set
+ */
+MaplibreNativeFfiCommandCompletion*
+maplibre_native_ffi_map_add_custom_layer_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
 );
 
@@ -624,163 +1018,11 @@ maplibre_native_ffi_map_apply_camera_delta_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
 );
 
-#if defined(__linux__)
 /**
- * maplibre_native_ffi_map_attach_dma_buf_ring:
+ * maplibre_native_ffi_map_attach:
  * @device: (nullable): the handle, or %NULL
  *
- * Creates a session that renders the map into a ring of dmabufs that the
- * library allocates.
- *
- * Acquire each frame with `maplibre_native_ffi_render_session_acquire_frame()`,
- * and get its buffer with `maplibre_native_ffi_acquired_frame_get_dma_buf()`.
- * `maplibre_native_ffi_render_session_resize_async()` gives the ring new
- * buffers of the new size.
- *
- * A Vulkan build renders with `device`, or, when `device` is null, with a
- * device that the library creates. An OpenGL build uses an EGL context of its
- * own, and `device` must be null. Attach with
- * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER`.
- *
- * For a reader that waits on no sync file, such as a Wayland compositor without
- * explicit synchronization, attach without
- * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_KIND_FLAG_SYNC_FD` in
- * `MaplibreNativeFfiRenderSessionAttachOptions:producer-sync-kinds`, so that
- * each frame finishes before you acquire it. Keep each frame acquired until its
- * reader is done with the buffer. Give the ring 3 buffers, so the session can
- * render while you hold two frames.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_dma_buf_ring` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the graphics context can't
- *   render into a dmabuf of any of `formats`.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the library can't create its
- *   Vulkan device or initialize an EGL display.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_dma_buf_ring(
-  MaplibreNativeFfiMap* self, MaplibreNativeFfiDmaBufRingDescriptor* descriptor,
-  MaplibreNativeFfiVulkanDevice* device,
-  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
-);
-#endif
-
-#if defined(__APPLE__)
-/**
- * maplibre_native_ffi_map_attach_io_surface_ring:
- *
- * Creates a session that renders the map into a ring of IOSurfaces that the
- * library allocates.
- *
- * Acquire each frame with `maplibre_native_ffi_render_session_acquire_frame()`,
- * and get its surface with
- * `maplibre_native_ffi_acquired_frame_get_io_surface()`.
- * `maplibre_native_ffi_render_session_resize_async()` gives the ring new
- * surfaces of the new size. Attach with
- * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER`.
- *
- * To hand frames to a reader that can't wait on an event, such as Flutter's
- * `copyPixelBuffer`, attach without
- * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_KIND_FLAG_METAL_SHARED_EVENT` in
- * `MaplibreNativeFfiRenderSessionAttachOptions:producer-sync-kinds`, so that
- * each frame finishes before you acquire it. Release a frame with
- * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE` only once the reader has finished
- * with its surface.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_io_surface_ring` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
- *   `maplibre_native_ffi_supported_render_backend_mask()` lacks
- *   `MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_METAL`.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when `context` names no device and
- *   the system has no Metal device.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_io_surface_ring(
-  MaplibreNativeFfiMap* self,
-  MaplibreNativeFfiIoSurfaceRingDescriptor* descriptor,
-  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
-);
-#endif
-
-#if defined(__APPLE__)
-/**
- * maplibre_native_ffi_map_attach_metal_borrowed_texture:
- *
- * Creates a session that renders the map into a ring of your Metal textures.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_metal_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
- *   `maplibre_native_ffi_supported_render_backend_mask()` lacks
- *   `MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_METAL`, or when the target
- *   supports none of the `producer_sync_kinds` in `options`.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession*
-maplibre_native_ffi_map_attach_metal_borrowed_texture(
-  MaplibreNativeFfiMap* self,
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* descriptor,
-  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
-);
-#endif
-
-#if defined(__APPLE__)
-/**
- * maplibre_native_ffi_map_attach_metal_surface:
- *
- * Creates a session that renders the map to a Metal layer.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_metal_surface` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
- *   `maplibre_native_ffi_supported_render_backend_mask()` lacks
- *   `MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_METAL`.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_metal_surface(
-  MaplibreNativeFfiMap* self,
-  MaplibreNativeFfiMetalSurfaceDescriptor* descriptor,
-  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
-);
-#endif
-
-/**
- * maplibre_native_ffi_map_attach_offscreen:
- * @device: (nullable): the handle, or %NULL
- *
- * Attaches a render session that renders the map offscreen.
- *
- * Read each image's pixels with
- * `maplibre_native_ffi_render_session_read_texture_async()`.
+ * Attaches a render session that renders the map into `target`.
  *
  * The session renders on `device`. When `device` is null, the session creates a
  * device with the default options, and releases it when the session ends.
@@ -788,174 +1030,36 @@ MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_metal_surface(
  * The object is ready once `maplibre_native_ffi_render_session_ready_async`
  * finishes, which fails with the errors that the completion reports.
  *
- * See `mln_map_attach_offscreen` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ * See `mln_map_attach` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  *
  * It fails with these errors:
  *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when a borrowed ring has depth
+ *   textures, but not one for each of its textures.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when the map already has a render
- *   session.
+ *   session, or a window is minimized or has no client area.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the device's
+ *   `MaplibreNativeFfiGpuDeviceCapabilities.target_kinds` lacks the target's
+ *   kind, or, for a null `device`, when no backend of this build renders to it,
+ *   when `options` sets `keep_depth` for a target other than an exported ring,
+ *   or when a borrowed ring's depth format isn't one of the device's
+ *   `MaplibreNativeFfiGpuDeviceCapabilities.depth_stencil_formats`.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when a window was minimized or
+ *   had no client area when the attach ran.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the GPU or the graphics driver
+ *   can't present to the window.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when `device` is null and the
- *   platform can't create a device.
+ *   platform can't create a device, or when the library can't create its
+ *   graphics context or present to the window.
  *
  * Returns: (transfer full): the new object, or %NULL with `error` set
  */
-MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_offscreen(
-  MaplibreNativeFfiMap* self,
-  const MaplibreNativeFfiOffscreenDescriptor* descriptor,
-  MaplibreNativeFfiRenderSessionAttachOptions* options,
-  MaplibreNativeFfiOffscreenDevice* device, GError** error
-);
-
-/**
- * maplibre_native_ffi_map_attach_open_gl_borrowed_texture:
- *
- * Creates a session that renders the map into a ring of your OpenGL textures.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_open_gl_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
- *   `maplibre_native_ffi_open_gl_supported_context_provider_mask()` lacks the
- *   context's platform, or when the target supports none of the
- *   `producer_sync_kinds` in `options`.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession*
-maplibre_native_ffi_map_attach_open_gl_borrowed_texture(
-  MaplibreNativeFfiMap* self,
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* descriptor,
+MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach(
+  MaplibreNativeFfiMap* self, const MaplibreNativeFfiRenderTarget* target,
+  MaplibreNativeFfiGpuDevice* device,
   MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
 );
-
-/**
- * maplibre_native_ffi_map_attach_open_gl_surface:
- *
- * Creates a session that renders the map to an OpenGL surface.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_open_gl_surface` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
- *   `maplibre_native_ffi_open_gl_supported_context_provider_mask()` lacks the
- *   context's platform.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_open_gl_surface(
-  MaplibreNativeFfiMap* self,
-  MaplibreNativeFfiOpenGlSurfaceDescriptor* descriptor,
-  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
-);
-
-/**
- * maplibre_native_ffi_map_attach_vulkan_borrowed_texture:
- *
- * Creates a session that renders the map into a ring of your Vulkan images.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_vulkan_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
- *   `maplibre_native_ffi_supported_render_backend_mask()` lacks
- *   `MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_VULKAN`, or when the target
- *   supports none of the `producer_sync_kinds` in `options`.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession*
-maplibre_native_ffi_map_attach_vulkan_borrowed_texture(
-  MaplibreNativeFfiMap* self,
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* descriptor,
-  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
-);
-
-/**
- * maplibre_native_ffi_map_attach_vulkan_surface:
- *
- * Creates a session that renders the map to a Vulkan surface.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_vulkan_surface` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
- *   `maplibre_native_ffi_supported_render_backend_mask()` lacks
- *   `MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_VULKAN`.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_vulkan_surface(
-  MaplibreNativeFfiMap* self,
-  MaplibreNativeFfiVulkanSurfaceDescriptor* descriptor,
-  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
-);
-
-#if defined(__linux__)
-/**
- * maplibre_native_ffi_map_attach_wayland_surface:
- * @device: (nullable): the handle, or %NULL
- *
- * Creates a session that presents the map to a Wayland surface, with a graphics
- * context that the library creates.
- *
- * A Vulkan build presents with `device`, or, when `device` is null, with a
- * device that the library creates. An OpenGL build uses an EGL context on the
- * display, and `device` must be null. Attach with
- * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER`.
- *
- * The session presents without waiting for the compositor, so demand at most
- * one frame per display refresh.
- *
- * Keep the surface until a release or replacement of the target, or a detach of
- * the session, completes. Keep the display connected until the session's detach
- * completes. In an OpenGL build, if you also use EGL on the display, initialize
- * it before you attach.
- *
- * The object is ready once `maplibre_native_ffi_render_session_ready_async`
- * finishes, which fails with the errors that the completion reports.
- *
- * See `mln_map_attach_wayland_surface` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when you created `device` without
- *   `MaplibreNativeFfiVulkanDeviceOptions:presentation`.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the GPU or the Vulkan loader
- *   can't present to Wayland.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the library can't create the
- *   graphics context or present to the surface.
- *
- * Returns: (transfer full): the new object, or %NULL with `error` set
- */
-MaplibreNativeFfiRenderSession* maplibre_native_ffi_map_attach_wayland_surface(
-  MaplibreNativeFfiMap* self,
-  MaplibreNativeFfiWaylandSurfaceDescriptor* descriptor,
-  MaplibreNativeFfiVulkanDevice* device,
-  MaplibreNativeFfiRenderSessionAttachOptions* options, GError** error
-);
-#endif
 
 /**
  * maplibre_native_ffi_map_begin_command_group_async:
@@ -2334,7 +2438,23 @@ maplibre_native_ffi_map_request_repaint_finish(
  * Renders a still image of a static or tile map.
  *
  * The map's render session draws the image once every resource that the image
- * needs has loaded.
+ * needs has loaded. While the image waits, the session holds a demand of its
+ * own for it, whose frame result carries
+ * `MAPLIBRE_NATIVE_FFI_FRAME_DEMAND_TOKEN_STILL_IMAGE`:
+ *
+ * - It waits for the map to load what the image needs, and while every texture
+ *   of a borrowed ring holds a frame.
+ * - It finishes with the image's frame, and the image completes once that
+ *   frame's result is queued. Frames of your own demands complete no image.
+ * - Your demands never replace it, nor it them.
+ * - `maplibre_native_ffi_render_session_barrier_async()` ends it with
+ *   `MAPLIBRE_NATIVE_FFI_RENDER_RESULT_NO_UPDATE`, and a detach or
+ *   `maplibre_native_ffi_render_session_release_target_async()` ends it with
+ *   `MAPLIBRE_NATIVE_FFI_RENDER_RESULT_TARGET_NOT_READY`. The image gets a new
+ *   demand once the barrier runs, the session has a target again, or the next
+ *   session attaches.
+ * - An image that fails ends its demand with
+ *   `MAPLIBRE_NATIVE_FFI_RENDER_RESULT_NO_UPDATE`.
  *
  * See `mln_map_request_still_image` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2367,10 +2487,11 @@ gboolean maplibre_native_ffi_map_request_still_image_finish(
  * @callback: (scope async) (nullable): the callback to call when the call finishes
  * @user_data: the data to pass to `callback`
  *
- * Sets the map's size.
+ * Sets the map's size and scale factor.
  *
- * A map with a render session takes its size from the session, so resize the
- * session with `maplibre_native_ffi_render_session_resize_async()` instead.
+ * The map keeps its loaded tiles. A map with a render session takes its size
+ * and scale factor from the session, so resize the session with
+ * `maplibre_native_ffi_render_session_resize_async()` instead.
  *
  * See `mln_map_resize` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2385,7 +2506,7 @@ gboolean maplibre_native_ffi_map_request_still_image_finish(
  * Without `callback`, nothing reports whether the call succeeds.
  */
 void maplibre_native_ffi_map_resize_async(
-  MaplibreNativeFfiMap* self, const MaplibreNativeFfiLogicalSize* logical_size,
+  MaplibreNativeFfiMap* self, const MaplibreNativeFfiLogicalExtent* extent,
   GAsyncReadyCallback callback, gpointer user_data
 );
 
@@ -3861,77 +3982,6 @@ gboolean maplibre_native_ffi_map_projection_set_camera(
 );
 
 /**
- * MaplibreNativeFfiOffscreenDevice:
- *
- * A GPU device that the library creates to render maps offscreen.
- *
- * See `mln_offscreen_device` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
- */
-#define MAPLIBRE_NATIVE_FFI_TYPE_OFFSCREEN_DEVICE \
-  (maplibre_native_ffi_offscreen_device_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiOffscreenDevice, maplibre_native_ffi_offscreen_device,
-  MAPLIBRE_NATIVE_FFI, OFFSCREEN_DEVICE, GObject
-)
-
-/**
- * maplibre_native_ffi_offscreen_device_get_id:
- *
- * The handle's ID, which runtime events name as their source.
- *
- * Returns: the ID
- */
-guint64 maplibre_native_ffi_offscreen_device_get_id(
-  MaplibreNativeFfiOffscreenDevice* self
-);
-
-/**
- * maplibre_native_ffi_offscreen_device_create: (constructor)
- * @options: (nullable): the value, or %NULL
- *
- * Creates a GPU device for rendering maps offscreen.
- *
- * `maplibre_native_ffi_map_attach_offscreen()` creates a device of its own when
- * it gets none. Create one to share it among the sessions on many maps, or to
- * pick a GPU.
- *
- * In a browser WebGPU build, attach without a device instead.
- *
- * See `mln_offscreen_device_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` in a browser WebGPU build, or when
- *   the device can't render with `client_api`.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when `adapter_index` names no GPU,
- *   or the platform can't create the device.
- *
- * Returns: (transfer full): the object
- */
-MaplibreNativeFfiOffscreenDevice* maplibre_native_ffi_offscreen_device_create(
-  MaplibreNativeFfiOffscreenDeviceOptions* options, GError** error
-);
-
-/**
- * maplibre_native_ffi_offscreen_device_release:
- *
- * Releases an offscreen device.
- *
- * Render sessions on the device keep working until they detach.
- *
- * The object calls this when it is disposed, unless it was released. Later
- * calls fail as on any released handle.
- *
- * See `mln_offscreen_device_release` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
- */
-void maplibre_native_ffi_offscreen_device_release(
-  MaplibreNativeFfiOffscreenDevice* self
-);
-
-/**
  * MaplibreNativeFfiRenderSession:
  *
  * A render session draws a map into a surface or a texture.
@@ -3971,6 +4021,12 @@ guint64 maplibre_native_ffi_render_session_get_id(
  *
  * Abandon keeps the session's OpenGL and WebGPU objects until the process
  * exits, and reports how many it kept. Detach the session instead to free them.
+ *
+ * A session lets go of your graphics objects later when you call this on the
+ * thread that runs its graphics work: from a callback that the session runs
+ * there, once the callback returns, and for a session driven by
+ * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`, at your next
+ * `maplibre_native_ffi_render_session_service_driver_work()` for it.
  *
  * See `mln_render_session_abandon` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4102,6 +4158,8 @@ gboolean maplibre_native_ffi_render_session_clear_data_finish(
  *
  * It fails with these errors:
  *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when `demand.token` is
+ *   `MAPLIBRE_NATIVE_FFI_FRAME_DEMAND_TOKEN_STILL_IMAGE`.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` or
  *   `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR`, as
  *   `MaplibreNativeFfiRenderSessionSnapshot.failure_status` reports, when the
@@ -4420,7 +4478,8 @@ maplibre_native_ffi_render_session_get_snapshot(
  * Finds the features that the session drew in an area of the screen.
  *
  * The query reads the last frame that the session rendered. A feature that
- * several layers draw appears once for each layer.
+ * several layers draw appears once for each layer. The topmost layer's features
+ * come first, and the bottom layer's last.
  *
  * See `mln_render_session_query_rendered_features` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -4601,7 +4660,19 @@ gboolean maplibre_native_ffi_render_session_release_finish(
  * the background. Release every acquired frame first. Frame demands that are
  * still pending, and later ones until you give the session a new target, finish
  * with `MAPLIBRE_NATIVE_FFI_RENDER_RESULT_TARGET_NOT_READY`. Once the release
- * completes, you can destroy the old target.
+ * completes, you can destroy the old target. An Android or OpenHarmony window
+ * can go away sooner, as `MaplibreNativeFfiAndroidWindowTarget` and
+ * `MaplibreNativeFfiOhosWindowTarget` say.
+ *
+ * For a borrowed ring, a completed release also means that the session has
+ * stopped waiting on the consumer sync that you released its frames with, so
+ * you can reuse or destroy the textures. The session waits about a second at
+ * most for that sync, and logs a warning when the wait runs out. It checks the
+ * sync without blocking a thread: keep servicing a session driven by
+ * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD` until the release
+ * completes. The session keeps nothing of the released textures: a texture that
+ * a later target gives it again is a new one, even one that you discarded a
+ * frame of.
  *
  * See `mln_render_session_release_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4609,9 +4680,7 @@ gboolean maplibre_native_ffi_render_session_release_finish(
  * It fails with these errors:
  *
  * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the session renders offscreen
- *   or into Android hardware buffers, dmabufs, DXGI shared textures, or
- *   IOSurfaces that it allocates.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the target is a WebGL canvas.
+ *   or into an exported ring.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` when the session loses its target
  *   before the release runs.
  */
@@ -4637,11 +4706,15 @@ gboolean maplibre_native_ffi_render_session_release_target_finish(
  * @callback: (scope async) (nullable): the callback to call when the call finishes
  * @user_data: the data to pass to `callback`
  *
- * Resizes the session's target and its map.
+ * Resizes the session's target and its map, and sets the map's scale factor.
  *
- * The session renders at the map's scale factor. Release every acquired frame
- * first. You can call it once the attach call returns. While the attach runs,
- * the resize waits for it to complete.
+ * Use it when the window changes size, or moves to a display with another scale
+ * factor. The map keeps its loaded tiles, and draws its next frame at the new
+ * size and scale factor. You can call it once the attach call returns. While
+ * the attach runs, the resize waits for it to complete.
+ *
+ * An exported ring gets textures of the new size. The frames that you hold keep
+ * their textures, of the old size, until you release or discard them.
  *
  * See `mln_render_session_resize` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4650,9 +4723,8 @@ gboolean maplibre_native_ffi_render_session_release_target_finish(
  *
  * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the session renders into a
  *   borrowed ring. Give it new textures of the new size instead.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` while you hold one of the
- *   session's acquired frames, or when the session failed, or you detached,
- *   abandoned, released, or disposed it.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when the session failed, or you
+ *   detached, abandoned, released, or disposed it.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` when the session loses its target
  *   before the resize applies.
  *
@@ -4660,8 +4732,8 @@ gboolean maplibre_native_ffi_render_session_release_target_finish(
  */
 void maplibre_native_ffi_render_session_resize_async(
   MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiLogicalSize* logical_size,
-  GAsyncReadyCallback callback, gpointer user_data
+  const MaplibreNativeFfiLogicalExtent* extent, GAsyncReadyCallback callback,
+  gpointer user_data
 );
 
 /**
@@ -4693,6 +4765,11 @@ maplibre_native_ffi_render_session_resize_finish(
  *
  * See `mln_render_session_service_driver_work` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_BUSY` when called while a service of the session
+ *   already runs on this thread, from a callback that the service runs.
  *
  * Returns: %TRUE on success, or %FALSE with `error` set
  */
@@ -4730,271 +4807,71 @@ gboolean maplibre_native_ffi_render_session_set_frame_pacer(
   GError** error
 );
 
-#if defined(__APPLE__)
 /**
- * maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async:
+ * maplibre_native_ffi_render_session_set_target_async:
  * @callback: (scope async) (nullable): the callback to call when the call finishes
  * @user_data: the data to pass to `callback`
  *
- * Replaces the Metal textures that a borrowed ring renders into.
+ * Replaces the window, surface, or borrowed ring that the session renders to,
+ * and resizes the map to it.
  *
- * Use it to resize the ring, or to give the session textures again after
- * `maplibre_native_ffi_render_session_release_target_async()`. Release every
- * acquired frame first. Once the replacement completes, the session no longer
- * uses the old textures.
+ * Use it to give the session a target again after
+ * `maplibre_native_ffi_render_session_release_target_async()`, to move it to
+ * another window or surface, or to give a borrowed ring new textures, such as
+ * of a new size. The session renders to `target` with the device that it
+ * attached with. Once the replacement completes, the session no longer uses the
+ * old target. A borrowed ring takes only a ring of the kind it attached with,
+ * with as many textures, with depth textures only when it attached with them,
+ * and with the same formats, final layouts, and owner. Release every acquired
+ * frame of a borrowed ring first. Once the replacement completes, the session
+ * has also stopped waiting on the consumer sync of the textures that the new
+ * ring doesn't have, as
+ * `maplibre_native_ffi_render_session_release_target_async()` says, so you can
+ * reuse or destroy them.
  *
- * See `mln_render_session_set_metal_borrowed_texture_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * See `mln_render_session_set_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  *
  * It fails with these errors:
  *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the new textures have a
- *   different pixel format than the old ones. Attach a new session to change
- *   it.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when a borrowed ring gets more
+ *   or fewer textures than it attached with, or depth textures but not one for
+ *   each texture.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when a window is minimized or has
+ *   no client area, or while you hold one of a borrowed ring's acquired frames.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the session renders offscreen
+ *   or into an exported ring, when `target` is offscreen or an exported ring,
+ *   when a session that presents gets a borrowed ring or a borrowed ring gets
+ *   anything else, or when no backend of this build renders to the target's
+ *   kind. An exported ring takes a new size from
+ *   `maplibre_native_ffi_render_session_resize_async()` instead.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when a window was minimized or
+ *   had no client area when the replacement ran.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the session's device can't
+ *   render to `target`, the new target needs a different color format or
+ *   pre-rotation support than the old one, or a borrowed ring's new textures
+ *   differ from the old ones in their formats, final layouts, or owner, or in
+ *   having depth textures. Attach a new session instead.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the library can't render to
+ *   the new target.
  */
-void maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async(
+void maplibre_native_ffi_render_session_set_target_async(
   MaplibreNativeFfiRenderSession* self,
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* replacement,
-  GAsyncReadyCallback callback, gpointer user_data
+  const MaplibreNativeFfiRenderTarget* target, GAsyncReadyCallback callback,
+  gpointer user_data
 );
-#endif
 
-#if defined(__APPLE__)
 /**
- * maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_finish:
+ * maplibre_native_ffi_render_session_set_target_finish:
  * @result: the result that the callback received
  *
- * Finishes a call that `maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async` started.
+ * Finishes a call that `maplibre_native_ffi_render_session_set_target_async` started.
  *
  * Returns: %TRUE when the call finished, or %FALSE with `error` set
  */
-gboolean
-maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_finish(
+gboolean maplibre_native_ffi_render_session_set_target_finish(
   MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
 );
-#endif
-
-#if defined(__APPLE__)
-/**
- * maplibre_native_ffi_render_session_set_metal_surface_target_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Replaces the Metal layer that the session renders to.
- *
- * Use it to give the session a layer again after
- * `maplibre_native_ffi_render_session_release_target_async()`, to move it to
- * another layer, or to resize it. Once the replacement completes, the session
- * no longer uses the old layer.
- *
- * See `mln_render_session_set_metal_surface_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-void maplibre_native_ffi_render_session_set_metal_surface_target_async(
-  MaplibreNativeFfiRenderSession* self,
-  MaplibreNativeFfiMetalSurfaceReplacement* replacement,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-#endif
-
-#if defined(__APPLE__)
-/**
- * maplibre_native_ffi_render_session_set_metal_surface_target_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_render_session_set_metal_surface_target_async` started.
- *
- * Returns: %TRUE when the call finished, or %FALSE with `error` set
- */
-gboolean maplibre_native_ffi_render_session_set_metal_surface_target_finish(
-  MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
-);
-#endif
-
-/**
- * maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Replaces the OpenGL textures that a borrowed ring renders into.
- *
- * Use it to resize the ring, or to give the session textures again after
- * `maplibre_native_ffi_render_session_release_target_async()`. Release every
- * acquired frame first. Once the replacement completes, the session no longer
- * uses the old textures.
- *
- * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-void maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_async(
-  MaplibreNativeFfiRenderSession* self,
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* replacement,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_async` started.
- *
- * Returns: %TRUE when the call finished, or %FALSE with `error` set
- */
-gboolean
-maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_finish(
-  MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
-);
-
-/**
- * maplibre_native_ffi_render_session_set_open_gl_surface_target_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Replaces the OpenGL surface that the session presents to.
- *
- * Use it to give the session a surface again after
- * `maplibre_native_ffi_render_session_release_target_async()`, to move it to
- * another surface, or to resize it. Once the replacement completes, the session
- * no longer uses the old surface.
- *
- * See `mln_render_session_set_open_gl_surface_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-void maplibre_native_ffi_render_session_set_open_gl_surface_target_async(
-  MaplibreNativeFfiRenderSession* self,
-  MaplibreNativeFfiOpenGlSurfaceReplacement* replacement,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_render_session_set_open_gl_surface_target_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_render_session_set_open_gl_surface_target_async` started.
- *
- * Returns: %TRUE when the call finished, or %FALSE with `error` set
- */
-gboolean maplibre_native_ffi_render_session_set_open_gl_surface_target_finish(
-  MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
-);
-
-/**
- * maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Replaces the Vulkan images that a borrowed ring renders into.
- *
- * Use it to resize the ring, or to give the session images again after
- * `maplibre_native_ffi_render_session_release_target_async()`. Release every
- * acquired frame first. Once the replacement completes, the session no longer
- * uses the old images.
- *
- * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-void maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async(
-  MaplibreNativeFfiRenderSession* self,
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* replacement,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async` started.
- *
- * Returns: %TRUE when the call finished, or %FALSE with `error` set
- */
-gboolean
-maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_finish(
-  MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
-);
-
-/**
- * maplibre_native_ffi_render_session_set_vulkan_surface_target_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Replaces the Vulkan surface that the session presents to.
- *
- * Use it to give the session a surface again after
- * `maplibre_native_ffi_render_session_release_target_async()`, to move it to
- * another surface, or to resize it. Once the replacement completes, the session
- * no longer uses the old surface.
- *
- * See `mln_render_session_set_vulkan_surface_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the new surface needs a
- *   different color format or pre-rotation support than the old one. Attach a
- *   new session instead.
- */
-void maplibre_native_ffi_render_session_set_vulkan_surface_target_async(
-  MaplibreNativeFfiRenderSession* self,
-  const MaplibreNativeFfiVulkanSurfaceReplacement* replacement,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_render_session_set_vulkan_surface_target_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_render_session_set_vulkan_surface_target_async` started.
- *
- * Returns: %TRUE when the call finished, or %FALSE with `error` set
- */
-gboolean maplibre_native_ffi_render_session_set_vulkan_surface_target_finish(
-  MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
-);
-
-#if defined(__linux__)
-/**
- * maplibre_native_ffi_render_session_set_wayland_surface_target_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Replaces the Wayland surface that the session presents to.
- *
- * Use it to give the session a surface again after
- * `maplibre_native_ffi_render_session_release_target_async()`, to move it to
- * another surface, or to resize it. Once the replacement completes, the session
- * no longer uses the old surface.
- *
- * See `mln_render_session_set_wayland_surface_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when, in a Vulkan build, the new
- *   surface needs a different color format than the old one. Attach a new
- *   session instead.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the library can't present to
- *   the new surface.
- */
-void maplibre_native_ffi_render_session_set_wayland_surface_target_async(
-  MaplibreNativeFfiRenderSession* self,
-  MaplibreNativeFfiWaylandSurfaceReplacement* replacement,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-#endif
-
-#if defined(__linux__)
-/**
- * maplibre_native_ffi_render_session_set_wayland_surface_target_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_render_session_set_wayland_surface_target_async` started.
- *
- * Returns: %TRUE when the call finished, or %FALSE with `error` set
- */
-gboolean maplibre_native_ffi_render_session_set_wayland_surface_target_finish(
-  MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
-);
-#endif
 
 /**
  * maplibre_native_ffi_render_session_ready_async:
@@ -5385,8 +5262,15 @@ maplibre_native_ffi_runtime_clear_resource_transform_finish(
  * Creates a runtime.
  *
  * A runtime holds maps and the resource loading, cache, and offline regions
- * that they share. In a browser, create runtimes on a Web Worker, not on the
- * main thread.
+ * that they share.
+ *
+ * In a browser, the library runs on the thread that loaded its module and never
+ * blocks it: commands, render sessions, completions, wakes and callbacks all
+ * run on that thread, in tasks of the library's own after the call that started
+ * them returns. Wait for a completion with a callback, or yield to the event
+ * loop; a blocking wait can't end. Load the module on a dedicated Web Worker,
+ * so that the map's work doesn't delay the page. On the page's thread it works
+ * too, but every frame and style parse runs there.
  *
  * See `mln_runtime_create` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -5395,6 +5279,8 @@ maplibre_native_ffi_runtime_clear_resource_transform_finish(
  *
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when the cache database file
  *   that `options` names can't be opened or created.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` in a browser for a cache path: the
+ *   browser caches the runtime's requests.
  *
  * Returns: (transfer full): the object
  */
@@ -5664,10 +5550,6 @@ GPtrArray* maplibre_native_ffi_runtime_list_offline_regions_finish(
  *
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when `side_database_path`
  *   isn't a readable database file.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the merge would exceed the
- *   tile limit that
- *   `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`
- *   describes.
  */
 void maplibre_native_ffi_runtime_merge_offline_regions_async(
   MaplibreNativeFfiRuntime* self, const char* side_database_path,
@@ -5783,8 +5665,8 @@ maplibre_native_ffi_runtime_set_event_handler_finish(
  *
  * Adds headers to the runtime's HTTP requests.
  *
- * The transform replaces the one set before. In a browser or on OpenHarmony,
- * serve the requests with
+ * The transform replaces the one set before. A redirect to another origin drops
+ * its headers. In a browser, serve the requests with
  * `maplibre_native_ffi_runtime_set_resource_provider_async()` instead.
  *
  * See `mln_runtime_set_http_header_transform` in the
@@ -5792,8 +5674,7 @@ maplibre_native_ffi_runtime_set_event_handler_finish(
  *
  * It fails with these errors:
  *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the library runs in a browser
- *   or on OpenHarmony.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the library runs in a browser.
  *
  * Without `callback`, nothing reports whether the call succeeds.
  */
@@ -6146,132 +6027,6 @@ void maplibre_native_ffi_style_expression_release(
 );
 
 /**
- * MaplibreNativeFfiVulkanDevice:
- *
- * A Vulkan instance, device, and queue that the library creates and owns.
- *
- * See `mln_vulkan_device` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
- */
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_DEVICE \
-  (maplibre_native_ffi_vulkan_device_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiVulkanDevice, maplibre_native_ffi_vulkan_device,
-  MAPLIBRE_NATIVE_FFI, VULKAN_DEVICE, GObject
-)
-
-/**
- * maplibre_native_ffi_vulkan_device_get_id:
- *
- * The handle's ID, which runtime events name as their source.
- *
- * Returns: the ID
- */
-guint64 maplibre_native_ffi_vulkan_device_get_id(
-  MaplibreNativeFfiVulkanDevice* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_create: (constructor)
- * @options: (nullable): the value, or %NULL
- *
- * Creates a Vulkan instance, device, and graphics queue for render sessions.
- *
- * Attach sessions with the context from
- * `maplibre_native_ffi_vulkan_device_get_context()`, in place of a device of
- * your own. Without `device_uuid` or `device_luid`, it prefers a discrete GPU.
- * The device enables the external memory and semaphore extensions that the GPU
- * offers.
- *
- * See `mln_vulkan_device_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when
- *   `maplibre_native_ffi_supported_render_backend_mask()` lacks
- *   `MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_VULKAN`, or when `presentation` is
- *   true and the Vulkan loader or the GPU can't present.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NOT_FOUND` when no GPU matches `device_uuid` and
- *   `device_luid`.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when there is no Vulkan loader, no
- *   GPU has a graphics queue, or Vulkan can't create the instance or the
- *   device.
- *
- * Returns: (transfer full): the object
- */
-MaplibreNativeFfiVulkanDevice* maplibre_native_ffi_vulkan_device_create(
-  MaplibreNativeFfiVulkanDeviceOptions* options, GError** error
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_get_context:
- *
- * Gets the context to attach render sessions to the device with.
- *
- * Pass it as the context of `maplibre_native_ffi_map_attach_vulkan_surface()`
- * or `maplibre_native_ffi_map_attach_vulkan_borrowed_texture()`. The sessions
- * on the device share its graphics queue. To submit to the queue yourself, set
- * `MaplibreNativeFfiRenderSessionAttachOptions:queue-lock` on each session.
- *
- * See `mln_vulkan_device_get_context` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- *
- * Returns: (transfer full): the value
- */
-MaplibreNativeFfiVulkanDeviceContextResult*
-maplibre_native_ffi_vulkan_device_get_context(
-  MaplibreNativeFfiVulkanDevice* self, GError** error
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_release:
- *
- * Releases a Vulkan device.
- *
- * Render sessions that attached with the device's context keep using it until
- * they detach or their release finishes.
- *
- * The object calls this when it is disposed, unless it was released. Later
- * calls fail as on any released handle.
- *
- * See `mln_vulkan_device_release` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- */
-void maplibre_native_ffi_vulkan_device_release(
-  MaplibreNativeFfiVulkanDevice* self
-);
-
-#if defined(__APPLE__)
-/**
- * maplibre_native_ffi_apple_frame_pacer_create:
- * @options: (nullable): the value, or %NULL
- *
- * Creates a frame pacer that follows the display through a `CADisplayLink`.
- *
- * You can call it on any thread. The pacer needs no run loop of yours. On
- * macOS, it follows the main display, the one with the menu bar.
- *
- * With `MaplibreNativeFfiFramePacerOptions:maximum-frames-per-second`, the
- * pacer also asks the system for that refresh rate. On iPhone, a rate above 60
- * needs `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
- *
- * See `mln_apple_frame_pacer_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the system has no display to
- *   follow.
- *
- * Returns: (transfer full): the object
- */
-MaplibreNativeFfiFramePacer* maplibre_native_ffi_apple_frame_pacer_create(
-  MaplibreNativeFfiFramePacerOptions* options, GError** error
-);
-#endif
-
-/**
  * maplibre_native_ffi_c_version:
  *
  * Returns the API epoch of the library.
@@ -6439,23 +6194,6 @@ gboolean maplibre_native_ffi_set_network_status(
  */
 MaplibreNativeFfiOpenGlContextProviderFlag
 maplibre_native_ffi_open_gl_supported_context_provider_mask(void);
-
-/**
- * maplibre_native_ffi_get_plugin_register_function_v1:
- *
- * Returns the function that registers a plugin's style layer types.
- *
- * Pass the function to the plugin's registration entry point before loading a
- * style that uses the plugin's layer types. Plugin callbacks run on library
- * threads and can keep running while the process exits, so they must not use
- * state that the process destroys at exit.
- *
- * See `mln_plugin_get_register_function_v1` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
- *
- * Returns: the result
- */
-gpointer maplibre_native_ffi_get_plugin_register_function_v1(void);
 
 /**
  * maplibre_native_ffi_projected_meters_for_lat_lng:

@@ -1,14 +1,14 @@
 # The SDL example for Linux and FreeBSD on Wayland, Windows, and macOS. Run it
 # with `mise run //examples/sdl:run`, or on Linux, which builds the Windows
 # preset with the MSVC SDK and runs the app under Wine, with
-# `mise -E msvc run //examples/sdl:run windows-x64-vulkan`.
+# `mise -E msvc run //examples/sdl:run windows-x64`.
 
 # CI builds the app with this, without running it.
 [tasks.build]
 description = "Build the C library for a preset, then build the SDL example against its install."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}" {
-  choices "linux-gnu-x64-vulkan" "linux-gnu-x64-egl" "linux-gnu-arm64-vulkan" "linux-gnu-arm64-egl" "windows-x64-vulkan" "windows-x64-wgl" "macos-arm64-metal" "macos-x64-metal"
+  choices "linux-gnu-x64" "linux-gnu-arm64" "windows-x64" "macos-arm64" "macos-x64"
 }
 '''
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
@@ -55,7 +55,7 @@ zig build "${zig_args[@]}"
 description = "Build the SDL example for a preset and run it, under Wine for Windows on Linux."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}" {
-  choices "linux-gnu-x64-vulkan" "linux-gnu-x64-egl" "linux-gnu-arm64-vulkan" "linux-gnu-arm64-egl" "windows-x64-vulkan" "windows-x64-wgl" "macos-arm64-metal" "macos-x64-metal"
+  choices "linux-gnu-x64" "linux-gnu-arm64" "windows-x64" "macos-arm64" "macos-x64"
 }
 '''
 depends = [{ task = "build", args = ["{{usage.preset}}"] }]

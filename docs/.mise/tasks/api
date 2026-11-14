@@ -2,7 +2,6 @@
 #MISE description="Generate every language's API reference into public/reference"
 #MISE shell="bash"
 #MISE depends=[{ task = "//:build", args = ["{{vars.host_native_preset}}"] }, "//bindings/kotlin:api", "//bindings/dart:api", "//bindings/python:api", "//bindings/dotnet:api", "//bindings/go:api", "//bindings/gobject:api", "//bindings/swift:api", "//bindings/typescript:api"]
-#MISE env={ MAPLIBRE_NATIVE_FFI_LOCAL_BUILD = "{{config_root}}/../build/{{vars.host_native_preset}}/install" }
 set -euo pipefail
 
 reference="$PWD/public/reference"
@@ -14,8 +13,6 @@ cp -a doxygen/gen/html/. "$reference/c/"
 
 (
   cd ..
-  cargo doc -p maplibre-native-ffi --no-deps
-  cp -a target/doc/. "$reference/rust/"
   zig build docs --prefix "$reference/zig"
 )
 

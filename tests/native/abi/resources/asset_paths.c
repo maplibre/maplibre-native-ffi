@@ -35,7 +35,7 @@ static void host_string_views_reject_nul_and_null_data_with_a_length(void) {
 // The browser and OpenHarmony have no asset directory on disk. Android reads
 // its packaged assets only for a path under /android_asset/, so a directory on
 // disk resolves there as it does on the desktop and simulator targets.
-#if !defined(__EMSCRIPTEN__) && !defined(__OHOS__)
+#if !defined(__OHOS__)
 
 static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
@@ -84,7 +84,7 @@ static void an_asset_style_resolves_under_the_runtime_asset_path(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(host_string_views_reject_nul_and_null_data_with_a_length);
-#if !defined(__EMSCRIPTEN__) && !defined(__OHOS__)
+#if !defined(__OHOS__)
   RUN_TEST(an_asset_style_resolves_under_the_runtime_asset_path);
 #endif
 }

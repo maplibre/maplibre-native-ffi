@@ -14,7 +14,7 @@ public sealed class CompletionTests
         await fixture.Map.RequestRepaintAsync();
         Assert.Equal(MapDebugFlag.TileBorders, fixture.Map.GetSnapshot().DebugFlags);
         Assert.Throws<MaplibreException>(() =>
-            fixture.Map.Discarding.Resize(new LogicalSize { Width = 0, Height = 8 })
+            fixture.Map.Discarding.Resize(new LogicalExtent(0, 8, 1))
         );
     }
 

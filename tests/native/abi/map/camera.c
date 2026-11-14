@@ -992,13 +992,16 @@ static void a_fit_command_fits_the_map_that_earlier_commands_leave(void) {
   for (size_t index = 0; index < 3; index += 1) {
     const char* label = fit_area_labels[index];
     MLN_TEST_AWAIT_OK(mln_map_resize(
-      map, (mln_logical_size){.width = 512, .height = 512},
+      map,
+      (mln_logical_extent){.width = 512, .height = 512, .scale_factor = 1.0},
       &completion.descriptor, NULL
     ));
     const mln_camera_options square = query_fit(map, fit_areas[index], NULL);
 
     MLN_TEST_OK(mln_map_resize(
-      map, (mln_logical_size){.width = 1024, .height = 512}, NULL, NULL
+      map,
+      (mln_logical_extent){.width = 1024, .height = 512, .scale_factor = 1.0},
+      NULL, NULL
     ));
     MLN_TEST_AWAIT_OK(
       submit_fit_command(map, fit_areas[index], &update, &completion.descriptor)

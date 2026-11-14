@@ -37,10 +37,10 @@ export interface AnchoredMomentum {
 }
 
 /**
- * The Android hardware buffer of an acquired frame.
+ * The Android hardware buffer of an exported ring's acquired frame.
  *
  * See `mln_android_hardware_buffer_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface AndroidHardwareBufferFrame {
   readonly width: number;
@@ -57,80 +57,26 @@ export interface AndroidHardwareBufferFrame {
 }
 
 /**
- * A ring of Android hardware buffers that the library allocates, for
- * `MapHandle.attachAndroidHardwareBufferRing()`.
+ * An Android window to present to.
  *
- * Each buffer has the map's size in pixels, `logical_size` times the map's
- * scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its usage
- * is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
- * AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
+ * The session takes its own reference to the window, so you can release yours
+ * once the call returns. When the platform destroys the window, such as in
+ * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+ * `RenderSessionHandle.releaseTarget()`, or give the session another window
+ * with `RenderSessionHandle.setTarget()`, without waiting for that to complete.
+ * A frame to the destroyed window finishes with `RenderResult.targetNotReady`,
+ * or with `RenderResult.rendered` if the window went away while the frame was
+ * presenting.
  *
- * See `mln_android_hardware_buffer_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ * See `mln_android_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface AndroidHardwareBufferRingDescriptor {
+export interface AndroidWindowTarget {
   logicalSize: LogicalSize;
   /**
-   * How many buffers the ring has, from 1 to 8.
+   * Your `ANativeWindow*`.
    */
-  bufferCount: number;
-  /**
-   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
-   * AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
-   */
-  usage?: bigint;
-}
-
-/**
- * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
- *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes
- * its own reference to the window, so you can release yours once the call
- * returns.
- *
- * See `mln_android_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
- */
-export interface AndroidSurfaceDescriptor {
-  logicalSize: LogicalSize;
-  /**
-   * Your `ANativeWindow*`, or null to name the window by `surface`.
-   */
-  window?: bigint;
-  /**
-   * The calling thread's `JNIEnv*`, with `surface`.
-   */
-  jniEnv?: bigint;
-  /**
-   * An `android.view.Surface`, with `jni_env`.
-   */
-  surface?: bigint;
-}
-
-/**
- * A new Android window for `RenderSessionHandle.setAndroidSurfaceTarget()`.
- *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes
- * its own reference to the window, so you can release yours once the call
- * returns.
- *
- * See `mln_android_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
- */
-export interface AndroidSurfaceReplacement {
-  logicalSize: LogicalSize;
-  /**
-   * Your `ANativeWindow*`, or null to name the window by `surface`.
-   */
-  window?: bigint;
-  /**
-   * The calling thread's `JNIEnv*`, with `surface`.
-   */
-  jniEnv?: bigint;
-  /**
-   * An `android.view.Surface`, with `jni_env`.
-   */
-  surface?: bigint;
+  window: bigint;
 }
 
 /**
@@ -638,6 +584,28 @@ export interface CanonicalTileId {
 }
 
 /**
+ * How a graphics API's clip space holds depth.
+ *
+ * See `mln_clip_depth_range` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export const ClipDepthRange = {
+  /**
+   * Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and OpenGL
+   * with `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+   */
+  zeroToOne: 1,
+  /**
+   * Clip z runs from -w to w, as in OpenGL by default.
+   */
+  negativeOneToOne: 2,
+} as const;
+/** One of the ClipDepthRange values, or a value this binding does not know. */
+export type ClipDepthRange =
+  | (typeof ClipDepthRange)[keyof typeof ClipDepthRange]
+  | (number & {});
+
+/**
  * How the map keeps the camera within the world or within its bounds.
  *
  * See `mln_constrain_mode` in the
@@ -708,6 +676,58 @@ export interface CustomGeometrySourceOptions {
 }
 
 /**
+ * The callbacks of a custom layer, which draws with your own GPU commands in
+ * the map's frame.
+ *
+ * Nor does a browser WebGPU session yet: the library's WebGPU (wgpu) exposes no
+ * command encoder or render pass to hand you. Leave unset the callbacks that
+ * you don't need.
+ *
+ * Runs on the thread that runs the session's graphics work: a library thread,
+ * or yours with `RenderDriverKind.callerGraphicsThread`. It can't call the
+ * library.
+ *
+ * It can't call the library.
+ *
+ * See `mln_custom_layer_host` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+export type CustomLayerHost = NativeRegistration<"CustomLayerHost">;
+export const CustomLayerHost = {
+  /**
+   * Creates a native registration from a native function pointer for
+   * each callback, and an optional context and release. The binding
+   * copies them into the C descriptor unchanged. The first call that
+   * carries the registration consumes it: native code releases the
+   * context of a call that it accepts, and the binding releases it for
+   * any other call. A later call throws a `MaplibreError` with the
+   * invalid-state status.
+   */
+  native(
+    fields: NativeCustomLayerHostFields,
+  ): NativeRegistration<"CustomLayerHost"> {
+    return nativeRegistration("CustomLayerHost", {
+      prerender: fields.prerender,
+      render: fields.render,
+      deinitialize: fields.deinitialize,
+      contextLost: fields.contextLost,
+      userData: fields.userData ?? 0n,
+      releaseUserData: fields.releaseUserData ?? 0n,
+    });
+  },
+};
+
+/** The fields of a native {@link CustomLayerHost}, as native addresses. */
+export interface NativeCustomLayerHostFields {
+  readonly prerender: bigint;
+  readonly render: bigint;
+  readonly deinitialize: bigint;
+  readonly contextLost: bigint;
+  readonly userData?: bigint;
+  readonly releaseUserData?: bigint;
+}
+
+/**
  * The callbacks and options of a custom vector source.
  *
  * Zoom levels are whole numbers from 0 to 32.
@@ -731,10 +751,33 @@ export interface CustomVectorSourceOptions {
 }
 
 /**
+ * A format of depth and stencil textures, as a bit in a set.
+ *
+ * See `mln_depth_stencil_format_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export const DepthStencilFormatFlag = {
+  /**
+   * 24-bit normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
+   * MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
+   * WGPUTextureFormat_Depth24PlusStencil8 (`depth24plus-stencil8`).
+   */
+  depth24Stencil8: 1,
+  /**
+   * 32-bit float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
+   * MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
+   * WGPUTextureFormat_Depth32FloatStencil8 (`depth32float-stencil8`).
+   */
+  depth32FloatStencil8: 2,
+} as const;
+/** A bitwise OR of DepthStencilFormatFlag flags. */
+export type DepthStencilFormatFlag = number;
+
+/**
  * A DRM format and modifier that you can import.
  *
  * See `mln_dma_buf_format` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface DmaBufFormat {
   /**
@@ -748,10 +791,10 @@ export interface DmaBufFormat {
 }
 
 /**
- * The dmabuf of an acquired frame.
+ * The dmabuf of an exported ring's acquired frame.
  *
  * See `mln_dma_buf_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface DmaBufFrame {
   readonly width: number;
@@ -775,7 +818,7 @@ export interface DmaBufFrame {
  * Where one plane of a dmabuf keeps its data.
  *
  * See `mln_dma_buf_plane` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface DmaBufPlane {
   /**
@@ -794,36 +837,10 @@ export interface DmaBufPlane {
 }
 
 /**
- * A ring of dmabufs that the library allocates, for
- * `MapHandle.attachDmaBufRing()`.
- *
- * Each buffer has the map's size in pixels and a format and modifier from
- * `formats`. The library renders only DRM_FORMAT_ABGR8888 and
- * DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its format
- * has, such as a plane of compression metadata, and the library takes any such
- * modifier that its GPU can render into and share.
- *
- * See `mln_dma_buf_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
- */
-export interface DmaBufRingDescriptor {
-  logicalSize: LogicalSize;
-  /**
-   * How many buffers the ring has, from 1 to 8.
-   */
-  bufferCount: number;
-  /**
-   * The formats and modifiers that your reader imports, most preferred first,
-   * such as those that eglQueryDmaBufModifiersEXT() reports.
-   */
-  formats: readonly DmaBufFormat[];
-}
-
-/**
- * The DXGI shared texture of an acquired frame.
+ * The DXGI shared texture of an exported ring's acquired frame.
  *
  * See `mln_dxgi_shared_texture_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface DxgiSharedTextureFrame {
   readonly width: number;
@@ -844,25 +861,6 @@ export interface DxgiSharedTextureFrame {
 }
 
 /**
- * A ring of DXGI shared textures that the library allocates, for
- * `MapHandle.attachDxgiSharedTextureRing()`.
- *
- * Each texture is a D3D11 2D texture with the map's size in pixels and the
- * format DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a render
- * target, and is shared through an NT handle.
- *
- * See `mln_dxgi_shared_texture_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
- */
-export interface DxgiSharedTextureRingDescriptor {
-  logicalSize: LogicalSize;
-  /**
-   * How many textures the ring has, from 1 to 8.
-   */
-  textureCount: number;
-}
-
-/**
  * Distances in logical pixels from each edge of the map.
  *
  * See `mln_edge_insets` in the
@@ -876,32 +874,113 @@ export interface EdgeInsets {
 }
 
 /**
- * The EGL objects that a render session makes its OpenGL context from.
+ * Your EGL context, which each session's context shares objects with.
+ *
+ * Each session makes its context on `display` with `config` and the client API
+ * and version of `share_context`.
  *
  * See `mln_egl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface EglContextDescriptor {
   /**
-   * An `EGLDisplay`.
+   * An `EGLDisplay`, which you initialized.
    */
   display: bigint;
   /**
-   * An `EGLConfig`.
+   * The `EGLConfig` of `share_context`.
    */
   config: bigint;
   /**
-   * Your `EGLContext`, for a shared context.
+   * Your `EGLContext`.
    */
-  shareContext?: bigint;
-  /**
-   * The API of a dedicated context. A shared context uses the API of yours.
-   */
-  clientApi?: OpenGlClientApi;
+  shareContext: bigint;
   /**
    * Your `eglGetProcAddress`, or null to use the system's.
    */
   getProcAddress?: bigint;
+}
+
+/**
+ * A ring of textures that the session allocates on its device and shares with
+ * you, in one of the ways that you can import.
+ *
+ * Each texture has the size in pixels of `logical_size` at the map's scale
+ * factor. `RenderSessionHandle.resize()` gives the ring textures of the new
+ * size, and a frame that you hold keeps its texture of the old size until you
+ * release or discard it.
+ *
+ * The ring shares its textures in the first kind of `export_kinds` that the
+ * device exports, in this order, and `RenderSessionCapabilities.exportKind`
+ * reports it:
+ *
+ * - `GpuExportKind.ioSurface`: IOSurfaces of the pixel format
+ *   kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm. Get
+ *   each frame's surface with `AcquiredFrameHandle.withIoSurface()`.
+ * - `GpuExportKind.androidHardwareBuffer`: hardware buffers of the format
+ *   AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage
+ *   AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+ *   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+ *   `android_hardware_buffer_usage`. Get each frame's buffer with
+ *   `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
+ * - `GpuExportKind.dxgiSharedHandle`: D3D11 textures of the format
+ *   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
+ *   resources and render targets. Open them on a D3D11 or D3D12 device of the
+ *   same adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each
+ *   frame's texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+ * - `GpuExportKind.dmaBuf`: dmabufs of a format and modifier from
+ *   `dma_buf_formats`. Get each frame's buffer with
+ *   `AcquiredFrameHandle.withDmaBuf()`.
+ * - `GpuExportKind.opaqueFd`: the memory of Vulkan images, which only a Vulkan
+ *   device or an OpenGL context with GL_EXT_memory_object_fd on the same GPU
+ *   and driver imports. To pick the GPU, create the device with
+ *   `GpuDeviceOptions.adapterUuid` set to your context's GL_DEVICE_UUID_EXT.
+ *   Get each frame's memory with `AcquiredFrameHandle.withOpaqueFd()`.
+ *
+ * `GpuDeviceCapabilities.exportKinds` reports the kinds that a device exports.
+ * Attach with `RenderDriverKind.coreWorker`. Without a device, the session
+ * renders on the first of the platform's backends whose device exports one of
+ * `export_kinds`.
+ *
+ * Each frame hands over with `GpuSyncKind.cpuComplete` or with the sync kind
+ * that crosses APIs on its platform: `GpuSyncKind.metalSharedEvent` for an
+ * IOSurface, and `GpuSyncKind.syncFd` for the others, where the device has
+ * them. For a reader that waits on neither, such as a Wayland compositor
+ * without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
+ * out of `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+ * finishes before you acquire it, and release each frame only once the reader
+ * is done with its texture. Give the ring 3 textures, so the session can render
+ * while you hold two frames.
+ *
+ * See `mln_exported_ring_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export interface ExportedRingTarget {
+  logicalSize: LogicalSize;
+  /**
+   * How many textures the ring has, from 1 to `TEXTURE_RING_MAX_DEPTH`.
+   */
+  textureCount: number;
+  /**
+   * The ways of sharing a texture that you can import.
+   */
+  exportKinds: GpuExportKindFlag;
+  /**
+   * The dmabuf formats and modifiers that you import, most preferred first,
+   * such as those that eglQueryDmaBufModifiersEXT() reports. A ring exports
+   * dmabufs only of one of them. The library renders only DRM_FORMAT_ABGR8888
+   * and DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+   * format has, such as a plane of compression metadata, and the library takes
+   * any such modifier that its GPU can render into and share. The library takes
+   * no implicit modifier: it skips DRM_FORMAT_MOD_INVALID, so a list of only
+   * that one gets no dmabuf.
+   */
+  dmaBufFormats?: readonly DmaBufFormat[];
+  /**
+   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads of a hardware buffer
+   * need, such as AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+   */
+  androidHardwareBufferUsage?: bigint;
 }
 
 /**
@@ -984,7 +1063,7 @@ export const FrameDemandFlag = {
 export type FrameDemandFlag = number;
 
 /**
- * Options for creating a frame pacer.
+ * Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
  *
  * See `mln_frame_pacer_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -996,6 +1075,75 @@ export interface FramePacerOptions {
    * frames at every refresh.
    */
   maximumFramesPerSecond?: number;
+  /**
+   * Removes the frame rate limit, so the pacer can demand frames at every
+   * display refresh, as it does by default.
+   */
+  unlimitedFramesPerSecond?: boolean;
+}
+
+/**
+ * Where a frame drew the map, and the depth that it wrote there.
+ *
+ * World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at 180°
+ * east, and on past both into the copies of the world beside the first. y runs
+ * from 0 at the north edge of the Mercator world, about 85.05° north, to 1 at
+ * its south edge. z is the altitude in meters above sea level, at the scale of
+ * the heights of the map's 3D layers, and the map draws its ground at 0.
+ *
+ * `matrix` takes a world point to the clip coordinates where the frame drew it,
+ * with the camera's padding, roll, field of view, and center altitude, and the
+ * map's viewport and projection mode. Clip y points up, as the map draws with
+ * OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so negate it
+ * there too. At high zooms, single precision can't tell nearby world points
+ * apart: subtract an origin near your geometry from its coordinates in double
+ * precision, and fold the origin into the matrix, before you convert to float.
+ *
+ * Clip z follows `clip_depth_range`, the convention of the device's graphics
+ * API. With the API's default depth range of 0 to 1, a fragment that you draw
+ * through `matrix` gets the depth that the map's 3D layers, such as fill
+ * extrusions, wrote at the same place: 0 at `near_distance` from the camera, up
+ * to `far_depth` at `far_distance`. Depth-tested against the frame's depth,
+ * your fragments hide behind the map's 3D layers where those stand in front of
+ * them.
+ *
+ * The frame's depth starts at 1. The map's 3D layers write the depth of each of
+ * their fragments. A 2D layer below every 3D layer of the style that draws
+ * opaque fragments, such as an opaque fill, writes one depth over all of them,
+ * wherever they are: the higher the layer, the lower its depth, and every one
+ * between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D
+ * layers above a 3D layer, such as labels, write no depth. So what you draw
+ * through `matrix`, even on the ground, lies in front of every 2D layer.
+ *
+ * While `globe` is true, the frame drew the map onto a globe, and its 2D layers
+ * wrote no depth. `matrix` then is the map's Mercator one, which doesn't place
+ * points on the globe.
+ *
+ * See `mln_frame_projection` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface FrameProjection {
+  readonly matrix: Mat4;
+  readonly clipDepthRange: ClipDepthRange;
+  /**
+   * The distance from the camera to the plane where the depth that you get
+   * through `matrix` is 0, along the camera's view. Like `far_distance`, it is
+   * in pixels of the map at the camera's zoom, where the world is 512 × 2^zoom
+   * pixels wide.
+   */
+  readonly nearDistance: number;
+  /**
+   * The distance to the plane where the depth is `far_depth`.
+   */
+  readonly farDistance: number;
+  /**
+   * The depth at `far_distance`, below 1.
+   */
+  readonly farDepth: number;
+  /**
+   * Whether the frame drew the map as a globe, alone or blending into Mercator.
+   */
+  readonly globe: boolean;
 }
 
 /**
@@ -1125,6 +1273,158 @@ export type GesturePhase =
   | (number & {});
 
 /**
+ * What a GPU device can do.
+ *
+ * See `mln_gpu_device_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+export interface GpuDeviceCapabilities {
+  readonly backend: RenderBackend;
+  /**
+   * The kinds of `RenderTarget` that sessions on the device render to.
+   */
+  readonly targetKinds: RenderTargetKindFlag;
+  /**
+   * The ways that the device can share the textures of an exported ring. A kind
+   * is here only once the device has exported a texture of it, so a driver that
+   * offers an extension but can't allocate the memory reports no kind of it.
+   */
+  readonly exportKinds: GpuExportKindFlag;
+  /**
+   * The kinds of `GpuSync` that the device can signal and wait on.
+   */
+  readonly syncKinds: GpuSyncKindFlag;
+  /**
+   * The formats of the depth textures that a borrowed ring takes.
+   */
+  readonly depthStencilFormats: DepthStencilFormatFlag;
+  /**
+   * The kinds of `export_kinds` whose rings also share each frame's depth
+   * texture, with `RenderSessionAttachOptions.keepDepth`. An IOSurface or a
+   * dmabuf holds no depth format, so only `GpuExportKind.opaqueFd` can be here.
+   */
+  readonly depthExportKinds: GpuExportKindFlag;
+}
+
+/**
+ * Options for `GpuDeviceHandle.create()`.
+ *
+ * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
+ * `adapter_luid`. Without one, the device prefers a discrete GPU. An OpenGL
+ * device takes none of them: it renders on the GPU that the platform picks.
+ *
+ * See `mln_gpu_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+export interface GpuDeviceOptions {
+  /**
+   * The backend that the device renders with. By default, the platform's own:
+   * Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has
+   * no Vulkan driver, and in a browser the build's one backend: WebGPU or
+   * OpenGL (WebGL2).
+   */
+  backend?: RenderBackend;
+  /**
+   * The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
+   * holds one GPU: the one that its display renders on.
+   */
+  adapterIndex?: number;
+  /**
+   * The 16-byte UUID of the GPU to use: Vulkan's
+   * `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.
+   */
+  adapterUuid?: Uint8Array;
+  /**
+   * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
+   * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a Vulkan
+   * device takes one.
+   */
+  adapterLuid?: Uint8Array;
+  /**
+   * The OpenGL API that an OpenGL device renders with. An EGL device defaults
+   * to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on Linux and
+   * FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its default, and a
+   * WebGL device only `OpenGlClientApi.gles`, its default.
+   */
+  openGlClientApi?: OpenGlClientApi;
+  /**
+   * Whether the sessions of an EGL device take turns in one OpenGL context
+   * instead of having one each.
+   */
+  openGlSingleContext?: boolean;
+  /**
+   * Your lock on a Vulkan device's queue, when you submit to the queue that
+   * `GpuDeviceHandle.getVulkanContext()` reports. Only a Vulkan device takes
+   * one.
+   */
+  queueLock?: QueueLock;
+}
+
+/**
+ * The Vulkan objects of a device, as `GpuDeviceHandle.getVulkanContext()`
+ * reports them.
+ *
+ * See `mln_gpu_device_vulkan_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+export interface GpuDeviceVulkanContextResult {
+  readonly context: VulkanContextDescriptor;
+}
+
+/**
+ * A way to share a texture's memory with another API or process.
+ *
+ * See `mln_gpu_export_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export const GpuExportKind = {
+  /**
+   * The texture isn't shared.
+   */
+  none: 0,
+  /**
+   * An `IOSurfaceRef`.
+   */
+  ioSurface: 1,
+  /**
+   * A Linux dmabuf, as file descriptors with a DRM format and modifier.
+   */
+  dmaBuf: 2,
+  /**
+   * An `AHardwareBuffer*`.
+   */
+  androidHardwareBuffer: 3,
+  /**
+   * A DXGI shared texture's NT handle.
+   */
+  dxgiSharedHandle: 4,
+  /**
+   * A Vulkan or OpenGL opaque memory file descriptor.
+   */
+  opaqueFd: 5,
+} as const;
+/** One of the GpuExportKind values, or a value this binding does not know. */
+export type GpuExportKind =
+  | (typeof GpuExportKind)[keyof typeof GpuExportKind]
+  | (number & {});
+
+/**
+ * A way to share a texture's memory, as a bit in a set.
+ *
+ * See `mln_gpu_export_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export const GpuExportKindFlag = {
+  ioSurface: 1,
+  dmaBuf: 2,
+  androidHardwareBuffer: 4,
+  dxgiSharedHandle: 8,
+  opaqueFd: 16,
+} as const;
+/** A bitwise OR of GpuExportKindFlag flags. */
+export type GpuExportKindFlag = number;
+
+/**
  * A point in GPU work that the other side waits for before using a texture.
  *
  * See `mln_gpu_sync` in the
@@ -1170,7 +1470,9 @@ export const GpuSyncKind = {
    */
   vulkanTimelineSemaphore: 3,
   /**
-   * `handle` is a sync file descriptor.
+   * `handle` is a sync file descriptor. A descriptor of -1, as Vulkan exports
+   * for a semaphore that has already signaled, counts as
+   * `GpuSyncKind.cpuComplete`.
    */
   syncFd: 4,
   /**
@@ -1272,10 +1574,10 @@ export interface ImageStretch {
 }
 
 /**
- * The IOSurface of an acquired frame.
+ * The IOSurface of an exported ring's acquired frame.
  *
  * See `mln_io_surface_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 export interface IoSurfaceFrame {
   readonly width: number;
@@ -1289,29 +1591,6 @@ export interface IoSurfaceFrame {
    * The `IOSurfaceRef`.
    */
   readonly surface: bigint;
-}
-
-/**
- * A ring of IOSurfaces that the library allocates, for
- * `MapHandle.attachIoSurfaceRing()`.
- *
- * Each surface has the map's size in pixels, `logical_size` times the map's
- * scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
- * names MTLPixelFormatBGRA8Unorm.
- *
- * See `mln_io_surface_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
- */
-export interface IoSurfaceRingDescriptor {
-  logicalSize: LogicalSize;
-  /**
-   * How many surfaces the ring has, from 1 to 8.
-   */
-  bufferCount: number;
-  /**
-   * The MTLDevice to render with. A null device picks the system's default.
-   */
-  context?: MetalContextDescriptor;
 }
 
 /**
@@ -1518,8 +1797,9 @@ export type MapMode = (typeof MapMode)[keyof typeof MapMode] | (number & {});
  */
 export interface MapOptions {
   /**
-   * The map's first size, and its scale factor. The scale factor stays fixed
-   * for the map's life, and every render session of the map renders at it.
+   * The map's first size, and its scale factor. Render sessions of the map
+   * render at its scale factor. `MapHandle.resize()` changes both, or
+   * `RenderSessionHandle.resize()` while a render session is attached.
    */
   initialExtent: LogicalExtent;
   mapMode?: MapMode;
@@ -1542,9 +1822,19 @@ export interface MapOptions {
    * that need complex shaping, like Myanmar or Devanagari. A JSON array of font
    * files, each an object with a `url` and an optional `unicode-range`, as in a
    * font face of a style's `font-faces`, which every font stack uses after the
-   * style's own font faces. Empty for none.
+   * style's own font faces. Empty for the system's fonts, unless
+   * `system_fonts_enabled` is false.
    */
   fallbackFontFaces?: string;
+  /**
+   * Whether the map falls back to the system's fonts for CJK and the scripts
+   * that need complex shaping when `fallback_font_faces` is empty: fonts that
+   * the platform's font matcher picks for the user's preferred languages.
+   * Without it, the map does. The first map that uses them waits for them to be
+   * found. In the browser, the browser draws CJK glyphs in its sans-serif font
+   * instead, where `fallback_font_faces` doesn't cover them.
+   */
+  systemFontsEnabled?: boolean;
 }
 
 /**
@@ -1698,120 +1988,103 @@ export interface MapViewportOptions {
 }
 
 /**
+ * A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x,
+ * plus `y` times its y, `z` times its z, and `w` times its w. In memory it is
+ * 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and WebGPU
+ * shaders take a matrix.
+ *
+ * See `mln_mat4` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface Mat4 {
+  readonly x: Vec4;
+  readonly y: Vec4;
+  readonly z: Vec4;
+  readonly w: Vec4;
+}
+
+/**
  * A Metal texture of a borrowed ring.
  *
  * See `mln_metal_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface MetalBorrowedTexture {
   /**
-   * Your MTLTexture.
+   * Your `MTLTexture`.
    */
   texture: bigint;
 }
 
 /**
- * A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
+ * A ring of your Metal textures to render into, on the Metal device that you
+ * attach on.
  *
- * `logical_size` sets the map's size. `physical_width` and `physical_height`
- * give the textures' size in pixels, which is usually `logical_size` times the
- * map's scale factor. The textures must all have that size, one device, one
- * pixel format, one sample, and MTLTextureUsageRenderTarget. The ring holds up
- * to `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. The textures
+ * must all have that size, the device's `MTLDevice`, one pixel format, one
+ * sample, and `MTLTextureUsageRenderTarget`. The ring holds up to
+ * `TEXTURE_RING_MAX_DEPTH` distinct textures.
  *
- * The session uses the textures until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, renders the map's
+ * depth and stencil into it, and stores them. They must have the size of
+ * `textures`, one pixel format of `GpuDeviceCapabilities.depthStencilFormats`,
+ * one sample, `MTLTextureUsageRenderTarget`, and a storage mode other than
+ * `MTLStorageModeMemoryless`.
  *
- * See `mln_metal_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * See `mln_metal_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface MetalBorrowedTextureDescriptor {
+export interface MetalBorrowedTexturesTarget {
   logicalSize: LogicalSize;
   physicalWidth: number;
   physicalHeight: number;
   textures: readonly MetalBorrowedTexture[];
+  depthTextures?: readonly MetalBorrowedTexture[];
+}
+
+/**
+ * Your Metal device and command queue, for `GpuDeviceHandle.wrapMetal()`.
+ *
+ * See `mln_metal_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+export interface MetalDeviceDescriptor {
   /**
-   * Your MTLCommandQueue on the textures' device, or null for a queue of the
-   * session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
+   * Your `MTLDevice`.
+   */
+  device: bigint;
+  /**
+   * Your `MTLCommandQueue` on `device`, or null for a queue of the library's.
+   * With your queue, borrowed rings can use `GpuSyncKind.queueOrder`.
    */
   commandQueue?: bigint;
 }
 
 /**
- * New Metal textures for a borrowed ring, for
- * `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
+ * A `CAMetalLayer` to present to.
  *
- * The members and the textures follow the rules of
- * `MetalBorrowedTextureDescriptor`. The ring keeps its depth, device, and
- * command queue, so give it as many textures as it attached with, on the same
- * device.
+ * The session sets the layer's device, pixel format, and drawable size.
  *
- * See `mln_metal_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export interface MetalBorrowedTextureReplacement {
-  logicalSize: LogicalSize;
-  physicalWidth: number;
-  physicalHeight: number;
-  textures: readonly MetalBorrowedTexture[];
-}
-
-/**
- * The Metal device that a render session uses.
- *
- * See `mln_metal_context_descriptor` in the
+ * See `mln_metal_layer_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface MetalContextDescriptor {
-  /**
-   * An `MTLDevice`.
-   */
-  device?: bigint;
-}
-
-/**
- * A Metal layer to render to, for `MapHandle.attachMetalSurface()`.
- *
- * The session sets the layer's device, pixel format, and drawable size. It uses
- * the layer until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_metal_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export interface MetalSurfaceDescriptor {
+export interface MetalLayerTarget {
   logicalSize: LogicalSize;
   /**
-   * The MTLDevice to render with. A null device picks the system's default.
-   */
-  context?: MetalContextDescriptor;
-  /**
-   * Your CAMetalLayer.
-   */
-  layer: bigint;
-}
-
-/**
- * A new Metal layer for `RenderSessionHandle.setMetalSurfaceTarget()`.
- *
- * The session renders to it with the device that it attached with. It uses the
- * layer until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_metal_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export interface MetalSurfaceReplacement {
-  logicalSize: LogicalSize;
-  /**
-   * Your CAMetalLayer.
+   * Your `CAMetalLayer*`.
    */
   layer: bigint;
 }
 
 /**
  * The Metal texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture: one of a
+ * borrowed ring's `depth_textures`, or an exported ring's with
+ * `RenderSessionAttachOptions.keepDepth`. Otherwise they are zero.
  *
  * See `mln_metal_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1836,6 +2109,14 @@ export interface MetalTextureFrame {
    * The texture's MTLPixelFormat.
    */
   readonly pixelFormat: bigint;
+  /**
+   * The MTLTexture that holds the frame's depth and stencil.
+   */
+  readonly depthTexture: bigint;
+  /**
+   * The depth texture's MTLPixelFormat.
+   */
+  readonly depthPixelFormat: bigint;
 }
 
 /**
@@ -2111,93 +2392,110 @@ export interface OfflineTilePyramidRegionDefinition {
 }
 
 /**
- * The image that `MapHandle.attachOffscreen()` renders. The session renders it
- * at the map's scale factor.
+ * An image that the session allocates, renders at the map's scale factor, and
+ * reads back with `RenderSessionHandle.readTexture()`.
  *
- * See `mln_offscreen_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ * See `mln_offscreen_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface OffscreenDescriptor {
+export interface OffscreenTarget {
   logicalSize: LogicalSize;
 }
 
 /**
- * Options for `OffscreenDeviceHandle.create()`.
+ * An OpenHarmony window to present to.
  *
- * See `mln_offscreen_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ * The session takes its own reference to the window, so you can release yours
+ * once the call returns. When the platform destroys the window, such as in an
+ * `XComponent`'s `onSurfaceDestroyed` callback, release the target or give the
+ * session another window without waiting, as for an Android window.
+ *
+ * See `mln_ohos_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface OffscreenDeviceOptions {
+export interface OhosWindowTarget {
+  logicalSize: LogicalSize;
   /**
-   * The GPU to use, as an index into the platform's list of GPUs.
+   * Your `OHNativeWindow*`.
    */
-  adapterIndex?: number;
-  /**
-   * Whether the device's sessions take turns in one OpenGL context instead of
-   * having one each. Only an EGL device reads it.
-   */
-  singleContext?: boolean;
-  /**
-   * The OpenGL API that the device's sessions render with. An EGL device
-   * defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on
-   * Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
-   * default, and a WebGL device only `OpenGlClientApi.gles`, its default. Other
-   * devices take neither.
-   */
-  clientApi?: OpenGlClientApi;
+  window: bigint;
 }
 
 /**
- * An OpenHarmony window to present to, for `MapHandle.attachOhosSurface()`.
+ * The memory of an exported ring's acquired frame, as an opaque file
+ * descriptor.
  *
- * Name the window by `window` or by `surface_id`. The session takes its own
- * reference to the window, so you can release yours once the call returns.
+ * The memory holds a 2D Vulkan image of `format`, with one mip level, one
+ * layer, optimal tiling, and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+ * VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a
+ * Vulkan image that imports it has too. In OpenGL, import it with
+ * glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the texture
+ * with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
+ * glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
+ * VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
  *
- * See `mln_ohos_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+ * With `RenderSessionAttachOptions.keepDepth`, on a device whose
+ * `GpuDeviceCapabilities.depthExportKinds` has `GpuExportKind.opaqueFd`, the
+ * depth members share the memory of the frame's depth image in the same way.
+ * Otherwise `depth_fd` is -1 and the others are zero. The depth image is 2D, of
+ * `depth_format`, with one mip level, one layer, optimal tiling, and the usage
+ * VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_USAGE_SAMPLED_BIT, and
+ * VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame leaves it in
+ * VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL. In OpenGL,
+ * make its texture with the internal format that `DepthStencilFormatFlag` names
+ * for `depth_format`.
+ *
+ * See `mln_opaque_fd_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-export interface OhosSurfaceDescriptor {
-  logicalSize: LogicalSize;
+export interface OpaqueFdFrame {
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
   /**
-   * Your `OHNativeWindow*`, or null to name the window by `surface_id`.
+   * The texture's index in the ring.
    */
-  window?: bigint;
+  readonly slot: number;
   /**
-   * The surface ID of a surface in this process, such as the one that
-   * `XComponentController.getXComponentSurfaceId()` reports, or 0 to name the
-   * window by `window`.
+   * The file descriptor of the image's memory.
    */
-  surfaceId?: bigint;
-}
-
-/**
- * A new OpenHarmony window for `RenderSessionHandle.setOhosSurfaceTarget()`.
- *
- * Name the window by `window` or by `surface_id`. The session takes its own
- * reference to the window, so you can release yours once the call returns.
- *
- * See `mln_ohos_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
- */
-export interface OhosSurfaceReplacement {
-  logicalSize: LogicalSize;
+  readonly fd: number;
   /**
-   * Your `OHNativeWindow*`, or null to name the window by `surface_id`.
+   * The size of the memory in bytes.
    */
-  window?: bigint;
+  readonly allocationSize: bigint;
   /**
-   * The surface ID of a surface in this process, such as the one that
-   * `XComponentController.getXComponentSurfaceId()` reports, or 0 to name the
-   * window by `window`.
+   * Whether the memory is the image's own, which an import says, such as with
+   * GL_DEDICATED_MEMORY_OBJECT_EXT.
    */
-  surfaceId?: bigint;
+  readonly dedicated: boolean;
+  /**
+   * The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8.
+   */
+  readonly format: number;
+  /**
+   * The file descriptor of the depth image's memory.
+   */
+  readonly depthFd: number;
+  /**
+   * The size of the depth image's memory in bytes.
+   */
+  readonly depthAllocationSize: bigint;
+  /**
+   * Whether the memory is the depth image's own.
+   */
+  readonly depthDedicated: boolean;
+  /**
+   * The depth image's `VkFormat`.
+   */
+  readonly depthFormat: number;
 }
 
 /**
  * An OpenGL texture of a borrowed ring.
  *
  * See `mln_open_gl_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface OpenGlBorrowedTexture {
   /**
@@ -2207,51 +2505,34 @@ export interface OpenGlBorrowedTexture {
 }
 
 /**
- * A ring of your OpenGL textures, for
- * `MapHandle.attachOpenGlBorrowedTexture()`.
+ * A ring of your OpenGL textures to render into, on an OpenGL device that
+ * `GpuDeviceHandle.wrapOpenGl()` made from your context.
  *
- * `logical_size` sets the map's size. `physical_width` and `physical_height`
- * give the textures' size in pixels, which is usually `logical_size` times the
- * map's scale factor. The context must use `OpenGlContextOwnership.shared`.
- * Each texture must be in your context's share group, with storage of that
- * size. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. Each texture
+ * must be in your context's share group, with RGBA8 storage of that size. The
+ * ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
  *
- * The session uses the textures until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, and renders the map's
+ * depth and stencil into it. They must be `GL_TEXTURE_2D` textures in the share
+ * group, with storage of the size of `textures` in a format of
+ * `GpuDeviceCapabilities.depthStencilFormats`.
  *
- * See `mln_open_gl_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * See `mln_open_gl_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface OpenGlBorrowedTextureDescriptor {
+export interface OpenGlBorrowedTexturesTarget {
   logicalSize: LogicalSize;
   physicalWidth: number;
   physicalHeight: number;
-  context: OpenGlContextDescriptor;
   textures: readonly OpenGlBorrowedTexture[];
   /**
-   * The textures' target. It must be GL_TEXTURE_2D.
+   * The textures' target. It must be `GL_TEXTURE_2D`.
    */
   target: number;
-}
-
-/**
- * New OpenGL textures for a borrowed ring, for
- * `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
- *
- * The members and the textures follow the rules of
- * `OpenGlBorrowedTextureDescriptor`. The ring keeps its depth, context, and
- * texture target, so give it as many textures as it attached with, in the same
- * share group.
- *
- * See `mln_open_gl_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export interface OpenGlBorrowedTextureReplacement {
-  logicalSize: LogicalSize;
-  physicalWidth: number;
-  physicalHeight: number;
-  textures: readonly OpenGlBorrowedTexture[];
+  depthTextures?: readonly OpenGlBorrowedTexture[];
 }
 
 /**
@@ -2271,50 +2552,16 @@ export type OpenGlClientApi =
   | (number & {});
 
 /**
- * How a render session gets the OpenGL context that it renders with.
- *
- * Keep the objects that it names alive until a detach or release of the session
- * completes, or an abandon of it returns.
+ * Your OpenGL context, for `GpuDeviceHandle.wrapOpenGl()`: the root of the
+ * share group that the device's sessions join.
  *
  * See `mln_open_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface OpenGlContextDescriptor {
-  ownership?: OpenGlContextOwnership;
-  data: OpenGlContextDescriptorData;
-}
-
-/**
- * The WGL, EGL, or WebGL part of an OpenGL context descriptor.
- *
- * See `mln_open_gl_context_descriptor_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-export type OpenGlContextDescriptorData =
+export type OpenGlContextDescriptor =
   | { readonly kind: "wgl"; readonly value: WglContextDescriptor }
   | { readonly kind: "egl"; readonly value: EglContextDescriptor }
   | { readonly kind: "webGl"; readonly value: WebGlContextDescriptor };
-
-/**
- * Whether a render session's OpenGL context shares objects with yours.
- *
- * See `mln_open_gl_context_ownership` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-export const OpenGlContextOwnership = {
-  /**
-   * The session's context shares objects with your `share_context`.
-   */
-  shared: 0,
-  /**
-   * The session's context shares objects with no other context.
-   */
-  dedicated: 1,
-} as const;
-/** One of the OpenGlContextOwnership values, or a value this binding does not know. */
-export type OpenGlContextOwnership =
-  | (typeof OpenGlContextOwnership)[keyof typeof OpenGlContextOwnership]
-  | (number & {});
 
 /**
  * An OpenGL context platform, as a bit in a set.
@@ -2331,45 +2578,29 @@ export const OpenGlContextProviderFlag = {
 export type OpenGlContextProviderFlag = number;
 
 /**
- * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
+ * Your OpenGL surface to present to, with the context that
+ * `GpuDeviceHandle.wrapOpenGl()` wrapped.
  *
- * The session uses the surface until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
+ * The session makes its context current on the surface for each frame, and
+ * swaps the surface's buffers to present.
  *
- * See `mln_open_gl_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ * See `mln_open_gl_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface OpenGlSurfaceDescriptor {
-  logicalSize: LogicalSize;
-  context: OpenGlContextDescriptor;
-  /**
-   * Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
-   */
-  surface?: bigint;
-}
-
-/**
- * A new OpenGL surface for `RenderSessionHandle.setOpenGlSurfaceTarget()`.
- *
- * The session presents to it with the context that it attached with. It uses
- * the surface until a replacement or release of the target completes, a detach
- * or release of the session completes, or an abandon of it returns.
- *
- * See `mln_open_gl_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export interface OpenGlSurfaceReplacement {
+export interface OpenGlSurfaceTarget {
   logicalSize: LogicalSize;
   /**
-   * Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
-   * leave it null.
+   * Your `EGLSurface` on the context's display, with its config, or your `HDC`
+   * with the context's pixel format.
    */
-  surface?: bigint;
+  surface: bigint;
 }
 
 /**
  * The OpenGL texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * `MetalTextureFrame`. Otherwise they are zero.
  *
  * See `mln_open_gl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2384,6 +2615,15 @@ export interface OpenGlTextureFrame {
   readonly slot: number;
   readonly texture: number;
   readonly target: number;
+  /**
+   * The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil.
+   */
+  readonly depthTexture: number;
+  /**
+   * The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero
+   * for a borrowed ring's.
+   */
+  readonly depthInternalFormat: number;
 }
 
 /**
@@ -2518,11 +2758,15 @@ export interface Quaternion {
 }
 
 /**
- * Your lock on a Vulkan queue that you and a render session both submit to.
+ * Your lock on a Vulkan queue that you and the render sessions of a GPU device
+ * all submit to.
  *
- * The session holds the lock only while it submits or presents to the queue.
- * Set both `lock` and `unlock`, or neither when you don't submit to the queue
- * yourself.
+ * A session holds the lock only while it submits or presents to the queue, or
+ * submits the empty batch that drains its work from the queue. It never holds
+ * the lock while it waits. Set both `lock` and `unlock`, or neither when you
+ * don't submit to the queue yourself.
+ *
+ * Don't hold the lock while you call the library.
  *
  * It can run on a library thread, and it can't call the library.
  *
@@ -2589,6 +2833,23 @@ export interface RenderAbandonResult {
 }
 
 /**
+ * A render backend.
+ *
+ * See `mln_render_backend` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+export const RenderBackend = {
+  metal: 1,
+  vulkan: 2,
+  openGl: 3,
+  webGpu: 4,
+} as const;
+/** One of the RenderBackend values, or a value this binding does not know. */
+export type RenderBackend =
+  | (typeof RenderBackend)[keyof typeof RenderBackend]
+  | (number & {});
+
+/**
  * A render backend, as a bit in a set.
  *
  * See `mln_render_backend_flag` in the
@@ -2646,6 +2907,11 @@ export interface RenderFrameResult {
    * The camera and extent that a rendered frame shows.
    */
   readonly view: MapView;
+  /**
+   * Where a rendered frame drew the map, for drawing into its frame with depth.
+   * All zero for a demand that rendered nothing.
+   */
+  readonly frameProjection: FrameProjection;
   readonly mode: RenderMode;
 }
 
@@ -2710,13 +2976,18 @@ export interface RenderSessionAttachOptions {
    * The thread that runs the session's graphics work, which depends on the
    * target:
    *
-   * - `RenderDriverKind.callerGraphicsThread` for a shared or dedicated EGL or
-   *   WGL context, an existing WebGL context, or a browser's WebGPU device.
-   * - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an Android,
-   *   OpenHarmony, or Win32 window, a Wayland surface, a ring of Android
-   *   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces, or an
-   *   offscreen session.
-   * - Either one for another Metal or Vulkan target.
+   * - `RenderDriverKind.callerGraphicsThread` for a borrowed ring of WebGPU
+   *   textures.
+   * - `RenderDriverKind.coreWorker` for an offscreen target, a window, or an
+   *   exported ring.
+   * - Either one for a web canvas. In a browser both run on the thread that
+   *   loaded the library: `RenderDriverKind.coreWorker` in the library's own
+   *   tasks, and `RenderDriverKind.callerGraphicsThread` when you service the
+   *   session.
+   * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
+   *   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
+   *   these on `RenderDriverKind.coreWorker` only, and fails an attach with
+   *   `RenderDriverKind.callerGraphicsThread` then.
    *
    * An attach with another driver fails with `Status.unsupported`.
    */
@@ -2742,13 +3013,24 @@ export interface RenderSessionAttachOptions {
   /**
    * Called when a session driven by `RenderDriverKind.callerGraphicsThread` has
    * work for `RenderSessionHandle.serviceDriverWork()`. It isn't called again
-   * until a service runs.
+   * until a service runs. It's never called on your graphics thread during a
+   * service: the service runs the work that comes while it runs, so you can
+   * call `RenderSessionHandle.serviceDriverWork()` from the wake.
    */
   driverWorkWake?: Wake;
   /**
-   * Your lock on the Vulkan queue, when you submit to it yourself.
+   * Whether an exported ring keeps the depth and stencil of each frame for you,
+   * so that you can draw into the frame depth-tested against the map, as
+   * `FrameProjection` says. The getter of the device's API, such as
+   * `AcquiredFrameHandle.withVulkanTexture()`, gets a frame's depth texture on
+   * the device, and `AcquiredFrameHandle.withOpaqueFd()` shares it across APIs
+   * when `GpuDeviceCapabilities.depthExportKinds` has the ring's kind. Keeping
+   * depth costs memory bandwidth, most on tile-based GPUs. A borrowed ring
+   * keeps depth in the textures that you give it instead, and the other targets
+   * keep none, so an attach to them with `keep_depth` fails with
+   * `Status.unsupported`.
    */
-  queueLock?: QueueLock;
+  keepDepth?: boolean;
 }
 
 /**
@@ -2774,6 +3056,11 @@ export interface RenderSessionCapabilities {
    * depend on the target and on what the device supports.
    */
   readonly consumerSyncKinds: GpuSyncKindFlag;
+  /**
+   * How an exported ring shares its textures, which says which getter gets an
+   * acquired frame's texture, or `GpuExportKind.none` for another target.
+   */
+  readonly exportKind: GpuExportKind;
 }
 
 /**
@@ -2846,6 +3133,79 @@ export const RenderSessionState = {
 export type RenderSessionState =
   | (typeof RenderSessionState)[keyof typeof RenderSessionState]
   | (number & {});
+
+/**
+ * What a render session renders into: one kind of target, and its descriptor.
+ *
+ * Every target has a size in logical pixels, which sets the map's size. The
+ * session renders it at the map's scale factor. A borrowed or exported ring
+ * hands each frame to you: acquire it with
+ * `RenderSessionHandle.acquireFrame()`, and release it with your GPU's
+ * synchronization once you have read it.
+ *
+ * The session uses the objects that the descriptor names until a replacement or
+ * release of the target completes, a detach or release of the session
+ * completes, or an abandon of it returns, except as a kind's descriptor says. A
+ * window target presents without waiting for the display, so demand at most one
+ * frame per display refresh.
+ *
+ * See `mln_render_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export type RenderTarget =
+  | { readonly kind: "offscreen"; readonly value: OffscreenTarget }
+  | { readonly kind: "metalLayer"; readonly value: MetalLayerTarget }
+  | { readonly kind: "win32Window"; readonly value: Win32WindowTarget }
+  | { readonly kind: "xlibWindow"; readonly value: XlibWindowTarget }
+  | { readonly kind: "waylandSurface"; readonly value: WaylandSurfaceTarget }
+  | { readonly kind: "androidWindow"; readonly value: AndroidWindowTarget }
+  | { readonly kind: "ohosWindow"; readonly value: OhosWindowTarget }
+  | { readonly kind: "vulkanSurface"; readonly value: VulkanSurfaceTarget }
+  | { readonly kind: "openGlSurface"; readonly value: OpenGlSurfaceTarget }
+  | {
+      readonly kind: "metalBorrowedTextures";
+      readonly value: MetalBorrowedTexturesTarget;
+    }
+  | {
+      readonly kind: "vulkanBorrowedTextures";
+      readonly value: VulkanBorrowedTexturesTarget;
+    }
+  | {
+      readonly kind: "openGlBorrowedTextures";
+      readonly value: OpenGlBorrowedTexturesTarget;
+    }
+  | {
+      readonly kind: "webGpuBorrowedTextures";
+      readonly value: WebGpuBorrowedTexturesTarget;
+    }
+  | { readonly kind: "exportedRing"; readonly value: ExportedRingTarget }
+  | { readonly kind: "webCanvas"; readonly value: WebCanvasTarget };
+
+/**
+ * A render target kind, as a bit in a set.
+ *
+ * See `mln_render_target_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export const RenderTargetKindFlag = {
+  offscreen: 1,
+  metalLayer: 2,
+  win32Window: 4,
+  xlibWindow: 8,
+  waylandSurface: 16,
+  androidWindow: 32,
+  ohosWindow: 64,
+  vulkanSurface: 512,
+  openGlSurface: 1024,
+  metalBorrowedTextures: 2048,
+  vulkanBorrowedTextures: 4096,
+  openGlBorrowedTextures: 8192,
+  webGpuBorrowedTextures: 16384,
+  exportedRing: 32768,
+  webCanvas: 65536,
+} as const;
+/** A bitwise OR of RenderTargetKindFlag flags. */
+export type RenderTargetKindFlag = number;
 
 /**
  * A feature that a rendered feature query found.
@@ -3333,16 +3693,15 @@ export const RuntimeEventFlag = {
   mapSourceChanged: 65536n,
   offlineRegionStatusChanged: 131072n,
   offlineRegionResponseError: 262144n,
-  offlineRegionTileCountLimitExceeded: 524288n,
-  mapGlyphsRequested: 1048576n,
-  mapGlyphsLoaded: 2097152n,
-  mapGlyphsError: 4194304n,
-  mapSpriteRequested: 8388608n,
-  mapSpriteLoaded: 16777216n,
-  mapSpriteError: 33554432n,
-  allMapEvents: 66191358n,
-  allRuntimeEvents: 917504n,
-  all: 67108862n,
+  mapGlyphsRequested: 524288n,
+  mapGlyphsLoaded: 1048576n,
+  mapGlyphsError: 2097152n,
+  mapSpriteRequested: 4194304n,
+  mapSpriteLoaded: 8388608n,
+  mapSpriteError: 16777216n,
+  allMapEvents: 33161214n,
+  allRuntimeEvents: 393216n,
+  all: 33554430n,
 } as const;
 /** A bitwise OR of RuntimeEventFlag flags. */
 export type RuntimeEventFlag = bigint;
@@ -3408,21 +3767,6 @@ export interface RuntimeEventOfflineRegionStatus {
 }
 
 /**
- * The details of `RuntimeEventType.offlineRegionTileCountLimitExceeded`.
- *
- * See `mln_runtime_event_offline_region_tile_count_limit` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-export interface RuntimeEventOfflineRegionTileCountLimit {
-  readonly regionId: bigint;
-  /**
-   * The number of demo server tiles that the cache file's offline regions may
-   * hold together.
-   */
-  readonly limit: bigint;
-}
-
-/**
  * The details of an event, in the member that its `payload_type` names.
  *
  * See `mln_runtime_event_payload` in the
@@ -3448,10 +3792,6 @@ export type RuntimeEventPayload =
   | {
       readonly kind: "offlineRegionResponseError";
       readonly value: RuntimeEventOfflineRegionResponseError;
-    }
-  | {
-      readonly kind: "offlineRegionTileCountLimit";
-      readonly value: RuntimeEventOfflineRegionTileCountLimit;
     }
   | { readonly kind: "glyphs"; readonly value: RuntimeEventGlyphs }
   | { readonly kind: "sprite"; readonly value: RuntimeEventSprite }
@@ -3594,19 +3934,12 @@ export const RuntimeEventType = {
    * A resource that the region needs failed to download.
    */
   offlineRegionResponseError: 18,
-  /**
-   * The region's download became inactive because the cache file's offline
-   * regions hold as many tiles from MapLibre's demo tile server as the limit
-   * allows. Only tiles of sources with a `maplibre://` URL count toward the
-   * limit.
-   */
-  offlineRegionTileCountLimitExceeded: 19,
-  mapGlyphsRequested: 20,
-  mapGlyphsLoaded: 21,
-  mapGlyphsError: 22,
-  mapSpriteRequested: 23,
-  mapSpriteLoaded: 24,
-  mapSpriteError: 25,
+  mapGlyphsRequested: 19,
+  mapGlyphsLoaded: 20,
+  mapGlyphsError: 21,
+  mapSpriteRequested: 22,
+  mapSpriteLoaded: 23,
+  mapSpriteError: 24,
 } as const;
 /** One of the RuntimeEventType values, or a value this binding does not know. */
 export type RuntimeEventType =
@@ -4262,6 +4595,19 @@ export interface Vec3 {
 }
 
 /**
+ * A vector in four dimensions, such as a point in homogeneous coordinates.
+ *
+ * See `mln_vec4` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface Vec4 {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly w: number;
+}
+
+/**
  * The vertical direction of the image that the map renders.
  *
  * See `mln_viewport_mode` in the
@@ -4283,69 +4629,65 @@ export type ViewportMode =
  * A Vulkan image of a borrowed ring.
  *
  * See `mln_vulkan_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface VulkanBorrowedTexture {
   /**
-   * Your VkImage.
+   * Your `VkImage`.
    */
   image: bigint;
   /**
-   * A 2D VkImageView of `image` with one mip level and one layer.
+   * A 2D `VkImageView` of `image` with one mip level and one layer.
    */
   imageView: bigint;
 }
 
 /**
- * A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
+ * A ring of your Vulkan images to render into, on the Vulkan device that you
+ * attach on.
  *
- * `logical_size` sets the map's size. `physical_width` and `physical_height`
- * give the images' size in pixels, which is usually `logical_size` times the
- * map's scale factor. Each image must have that size, `format`, and
- * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
- * ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct images.
+ * `physical_width` and `physical_height` give the images' size in pixels, which
+ * is usually `logical_size` times the map's scale factor. Each image must have
+ * that size, `format`, and `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT`, and belong to
+ * the device's `VkDevice`. The ring holds up to `TEXTURE_RING_MAX_DEPTH`
+ * distinct images.
  *
- * The session uses the images until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, renders the map's
+ * depth and stencil into it, stores them, and leaves it in
+ * `depth_final_layout`, with `owner` as for the color image. They must have the
+ * size of `textures`, `depth_format`, one sample, and
+ * `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and their views both the depth
+ * and the stencil aspect.
  *
- * See `mln_vulkan_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * See `mln_vulkan_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface VulkanBorrowedTextureDescriptor {
+export interface VulkanBorrowedTexturesTarget {
   logicalSize: LogicalSize;
   physicalWidth: number;
   physicalHeight: number;
-  context: VulkanContextDescriptor;
   textures: readonly VulkanBorrowedTexture[];
   /**
-   * The images' VkFormat.
+   * The images' `VkFormat`.
    */
   format: number;
   /**
-   * The VkImageLayout that each frame leaves its image in.
+   * The `VkImageLayout` that each frame leaves its image in.
    */
   finalLayout: number;
   owner?: VulkanImageOwner;
-}
-
-/**
- * New Vulkan images for a borrowed ring, for
- * `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
- *
- * The members and the images follow the rules of
- * `VulkanBorrowedTextureDescriptor`. The ring keeps its depth, context,
- * `format`, `final_layout`, and `owner`, so give it as many images as it
- * attached with, in that format, on the same device.
- *
- * See `mln_vulkan_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export interface VulkanBorrowedTextureReplacement {
-  logicalSize: LogicalSize;
-  physicalWidth: number;
-  physicalHeight: number;
-  textures: readonly VulkanBorrowedTexture[];
+  depthTextures?: readonly VulkanBorrowedTexture[];
+  /**
+   * The depth images' `VkFormat`, of
+   * `GpuDeviceCapabilities.depthStencilFormats`.
+   */
+  depthFormat?: number;
+  /**
+   * The `VkImageLayout` that each frame leaves its depth image in.
+   */
+  depthFinalLayout?: number;
 }
 
 /**
@@ -4372,7 +4714,7 @@ export interface VulkanContextDescriptor {
   device: bigint;
   /**
    * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If
-   * you submit to it too, set `RenderSessionAttachOptions.queueLock`.
+   * you submit to it too, give the device your `QueueLock`.
    */
   graphicsQueue: bigint;
   graphicsQueueFamilyIndex: number;
@@ -4387,39 +4729,26 @@ export interface VulkanContextDescriptor {
 }
 
 /**
- * A Vulkan device's context, as `VulkanDeviceHandle.getContext()` reports it.
+ * Your Vulkan device and queue, for `GpuDeviceHandle.wrapVulkan()`.
  *
- * See `mln_vulkan_device_context_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ * See `mln_vulkan_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
  */
-export interface VulkanDeviceContextResult {
-  readonly context: VulkanContextDescriptor;
-}
-
-/**
- * Options for `VulkanDeviceHandle.create()`.
- *
- * See `mln_vulkan_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- */
-export interface VulkanDeviceOptions {
+export interface VulkanDeviceDescriptor {
+  context: VulkanContextDescriptor;
   /**
-   * Whether the device can present to a window. The instance then enables
-   * VK_KHR_surface and the platform's surface extensions, and the device
-   * enables VK_KHR_swapchain. Defaults to false.
+   * Your lock on `context.graphics_queue`, when you submit to it yourself. Give
+   * every device that wraps the queue the same lock.
    */
-  presentation?: boolean;
+  queueLock?: QueueLock;
   /**
-   * The 16-byte `deviceUUID` of the GPU to use, as
-   * `VkPhysicalDeviceIDProperties` reports it.
+   * The names of the device extensions that you enabled on `context.device`,
+   * such as "VK_KHR_external_semaphore_fd". Vulkan offers no way to ask a
+   * device which extensions it has, so the device offers the export kinds and
+   * `GpuSyncKind.syncFd` only when the extensions that they need are listed
+   * here, and none of them when the list is empty.
    */
-  deviceUuid?: Uint8Array;
-  /**
-   * The 8-byte `deviceLUID` of the GPU to use, as
-   * `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
-   * DXGI adapter LUID.
-   */
-  deviceLuid?: Uint8Array;
+  enabledExtensions?: readonly string[];
 }
 
 /**
@@ -4429,11 +4758,11 @@ export interface VulkanDeviceOptions {
  * image on your side before you read it. You don't need to release it back.
  *
  * See `mln_vulkan_image_owner` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export const VulkanImageOwner = {
   /**
-   * The image stays with the queue family of `graphics_queue_family_index`.
+   * The image stays with the queue family of the device's queue.
    */
   graphicsQueue: 0,
   /**
@@ -4451,48 +4780,28 @@ export type VulkanImageOwner =
   | (number & {});
 
 /**
- * A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()`.
+ * Your Vulkan surface to present to.
  *
- * The device must have VK_KHR_swapchain enabled, and the queue family of
- * `graphics_queue_family_index` must support presenting to the surface. The
- * session creates the swapchain. It uses the surface until a replacement or
- * release of the target completes, a detach or release of the session
- * completes, or an abandon of it returns.
+ * Make it with the instance of the Vulkan device that you attach on. The
+ * device's queue family must support presenting to the surface. The session
+ * creates the swapchain, and destroys it but not the surface.
  *
- * See `mln_vulkan_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ * See `mln_vulkan_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface VulkanSurfaceDescriptor {
-  logicalSize: LogicalSize;
-  context: VulkanContextDescriptor;
-  /**
-   * Your VkSurfaceKHR.
-   */
-  surface: bigint;
-}
-
-/**
- * A new Vulkan surface for `RenderSessionHandle.setVulkanSurfaceTarget()`.
- *
- * The session presents to it with the context that it attached with, so the
- * queue family of that context's `graphics_queue_family_index` must support
- * presenting to the surface. It uses the surface until a replacement or release
- * of the target completes, a detach or release of the session completes, or an
- * abandon of it returns.
- *
- * See `mln_vulkan_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export interface VulkanSurfaceReplacement {
+export interface VulkanSurfaceTarget {
   logicalSize: LogicalSize;
   /**
-   * Your VkSurfaceKHR.
+   * Your `VkSurfaceKHR`.
    */
   surface: bigint;
 }
 
 /**
  * The Vulkan image of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth image, as for
+ * `MetalTextureFrame`. Otherwise they are zero.
  *
  * See `mln_vulkan_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4525,6 +4834,22 @@ export interface VulkanTextureFrame {
    * The VkImageLayout that the frame left the image in.
    */
   readonly layout: number;
+  /**
+   * The VkImage that holds the frame's depth and stencil.
+   */
+  readonly depthImage: bigint;
+  /**
+   * A VkImageView of the depth image's depth and stencil aspects.
+   */
+  readonly depthImageView: bigint;
+  /**
+   * The depth image's VkFormat.
+   */
+  readonly depthFormat: number;
+  /**
+   * The VkImageLayout that the frame left the depth image in.
+   */
+  readonly depthLayout: number;
 }
 
 /**
@@ -4574,12 +4899,15 @@ export interface NativeWakeFields {
 }
 
 /**
- * A Wayland surface to present to, for `MapHandle.attachWaylandSurface()`.
+ * A Wayland surface to present to.
  *
- * See `mln_wayland_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+ * Keep the display connected until the session's detach completes. On an OpenGL
+ * device, if you also use EGL on the display, initialize it before you attach.
+ *
+ * See `mln_wayland_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface WaylandSurfaceDescriptor {
+export interface WaylandSurfaceTarget {
   logicalSize: LogicalSize;
   /**
    * Your `wl_display*`.
@@ -4592,123 +4920,98 @@ export interface WaylandSurfaceDescriptor {
 }
 
 /**
- * A new Wayland surface for `RenderSessionHandle.setWaylandSurfaceTarget()`.
+ * A canvas to present to.
  *
- * See `mln_wayland_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
+ * The session makes the canvas's "webgpu" or "webgl2" context with the device's
+ * backend, and sets the canvas's size to `logical_size` at the map's scale
+ * factor. Attached without a device, it renders with the build's backend: a
+ * WebGPU build asks the browser for a device, and attaches once it has one. For
+ * an OpenGL device that wraps your WebGL2 context, the canvas must be the
+ * context's own.
+ *
+ * See `mln_web_canvas_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface WaylandSurfaceReplacement {
+export interface WebCanvasTarget {
   logicalSize: LogicalSize;
   /**
-   * Your `wl_surface*`, on the display that the session attached with.
+   * An `OffscreenCanvas`, such as one from
+   * `HTMLCanvasElement.transferControlToOffscreen()` that you posted to the
+   * library's Web Worker, or an `HTMLCanvasElement` when the library runs on
+   * the page's thread.
    */
-  surface: bigint;
+  canvas: number;
+  /**
+   * For a WebGPU device, the `GPUTextureFormat` to configure the canvas with,
+   * such as `bgra8unorm`. Empty for a format that the device's adapter prefers.
+   */
+  format?: string;
 }
 
 /**
- * The WebGL context or canvas that a render session uses.
+ * The WebGL2 context that an OpenGL device wraps.
  *
  * See `mln_web_gl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface WebGlContextDescriptor {
-  kind?: WebGlContextKind;
   /**
-   * Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
+   * Your `WebGL2RenderingContext`.
    */
-  context?: number;
-  /**
-   * The canvas's CSS selector, for a transferred canvas.
-   */
-  canvasSelector?: string;
+  context: number;
 }
-
-/**
- * How a render session gets its WebGL context.
- *
- * See `mln_web_gl_context_kind` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-export const WebGlContextKind = {
-  /**
-   * The session uses a context that you created with
-   * `emscripten_webgl_create_context()`.
-   */
-  existing: 0,
-  /**
-   * The library transfers the canvas that `canvas_selector` names to a worker
-   * and creates the context there.
-   */
-  transferredCanvas: 1,
-} as const;
-/** One of the WebGlContextKind values, or a value this binding does not know. */
-export type WebGlContextKind =
-  | (typeof WebGlContextKind)[keyof typeof WebGlContextKind]
-  | (number & {});
 
 /**
  * A WebGPU texture of a borrowed ring.
  *
  * See `mln_web_gpu_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface WebGpuBorrowedTexture {
   /**
-   * Your WGPUTexture.
+   * Your `GPUTexture`.
    */
-  texture: bigint;
-  /**
-   * A WGPUTextureView of `texture`.
-   */
-  textureView: bigint;
+  texture: number;
 }
 
 /**
- * A ring of your WebGPU textures, for
- * `MapHandle.attachWebGpuBorrowedTexture()`.
+ * A ring of your WebGPU textures to render into, on a WebGPU device that wraps
+ * yours.
  *
- * `logical_size` sets the map's size. `physical_width` and `physical_height`
- * give the textures' size in pixels, which is usually `logical_size` times the
- * map's scale factor. Each texture must be 2D with that size, `format`, one
- * layer, one mip level, one sample, and WGPUTextureUsage_RenderAttachment. The
- * ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. Each texture
+ * must be 2D with that size, `format`, one layer, one mip level, one sample,
+ * and `GPUTextureUsage.RENDER_ATTACHMENT`. The ring holds up to
+ * `TEXTURE_RING_MAX_DEPTH` distinct textures.
  *
- * The session uses the textures until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, renders the map's
+ * depth and stencil into it, and stores them. They must be 2D with the size of
+ * `textures`, `depth_format`, one layer, one mip level, one sample, and
+ * `GPUTextureUsage.RENDER_ATTACHMENT`.
  *
- * See `mln_web_gpu_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * The ring renders on a device from `GpuDeviceHandle.wrapWebGpu()`, which no
+ * build has yet: an attach with it fails with `Status.unsupported`.
+ *
+ * See `mln_web_gpu_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface WebGpuBorrowedTextureDescriptor {
-  logicalSize: LogicalSize;
-  physicalWidth: number;
-  physicalHeight: number;
-  context: WebGpuContextDescriptor;
-  textures: readonly WebGpuBorrowedTexture[];
-  /**
-   * The textures' WGPUTextureFormat.
-   */
-  format: number;
-}
-
-/**
- * New WebGPU textures for a borrowed ring, for
- * `RenderSessionHandle.setWebGpuBorrowedTextureTarget()`.
- *
- * The members and the textures follow the rules of
- * `WebGpuBorrowedTextureDescriptor`. The ring keeps its depth, context, and
- * `format`, so give it as many textures as it attached with, in that format, on
- * the same device.
- *
- * See `mln_web_gpu_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-export interface WebGpuBorrowedTextureReplacement {
+export interface WebGpuBorrowedTexturesTarget {
   logicalSize: LogicalSize;
   physicalWidth: number;
   physicalHeight: number;
   textures: readonly WebGpuBorrowedTexture[];
+  /**
+   * The textures' `GPUTextureFormat`, such as `rgba8unorm`.
+   */
+  format: string;
+  depthTextures?: readonly WebGpuBorrowedTexture[];
+  /**
+   * The depth textures' `GPUTextureFormat`, of
+   * `GpuDeviceCapabilities.depthStencilFormats`.
+   */
+  depthFormat?: string;
 }
 
 /**
@@ -4719,62 +5022,16 @@ export interface WebGpuBorrowedTextureReplacement {
  */
 export interface WebGpuContextDescriptor {
   /**
-   * A `WGPUInstance`, or null.
+   * Your `GPUDevice`. Sessions submit to its `queue`.
    */
-  instance?: bigint;
-  /**
-   * A `WGPUDevice`.
-   */
-  device: bigint;
-  /**
-   * A `WGPUQueue`, or null to use the device's queue.
-   */
-  queue?: bigint;
-}
-
-/**
- * A WebGPU surface to present to, for `MapHandle.attachWebGpuSurface()`.
- *
- * The session configures the surface. It uses the surface until a replacement
- * or release of the target completes, a detach or release of the session
- * completes, or an abandon of it returns.
- *
- * See `mln_web_gpu_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export interface WebGpuSurfaceDescriptor {
-  logicalSize: LogicalSize;
-  context: WebGpuContextDescriptor;
-  /**
-   * Your WGPUSurface.
-   */
-  surface: bigint;
-  /**
-   * The WGPUTextureFormat to configure the surface with.
-   */
-  format: number;
-}
-
-/**
- * A new WebGPU surface for `RenderSessionHandle.setWebGpuSurfaceTarget()`.
- *
- * The session configures it with the context and format that it attached with.
- * It uses the surface until a replacement or release of the target completes, a
- * detach or release of the session completes, or an abandon of it returns.
- *
- * See `mln_web_gpu_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-export interface WebGpuSurfaceReplacement {
-  logicalSize: LogicalSize;
-  /**
-   * Your WGPUSurface.
-   */
-  surface: bigint;
+  device: number;
 }
 
 /**
  * The WebGPU texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * `MetalTextureFrame`. Otherwise they are zero.
  *
  * See `mln_web_gpu_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4788,38 +5045,42 @@ export interface WebGpuTextureFrame {
    */
   readonly slot: number;
   /**
-   * The WGPUTexture.
+   * The `GPUTexture`.
    */
-  readonly texture: bigint;
+  readonly texture: number;
   /**
-   * The WGPUTextureView.
+   * The texture's `GPUDevice`.
    */
-  readonly textureView: bigint;
+  readonly device: number;
   /**
-   * The texture's WGPUDevice.
+   * The texture's `GPUTextureFormat`.
    */
-  readonly device: bigint;
+  readonly format: string;
   /**
-   * The texture's WGPUTextureFormat.
+   * The `GPUTexture` that holds the frame's depth and stencil.
    */
-  readonly format: number;
+  readonly depthTexture: number;
+  /**
+   * The depth texture's `GPUTextureFormat`.
+   */
+  readonly depthFormat: string;
 }
 
 /**
- * The WGL objects that a render session makes its OpenGL context from.
+ * Your WGL context, which each session's context shares objects with.
  *
  * See `mln_wgl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 export interface WglContextDescriptor {
   /**
-   * An `HDC`.
+   * An `HDC` with the pixel format of `share_context`.
    */
   deviceContext: bigint;
   /**
-   * Your `HGLRC`, for a shared context.
+   * Your `HGLRC`.
    */
-  shareContext?: bigint;
+  shareContext: bigint;
   /**
    * Your `wglGetProcAddress`, or null to use the system's.
    */
@@ -4827,12 +5088,16 @@ export interface WglContextDescriptor {
 }
 
 /**
- * A Win32 window to present to, for `MapHandle.attachWin32Window()`.
+ * A Win32 window to present to.
  *
- * See `mln_win32_window_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ * On an OpenGL device, the session sets the window's pixel format, so don't set
+ * one yourself. While the window is minimized, frame demands finish with
+ * `RenderResult.targetNotReady`.
+ *
+ * See `mln_win32_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface Win32WindowDescriptor {
+export interface Win32WindowTarget {
   logicalSize: LogicalSize;
   /**
    * Your `HWND`.
@@ -4841,15 +5106,21 @@ export interface Win32WindowDescriptor {
 }
 
 /**
- * A new Win32 window for `RenderSessionHandle.setWin32WindowTarget()`.
+ * An X11 window to present to, through Xlib.
  *
- * See `mln_win32_window_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ * Keep the display connected until the session's detach completes.
+ *
+ * See `mln_xlib_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-export interface Win32WindowReplacement {
+export interface XlibWindowTarget {
   logicalSize: LogicalSize;
   /**
-   * Your `HWND`.
+   * Your `Display*`.
+   */
+  display: bigint;
+  /**
+   * Your `Window`, on `display`.
    */
   window: bigint;
 }
@@ -4863,8 +5134,9 @@ export interface Win32WindowReplacement {
 export const DIAGNOSTIC_MESSAGE_CAPACITY: number = 4096;
 
 /**
- * The token of the frame results that a session adds when it renders an image
- * for `MapHandle.requestStillImage()`. Your own demands can't use it.
+ * The token of the frame results of the demand that a session holds for an
+ * image of `MapHandle.requestStillImage()`, which says how that demand runs.
+ * Your own demands can't use it.
  *
  * See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

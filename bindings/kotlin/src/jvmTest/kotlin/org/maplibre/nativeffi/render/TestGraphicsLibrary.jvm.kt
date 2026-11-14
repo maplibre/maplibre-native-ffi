@@ -3,7 +3,10 @@ package org.maplibre.nativeffi.render
 import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
+import java.lang.foreign.MemoryLayout
+import java.lang.foreign.MemoryLayout.PathElement.groupElement
 import java.lang.foreign.MemorySegment
+import java.lang.foreign.StructLayout
 import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout.ADDRESS
 import java.lang.foreign.ValueLayout.JAVA_BOOLEAN
@@ -50,27 +53,29 @@ internal actual object TestGraphicsLibrary {
 
   actual fun context(graphics: Long): TestGraphicsContext =
     Arena.ofConfined().use { arena ->
-      // mln_test_graphics_context: two uint32 fields, then fourteen pointers.
-      val context = arena.allocate(CONTEXT_POINTERS_OFFSET + 14L * ADDRESS.byteSize(), 8)
+      val context = arena.allocate(contextLayout)
       check(getContext.invokeWithArguments(MemorySegment.ofAddress(graphics), context) as Boolean) {
         "tests/graphics context lookup failed: ${lastError()}"
       }
-      fun pointer(index: Int): Long =
-        context.get(ADDRESS, CONTEXT_POINTERS_OFFSET + index * ADDRESS.byteSize()).address()
+      fun pointer(field: String): Long =
+        context.get(ADDRESS, contextLayout.byteOffset(groupElement(field))).address()
       TestGraphicsContext(
-        metalDevice = pointer(0),
-        vulkanInstance = pointer(1),
-        vulkanPhysicalDevice = pointer(2),
-        vulkanDevice = pointer(3),
-        vulkanQueue = pointer(4),
-        vulkanQueueFamilyIndex = context.get(JAVA_INT, 4).toUInt(),
-        vulkanGetInstanceProcAddr = pointer(5),
-        vulkanGetDeviceProcAddr = pointer(6),
-        eglDisplay = pointer(7),
-        eglConfig = pointer(8),
-        eglContext = pointer(9),
-        wglDeviceContext = pointer(10),
-        wglContext = pointer(11),
+        metalDevice = pointer("metal_device"),
+        vulkanInstance = pointer("vulkan_instance"),
+        vulkanPhysicalDevice = pointer("vulkan_physical_device"),
+        vulkanDevice = pointer("vulkan_device"),
+        vulkanQueue = pointer("vulkan_queue"),
+        vulkanQueueFamilyIndex =
+          context
+            .get(JAVA_INT, contextLayout.byteOffset(groupElement("vulkan_queue_family_index")))
+            .toUInt(),
+        vulkanGetInstanceProcAddr = pointer("vulkan_get_instance_proc_addr"),
+        vulkanGetDeviceProcAddr = pointer("vulkan_get_device_proc_addr"),
+        eglDisplay = pointer("egl_display"),
+        eglConfig = pointer("egl_config"),
+        eglContext = pointer("egl_context"),
+        wglDeviceContext = pointer("wgl_device_context"),
+        wglContext = pointer("wgl_context"),
       )
     }
 
@@ -124,5 +129,32 @@ internal actual object TestGraphicsLibrary {
   private fun function(name: String, descriptor: FunctionDescriptor): MethodHandle =
     linker.downcallHandle(library.find(name).orElseThrow(), descriptor)
 
-  private const val CONTEXT_POINTERS_OFFSET = 8L
+  /** mln_test_graphics_context, field for field, as tests/graphics/include declares it. */
+  private val contextLayout: StructLayout =
+    MemoryLayout.structLayout(
+      *listOfNotNull(
+          JAVA_INT.withName("backend"),
+          JAVA_INT.withName("vulkan_queue_family_index"),
+          ADDRESS.withName("metal_device"),
+          ADDRESS.withName("vulkan_instance"),
+          ADDRESS.withName("vulkan_physical_device"),
+          ADDRESS.withName("vulkan_device"),
+          ADDRESS.withName("vulkan_queue"),
+          ADDRESS.withName("vulkan_get_instance_proc_addr"),
+          ADDRESS.withName("vulkan_get_device_proc_addr"),
+          ADDRESS.withName("vulkan_device_extensions"),
+          JAVA_INT.withName("vulkan_device_extension_count"),
+          // The padding that aligns egl_display after the count.
+          (ADDRESS.byteAlignment() - JAVA_INT.byteSize())
+            .takeIf { it > 0 }
+            ?.let(MemoryLayout::paddingLayout),
+          ADDRESS.withName("egl_display"),
+          ADDRESS.withName("egl_config"),
+          ADDRESS.withName("egl_context"),
+          ADDRESS.withName("wgl_device_context"),
+          ADDRESS.withName("wgl_context"),
+          ADDRESS.withName("get_proc_address"),
+        )
+        .toTypedArray(),
+    )
 }

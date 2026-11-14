@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Builds an Apple package consumer and runs its portable binding suite where supported.
+# Builds an Apple package consumer and runs its portable binding suite where
+# supported, with the render backend under test.
 set -euo pipefail
-preset=${1:?usage: test-dotnet-apple.sh <preset> [--build-only]}
+usage="usage: test-dotnet-apple.sh <preset> <backend>|--build-only"
+preset=${1:?$usage}
+mode=${2:?$usage}
 case "$preset" in
   ios-simulator-*) platform=ios; rid=iossimulator-arm64 ;;
   ios-maccatalyst-*) platform=maccatalyst; rid=maccatalyst-arm64 ;;
-  ios-arm64-*) platform=ios; rid=ios-arm64 ;;
+  ios-arm64) platform=ios; rid=ios-arm64 ;;
   tvos-simulator-*) platform=tvos; rid=tvossimulator-arm64 ;;
-  tvos-arm64-*) platform=tvos; rid=tvos-arm64 ;;
+  tvos-arm64) platform=tvos; rid=tvos-arm64 ;;
   *) echo "The .NET Apple suite cannot build $preset." >&2; exit 2 ;;
 esac
 
@@ -30,9 +33,11 @@ dotnet build "$project" -c Release -r "$rid" \
   "-p:BaseIntermediateOutputPath=$work/obj/" \
   "-p:RestorePackagesPath=$work/restore" \
   "-p:RestoreAdditionalProjectSources=$work/packages"
-if [[ ${2:-} == --build-only ]]; then
+if [[ $mode == --build-only ]]; then
   exit 0
 fi
+# The suite reads the backend under test, which the simulator runner forwards.
+export MLN_FFI_TEST_BACKEND=$mode
 app="$work/app/Release/net10.0-$platform/$rid/Maplibre.NativeFfi.Tests.app"
 if [[ $platform == maccatalyst ]]; then
   exec perl -e 'alarm shift; exec @ARGV' 300 "$app/Contents/MacOS/Maplibre.NativeFfi.Tests"

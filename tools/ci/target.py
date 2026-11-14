@@ -29,6 +29,7 @@ def record(suite: Suite) -> dict[str, object]:
         "shell": suite.shell,
         "timeout-minutes": suite.timeout_minutes,
         "prerequisites": list(suite.prerequisites),
+        "backend": suite.backend,
     }
 
 

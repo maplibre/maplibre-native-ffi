@@ -10,7 +10,8 @@
     "android": @MLN_FFI_ANDROID_JSON@,
     "defaultBackend": "@MLN_FFI_DEFAULT_RENDER_BACKEND@"
   },
-  "backend": "@MLN_FFI_RENDER_BACKEND@",
+  "backends": [@MLN_FFI_RENDER_BACKENDS_JSON@],
+  "openglContextProvider": @MLN_FFI_OPENGL_CONTEXT_PROVIDER_JSON@,
   "link": {
     "libraries": [@MLN_FFI_STATIC_LINK_LIBRARIES_JSON@],
     "frameworks": [@MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON@]

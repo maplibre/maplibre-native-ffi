@@ -2,8 +2,9 @@
 /// `tests/graphics`, loaded from the install prefix the suite runs against.
 ///
 /// A test attaches a borrowed texture in such a context only for what an
-/// offscreen session lacks: acquired frames, and a Vulkan queue lock. Both exist
-/// only on Metal and Vulkan builds, so an OpenGL build opens no context here.
+/// offscreen session lacks: acquired frames, and a device that wraps the host's
+/// Vulkan device with a queue lock. Both exist only on Metal and Vulkan, so a
+/// run that tests OpenGL opens no context here.
 library;
 
 import 'dart:ffi';
@@ -12,6 +13,8 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
+
+import 'backend.dart';
 
 const _backendMetal = 1;
 const _backendVulkan = 2;
@@ -29,6 +32,9 @@ final class _Context extends Struct {
   external Pointer<Void> vulkanQueue;
   external Pointer<Void> vulkanGetInstanceProcAddr;
   external Pointer<Void> vulkanGetDeviceProcAddr;
+  external Pointer<Pointer<Utf8>> vulkanDeviceExtensions;
+  @Uint32()
+  external int vulkanDeviceExtensionCount;
   external Pointer<Void> eglDisplay;
   external Pointer<Void> eglConfig;
   external Pointer<Void> eglContext;
@@ -129,38 +135,37 @@ String _libraryPath() {
   return '$prefix/lib/libmln_test_graphics.so';
 }
 
-/// The backend the native library was built for, which is the one backend
-/// every render test runs on, or null on an OpenGL build.
-int? _buildBackend() {
-  final backends = supportedRenderBackendMask();
-  if (backends.contains(RenderBackendFlag.metal)) return _backendMetal;
-  if (backends.contains(RenderBackendFlag.vulkan)) return _backendVulkan;
-  return null;
-}
+/// The `tests/graphics` backend of the backend under test, or null for
+/// OpenGL.
+int? _graphicsBackend() => switch (backendUnderTest) {
+  RenderBackend.metal => _backendMetal,
+  RenderBackend.vulkan => _backendVulkan,
+  _ => null,
+};
 
-/// Whether this build attaches sessions to Vulkan, the one backend whose
-/// sessions take a queue lock.
-bool get buildAttachesVulkan => _buildBackend() == _backendVulkan;
+/// Whether the backend under test is Vulkan, the one backend whose devices
+/// take a queue lock.
+bool get vulkanUnderTest => _graphicsBackend() == _backendVulkan;
 
-/// Whether [TestGraphics.open] opens a context on this build.
-bool get buildOpensTestGraphics => _buildBackend() != null;
+/// Whether [TestGraphics.open] opens a context for the backend under test.
+bool get testGraphicsOpens => _graphicsBackend() != null;
 
-/// Whether a core-worker session on this build exposes its frames to the host.
-/// Metal and Vulkan sessions do. An OpenGL session exposes frames only from a
-/// context that it shares with the host, which only a caller-driven session
-/// can drive.
-bool get buildExposesCoreWorkerFrames => _buildBackend() != null;
+/// Whether a core-worker session of the backend under test exposes its frames
+/// to the host. Metal and Vulkan sessions do. An OpenGL session exposes frames
+/// only from a context that it shares with the host, which only a
+/// caller-driven session can drive.
+bool get coreWorkerExposesFrames => _graphicsBackend() != null;
 
 /// A device or context standing in for the host's.
 final class TestGraphics {
   TestGraphics._(this._handle, this._context);
 
-  /// Creates the build's backend context, destroyed by a teardown that runs
-  /// after every session the test attaches to it. A build whose backend has
-  /// no context here fails, rather than skipping.
+  /// Creates a context of the backend under test, destroyed by a teardown that
+  /// runs after every session the test attaches to it. A backend with no
+  /// context here fails, rather than skipping.
   factory TestGraphics.open() {
-    final backend = _buildBackend();
-    if (backend == null) fail('an OpenGL build has no test graphics context');
+    final backend = _graphicsBackend();
+    if (backend == null) fail('OpenGL has no test graphics context');
     final handle = _library.create(backend);
     if (handle == nullptr) {
       fail('mln_test_graphics_create: ${_library.lastError().toDartString()}');
@@ -182,36 +187,21 @@ final class TestGraphics {
   final _textures = <Pointer<Void>>[];
   var _closed = false;
 
-  /// Attaches a ring of one texture on this device for a core worker, at
-  /// [size] on a map of scale factor 1. [close] destroys the texture, so the
-  /// session must retire first.
-  RenderSessionHandle attachBorrowedTexture(
-    MapHandle map,
-    LogicalSize size,
-    RenderSessionAttachOptions options,
-  ) {
-    final width = size.width;
-    final height = size.height;
-    final texture = _createTexture(width, height);
+  /// Wraps this context's device in a GPU device, which a teardown releases.
+  /// A Vulkan device takes [queueLock], the lock on the queue that the host
+  /// submits to.
+  GpuDeviceHandle wrapDevice({QueueLock? queueLock}) {
     final context = _context.ref;
     NativePointer pointer(Pointer<Void> value) => NativePointer(value.address);
+    final GpuDeviceHandle device;
     switch (context.backend) {
       case _backendMetal:
-        return map.attachMetalBorrowedTexture(
-          MetalBorrowedTextureDescriptor(
-            logicalSize: size,
-            physicalWidth: width,
-            physicalHeight: height,
-            textures: [MetalBorrowedTexture(texture: texture.metalTexture)],
-          ),
-          options,
+        device = GpuDeviceHandle.wrapMetal(
+          MetalDeviceDescriptor(device: pointer(context.metalDevice)),
         );
       case _backendVulkan:
-        return map.attachVulkanBorrowedTexture(
-          VulkanBorrowedTextureDescriptor(
-            logicalSize: size,
-            physicalWidth: width,
-            physicalHeight: height,
+        device = GpuDeviceHandle.wrapVulkan(
+          VulkanDeviceDescriptor(
             context: VulkanContextDescriptor(
               instance: pointer(context.vulkanInstance),
               physicalDevice: pointer(context.vulkanPhysicalDevice),
@@ -221,20 +211,61 @@ final class TestGraphics {
               getInstanceProcAddr: pointer(context.vulkanGetInstanceProcAddr),
               getDeviceProcAddr: pointer(context.vulkanGetDeviceProcAddr),
             ),
-            textures: [
-              VulkanBorrowedTexture(
-                image: texture.vulkanImage,
-                imageView: texture.vulkanImageView,
-              ),
+            queueLock: queueLock,
+            enabledExtensions: [
+              for (var i = 0; i < context.vulkanDeviceExtensionCount; i++)
+                context.vulkanDeviceExtensions[i].toDartString(),
             ],
-            format: texture.format,
-            finalLayout: texture.vulkanFinalLayout,
           ),
-          options,
         );
       default:
-        fail('no borrowed texture for backend ${context.backend}');
+        fail('no GPU device for backend ${context.backend}');
     }
+    addTearDown(device.release);
+    return device;
+  }
+
+  /// Attaches a ring of one texture on this context for a core worker, at
+  /// [size] on a map of scale factor 1, on [device] or else on a device that
+  /// wraps this context's. [close] destroys the texture, so the session must
+  /// retire first.
+  RenderSessionHandle attachBorrowedTexture(
+    MapHandle map,
+    LogicalSize size,
+    RenderSessionAttachOptions options, {
+    GpuDeviceHandle? device,
+  }) {
+    final width = size.width;
+    final height = size.height;
+    final texture = _createTexture(width, height);
+    final backend = _context.ref.backend;
+    final target = switch (backend) {
+      _backendMetal => RenderTarget.metalBorrowedTextures(
+        MetalBorrowedTexturesTarget(
+          logicalSize: size,
+          physicalWidth: width,
+          physicalHeight: height,
+          textures: [MetalBorrowedTexture(texture: texture.metalTexture)],
+        ),
+      ),
+      _backendVulkan => RenderTarget.vulkanBorrowedTextures(
+        VulkanBorrowedTexturesTarget(
+          logicalSize: size,
+          physicalWidth: width,
+          physicalHeight: height,
+          textures: [
+            VulkanBorrowedTexture(
+              image: texture.vulkanImage,
+              imageView: texture.vulkanImageView,
+            ),
+          ],
+          format: texture.format,
+          finalLayout: texture.vulkanFinalLayout,
+        ),
+      ),
+      _ => fail('no borrowed texture for backend $backend'),
+    };
+    return map.attach(target, options, device: device ?? wrapDevice());
   }
 
   /// Creates a texture that [close] destroys, and returns its info.

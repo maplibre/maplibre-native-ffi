@@ -32,7 +32,7 @@ class HandleLifecycleTest {
     expression.release()
     expression.release()
 
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     runtime.release().awaitWithin("the runtime teardown")
     // Native refuses a released handle, whether to release it again or to use it.
     assertFailsWithStatus(Status.INVALID_STATE) { runtime.release() }
@@ -52,7 +52,7 @@ class HandleLifecycleTest {
 
   @Test
   fun aDisposeEndsTheHandleAndRepeatedCleanupDoesNothing() = runSuspendTest {
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     assertFalse(runtime.isClosed)
     runtime.dispose()
     assertTrue(runtime.isClosed)
@@ -65,7 +65,7 @@ class HandleLifecycleTest {
 
   @Test
   fun useDisposesAHandleWithADispose() = runSuspendTest {
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     lateinit var map: MapHandle
 
     // Native refuses to release a runtime with a live map, but accepts its dispose.
@@ -79,14 +79,14 @@ class HandleLifecycleTest {
 
   @Test
   fun useReleasingLeavesAnOwnerThatItsBlockReleased() = runSuspendTest {
-    RuntimeHandle.create(RuntimeOptions()).await().useReleasing { runtime ->
+    RuntimeHandle.create(RuntimeOptions()).useReleasing { runtime ->
       runtime.release().awaitWithin("the runtime teardown")
     }
   }
 
   @Test
   fun aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds() = runSuspendTest {
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     val map = runtime.createMap(smallMapOptions())
     map.ready.awaitWithin("the map")
 
@@ -102,7 +102,7 @@ class HandleLifecycleTest {
 
   @Test
   fun useReleasingKeepsTheBlockFailureAndSuppressesTheRefusedRelease() = runSuspendTest {
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     lateinit var map: MapHandle
 
     // The live map makes native refuse the runtime release after the block throws.
@@ -124,7 +124,7 @@ class HandleLifecycleTest {
 
   @Test
   fun useReleasingReportsARefusedReleaseAfterTheBlockReturns() = runSuspendTest {
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     lateinit var map: MapHandle
 
     assertFailsWithStatus(Status.INVALID_STATE) {
@@ -140,7 +140,7 @@ class HandleLifecycleTest {
 
   @Test
   fun useReleasingReleasesTheOwnerWhenItsBlockReturnsFromTheCaller() = runSuspendTest {
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     returnFromUse(runtime)
     assertTrue(runtime.isClosed)
   }
@@ -183,7 +183,7 @@ class HandleLifecycleTest {
 
   /** Creates a map whose runtime nothing but the map references, and a weak reference to it. */
   private suspend fun mapWithUnreferencedRuntime(): Pair<MapHandle, TestWeakReference> {
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     val map = runtime.createMap(smallMapOptions())
     map.ready.awaitWithin("the map")
     return map to TestWeakReference(runtime)

@@ -161,6 +161,339 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   }
 }
 
+/// The GPU commands of a frame outside the map's render pass, by the backend
+/// that the session renders with.
+///
+/// An OpenGL session has no variant: its context is current, and it draws
+/// through no object that the callback needs.
+///
+/// See `mln_custom_layer_encoder_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public enum CustomLayerEncoderData: Equatable, Hashable, Sendable {
+  case metal(MetalCustomLayerEncoder)
+  case vulkan(VulkanCustomLayerEncoder)
+  case webGpu(WebGpuCustomLayerEncoder)
+  case none
+  case unknown(UInt32, Data)
+}
+
+/// The frame that a custom layer draws into, as its callbacks get it.
+///
+/// The view and the frame projection are the ones that the frame draws the map
+/// with, so they are never newer than the frame, unlike the map's camera.
+///
+/// See `mln_custom_layer_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct CustomLayerFrame: Equatable, Hashable, Sendable {
+  /// The camera, extent, and scale factor that the frame shows.
+  public var view: MapView
+  /// Where the frame draws the map, and the depth that it writes there.
+  public var frameProjection: FrameProjection
+  /// The width of the frame's attachments, in physical pixels.
+  public var width: UInt32
+  /// The height of the frame's attachments, in physical pixels.
+  public var height: UInt32
+  public init(
+    view: MapView = .init(),
+    frameProjection: FrameProjection = .init(),
+    width: UInt32 = 0,
+    height: UInt32 = 0
+  ) {
+    self.view = view
+    self.frameProjection = frameProjection
+    self.width = width
+    self.height = height
+  }
+
+  init(raw: mln_custom_layer_frame) {
+    view = MapView(raw: raw.view)
+    frameProjection = FrameProjection(raw: raw.frame_projection)
+    width = raw.width
+    height = raw.height
+  }
+}
+
+/// The callbacks of a custom layer, which draws with your own GPU commands in
+/// the map's frame.
+///
+/// A session runs the callbacks only when it can hand you its commands as one
+/// of `CustomLayerPassData`'s variants, so a session on another backend, such
+/// as WebGPU outside a browser, doesn't draw the layer. Nor does a browser
+/// WebGPU session yet: the library's WebGPU (wgpu) exposes no command encoder
+/// or render pass to hand you. Leave unset the callbacks that you don't need.
+///
+/// Runs on the thread that runs the session's graphics work: a library thread,
+/// or yours with `RenderDriverKind.callerGraphicsThread`. It can't call the
+/// library.
+///
+/// Runs on the thread that runs the session's graphics work, as
+/// `CustomLayerPrerenderCallback` says. It can't call the library.
+///
+/// See `mln_custom_layer_host` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct CustomLayerHost: Sendable {
+  public var prerender: CustomLayerPrerenderCallback?
+  public var render: CustomLayerRenderCallback?
+  public var deinitialize: CustomLayerSessionEndCallback?
+  public var contextLost: CustomLayerSessionEndCallback?
+  public init(
+    prerender: CustomLayerPrerenderCallback? = nil,
+    render: CustomLayerRenderCallback? = nil,
+    deinitialize: CustomLayerSessionEndCallback? = nil,
+    contextLost: CustomLayerSessionEndCallback? = nil
+  ) {
+    self.prerender = prerender
+    self.render = render
+    self.deinitialize = deinitialize
+    self.contextLost = contextLost
+  }
+
+  func nativeValue(arena: NativeInputArena) throws -> mln_custom_layer_host {
+    var raw = mln_custom_layer_host()
+    raw.size = UInt32(MemoryLayout<mln_custom_layer_host>.size)
+    raw.prerender = prerender == nil ? nil : invokeCustomLayerHostPrerender
+    raw.render = render == nil ? nil : invokeCustomLayerHostRender
+    raw
+      .deinitialize = deinitialize == nil ? nil :
+      invokeCustomLayerHostDeinitialize
+    raw
+      .context_lost = contextLost == nil ? nil :
+      invokeCustomLayerHostContextLost
+    if prerender != nil || render != nil || deinitialize != nil ||
+      contextLost !=
+      nil
+    {
+      raw.user_data = arena.callback(self)
+      raw.release_user_data = releaseGeneratedCallback
+    }
+    return raw
+  }
+}
+
+private func invokeCustomLayerHostPrerender(
+  user_data: UnsafeMutableRawPointer?,
+  parameters: UnsafePointer<mln_custom_layer_prerender_parameters>?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  do {
+    try box.value
+      .prerender?(NativeInputArena.copyArray(parameters, count: 1)
+        .map { try CustomLayerPrerenderParameters(raw: $0) }[0])
+  } catch {
+    reportToStandardError(
+      "mln_custom_layer_prerender_callback failed: \(error)\n"
+    )
+  }
+}
+
+private func invokeCustomLayerHostRender(
+  user_data: UnsafeMutableRawPointer?,
+  parameters: UnsafePointer<mln_custom_layer_render_parameters>?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  do {
+    try box.value
+      .render?(NativeInputArena.copyArray(parameters, count: 1)
+        .map { try CustomLayerRenderParameters(raw: $0) }[0])
+  } catch {
+    reportToStandardError("mln_custom_layer_render_callback failed: \(error)\n")
+  }
+}
+
+private func invokeCustomLayerHostDeinitialize(
+  user_data: UnsafeMutableRawPointer?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  box.value.deinitialize?()
+}
+
+private func invokeCustomLayerHostContextLost(
+  user_data: UnsafeMutableRawPointer?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CustomLayerHost>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  box.value.contextLost?()
+}
+
+/// The map's render pass at a custom layer's place in the style, by the backend
+/// that the session renders with.
+///
+/// See `mln_custom_layer_pass_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public enum CustomLayerPassData: Equatable, Hashable, Sendable {
+  case metal(MetalCustomLayerPass)
+  case vulkan(VulkanCustomLayerPass)
+  case openGl(OpenGlCustomLayerPass)
+  case webGpu(WebGpuCustomLayerPass)
+  case unknown(UInt32, Data)
+}
+
+/// Records a custom layer's GPU work that can't run in the map's render pass,
+/// such as drawing into textures of your own.
+///
+/// Each frame that shows the layer runs the prerender callbacks of its custom
+/// layers, from the bottom of the style to the top, before the map begins its
+/// render pass, and so before any render callback.
+///
+/// Runs on the thread that runs the session's graphics work: a library thread,
+/// or yours with `RenderDriverKind.callerGraphicsThread`. It can't call the
+/// library.
+///
+/// See `mln_custom_layer_prerender_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public typealias CustomLayerPrerenderCallback =
+  @Sendable (_ parameters: CustomLayerPrerenderParameters) -> Void
+
+/// What a custom layer's prerender callback gets.
+///
+/// See `mln_custom_layer_prerender_parameters` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct CustomLayerPrerenderParameters: Equatable, Hashable, Sendable {
+  public var encoder: CustomLayerEncoderData
+  public var frame: CustomLayerFrame
+  public init(
+    encoder: CustomLayerEncoderData = .none,
+    frame: CustomLayerFrame = .init()
+  ) {
+    self.encoder = encoder
+    self.frame = frame
+  }
+
+  init(
+    raw: mln_custom_layer_prerender_parameters,
+    recordBytes: UnsafeRawBufferPointer? = nil
+  ) throws {
+    encoder = try { () throws -> CustomLayerEncoderData in
+      switch raw.backend
+        .rawValue
+      {
+      case MLN_RENDER_BACKEND_METAL
+        .rawValue: return .metal(MetalCustomLayerEncoder(raw: raw.encoder
+            .metal)) case MLN_RENDER_BACKEND_VULKAN
+                  .rawValue: return .vulkan(VulkanCustomLayerEncoder(raw: raw
+            .encoder
+            .vulkan)) case MLN_RENDER_BACKEND_WEB_GPU
+                  .rawValue: return .webGpu(WebGpuCustomLayerEncoder(raw: raw
+            .encoder
+            .web_gpu)) case MLN_RENDER_BACKEND_OPEN_GL
+                  .rawValue: return .none default: return .unknown(
+          raw.backend.rawValue,
+          recordBytes
+            .map {
+              Data($0
+                .dropFirst(MemoryLayout<mln_custom_layer_prerender_parameters>
+                  .offset(of: \.encoder)!))
+            } ??
+            withUnsafeBytes(of: raw.encoder) { Data($0) }
+        )
+      }
+    }()
+    frame = CustomLayerFrame(raw: raw.frame)
+  }
+}
+
+/// Draws a custom layer into the map's render pass, at its place in the style.
+///
+/// The map draws its layers below the custom layer before the callback, and
+/// those above it after, except for the opaque fragments of 2D layers, which it
+/// draws before either, as `CustomLayerRenderParameters.layerDepth` describes.
+/// Draw through `frame.frame_projection.matrix` to depth-test against the map's
+/// 3D layers.
+///
+/// Runs on the thread that runs the session's graphics work, as
+/// `CustomLayerPrerenderCallback` says. It can't call the library.
+///
+/// See `mln_custom_layer_render_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public typealias CustomLayerRenderCallback =
+  @Sendable (_ parameters: CustomLayerRenderParameters) -> Void
+
+/// What a custom layer's render callback gets.
+///
+/// See `mln_custom_layer_render_parameters` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct CustomLayerRenderParameters: Equatable, Hashable, Sendable {
+  public var pass: CustomLayerPassData
+  public var frame: CustomLayerFrame
+  /// The depth that a 2D layer at the layer's place in the style writes, as
+  /// `FrameProjection` describes, between `frame.frame_projection.far_depth`
+  /// and 1.
+  ///
+  /// The map draws the opaque fragments of its 2D layers before the render
+  /// callback runs, those above the custom layer too. A fragment that you draw
+  /// at this depth, tested with less-or-equal, stays under those above that
+  /// wrote depth.
+  public var layerDepth: Double
+  public init(
+    pass: CustomLayerPassData = .unknown(0, Data()),
+    frame: CustomLayerFrame = .init(),
+    layerDepth: Double = 0
+  ) {
+    self.pass = pass
+    self.frame = frame
+    self.layerDepth = layerDepth
+  }
+
+  init(
+    raw: mln_custom_layer_render_parameters,
+    recordBytes: UnsafeRawBufferPointer? = nil
+  ) throws {
+    pass = try { () throws -> CustomLayerPassData in
+      switch raw.backend
+        .rawValue
+      {
+      case MLN_RENDER_BACKEND_METAL
+        .rawValue: return .metal(MetalCustomLayerPass(raw: raw.pass
+            .metal)) case MLN_RENDER_BACKEND_VULKAN
+                  .rawValue: return .vulkan(VulkanCustomLayerPass(raw: raw.pass
+            .vulkan)) case MLN_RENDER_BACKEND_OPEN_GL
+                  .rawValue: return .openGl(OpenGlCustomLayerPass(raw: raw.pass
+            .open_gl)) case MLN_RENDER_BACKEND_WEB_GPU
+                  .rawValue: return try .webGpu(WebGpuCustomLayerPass(raw: raw
+            .pass
+            .web_gpu)) default: return .unknown(
+          raw.backend.rawValue,
+          recordBytes
+            .map {
+              Data($0
+                .dropFirst(MemoryLayout<mln_custom_layer_render_parameters>
+                  .offset(of: \.pass)!))
+            } ?? withUnsafeBytes(of: raw.pass) { Data($0) }
+        )
+      }
+    }()
+    frame = CustomLayerFrame(raw: raw.frame)
+    layerDepth = raw.layer_depth
+  }
+}
+
+/// Tells a custom layer that a session stopped drawing it.
+///
+/// `deinitialize` runs once a session that ran the layer's prerender or render
+/// callback stops drawing the layer: when the layer leaves the style, or the
+/// session detaches, is released, or replaces its device's backend. Destroy the
+/// GPU objects that you made for that session then. The session's GPU no longer
+/// uses them, and an OpenGL session's context is current. `context_lost` runs
+/// instead when the session is abandoned. Its graphics objects may be gone
+/// already, so forget yours without destroying them.
+///
+/// A later prerender or render callback is for a new session, which can render
+/// on another device or backend.
+///
+/// Runs on the thread that runs the session's graphics work, as
+/// `CustomLayerPrerenderCallback` says. It can't call the library.
+///
+/// See `mln_custom_layer_session_end_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public typealias CustomLayerSessionEndCallback = @Sendable () -> Void
+
 /// Reports that a custom source no longer needs a tile.
 ///
 /// `map` and `sourceId` name the source.
@@ -458,6 +791,112 @@ public struct ImageStretch: Equatable, Hashable, Sendable {
     raw.from = from
     raw.to = to
     return raw
+  }
+}
+
+/// The frame's Metal command buffer, outside the map's render pass.
+///
+/// End each encoder that you make on `command_buffer` before the callback
+/// returns, and don't commit the buffer.
+///
+/// See `mln_metal_custom_layer_encoder` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct MetalCustomLayerEncoder: Equatable, Hashable, Sendable {
+  /// The frame's `MTLCommandBuffer`, with no encoder open.
+  public var commandBuffer: NativePointer
+  public init(commandBuffer: NativePointer = .null) {
+    self.commandBuffer = commandBuffer
+  }
+
+  init(raw: mln_metal_custom_layer_encoder) {
+    commandBuffer = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_buffer,
+      to: UInt.self
+    ))
+  }
+}
+
+/// The map's Metal render pass, at a custom layer's place in the style.
+///
+/// Set your own pipeline state, depth-stencil state, buffers, textures, and
+/// samplers on `encoder`, and any other state that your draws need. After the
+/// callback returns, the map sets the state that its own draws need again.
+/// Don't end `encoder`.
+///
+/// See `mln_metal_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct MetalCustomLayerPass: Equatable, Hashable, Sendable {
+  /// The pass's `MTLRenderCommandEncoder`.
+  public var encoder: NativePointer
+  /// The `MTLCommandBuffer` that `encoder` encodes into. Don't commit it.
+  public var commandBuffer: NativePointer
+  /// The `MTLPixelFormat` of the pass's color attachment.
+  public var colorFormat: UInt64
+  /// The `MTLPixelFormat` of the pass's depth attachment, or
+  /// `MTLPixelFormatInvalid` when it has none.
+  public var depthFormat: UInt64
+  /// The `MTLPixelFormat` of the pass's stencil attachment, or
+  /// `MTLPixelFormatInvalid` when it has none.
+  public var stencilFormat: UInt64
+  /// The sample count of the pass's attachments.
+  public var sampleCount: UInt32
+  public init(
+    encoder: NativePointer = .null,
+    commandBuffer: NativePointer = .null,
+    colorFormat: UInt64 = 0,
+    depthFormat: UInt64 = 0,
+    stencilFormat: UInt64 = 0,
+    sampleCount: UInt32 = 0
+  ) {
+    self.encoder = encoder
+    self.commandBuffer = commandBuffer
+    self.colorFormat = colorFormat
+    self.depthFormat = depthFormat
+    self.stencilFormat = stencilFormat
+    self.sampleCount = sampleCount
+  }
+
+  init(raw: mln_metal_custom_layer_pass) {
+    encoder = NativePointer(bitPattern: unsafeBitCast(
+      raw.encoder,
+      to: UInt.self
+    ))
+    commandBuffer = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_buffer,
+      to: UInt.self
+    ))
+    colorFormat = raw.color_format
+    depthFormat = raw.depth_format
+    stencilFormat = raw.stencil_format
+    sampleCount = raw.sample_count
+  }
+}
+
+/// The map's OpenGL framebuffer, at a custom layer's place in the style.
+///
+/// The session's context is current, with `framebuffer` bound and the viewport
+/// covering it. You can change the program, the vertex array, the buffers bound
+/// to each target, the framebuffer, the viewport, the active texture unit and
+/// the textures bound to each unit, the uniform buffer bindings, and the
+/// scissor, depth, stencil, blend, color mask, cull face, and line width state.
+/// After the callback returns, the map sets again what its own draws need of
+/// these. The vertex array bound when the callback starts is 0, so bind your
+/// own before you set vertex attributes. Leave any other state as you found it,
+/// such as the sampler objects bound to texture units, the pixel pack and
+/// unpack buffers and parameters, polygon offset, and rasterizer discard. Don't
+/// clear or invalidate the framebuffer's attachments.
+///
+/// See `mln_open_gl_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct OpenGlCustomLayerPass: Equatable, Hashable, Sendable {
+  /// The framebuffer that the map draws into, or 0 for the default one.
+  public var framebuffer: UInt32
+  public init(framebuffer: UInt32 = 0) {
+    self.framebuffer = framebuffer
+  }
+
+  init(raw: mln_open_gl_custom_layer_pass) {
+    framebuffer = raw.framebuffer
   }
 }
 
@@ -1021,5 +1460,176 @@ public struct StyleVectorTileEncoding: RawRepresentable,
     case 1: return "mlt"
     default: return "StyleVectorTileEncoding(\(rawValue))"
     }
+  }
+}
+
+/// The frame's Vulkan command buffer, outside the map's render pass.
+///
+/// Record work such as copies, compute dispatches, and render passes of your
+/// own, with the barriers that it needs. The map's render pass loads its
+/// attachments after a barrier of its own, but it doesn't wait for writes to
+/// your images: give those the barriers that your later reads need. Don't end
+/// or submit `command_buffer`.
+///
+/// See `mln_vulkan_custom_layer_encoder` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct VulkanCustomLayerEncoder: Equatable, Hashable, Sendable {
+  /// The device that the session renders on. Make the objects that your
+  /// commands use on `context.device`. Don't submit to `context.graphics_queue`
+  /// from a callback.
+  public var context: VulkanContextDescriptor
+  /// The frame's `VkCommandBuffer`, recording outside a render pass.
+  public var commandBuffer: NativePointer
+  public init(
+    context: VulkanContextDescriptor,
+    commandBuffer: NativePointer = .null
+  ) {
+    self.context = context
+    self.commandBuffer = commandBuffer
+  }
+
+  init(raw: mln_vulkan_custom_layer_encoder) {
+    context = VulkanContextDescriptor(raw: raw.context)
+    commandBuffer = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_buffer,
+      to: UInt.self
+    ))
+  }
+}
+
+/// The map's Vulkan render pass, at a custom layer's place in the style.
+///
+/// Record draws into `command_buffer`, with pipelines that you make for
+/// `render_pass`, `subpass`, and `sample_count`. Bind your own pipeline,
+/// descriptor sets, vertex and index buffers, and push constants, and set the
+/// dynamic state that your pipelines have, such as the viewport and scissor.
+/// After the callback returns, the map binds and sets again what its own draws
+/// need. Your pipeline layouts can differ from the map's. Record nothing that a
+/// render pass can't hold, and don't end the render pass.
+///
+/// See `mln_vulkan_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct VulkanCustomLayerPass: Equatable, Hashable, Sendable {
+  /// The device that the session renders on. Make the objects that your
+  /// commands use on `context.device`. Don't submit to `context.graphics_queue`
+  /// from a callback.
+  public var context: VulkanContextDescriptor
+  /// The frame's `VkCommandBuffer`, recording inside `render_pass`.
+  public var commandBuffer: NativePointer
+  /// The `VkRenderPass` that `command_buffer` records in.
+  public var renderPass: UInt64
+  /// The index of the subpass that `command_buffer` records in.
+  public var subpass: UInt32
+  /// The `VkSampleCountFlagBits` of the render pass's attachments.
+  public var sampleCount: UInt32
+  /// The `VkFormat` of the render pass's color attachment.
+  public var colorFormat: UInt32
+  /// The `VkFormat` of the render pass's depth-stencil attachment, or
+  /// `VK_FORMAT_UNDEFINED` when it has none.
+  public var depthStencilFormat: UInt32
+  public init(
+    context: VulkanContextDescriptor,
+    commandBuffer: NativePointer = .null,
+    renderPass: UInt64 = 0,
+    subpass: UInt32 = 0,
+    sampleCount: UInt32 = 0,
+    colorFormat: UInt32 = 0,
+    depthStencilFormat: UInt32 = 0
+  ) {
+    self.context = context
+    self.commandBuffer = commandBuffer
+    self.renderPass = renderPass
+    self.subpass = subpass
+    self.sampleCount = sampleCount
+    self.colorFormat = colorFormat
+    self.depthStencilFormat = depthStencilFormat
+  }
+
+  init(raw: mln_vulkan_custom_layer_pass) {
+    context = VulkanContextDescriptor(raw: raw.context)
+    commandBuffer = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_buffer,
+      to: UInt.self
+    ))
+    renderPass = raw.render_pass
+    subpass = raw.subpass
+    sampleCount = raw.sample_count
+    colorFormat = raw.color_format
+    depthStencilFormat = raw.depth_stencil_format
+  }
+}
+
+/// The frame's WebGPU command encoder, outside the map's render pass.
+///
+/// End each pass that you begin on `encoder` before the callback returns, and
+/// don't finish the encoder.
+///
+/// See `mln_web_gpu_custom_layer_encoder` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct WebGpuCustomLayerEncoder: Equatable, Hashable, Sendable {
+  /// The `GPUDevice` that the session renders on.
+  public var device: UInt32
+  /// The frame's `GPUCommandEncoder`, with no pass open.
+  public var encoder: UInt32
+  public init(device: UInt32 = 0, encoder: UInt32 = 0) {
+    self.device = device
+    self.encoder = encoder
+  }
+
+  init(raw: mln_web_gpu_custom_layer_encoder) {
+    device = raw.device
+    encoder = raw.encoder
+  }
+}
+
+/// The map's WebGPU render pass, at a custom layer's place in the style.
+///
+/// Set your own pipeline, bind groups, vertex and index buffers, viewport,
+/// scissor rectangle, and stencil reference on `encoder`. After the callback
+/// returns, the map sets again what its own draws need. Don't end `encoder`.
+///
+/// See `mln_web_gpu_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct WebGpuCustomLayerPass: Equatable, Hashable, Sendable {
+  /// The `GPUDevice` that the session renders on.
+  public var device: UInt32
+  /// The pass's `GPURenderPassEncoder`.
+  public var encoder: UInt32
+  /// The `GPUTextureFormat` of the pass's color attachment.
+  public var colorFormat: String
+  /// The `GPUTextureFormat` of the pass's depth-stencil attachment, or empty
+  /// when it has none.
+  public var depthStencilFormat: String
+  /// The sample count of the pass's attachments.
+  public var sampleCount: UInt32
+  public init(
+    device: UInt32 = 0,
+    encoder: UInt32 = 0,
+    colorFormat: String = "",
+    depthStencilFormat: String = "",
+    sampleCount: UInt32 = 0
+  ) {
+    self.device = device
+    self.encoder = encoder
+    self.colorFormat = colorFormat
+    self.depthStencilFormat = depthStencilFormat
+    self.sampleCount = sampleCount
+  }
+
+  init(
+    raw: mln_web_gpu_custom_layer_pass,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    device = raw.device
+    encoder = raw.encoder
+    colorFormat = try NativeString.copyUTF8(
+      data: raw.color_format.data,
+      size: raw.color_format.size
+    )
+    depthStencilFormat = try NativeString.copyUTF8(
+      data: raw.depth_stencil_format.data,
+      size: raw.depth_stencil_format.size
+    )
+    sampleCount = raw.sample_count
   }
 }

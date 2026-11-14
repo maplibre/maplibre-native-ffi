@@ -12,29 +12,29 @@ class DartAndroidTest(unittest.TestCase):
         cls.targets = {target.preset: target for target in targets(presets)}
 
     def test_dart_android_runs_on_emulator_targets_and_builds_for_arm(self):
-        for backend in ("egl", "vulkan"):
-            for arch, abi, action in (
-                ("x64", "x86_64", "test:android"),
-                ("arm64", "arm64-v8a", "build:mobile"),
-            ):
-                preset = f"android-{arch}-{backend}"
-                self.assertIn(
-                    f"mise run //bindings/dart:{action} {preset}",
-                    [
-                        " ".join(command)
-                        for command in consumer_commands(self.targets[preset])
-                    ],
-                )
+        for preset, commands in (
+            (
+                "android-x64",
+                [
+                    "mise run //bindings/dart:test:android android-x64 vulkan",
+                    "mise run //bindings/dart:test:android android-x64 opengl",
+                ],
+            ),
+            ("android-arm64", ["mise run //bindings/dart:build:mobile android-arm64"]),
+        ):
+            self.assertEqual(
+                [
+                    " ".join(command)
+                    for command, _ in consumer_commands(self.targets[preset])
+                    if "//bindings/dart:" in command[2]
+                ],
+                commands,
+            )
 
     def test_android_x86_has_no_flutter_target(self):
-        for backend in ("egl", "vulkan"):
-            preset = f"android-x86-{backend}"
-            self.assertFalse(
-                any(
-                    "//bindings/dart:" in command
-                    for command in [
-                        " ".join(command)
-                        for command in consumer_commands(self.targets[preset])
-                    ]
-                )
+        self.assertFalse(
+            any(
+                "//bindings/dart:" in command[2]
+                for command, _ in consumer_commands(self.targets["android-x86"])
             )
+        )

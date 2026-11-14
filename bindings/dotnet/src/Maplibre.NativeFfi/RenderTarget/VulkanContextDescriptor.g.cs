@@ -50,8 +50,8 @@ public readonly partial record struct VulkanContextDescriptor
 
     /// <summary>
     /// A <c>VkQueue</c> from <c>graphics_queue_family_index</c> that supports
-    /// graphics. If you submit to it too, set
-    /// <c>RenderSessionAttachOptions.QueueLock</c>.
+    /// graphics. If you submit to it too, give the device your
+    /// <c>QueueLock</c>.
     /// </summary>
     public required NativePointer GraphicsQueue { get; init; }
     public uint GraphicsQueueFamilyIndex { get; init; }

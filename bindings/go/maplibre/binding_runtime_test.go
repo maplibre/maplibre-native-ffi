@@ -49,7 +49,7 @@ func TestIntegerCarriersKeepTheirValues(t *testing.T) {
 	)
 	arena := &bindingArena{}
 	defer arena.close()
-	descriptor := nativeVulkanBorrowedTextureDescriptor(VulkanBorrowedTextureDescriptor{
+	descriptor := nativeVulkanBorrowedTexturesTarget(VulkanBorrowedTexturesTarget{
 		LogicalSize: LogicalSize{Width: 64, Height: 32},
 		Textures:    []VulkanBorrowedTexture{{Image: image, ImageView: imageView}},
 	}, arena)

@@ -19,3 +19,10 @@ internal expect suspend fun requestCollection()
  * where the binding's reports go to the log.
  */
 internal expect fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit)?
+
+/**
+ * The render backend under test, vulkan, opengl, metal, or webgpu, as the test task names it: in
+ * MLN_FFI_TEST_BACKEND, or on Android in the `mlnTestBackend` instrumentation argument. Null where
+ * nothing names one, as in a browser, whose module carries one backend.
+ */
+internal expect fun testBackendName(): String?

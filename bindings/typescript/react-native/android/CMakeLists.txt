@@ -11,7 +11,7 @@ file(REAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}/.." PACKAGE_ROOT)
 
 # The npm package carries the binding's native sources and the C library for
 # each ABI. In the workspace, the sources sit beside this package, and the
-# library comes from `mise run //:build android-<arch>-egl`.
+# library comes from `mise run //:build android-<arch>`.
 if(EXISTS "${PACKAGE_ROOT}/../native/hermes/CMakeLists.txt")
   file(REAL_PATH "${PACKAGE_ROOT}/../../.." root)
   set(MLN_TS_NATIVE "${PACKAGE_ROOT}/../native")
@@ -20,7 +20,7 @@ if(EXISTS "${PACKAGE_ROOT}/../native/hermes/CMakeLists.txt")
   set(abis_arm64-v8a arm64)
   set(abis_x86 x86)
   set(abis_x86_64 x64)
-  set(preset "android-${abis_${ANDROID_ABI}}-egl")
+  set(preset "android-${abis_${ANDROID_ABI}}")
   set(MLN_FFI_NATIVE_PREFIX "${root}/build/${preset}/install")
   if(NOT EXISTS "${MLN_FFI_NATIVE_PREFIX}/include/maplibre_native_c.h")
     message(

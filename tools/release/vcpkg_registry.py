@@ -43,32 +43,14 @@ SYSTEMS = {
     "freebsd": "FreeBSD",
     "android": "Android",
 }
-FEATURES = {
-    "opengl": "OpenGL (EGL, or WGL on Windows)",
-    "metal": "Metal (macOS)",
-    "vulkan": "Vulkan",
-}
 PORTFILE = """\
 # These release prefixes export both shared and static targets. They are
 # already built and include Release binaries for every consumer configuration.
 set(VCPKG_POLICY_SKIP_ALL_POST_BUILD_CHECKS enabled)
 
-set(backend "")
-foreach(feature IN ITEMS opengl metal vulkan)
-    if(feature IN_LIST FEATURES)
-        if(NOT backend STREQUAL "")
-            message(FATAL_ERROR "Select exactly one maplibre-native-c renderer feature")
-        endif()
-        set(backend "${feature}")
-    endif()
-endforeach()
-if(backend STREQUAL "")
-    message(FATAL_ERROR "Select a maplibre-native-c renderer feature: opengl, metal, or vulkan")
-endif()
-
 include("${CMAKE_CURRENT_LIST_DIR}/archives.cmake")
 if(NOT DEFINED archive)
-    message(FATAL_ERROR "No maplibre-native-c archive for ${TARGET_TRIPLET} with ${backend}")
+    message(FATAL_ERROR "No maplibre-native-c archive for ${TARGET_TRIPLET}")
 endif()
 vcpkg_download_distfile(download
     URLS "${url}"
@@ -83,10 +65,11 @@ file(INSTALL "${CMAKE_CURRENT_LIST_DIR}/usage"
      DESTINATION "${CURRENT_PACKAGES_DIR}/share/maplibre-native-c")
 """
 USAGE = """\
-Select exactly one feature: opengl, metal, or vulkan. Available archives cover
-Linux (glibc), macOS, Windows, FreeBSD x64, and Android. An unsupported
-platform, architecture, or renderer combination fails during installation.
-Both shared and static targets use the release's Release binaries:
+Available archives cover Linux (glibc), macOS, Windows, FreeBSD x64, and
+Android, each with every render backend of its platform: Vulkan and OpenGL
+(EGL, or WGL on Windows) off Apple platforms, and Metal on macOS. An
+unsupported platform or architecture fails during installation. Both shared and
+static targets use the release's Release binaries:
 
     find_package(maplibre-native-c CONFIG REQUIRED)
     target_link_libraries(app PRIVATE maplibre-native-c::maplibre-native-c)
@@ -123,12 +106,10 @@ def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> Non
     port.mkdir(parents=True)
     selections = []
     for archive in archives:
-        preset = archive.name.removeprefix(ARCHIVE_PREFIX).removesuffix(ARCHIVE_SUFFIX)
-        platform, _, renderer = preset.rpartition("-")
+        platform = archive.name.removeprefix(ARCHIVE_PREFIX).removesuffix(
+            ARCHIVE_SUFFIX
+        )
         if platform not in PLATFORMS:
-            continue
-        backend = "opengl" if renderer in {"egl", "wgl"} else renderer
-        if backend not in FEATURES:
             continue
         with archive.open("rb") as source:
             sha256 = hashlib.file_digest(source, "sha256").hexdigest()
@@ -140,8 +121,7 @@ def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> Non
         url = archive.resolve().as_uri() if release.local else release.url(archive.name)
         selections.append(
             f'if("${{VCPKG_CMAKE_SYSTEM_NAME}}" STREQUAL "{SYSTEMS[system]}"\n'
-            f'   AND VCPKG_TARGET_ARCHITECTURE STREQUAL "{architecture}"\n'
-            f'   AND backend STREQUAL "{backend}")\n'
+            f'   AND VCPKG_TARGET_ARCHITECTURE STREQUAL "{architecture}")\n'
             f'    set(archive "{archive.name}")\n'
             f'    set(url "{url}")\n'
             f'    set(sha512 "{sha512}")\n'
@@ -158,10 +138,6 @@ def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> Non
             "homepage": "https://maplibre.org/maplibre-native-ffi/",
             "license": "BSD-2-Clause",
             "supports": "(linux & (x64 | arm64)) | (osx & (x64 | arm64)) | (windows & !mingw & !uwp & (x64 | arm64)) | (freebsd & x64) | (android & (arm | arm64 | x86 | x64))",
-            "features": {
-                name: {"description": description}
-                for name, description in FEATURES.items()
-            },
         },
     )
     (port / "portfile.cmake").write_text(PORTFILE, encoding="utf-8")

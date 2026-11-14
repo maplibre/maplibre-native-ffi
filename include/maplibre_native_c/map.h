@@ -203,6 +203,7 @@ typedef struct mln_logical_size {
 typedef enum MLN_BINDING("kind=bitmask") mln_map_option_field : uint32_t {
   MLN_MAP_OPTION_EVENT_MASK = 1U << 0U,
   MLN_MAP_OPTION_TILE_CACHE_ENABLED = 1U << 1U,
+  MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 1U << 2U,
 } mln_map_option_field;
 
 /** A set of mln_map_option_field bits. */
@@ -213,8 +214,9 @@ typedef struct mln_map_options {
   uint32_t size;
   mln_map_option_fields fields;
   /**
-   * The map's first size, and its scale factor. The scale factor stays fixed
-   * for the map's life, and every render session of the map renders at it.
+   * The map's first size, and its scale factor. Render sessions of the map
+   * render at its scale factor. mln_map_resize() changes both, or
+   * mln_render_session_resize() while a render session is attached.
    */
   mln_logical_extent initial_extent MLN_BINDING("required=true");
   mln_map_mode map_mode;
@@ -237,9 +239,20 @@ typedef struct mln_map_options {
    * that need complex shaping, like Myanmar or Devanagari. A JSON array of font
    * files, each an object with a `url` and an optional `unicode-range`, as in
    * a font face of a style's `font-faces`, which every font stack uses after
-   * the style's own font faces. Empty for none.
+   * the style's own font faces. Empty for the system's fonts, unless
+   * `system_fonts_enabled` is false.
    */
   mln_buffer_view fallback_font_faces;
+  /**
+   * Whether the map falls back to the system's fonts for CJK and the scripts
+   * that need complex shaping when `fallback_font_faces` is empty: fonts that
+   * the platform's font matcher picks for the user's preferred languages.
+   * Without it, the map does. The first map that uses them waits for them
+   * to be found. In the browser, the browser draws CJK glyphs in its
+   * sans-serif font instead, where `fallback_font_faces` doesn't cover them.
+   */
+  bool system_fonts_enabled
+    MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED");
 } mln_map_options;
 
 /** A point on the screen, in logical pixels from the map's top-left corner. */
@@ -1041,10 +1054,6 @@ MLN_API mln_status mln_runtime_list_offline_regions(
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when `side_database_path` isn't a readable
  *   database file.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the merge would exceed the tile limit that
- *   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED describes.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info;shape=array")
 MLN_API mln_status mln_runtime_merge_offline_regions(
@@ -1245,6 +1254,97 @@ typedef struct mln_map_view {
   mln_projection_definition projection;
 } mln_map_view;
 
+/** A vector in four dimensions, such as a point in homogeneous coordinates. */
+typedef struct mln_vec4 {
+  double x;
+  double y;
+  double z;
+  double w;
+} mln_vec4;
+
+/**
+ * A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x,
+ * plus `y` times its y, `z` times its z, and `w` times its w. In memory it is
+ * 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and WebGPU
+ * shaders take a matrix.
+ */
+typedef struct mln_mat4 {
+  mln_vec4 x;
+  mln_vec4 y;
+  mln_vec4 z;
+  mln_vec4 w;
+} mln_mat4;
+
+/** How a graphics API's clip space holds depth. */
+typedef enum mln_clip_depth_range : uint32_t {
+  /**
+   * Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and
+   * OpenGL with `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+   */
+  MLN_CLIP_DEPTH_RANGE_ZERO_TO_ONE = 1U,
+  /** Clip z runs from -w to w, as in OpenGL by default. */
+  MLN_CLIP_DEPTH_RANGE_NEGATIVE_ONE_TO_ONE = 2U,
+} mln_clip_depth_range;
+
+/**
+ * Where a frame drew the map, and the depth that it wrote there.
+ *
+ * World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at
+ * 180° east, and on past both into the copies of the world beside the first.
+ * y runs from 0 at the north edge of the Mercator world, about 85.05° north, to
+ * 1 at its south edge. z is the altitude in meters above sea level, at the
+ * scale of the heights of the map's 3D layers, and the map draws its ground at
+ * 0.
+ *
+ * `matrix` takes a world point to the clip coordinates where the frame drew
+ * it, with the camera's padding, roll, field of view, and center altitude, and
+ * the map's viewport and projection mode. Clip y points up, as the map draws
+ * with OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so negate
+ * it there too. At high zooms, single precision can't tell nearby world points
+ * apart: subtract an origin near your geometry from its coordinates in double
+ * precision, and fold the origin into the matrix, before you convert to float.
+ *
+ * Clip z follows `clip_depth_range`, the convention of the device's graphics
+ * API. With the API's default depth range of 0 to 1, a fragment that you draw
+ * through `matrix` gets the depth that the map's 3D layers, such as fill
+ * extrusions, wrote at the same place: 0 at `near_distance` from the camera,
+ * up to `far_depth` at `far_distance`. Depth-tested against the frame's depth,
+ * your fragments hide behind the map's 3D layers where those stand in front of
+ * them.
+ *
+ * The frame's depth starts at 1. The map's 3D layers write the depth of each of
+ * their fragments. A 2D layer below every 3D layer of the style that draws
+ * opaque fragments, such as an opaque fill, writes one depth over all of them,
+ * wherever they are: the higher the layer, the lower its depth, and every one
+ * between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D
+ * layers above a 3D layer, such as labels, write no depth. So what you draw
+ * through `matrix`, even on the ground, lies in front of every 2D layer.
+ *
+ * While `globe` is true, the frame drew the map onto a globe, and its 2D layers
+ * wrote no depth. `matrix` then is the map's Mercator one, which doesn't place
+ * points on the globe.
+ */
+typedef struct mln_frame_projection {
+  mln_mat4 matrix;
+  mln_clip_depth_range clip_depth_range;
+  /**
+   * The distance from the camera to the plane where the depth that you get
+   * through `matrix` is 0, along the camera's view. Like `far_distance`, it is
+   * in pixels of the map at the camera's zoom, where the world is
+   * 512 × 2^zoom pixels wide.
+   */
+  double near_distance;
+  /** The distance to the plane where the depth is `far_depth`. */
+  double far_distance;
+  /** The depth at `far_distance`, below 1. */
+  double far_depth;
+  /**
+   * Whether the frame drew the map as a globe, alone or blending into
+   * Mercator.
+   */
+  bool globe;
+} mln_frame_projection;
+
 /**
  * How the map picks the tiles to load.
  *
@@ -1359,10 +1459,11 @@ MLN_API mln_status mln_map_get_snapshot(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets the map's size.
+ * Sets the map's size and scale factor.
  *
- * A map with a render session takes its size from the session, so resize the
- * session with mln_render_session_resize() instead.
+ * The map keeps its loaded tiles. A map with a render session takes its size
+ * and scale factor from the session, so resize the session with
+ * mln_render_session_resize() instead.
  *
  * Returns:
  * - MLN_STATUS_INVALID_STATE when the map has a render session.
@@ -1373,7 +1474,7 @@ MLN_API mln_status mln_map_get_snapshot(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_resize(
-  mln_map map, mln_logical_size logical_size, const mln_completion* completion,
+  mln_map map, mln_logical_extent extent, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1445,7 +1546,20 @@ MLN_API mln_status mln_map_remove_feature_state(
  * Renders a still image of a static or tile map.
  *
  * The map's render session draws the image once every resource that the image
- * needs has loaded.
+ * needs has loaded. While the image waits, the session holds a demand of its
+ * own for it, whose frame result carries MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE:
+ *
+ * - It waits for the map to load what the image needs, and while every
+ *   texture of a borrowed ring holds a frame.
+ * - It finishes with the image's frame, and the image completes once that
+ *   frame's result is queued. Frames of your own demands complete no image.
+ * - Your demands never replace it, nor it them.
+ * - mln_render_session_barrier() ends it with MLN_RENDER_RESULT_NO_UPDATE, and
+ *   a detach or mln_render_session_release_target() ends it with
+ *   MLN_RENDER_RESULT_TARGET_NOT_READY. The image gets a new demand once the
+ *   barrier runs, the session has a target again, or the next session
+ *   attaches.
+ * - An image that fails ends its demand with MLN_RENDER_RESULT_NO_UPDATE.
  *
  * Completes with:
  * - MLN_STATUS_CANCELLED when the map is released before the image is done.

@@ -44,7 +44,8 @@ enum class AndroidTarget(
   fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang"
 
   companion object {
-    const val DEFAULT_BACKEND = "opengl"
+    /** The render backend that the Android device suite tests unless one is named. */
+    const val DEFAULT_TEST_BACKEND = "opengl"
 
     val DEFAULT_ABIS: String = entries.joinToString(",") { it.ndkAbi }
 
@@ -66,10 +67,10 @@ enum class AndroidTarget(
       }
     }
 
-    fun parseBackend(value: String): String {
+    fun parseTestBackend(value: String): String {
       val backend = value.trim().lowercase()
       require(backend == "opengl" || backend == "vulkan") {
-        "Unsupported Android backend '$value'; maplibre.android.backend supports opengl or vulkan"
+        "Unsupported Android backend '$value'; maplibre.android.testBackend supports opengl or vulkan"
       }
       return backend
     }

@@ -1,12 +1,11 @@
-// Runs an emcc HTML page or JavaScript module in isolated headless Chromium.
+// Runs a test page in headless Chromium.
 //
-// Usage: node scripts/run-browser-test.mjs <page.html|module.js>
+// Usage: node scripts/run-browser-test.mjs <page.html>
 //        [--timeout-seconds N] [--render-backend NAME] [--browser-arg FLAG]...
 //        [--module-arg ARG]... [--print-output] [--hardware-gpu]
 //
-// Backend-specific browser flags live here for both C and Rust suites. Module
-// arguments reach a module page through its worker and an emcc page through its
-// query string, which the native suite's page shell reads.
+// Backend-specific browser flags live here for every suite. Module arguments
+// reach the page through its query string.
 //
 // The browser is slower than a native run, so the page gets the timeout scale
 // the native suite stretches its waits by: MLN_TEST_TIMEOUT_SCALE, or 3.
@@ -16,7 +15,7 @@
 // benchmarks.
 
 import { spawn } from "node:child_process";
-import { createReadStream, existsSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -83,9 +82,7 @@ function fail(message) {
 
 const [targetPath, ...rest] = process.argv.slice(2);
 if (!targetPath)
-  fail(
-    "usage: run-browser-test.mjs <page.html|module.js> [--timeout-seconds N]",
-  );
+  fail("usage: run-browser-test.mjs <page.html> [--timeout-seconds N]");
 if (!existsSync(targetPath)) fail(`test target does not exist: ${targetPath}`);
 
 let timeoutSeconds = 600;
@@ -109,106 +106,7 @@ for (let i = 0; i < rest.length; i += 1) {
 
 const timeoutScale = process.env.MLN_TEST_TIMEOUT_SCALE ?? "3";
 const root = path.dirname(path.resolve(targetPath));
-const pageName =
-  path.extname(targetPath) === ".html"
-    ? path.basename(targetPath)
-    : generateModulePage(path.basename(targetPath));
-
-// Writes the page and worker a cargo test binary needs, which emcc does not
-// produce for a `.js` output.
-//
-// The page hosts the module in a worker of its own so the browser's main thread
-// stays out of it entirely. Whether the module then proxies its entry point onto
-// a further pthread is the module's own business; see bindings/rust/mise.toml.
-function generateModulePage(moduleName) {
-  const stem = moduleName.replace(/\.js$/, "");
-  // The HTML parser ends an inline script at the first `</script`, whatever the
-  // JavaScript around it means, so a value carrying one has to reach the script
-  // escaped. Test filters and libtest arguments arrive here from a command line.
-  const embed = (value) => JSON.stringify(value).replaceAll("</", "<\\/");
-  const escapeText = (value) =>
-    value
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;");
-  const workerName = `${stem}.runner-worker.js`;
-  const generatedPageName = `${stem}.runner.html`;
-
-  writeFileSync(
-    path.join(root, workerName),
-    `self.onmessage = (event) => {
-  const lines = [];
-  const record = (text) => {
-    lines.push(text);
-    self.postMessage({ line: text });
-  };
-  self.Module = {
-    // Emscripten resolves the pthread worker script from the running script's
-    // URL, which in here is this worker rather than the module, so the pool
-    // would load this file forever without being told otherwise.
-    mainScriptUrlOrBlob: new URL(${JSON.stringify(moduleName)}, self.location.href).href,
-    arguments: event.data.args,
-    // Only a module linked with ENV among its exported runtime methods can be
-    // handed the fixture origin. One that was not is a module with no test
-    // reading it, so this reports nothing and lets the run proceed.
-    preRun: [() => {
-      if (typeof ENV !== "undefined") Object.assign(ENV, event.data.env);
-    }],
-    print: record,
-    printErr: record,
-    onExit: (status) => self.postMessage({ status, output: lines.join("\\n") }),
-    onAbort: (reason) => {
-      record("aborted: " + reason);
-      self.postMessage({ status: 70, output: lines.join("\\n") });
-    },
-  };
-  importScripts(${JSON.stringify(moduleName)});
-};
-`,
-  );
-
-  writeFileSync(
-    path.join(root, generatedPageName),
-    `<!DOCTYPE html>
-<html lang="en">
-  <head><meta charset="utf-8" /><title>${escapeText(stem)}</title></head>
-  <body>
-    <script>
-const report = (payload) =>
-  void fetch("/__result", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-window.addEventListener("error", (event) =>
-  report({ status: 70, output: "uncaught error: " + event.message }));
-window.addEventListener("unhandledrejection", (event) =>
-  report({ status: 70, output: "unhandled rejection: " + event.reason }));
-
-const worker = new Worker(${embed(workerName)});
-worker.onmessage = (event) => {
-  if (event.data.line !== undefined) {
-    console.log(event.data.line);
-    return;
-  }
-  report(event.data);
-};
-worker.onerror = (event) =>
-  report({ status: 70, output: "worker error: " + event.message });
-worker.postMessage({
-  args: ${embed(moduleArgs)},
-  env: {
-    MLN_FFI_TEST_FIXTURE_ORIGIN: location.origin,
-    MLN_TEST_TIMEOUT_SCALE: ${embed(timeoutScale)},
-  },
-});
-    </script>
-  </body>
-</html>
-`,
-  );
-  return generatedPageName;
-}
+const pageName = path.basename(targetPath);
 
 let settle;
 const finished = new Promise((resolve) => {
@@ -275,9 +173,6 @@ function serveOrigin(url, request, response) {
 }
 
 const server = createServer((request, response) => {
-  // Cross-origin isolation, so the page may use SharedArrayBuffer.
-  response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
   response.setHeader("Cache-Control", "no-store");
 
   const url = new URL(request.url ?? "/", "http://localhost");
@@ -340,8 +235,7 @@ const profile = await mkdtemp(path.join(tmpdir(), "mln-browser-test-"));
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const { port } = server.address();
 const pageQuery = new URLSearchParams({ scale: timeoutScale });
-if (path.extname(targetPath) === ".html")
-  for (const argument of moduleArgs) pageQuery.append("arg", argument);
+for (const argument of moduleArgs) pageQuery.append("arg", argument);
 const pageUrl = `http://127.0.0.1:${port}/${pageName}?${pageQuery}`;
 console.log(`running ${pageUrl} in ${browser}`);
 

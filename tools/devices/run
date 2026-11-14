@@ -12,7 +12,8 @@
 # ends it and reports. --boot only gets the device ready, so that a caller can
 # boot it before any test's deadline starts. MLN_FFI_DEVICE_LIBRARIES lists, by
 # colons, further shared libraries that an emulator needs beside the
-# executable, such as a plugin it loads.
+# executable, such as the test graphics library. MLN_FFI_TEST_BACKEND names the
+# render backend under test, where the device depends on it.
 set -euo pipefail
 
 usage="usage: tools/devices/run <executable> [argument ...] | --boot"
@@ -34,7 +35,7 @@ target_platform=$(field .platform.id)
 devices="$MISE_MONOREPO_ROOT/tools/devices"
 scripts="$MISE_MONOREPO_ROOT/scripts"
 ohos_libraries=()
-if [[ "$target_platform" == ohos-x64 && "$(field .backend)" == vulkan ]]; then
+if [[ "$target_platform" == ohos-x64 && "${MLN_FFI_TEST_BACKEND:-}" == vulkan ]]; then
   ohos_libraries=(--library "$("$devices/ohos-vulkan-driver")")
 fi
 

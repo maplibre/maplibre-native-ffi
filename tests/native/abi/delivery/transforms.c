@@ -13,7 +13,7 @@
 #include "support/http_server.h"
 #endif
 
-#if defined(__EMSCRIPTEN__) || defined(__OHOS__)
+#if defined(__OHOS__)
 #define MLN_TEST_HEADER_TRANSFORM_SUPPORTED 0
 #else
 #define MLN_TEST_HEADER_TRANSFORM_SUPPORTED 1

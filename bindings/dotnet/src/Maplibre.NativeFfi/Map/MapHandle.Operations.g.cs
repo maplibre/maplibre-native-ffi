@@ -115,6 +115,55 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Adds a layer that draws with your own GPU commands, through <c>host</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>The layer goes below the layer named <c>beforeLayerId</c>, or
+    /// above every layer when <c>beforeLayerId</c> is empty. Its type is
+    /// <c>custom</c>, and it takes the <c>visibility</c>, <c>minzoom</c>, and
+    /// <c>maxzoom</c> properties, but no paint properties.
+    /// <c>MapHandle.RemoveStyleLayerAsync()</c> removes it.</para>
+    /// <para>Runs on the thread that runs the session's graphics work: a
+    /// library thread, or yours with
+    /// <c>RenderDriverKind.CallerGraphicsThread</c>. It can't call the
+    /// library.</para>
+    /// <para>Runs on the thread that runs the session's graphics work, as
+    /// <c>CustomLayerPrerenderCallback</c> says. It can't call the
+    /// library.</para>
+    /// <para>See <c>mln_map_add_custom_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.NotFound</c> when the style has no layer
+    /// named <c>beforeLayerId</c>.</description></item>
+    /// <item><description><c>Status.AlreadyExists</c> when the style already
+    /// has a layer named <c>layerId</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> while the style isn't
+    /// loaded, as <c>MapHandle.SetStyleUrlAsync()</c>
+    /// describes.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<CommandCompletion> AddCustomLayerAsync(
+        string layerId,
+        string? beforeLayerId,
+        CustomLayerHost host
+    )
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeHost = NativeCustomLayerHost(host, scope);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_map_add_custom_layer(
+            Handle,
+            scope.Utf8(layerId),
+            beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
+            &nativeHost,
+            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
     /// Adds a source whose vector tiles come from callbacks.
     /// </summary>
     /// <remarks>
@@ -349,692 +398,53 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Creates a session that renders the map into a ring of Android hardware
-    /// buffers that the library allocates.
+    /// Attaches a render session that renders the map into <c>target</c>.
     /// </summary>
     /// <remarks>
-    /// <para>Acquire each frame with <c>RenderSessionHandle.AcquireFrame()</c>,
-    /// and get its buffer with
-    /// <c>AcquiredFrameHandle.WithAndroidHardwareBuffer()</c>.
-    /// <c>RenderSessionHandle.ResizeAsync()</c> gives the ring new buffers of
-    /// the new size.</para>
-    /// <para>A Vulkan build renders with <c>device</c>, or, when <c>device</c>
-    /// is null, with a device that the library creates. An OpenGL build uses an
-    /// EGL context on the default display, and <c>device</c> must be null.
-    /// Attach with <c>RenderDriverKind.CoreWorker</c>.</para>
-    /// <para>To show the buffers through Android's UI, such as with
-    /// <c>Bitmap.wrapHardwareBuffer</c>, attach without
-    /// <c>GpuSyncKindFlag.SyncFd</c> in
-    /// <c>RenderSessionAttachOptions.ProducerSyncKinds</c>, so that each frame
-    /// finishes before you acquire it. Keep each frame acquired until the next
-    /// one replaces it on screen, then release it with
-    /// <c>GpuSyncKind.CpuComplete</c>. Give the ring 3 buffers, so the session
-    /// can render while you hold two frames.</para>
-    /// <para>See <c>mln_map_attach_android_hardware_buffer_ring</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when Android is older than
-    /// 8.0, API level 26, or when the graphics context can't render into
-    /// hardware buffers: the Vulkan device lacks
-    /// VK_ANDROID_external_memory_android_hardware_buffer, or the EGL display
-    /// lacks EGL_ANDROID_get_native_client_buffer or
-    /// EGL_ANDROID_image_native_buffer.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the library can't
-    /// create its Vulkan device or initialize the default EGL
-    /// display.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    public RenderSessionHandle AttachAndroidHardwareBufferRing(
-        AndroidHardwareBufferRingDescriptor descriptor,
-        VulkanDeviceHandle? device,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeAndroidHardwareBufferRingDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_android_hardware_buffer_ring(
-            Handle,
-            &nativeDescriptor,
-            scope.UseOptional(device),
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that presents the map to an Android window, with a
-    /// graphics context that the library creates.
-    /// </summary>
-    /// <remarks>
-    /// <para>A Vulkan build presents with <c>device</c>, or, when <c>device</c>
-    /// is null, with a device that the library creates. An OpenGL build uses an
-    /// EGL context on the default display, and <c>device</c> must be null.
-    /// Attach with <c>RenderDriverKind.CoreWorker</c>.</para>
-    /// <para>When the platform destroys the window, such as in
-    /// <c>SurfaceHolder.Callback.surfaceDestroyed</c>, release the target with
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c>, or give the session a
-    /// new window with
-    /// <c>RenderSessionHandle.SetAndroidSurfaceTargetAsync()</c>, without
-    /// waiting for that to complete. The session keeps its own reference to the
-    /// window and stays usable for the next window. A frame to the destroyed
-    /// window finishes with <c>RenderResult.TargetNotReady</c>, or with
-    /// <c>RenderResult.Rendered</c> if the window went away while the frame was
-    /// presenting.</para>
-    /// <para>See <c>mln_map_attach_android_surface</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when <c>surface</c> has
-    /// no window, such as after the platform destroyed it.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when you created
-    /// <c>device</c> without
-    /// <c>VulkanDeviceOptions.Presentation</c>.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when the GPU or the Vulkan
-    /// loader can't present.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the library can't
-    /// create the graphics context or the window's
-    /// surface.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    public RenderSessionHandle AttachAndroidSurface(
-        AndroidSurfaceDescriptor descriptor,
-        VulkanDeviceHandle? device,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeAndroidSurfaceDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_android_surface(
-            Handle,
-            &nativeDescriptor,
-            scope.UseOptional(device),
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map into a ring of dmabufs that the
-    /// library allocates.
-    /// </summary>
-    /// <remarks>
-    /// <para>Acquire each frame with <c>RenderSessionHandle.AcquireFrame()</c>,
-    /// and get its buffer with <c>AcquiredFrameHandle.WithDmaBuf()</c>.
-    /// <c>RenderSessionHandle.ResizeAsync()</c> gives the ring new buffers of
-    /// the new size.</para>
-    /// <para>A Vulkan build renders with <c>device</c>, or, when <c>device</c>
-    /// is null, with a device that the library creates. An OpenGL build uses an
-    /// EGL context of its own, and <c>device</c> must be null. Attach with
-    /// <c>RenderDriverKind.CoreWorker</c>.</para>
-    /// <para>For a reader that waits on no sync file, such as a Wayland
-    /// compositor without explicit synchronization, attach without
-    /// <c>GpuSyncKindFlag.SyncFd</c> in
-    /// <c>RenderSessionAttachOptions.ProducerSyncKinds</c>, so that each frame
-    /// finishes before you acquire it. Keep each frame acquired until its
-    /// reader is done with the buffer. Give the ring 3 buffers, so the session
-    /// can render while you hold two frames.</para>
-    /// <para>See <c>mln_map_attach_dma_buf_ring</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when the graphics context
-    /// can't render into a dmabuf of any of
-    /// <c>formats</c>.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the library can't
-    /// create its Vulkan device or initialize an EGL
-    /// display.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
-    public RenderSessionHandle AttachDmaBufRing(
-        DmaBufRingDescriptor descriptor,
-        VulkanDeviceHandle? device,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeDmaBufRingDescriptor(descriptor, scope);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_dma_buf_ring(
-            Handle,
-            &nativeDescriptor,
-            scope.UseOptional(device),
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map into a ring of DXGI shared
-    /// textures that the library allocates.
-    /// </summary>
-    /// <remarks>
-    /// <para>Acquire each frame with <c>RenderSessionHandle.AcquireFrame()</c>,
-    /// and get its texture with
-    /// <c>AcquiredFrameHandle.WithDxgiSharedTexture()</c>.
-    /// <c>RenderSessionHandle.ResizeAsync()</c> gives the ring new textures of
-    /// the new size.</para>
-    /// <para>The session renders with the Vulkan device <c>device</c>, or, when
-    /// <c>device</c> is null, with one that the library creates. The textures
-    /// belong to the device's GPU, so open them on a D3D11 or D3D12 device of
-    /// the same adapter. To pick the GPU, create <c>device</c> with
-    /// <c>VulkanDeviceOptions.DeviceLuid</c> set to your adapter's LUID. Attach
-    /// with <c>RenderDriverKind.CoreWorker</c>.</para>
-    /// <para>For a reader that waits on no fence, such as Flutter's texture
-    /// registrar, attach without <c>GpuSyncKindFlag.D3d12Fence</c> in
-    /// <c>RenderSessionAttachOptions.ProducerSyncKinds</c>, so that each frame
-    /// finishes before you acquire it. Release a frame with
-    /// <c>GpuSyncKind.CpuComplete</c> only once the reader has finished with
-    /// its texture.</para>
-    /// <para>See <c>mln_map_attach_dxgi_shared_texture_ring</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> in an OpenGL build, or when
-    /// the GPU can't share the textures: D3D11 has no adapter with the Vulkan
-    /// device's LUID or can't share textures through NT handles, or the device
-    /// lacks VK_KHR_external_memory_win32 or can't import D3D11
-    /// textures.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the library can't
-    /// create its Vulkan device or a D3D11 device on the
-    /// adapter.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public RenderSessionHandle AttachDxgiSharedTextureRing(
-        DxgiSharedTextureRingDescriptor descriptor,
-        VulkanDeviceHandle? device,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeDxgiSharedTextureRingDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_dxgi_shared_texture_ring(
-            Handle,
-            &nativeDescriptor,
-            scope.UseOptional(device),
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map into a ring of IOSurfaces that
-    /// the library allocates.
-    /// </summary>
-    /// <remarks>
-    /// <para>Acquire each frame with <c>RenderSessionHandle.AcquireFrame()</c>,
-    /// and get its surface with <c>AcquiredFrameHandle.WithIoSurface()</c>.
-    /// <c>RenderSessionHandle.ResizeAsync()</c> gives the ring new surfaces of
-    /// the new size. Attach with <c>RenderDriverKind.CoreWorker</c>.</para>
-    /// <para>To hand frames to a reader that can't wait on an event, such as
-    /// Flutter's <c>copyPixelBuffer</c>, attach without
-    /// <c>GpuSyncKindFlag.MetalSharedEvent</c> in
-    /// <c>RenderSessionAttachOptions.ProducerSyncKinds</c>, so that each frame
-    /// finishes before you acquire it. Release a frame with
-    /// <c>GpuSyncKind.CpuComplete</c> only once the reader has finished with
-    /// its surface.</para>
-    /// <para>See <c>mln_map_attach_io_surface_ring</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
-    /// <c>RenderBackendFlag.Metal</c>.</description></item>
-    /// <item><description><c>Status.NativeError</c> when <c>context</c> names
-    /// no device and the system has no Metal device.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
-    public RenderSessionHandle AttachIoSurfaceRing(
-        IoSurfaceRingDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeIoSurfaceRingDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_io_surface_ring(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map into a ring of your Metal
-    /// textures.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_attach_metal_borrowed_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
-    /// <c>RenderBackendFlag.Metal</c>, or when the target supports none of the
-    /// <c>producer_sync_kinds</c> in <c>options</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
-    public RenderSessionHandle AttachMetalBorrowedTexture(
-        MetalBorrowedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeMetalBorrowedTextureDescriptor(descriptor, scope);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_metal_borrowed_texture(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map to a Metal layer.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_attach_metal_surface</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
-    /// <c>RenderBackendFlag.Metal</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("ios")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("maccatalyst")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("tvos")]
-    public RenderSessionHandle AttachMetalSurface(
-        MetalSurfaceDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeMetalSurfaceDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_metal_surface(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Attaches a render session that renders the map offscreen.
-    /// </summary>
-    /// <remarks>
-    /// <para>Read each image's pixels with
-    /// <c>RenderSessionHandle.ReadTextureAsync()</c>.</para>
     /// <para>The session renders on <c>device</c>. When <c>device</c> is null,
     /// the session creates a device with the default options, and releases it
     /// when the session ends.</para>
-    /// <para>See <c>mln_map_attach_offscreen</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html">C API reference</see>.</para>
+    /// <para>See <c>mln_map_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when a borrowed ring
+    /// has depth textures, but not one for each of its
+    /// textures.</description></item>
     /// <item><description><c>Status.InvalidState</c> when the map already has a
-    /// render session.</description></item>
+    /// render session, or a window is minimized or has no client
+    /// area.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the device's
+    /// <c>GpuDeviceCapabilities.TargetKinds</c> lacks the target's kind, or,
+    /// for a null <c>device</c>, when no backend of this build renders to it,
+    /// when <c>options</c> sets <c>keep_depth</c> for a target other than an
+    /// exported ring, or when a borrowed ring's depth format isn't one of the
+    /// device's
+    /// <c>GpuDeviceCapabilities.DepthStencilFormats</c>.</description></item>
+    /// <item><description><c>Status.InvalidState</c> when a window was
+    /// minimized or had no client area when the attach
+    /// ran.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the GPU or the
+    /// graphics driver can't present to the window.</description></item>
     /// <item><description><c>Status.NativeError</c> when <c>device</c> is null
-    /// and the platform can't create a device.</description></item>
+    /// and the platform can't create a device, or when the library can't create
+    /// its graphics context or present to the window.</description></item>
     /// </list>
     /// </remarks>
-    public RenderSessionHandle AttachOffscreen(
-        OffscreenDescriptor descriptor,
-        RenderSessionAttachOptions options,
-        OffscreenDeviceHandle? device = null
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOffscreenDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_offscreen(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            scope.UseOptional(device),
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map into a ring of your OpenGL
-    /// textures.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_attach_open_gl_borrowed_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.OpenGlSupportedContextProviderMask()</c> lacks the
-    /// context's platform, or when the target supports none of the
-    /// <c>producer_sync_kinds</c> in <c>options</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    public RenderSessionHandle AttachOpenGlBorrowedTexture(
-        OpenGlBorrowedTextureDescriptor descriptor,
+    public RenderSessionHandle Attach(
+        RenderTarget target,
+        GpuDeviceHandle? device,
         RenderSessionAttachOptions options
     )
     {
         using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenGlBorrowedTextureDescriptor(descriptor, scope);
+        var nativeTarget = NativeRenderTarget(target, scope);
         var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
         MlnRenderSession outSession = default;
         mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_open_gl_borrowed_texture(
+        var nativeStatus = NativeMethods.mln_map_attach(
             Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map to an OpenGL surface.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_attach_open_gl_surface</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.OpenGlSupportedContextProviderMask()</c> lacks the
-    /// context's platform.</description></item>
-    /// </list>
-    /// </remarks>
-    public RenderSessionHandle AttachOpenGlSurface(
-        OpenGlSurfaceDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeOpenGlSurfaceDescriptor(descriptor, scope);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_open_gl_surface(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map into a ring of your Vulkan
-    /// images.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_attach_vulkan_borrowed_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
-    /// <c>RenderBackendFlag.Vulkan</c>, or when the target supports none of the
-    /// <c>producer_sync_kinds</c> in <c>options</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public RenderSessionHandle AttachVulkanBorrowedTexture(
-        VulkanBorrowedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeVulkanBorrowedTextureDescriptor(descriptor, scope);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_vulkan_borrowed_texture(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that renders the map to a Vulkan surface.
-    /// </summary>
-    /// <remarks>
-    /// <para>See <c>mln_map_attach_vulkan_surface</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when
-    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
-    /// <c>RenderBackendFlag.Vulkan</c>.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public RenderSessionHandle AttachVulkanSurface(
-        VulkanSurfaceDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeVulkanSurfaceDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_vulkan_surface(
-            Handle,
-            &nativeDescriptor,
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that presents the map to a Wayland surface, with a
-    /// graphics context that the library creates.
-    /// </summary>
-    /// <remarks>
-    /// <para>A Vulkan build presents with <c>device</c>, or, when <c>device</c>
-    /// is null, with a device that the library creates. An OpenGL build uses an
-    /// EGL context on the display, and <c>device</c> must be null. Attach with
-    /// <c>RenderDriverKind.CoreWorker</c>.</para>
-    /// <para>The session presents without waiting for the compositor, so demand
-    /// at most one frame per display refresh.</para>
-    /// <para>Keep the surface until a release or replacement of the target, or
-    /// a detach of the session, completes. Keep the display connected until the
-    /// session's detach completes. In an OpenGL build, if you also use EGL on
-    /// the display, initialize it before you attach.</para>
-    /// <para>See <c>mln_map_attach_wayland_surface</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when you created
-    /// <c>device</c> without
-    /// <c>VulkanDeviceOptions.Presentation</c>.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when the GPU or the Vulkan
-    /// loader can't present to Wayland.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the library can't
-    /// create the graphics context or present to the
-    /// surface.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
-    public RenderSessionHandle AttachWaylandSurface(
-        WaylandSurfaceDescriptor descriptor,
-        VulkanDeviceHandle? device,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeWaylandSurfaceDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_wayland_surface(
-            Handle,
-            &nativeDescriptor,
-            scope.UseOptional(device),
-            &nativeOptions,
-            &outSession,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        var nativeReady = nativePending.Submitted(nativeStatus);
-        scope.Accept();
-        return RenderSessionHandle.Adopt(this, outSession, nativeReady);
-    }
-
-    /// <summary>
-    /// Creates a session that presents the map to a Win32 window, with a
-    /// graphics context that the library creates.
-    /// </summary>
-    /// <remarks>
-    /// <para>A Vulkan build presents with <c>device</c>, or, when <c>device</c>
-    /// is null, with a device that the library creates. An OpenGL build uses a
-    /// WGL context, and <c>device</c> must be null. Attach with
-    /// <c>RenderDriverKind.CoreWorker</c>.</para>
-    /// <para>An OpenGL build sets the window's pixel format, so don't set one
-    /// yourself.</para>
-    /// <para>The session presents without waiting for the display, so demand at
-    /// most one frame per display refresh. While the window is minimized, frame
-    /// demands finish with <c>RenderResult.TargetNotReady</c>.</para>
-    /// <para>Keep the window until a release or replacement of the target, or a
-    /// detach of the session, completes.</para>
-    /// <para>See <c>mln_map_attach_win32_window</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.InvalidArgument</c> when <c>window</c>
-    /// isn't a window, or, in an OpenGL build, already has another pixel
-    /// format.</description></item>
-    /// <item><description><c>Status.InvalidState</c> when <c>window</c> is
-    /// minimized or has no client area.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when you created
-    /// <c>device</c> without
-    /// <c>VulkanDeviceOptions.Presentation</c>.</description></item>
-    /// <item><description><c>Status.InvalidState</c> when <c>window</c> was
-    /// minimized before the attach ran.</description></item>
-    /// <item><description><c>Status.Unsupported</c> when the GPU or the Vulkan
-    /// loader can't present.</description></item>
-    /// <item><description><c>Status.NativeError</c> when the library can't
-    /// create the graphics context or present to the
-    /// window.</description></item>
-    /// </list>
-    /// </remarks>
-    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
-    public RenderSessionHandle AttachWin32Window(
-        Win32WindowDescriptor descriptor,
-        VulkanDeviceHandle? device,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this);
-        var nativeDescriptor = NativeWin32WindowDescriptor(descriptor);
-        var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-        MlnRenderSession outSession = default;
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_attach_win32_window(
-            Handle,
-            &nativeDescriptor,
+            &nativeTarget,
             scope.UseOptional(device),
             &nativeOptions,
             &outSession,
@@ -2265,7 +1675,27 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </summary>
     /// <remarks>
     /// <para>The map's render session draws the image once every resource that
-    /// the image needs has loaded.</para>
+    /// the image needs has loaded. While the image waits, the session holds a
+    /// demand of its own for it, whose frame result carries
+    /// <c>MaplibreNative.FrameDemandTokenStillImage</c>:</para>
+    /// <list type="bullet">
+    /// <item><description>It waits for the map to load what the image needs,
+    /// and while every texture of a borrowed ring holds a
+    /// frame.</description></item>
+    /// <item><description>It finishes with the image's frame, and the image
+    /// completes once that frame's result is queued. Frames of your own demands
+    /// complete no image.</description></item>
+    /// <item><description>Your demands never replace it, nor it
+    /// them.</description></item>
+    /// <item><description><c>RenderSessionHandle.BarrierAsync()</c> ends it
+    /// with <c>RenderResult.NoUpdate</c>, and a detach or
+    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c> ends it with
+    /// <c>RenderResult.TargetNotReady</c>. The image gets a new demand once the
+    /// barrier runs, the session has a target again, or the next session
+    /// attaches.</description></item>
+    /// <item><description>An image that fails ends its demand with
+    /// <c>RenderResult.NoUpdate</c>.</description></item>
+    /// </list>
     /// <para>See <c>mln_map_request_still_image</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -2289,12 +1719,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Sets the map's size.
+    /// Sets the map's size and scale factor.
     /// </summary>
     /// <remarks>
-    /// <para>A map with a render session takes its size from the session, so
-    /// resize the session with <c>RenderSessionHandle.ResizeAsync()</c>
-    /// instead.</para>
+    /// <para>The map keeps its loaded tiles. A map with a render session takes
+    /// its size and scale factor from the session, so resize the session with
+    /// <c>RenderSessionHandle.ResizeAsync()</c> instead.</para>
     /// <para>See <c>mln_map_resize</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -2305,13 +1735,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// attached to the map before the resize applied.</description></item>
     /// </list>
     /// </remarks>
-    public Task<CommandCompletion> ResizeAsync(LogicalSize logicalSize)
+    public Task<CommandCompletion> ResizeAsync(LogicalExtent extent)
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_resize(
             Handle,
-            NativeLogicalSize(logicalSize),
+            NativeLogicalExtent(extent),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -3277,6 +2707,24 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
+        public void AddCustomLayer(string layerId, string? beforeLayerId, CustomLayerHost host)
+        {
+            var receiverHandle = owner.Handle;
+            using var scope = new NativeCallScope(owner);
+            var nativeHost = NativeCustomLayerHost(host, scope);
+            Check(
+                NativeMethods.mln_map_add_custom_layer(
+                    receiverHandle,
+                    scope.Utf8(layerId),
+                    beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
+                    &nativeHost,
+                    null,
+                    Diagnostic
+                )
+            );
+            scope.Accept();
+        }
+
         public void AddCustomVectorSource(string sourceId, CustomVectorSourceOptions options)
         {
             var receiverHandle = owner.Handle;
@@ -3645,14 +3093,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void Resize(LogicalSize logicalSize)
+        public void Resize(LogicalExtent extent)
         {
             var receiverHandle = owner.Handle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_resize(
                     receiverHandle,
-                    NativeLogicalSize(logicalSize),
+                    NativeLogicalExtent(extent),
                     null,
                     Diagnostic
                 )

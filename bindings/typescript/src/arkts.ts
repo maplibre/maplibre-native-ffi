@@ -6,7 +6,7 @@
 // ends through its environment's cleanup, which releases its queue. It has no
 // process warnings either, so leak reports go to console.warn.
 //
-// The addon comes from a backend HAR, and OHPM has no peer dependencies, so
+// The addon comes from the runtime HAR, and OHPM has no peer dependencies, so
 // an application that installs only the facade resolves the import to
 // undefined.
 
@@ -17,7 +17,7 @@ import { installRealm } from "./internal/realm.ts";
 
 if (addon === undefined) {
   throw new Error(
-    "no MapLibre Native backend package is installed; install one of @maplibre/native-ffi-opengl, @maplibre/native-ffi-vulkan at the version of @maplibre/native-ffi",
+    "no MapLibre Native runtime package is installed; install @maplibre/native-ffi-runtime at the version of @maplibre/native-ffi",
   );
 }
 bindAddon(addon as Addon, {}, installRealm);

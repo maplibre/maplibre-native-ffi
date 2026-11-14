@@ -6,8 +6,10 @@ namespace Maplibre.NativeFfi;
 /// The Vulkan image of an acquired frame.
 /// </summary>
 /// <remarks>
-/// See <c>mln_vulkan_texture_frame</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+/// <para>The depth members are set when the frame has a depth image, as for
+/// <c>MetalTextureFrame</c>. Otherwise they are zero.</para>
+/// <para>See <c>mln_vulkan_texture_frame</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
 /// </remarks>
 /// <param name="Slot">
 /// The image's index in the descriptor's <c>textures</c>.
@@ -27,6 +29,18 @@ namespace Maplibre.NativeFfi;
 /// <param name="Layout">
 /// The VkImageLayout that the frame left the image in.
 /// </param>
+/// <param name="DepthImage">
+/// The VkImage that holds the frame's depth and stencil.
+/// </param>
+/// <param name="DepthImageView">
+/// A VkImageView of the depth image's depth and stencil aspects.
+/// </param>
+/// <param name="DepthFormat">
+/// The depth image's VkFormat.
+/// </param>
+/// <param name="DepthLayout">
+/// The VkImageLayout that the frame left the depth image in.
+/// </param>
 public readonly partial record struct VulkanTextureFrame(
     uint Width,
     uint Height,
@@ -36,5 +50,9 @@ public readonly partial record struct VulkanTextureFrame(
     ulong ImageView,
     NativePointer Device,
     uint Format,
-    uint Layout
+    uint Layout,
+    ulong DepthImage,
+    ulong DepthImageView,
+    uint DepthFormat,
+    uint DepthLayout
 );

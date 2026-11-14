@@ -70,7 +70,7 @@ case "$1" in
       -Dtarget-libc="$zig_libc"
     )
     ;;
-  macos-x64-*)
+  macos-x64)
     zig_cross_args=(-frosetta)
     ;;
 esac

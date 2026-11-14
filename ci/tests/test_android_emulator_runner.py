@@ -205,15 +205,18 @@ class AndroidSerialTest(unittest.TestCase):
             ["get", "android", "--api", "26", "--abi", "x86_64", "--"],
         )
 
-    def test_presets_select_their_image(self):
-        for preset, abi, api, variant in (
-            ("android-x86-egl", "x86", "30", ["--variant", "google_apis"]),
-            ("android-x86-vulkan", "x86", "30", ["--variant", "google_apis"]),
-            ("android-x64-egl", "x86_64", "26", []),
-            ("android-x64-vulkan", "x86_64", "36", []),
+    def test_presets_and_backends_select_their_image(self):
+        for preset, backend, abi, api, variant in (
+            ("android-x86", "opengl", "x86", "30", ["--variant", "google_apis"]),
+            ("android-x86", "vulkan", "x86", "30", ["--variant", "google_apis"]),
+            ("android-x64", "opengl", "x86_64", "26", []),
+            ("android-x64", "vulkan", "x86_64", "36", []),
+            ("android-x64", "", "x86_64", "36", []),
         ):
-            with self.subTest(preset=preset):
-                result = self.serial(preset, FAKE_ABI=abi, FAKE_API=api)
+            with self.subTest(preset=preset, backend=backend):
+                result = self.serial(
+                    preset, FAKE_ABI=abi, FAKE_API=api, MLN_FFI_TEST_BACKEND=backend
+                )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 arguments = self.arguments.read_text().splitlines()
                 self.assertEqual(

@@ -30,10 +30,10 @@ copies beside it. An app outside this repository references the
 `Maplibre.NativeFfi` package instead.
 
 `MapView.cs` is an `HwndHost` that holds the map's window, a Win32 child window.
-`MapController.cs` attaches a render session to it with `AttachWin32Window`. The
-session renders on a library thread with a Vulkan device that the library
-creates, and presents to the window itself. A redraw wake asks for a frame, and
-the controller demands it at WPF's next frame, from
+`MapController.cs` attaches a render session to it with `Attach` and a Win32
+window target. The session renders on a library thread with a Vulkan device that
+the library creates, and presents to the window itself. A redraw wake asks for a
+frame, and the controller demands it at WPF's next frame, from
 `CompositionTarget.Rendering`, which the desktop compositor paces to the
 display. WPF renders frames only while something subscribes to that event, so an
 idle map costs nothing. A frame wake drains the frame results. While the window

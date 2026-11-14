@@ -25,8 +25,7 @@ typedef struct looper_thread {
 static void* run_looper(void* context) {
   looper_thread* state = context;
   state->looper = ALooper_prepare(0);
-  state->create_status =
-    mln_android_frame_pacer_create(NULL, &state->pacer, NULL);
+  state->create_status = mln_frame_pacer_create(NULL, &state->pacer, NULL);
   mln_test_flag_set(&state->ready);
   while (!atomic_load(&state->stop)) {
     (void)ALooper_pollOnce(-1, NULL, NULL, NULL);
@@ -98,8 +97,7 @@ static void expect_paced_frames(mln_frame_pacer pacer, bool release) {
 
 static void* create_pacer_without_looper(void* context) {
   looper_thread* state = context;
-  state->create_status =
-    mln_android_frame_pacer_create(NULL, &state->pacer, NULL);
+  state->create_status = mln_frame_pacer_create(NULL, &state->pacer, NULL);
   return NULL;
 }
 
@@ -119,6 +117,52 @@ LOOPER_CASE(a_paced_session_draws_each_change_without_a_demand) {
 
 LOOPER_CASE(a_released_pacer_keeps_pacing_its_sessions) {
   expect_paced_frames(pacer, true);
+}
+
+// The changes come from a thread other than the pacer's looper, and each can
+// come while the session waits for a refresh.
+LOOPER_CASE(a_pacer_keeps_pacing_its_sessions_as_its_limit_changes) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_offscreen(map, &fixture));
+  MLN_TEST_OK(mln_render_session_set_frame_pacer(fixture.session, pacer, NULL));
+  mln_frame_pacer_options options = {.size = sizeof(mln_frame_pacer_options)};
+
+  uint64_t generation = move_camera(map, 2.0);
+  options.fields = MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+  options.maximum_frames_per_second = 30;
+  MLN_TEST_OK(
+    mln_frame_pacer_set_options(pacer, &options, MLN_TEST_DIAGNOSTIC)
+  );
+  mln_test_render_wait_for_update(&fixture, generation);
+
+  generation = move_camera(map, 3.0);
+  options.fields = MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+  MLN_TEST_OK(
+    mln_frame_pacer_set_options(pacer, &options, MLN_TEST_DIAGNOSTIC)
+  );
+  mln_test_render_wait_for_update(&fixture, generation);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_frame_pacer_release(pacer);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+LOOPER_CASE(set_options_refuses_an_invalid_limit_and_a_released_pacer) {
+  mln_frame_pacer_options options = {.size = sizeof(mln_frame_pacer_options)};
+  options.fields = MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+  options.maximum_frames_per_second = 0;
+  MLN_TEST_INVALID(mln_frame_pacer_set_options(pacer, &options, NULL));
+  options.fields |= MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+  options.maximum_frames_per_second = 30;
+  MLN_TEST_INVALID(mln_frame_pacer_set_options(pacer, &options, NULL));
+
+  mln_frame_pacer_release(pacer);
+  options.fields = MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+  MLN_TEST_INVALID_STATE(mln_frame_pacer_set_options(pacer, &options, NULL));
 }
 
 LOOPER_CASE(a_session_with_a_redraw_wake_takes_no_pacer) {
@@ -150,5 +194,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_thread_without_a_looper_creates_no_pacer);
   RUN_TEST(a_paced_session_draws_each_change_without_a_demand);
   RUN_TEST(a_released_pacer_keeps_pacing_its_sessions);
+  RUN_TEST(a_pacer_keeps_pacing_its_sessions_as_its_limit_changes);
+  RUN_TEST(set_options_refuses_an_invalid_limit_and_a_released_pacer);
   RUN_TEST(a_session_with_a_redraw_wake_takes_no_pacer);
 }

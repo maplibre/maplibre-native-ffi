@@ -31,6 +31,48 @@ public extension MapHandle {
     }
   }
 
+  /// Adds a layer that draws with your own GPU commands, through `host`.
+  ///
+  /// The layer goes below the layer named `beforeLayerId`, or above every layer
+  /// when `beforeLayerId` is empty. Its type is `custom`, and it takes the
+  /// `visibility`, `minzoom`, and `maxzoom` properties, but no paint
+  /// properties. `MapHandle.removeStyleLayer()` removes it.
+  ///
+  /// Runs on the thread that runs the session's graphics work: a library
+  /// thread, or yours with `RenderDriverKind.callerGraphicsThread`. It can't
+  /// call the library.
+  ///
+  /// Runs on the thread that runs the session's graphics work, as
+  /// `CustomLayerPrerenderCallback` says. It can't call the library.
+  ///
+  /// See `mln_map_add_custom_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the style has no layer named `beforeLayerId`.
+  /// - `Status.alreadyExists` when the style already has a layer named
+  ///   `layerId`.
+  /// - `Status.invalidState` while the style isn't loaded, as
+  ///   `MapHandle.setStyleUrl()` describes.
+  @discardableResult
+  func addCustomLayer(
+    _ bindingArg0: String,
+    beforeLayerId bindingArg1: String? = nil,
+    host bindingArg2: CustomLayerHost
+  ) async throws -> CommandCompletion {
+    try await nativeCommand { raw, arena, completion, diagnostic in
+      try mln_map_add_custom_layer(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        arena.store(bindingArg2.nativeValue(arena: arena)),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
   /// Adds a source whose vector tiles come from callbacks.
   ///
   /// See `mln_map_add_custom_vector_source` in the
@@ -1214,6 +1256,22 @@ public extension MapHandleDiscarding {
           diagnostic
         )
       }
+  }
+
+  func addCustomLayer(
+    _ bindingArg0: String,
+    beforeLayerId bindingArg1: String? = nil,
+    host bindingArg2: CustomLayerHost
+  ) throws {
+    try owner
+      .nativeInvoke { raw, arena, diagnostic in try mln_map_add_custom_layer(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        arena.store(bindingArg2.nativeValue(arena: arena)),
+        nil,
+        diagnostic
+      ) }
   }
 
   func addCustomVectorSource(

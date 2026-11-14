@@ -74,12 +74,11 @@ public class OfflineTest {
     // #region cache-file
     RuntimeHandle runtime =
         RuntimeHandle.create(
-                RuntimeOptions.of()
-                    .withCachePath(
-                        cacheDirectory
-                            .resolve("maplibre-cache.db")
-                            .toString()))
-            .join();
+            RuntimeOptions.of()
+                .withCachePath(
+                    cacheDirectory
+                        .resolve("maplibre-cache.db")
+                        .toString()));
     // #endregion cache-file
     try {
       SnippetFixture.keepOffTheNetwork(runtime);

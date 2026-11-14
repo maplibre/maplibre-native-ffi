@@ -18,7 +18,7 @@ public readonly partial record struct RenderSessionAttachOptions
         Wake FrameWake,
         Wake RedrawWake,
         Wake DriverWorkWake,
-        QueueLock QueueLock
+        bool KeepDepth
     )
     {
         this.Driver = Driver;
@@ -26,7 +26,7 @@ public readonly partial record struct RenderSessionAttachOptions
         this.FrameWake = FrameWake;
         this.RedrawWake = RedrawWake;
         this.DriverWorkWake = DriverWorkWake;
-        this.QueueLock = QueueLock;
+        this.KeepDepth = KeepDepth;
     }
 
     /// <summary>
@@ -36,14 +36,19 @@ public readonly partial record struct RenderSessionAttachOptions
     /// <remarks>
     /// <list type="bullet">
     /// <item><description><c>RenderDriverKind.CallerGraphicsThread</c> for a
-    /// shared or dedicated EGL or WGL context, an existing WebGL context, or a
-    /// browser's WebGPU device.</description></item>
-    /// <item><description><c>RenderDriverKind.CoreWorker</c> for a transferred
-    /// WebGL canvas, an Android, OpenHarmony, or Win32 window, a Wayland
-    /// surface, a ring of Android hardware buffers, dmabufs, DXGI shared
-    /// textures, or IOSurfaces, or an offscreen session.</description></item>
-    /// <item><description>Either one for another Metal or Vulkan
-    /// target.</description></item>
+    /// borrowed ring of WebGPU textures.</description></item>
+    /// <item><description><c>RenderDriverKind.CoreWorker</c> for an offscreen
+    /// target, a window, or an exported ring.</description></item>
+    /// <item><description>Either one for a web canvas. In a browser both run on
+    /// the thread that loaded the library: <c>RenderDriverKind.CoreWorker</c>
+    /// in the library's own tasks, and
+    /// <c>RenderDriverKind.CallerGraphicsThread</c> when you service the
+    /// session.</description></item>
+    /// <item><description>Either one for a Metal layer, a Vulkan surface, an
+    /// OpenGL surface, or a borrowed ring of Metal, Vulkan, or OpenGL textures.
+    /// A build may drive these on <c>RenderDriverKind.CoreWorker</c> only, and
+    /// fails an attach with <c>RenderDriverKind.CallerGraphicsThread</c>
+    /// then.</description></item>
     /// </list>
     /// <para>An attach with another driver fails with
     /// <c>Status.Unsupported</c>.</para>
@@ -75,12 +80,23 @@ public readonly partial record struct RenderSessionAttachOptions
     /// Called when a session driven by
     /// <c>RenderDriverKind.CallerGraphicsThread</c> has work for
     /// <c>RenderSessionHandle.ServiceDriverWork()</c>. It isn't called again
-    /// until a service runs.
+    /// until a service runs. It's never called on your graphics thread during a
+    /// service: the service runs the work that comes while it runs, so you can
+    /// call <c>RenderSessionHandle.ServiceDriverWork()</c> from the wake.
     /// </summary>
     public Wake DriverWorkWake { get; init; }
 
     /// <summary>
-    /// Your lock on the Vulkan queue, when you submit to it yourself.
+    /// Whether an exported ring keeps the depth and stencil of each frame for
+    /// you, so that you can draw into the frame depth-tested against the map,
+    /// as <c>FrameProjection</c> says. The getter of the device's API, such as
+    /// <c>AcquiredFrameHandle.WithVulkanTexture()</c>, gets a frame's depth
+    /// texture on the device, and <c>AcquiredFrameHandle.WithOpaqueFd()</c>
+    /// shares it across APIs when <c>GpuDeviceCapabilities.DepthExportKinds</c>
+    /// has the ring's kind. Keeping depth costs memory bandwidth, most on
+    /// tile-based GPUs. A borrowed ring keeps depth in the textures that you
+    /// give it instead, and the other targets keep none, so an attach to them
+    /// with <c>keep_depth</c> fails with <c>Status.Unsupported</c>.
     /// </summary>
-    public QueueLock QueueLock { get; init; }
+    public bool KeepDepth { get; init; }
 }

@@ -2,6 +2,11 @@
 
 Bindings without a matching entry are supported. A C gap also applies to its
 bindings, since they cannot reach a platform before the native library does.
+
+A cell is a binding on one platform, architecture, and render backend. A
+platform's package carries all of its backends, so building and packaging are
+a platform's: they happen where any of its backends' cells has no gap. Testing
+is a backend's, since a CI job runs each backend's suites on its own.
 """
 
 from __future__ import annotations
@@ -30,7 +35,7 @@ PLATFORM_LABELS = {
     "tvos": "tvOS",
     "visionos": "visionOS",
     "ohos": "OpenHarmony",
-    "emscripten": "Web (Emscripten)",
+    "web": "Web",
 }
 PLATFORM_ORDER = list(PLATFORM_LABELS)
 # Apple mobile platforms list device and simulator rows separately.
@@ -64,7 +69,6 @@ BINDING_LABELS = {
     "kotlin-jvm": "Kotlin (JAR)",
     "kotlin-native": "Kotlin (KLIB)",
     "python": "Python",
-    "rust": "Rust",
     "swift": "Swift",
     "typescript": "TypeScript",
     "zig": "Zig",
@@ -87,11 +91,6 @@ class Target:
         )
 
 
-def target_from_name(preset: str) -> Target:
-    platform, arch, backend = preset.rsplit("-", 2)
-    return normalized_target(platform, arch, backend)
-
-
 def normalized_target(platform: str, arch: str, backend: str) -> Target:
     return Target(
         platform={"mingw": "windows-mingw"}.get(
@@ -105,8 +104,14 @@ def normalized_target(platform: str, arch: str, backend: str) -> Target:
     )
 
 
-def target_from_preset(preset: NativeTarget) -> Target:
-    return normalized_target(preset.platform, preset.architecture, preset.backend)
+def cell(preset: NativeTarget, backend: str) -> Target:
+    """The row of one of a native target's backends."""
+    return normalized_target(preset.platform, preset.architecture, backend)
+
+
+def cells(preset: NativeTarget) -> list[Target]:
+    """The rows of a native target's backends."""
+    return [cell(preset, backend) for backend in preset.backends]
 
 
 OPERATIONS = ("build", "test", "package", "xcframework")
@@ -263,5 +268,23 @@ def gap(binding: str, target: Target, operation: str = "test") -> Entry | None:
     return None
 
 
-def supported(binding: str, target: NativeTarget, operation: str = "test") -> bool:
-    return gap(binding, target_from_preset(target), operation) is None
+def supported(
+    binding: str,
+    target: NativeTarget,
+    operation: str = "test",
+    backend: str | None = None,
+) -> bool:
+    """Whether a binding reaches an operation on one of the target's backends,
+    or with none named, on any of them."""
+    backends = (backend,) if backend else target.backends
+    return any(gap(binding, cell(target, name), operation) is None for name in backends)
+
+
+def tested_backends(binding: str, target: NativeTarget) -> tuple[str, ...]:
+    """The target's backends whose suites the binding runs, in the target's
+    order."""
+    return tuple(
+        backend
+        for backend in target.backends
+        if supported(binding, target, "test", backend)
+    )

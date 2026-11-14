@@ -326,9 +326,6 @@ func TestProviderRoutesDecideWhichRequestsReachIt(t *testing.T) {
 // A header transform's response object works only inside its invocation and
 // on the thread native called it on.
 func TestScopedResponseRejectsLateAndForeignUse(t *testing.T) {
-	if !headerTransformSupported {
-		t.Skip("HTTP header transforms are unsupported on OpenHarmony")
-	}
 	f := newFixture(t)
 	failures := newFailureLog()
 	responses := make(chan *HTTPHeaderTransformResponseScope, 1)

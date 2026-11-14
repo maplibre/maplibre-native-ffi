@@ -77,7 +77,9 @@ static void discarded_commands_publish_state_and_events_before_a_later_query(
 
   mln_map_snapshot before = {.size = sizeof(before)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
-  const mln_logical_size extent = {.width = 96, .height = 80};
+  const mln_logical_extent extent = {
+    .width = 96, .height = 80, .scale_factor = 1.0
+  };
   mln_camera_update camera = {
     .size = sizeof(mln_camera_update),
     .camera = {.size = sizeof(mln_camera_options)}
@@ -136,7 +138,7 @@ static void discarded_commands_keep_synchronous_validation(void) {
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   MLN_TEST_INVALID(mln_map_set_event_mask(map, UINT64_MAX, NULL, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "mask"));
-  MLN_TEST_INVALID(mln_map_resize(map, (mln_logical_size){0}, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_resize(map, (mln_logical_extent){0}, NULL, NULL));
   mln_completion undersized = {.size = sizeof(mln_completion) - 1};
   MLN_TEST_INVALID(mln_map_request_repaint(map, &undersized, NULL));
   mln_test_destroy_map(map);
@@ -169,7 +171,10 @@ static void a_session_barrier_fences_a_discarded_resize(void) {
   mln_render_session_snapshot before = {.size = sizeof(before)};
   MLN_TEST_OK(mln_render_session_get_snapshot(fixture.session, &before, NULL));
   const mln_logical_size extent = {.width = 96, .height = 80};
-  MLN_TEST_OK(mln_render_session_resize(fixture.session, extent, NULL, NULL));
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.session, mln_test_session_extent(fixture.session, extent), NULL,
+    NULL
+  ));
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)

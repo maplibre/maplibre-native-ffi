@@ -164,22 +164,6 @@ public fun openGlSupportedContextProviderMask(): OpenGlContextProviderFlag =
   }
 
 /**
- * Returns the function that registers a plugin's style layer types.
- *
- * Pass the function to the plugin's registration entry point before loading a style that uses the
- * plugin's layer types. Plugin callbacks run on library threads and can keep running while the
- * process exits, so they must not use state that the process destroys at exit.
- *
- * See `mln_plugin_get_register_function_v1` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
- */
-public fun getPluginRegisterFunctionV1(): NativePointer =
-  nativeCall(null, null) {
-    val raw = C.mln_plugin_get_register_function_v1()
-    NativePointer.ofAddress(raw)
-  }
-
-/**
  * Converts a coordinate to meters in the Web Mercator projection.
  *
  * See `mln_projected_meters_for_lat_lng` in the

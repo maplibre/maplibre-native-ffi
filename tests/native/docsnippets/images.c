@@ -70,9 +70,10 @@ void mln_doc_images(mln_runtime runtime) {
   // #endregion style
 
   // #region attach
-  mln_offscreen_descriptor offscreen = {
-    .size = sizeof(mln_offscreen_descriptor),
-    .logical_size = {.width = 800, .height = 600},
+  mln_render_target offscreen = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_OFFSCREEN,
+    .data.offscreen = {.logical_size = {.width = 800, .height = 600}},
   };
   mln_render_session_attach_options attach_options = {
     .size = sizeof(mln_render_session_attach_options),
@@ -82,8 +83,8 @@ void mln_doc_images(mln_runtime runtime) {
 
   // With no device, the session creates its own.
   mln_render_session session = MLN_HANDLE_NULL;
-  mln_map_attach_offscreen(
-    map, &offscreen, &attach_options, MLN_HANDLE_NULL, &session,
+  mln_map_attach(
+    map, &offscreen, MLN_HANDLE_NULL, &attach_options, &session,
     &done, NULL
   );
   // #endregion attach

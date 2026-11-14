@@ -72,7 +72,7 @@ test("discarded commands are fenced and synchronous rejection throws", async () 
 
   // A command that native rejects before accepting it throws at once.
   assert.throws(
-    () => map.discarding.resize({ width: 0, height: 0 }),
+    () => map.discarding.resize({ width: 0, height: 0, scaleFactor: 1 }),
     (error) =>
       error instanceof MaplibreError && error.status === Status.invalidArgument,
   );

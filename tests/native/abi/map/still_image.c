@@ -89,7 +89,10 @@ static void a_tile_map_session_resizes_between_still_images(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, (mln_logical_size){.width = 96, .height = 48},
+      fixture.session,
+      mln_test_session_extent(
+        fixture.session, (mln_logical_size){.width = 96, .height = 48}
+      ),
       &completion.descriptor, NULL
     )
   );

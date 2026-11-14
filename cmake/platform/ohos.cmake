@@ -3,43 +3,17 @@ function(mln_ffi_configure_platform_dependencies target)
   if(NOT CMAKE_SYSROOT)
     message(FATAL_ERROR "The OHOS toolchain must define CMAKE_SYSROOT")
   endif()
-  mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_SYSROOT}/../NOTICE.txt")
   set(ohos_test_supported FALSE)
   if(MLN_FFI_TARGET_PLATFORM STREQUAL "ohos-x64")
     set(ohos_test_supported TRUE)
   endif()
-  foreach(
-    library
-    IN
-    ITEMS
-    icu
-    image_source
-    pixelmap
-    hilog_ndk.z
-    native_vsync
-    native_window
-    net_http
-    uv
-    z)
-    string(MAKE_C_IDENTIFIER "${library}" identifier)
-    find_library(MLN_FFI_OHOS_${identifier}_LIBRARY NAMES "${library}" REQUIRED)
-    target_link_libraries(
-      ${target}
-      INTERFACE "${MLN_FFI_OHOS_${identifier}_LIBRARY}")
-  endforeach()
   set_target_properties(
     ${target}
     PROPERTIES
-      MLN_FFI_DEFAULT_LOGGING_STDERR
-      FALSE
-      MLN_FFI_DEFAULT_THREAD_LOCAL
-      TRUE
       MLN_FFI_SHARED_SUPPORTED
       TRUE
       MLN_FFI_ARCHIVE_FORMAT
       elf
-      MLN_FFI_STATIC_ARCHIVES
-      mbgl-vendor-icu
       MLN_FFI_TEST_SUPPORTED
       ${ohos_test_supported}
       MLN_FFI_ZIG_LIBC_SYSROOT
@@ -48,53 +22,4 @@ function(mln_ffi_configure_platform_dependencies target)
       "${CMAKE_SYSROOT}/usr/include/${MLN_FFI_ZIG_TARGET}"
       MLN_FFI_ZIG_LIBC_CRT_DIR
       "${CMAKE_SYSROOT}/usr/lib/${MLN_FFI_ZIG_TARGET}")
-endfunction()
-
-function(mln_ffi_configure_platform target)
-  include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
-
-  set(MLN_FFI_VENDOR_OHOS_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/async_task.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/png_writer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/run_loop.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/thread.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/timer.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/ohos/src/http_file_source.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/ohos/src/image.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/ohos/src/logging_hilog.cpp)
-
-  mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OHOS_SOURCES})
-  mln_ffi_target_project_sources(
-    ${target} ${PROJECT_SOURCE_DIR}/src/platform/ohos/frame_pacer.cpp
-    ${PROJECT_SOURCE_DIR}/src/platform/ohos/i18n.cpp
-    ${PROJECT_SOURCE_DIR}/src/render/ohos_surface_session.cpp)
-
-  # Only Native's bidi and character classes use the ICU it vendors. Its headers
-  # rename every symbol for ICU 61, so they reach only those sources and do not
-  # shadow the system ICU that the locale expressions call.
-  set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
-    PROPERTIES
-      COMPILE_OPTIONS "-isystem;${MLN_FFI_SOURCE_DIR}/vendor/icu/include")
-
-  target_include_directories(
-    ${target}
-    BEFORE
-    PRIVATE ${MLN_FFI_SOURCE_DIR}/platform/ohos/compat)
-
-  target_include_directories(
-    ${target}
-    SYSTEM
-    PRIVATE ${MLN_FFI_SOURCE_DIR}/platform/default/include)
-
-  target_compile_definitions(${target} PRIVATE OHOS_PLATFORM)
-
-  target_link_libraries(
-    ${target}
-    PRIVATE $<LINK_ONLY:mbgl-vendor-icu> MLN_FFI::PlatformDependencies)
 endfunction()

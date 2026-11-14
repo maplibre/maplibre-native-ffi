@@ -2,7 +2,6 @@
 // The JNI half of each C function and upcall the Kotlin binding uses. Every
 // argument is a primitive; mln_jni.h defines the casts and mln_jni.c the rest.
 #include <maplibre_native_c.h>
-#include <maplibre_native_c/plugin.h>
 
 #include "mln_jni.h"
 
@@ -59,6 +58,15 @@ static jint mln_acquired_frame_get_metal_texture_jni(
   return (jint)mln_acquired_frame_get_metal_texture(
     (mln_acquired_frame)frame,
     MLN_JNI_POINTER(mln_metal_texture_frame*, out_frame),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_acquired_frame_get_opaque_fd_jni(
+  JNIEnv* env, jclass type, jlong frame, jlong out_frame, jlong out_diagnostic
+) {
+  return (jint)mln_acquired_frame_get_opaque_fd(
+    (mln_acquired_frame)frame, MLN_JNI_POINTER(mln_opaque_fd_frame*, out_frame),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -138,31 +146,11 @@ static void mln_acquired_frame_view_end_jni(
   mln_acquired_frame_view_end(MLN_JNI_POINTER(void*, scope));
 }
 
-static jint mln_android_frame_pacer_create_jni(
-  JNIEnv* env, jclass type, jlong options, jlong out_pacer, jlong out_diagnostic
-) {
-  return (jint)mln_android_frame_pacer_create(
-    MLN_JNI_POINTER(const mln_frame_pacer_options*, options),
-    MLN_JNI_POINTER(mln_frame_pacer*, out_pacer),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_android_init_jni(
   JNIEnv* env, jclass type, jlong jni_env, jlong context, jlong out_diagnostic
 ) {
   return (jint)mln_android_init(
     MLN_JNI_POINTER(void*, jni_env), MLN_JNI_POINTER(void*, context),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_apple_frame_pacer_create_jni(
-  JNIEnv* env, jclass type, jlong options, jlong out_pacer, jlong out_diagnostic
-) {
-  return (jint)mln_apple_frame_pacer_create(
-    MLN_JNI_POINTER(const mln_frame_pacer_options*, options),
-    MLN_JNI_POINTER(mln_frame_pacer*, out_pacer),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -207,8 +195,108 @@ static void mln_delivery_queue_release_jni(
   mln_delivery_queue_release((mln_delivery_queue)queue);
 }
 
+static jint mln_frame_pacer_create_jni(
+  JNIEnv* env, jclass type, jlong options, jlong out_pacer, jlong out_diagnostic
+) {
+  return (jint)mln_frame_pacer_create(
+    MLN_JNI_POINTER(const mln_frame_pacer_options*, options),
+    MLN_JNI_POINTER(mln_frame_pacer*, out_pacer),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static void mln_frame_pacer_release_jni(JNIEnv* env, jclass type, jlong pacer) {
   mln_frame_pacer_release((mln_frame_pacer)pacer);
+}
+
+static jint mln_frame_pacer_set_options_jni(
+  JNIEnv* env, jclass type, jlong pacer, jlong options, jlong out_diagnostic
+) {
+  return (jint)mln_frame_pacer_set_options(
+    (mln_frame_pacer)pacer,
+    MLN_JNI_POINTER(const mln_frame_pacer_options*, options),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_gpu_device_create_jni(
+  JNIEnv* env, jclass type, jlong options, jlong out_device,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_create(
+    MLN_JNI_POINTER(const mln_gpu_device_options*, options),
+    MLN_JNI_POINTER(mln_gpu_device*, out_device),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_gpu_device_get_capabilities_jni(
+  JNIEnv* env, jclass type, jlong device, jlong out_capabilities,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_get_capabilities(
+    (mln_gpu_device)device,
+    MLN_JNI_POINTER(mln_gpu_device_capabilities*, out_capabilities),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_gpu_device_get_vulkan_context_jni(
+  JNIEnv* env, jclass type, jlong device, jlong out_result, jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_get_vulkan_context(
+    (mln_gpu_device)device,
+    MLN_JNI_POINTER(mln_gpu_device_vulkan_context_result*, out_result),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static void mln_gpu_device_release_jni(JNIEnv* env, jclass type, jlong device) {
+  mln_gpu_device_release((mln_gpu_device)device);
+}
+
+static jint mln_gpu_device_wrap_metal_jni(
+  JNIEnv* env, jclass type, jlong descriptor, jlong out_device,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_wrap_metal(
+    MLN_JNI_POINTER(const mln_metal_device_descriptor*, descriptor),
+    MLN_JNI_POINTER(mln_gpu_device*, out_device),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_gpu_device_wrap_open_gl_jni(
+  JNIEnv* env, jclass type, jlong context, jlong out_device,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_wrap_open_gl(
+    MLN_JNI_POINTER(const mln_open_gl_context_descriptor*, context),
+    MLN_JNI_POINTER(mln_gpu_device*, out_device),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_gpu_device_wrap_vulkan_jni(
+  JNIEnv* env, jclass type, jlong descriptor, jlong out_device,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_wrap_vulkan(
+    MLN_JNI_POINTER(const mln_vulkan_device_descriptor*, descriptor),
+    MLN_JNI_POINTER(mln_gpu_device*, out_device),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_gpu_device_wrap_web_gpu_jni(
+  JNIEnv* env, jclass type, jlong context, jlong out_device,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_wrap_web_gpu(
+    MLN_JNI_POINTER(const mln_web_gpu_context_descriptor*, context),
+    MLN_JNI_POINTER(mln_gpu_device*, out_device),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
 }
 
 static jint mln_http_header_transform_response_set_header_jni(
@@ -279,6 +367,19 @@ static jint mln_map_add_custom_geometry_source_jni(
   return (jint)mln_map_add_custom_geometry_source(
     (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, source_id),
     MLN_JNI_POINTER(const mln_custom_geometry_source_options*, options),
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_map_add_custom_layer_jni(
+  JNIEnv* env, jclass type, jlong map, jlong layer_id, jlong before_layer_id,
+  jlong host, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_add_custom_layer(
+    (mln_map)map, MLN_JNI_RECORD(mln_buffer_view, layer_id),
+    MLN_JNI_RECORD(mln_buffer_view, before_layer_id),
+    MLN_JNI_POINTER(const mln_custom_layer_host*, host),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -357,231 +458,13 @@ static jint mln_map_apply_camera_delta_jni(
   );
 }
 
-static jint mln_map_attach_android_hardware_buffer_ring_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong device,
+static jint mln_map_attach_jni(
+  JNIEnv* env, jclass type, jlong map, jlong target, jlong device,
   jlong options, jlong out_session, jlong completion, jlong out_diagnostic
 ) {
-  return (jint)mln_map_attach_android_hardware_buffer_ring(
-    (mln_map)map,
-    MLN_JNI_POINTER(
-      const mln_android_hardware_buffer_ring_descriptor*, descriptor
-    ),
-    (mln_vulkan_device)device,
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_android_surface_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong device,
-  jlong options, jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_android_surface(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_android_surface_descriptor*, descriptor),
-    (mln_vulkan_device)device,
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_dma_buf_ring_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong device,
-  jlong options, jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_dma_buf_ring(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_dma_buf_ring_descriptor*, descriptor),
-    (mln_vulkan_device)device,
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_dxgi_shared_texture_ring_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong device,
-  jlong options, jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_dxgi_shared_texture_ring(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_dxgi_shared_texture_ring_descriptor*, descriptor),
-    (mln_vulkan_device)device,
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_io_surface_ring_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_io_surface_ring(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_io_surface_ring_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_metal_borrowed_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_metal_borrowed_texture(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_metal_borrowed_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_metal_surface_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_metal_surface(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_metal_surface_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_offscreen_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong device, jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_offscreen(
-    (mln_map)map, MLN_JNI_POINTER(const mln_offscreen_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    (mln_offscreen_device)device,
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_open_gl_borrowed_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_open_gl_borrowed_texture(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_open_gl_borrowed_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_open_gl_surface_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_open_gl_surface(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_open_gl_surface_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_vulkan_borrowed_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_vulkan_borrowed_texture(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_vulkan_borrowed_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_vulkan_surface_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_vulkan_surface(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_vulkan_surface_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_wayland_surface_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong device,
-  jlong options, jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_wayland_surface(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_wayland_surface_descriptor*, descriptor),
-    (mln_vulkan_device)device,
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_web_gpu_borrowed_texture_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_web_gpu_borrowed_texture(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_web_gpu_borrowed_texture_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_web_gpu_surface_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong options,
-  jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_web_gpu_surface(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_web_gpu_surface_descriptor*, descriptor),
-    MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
-    MLN_JNI_POINTER(mln_render_session*, out_session),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_map_attach_win32_window_jni(
-  JNIEnv* env, jclass type, jlong map, jlong descriptor, jlong device,
-  jlong options, jlong out_session, jlong completion, jlong out_diagnostic
-) {
-  return (jint)mln_map_attach_win32_window(
-    (mln_map)map,
-    MLN_JNI_POINTER(const mln_win32_window_descriptor*, descriptor),
-    (mln_vulkan_device)device,
+  return (jint)mln_map_attach(
+    (mln_map)map, MLN_JNI_POINTER(const mln_render_target*, target),
+    (mln_gpu_device)device,
     MLN_JNI_POINTER(const mln_render_session_attach_options*, options),
     MLN_JNI_POINTER(mln_render_session*, out_session),
     MLN_JNI_POINTER(const mln_completion*, completion),
@@ -1169,11 +1052,11 @@ static jint mln_map_request_still_image_jni(
 }
 
 static jint mln_map_resize_jni(
-  JNIEnv* env, jclass type, jlong map, jlong logical_size, jlong completion,
+  JNIEnv* env, jclass type, jlong map, jlong extent, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_map_resize(
-    (mln_map)map, MLN_JNI_RECORD(mln_logical_size, logical_size),
+    (mln_map)map, MLN_JNI_RECORD(mln_logical_extent, extent),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -1548,31 +1431,10 @@ static jint mln_network_set_status_jni(
   );
 }
 
-static jint mln_offscreen_device_create_jni(
-  JNIEnv* env, jclass type, jlong options, jlong out_device,
-  jlong out_diagnostic
-) {
-  return (jint)mln_offscreen_device_create(
-    MLN_JNI_POINTER(const mln_offscreen_device_options*, options),
-    MLN_JNI_POINTER(mln_offscreen_device*, out_device),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static void mln_offscreen_device_release_jni(
-  JNIEnv* env, jclass type, jlong device
-) {
-  mln_offscreen_device_release((mln_offscreen_device)device);
-}
-
 static jint mln_open_gl_supported_context_provider_mask_jni(
   JNIEnv* env, jclass type
 ) {
   return (jint)mln_open_gl_supported_context_provider_mask();
-}
-
-static jlong mln_plugin_get_register_function_v1_jni(JNIEnv* env, jclass type) {
-  return MLN_JNI_ADDRESS(mln_plugin_get_register_function_v1());
 }
 
 static jint mln_projected_meters_for_lat_lng_jni(
@@ -1841,11 +1703,11 @@ static jint mln_render_session_release_target_jni(
 }
 
 static jint mln_render_session_resize_jni(
-  JNIEnv* env, jclass type, jlong session, jlong logical_size, jlong completion,
+  JNIEnv* env, jclass type, jlong session, jlong extent, jlong completion,
   jlong out_diagnostic
 ) {
   return (jint)mln_render_session_resize(
-    (mln_render_session)session, MLN_JNI_RECORD(mln_logical_size, logical_size),
+    (mln_render_session)session, MLN_JNI_RECORD(mln_logical_extent, extent),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -1860,18 +1722,6 @@ static jint mln_render_session_service_driver_work_jni(
   );
 }
 
-static jint mln_render_session_set_android_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_android_surface_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_android_surface_replacement*, replacement),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_render_session_set_frame_pacer_jni(
   JNIEnv* env, jclass type, jlong session, jlong pacer, jlong out_diagnostic
 ) {
@@ -1881,127 +1731,13 @@ static jint mln_render_session_set_frame_pacer_jni(
   );
 }
 
-static jint mln_render_session_set_metal_borrowed_texture_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
+static jint mln_render_session_set_target_jni(
+  JNIEnv* env, jclass type, jlong session, jlong target, jlong completion,
   jlong out_diagnostic
 ) {
-  return (jint)mln_render_session_set_metal_borrowed_texture_target(
+  return (jint)mln_render_session_set_target(
     (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_metal_borrowed_texture_replacement*, replacement),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_metal_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_metal_surface_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_metal_surface_replacement*, replacement),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_open_gl_borrowed_texture_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_open_gl_borrowed_texture_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(
-      const mln_open_gl_borrowed_texture_replacement*, replacement
-    ),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_open_gl_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_open_gl_surface_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_open_gl_surface_replacement*, replacement),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_vulkan_borrowed_texture_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_vulkan_borrowed_texture_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(
-      const mln_vulkan_borrowed_texture_replacement*, replacement
-    ),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_vulkan_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_vulkan_surface_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_vulkan_surface_replacement*, replacement),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_wayland_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_wayland_surface_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_wayland_surface_replacement*, replacement),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_web_gpu_borrowed_texture_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_web_gpu_borrowed_texture_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(
-      const mln_web_gpu_borrowed_texture_replacement*, replacement
-    ),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_web_gpu_surface_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_web_gpu_surface_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_web_gpu_surface_replacement*, replacement),
-    MLN_JNI_POINTER(const mln_completion*, completion),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
-static jint mln_render_session_set_win32_window_target_jni(
-  JNIEnv* env, jclass type, jlong session, jlong replacement, jlong completion,
-  jlong out_diagnostic
-) {
-  return (jint)mln_render_session_set_win32_window_target(
-    (mln_render_session)session,
-    MLN_JNI_POINTER(const mln_win32_window_replacement*, replacement),
+    MLN_JNI_POINTER(const mln_render_target*, target),
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2393,31 +2129,20 @@ static jint mln_supported_render_backend_mask_jni(JNIEnv* env, jclass type) {
   return (jint)mln_supported_render_backend_mask();
 }
 
-static jint mln_vulkan_device_create_jni(
-  JNIEnv* env, jclass type, jlong options, jlong out_device,
-  jlong out_diagnostic
+static jlong mln_web_alloc_jni(
+  JNIEnv* env, jclass type, jlong size, jlong align
 ) {
-  return (jint)mln_vulkan_device_create(
-    MLN_JNI_POINTER(const mln_vulkan_device_options*, options),
-    MLN_JNI_POINTER(mln_vulkan_device*, out_device),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
+  return MLN_JNI_ADDRESS(mln_web_alloc((size_t)size, (size_t)align));
 }
 
-static jint mln_vulkan_device_get_context_jni(
-  JNIEnv* env, jclass type, jlong device, jlong out_result, jlong out_diagnostic
+static void mln_web_free_jni(
+  JNIEnv* env, jclass type, jlong pointer, jlong size, jlong align
 ) {
-  return (jint)mln_vulkan_device_get_context(
-    (mln_vulkan_device)device,
-    MLN_JNI_POINTER(mln_vulkan_device_context_result*, out_result),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
+  mln_web_free(MLN_JNI_POINTER(void*, pointer), (size_t)size, (size_t)align);
 }
 
-static void mln_vulkan_device_release_jni(
-  JNIEnv* env, jclass type, jlong device
-) {
-  mln_vulkan_device_release((mln_vulkan_device)device);
+static void mln_web_object_release_jni(JNIEnv* env, jclass type, jint object) {
+  mln_web_object_release((mln_web_object)object);
 }
 
 const JNINativeMethod mln_jni_methods[] = {
@@ -2433,6 +2158,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_acquired_frame_get_io_surface_jni},
   {"mln_acquired_frame_get_metal_texture", "(JJJ)I",
    (void*)mln_acquired_frame_get_metal_texture_jni},
+  {"mln_acquired_frame_get_opaque_fd", "(JJJ)I",
+   (void*)mln_acquired_frame_get_opaque_fd_jni},
   {"mln_acquired_frame_get_open_gl_texture", "(JJJ)I",
    (void*)mln_acquired_frame_get_open_gl_texture_jni},
   {"mln_acquired_frame_get_producer_sync", "(JJJ)I",
@@ -2449,18 +2176,30 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_acquired_frame_view_begin_jni},
   {"mln_acquired_frame_view_end", "(J)V",
    (void*)mln_acquired_frame_view_end_jni},
-  {"mln_android_frame_pacer_create", "(JJJ)I",
-   (void*)mln_android_frame_pacer_create_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
-  {"mln_apple_frame_pacer_create", "(JJJ)I",
-   (void*)mln_apple_frame_pacer_create_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
   {"mln_camera_for_tile", "(JJJJ)I", (void*)mln_camera_for_tile_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
+  {"mln_frame_pacer_create", "(JJJ)I", (void*)mln_frame_pacer_create_jni},
   {"mln_frame_pacer_release", "(J)V", (void*)mln_frame_pacer_release_jni},
+  {"mln_frame_pacer_set_options", "(JJJ)I",
+   (void*)mln_frame_pacer_set_options_jni},
+  {"mln_gpu_device_create", "(JJJ)I", (void*)mln_gpu_device_create_jni},
+  {"mln_gpu_device_get_capabilities", "(JJJ)I",
+   (void*)mln_gpu_device_get_capabilities_jni},
+  {"mln_gpu_device_get_vulkan_context", "(JJJ)I",
+   (void*)mln_gpu_device_get_vulkan_context_jni},
+  {"mln_gpu_device_release", "(J)V", (void*)mln_gpu_device_release_jni},
+  {"mln_gpu_device_wrap_metal", "(JJJ)I", (void*)mln_gpu_device_wrap_metal_jni},
+  {"mln_gpu_device_wrap_open_gl", "(JJJ)I",
+   (void*)mln_gpu_device_wrap_open_gl_jni},
+  {"mln_gpu_device_wrap_vulkan", "(JJJ)I",
+   (void*)mln_gpu_device_wrap_vulkan_jni},
+  {"mln_gpu_device_wrap_web_gpu", "(JJJ)I",
+   (void*)mln_gpu_device_wrap_web_gpu_jni},
   {"mln_http_header_transform_response_set_header", "(JJJJ)I",
    (void*)mln_http_header_transform_response_set_header_jni},
   {"mln_lat_lng_for_projected_meters", "(JJJ)I",
@@ -2473,6 +2212,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_logical_extent_physical_size_jni},
   {"mln_map_add_custom_geometry_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_geometry_source_jni},
+  {"mln_map_add_custom_layer", "(JJJJJJ)I",
+   (void*)mln_map_add_custom_layer_jni},
   {"mln_map_add_custom_vector_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_vector_source_jni},
   {"mln_map_add_geo_json_source", "(JJJJJJ)I",
@@ -2485,38 +2226,7 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_add_style_source_json_jni},
   {"mln_map_apply_camera_delta", "(JJJJ)I",
    (void*)mln_map_apply_camera_delta_jni},
-  {"mln_map_attach_android_hardware_buffer_ring", "(JJJJJJJ)I",
-   (void*)mln_map_attach_android_hardware_buffer_ring_jni},
-  {"mln_map_attach_android_surface", "(JJJJJJJ)I",
-   (void*)mln_map_attach_android_surface_jni},
-  {"mln_map_attach_dma_buf_ring", "(JJJJJJJ)I",
-   (void*)mln_map_attach_dma_buf_ring_jni},
-  {"mln_map_attach_dxgi_shared_texture_ring", "(JJJJJJJ)I",
-   (void*)mln_map_attach_dxgi_shared_texture_ring_jni},
-  {"mln_map_attach_io_surface_ring", "(JJJJJJ)I",
-   (void*)mln_map_attach_io_surface_ring_jni},
-  {"mln_map_attach_metal_borrowed_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_metal_borrowed_texture_jni},
-  {"mln_map_attach_metal_surface", "(JJJJJJ)I",
-   (void*)mln_map_attach_metal_surface_jni},
-  {"mln_map_attach_offscreen", "(JJJJJJJ)I",
-   (void*)mln_map_attach_offscreen_jni},
-  {"mln_map_attach_open_gl_borrowed_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_open_gl_borrowed_texture_jni},
-  {"mln_map_attach_open_gl_surface", "(JJJJJJ)I",
-   (void*)mln_map_attach_open_gl_surface_jni},
-  {"mln_map_attach_vulkan_borrowed_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_vulkan_borrowed_texture_jni},
-  {"mln_map_attach_vulkan_surface", "(JJJJJJ)I",
-   (void*)mln_map_attach_vulkan_surface_jni},
-  {"mln_map_attach_wayland_surface", "(JJJJJJJ)I",
-   (void*)mln_map_attach_wayland_surface_jni},
-  {"mln_map_attach_web_gpu_borrowed_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_web_gpu_borrowed_texture_jni},
-  {"mln_map_attach_web_gpu_surface", "(JJJJJJ)I",
-   (void*)mln_map_attach_web_gpu_surface_jni},
-  {"mln_map_attach_win32_window", "(JJJJJJJ)I",
-   (void*)mln_map_attach_win32_window_jni},
+  {"mln_map_attach", "(JJJJJJJ)I", (void*)mln_map_attach_jni},
   {"mln_map_begin_command_group", "(JJJ)I",
    (void*)mln_map_begin_command_group_jni},
   {"mln_map_camera_for_geometry", "(JJJJJ)I",
@@ -2664,14 +2374,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_map_update_camera", "(JJJJ)I", (void*)mln_map_update_camera_jni},
   {"mln_network_get_status", "(JJ)I", (void*)mln_network_get_status_jni},
   {"mln_network_set_status", "(IJ)I", (void*)mln_network_set_status_jni},
-  {"mln_offscreen_device_create", "(JJJ)I",
-   (void*)mln_offscreen_device_create_jni},
-  {"mln_offscreen_device_release", "(J)V",
-   (void*)mln_offscreen_device_release_jni},
   {"mln_open_gl_supported_context_provider_mask", "()I",
    (void*)mln_open_gl_supported_context_provider_mask_jni},
-  {"mln_plugin_get_register_function_v1", "()J",
-   (void*)mln_plugin_get_register_function_v1_jni},
   {"mln_projected_meters_for_lat_lng", "(JJJ)I",
    (void*)mln_projected_meters_for_lat_lng_jni},
   {"mln_render_frame_batch_release", "(J)V",
@@ -2721,30 +2425,10 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_resize_jni},
   {"mln_render_session_service_driver_work", "(JJ)I",
    (void*)mln_render_session_service_driver_work_jni},
-  {"mln_render_session_set_android_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_android_surface_target_jni},
   {"mln_render_session_set_frame_pacer", "(JJJ)I",
    (void*)mln_render_session_set_frame_pacer_jni},
-  {"mln_render_session_set_metal_borrowed_texture_target", "(JJJJ)I",
-   (void*)mln_render_session_set_metal_borrowed_texture_target_jni},
-  {"mln_render_session_set_metal_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_metal_surface_target_jni},
-  {"mln_render_session_set_open_gl_borrowed_texture_target", "(JJJJ)I",
-   (void*)mln_render_session_set_open_gl_borrowed_texture_target_jni},
-  {"mln_render_session_set_open_gl_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_open_gl_surface_target_jni},
-  {"mln_render_session_set_vulkan_borrowed_texture_target", "(JJJJ)I",
-   (void*)mln_render_session_set_vulkan_borrowed_texture_target_jni},
-  {"mln_render_session_set_vulkan_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_vulkan_surface_target_jni},
-  {"mln_render_session_set_wayland_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_wayland_surface_target_jni},
-  {"mln_render_session_set_web_gpu_borrowed_texture_target", "(JJJJ)I",
-   (void*)mln_render_session_set_web_gpu_borrowed_texture_target_jni},
-  {"mln_render_session_set_web_gpu_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_web_gpu_surface_target_jni},
-  {"mln_render_session_set_win32_window_target", "(JJJJ)I",
-   (void*)mln_render_session_set_win32_window_target_jni},
+  {"mln_render_session_set_target", "(JJJJ)I",
+   (void*)mln_render_session_set_target_jni},
   {"mln_resource_request_complete", "(JJJ)I",
    (void*)mln_resource_request_complete_jni},
   {"mln_resource_request_is_cancelled", "(JJJ)I",
@@ -2815,10 +2499,9 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_style_expression_release_jni},
   {"mln_supported_render_backend_mask", "()I",
    (void*)mln_supported_render_backend_mask_jni},
-  {"mln_vulkan_device_create", "(JJJ)I", (void*)mln_vulkan_device_create_jni},
-  {"mln_vulkan_device_get_context", "(JJJ)I",
-   (void*)mln_vulkan_device_get_context_jni},
-  {"mln_vulkan_device_release", "(J)V", (void*)mln_vulkan_device_release_jni},
+  {"mln_web_alloc", "(JJ)J", (void*)mln_web_alloc_jni},
+  {"mln_web_free", "(JJJ)V", (void*)mln_web_free_jni},
+  {"mln_web_object_release", "(I)V", (void*)mln_web_object_release_jni},
 };
 const size_t mln_jni_method_count =
   sizeof mln_jni_methods / sizeof mln_jni_methods[0];
@@ -2836,6 +2519,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_acquired_frame_get_io_surface_jni},
   {"mln_acquired_frame_get_metal_texture", "(JJJ)I",
    (void*)mln_acquired_frame_get_metal_texture_jni},
+  {"mln_acquired_frame_get_opaque_fd", "(JJJ)I",
+   (void*)mln_acquired_frame_get_opaque_fd_jni},
   {"mln_acquired_frame_get_open_gl_texture", "(JJJ)I",
    (void*)mln_acquired_frame_get_open_gl_texture_jni},
   {"mln_acquired_frame_get_producer_sync", "(JJJ)I",
@@ -2852,18 +2537,30 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_acquired_frame_view_begin_jni},
   {"mln_acquired_frame_view_end", "(J)V",
    (void*)mln_acquired_frame_view_end_jni},
-  {"mln_android_frame_pacer_create", "(JJJ)I",
-   (void*)mln_android_frame_pacer_create_jni},
   {"mln_android_init", "(JJJ)I", (void*)mln_android_init_jni},
-  {"mln_apple_frame_pacer_create", "(JJJ)I",
-   (void*)mln_apple_frame_pacer_create_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
   {"mln_camera_for_tile", "(JJJJ)I", (void*)mln_camera_for_tile_jni},
   {"mln_delivery_queue_create", "(JJJ)I", (void*)mln_delivery_queue_create_jni},
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
+  {"mln_frame_pacer_create", "(JJJ)I", (void*)mln_frame_pacer_create_jni},
   {"mln_frame_pacer_release", "(J)V", (void*)mln_frame_pacer_release_jni},
+  {"mln_frame_pacer_set_options", "(JJJ)I",
+   (void*)mln_frame_pacer_set_options_jni},
+  {"mln_gpu_device_create", "(JJJ)I", (void*)mln_gpu_device_create_jni},
+  {"mln_gpu_device_get_capabilities", "(JJJ)I",
+   (void*)mln_gpu_device_get_capabilities_jni},
+  {"mln_gpu_device_get_vulkan_context", "(JJJ)I",
+   (void*)mln_gpu_device_get_vulkan_context_jni},
+  {"mln_gpu_device_release", "(J)V", (void*)mln_gpu_device_release_jni},
+  {"mln_gpu_device_wrap_metal", "(JJJ)I", (void*)mln_gpu_device_wrap_metal_jni},
+  {"mln_gpu_device_wrap_open_gl", "(JJJ)I",
+   (void*)mln_gpu_device_wrap_open_gl_jni},
+  {"mln_gpu_device_wrap_vulkan", "(JJJ)I",
+   (void*)mln_gpu_device_wrap_vulkan_jni},
+  {"mln_gpu_device_wrap_web_gpu", "(JJJ)I",
+   (void*)mln_gpu_device_wrap_web_gpu_jni},
   {"mln_http_header_transform_response_set_header", "(JJJJ)I",
    (void*)mln_http_header_transform_response_set_header_jni},
   {"mln_lat_lng_for_projected_meters", "(JJJ)I",
@@ -2876,6 +2573,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_logical_extent_physical_size_jni},
   {"mln_map_add_custom_geometry_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_geometry_source_jni},
+  {"mln_map_add_custom_layer", "(JJJJJJ)I",
+   (void*)mln_map_add_custom_layer_jni},
   {"mln_map_add_custom_vector_source", "(JJJJJ)I",
    (void*)mln_map_add_custom_vector_source_jni},
   {"mln_map_add_geo_json_source", "(JJJJJJ)I",
@@ -2888,38 +2587,7 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_map_add_style_source_json_jni},
   {"mln_map_apply_camera_delta", "(JJJJ)I",
    (void*)mln_map_apply_camera_delta_jni},
-  {"mln_map_attach_android_hardware_buffer_ring", "(JJJJJJJ)I",
-   (void*)mln_map_attach_android_hardware_buffer_ring_jni},
-  {"mln_map_attach_android_surface", "(JJJJJJJ)I",
-   (void*)mln_map_attach_android_surface_jni},
-  {"mln_map_attach_dma_buf_ring", "(JJJJJJJ)I",
-   (void*)mln_map_attach_dma_buf_ring_jni},
-  {"mln_map_attach_dxgi_shared_texture_ring", "(JJJJJJJ)I",
-   (void*)mln_map_attach_dxgi_shared_texture_ring_jni},
-  {"mln_map_attach_io_surface_ring", "(JJJJJJ)I",
-   (void*)mln_map_attach_io_surface_ring_jni},
-  {"mln_map_attach_metal_borrowed_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_metal_borrowed_texture_jni},
-  {"mln_map_attach_metal_surface", "(JJJJJJ)I",
-   (void*)mln_map_attach_metal_surface_jni},
-  {"mln_map_attach_offscreen", "(JJJJJJJ)I",
-   (void*)mln_map_attach_offscreen_jni},
-  {"mln_map_attach_open_gl_borrowed_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_open_gl_borrowed_texture_jni},
-  {"mln_map_attach_open_gl_surface", "(JJJJJJ)I",
-   (void*)mln_map_attach_open_gl_surface_jni},
-  {"mln_map_attach_vulkan_borrowed_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_vulkan_borrowed_texture_jni},
-  {"mln_map_attach_vulkan_surface", "(JJJJJJ)I",
-   (void*)mln_map_attach_vulkan_surface_jni},
-  {"mln_map_attach_wayland_surface", "(JJJJJJJ)I",
-   (void*)mln_map_attach_wayland_surface_jni},
-  {"mln_map_attach_web_gpu_borrowed_texture", "(JJJJJJ)I",
-   (void*)mln_map_attach_web_gpu_borrowed_texture_jni},
-  {"mln_map_attach_web_gpu_surface", "(JJJJJJ)I",
-   (void*)mln_map_attach_web_gpu_surface_jni},
-  {"mln_map_attach_win32_window", "(JJJJJJJ)I",
-   (void*)mln_map_attach_win32_window_jni},
+  {"mln_map_attach", "(JJJJJJJ)I", (void*)mln_map_attach_jni},
   {"mln_map_begin_command_group", "(JJJ)I",
    (void*)mln_map_begin_command_group_jni},
   {"mln_map_camera_for_geometry", "(JJJJJ)I",
@@ -3067,14 +2735,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_map_update_camera", "(JJJJ)I", (void*)mln_map_update_camera_jni},
   {"mln_network_get_status", "(JJ)I", (void*)mln_network_get_status_jni},
   {"mln_network_set_status", "(IJ)I", (void*)mln_network_set_status_jni},
-  {"mln_offscreen_device_create", "(JJJ)I",
-   (void*)mln_offscreen_device_create_jni},
-  {"mln_offscreen_device_release", "(J)V",
-   (void*)mln_offscreen_device_release_jni},
   {"mln_open_gl_supported_context_provider_mask", "()I",
    (void*)mln_open_gl_supported_context_provider_mask_jni},
-  {"mln_plugin_get_register_function_v1", "()J",
-   (void*)mln_plugin_get_register_function_v1_jni},
   {"mln_projected_meters_for_lat_lng", "(JJJ)I",
    (void*)mln_projected_meters_for_lat_lng_jni},
   {"mln_render_frame_batch_release", "(J)V",
@@ -3124,30 +2786,10 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_resize_jni},
   {"mln_render_session_service_driver_work", "(JJ)I",
    (void*)mln_render_session_service_driver_work_jni},
-  {"mln_render_session_set_android_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_android_surface_target_jni},
   {"mln_render_session_set_frame_pacer", "(JJJ)I",
    (void*)mln_render_session_set_frame_pacer_jni},
-  {"mln_render_session_set_metal_borrowed_texture_target", "(JJJJ)I",
-   (void*)mln_render_session_set_metal_borrowed_texture_target_jni},
-  {"mln_render_session_set_metal_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_metal_surface_target_jni},
-  {"mln_render_session_set_open_gl_borrowed_texture_target", "(JJJJ)I",
-   (void*)mln_render_session_set_open_gl_borrowed_texture_target_jni},
-  {"mln_render_session_set_open_gl_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_open_gl_surface_target_jni},
-  {"mln_render_session_set_vulkan_borrowed_texture_target", "(JJJJ)I",
-   (void*)mln_render_session_set_vulkan_borrowed_texture_target_jni},
-  {"mln_render_session_set_vulkan_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_vulkan_surface_target_jni},
-  {"mln_render_session_set_wayland_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_wayland_surface_target_jni},
-  {"mln_render_session_set_web_gpu_borrowed_texture_target", "(JJJJ)I",
-   (void*)mln_render_session_set_web_gpu_borrowed_texture_target_jni},
-  {"mln_render_session_set_web_gpu_surface_target", "(JJJJ)I",
-   (void*)mln_render_session_set_web_gpu_surface_target_jni},
-  {"mln_render_session_set_win32_window_target", "(JJJJ)I",
-   (void*)mln_render_session_set_win32_window_target_jni},
+  {"mln_render_session_set_target", "(JJJJ)I",
+   (void*)mln_render_session_set_target_jni},
   {"mln_resource_request_complete", "(JJJ)I",
    (void*)mln_resource_request_complete_jni},
   {"mln_resource_request_is_cancelled", "(JJJ)I",
@@ -3218,10 +2860,9 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_style_expression_release_jni},
   {"mln_supported_render_backend_mask", "()I",
    (void*)mln_supported_render_backend_mask_jni},
-  {"mln_vulkan_device_create", "(JJJ)I", (void*)mln_vulkan_device_create_jni},
-  {"mln_vulkan_device_get_context", "(JJJ)I",
-   (void*)mln_vulkan_device_get_context_jni},
-  {"mln_vulkan_device_release", "(J)V", (void*)mln_vulkan_device_release_jni},
+  {"mln_web_alloc", "(JJ)J", (void*)mln_web_alloc_jni},
+  {"mln_web_free", "(JJJ)V", (void*)mln_web_free_jni},
+  {"mln_web_object_release", "(I)V", (void*)mln_web_object_release_jni},
 };
 
 static mln_jni_upcall mln_jni_completion_upcall = {
@@ -3249,6 +2890,22 @@ static mln_jni_upcall mln_jni_customGeometrySourceOptionsCancelTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
   "customGeometrySourceOptionsCancelTile", "(JJJJ)V", NULL
 };
+static mln_jni_upcall mln_jni_customLayerHostPrerender_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "customLayerHostPrerender",
+  "(JJ)V", NULL
+};
+static mln_jni_upcall mln_jni_customLayerHostRender_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "customLayerHostRender", "(JJ)V",
+  NULL
+};
+static mln_jni_upcall mln_jni_customLayerHostDeinitialize_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "customLayerHostDeinitialize",
+  "(J)V", NULL
+};
+static mln_jni_upcall mln_jni_customLayerHostContextLost_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "customLayerHostContextLost",
+  "(J)V", NULL
+};
 static mln_jni_upcall mln_jni_customVectorSourceOptionsFetchTile_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
   "customVectorSourceOptionsFetchTile", "(JJJJ)V", NULL
@@ -3273,14 +2930,14 @@ static mln_jni_upcall mln_jni_resourceTransformCallback_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls", "resourceTransformCallback",
   "(JIJJ)V", NULL
 };
-static mln_jni_upcall mln_jni_wakeCallback_upcall = {
-  "org/maplibre/nativeffi/internal/c/Upcalls", "wakeCallback", "(J)V", NULL
-};
 static mln_jni_upcall mln_jni_queueLockLock_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls", "queueLockLock", "(J)V", NULL
 };
 static mln_jni_upcall mln_jni_queueLockUnlock_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls", "queueLockUnlock", "(J)V", NULL
+};
+static mln_jni_upcall mln_jni_wakeCallback_upcall = {
+  "org/maplibre/nativeffi/internal/c/Upcalls", "wakeCallback", "(J)V", NULL
 };
 static mln_jni_upcall mln_jni_cameraTransitionHandlerCallback_upcall = {
   "org/maplibre/nativeffi/internal/c/Upcalls",
@@ -3367,6 +3024,34 @@ static void mln_jni_customGeometrySourceOptionsCancelTile(
   );
 }
 
+static void mln_jni_customLayerHostPrerender(
+  void* userData, const mln_custom_layer_prerender_parameters* parameters
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(parameters)}
+  };
+  mln_jni_upcall_void(&mln_jni_customLayerHostPrerender_upcall, arguments);
+}
+
+static void mln_jni_customLayerHostRender(
+  void* userData, const mln_custom_layer_render_parameters* parameters
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(parameters)}
+  };
+  mln_jni_upcall_void(&mln_jni_customLayerHostRender_upcall, arguments);
+}
+
+static void mln_jni_customLayerHostDeinitialize(void* userData) {
+  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
+  mln_jni_upcall_void(&mln_jni_customLayerHostDeinitialize_upcall, arguments);
+}
+
+static void mln_jni_customLayerHostContextLost(void* userData) {
+  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
+  mln_jni_upcall_void(&mln_jni_customLayerHostContextLost_upcall, arguments);
+}
+
 static void mln_jni_customVectorSourceOptionsFetchTile(
   void* userData, mln_map map, mln_buffer_view sourceId,
   mln_canonical_tile_id tileId
@@ -3448,11 +3133,6 @@ static void mln_jni_resourceTransformCallback(
   }
 }
 
-static void mln_jni_wakeCallback(void* userData) {
-  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
-  mln_jni_upcall_void(&mln_jni_wakeCallback_upcall, arguments);
-}
-
 static void mln_jni_queueLockLock(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
   mln_jni_upcall_void(&mln_jni_queueLockLock_upcall, arguments);
@@ -3461,6 +3141,11 @@ static void mln_jni_queueLockLock(void* userData) {
 static void mln_jni_queueLockUnlock(void* userData) {
   jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
   mln_jni_upcall_void(&mln_jni_queueLockUnlock_upcall, arguments);
+}
+
+static void mln_jni_wakeCallback(void* userData) {
+  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
+  mln_jni_upcall_void(&mln_jni_wakeCallback_upcall, arguments);
 }
 
 static void mln_jni_cameraTransitionHandlerCallback(
@@ -3482,15 +3167,19 @@ mln_jni_upcall* const mln_jni_upcalls[] = {
   &mln_jni_logHandlerCallback_upcall,
   &mln_jni_customGeometrySourceOptionsFetchTile_upcall,
   &mln_jni_customGeometrySourceOptionsCancelTile_upcall,
+  &mln_jni_customLayerHostPrerender_upcall,
+  &mln_jni_customLayerHostRender_upcall,
+  &mln_jni_customLayerHostDeinitialize_upcall,
+  &mln_jni_customLayerHostContextLost_upcall,
   &mln_jni_customVectorSourceOptionsFetchTile_upcall,
   &mln_jni_customVectorSourceOptionsCancelTile_upcall,
   &mln_jni_resourceRequestCancelHandlerCallback_upcall,
   &mln_jni_runtimeEventHandlerCallback_upcall,
   &mln_jni_resourceProviderCallback_upcall,
   &mln_jni_resourceTransformCallback_upcall,
-  &mln_jni_wakeCallback_upcall,
   &mln_jni_queueLockLock_upcall,
   &mln_jni_queueLockUnlock_upcall,
+  &mln_jni_wakeCallback_upcall,
   &mln_jni_cameraTransitionHandlerCallback_upcall,
 };
 
@@ -3502,15 +3191,19 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_logHandlerCallback,
   (void*)mln_jni_customGeometrySourceOptionsFetchTile,
   (void*)mln_jni_customGeometrySourceOptionsCancelTile,
+  (void*)mln_jni_customLayerHostPrerender,
+  (void*)mln_jni_customLayerHostRender,
+  (void*)mln_jni_customLayerHostDeinitialize,
+  (void*)mln_jni_customLayerHostContextLost,
   (void*)mln_jni_customVectorSourceOptionsFetchTile,
   (void*)mln_jni_customVectorSourceOptionsCancelTile,
   (void*)mln_jni_resourceRequestCancelHandlerCallback,
   (void*)mln_jni_runtimeEventHandlerCallback,
   (void*)mln_jni_resourceProviderCallback,
   (void*)mln_jni_resourceTransformCallback,
-  (void*)mln_jni_wakeCallback,
   (void*)mln_jni_queueLockLock,
   (void*)mln_jni_queueLockUnlock,
+  (void*)mln_jni_wakeCallback,
   (void*)mln_jni_cameraTransitionHandlerCallback,
 };
 const size_t mln_jni_upcall_count =

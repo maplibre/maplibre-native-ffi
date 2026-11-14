@@ -16,10 +16,11 @@ import org.maplibre.nativeffi.MapHandle;
 import org.maplibre.nativeffi.MapMode;
 import org.maplibre.nativeffi.MapOptions;
 import org.maplibre.nativeffi.MaplibreException;
-import org.maplibre.nativeffi.OffscreenDescriptor;
+import org.maplibre.nativeffi.OffscreenTarget;
 import org.maplibre.nativeffi.RenderDriverKind;
 import org.maplibre.nativeffi.RenderSessionAttachOptions;
 import org.maplibre.nativeffi.RenderSessionHandle;
+import org.maplibre.nativeffi.RenderTarget;
 import org.maplibre.nativeffi.RuntimeHandle;
 
 public class CreateAMapTest {
@@ -32,11 +33,12 @@ public class CreateAMapTest {
   // Attaches a render target, as the render target guides show.
   private static RenderSessionHandle attachTarget(MapHandle map) {
     RenderSessionHandle session =
-        map.attachOffscreen(
-            new OffscreenDescriptor(LogicalSize.of(800, 600)),
+        map.attach(
+            new RenderTarget.Offscreen(
+                new OffscreenTarget(LogicalSize.of(800, 600))),
+            null,
             RenderSessionAttachOptions.of(
-                RenderDriverKind.CORE_WORKER),
-            null);
+                RenderDriverKind.CORE_WORKER));
     session.getReady().join();
     return session;
   }
@@ -44,7 +46,7 @@ public class CreateAMapTest {
   @Test(timeout = SnippetFixture.TEST_TIMEOUT_MS)
   public void createAMap() {
     // #region runtime
-    RuntimeHandle runtime = RuntimeHandle.create(null).join();
+    RuntimeHandle runtime = RuntimeHandle.create(null);
     // #endregion runtime
     SnippetFixture.keepOffTheNetwork(runtime);
 

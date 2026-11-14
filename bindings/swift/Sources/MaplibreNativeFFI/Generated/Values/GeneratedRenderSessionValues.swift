@@ -54,20 +54,29 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let waitForUpdate: FrameDemandFlag = .init(rawValue: 4)
 }
 
-/// Options for creating a frame pacer.
+/// Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
 ///
 /// See `mln_frame_pacer_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct FramePacerOptions: Equatable, Hashable, Sendable {
+  /// Removes the frame rate limit, so the pacer can demand frames at every
+  /// display refresh, as it does by default.
+  public var unlimitedFramesPerSecond: Bool
   /// The most frames per second that the pacer demands, greater than zero. The
   /// pacer skips display refreshes to stay within it. By default, it can demand
   /// frames at every refresh.
   public var maximumFramesPerSecond: UInt32?
-  public init(maximumFramesPerSecond: UInt32? = nil) {
+  public init(
+    unlimitedFramesPerSecond: Bool = false,
+    maximumFramesPerSecond: UInt32? = nil
+  ) {
+    self.unlimitedFramesPerSecond = unlimitedFramesPerSecond
     self.maximumFramesPerSecond = maximumFramesPerSecond
   }
 
   init(raw: mln_frame_pacer_options) {
+    unlimitedFramesPerSecond = raw
+      .fields & MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND.rawValue != 0
     maximumFramesPerSecond = raw
       .fields & MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND
       .rawValue != 0 ? raw.maximum_frames_per_second : nil
@@ -76,6 +85,9 @@ public struct FramePacerOptions: Equatable, Hashable, Sendable {
   func nativeValue() -> mln_frame_pacer_options {
     var raw = mln_frame_pacer_options()
     raw.fields = 0
+    if unlimitedFramesPerSecond {
+      raw.fields |= MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND.rawValue
+    }
     raw.size = UInt32(MemoryLayout<mln_frame_pacer_options>.size)
     if let item = maximumFramesPerSecond {
       raw.fields |= MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND
@@ -147,6 +159,9 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   public var needsRepaint: Bool
   /// The camera and extent that a rendered frame shows.
   public var view: MapView
+  /// Where a rendered frame drew the map, for drawing into its frame with
+  /// depth. All zero for a demand that rendered nothing.
+  public var frameProjection: FrameProjection
   public var mode: RenderMode
   public init(
     disposition: RenderResult = .init(rawValue: 0),
@@ -156,6 +171,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     frameGeneration: UInt64 = 0,
     needsRepaint: Bool = false,
     view: MapView = .init(),
+    frameProjection: FrameProjection = .init(),
     mode: RenderMode = .init(rawValue: 0)
   ) {
     self.disposition = disposition
@@ -165,6 +181,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     self.frameGeneration = frameGeneration
     self.needsRepaint = needsRepaint
     self.view = view
+    self.frameProjection = frameProjection
     self.mode = mode
   }
 
@@ -176,6 +193,7 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
     frameGeneration = raw.frame_generation
     needsRepaint = raw.needs_repaint
     view = MapView(raw: raw.view)
+    frameProjection = FrameProjection(raw: raw.frame_projection)
     mode = RenderMode(rawValue: raw.mode.rawValue)
   }
 }
@@ -296,8 +314,9 @@ public struct RenderSessionState: RawRepresentable, CustomStringConvertible,
   }
 }
 
-/// The token of the frame results that a session adds when it renders an image
-/// for `MapHandle.requestStillImage()`. Your own demands can't use it.
+/// The token of the frame results of the demand that a session holds for an
+/// image of `MapHandle.requestStillImage()`, which says how that demand runs.
+/// Your own demands can't use it.
 ///
 /// See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

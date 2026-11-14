@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-#MISE description="Run the Python suite on the oldest supported Python."
-#MISE extends="ffi:preset"
+#MISE description="Run the Python suite on the oldest supported Python, with one of the preset's render backends."
+#MISE extends="ffi:test"
 #MISE depends=[{ task = ":_install", args = ["{{usage.preset}}"] }]
 #MISE shell="bash"
 set -euo pipefail
+
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 
 # The default interpreter is the newest Python. This runs the suite against the
 # same wheels on the oldest Python that requires-python admits.

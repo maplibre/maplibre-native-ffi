@@ -2,8 +2,9 @@
 
 An OpenHarmony app with one ArkUI page that shows a continuous map with the
 TypeScript binding's OHPM packages, `@maplibre/native-ffi` and
-`@maplibre/native-ffi-opengl`. It renders with OpenGL ES into an `XComponent`
-surface.
+`@maplibre/native-ffi-runtime`. It renders into an `XComponent` surface with the
+platform's default backend: Vulkan where the device has a Vulkan driver, and
+OpenGL ES elsewhere, as on the emulator.
 
 ## Run it
 
@@ -14,19 +15,22 @@ app, then install and start it on this worktree's emulator:
 mise -E ohos run //examples/arkui:run
 ```
 
-The emulator is x64, so this task builds for `ohos-x64-egl`. To install on
-another device, pass its hdc connect key with `--device <key>`. To build for
-another preset, run `mise -E ohos run //examples/arkui:build <preset>`.
+The emulator is x64, so this task builds for `ohos-x64`. To install on another
+device, pass its hdc connect key with `--device <key>`. To build for another
+preset, run `mise -E ohos run //examples/arkui:build <preset>`.
 
 ## How it fits together
 
-The app has no native code of its own. It installs the HARs that
-`//bindings/typescript:pack-ohpm` packs, as `ohpm install` would.
+The app installs the HARs that `//bindings/typescript:pack-ohpm` packs, as
+`ohpm install` would.
 
 `entry/src/main/ets/pages/Index.ets` shows the `XComponent` and reports its
-surface. `map/MapController.ets` attaches a render session to that surface,
-gives the session each new surface, and paces its frames to the display, as the
-browser example in `examples/browser` and the React Native example in
+surface's ID. The library's OpenHarmony window target takes the surface's
+`OHNativeWindow`, which ArkTS can't reach, so the app's one native module,
+`entry/src/main/cpp/ohos_window.c`, gets the window from the ID.
+`map/MapController.ets` attaches a render session to that window, gives the
+session each new window, and paces its frames to the display, as the browser
+example in `examples/browser` and the React Native example in
 `examples/react-native` do. The session renders on a library thread, in a
 graphics context that the library makes for the window. `map/gestures.ets` turns
 ArkUI's pan, pinch, and rotation gestures into camera changes, and passes their

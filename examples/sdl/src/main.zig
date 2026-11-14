@@ -40,9 +40,9 @@ fn init(_: [*c]?*anyopaque, _: c_int, _: [*c][*c]u8) callconv(.c) c.SDL_AppResul
 
 fn start() !void {
     _ = c.SDL_SetAppMetadata(title, null, "org.maplibre.nativeffi.example.sdl");
-    // The library presents to Wayland surfaces on Linux and FreeBSD, not to X11
-    // windows.
-    if (builtin.os.tag == .linux or builtin.os.tag == .freebsd) _ = c.SDL_SetHint(c.SDL_HINT_VIDEO_DRIVER, "wayland");
+    // On Linux and FreeBSD, the view presents to a Wayland surface, and to an
+    // X11 window where there is no Wayland compositor.
+    if (builtin.os.tag == .linux or builtin.os.tag == .freebsd) _ = c.SDL_SetHint(c.SDL_HINT_VIDEO_DRIVER, "wayland,x11");
     _ = c.SDL_SetHint(c.SDL_HINT_MAIN_CALLBACK_RATE, "waitevent");
     if (!c.SDL_Init(c.SDL_INIT_VIDEO)) return error.SdlFailed;
     wake_event = c.SDL_RegisterEvents(1);
@@ -80,7 +80,7 @@ fn iterate(_: ?*anyopaque) callconv(.c) c.SDL_AppResult {
 fn handle(_: ?*anyopaque, event: [*c]c.SDL_Event) callconv(.c) c.SDL_AppResult {
     switch (event.*.type) {
         c.SDL_EVENT_QUIT => return c.SDL_APP_SUCCESS,
-        c.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED => view.resize(event.*.window.data1, event.*.window.data2),
+        c.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED, c.SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED => view.resize(),
         // The window shows again, or, on Wayland, the compositor waits for a
         // frame of the window's new size before it resizes it again.
         c.SDL_EVENT_WINDOW_EXPOSED, c.SDL_EVENT_WINDOW_RESTORED => view.redraw(),

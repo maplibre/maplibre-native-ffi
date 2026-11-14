@@ -6,7 +6,6 @@
 // follower's camera changes don't move the leader, so the two maps don't echo
 // each other's changes.
 
-import { CameraUpdateMode, type MapHandle } from "@maplibre/native-ffi";
 import {
   getVersion,
   Map as GlMap,
@@ -17,6 +16,7 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 
+import type { RemoteMap } from "./demo.ts";
 import type { Style } from "./styles.ts";
 
 // The bundle moves GL JS away from its worker, so the page tells it where the
@@ -37,7 +37,7 @@ export interface Comparison {
  * the two cameras together.
  */
 export function compare(
-  map: MapHandle,
+  map: RemoteMap,
   canvas: HTMLCanvasElement,
   style: Style,
 ): Comparison {
@@ -54,8 +54,8 @@ export function compare(
   const glLabel = label("compare-label gl", `MapLibre GL JS ${getVersion()}`);
   canvas.after(container, divider, nativeLabel, glLabel);
 
-  const { view, bounds } = map.getSnapshot();
-  const { center, zoom, bearing, pitch, roll } = view.camera;
+  const { camera, bounds } = map.view!;
+  const { center, zoom, bearing, pitch, roll } = camera;
   const gl = new GlMap({
     container,
     style: glStyle(style),
@@ -93,7 +93,7 @@ export function compare(
       type,
       () => {
         leader = "gl";
-        map.discarding.cancelCameraTransitions();
+        map.cancelCameraTransitions();
       },
       { capture: true, signal },
     );
@@ -102,15 +102,12 @@ export function compare(
   gl.on("move", () => {
     if (leader !== "gl") return;
     const { lng, lat } = gl.getCenter();
-    map.discarding.updateCamera({
-      mode: CameraUpdateMode.jump,
-      camera: {
-        center: { latitude: lat, longitude: lng },
-        zoom: gl.getZoom(),
-        bearing: gl.getBearing(),
-        pitch: gl.getPitch(),
-        roll: gl.getRoll(),
-      },
+    map.jumpTo({
+      center: { latitude: lat, longitude: lng },
+      zoom: gl.getZoom(),
+      bearing: gl.getBearing(),
+      pitch: gl.getPitch(),
+      roll: gl.getRoll(),
     });
   });
 
@@ -118,9 +115,8 @@ export function compare(
 
   return {
     nativeCameraChanged() {
-      if (leader !== "native") return;
-      const { center, zoom, bearing, pitch, roll } =
-        map.getSnapshot().view.camera;
+      if (leader !== "native" || map.view === undefined) return;
+      const { center, zoom, bearing, pitch, roll } = map.view.camera;
       gl.jumpTo({
         center: [center.longitude, center.latitude],
         zoom,

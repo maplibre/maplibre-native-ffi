@@ -1,4 +1,5 @@
-"""A `platforms=` annotation limits a function to the platforms it serves."""
+"""A `platforms=` annotation limits a function, or a tagged union's variant, to
+the platforms it serves."""
 
 import unittest
 
@@ -12,7 +13,6 @@ from tools.bindgen.emitters import (
     gobject,
     kotlin,
     python,
-    rust,
     swift,
     typescript,
     zig,
@@ -62,6 +62,34 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
             ):
                 validate(header)
 
+    def test_a_union_variant_names_its_platforms_and_no_other_member_does(self):
+        variants = """typedef enum mln_target_kind : unsigned int {
+  MLN_TARGET_KIND_IMAGE = 1,
+  MLN_TARGET_KIND_WINDOW = 2,
+} mln_target_kind;
+typedef struct mln_image_target { unsigned int width; } mln_image_target;
+typedef struct mln_window_target { void *window; } mln_window_target;
+typedef union mln_target_data {
+  mln_image_target image BIND("variant=MLN_TARGET_KIND_IMAGE");
+  mln_window_target window BIND("variant=MLN_TARGET_KIND_WINDOW;platforms={platforms}");
+} mln_target_data;
+typedef struct mln_target {
+  unsigned int size;
+  mln_target_kind kind;
+  mln_target_data data BIND("tag=kind");
+} mln_target;
+mln_status mln_target_use(const mln_target *target, mln_diagnostic *out_diagnostic);
+"""
+        validate(parse(variants.replace("{platforms}", "windows")))
+        with self.assertRaisesRegex(ModelError, "each platform once, in order"):
+            validate(parse(variants.replace("{platforms}", "windows,android")))
+        with self.assertRaisesRegex(ModelError, "platforms requires a union variant"):
+            validate(
+                parse("""typedef struct mln_box { unsigned int width BIND("platforms=web"); } mln_box;
+mln_status mln_box_use(const mln_box *box, mln_diagnostic *out_diagnostic);
+""")
+            )
+
     def test_a_binding_leaves_out_what_none_of_its_targets_serve(self):
         bound = compile_api(api(), frozenset({"linux", "macos"}))
         self.assertNotIn("mln_map_attach_canvas", bound.operations_by_name)
@@ -97,17 +125,6 @@ mln_status mln_start(mln_diagnostic *out_diagnostic);
         dart_operations = dart.lower(api()).files[dart.OPERATIONS]
         self.assertIn("useMetal(", dart_operations)
         self.assertNotIn("attachCanvas(", dart_operations)
-
-    def test_rust_compiles_a_function_only_for_the_platforms_it_serves(self):
-        source = emitted(rust, api())["crates/maplibre-native-ffi/src/generated/map.rs"]
-        self.assertIn(
-            '    #[cfg(any(target_os = "ios", target_os = "macos", target_os = "tvos", target_os = "visionos"))]\n'
-            "    pub fn use_metal(",
-            source,
-        )
-        self.assertIn('    #[cfg(target_os = "emscripten")]\n    pub', source)
-        self.assertIn("    pub fn redraw(", source)
-        self.assertNotIn('#[cfg(any(target_os = "android"', source)
 
     def test_swift_compiles_a_function_only_for_the_platforms_it_serves(self):
         generated = "\n".join(emitted(swift, api()).values())

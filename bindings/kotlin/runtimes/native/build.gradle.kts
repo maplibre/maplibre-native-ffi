@@ -1,0 +1,52 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.maplibre.nativeffi.gradle.AndroidTarget
+import org.maplibre.nativeffi.gradle.MaplibreRuntime
+import org.maplibre.nativeffi.gradle.configureMaplibreRuntime
+
+plugins {
+  id("org.jetbrains.kotlin.multiplatform")
+  id("com.android.kotlin.multiplatform.library")
+  id("com.vanniktech.maven.publish")
+}
+
+val androidTargets =
+  AndroidTarget.parseAbis(
+    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),
+  )
+val packagedAndroidRuntimeLibs =
+  project(":bindings:kotlin").layout.buildDirectory.dir("generated/jniLibs/runtime")
+
+kotlin {
+  jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
+
+  androidNativeArm32()
+  androidNativeArm64()
+  androidNativeX86()
+  androidNativeX64()
+  linuxArm64()
+  linuxX64()
+  iosArm64()
+  iosSimulatorArm64()
+  tvosArm64()
+  tvosSimulatorArm64()
+  macosArm64()
+  macosX64()
+
+  android {
+    namespace = "org.maplibre.nativeffi.runtime"
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    minSdk = libs.versions.android.minSdk.get().toInt()
+  }
+}
+
+androidComponents {
+  onVariants { variant ->
+    androidTargets.forEach { target ->
+      variant.sources.jniLibs?.addStaticSourceDirectory(
+        packagedAndroidRuntimeLibs.get().dir(target.cargoTarget).asFile.absolutePath,
+      )
+    }
+  }
+}
+
+configureMaplibreRuntime(MaplibreRuntime.NATIVE)

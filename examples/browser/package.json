@@ -5,7 +5,6 @@
   "dependencies": {
     "@fontsource-variable/overpass": "5.2.8",
     "@maplibre/native-ffi": "workspace:*",
-    "coi-serviceworker": "0.1.7",
     "maplibre-gl": "6.16.0"
   }
 }

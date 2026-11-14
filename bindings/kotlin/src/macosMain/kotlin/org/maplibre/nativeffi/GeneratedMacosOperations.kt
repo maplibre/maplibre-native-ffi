@@ -9,6 +9,11 @@ import org.maplibre.nativeffi.internal.memory.*
 /**
  * Gets the Vulkan image of an acquired frame.
  *
+ * It gets a borrowed ring's image, or an exported ring's on a Vulkan device: the image whose memory
+ * the ring shares, and the frame's depth image with `RenderSessionAttachOptions.keepDepth`. An
+ * exported ring's frame releases them to VK_QUEUE_FAMILY_EXTERNAL, so acquire them from there. Wait
+ * for `AcquiredFrameHandle.withProducerSync()` before you use them.
+ *
  * See `mln_acquired_frame_get_vulkan_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  *
@@ -22,180 +27,59 @@ public fun <T> AcquiredFrameHandle.withVulkanTexture(block: (VulkanTextureFrame)
       { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
       { C.mln_acquired_frame_view_end(it) },
     ) { scope ->
-      val out = sized(w(64, 64, 52), w(8, 8, 4))
+      val out = sized(w(88, 88, 76), w(8, 8, 4))
       check(C.mln_acquired_frame_get_vulkan_texture(handle, out, diagnostic))
       block(readVulkanTextureFrame(out, scope))
     }
   }
 
 /**
- * Creates a Vulkan instance, device, and graphics queue for render sessions.
+ * Wraps your Vulkan device and queue, so that sessions render on them.
  *
- * Attach sessions with the context from `VulkanDeviceHandle.getContext()`, in place of a device of
- * your own. Without `device_uuid` or `device_luid`, it prefers a discrete GPU. The device enables
- * the external memory and semaphore extensions that the GPU offers.
+ * Sessions on the device render into your images, present to your surfaces, and submit to your
+ * queue, under your queue lock when you give one. Sessions of several devices that wrap one queue
+ * never submit to it at once.
  *
- * See `mln_vulkan_device_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.VULKAN`, or
- *   when `presentation` is true and the Vulkan loader or the GPU can't present.
- * - `Status.NOT_FOUND` when no GPU matches `device_uuid` and `device_luid`.
- * - `Status.NATIVE_ERROR` when there is no Vulkan loader, no GPU has a graphics queue, or Vulkan
- *   can't create the instance or the device.
- */
-public fun VulkanDeviceHandle.Companion.create(
-  options: VulkanDeviceOptions? = null,
-): VulkanDeviceHandle =
-  nativeCall(null, null) {
-    val out = allocate(8, w(8, 8, 4))
-    check(
-      C.mln_vulkan_device_create(
-        options?.let { writeVulkanDeviceOptions(it) } ?: 0L,
-        out,
-        diagnostic,
-      ),
-    )
-    adopt(out, GeneratedOwnerDisposal::vulkanDevice) { VulkanDeviceHandle.wrap(it) }
-  }
-
-/**
- * Creates a session that renders the map into a ring of your Vulkan images.
- *
- * See `mln_map_attach_vulkan_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- *
- * Errors:
- *
- * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.VULKAN`, or
- *   when the target supports none of the `producer_sync_kinds` in `options`.
- */
-public fun MapHandle.attachVulkanBorrowedTexture(
-  descriptor: VulkanBorrowedTextureDescriptor,
-  options: RenderSessionAttachOptions,
-): RenderSessionHandle =
-  nativeCall(this, binding) {
-    attach(
-      { out, completion ->
-        C.mln_map_attach_vulkan_borrowed_texture(
-          handle,
-          writeVulkanBorrowedTextureDescriptor(descriptor),
-          writeRenderSessionAttachOptions(options),
-          out,
-          completion,
-          diagnostic,
-        )
-      },
-      GeneratedOwnerDisposal::renderSession,
-      { created, ready ->
-        RenderSessionHandle.wrap(created, this@attachVulkanBorrowedTexture, ready)
-      },
-      { it.bindingCallbacks },
-      { it.dispose() },
-    )
-  }
-
-/**
- * Creates a session that renders the map to a Vulkan surface.
- *
- * See `mln_map_attach_vulkan_surface` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ * See `mln_gpu_device_wrap_vulkan` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
  *
  * Errors:
  *
  * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.VULKAN`.
+ * - `Status.NATIVE_ERROR` when the library can't load the device's functions.
  */
-public fun MapHandle.attachVulkanSurface(
-  descriptor: VulkanSurfaceDescriptor,
-  options: RenderSessionAttachOptions,
-): RenderSessionHandle =
-  nativeCall(this, binding) {
-    attach(
-      { out, completion ->
-        C.mln_map_attach_vulkan_surface(
-          handle,
-          writeVulkanSurfaceDescriptor(descriptor),
-          writeRenderSessionAttachOptions(options),
-          out,
-          completion,
-          diagnostic,
-        )
-      },
-      GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle.wrap(created, this@attachVulkanSurface, ready) },
+public fun GpuDeviceHandle.Companion.wrapVulkan(
+  descriptor: VulkanDeviceDescriptor,
+): GpuDeviceHandle =
+  nativeCall(null, null) {
+    val out = allocate(8, w(8, 8, 4))
+    check(C.mln_gpu_device_wrap_vulkan(writeVulkanDeviceDescriptor(descriptor), out, diagnostic))
+    adoptRegistered(
+      out,
+      GeneratedOwnerDisposal::gpuDevice,
+      { GpuDeviceHandle.wrap(it) },
       { it.bindingCallbacks },
-      { it.dispose() },
+      { it.release() },
     )
   }
 
 /**
- * Replaces the Vulkan images that a borrowed ring renders into.
+ * Gets the Vulkan instance, device, and graphics queue of a Vulkan device.
  *
- * Use it to resize the ring, or to give the session images again after
- * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first. Once the replacement
- * completes, the session no longer uses the old images.
+ * Use them to make the images of a borrowed ring, or a surface, that sessions on the device render
+ * to. The sessions on the device share its graphics queue. To submit to the queue yourself, create
+ * the device with `GpuDeviceOptions.queueLock`.
  *
- * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public fun RenderSessionHandle.setVulkanBorrowedTextureTarget(
-  replacement: VulkanBorrowedTextureReplacement,
-): Completion<Unit> =
-  nativeUnit(this, binding) {
-    check(
-      C.mln_render_session_set_vulkan_borrowed_texture_target(
-        handle,
-        writeVulkanBorrowedTextureReplacement(replacement),
-        completion,
-        diagnostic,
-      ),
-    )
-  }
-
-/**
- * Replaces the Vulkan surface that the session presents to.
- *
- * Use it to give the session a surface again after `RenderSessionHandle.releaseTarget()`, to move
- * it to another surface, or to resize it. Once the replacement completes, the session no longer
- * uses the old surface.
- *
- * See `mln_render_session_set_vulkan_surface_target` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ * See `mln_gpu_device_get_vulkan_context` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
  *
  * Errors:
  *
- * - `Status.UNSUPPORTED` when the new surface needs a different color format or pre-rotation
- *   support than the old one. Attach a new session instead.
+ * - `Status.UNSUPPORTED` when the device doesn't render with Vulkan.
  */
-public fun RenderSessionHandle.setVulkanSurfaceTarget(
-  replacement: VulkanSurfaceReplacement,
-): Completion<Unit> =
-  nativeUnit(this, binding) {
-    check(
-      C.mln_render_session_set_vulkan_surface_target(
-        handle,
-        writeVulkanSurfaceReplacement(replacement),
-        completion,
-        diagnostic,
-      ),
-    )
-  }
-
-/**
- * Gets the context to attach render sessions to the device with.
- *
- * Pass it as the context of `MapHandle.attachVulkanSurface()` or
- * `MapHandle.attachVulkanBorrowedTexture()`. The sessions on the device share its graphics queue.
- * To submit to the queue yourself, set `RenderSessionAttachOptions.queueLock` on each session.
- *
- * See `mln_vulkan_device_get_context` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- */
-public fun VulkanDeviceHandle.getContext(): VulkanDeviceContextResult =
+public fun GpuDeviceHandle.getVulkanContext(): GpuDeviceVulkanContextResult =
   nativeCall(this, binding) {
     val out = sized(w(32, 64), w(4, 8))
-    check(C.mln_vulkan_device_get_context(handle, out, diagnostic))
-    readVulkanDeviceContextResult(out)
+    check(C.mln_gpu_device_get_vulkan_context(handle, out, diagnostic))
+    readGpuDeviceVulkanContextResult(out)
   }

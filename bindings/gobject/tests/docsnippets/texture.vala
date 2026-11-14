@@ -47,19 +47,30 @@ namespace Texture {
 			driver = RenderDriverKind.CORE_WORKER,
 			frame_wake = frame_wake,
 		};
-		// A queue lock, which your renderer needs only if it also
-		// submits to the graphics queue, takes native callbacks that
-		// only C code can set.
 		// #endregion attach-options
 
 		// #region attach-borrowed
-		var ring = new VulkanBorrowedTextureDescriptor () {
+		// Your VkDevice and graphics queue. A queue lock, which your
+		// renderer needs only if it also submits to the graphics queue,
+		// takes native callbacks that only C code can set.
+		var device = new GpuDevice.wrap_vulkan (
+			new VulkanDeviceDescriptor () {
+				context = vulkan,
+				// The device extensions that you enabled on your
+				// VkDevice.
+				enabled_extensions = {
+					"VK_KHR_swapchain",
+					"VK_KHR_external_semaphore_fd",
+				},
+			}
+		);
+
+		var ring = new VulkanBorrowedTexturesTarget () {
 			// The map's size in logical pixels.
 			logical_size = { width: 800, height: 600 },
 			// The size of your textures in device pixels.
 			physical_width = 1600,
 			physical_height = 1200,
-			context = vulkan,
 			format = 37, // VK_FORMAT_R8G8B8A8_UNORM
 			// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 			final_layout = 5,
@@ -70,15 +81,21 @@ namespace Texture {
 			{ image: images[1], image_view: views[1] },
 		});
 
-		session = map.attach_vulkan_borrowed_texture (ring, options);
+		session = map.attach (
+			new RenderTarget.vulkan_borrowed_textures (ring), device, options
+		);
+		// The session keeps the device until it detaches.
+		device.release ();
 		yield session.ready_async ();
 		// #endregion attach-borrowed
 
 		// #region resize-borrowed
-		var resized = new VulkanBorrowedTextureReplacement () {
+		var resized = new VulkanBorrowedTexturesTarget () {
 			logical_size = { width: 1024, height: 768 },
 			physical_width = 2048,
 			physical_height = 1536,
+			format = 37,
+			final_layout = 5,
 		};
 		// Your new textures, at the new size.
 		resized.set_textures ({
@@ -86,7 +103,9 @@ namespace Texture {
 			{ image: new_images[1], image_view: new_views[1] },
 		});
 
-		yield session.set_vulkan_borrowed_texture_target_async (resized);
+		yield session.set_target_async (
+			new RenderTarget.vulkan_borrowed_textures (resized)
+		);
 		// vkDestroyImageView and vkDestroyImage
 		destroy_textures (images, views);
 		// #endregion resize-borrowed

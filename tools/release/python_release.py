@@ -26,12 +26,19 @@ from sbom import (
     document,
     package_inventory,
     stamp,
-    without_native_rust,
     write_json,
 )
 
-BACKENDS = ("opengl", "metal", "vulkan")
+# The runtime directory under bindings/python/runtimes of each distribution.
+# MinGW's has a distribution of its own, since its wheels take the platform
+# tags of the MSVC ones.
+RUNTIMES = {
+    "native": "maplibre-native-ffi-runtime",
+    "mingw": "maplibre-native-ffi-runtime-mingw",
+}
 DESCRIPTOR_PATH = pathlib.Path("share/maplibre-native-c/artifact.json")
+NATIVE_DLL = "maplibre-native-c.dll"
+MINGW_RUNTIME_DLLS = ("libunwind.dll", "libc++.dll")
 LICENSE = pathlib.Path(__file__).resolve().parents[2] / "LICENSE"
 DEV_SUFFIX = re.compile(r"\.dev[0-9]+\Z")
 
@@ -55,16 +62,30 @@ def prepare(package: pathlib.Path, version: str) -> None:
 def stage_runtime_dlls(
     runtime_root: pathlib.Path, prefix: pathlib.Path, platform: str
 ) -> None:
-    """Put the Visual C++ runtime DLLs beside an MSVC wheel's extension.
+    """Put the DLLs that a Windows wheel's extension loads beside it.
 
-    The extension embeds the MSVC archive, which imports the runtime, and
-    CPython ships only part of it. Windows finds the DLLs in the package
+    On Windows the extension links the native library's DLL rather than its
+    static archive, and an MSVC build also imports the Visual C++ runtime, of
+    which CPython ships only part. Windows finds the DLLs in the package
     directory that the extension loads from.
     """
     (module,) = (runtime_root / "python").iterdir()
     for stale in module.glob("*.dll"):
         stale.unlink()
-    if not platform.startswith("windows-") or platform.startswith("windows-mingw-"):
+    if not platform.startswith("windows-"):
+        return
+    native = prefix / "bin" / NATIVE_DLL
+    if not native.is_file():
+        raise SystemExit(f"{prefix} carries no {NATIVE_DLL}")
+    shutil.copy2(native, module / native.name)
+    if platform.startswith("windows-mingw-"):
+        # An LLVM MinGW build's DLL imports the toolchain's unwinder and C++
+        # runtime, which the native package installs beside it. Windows looks
+        # for them where it found the DLL, not in the wheel's .libs directory.
+        for runtime in MINGW_RUNTIME_DLLS:
+            dll = prefix / "bin" / runtime
+            if dll.is_file():
+                shutil.copy2(dll, module / dll.name)
         return
     runtime_dlls = [
         *sorted(prefix.glob("bin/vcruntime140*.dll")),
@@ -78,13 +99,10 @@ def stage_runtime_dlls(
 
 def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     descriptor = json.loads((prefix / DESCRIPTOR_PATH).read_text())
-    backend = descriptor["backend"]
-    if backend not in BACKENDS:
-        raise SystemExit(f"no Python runtime serves the {backend} backend")
-    runtime = backend
+    runtime = "native"
     if descriptor["platform"]["id"].startswith("windows-mingw-"):
-        runtime += "-mingw"
-    # The wheel embeds the native library, so it carries the notices of the
+        runtime = "mingw"
+    # The wheel carries the native library, so it carries the notices of the
     # third-party code in it.
     notices = next(prefix.glob("share/*/licenses"), None)
     if notices is None:
@@ -110,7 +128,7 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
                 "--manifest-path",
                 str(manifest),
                 "--config",
-                str(REPOSITORY / "src/platform/rust/about.toml"),
+                str(REPOSITORY / "cmake/about.toml"),
                 "--target",
                 target,
                 "--locked",
@@ -136,16 +154,20 @@ def runtime_metadata(package: pathlib.Path, prefix: pathlib.Path) -> None:
     )
     inventory = json.loads((prefix / "share/maplibre-native-c" / SBOM_NAME).read_text())
     result = package_inventory(
-        f"maplibre-native-ffi-runtime-{runtime}",
+        RUNTIMES[runtime],
         "0.0.0",
         "pypi",
-        [without_native_rust(inventory), extension],
+        # The wheel bundles the prebuilt native library, crates and all, and
+        # adds the extension's own crates.
+        [inventory, extension],
     )
     result["metadata"]["component"]["properties"] = [
         {"name": "maplibre:source-commit", "value": descriptor["commit"]}
     ]
     write_json(licenses.parent / SBOM_NAME, result)
-    (licenses / "rust.md").write_text(cargo_notices(about), encoding="utf-8")
+    (licenses / "python-extension.md").write_text(
+        cargo_notices(about), encoding="utf-8"
+    )
     sysroot = pathlib.Path(
         subprocess.check_output(["rustc", "--print", "sysroot"], text=True).strip()
     )

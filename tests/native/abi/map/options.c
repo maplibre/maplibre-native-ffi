@@ -457,7 +457,7 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void map_extent_snapshot_tracks_resize_and_keeps_scale_factor(void) {
+static void map_extent_snapshot_tracks_resize_and_scale_factor(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_test_map_options();
   options.initial_extent.width = 512;
@@ -471,20 +471,20 @@ static void map_extent_snapshot_tracks_resize_and_keeps_scale_factor(void) {
   const uint64_t initial_generation = snapshot.generation;
 
   MLN_TEST_AWAIT_OK(mln_map_resize(
-    map, (mln_logical_size){.width = 96, .height = 48}, &completion.descriptor,
-    NULL
+    map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 2.0},
+    &completion.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_map_fence(map));
   snapshot = read_snapshot(map);
   TEST_ASSERT_GREATER_THAN_UINT64(initial_generation, snapshot.generation);
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.view.extent.width);
   TEST_ASSERT_EQUAL_UINT32(48, snapshot.view.extent.height);
-  TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.view.extent.scale_factor);
+  TEST_ASSERT_EQUAL_DOUBLE(2.0, snapshot.view.extent.scale_factor);
 
   const uint64_t render_update = snapshot.latest_render_update_generation;
   MLN_TEST_AWAIT_OK(mln_map_resize(
-    map, (mln_logical_size){.width = 96, .height = 48}, &completion.descriptor,
-    NULL
+    map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 2.0},
+    &completion.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_map_fence(map));
   snapshot = read_snapshot(map);
@@ -492,15 +492,23 @@ static void map_extent_snapshot_tracks_resize_and_keeps_scale_factor(void) {
     render_update, snapshot.latest_render_update_generation
   );
 
-  // A resize changes only the width and height. The scale factor stays.
-  mln_completion rejected = mln_test_discard_completion();
-  MLN_TEST_INVALID(mln_map_resize(
-    map, (mln_logical_size){.width = 0, .height = 48}, &rejected, NULL
-  ));
+  // A rejected resize leaves the size and the scale factor as they were.
+  const mln_logical_extent invalid[] = {
+    {.width = 0, .height = 48, .scale_factor = 2.0},
+    {.width = 96, .height = 48, .scale_factor = 0.0},
+    {.width = 96, .height = 48, .scale_factor = -1.0},
+    {.width = 96, .height = 48, .scale_factor = NAN},
+    {.width = 96, .height = 48, .scale_factor = INFINITY},
+  };
+  for (size_t index = 0; index < sizeof(invalid) / sizeof(invalid[0]);
+       index += 1) {
+    mln_completion rejected = mln_test_discard_completion();
+    MLN_TEST_INVALID(mln_map_resize(map, invalid[index], &rejected, NULL));
+  }
   MLN_TEST_OK(mln_test_map_fence(map));
   snapshot = read_snapshot(map);
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.view.extent.width);
-  TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.view.extent.scale_factor);
+  TEST_ASSERT_EQUAL_DOUBLE(2.0, snapshot.view.extent.scale_factor);
 
   MLN_TEST_INVALID(mln_map_get_snapshot(MLN_HANDLE_NULL, &snapshot, NULL));
   mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
@@ -557,10 +565,12 @@ static void resizes_apply_in_order_and_the_last_sets_the_extent(void) {
   mln_test_completion first = mln_test_completion_default(0);
   mln_test_completion last = mln_test_completion_default(0);
   MLN_TEST_OK(mln_map_resize(
-    map, (mln_logical_size){.width = 96, .height = 48}, &first.descriptor, NULL
+    map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+    &first.descriptor, NULL
   ));
   MLN_TEST_OK(mln_map_resize(
-    map, (mln_logical_size){.width = 64, .height = 32}, &last.descriptor, NULL
+    map, (mln_logical_extent){.width = 64, .height = 32, .scale_factor = 1.0},
+    &last.descriptor, NULL
   ));
 
   MLN_TEST_OK(mln_test_completion_finish(&first));
@@ -667,7 +677,7 @@ static void generations_increase_across_submitting_threads(void) {
 MLN_TEST_GROUP {
   RUN_TEST(every_option_command_round_trips_through_the_snapshot);
   RUN_TEST(option_descriptors_reject_what_they_cannot_express);
-  RUN_TEST(map_extent_snapshot_tracks_resize_and_keeps_scale_factor);
+  RUN_TEST(map_extent_snapshot_tracks_resize_and_scale_factor);
   RUN_TEST(reapplying_the_reported_lod_pitch_threshold_changes_nothing);
   RUN_TEST(resizes_apply_in_order_and_the_last_sets_the_extent);
   RUN_TEST(generations_increase_across_submitting_threads);

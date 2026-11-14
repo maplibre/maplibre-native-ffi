@@ -5,23 +5,23 @@
 goos=
 
 case "$1" in
-  android-arm-* | android-arm64-* | android-x86-* | android-x64-*)
+  android-arm | android-arm64 | android-x86 | android-x64)
     goos=android
     case "$1" in
-      android-arm-*)
+      android-arm)
         goarch=arm
         compiler_prefix=armv7a-linux-androideabi
         export GOARM=7
         ;;
-      android-arm64-*)
+      android-arm64)
         goarch=arm64
         compiler_prefix=aarch64-linux-android
         ;;
-      android-x86-*)
+      android-x86)
         goarch=386
         compiler_prefix=i686-linux-android
         ;;
-      android-x64-*)
+      android-x64)
         goarch=amd64
         compiler_prefix=x86_64-linux-android
         ;;
@@ -34,16 +34,16 @@ case "$1" in
     export CC="$ndk_bin/${compiler_prefix}24-clang"
     export CXX="$ndk_bin/${compiler_prefix}24-clang++"
     ;;
-  linux-musl-arm64-* | linux-musl-x64-* | freebsd-x64-* | linux-*-riscv64-* | linux-*-loongarch64-*)
+  linux-musl-arm64 | linux-musl-x64 | freebsd-x64 | linux-*-riscv64 | linux-*-loongarch64)
     if [[ "$1" == freebsd-* ]]; then
       goos=freebsd
     else
       goos=linux
     fi
     case "$1" in
-      *-arm64-*) goarch=arm64 ;;
-      *-riscv64-*) goarch=riscv64 ;;
-      *-loongarch64-*) goarch=loong64 ;;
+      *-arm64) goarch=arm64 ;;
+      *-riscv64) goarch=riscv64 ;;
+      *-loongarch64) goarch=loong64 ;;
       *) goarch=amd64 ;;
     esac
     compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
@@ -57,8 +57,8 @@ case "$1" in
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$compiler" CXX="$compiler_cxx"
     ;;
-  windows-x64-* | windows-arm64-* | mingw-*)
-    if [[ "$1" == *-arm64-* ]]; then
+  windows-x64 | windows-arm64 | mingw-*)
+    if [[ "$1" == *-arm64 ]]; then
       goarch=arm64
     else
       goarch=amd64
@@ -71,11 +71,11 @@ case "$1" in
     msys2_bin_dir="$(cygpath -u "$MLN_FFI_MSYS2_ROOT/bin")"
     export PATH="$msys2_bin_dir${PATH:+:$PATH}"
     ;;
-  macos-x64-*)
+  macos-x64)
     export GOARCH=amd64 CGO_ENABLED=1
     export CC="clang -arch x86_64" CXX="clang++ -arch x86_64"
     ;;
-  ios-arm64-* | ios-simulator-arm64-* | ios-maccatalyst-arm64-*)
+  ios-arm64 | ios-simulator-arm64 | ios-maccatalyst-arm64)
     goos=ios
     case "$1" in
       ios-simulator-*) sdk_name=iphonesimulator; target=arm64-apple-ios15.0-simulator ;;
@@ -89,10 +89,10 @@ case "$1" in
     CXX="$(xcrun --sdk "$sdk_name" --find clang++) $target_flags"
     export CC CXX
     ;;
-  ohos-arm64-* | ohos-x64-*)
+  ohos-arm64 | ohos-x64)
     # Go has no OpenHarmony port, so use its Linux port with the OHOS sysroot.
     goos=linux
-    if [[ "$1" == ohos-arm64-* ]]; then
+    if [[ "$1" == ohos-arm64 ]]; then
       goarch=arm64
       compiler_target=aarch64-linux-ohos
     else
