@@ -102,6 +102,10 @@ runs:
         msystem: ${{ runner.arch == 'ARM64' && 'CLANGARM64' || 'MINGW64' }}
         path-type: inherit
         update: true
+        # Saving the package cache first prunes it with paccache, which the
+        # upgrade above can leave missing. The packages download in under a
+        # minute without it.
+        cache: false
         pacboy: clang:p llvm:p pkgconf:p
 
     - name: Select MSYS2 prefix
