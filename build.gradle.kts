@@ -14,14 +14,8 @@ plugins {
 allprojects {
   repositories.mavenCentral()
 
-  pluginManager.withPlugin("com.android.kotlin.multiplatform.library") {
-    repositories.google()
-    repositories.rustlsPlatformVerifier()
-  }
-  pluginManager.withPlugin("com.android.application") {
-    repositories.google()
-    repositories.rustlsPlatformVerifier()
-  }
+  pluginManager.withPlugin("com.android.kotlin.multiplatform.library") { repositories.google() }
+  pluginManager.withPlugin("com.android.application") { repositories.google() }
 
   pluginManager.withPlugin("maven-publish") {
     rootProject.providers.gradleProperty("maplibre.maven.localRepository").orNull?.let {
@@ -41,19 +35,5 @@ allprojects {
         languageVersion = JavaLanguageVersion.of(libs.versions.java.toolchain.get().toInt())
       }
     }
-  }
-}
-
-/**
- * The Maven repository on GitHub that rustls-platform-verifier publishes its Android component to,
- * for that component alone.
- */
-fun RepositoryHandler.rustlsPlatformVerifier() {
-  maven {
-    url =
-      uri(
-        "https://github.com/rustls/rustls-platform-verifier/raw/maven-archive/android-release-support/maven/",
-      )
-    content { includeGroup("org.rustls") }
   }
 }

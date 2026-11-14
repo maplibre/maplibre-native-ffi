@@ -659,6 +659,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.34.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "627003914c6057c9c8f0832ee4f870b5a4f599d0cfa83f4072675114860cd0ff"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "glow"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1605,6 +1614,7 @@ version = "0.0.11"
 dependencies = [
  "bytemuck",
  "earcut",
+ "glam",
  "mln-rs-actor",
  "mln-rs-expression",
  "mln-rs-feature",
@@ -1697,7 +1707,6 @@ dependencies = [
  "pmtiles",
  "rusqlite",
  "rustls",
- "rustls-platform-verifier",
  "serde_json",
  "thiserror",
  "ureq",
