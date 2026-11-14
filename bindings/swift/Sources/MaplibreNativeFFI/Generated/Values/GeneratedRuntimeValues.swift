@@ -1405,7 +1405,7 @@ public struct RuntimeEventLoadingFailed: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_runtime_event_loading_failed) {
-    error = MapLoadError(rawValue: raw.error.rawValue)
+    self.error = MapLoadError(rawValue: raw.error.rawValue)
   }
 }
 

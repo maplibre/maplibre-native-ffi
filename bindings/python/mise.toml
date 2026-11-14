@@ -18,5 +18,5 @@ run = 'uv run --project "$MISE_MONOREPO_ROOT" --no-sync python "$MISE_MONOREPO_R
 hide = true
 usage = 'arg "<preset>"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-tools = { "core:java" = "temurin-21.0.11+10.0.LTS" }
+tools = { "core:java" = "temurin-21.0.13+9.0.LTS" }
 run = '"$MISE_MONOREPO_ROOT/scripts/build-python-android-wheel.sh" "$usage_preset" --test'

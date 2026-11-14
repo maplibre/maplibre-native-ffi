@@ -16,7 +16,7 @@ run = 'pnpm exec react-native run-android --no-packager ${usage_args:-}'
 [tasks.ios]
 description = "Build the C library for the iOS simulator, then build the React Native example and run it in a simulator."
 # CocoaPods installs the app's native dependencies.
-tools = { "core:ruby" = "3.4.12", "gem:cocoapods" = "1.16.2" }
+tools = { "core:ruby" = "3.4.12", "gem:cocoapods" = "1.17.0" }
 usage = 'arg "[args]..." var=#true help="Options for react-native run-ios, such as --udid <udid>"'
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
@@ -49,7 +49,7 @@ esac
 
 [tasks.build-ios]
 description = "Build the C library for the iOS simulator, then build the React Native example's release app for it, unsigned."
-tools = { "core:ruby" = "3.4.12", "gem:cocoapods" = "1.16.2" }
+tools = { "core:ruby" = "3.4.12", "gem:cocoapods" = "1.17.0" }
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
 ../../bindings/typescript/react-native/scripts/stage.sh

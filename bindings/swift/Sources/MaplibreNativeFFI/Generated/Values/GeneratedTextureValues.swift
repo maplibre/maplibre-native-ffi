@@ -376,7 +376,7 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     data = try NativeString.copyData(data: raw.data.data, size: raw.data.size)
-    info = TextureImageInfo(raw: raw.info)
+    self.info = TextureImageInfo(raw: raw.info)
   }
 }
 

@@ -438,7 +438,7 @@ runs:
         # without a runtime keeps every later run from getting one. The version
         # is the only part of that key this action exposes, so a patch bump is
         # what retires the entry.
-        vulkan_version: 1.4.363.0
+        vulkan_version: 1.4.363.1
         cache: true
         stripdown: true
         # The SDK alone carries vulkan-1.lib but not the loader it imports, so
@@ -533,7 +533,7 @@ runs:
         GITHUB_TOKEN: ${{ github.token }}
       with:
         # Match `min_version` in .config/mise.toml.
-        version: 2026.10.24
+        version: 2026.11.8
         cache: false
         bootstrap: true
 
