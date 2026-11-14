@@ -130,7 +130,7 @@ class SwiftEmitterTests(unittest.TestCase):
             "public init(`initialExtent`: LogicalExtent, `mapMode`: MapMode = "
             ".init(rawValue: 0), `fastPforEnabled`: Bool = false, `eventMask`: "
             "RuntimeEventFlag? = nil, `tileCacheEnabled`: Bool? = nil, "
-            '`fallbackFontFaces`: String = "")',
+            '`fallbackFontFaces`: String = "", `systemFontsEnabled`: Bool? = nil)',
             values,
         )
         self.assertNotIn("static var `default`", values)
