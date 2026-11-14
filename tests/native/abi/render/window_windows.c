@@ -165,10 +165,11 @@ static mln_render_target window_target(HWND window) {
   return target;
 }
 
+// Attaches on a device of the suite's backend, which the session holds, so the
+// device is released once the attach call returns.
 static mln_status start_attach(
-  mln_map map, HWND window, mln_gpu_device device,
-  mln_render_driver_kind driver, mln_test_completion* completion,
-  mln_test_render_fixture* fixture
+  mln_map map, HWND window, mln_render_driver_kind driver,
+  mln_test_completion* completion, mln_test_render_fixture* fixture
 ) {
   const mln_render_target target = window_target(window);
   mln_render_session_attach_options options = {
@@ -176,10 +177,12 @@ static mln_status start_attach(
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = driver;
+  const mln_gpu_device device = mln_test_create_device();
   const mln_status status = mln_map_attach(
     map, &target, device, &options, &fixture->session, &completion->descriptor,
     MLN_TEST_DIAGNOSTIC
   );
+  mln_gpu_device_release(device);
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
 }
@@ -189,8 +192,7 @@ static void attach(
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK(start_attach(
-    map, window->window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER,
-    &completion, fixture
+    map, window->window, MLN_RENDER_DRIVER_CORE_WORKER, &completion, fixture
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &completion));
   mln_test_completion_destroy(&completion);
@@ -330,8 +332,8 @@ static void a_minimized_window_is_rejected(void) {
     MLN_TEST_STATUS(
       MLN_STATUS_INVALID_STATE,
       start_attach(
-        map, windows[0].window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER,
-        &rejected, &fixture
+        map, windows[0].window, MLN_RENDER_DRIVER_CORE_WORKER, &rejected,
+        &fixture
       )
     );
     mln_test_completion_destroy(&rejected);
@@ -366,8 +368,8 @@ static void a_win32_window_rejects_the_callers_graphics_thread(void) {
     MLN_TEST_STATUS(
       MLN_STATUS_UNSUPPORTED,
       start_attach(
-        map, windows[0].window, MLN_HANDLE_NULL,
-        MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, &completion, &fixture
+        map, windows[0].window, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+        &completion, &fixture
       )
     );
     mln_test_completion_destroy(&completion);
@@ -427,8 +429,8 @@ static void a_window_with_another_pixel_format_is_rejected(void) {
     MLN_TEST_STATUS(
       MLN_STATUS_INVALID_ARGUMENT,
       start_attach(
-        map, windows[0].window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER,
-        &completion, &fixture
+        map, windows[0].window, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
+        &fixture
       )
     );
     mln_test_completion_destroy(&completion);

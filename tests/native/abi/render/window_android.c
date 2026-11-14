@@ -8,6 +8,7 @@
 #include <media/NdkImageReader.h>
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 
 enum { window_size = 64 };
@@ -106,7 +107,7 @@ static mln_render_target window_target(
   return target;
 }
 
-static mln_status start_attach(
+static mln_status start_attach_on(
   mln_map map, ANativeWindow* window, mln_gpu_device device,
   mln_render_driver_kind driver, mln_test_completion* completion,
   mln_test_render_fixture* fixture
@@ -127,6 +128,19 @@ static mln_status start_attach(
   return status;
 }
 
+// Attaches on a device of the suite's backend, which the session holds, so the
+// device is released once the attach call returns.
+static mln_status start_attach(
+  mln_map map, ANativeWindow* window, mln_render_driver_kind driver,
+  mln_test_completion* completion, mln_test_render_fixture* fixture
+) {
+  const mln_gpu_device device = mln_test_create_device();
+  const mln_status status =
+    start_attach_on(map, window, device, driver, completion, fixture);
+  mln_gpu_device_release(device);
+  return status;
+}
+
 static void finish_attach(
   const mln_test_render_fixture* fixture, mln_test_completion* completion
 ) {
@@ -139,8 +153,7 @@ static void attach(
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK(start_attach(
-    map, window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
-    fixture
+    map, window, MLN_RENDER_DRIVER_CORE_WORKER, &completion, fixture
   ));
   finish_attach(fixture, &completion);
 }
@@ -211,8 +224,7 @@ static void a_session_presents_to_a_window_that_the_host_let_go_of(void) {
     ANativeWindow_acquire(reader.window);
     mln_test_completion completion = mln_test_completion_default(0);
     const mln_status attached = start_attach(
-      map, reader.window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER,
-      &completion, &fixture
+      map, reader.window, MLN_RENDER_DRIVER_CORE_WORKER, &completion, &fixture
     );
     ANativeWindow_release(reader.window);
     MLN_TEST_OK(attached);
@@ -323,8 +335,8 @@ static void an_android_surface_rejects_the_callers_graphics_thread(void) {
     MLN_TEST_STATUS(
       MLN_STATUS_UNSUPPORTED,
       start_attach(
-        map, reader.window, MLN_HANDLE_NULL,
-        MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, &completion, &fixture
+        map, reader.window, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+        &completion, &fixture
       )
     );
     mln_test_completion_destroy(&completion);
@@ -355,7 +367,7 @@ static void a_session_presents_with_the_hosts_device(void) {
     reader_create(&reader);
     const mln_gpu_device device = create_device();
     mln_test_completion completion = mln_test_completion_default(0);
-    const mln_status attached = start_attach(
+    const mln_status attached = start_attach_on(
       map, reader.window, device, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
       &fixture
     );

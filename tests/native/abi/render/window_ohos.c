@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 
 enum { window_size = 64 };
@@ -70,12 +71,12 @@ static mln_render_target window_target(OHNativeWindow* window) {
   return target;
 }
 
-// Submits an attach to `window` without waiting for it. The fixture holds the
-// session once the call succeeds.
+// Submits an attach to `window`, on a device of the suite's backend, without
+// waiting for it. The fixture holds the session once the call succeeds, and the
+// session holds the device.
 static mln_status start_attach(
-  mln_map map, OHNativeWindow* window, mln_gpu_device device,
-  mln_render_driver_kind driver, mln_test_completion* completion,
-  mln_test_render_fixture* fixture
+  mln_map map, OHNativeWindow* window, mln_render_driver_kind driver,
+  mln_test_completion* completion, mln_test_render_fixture* fixture
 ) {
   const mln_render_target target = window_target(window);
   mln_render_session_attach_options options = {
@@ -83,10 +84,12 @@ static mln_status start_attach(
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = driver;
+  const mln_gpu_device device = mln_test_create_device();
   const mln_status status = mln_map_attach(
     map, &target, device, &options, &fixture->session, &completion->descriptor,
     MLN_TEST_DIAGNOSTIC
   );
+  mln_gpu_device_release(device);
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
 }
@@ -153,8 +156,7 @@ static void attach(
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
   MLN_TEST_OK(start_attach(
-    map, window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
-    fixture
+    map, window, MLN_RENDER_DRIVER_CORE_WORKER, &completion, fixture
   ));
   finish_attach(fixture, &completion);
 }
@@ -211,8 +213,7 @@ static void a_session_presents_to_a_window_that_the_host_let_go_of(void) {
     );
     mln_test_completion completion = mln_test_completion_default(0);
     const mln_status attached = start_attach(
-      map, consumer.window, MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER,
-      &completion, &fixture
+      map, consumer.window, MLN_RENDER_DRIVER_CORE_WORKER, &completion, &fixture
     );
     (void)OH_NativeWindow_NativeObjectUnreference(consumer.window);
     MLN_TEST_OK(attached);
@@ -313,8 +314,8 @@ static void an_ohos_surface_rejects_the_callers_graphics_thread(void) {
     MLN_TEST_STATUS(
       MLN_STATUS_UNSUPPORTED,
       start_attach(
-        map, consumer.window, MLN_HANDLE_NULL,
-        MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, &completion, &fixture
+        map, consumer.window, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+        &completion, &fixture
       )
     );
     mln_test_completion_destroy(&completion);
