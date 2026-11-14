@@ -550,7 +550,8 @@ public sealed unsafe partial class RenderSessionHandle
     /// </summary>
     /// <remarks>
     /// <para>The query reads the last frame that the session rendered. A
-    /// feature that several layers draw appears once for each layer.</para>
+    /// feature that several layers draw appears once for each layer. The
+    /// topmost layer's features come first, and the bottom layer's last.</para>
     /// <para>See <c>mln_render_session_query_rendered_features</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -824,6 +825,12 @@ public sealed unsafe partial class RenderSessionHandle
     /// thread without servicing driver work never completes.</para>
     /// <para>See <c>mln_render_session_service_driver_work</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Busy</c> when called while a service of the
+    /// session already runs on this thread, from a callback that the service
+    /// runs.</description></item>
+    /// </list>
     /// </remarks>
     public void ServiceDriverWork()
     {

@@ -3003,7 +3003,9 @@ export interface RenderSessionAttachOptions {
   /**
    * Called when a session driven by `RenderDriverKind.callerGraphicsThread` has
    * work for `RenderSessionHandle.serviceDriverWork()`. It isn't called again
-   * until a service runs.
+   * until a service runs. It's never called on your graphics thread during a
+   * service: the service runs the work that comes while it runs, so you can
+   * call `RenderSessionHandle.serviceDriverWork()` from the wake.
    */
   driverWorkWake?: Wake;
   /**

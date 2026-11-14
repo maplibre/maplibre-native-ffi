@@ -7468,7 +7468,9 @@ public data class RenderSessionAttachOptions(
   public val redrawWake: Wake = Wake(),
   /**
    * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
-   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs.
+   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs. It's
+   * never called on your graphics thread during a service: the service runs the work that comes
+   * while it runs, so you can call `RenderSessionHandle.serviceDriverWork()` from the wake.
    */
   public val driverWorkWake: Wake = Wake(),
   /**

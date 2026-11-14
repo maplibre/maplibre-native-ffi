@@ -5417,7 +5417,9 @@ type RenderSessionAttachOptions struct {
 	RedrawWake Wake
 	// Called when a session driven by RenderDriverKindCallerGraphicsThread has work
 	// for RenderSessionHandle.ServiceDriverWork(). It isn't called again until a
-	// service runs.
+	// service runs. It's never called on your graphics thread during a service: the
+	// service runs the work that comes while it runs, so you can call
+	// RenderSessionHandle.ServiceDriverWork() from the wake.
 	DriverWorkWake Wake
 	// Whether an exported ring keeps the depth and stencil of each frame for you,
 	// so that you can draw into the frame depth-tested against the map, as
@@ -10515,7 +10517,8 @@ func (receiver *RenderSessionHandle) Snapshot() (RenderSessionSnapshot, error) {
 // the screen.
 //
 // The query reads the last frame that the session rendered. A feature that
-// several layers draw appears once for each layer.
+// several layers draw appears once for each layer. The topmost layer's features
+// come first, and the bottom layer's last.
 //
 // See mln_render_session_query_rendered_features in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html
@@ -10666,6 +10669,10 @@ func (receiver *RenderSessionHandle) Resize(extent LogicalExtent) (*Future[Comma
 //
 // See mln_render_session_service_driver_work in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+//
+// Errors:
+//   - StatusBusy when called while a service of the session already runs on
+//     this thread, from a callback that the service runs.
 func (receiver *RenderSessionHandle) ServiceDriverWork() error {
 	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_service_driver_work(C.mln_render_session(raw), diagnostic))
