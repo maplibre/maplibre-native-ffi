@@ -37,6 +37,12 @@ case "$usage_preset" in
   mingw-*)
     source "$MISE_MONOREPO_ROOT/tools/env/rust-cross-env.sh" "$usage_preset"
     maturin_flags+=(--target "$cargo_target" --auditwheel repair)
+    # The repair renames the DLLs that it bundles and rewrites the extension's
+    # imports in place, which reaches cargo's own copy of the extension through
+    # its hard link. A later build that reuses that copy would find none of the
+    # renamed DLLs and bundle nothing, so cargo links the extension afresh.
+    cargo clean --quiet --release --target "$cargo_target" \
+      --package maplibre-native-ffi-python
     ;;
 esac
 wheel_output=$(mktemp -d)
