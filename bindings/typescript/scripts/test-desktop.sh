@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Runs the suite under Node, Bun, and Deno, or under the one runtime named, for
-# a desktop preset whose addon the binding's build task built. The suite draws
-# with the backend that MLN_FFI_TEST_BACKEND names, which the test task sets.
+# Runs the suite under Node, Bun, and Deno (Node and Deno on macos-x64), or
+# under the one runtime named, for a desktop preset whose addon the binding's
+# build task built. The suite draws with the backend that MLN_FFI_TEST_BACKEND
+# names, which the test task sets.
 #
 #   test-desktop.sh <preset> [node|bun|deno]
 #
@@ -30,6 +31,15 @@ case "$preset" in
     read -r -a runtimes <<<"${2:-node bun}"
     if [[ "${runtimes[0]}" == deno ]]; then
       echo "error: Deno publishes no musl runtime" >&2
+      exit 2
+    fi
+    ;;
+  macos-x64)
+    # The x64 suite runs under Rosetta, where Bun's x64 build segfaults in its
+    # own parser now and then, before any case runs.
+    read -r -a runtimes <<<"${2:-node deno}"
+    if [[ " ${runtimes[*]} " == *" bun "* ]]; then
+      echo "error: macos-x64 runs the suite under Node and Deno, not Bun" >&2
       exit 2
     fi
     ;;
@@ -107,7 +117,7 @@ case "$preset" in
     ;;
   macos-x64)
     MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
-      MISE_ARCH=x64 MISE_NO_HOOKS=1 mise exec --no-deps node bun deno -- \
+      MISE_ARCH=x64 MISE_NO_HOOKS=1 mise exec --no-deps node deno -- \
       scripts/run-desktop.sh "${runtimes[@]}"
     ;;
   *) scripts/run-desktop.sh "${runtimes[@]}" ;;
