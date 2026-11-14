@@ -93,11 +93,14 @@ NATIVE_TARGETS = {
 }
 
 
+# The notices that every native library and browser module carries: the C
+# API's, mln-rs's, the Rust crates' that Cargo builds into it, and the Rust
+# standard library's.
 COMMON_NATIVE_LICENSES = {
-    "icu.txt",
-    "maplibre-native.md",
-    "nunicode.txt",
-    "pmtiles.txt",
+    "maplibre-native-ffi.txt",
+    "mln-rs.md",
+    "rust-std.html",
+    "rust.md",
 }
 
 POM_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
@@ -105,21 +108,9 @@ POM_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
 
 def native_licenses(target: str) -> set[str]:
     licenses = set(COMMON_NATIVE_LICENSES)
-    if target.startswith(("android-", "freebsd-", "linux-", "windows-")):
-        licenses.add("rust.md")
-    if target.startswith(("freebsd-", "linux-", "windows-")):
-        licenses.update({"libuv-extra.txt", "libuv.txt", "zlib.txt"})
-    # Every platform but Apple's carries Vulkan.
-    if not target.startswith(("ios-", "macos-", "tvos-")):
-        licenses.update(
-            {"glslang.txt", "vulkan-headers.md", "vulkan-memory-allocator.txt"}
-        )
-    if target.startswith("windows-mingw-"):
-        licenses.update(
-            {"libc++.txt", "libunwind.txt"}
-            if target.endswith("-arm64")
-            else {"libstdc++.txt", "libgcc.txt", "libwinpthread.txt"}
-        )
+    # The ARM64 MinGW library ships MSYS2's libunwind.dll beside it.
+    if target.startswith("windows-mingw-") and target.endswith("-arm64"):
+        licenses.add("libunwind.txt")
     return licenses
 
 
@@ -515,7 +506,7 @@ def verify_wasm(root: pathlib.Path) -> None:
                 "META-INF/LICENSE",
                 *(
                     f"META-INF/licenses/maplibre-native-c/{name}"
-                    for name in COMMON_NATIVE_LICENSES | {"rust.md", "fastpfor.txt"}
+                    for name in COMMON_NATIVE_LICENSES
                 ),
             ):
                 if name not in names:
