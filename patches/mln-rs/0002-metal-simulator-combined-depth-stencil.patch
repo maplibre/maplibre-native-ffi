@@ -1,0 +1,49 @@
+Give the simulator's Metal window and ring targets one depth-stencil texture.
+
+The simulator's Metal requires a render pipeline's depth and stencil
+attachment formats to match, and aborts with a validation assertion
+otherwise. A borrowed ring's own depth and a CAMetalLayer target's depth made
+a separate Depth32Float and Stencil8 on every arm64 target, so the native
+suites aborted on the iOS and tvOS simulators. Upstream:
+https://github.com/louwers/mln-rs/pull/402
+
+diff --git a/crates/mln_mtl/src/borrowed_target.rs b/crates/mln_mtl/src/borrowed_target.rs
+index cb5ec16c..544c1ef6 100644
+--- a/crates/mln_mtl/src/borrowed_target.rs
++++ b/crates/mln_mtl/src/borrowed_target.rs
+@@ -194,7 +194,7 @@ impl Resource {
+ 
+     /// The depth and stencil textures of the ring's size: the host's of the
+     /// selected slot, which holds both, or the target's own. Intel and AMD
+-    /// GPUs take one texture for both.
++    /// GPUs and the simulator take one texture for both.
+     fn depth_stencil(&self) -> Option<(MTLTexturePtr, MTLTexturePtr)> {
+         if let Some(depth) = self.textures.borrow().depth_textures.get(self.selected.get()) {
+             return Some((depth.clone(), depth.clone()));
+@@ -202,7 +202,7 @@ impl Resource {
+         let size = self.textures.borrow().size;
+         let mut depth = self.depth.borrow_mut();
+         if depth.as_ref().is_none_or(|(made, _, _)| *made != size) {
+-            *depth = if cfg!(target_arch = "x86_64") {
++            *depth = if cfg!(target_arch = "x86_64") || cfg!(target_abi = "sim") {
+                 self.texture_2d(MTLPixelFormat::Depth32Float_Stencil8, size)
+                     .map(|texture| (size, texture.clone(), texture))
+             } else {
+diff --git a/crates/mln_mtl/src/surface_target.rs b/crates/mln_mtl/src/surface_target.rs
+index 74a496f2..044b219e 100644
+--- a/crates/mln_mtl/src/surface_target.rs
++++ b/crates/mln_mtl/src/surface_target.rs
+@@ -99,11 +99,11 @@ impl SurfaceState {
+     }
+ 
+     /// The depth and stencil textures for a drawable of `size`. Intel and
+-    /// AMD GPUs take one texture for both.
++    /// AMD GPUs and the simulator take one texture for both.
+     fn depth_stencil_for(&self, size: (usize, usize)) -> Option<(MTLTexturePtr, MTLTexturePtr)> {
+         let mut depth_stencil = self.depth_stencil.borrow_mut();
+         if depth_stencil.as_ref().is_none_or(|d| d.size != size) {
+-            *depth_stencil = if cfg!(target_arch = "x86_64") {
++            *depth_stencil = if cfg!(target_arch = "x86_64") || cfg!(target_abi = "sim") {
+                 self.texture_2d(MTLPixelFormat::Depth32Float_Stencil8, size.0, size.1).map(|texture| DepthStencil {
+                     size,
+                     depth: texture.clone(),
