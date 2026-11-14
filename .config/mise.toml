@@ -310,7 +310,8 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # program through tools/devices/run. Each backend's entries carry its name as
 # a label. A web preset builds no C, so mln-rs's browser check drives the
 # package's raw C ABI from a Web Worker in headless Chromium instead;
-# scripts/find-chromium.mjs says how a browser is located.
+# scripts/find-chromium.mjs says how a browser is located. The check draws a
+# CJK label in the browser's sans-serif font, so it needs a CJK font installed.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
 share="$build_dir/install/share/maplibre-native-c"

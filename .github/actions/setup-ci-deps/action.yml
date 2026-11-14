@@ -214,6 +214,15 @@ runs:
           echo "MLN_TEST_TIMEOUT_SCALE=3"
         } >> "$GITHUB_ENV"
 
+    # mln-rs's browser check, which the web presets' tests run, draws a CJK
+    # label in the browser's sans-serif font, so the system needs a CJK font.
+    - name: Install a CJK font for the browser check
+      if: ${{ runner.os == 'Linux' && inputs.mise-env == 'web' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends --yes fonts-wqy-microhei
+
     # devices-cli runs one emulator per 8 GiB of RAM by default, which leaves a
     # 16 GiB runner, whose kernel keeps some, room for one. The x64 job's
     # OpenGL ES suites run on API 26 and its other suites on API 36, at once.
