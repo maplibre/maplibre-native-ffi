@@ -1,6 +1,6 @@
-// What a case costs beyond time: allocations, CPU by thread, and peak and
-// resident memory. A target without a source reports no counter for it, rather
-// than a value that means something else.
+// What a case costs beyond time: allocations, instructions, CPU by thread, and
+// peak and resident memory. A target without a source reports no counter for
+// it, rather than a value that means something else.
 
 #include <algorithm>
 #include <atomic>
@@ -24,6 +24,11 @@
 #include <dirent.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#endif
+
+#if defined(BENCH_PROC_FS) && !defined(__EMSCRIPTEN__)
+#define BENCH_PERF_EVENTS 1
+#include <linux/perf_event.h>
 #endif
 
 #if defined(__APPLE__)
@@ -232,6 +237,62 @@ auto allocation_totals() -> std::pair<uint64_t, uint64_t> {
 #endif
 }
 
+#if defined(BENCH_PERF_EVENTS)
+// One instruction counter per PMU that counts some of the cores. A CPU with two
+// kinds of cores, such as Intel's P and E cores, has a PMU for each, and a
+// hardware event counts only on its own PMU's cores, so the counts add up.
+std::vector<int> instruction_counters;
+
+auto open_instruction_counter(uint64_t pmu_type) -> int {
+  perf_event_attr attr{};
+  attr.type = PERF_TYPE_HARDWARE;
+  attr.size = sizeof(attr);
+  // A hardware event's config names its PMU above bit 32 (PERF_PMU_TYPE_SHIFT
+  // in newer headers); 0 is the default PMU.
+  attr.config = (pmu_type << 32U) | PERF_COUNT_HW_INSTRUCTIONS;
+  // Every thread that this one, or a thread it starts, starts from now on.
+  attr.inherit = 1;
+  attr.exclude_kernel = 1;
+  attr.exclude_hv = 1;
+  return static_cast<int>(
+    syscall(SYS_perf_event_open, &attr, 0, -1, -1, PERF_FLAG_FD_CLOEXEC)
+  );
+}
+
+// The types of the core PMUs that list the cores they count, as a CPU with more
+// than one kind of core has. None means the default PMU counts on every core.
+auto core_pmu_types() -> std::vector<uint64_t> {
+  std::vector<uint64_t> types;
+  const std::string root = "/sys/bus/event_source/devices/";
+  DIR* directory = opendir(root.c_str());
+  if (directory == nullptr) return types;
+  while (const dirent* entry = readdir(directory)) {
+    if (entry->d_name[0] == '.') continue;
+    const auto device = root + entry->d_name;
+    if (read_file(device + "/cpus").empty()) continue;
+    const auto type = read_file(device + "/type");
+    if (!type.empty())
+      types.push_back(std::strtoull(type.c_str(), nullptr, 10));
+  }
+  closedir(directory);
+  return types;
+}
+#endif
+
+// The user-space instructions that every thread of the process has retired
+// since open_instruction_counters(), or 0 without counters. A count is what
+// the counter counted while it had the hardware, unscaled, so it only grows.
+auto instruction_total() -> uint64_t {
+  uint64_t total = 0;
+#if defined(BENCH_PERF_EVENTS)
+  for (const int counter : instruction_counters) {
+    uint64_t value = 0;
+    if (read(counter, &value, sizeof(value)) == sizeof(value)) total += value;
+  }
+#endif
+  return total;
+}
+
 struct EndedThread {
   uint64_t id = 0;
   uint64_t cpu_ns = 0;
@@ -307,6 +368,37 @@ void note_callback_thread(CallbackKind kind) {
   if (auto* slot = find_callback_thread(id, true)) {
     slot->kinds.fetch_or(bit, std::memory_order_relaxed);
   }
+}
+
+auto open_instruction_counters() -> bool {
+#if defined(BENCH_PERF_EVENTS)
+  for (const auto type : core_pmu_types()) {
+    const int counter = open_instruction_counter(type);
+    if (counter < 0) {
+      for (const int open : instruction_counters) close(open);
+      instruction_counters.clear();
+      break;
+    }
+    instruction_counters.push_back(counter);
+  }
+  if (instruction_counters.empty()) {
+    const int counter = open_instruction_counter(0);
+    if (counter >= 0) instruction_counters.push_back(counter);
+  }
+  if (instruction_counters.empty()) {
+    std::fprintf(
+      stderr,
+      "mln_ffi_bench: no instruction counts: perf_event_open failed: %s "
+      "(kernel.perf_event_paranoid is %d; it must be at most 2, and a "
+      "container may block the call)\n",
+      std::strerror(errno),
+      std::atoi(read_file("/proc/sys/kernel/perf_event_paranoid").c_str())
+    );
+  }
+  return !instruction_counters.empty();
+#else
+  return false;
+#endif
 }
 
 }  // namespace bench
@@ -536,9 +628,11 @@ void Meter::start_span() {
   span_process_cpu_ns_ = process_cpu_ns();
   span_own_cpu_ns_ = own_cpu_ns();
   std::tie(span_allocations_, span_bytes_) = allocation_totals();
+  span_instructions_ = instruction_total();
 }
 
 void Meter::end_span() {
+  instructions_ += instruction_total() - span_instructions_;
   const auto [allocations, bytes] = allocation_totals();
   const auto own = own_cpu_ns() - span_own_cpu_ns_;
   const auto process = process_cpu_ns() - span_process_cpu_ns_;
@@ -585,6 +679,13 @@ void Meter::finish() {
   state_.counters["alloc_kib"] = benchmark::Counter(
     static_cast<double>(allocated_bytes_) / 1024.0, per_iteration
   );
+#endif
+#if defined(BENCH_PERF_EVENTS)
+  if (!instruction_counters.empty()) {
+    state_.counters["minstr"] = benchmark::Counter(
+      static_cast<double>(instructions_) / 1e6, per_iteration
+    );
+  }
 #endif
   state_.counters["events"] =
     benchmark::Counter(static_cast<double>(events_), per_iteration);

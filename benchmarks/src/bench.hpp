@@ -369,9 +369,9 @@ class Series {
 };
 
 // Measures what a case's loop costs beyond the time and CPU that Google
-// Benchmark measures: allocations, CPU by thread, peak resident memory,
-// runtime events, and latencies. Construct it just before the loop and call
-// finish() just after.
+// Benchmark measures: allocations, instructions, CPU by thread, peak resident
+// memory, runtime events, and latencies. Construct it just before the loop and
+// call finish() just after.
 class Meter {
  public:
   explicit Meter(benchmark::State& state);
@@ -396,6 +396,7 @@ class Meter {
   // Totals over the measured spans.
   uint64_t allocations_ = 0;
   uint64_t allocated_bytes_ = 0;
+  uint64_t instructions_ = 0;
   uint64_t events_ = 0;
   uint64_t process_cpu_ns_ = 0;
   uint64_t named_cpu_ns_ = 0;
@@ -403,12 +404,22 @@ class Meter {
   // Readings at the start of the current span.
   uint64_t span_allocations_ = 0;
   uint64_t span_bytes_ = 0;
+  uint64_t span_instructions_ = 0;
   uint64_t span_events_ = 0;
   uint64_t span_process_cpu_ns_ = 0;
   uint64_t span_own_cpu_ns_ = 0;
   size_t span_ended_from_ = 0;
   std::vector<std::pair<uint64_t, uint64_t>> span_threads_;
 };
+
+// Starts counting the user-space instructions of this thread and of every
+// thread started after it, for the meter's `minstr`, on Linux where perf events
+// are open to the process (kernel.perf_event_paranoid at most 2). Load on the
+// machine hardly changes the count, so it shows a change in the work done where
+// the times are noise. The kernel's work, such as waking a thread, is left out
+// and shows only in the CPU times. Call it before the library starts any
+// thread. Reports whether it counts.
+auto open_instruction_counters() -> bool;
 
 // The malloc heap in use and the resident memory, in KiB, or 0 where the
 // target can't tell.

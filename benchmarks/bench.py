@@ -631,6 +631,7 @@ HIGHER_IS_BETTER = {"items_per_second", "bytes_per_second", "frames"}
 # The metrics that get verdicts. The others print with --verbose, as clues to
 # where a change in these comes from.
 LEAD = (
+    "minstr",
     "cpu_time",
     "real_time",
     "allocs",
