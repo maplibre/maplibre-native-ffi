@@ -2,7 +2,7 @@
   "name": "maplibre-native-ffi",
   "private": true,
   "devDependencies": {
-    "vite-plus": "^1.4.0"
+    "vite-plus": "^1.6.0"
   },
   "packageManager": "pnpm@12.16.1"
 }
