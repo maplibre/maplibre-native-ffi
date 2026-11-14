@@ -112,6 +112,8 @@ auto backend_name() -> const char* {
 }  // namespace
 
 auto main(int argc, char** argv) -> int {
+  // Before anything starts a thread, so that the counters inherit to them all.
+  bench::open_instruction_counters();
   auto& environment = bench::environment();
   if (const char* directory = take_flag(argc, argv, "--mln_fixture_dir")) {
     environment.fixture_dir = directory;

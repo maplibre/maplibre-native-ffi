@@ -1,6 +1,6 @@
-// What a case costs beyond time: allocations, CPU by thread, and peak and
-// resident memory. A target without a source reports no counter for it, rather
-// than a value that means something else.
+// What a case costs beyond time: allocations, instructions, CPU by thread, and
+// peak and resident memory. A target without a source reports no counter for
+// it, rather than a value that means something else.
 
 #include <algorithm>
 #include <atomic>
@@ -24,6 +24,11 @@
 #include <dirent.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#endif
+
+#if defined(BENCH_PROC_FS) && !defined(__EMSCRIPTEN__)
+#define BENCH_PERF_EVENTS 1
+#include <linux/perf_event.h>
 #endif
 
 #if defined(__APPLE__)
@@ -232,6 +237,105 @@ auto allocation_totals() -> std::pair<uint64_t, uint64_t> {
 #endif
 }
 
+#if defined(BENCH_PERF_EVENTS)
+// One instruction counter per PMU that counts some of the cores. A CPU with two
+// kinds of cores, such as Intel's P and E cores, has a PMU for each, and a
+// hardware event counts only on its own PMU's cores, so the counts add up.
+std::vector<int> instruction_counters;
+
+auto open_instruction_counter(uint64_t pmu_type) -> int {
+  perf_event_attr attr{};
+  attr.type = PERF_TYPE_HARDWARE;
+  attr.size = sizeof(attr);
+  // A hardware event's config names its PMU above bit 32 (PERF_PMU_TYPE_SHIFT
+  // in newer headers); 0 is the default PMU.
+  attr.config = (pmu_type << 32U) | PERF_COUNT_HW_INSTRUCTIONS;
+  // Every thread that this one, or a thread it starts, starts from now on.
+  attr.inherit = 1;
+  // A pinned event keeps its hardware counter whenever its thread runs, where
+  // a flexible one could share it with other perf users and miss
+  // instructions. When the kernel can't give it a counter, reads of it fail.
+  attr.pinned = 1;
+  attr.exclude_kernel = 1;
+  attr.exclude_hv = 1;
+  return static_cast<int>(
+    syscall(SYS_perf_event_open, &attr, 0, -1, -1, PERF_FLAG_FD_CLOEXEC)
+  );
+}
+
+// The types of the core PMUs that list the cores they count, as a CPU with more
+// than one kind of core has. None means the default PMU counts on every core.
+auto core_pmu_types() -> std::vector<uint64_t> {
+  std::vector<uint64_t> types;
+  const std::string root = "/sys/bus/event_source/devices/";
+  DIR* directory = opendir(root.c_str());
+  if (directory == nullptr) return types;
+  while (const dirent* entry = readdir(directory)) {
+    if (entry->d_name[0] == '.') continue;
+    const auto device = root + entry->d_name;
+    if (read_file(device + "/cpus").empty()) continue;
+    const auto type = read_file(device + "/type");
+    if (!type.empty()) {
+      types.push_back(std::strtoull(type.c_str(), nullptr, 10));
+    }
+  }
+  closedir(directory);
+  return types;
+}
+
+auto task_count() -> size_t {
+  size_t count = 0;
+  if (DIR* directory = opendir("/proc/self/task")) {
+    while (const dirent* entry = readdir(directory)) {
+      if (entry->d_name[0] != '.') ++count;
+    }
+    closedir(directory);
+  }
+  return count;
+}
+
+void close_instruction_counters() {
+  for (const int counter : instruction_counters) close(counter);
+  instruction_counters.clear();
+}
+
+auto read_counter(int counter, uint64_t& value) -> bool {
+  for (;;) {
+    const auto read_bytes = read(counter, &value, sizeof(value));
+    if (read_bytes == static_cast<ssize_t>(sizeof(value))) return true;
+    if (read_bytes < 0 && errno == EINTR) continue;
+    // A pinned event that lost its counter reads as end of file.
+    return false;
+  }
+}
+#endif
+
+auto counts_instructions() -> bool {
+#if defined(BENCH_PERF_EVENTS)
+  return !instruction_counters.empty();
+#else
+  return false;
+#endif
+}
+
+// The user-space instructions that every counted thread of the process has
+// retired since open_instruction_counters(). Reports false without counters,
+// or when one can't be read, and the count then means nothing.
+auto instruction_total(uint64_t& total) -> bool {
+  total = 0;
+#if defined(BENCH_PERF_EVENTS)
+  if (instruction_counters.empty()) return false;
+  for (const int counter : instruction_counters) {
+    uint64_t value = 0;
+    if (!read_counter(counter, value)) return false;
+    total += value;
+  }
+  return true;
+#else
+  return false;
+#endif
+}
+
 struct EndedThread {
   uint64_t id = 0;
   uint64_t cpu_ns = 0;
@@ -307,6 +411,50 @@ void note_callback_thread(CallbackKind kind) {
   if (auto* slot = find_callback_thread(id, true)) {
     slot->kinds.fetch_or(bit, std::memory_order_relaxed);
   }
+}
+
+auto open_instruction_counters() -> bool {
+#if defined(BENCH_PERF_EVENTS)
+  const auto skip = [](const char* reason) {
+    close_instruction_counters();
+    std::fprintf(stderr, "mln_ffi_bench: no instruction counts: %s\n", reason);
+    return false;
+  };
+  // A counter inherits only to the threads that this one goes on to start.
+  if (task_count() != 1) {
+    return skip("the process started threads before main()");
+  }
+  // On a CPU with more than one kind of core, a count from fewer than all of
+  // its core PMUs would leave out the instructions of the other cores.
+  const auto types = core_pmu_types();
+  for (const auto type : types) {
+    const int counter = open_instruction_counter(type);
+    if (counter < 0) break;
+    instruction_counters.push_back(counter);
+  }
+  if (types.empty()) {
+    const int counter = open_instruction_counter(0);
+    if (counter >= 0) instruction_counters.push_back(counter);
+  }
+  if (
+    instruction_counters.empty() || instruction_counters.size() < types.size()
+  ) {
+    char reason[256];
+    std::snprintf(
+      reason, sizeof(reason),
+      "perf_event_open failed: %s (kernel.perf_event_paranoid is %d; it must "
+      "be at most 2, and a container may block the call)",
+      std::strerror(errno),
+      std::atoi(read_file("/proc/sys/kernel/perf_event_paranoid").c_str())
+    );
+    return skip(reason);
+  }
+  uint64_t total = 0;
+  if (!instruction_total(total)) return skip("the counters can't be read");
+  return true;
+#else
+  return false;
+#endif
 }
 
 }  // namespace bench
@@ -536,9 +684,19 @@ void Meter::start_span() {
   span_process_cpu_ns_ = process_cpu_ns();
   span_own_cpu_ns_ = own_cpu_ns();
   std::tie(span_allocations_, span_bytes_) = allocation_totals();
+  span_instructions_counted_ = instruction_total(span_instructions_);
 }
 
 void Meter::end_span() {
+  uint64_t instructions = 0;
+  if (
+    span_instructions_counted_ && instruction_total(instructions) &&
+    instructions >= span_instructions_
+  ) {
+    instructions_ += instructions - span_instructions_;
+  } else {
+    instructions_counted_ = false;
+  }
   const auto [allocations, bytes] = allocation_totals();
   const auto own = own_cpu_ns() - span_own_cpu_ns_;
   const auto process = process_cpu_ns() - span_process_cpu_ns_;
@@ -586,6 +744,16 @@ void Meter::finish() {
     static_cast<double>(allocated_bytes_) / 1024.0, per_iteration
   );
 #endif
+  if (instructions_counted_) {
+    state_.counters["minstr"] = benchmark::Counter(
+      static_cast<double>(instructions_) / 1e6, per_iteration
+    );
+  } else if (counts_instructions()) {
+    std::fprintf(
+      stderr, "mln_ffi_bench: %s: no minstr: a counter couldn't be read\n",
+      case_key(state_).c_str()
+    );
+  }
   state_.counters["events"] =
     benchmark::Counter(static_cast<double>(events_), per_iteration);
   for (const auto& [group, cpu_ns] : thread_cpu_ns_) {
