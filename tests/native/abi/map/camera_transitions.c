@@ -282,6 +282,10 @@ static void an_unobserved_animation_publishes_its_final_snapshot(void) {
     TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   } while (result.needs_repaint);
 
+  // The map publishes an update before it copies its snapshot, so a frame can
+  // show an update that the snapshot doesn't yet. The fence runs after the
+  // copy.
+  MLN_TEST_OK(mln_test_map_fence(map));
   mln_map_snapshot snapshot = {.size = sizeof(snapshot)};
   MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, snapshot.view.camera.zoom);
