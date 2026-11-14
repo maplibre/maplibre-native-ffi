@@ -865,7 +865,9 @@ public struct RenderSessionAttachOptions: Sendable {
   public var redrawWake: Wake
   /// Called when a session driven by `RenderDriverKind.callerGraphicsThread`
   /// has work for `RenderSessionHandle.serviceDriverWork()`. It isn't called
-  /// again until a service runs.
+  /// again until a service runs. It's never called on your graphics thread
+  /// during a service: the service runs the work that comes while it runs, so
+  /// you can call `RenderSessionHandle.serviceDriverWork()` from the wake.
   public var driverWorkWake: Wake
   /// Whether an exported ring keeps the depth and stencil of each frame for
   /// you, so that you can draw into the frame depth-tested against the map, as

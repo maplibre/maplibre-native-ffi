@@ -431,6 +431,11 @@ public extension RenderSessionHandle {
   ///
   /// See `mln_render_session_service_driver_work` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.busy` when called while a service of the session already runs on
+  ///   this thread, from a callback that the service runs.
   func serviceDriverWork() throws {
     try nativeInvoke { raw, _, diagnostic in
       mln_render_session_service_driver_work(

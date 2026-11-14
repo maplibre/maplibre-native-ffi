@@ -4394,7 +4394,9 @@ class RenderSessionAttachOptions:
     driver_work_wake: Wake | NativeWake = field(default_factory=lambda: Wake())
     """Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD`
     has work for `RenderSessionHandle.service_driver_work()`. It isn't called
-    again until a service runs.
+    again until a service runs. It's never called on your graphics thread
+    during a service: the service runs the work that comes while it runs, so
+    you can call `RenderSessionHandle.service_driver_work()` from the wake.
     """
 
     keep_depth: bool = False

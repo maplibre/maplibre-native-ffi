@@ -4705,7 +4705,8 @@ export class RenderSessionHandle extends Owner {
    * Finds the features that the session drew in an area of the screen.
    *
    * The query reads the last frame that the session rendered. A feature that
-   * several layers draw appears once for each layer.
+   * several layers draw appears once for each layer. The topmost layer's
+   * features come first, and the bottom layer's last.
    *
    * See `mln_render_session_query_rendered_features` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -4892,6 +4893,11 @@ export class RenderSessionHandle extends Owner {
    *
    * See `mln_render_session_service_driver_work` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.busy` when called while a service of the session already runs on
+   *   this thread, from a callback that the service runs.
    */
   serviceDriverWork(): void {
     native.mln_render_session_service_driver_work(this.id);

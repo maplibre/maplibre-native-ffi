@@ -80,7 +80,9 @@ public readonly partial record struct RenderSessionAttachOptions
     /// Called when a session driven by
     /// <c>RenderDriverKind.CallerGraphicsThread</c> has work for
     /// <c>RenderSessionHandle.ServiceDriverWork()</c>. It isn't called again
-    /// until a service runs.
+    /// until a service runs. It's never called on your graphics thread during a
+    /// service: the service runs the work that comes while it runs, so you can
+    /// call <c>RenderSessionHandle.ServiceDriverWork()</c> from the wake.
     /// </summary>
     public Wake DriverWorkWake { get; init; }
 
