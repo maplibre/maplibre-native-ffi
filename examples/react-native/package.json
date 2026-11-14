@@ -8,13 +8,13 @@
   },
   "dependencies": {
     "@maplibre/native-ffi-react-native": "workspace:*",
-    "react": "19.3.0",
+    "react": "19.3.1",
     "react-native": "0.88.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.2",
-    "@babel/preset-env": "^7.25.3",
-    "@babel/runtime": "^7.25.0",
+    "@babel/core": "^8.1.0",
+    "@babel/preset-env": "^8.0.7",
+    "@babel/runtime": "^8.1.0",
     "@react-native-community/cli": "20.2.0",
     "@react-native-community/cli-platform-android": "20.2.0",
     "@react-native-community/cli-platform-ios": "20.2.0",
@@ -24,6 +24,6 @@
     "@react-native/metro-config": "0.88.1",
     "@react-native/typescript-config": "0.88.1",
     "@types/react": "^19.2.0",
-    "hermes-compiler": "260318099.0.5"
+    "hermes-compiler": "260318099.0.7"
   }
 }
