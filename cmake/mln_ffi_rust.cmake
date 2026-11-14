@@ -80,7 +80,8 @@ function(mln_ffi_link_rust_platform target)
   # Go 1.27's cgo linker rejects LLVM bitcode sections in static archives named
   # by #cgo LDFLAGS. rustc 1.100 embeds .llvmbc in staticlib output unless this
   # is off. Flags after cargo rustc `--` win over cargo's own -C flags; the
-  # encoded env form has no spaces, so cmake -E env cannot split them.
+  # encoded env form has no spaces, so cmake -E env cannot split them. Do not
+  # pass `--` to cmake -E env: CMake 4.5 treats that as the program to run.
   string(ASCII 31 rust_flag_sep)
   set(encoded_rustflags "-Cembed-bitcode=no")
   set(rustc_flags -Cembed-bitcode=no)
@@ -104,12 +105,10 @@ function(mln_ffi_link_rust_platform target)
 
   # The manifest declares only the library that Rust hosts build from crates.io,
   # so the static library is asked for here.
-  set(rust_build_commands
-      COMMAND
+  set(rust_cargo_command
       ${CMAKE_COMMAND}
       -E
       env
-      --
       ${rust_environment}
       "${CARGO_EXECUTABLE}"
       rustc
@@ -129,22 +128,27 @@ function(mln_ffi_link_rust_platform target)
   # Go 1.27 scans ELF members of archives named by #cgo LDFLAGS. Strip leftover
   # bitcode even if a wrapper dropped the rustc flag.
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_OBJCOPY)
-    list(
-      APPEND
-      rust_build_commands
+    add_custom_command(
+      OUTPUT "${rust_library}"
+      COMMAND ${rust_cargo_command}
       COMMAND
-      "${CMAKE_OBJCOPY}"
-      --remove-section=.llvmbc
-      --remove-section=.llvm_lto
-      "${rust_library}")
+        "${CMAKE_OBJCOPY}" --remove-section=.llvmbc --remove-section=.llvm_lto
+        "${rust_library}"
+      DEPENDS
+        "${rust_manifest}" ${rust_sources} "${PROJECT_SOURCE_DIR}/Cargo.toml"
+        "${PROJECT_SOURCE_DIR}/Cargo.lock"
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+      VERBATIM)
+  else()
+    add_custom_command(
+      OUTPUT "${rust_library}"
+      COMMAND ${rust_cargo_command}
+      DEPENDS
+        "${rust_manifest}" ${rust_sources} "${PROJECT_SOURCE_DIR}/Cargo.toml"
+        "${PROJECT_SOURCE_DIR}/Cargo.lock"
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+      VERBATIM)
   endif()
-  add_custom_command(
-    OUTPUT "${rust_library}" ${rust_build_commands}
-    DEPENDS
-      "${rust_manifest}" ${rust_sources} "${PROJECT_SOURCE_DIR}/Cargo.toml"
-      "${PROJECT_SOURCE_DIR}/Cargo.lock"
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    VERBATIM)
 
   add_custom_target(mln_ffi_platform_rust_build DEPENDS "${rust_library}")
 
