@@ -5470,6 +5470,16 @@ bool mln_ts_write_map_options(
     if (!mln_ts_read_text_view(call, member, &out->fallback_font_faces, child))
       return false;
   }
+  if (!mln_ts_member(call, value, "systemFontsEnabled", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "systemFontsEnabled");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->system_fonts_enabled = flag;
+    }
+    out->fields |= MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED;
+  }
   return true;
 }
 

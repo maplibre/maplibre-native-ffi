@@ -2722,6 +2722,10 @@ Pointer<raw.mln_map_options> _writeMapOptions(
     value.fallbackFontFaces,
     arena,
   ).value;
+  if (value.systemFontsEnabled != null) {
+    result.ref.fields |= raw.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED;
+    result.ref.system_fonts_enabled = value.systemFontsEnabled!;
+  }
   return result;
 }
 

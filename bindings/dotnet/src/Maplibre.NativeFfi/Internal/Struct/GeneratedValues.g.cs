@@ -1317,6 +1317,12 @@ internal static unsafe class GeneratedValues
             static present => (byte)(present ? 1 : 0)
         );
         native.fallback_font_faces = scope.Utf8(value.FallbackFontFaces);
+        native.fields |= Put(
+            value.SystemFontsEnabled,
+            ref native.system_fonts_enabled,
+            MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED,
+            static present => (byte)(present ? 1 : 0)
+        );
         return native;
     }
 

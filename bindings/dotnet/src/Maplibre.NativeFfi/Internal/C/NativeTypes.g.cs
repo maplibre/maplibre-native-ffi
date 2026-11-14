@@ -664,6 +664,7 @@ internal unsafe struct mln_map_options
     public ulong event_mask;
     public byte tile_cache_enabled;
     public mln_buffer_view fallback_font_faces;
+    public byte system_fonts_enabled;
 }
 
 internal unsafe struct mln_map_projection_camera_result
@@ -2123,6 +2124,7 @@ internal enum mln_map_option_field : uint
 {
     MLN_MAP_OPTION_EVENT_MASK = 1,
     MLN_MAP_OPTION_TILE_CACHE_ENABLED = 2,
+    MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 4,
 }
 
 internal enum mln_map_tile_option_field : uint

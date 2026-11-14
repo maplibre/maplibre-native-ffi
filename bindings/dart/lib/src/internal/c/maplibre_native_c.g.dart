@@ -858,6 +858,8 @@ final class mln_map_options extends Struct {
   @Bool()
   external bool tile_cache_enabled;
   external mln_buffer_view fallback_font_faces;
+  @Bool()
+  external bool system_fonts_enabled;
 }
 
 final class mln_map_projection_camera_result extends Struct {
@@ -2431,6 +2433,7 @@ const MLN_MAP_MODE_TILE = 2;
 // mln_map_option_field
 const MLN_MAP_OPTION_EVENT_MASK = 1;
 const MLN_MAP_OPTION_TILE_CACHE_ENABLED = 2;
+const MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 4;
 
 // mln_map_tile_option_field
 const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1;

@@ -9750,7 +9750,8 @@ void maplibre_native_ffi_map_options_set_tile_cache_enabled(
  * need complex shaping, like Myanmar or Devanagari. A JSON array of font files,
  * each an object with a `url` and an optional `unicode-range`, as in a font
  * face of a style's `font-faces`, which every font stack uses after the style's
- * own font faces. Empty for none.
+ * own font faces. Empty for the system's fonts, unless `system_fonts_enabled`
+ * is false.
  */
 /**
  * maplibre_native_ffi_map_options_get_fallback_font_faces: (get-property fallback-font-faces)
@@ -9771,6 +9772,47 @@ const char* maplibre_native_ffi_map_options_get_fallback_font_faces(
  */
 void maplibre_native_ffi_map_options_set_fallback_font_faces(
   MaplibreNativeFfiMapOptions* self, const char* value
+);
+
+/**
+ * MaplibreNativeFfiMapOptions:system-fonts-enabled: (setter set_system_fonts_enabled) (getter get_system_fonts_enabled)
+ *
+ * Whether the map falls back to the system's fonts for CJK and the scripts that
+ * need complex shaping when `fallback_font_faces` is empty: fonts that the
+ * platform's font matcher picks for the user's preferred languages. Without it,
+ * the map does. The first map that uses them waits for them to be found. In the
+ * browser, the browser draws CJK glyphs in its sans-serif font instead, where
+ * `fallback_font_faces` doesn't cover them.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_system_fonts_enabled: (get-property system-fonts-enabled)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:system-fonts-enabled`.
+ *
+ * Returns: the value
+ */
+gboolean maplibre_native_ffi_map_options_get_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_has_system_fonts_enabled:
+ *
+ * Whether `MaplibreNativeFfiMapOptions:system-fonts-enabled` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_map_options_has_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_set_system_fonts_enabled: (set-property system-fonts-enabled)
+ *
+ * Sets `MaplibreNativeFfiMapOptions:system-fonts-enabled`.
+ */
+void maplibre_native_ffi_map_options_set_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self, gboolean value
 );
 
 GType maplibre_native_ffi_map_projection_camera_result_get_type(

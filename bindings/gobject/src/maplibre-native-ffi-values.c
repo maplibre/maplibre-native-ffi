@@ -10922,6 +10922,7 @@ struct _MaplibreNativeFfiMapOptions {
   MaplibreNativeFfiRuntimeEventFlag event_mask;
   gboolean tile_cache_enabled;
   char* fallback_font_faces;
+  gboolean system_fonts_enabled;
 };
 
 enum {
@@ -10932,6 +10933,7 @@ enum {
   MAP_OPTIONS_PROP_EVENT_MASK,
   MAP_OPTIONS_PROP_TILE_CACHE_ENABLED,
   MAP_OPTIONS_PROP_FALLBACK_FONT_FACES,
+  MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED,
   MAP_OPTIONS_N_PROPERTIES
 };
 
@@ -10970,6 +10972,9 @@ static void maplibre_native_ffi_map_options_get_property(
       break;
     case MAP_OPTIONS_PROP_FALLBACK_FONT_FACES:
       g_value_set_string(value, self->fallback_font_faces);
+      break;
+    case MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED:
+      g_value_set_boolean(value, self->system_fonts_enabled);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -11011,6 +11016,11 @@ static void maplibre_native_ffi_map_options_set_property(
         self, g_value_get_string(value)
       );
       break;
+    case MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED:
+      maplibre_native_ffi_map_options_set_system_fonts_enabled(
+        self, g_value_get_boolean(value)
+      );
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
   }
@@ -11044,6 +11054,10 @@ static void maplibre_native_ffi_map_options_class_init(
     );
   map_options_properties[MAP_OPTIONS_PROP_FALLBACK_FONT_FACES] =
     g_param_spec_string("fallback-font-faces", NULL, NULL, "", PROPERTY_FLAGS);
+  map_options_properties[MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED] =
+    g_param_spec_boolean(
+      "system-fonts-enabled", NULL, NULL, FALSE, PROPERTY_FLAGS
+    );
   g_object_class_install_properties(
     object_class, MAP_OPTIONS_N_PROPERTIES, map_options_properties
   );
@@ -11204,6 +11218,35 @@ void maplibre_native_ffi_map_options_set_fallback_font_faces(
     );
 }
 
+gboolean maplibre_native_ffi_map_options_get_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self), FALSE);
+  return self->system_fonts_enabled;
+}
+
+gboolean maplibre_native_ffi_map_options_has_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self), FALSE);
+  return (self->fields & MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED) != 0;
+}
+
+void maplibre_native_ffi_map_options_set_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED) != 0;
+  gboolean changed = self->system_fonts_enabled != value;
+  self->system_fonts_enabled = value;
+  self->fields |= MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      map_options_properties[MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED]
+    );
+}
+
 void maplibre_native_ffi_map_options_to_native(
   const MaplibreNativeFfiMapOptions* self, mln_map_options* out,
   MaplibreNativeFfiCall* call
@@ -11220,6 +11263,7 @@ void maplibre_native_ffi_map_options_to_native(
   out->tile_cache_enabled = (self->tile_cache_enabled) != FALSE;
   out->fallback_font_faces =
     maplibre_native_ffi_text_view(self->fallback_font_faces);
+  out->system_fonts_enabled = (self->system_fonts_enabled) != FALSE;
 }
 
 G_DEFINE_BOXED_TYPE(
