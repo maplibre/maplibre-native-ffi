@@ -6,7 +6,3 @@
 -keep class org.maplibre.nativeffi.internal.memory.NativeMemory { native <methods>; }
 -keep class org.maplibre.nativeffi.internal.c.Upcalls { public static <methods>; }
 -keep class org.maplibre.nativeffi.internal.c.ThreadedUpcalls { public static <methods>; }
-
-# The native library's HTTPS verifies certificates by calling
-# rustls-platform-verifier's Android component through JNI.
--keep,includedescriptorclasses class org.rustls.platformverifier.** { *; }
