@@ -115,29 +115,6 @@ def package_inventory(
     return compose(root, inventories)
 
 
-def without_native_rust(inventory: dict) -> dict:
-    """Cargo consumers rebuild the platform crate with their own resolution."""
-    result = copy.deepcopy(inventory)
-    result["components"] = [
-        item
-        for item in result["components"]
-        if not item.get("purl", "").startswith("pkg:cargo/")
-        and item.get("group") != "org.maplibre.nativeffi"
-        and item["name"] != "rust-std"
-    ]
-    refs = {item["bom-ref"] for item in result["components"]}
-    refs.add(result["metadata"]["component"]["bom-ref"])
-    result["dependencies"] = [
-        {
-            "ref": entry["ref"],
-            "dependsOn": [ref for ref in entry["dependsOn"] if ref in refs],
-        }
-        for entry in result["dependencies"]
-        if entry["ref"] in refs
-    ]
-    return result
-
-
 def source_version(source: pathlib.Path) -> tuple[str, list[dict]]:
     commit = git(source, "rev-parse", "HEAD")
     checkout = pathlib.Path(git(source, "rev-parse", "--show-toplevel"))
